@@ -2,6 +2,17 @@ import betterpybullet as pb
 
 from giskardpy.utils.utils import resolve_ros_iris
 
+class MyCollisionObject(pb.CollisionObject):
+    def __init__(self, name):
+        super(MyCollisionObject, self).__init__()
+        self.name = name
+
+    def __repr__(self):
+        return str(self.name)
+
+    def __str__(self):
+        return str(self.name)
+
 
 def create_cube_shape(extents):
     out = pb.BoxShape(pb.Vector3(*[extents[x] * 0.5 for x in range(3)])) if type(extents) is not pb.Vector3 else pb.BoxShape(extents)
@@ -34,8 +45,8 @@ def load_convex_mesh_shape(pkg_filename, single_shape=False, scale=[1, 1, 1]):
                                 single_shape=single_shape, 
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
 
-def create_object(shape, transform=pb.Transform.identity()):
-    out = pb.CollisionObject()
+def create_object(name, shape, transform=pb.Transform.identity()):
+    out = MyCollisionObject(name)
     out.collision_shape = shape
     out.collision_flags = pb.CollisionObject.KinematicObject
     out.transform = transform

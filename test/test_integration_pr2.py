@@ -20,6 +20,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
+from giskardpy.python_interface import DEFAULT_WORLD_TIMEOUT
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
 from test_integration_pr2_without_base import gaya_pose
@@ -2492,17 +2493,6 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.plan_and_execute()
         # kitchen_setup.check_cart_goal(u'box', r_goal2)
 
-    def test_add_box(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = u'muh'
-        p = PoseStamped()
-        p.header.frame_id = u'map'
-        p.pose.position = Point(1.2, 0, 1.6)
-        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, pose=p)
-
     def test_clear_world(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -2610,23 +2600,14 @@ class TestCollisionAvoidanceGoals(object):
         :type kitchen_setup: PR2
         """
         object_name = u'kitchen'
-        kitchen_setup.remove_object(object_name)
         kitchen_setup.clear_world()
-        try:
-            kitchen_setup.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                                   tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
-                                   set_js_topic=u'/kitchen/cram_joint_states')
-        except Exception as e:
-            kitchen_setup.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                                   tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
-                                   set_js_topic=u'/kitchen/cram_joint_states')
-
-    def test_attach_box(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        kitchen_setup.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                               tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                               set_js_topic=u'/kitchen/cram_joint_states')
+        kitchen_setup.remove_object(object_name)
+        kitchen_setup.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                               tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                               set_js_topic=u'/kitchen/cram_joint_states')
 
     def test_attach_box_as_eef(self, zero_pose):
         """
@@ -2806,7 +2787,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
-        req = UpdateWorldRequest(42, WorldBody(), True, PoseStamped())
+        req = UpdateWorldRequest(42, DEFAULT_WORLD_TIMEOUT, WorldBody(), True, PoseStamped())
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_missing_body_error(self, zero_pose):
@@ -2821,16 +2802,18 @@ class TestCollisionAvoidanceGoals(object):
         """
         p = PoseStamped()
         p.header.frame_id = 'map'
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                                                                   shape=SolidPrimitive(type=42)), True, p)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
+                                 WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                                           shape=SolidPrimitive(type=42)), True, p)
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
 
     def test_tf_error(self, zero_pose):
         """
         :type zero_pose: PR2
         """
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                                                                   shape=SolidPrimitive(type=42)), True, PoseStamped())
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
+                                 WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                                           shape=SolidPrimitive(type=42)), True, PoseStamped())
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
@@ -2845,7 +2828,7 @@ class TestCollisionAvoidanceGoals(object):
         pose.pose.orientation = Quaternion(w=1)
         wb.type = WorldBody.URDF_BODY
 
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT, wb, True, pose)
         assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
 
     def test_infeasible(self, kitchen_setup):

@@ -25,6 +25,13 @@ class GiskardBehavior(Behaviour):
         return self.god_map
 
     @property
+    def tree(self):
+        """
+        :rtype: giskardpy.tree.tree_manager.TreeManager
+        """
+        return self.god_map.unsafe_get_data(identifier.tree_manager)
+
+    @property
     def collision_scene(self):
         """
         :rtype: giskardpy.model.collision_world_syncer.CollisionWorldSynchronizer

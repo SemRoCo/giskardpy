@@ -28,19 +28,12 @@ from giskardpy.tree.tree_manager import TreeManager
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose
 
-try:
-    # Python 2
-    from Queue import Empty, Queue
-except ImportError:
-    # Python 3
-    from queue import Queue, Empty
-
 
 def exception_to_response(e, req):
     def error_in_list(error, list_of_errors):
         result = False
         for x in list_of_errors:
-            result |= isinstance(error, e)
+            result |= isinstance(error, x)
         return result
     if error_in_list(e, [CorruptShapeException, ParseError]):
         traceback.print_exc()
@@ -74,6 +67,7 @@ class WorldUpdater(GiskardBehavior):
 
     # TODO reject changes if plugin not active or something
     def __init__(self, name):
+        self.added_plugin_names = []
         super(WorldUpdater, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
@@ -152,7 +146,7 @@ class WorldUpdater(GiskardBehavior):
         """
         self.queue.put('busy')
         try:
-            self.queue2.get(timeout=1)
+            self.queue2.get(timeout=req.timeout)
             with self.get_god_map():
                 self.clear_markers()
                 try:
@@ -183,14 +177,14 @@ class WorldUpdater(GiskardBehavior):
                     return UpdateWorldResponse()
                 except Exception as e:
                     return exception_to_response(e, req)
-        except:
+        except Exception as e:
             response = UpdateWorldResponse()
             response.error_codes = UpdateWorldResponse.BUSY
             logging.logwarn('Can\'t update world while Giskard is busy.')
             return response
         finally:
-            self.queue.get_nowait()
             self.timer_state = self.STALL
+            self.queue.get_nowait()
 
     def add_object(self, req):
         """
@@ -204,10 +198,10 @@ class WorldUpdater(GiskardBehavior):
         # FIXME also keep track of base pose
         logging.loginfo('Added object {} to world.'.format(req.body.name))
         if world_body.joint_state_topic:
-            plugin_name = PrefixName(world_body.name, 'js')
-            plugin = ConfigurationPlugin(str(plugin_name), prefix=None, joint_state_topic=world_body.joint_state_topic)
-            tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
-            tree.insert_node(plugin, 'Synchronize', 1)
+            plugin_name = str(PrefixName(world_body.name, 'js'))
+            plugin = ConfigurationPlugin(plugin_name, prefix=None, joint_state_topic=world_body.joint_state_topic)
+            self.tree.insert_node(plugin, 'Synchronize', 1)
+            self.added_plugin_names.append(plugin_name)
             logging.loginfo('Added configuration plugin for {} to tree.'.format(req.body.name))
 
     def detach_object(self, req):
@@ -220,6 +214,8 @@ class WorldUpdater(GiskardBehavior):
         """
         :type req: UpdateWorldRequest
         """
+        if req.pose.header.frame_id not in self.robot.link_names:
+            raise UnknownBodyException('Robot has no link \'{}\'.'.format(req.pose.header.frame_id))
         # assumes that parent has god map lock
         if req.body.name not in self.world.groups:
             self.add_object(req)
@@ -238,7 +234,10 @@ class WorldUpdater(GiskardBehavior):
 
     def clear_world(self):
         # assumes that parent has god map lock
-        self.unsafe_get_world().hard_reset()
+        self.world.hard_reset()
+        for plugin_name in self.added_plugin_names:
+            self.tree.remove_node(plugin_name)
+        self.added_plugin_names = []
         logging.loginfo('Cleared world.')
 
     def clear_markers(self):

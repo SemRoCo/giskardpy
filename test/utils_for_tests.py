@@ -30,7 +30,6 @@ from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
-from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 
 BIG_NUMBER = 1e100
@@ -336,7 +335,7 @@ class AlignPlanesGoalChecker(GoalChecker):
     def __call__(self):
         expected = self.expected
         current = self.transform_msg(self.root_link, self.tip_normal)
-        np.testing.assert_array_almost_equal(msg_to_list(expected.vector),  msg_to_list(current.vector), decimal=2)
+        np.testing.assert_array_almost_equal(msg_to_list(expected.vector), msg_to_list(current.vector), decimal=2)
 
 
 class RotationGoalChecker(GoalChecker):
@@ -502,7 +501,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_base.call(goal)
         rospy.sleep(0.5)
 
-    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True, **kwargs):
+    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
+                          **kwargs):
         if not root_link:
             root_link = self.default_root
         super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
@@ -780,6 +780,7 @@ class GiskardTestWrapper(GiskardWrapper):
         :param distance_threshold:
         :rtype: list
         """
+        self.collision_scene.reset_cache()
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
                                                                                     defaultdict(lambda: 0.3))
@@ -804,9 +805,11 @@ class GiskardTestWrapper(GiskardWrapper):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance <= distance_threshold, \
-                u'distance for {}: {} <= {}'.format(link,
-                                                    collisions[0].contact_distance,
-                                                    distance_threshold)
+                u'distance for {}: {} <= {} ({} with {})'.format(link,
+                                                                 collisions[0].contact_distance,
+                                                                 distance_threshold,
+                                                                 collisions[0].link_a,
+                                                                 collisions[0].link_b)
 
     def move_base(self, goal_pose):
         """

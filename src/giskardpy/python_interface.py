@@ -18,8 +18,10 @@ from giskardpy.model.urdf_object import URDFObject
 from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
 from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, make_pose_from_parts
 
+DEFAULT_WORLD_TIMEOUT = 5
 
 class GiskardWrapper(object):
+
     def __init__(self, node_name=u'giskard'):
         giskard_topic = u'{}/command'.format(node_name)
         if giskard_topic is not None:
@@ -526,16 +528,16 @@ class GiskardWrapper(object):
         self._client.wait_for_result(timeout)
         return self._client.get_result()
 
-    def clear_world(self):
+    def clear_world(self, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Removes any objects and attached objects from Giskard's world and reverts the robots urdf to what it got from
         the parameter server.
         :rtype: UpdateWorldResponse
         """
-        req = UpdateWorldRequest(UpdateWorldRequest.REMOVE_ALL, WorldBody(), False, PoseStamped())
+        req = UpdateWorldRequest(UpdateWorldRequest.REMOVE_ALL, timeout, WorldBody(), False, PoseStamped())
         return self._update_world_srv.call(req)
 
-    def remove_object(self, name):
+    def remove_object(self, name, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         :param name:
         :type name: str
@@ -544,11 +546,11 @@ class GiskardWrapper(object):
         """
         object = WorldBody()
         object.name = str(name)
-        req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, object, False, PoseStamped())
+        req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, timeout, object, False, PoseStamped())
         return self._update_world_srv.call(req)
 
     def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                pose=None):
+                pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
@@ -562,11 +564,11 @@ class GiskardWrapper(object):
         """
         box = make_world_body_box(name, size[0], size[1], size[2])
         pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, box, False, pose)
         return self._update_world_srv.call(req)
 
     def add_sphere(self, name=u'sphere', radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                   pose=None):
+                   pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
@@ -584,11 +586,11 @@ class GiskardWrapper(object):
         pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.shape.type = SolidPrimitive.SPHERE
         object.shape.dimensions.append(radius)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, object, False, pose)
         return self._update_world_srv.call(req)
 
     def add_mesh(self, name=u'mesh', mesh=u'', frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                 pose=None):
+                 pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
@@ -604,11 +606,11 @@ class GiskardWrapper(object):
         object.name = str(name)
         pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.mesh = mesh
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, object, False, pose)
         return self._update_world_srv.call(req)
 
     def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                     pose=None):
+                     pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
@@ -630,10 +632,11 @@ class GiskardWrapper(object):
         object.shape.dimensions = [0,0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, object, False, pose)
         return self._update_world_srv.call(req)
 
-    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None):
+    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
+                   timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Add a box to the world and attach it to the robot at frame_id.
         If pose is used, frame_id, position and orientation are ignored.
@@ -648,11 +651,11 @@ class GiskardWrapper(object):
         box = make_world_body_box(name, size[0], size[1], size[2])
         pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
 
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, box, True, pose)
         return self._update_world_srv.call(req)
 
     def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
-                        pose=None):
+                        pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Add a cylinder to the world and attach it to the robot at frame_id.
         If pose is used, frame_id, position and orientation are ignored.
@@ -666,10 +669,10 @@ class GiskardWrapper(object):
         cylinder = make_world_body_cylinder(name, height, radius)
         pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
 
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, cylinder, True, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, cylinder, True, pose)
         return self._update_world_srv.call(req)
 
-    def attach_object(self, name, link_frame_id):
+    def attach_object(self, name, link_frame_id, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Attach an already existing object at link_frame_id of the robot.
         :type name: str
@@ -678,13 +681,14 @@ class GiskardWrapper(object):
         :return: UpdateWorldResponse
         """
         req = UpdateWorldRequest()
+        req.timeout = timeout
         req.rigidly_attached = True
         req.body.name = name
         req.pose.header.frame_id = link_frame_id
         req.operation = UpdateWorldRequest.ADD
         return self._update_world_srv.call(req)
 
-    def detach_object(self, object_name):
+    def detach_object(self, object_name, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Detach an object from the robot and add it back to the world.
         Careful though, you could amputate an arm be accident!
@@ -692,11 +696,12 @@ class GiskardWrapper(object):
         :return: UpdateWorldResponse
         """
         req = UpdateWorldRequest()
+        req.timeout = timeout
         req.body.name = object_name
         req.operation = req.DETACH
         return self._update_world_srv.call(req)
 
-    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None):
+    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Adds a urdf to the world
         :param name: name it will have in the world
@@ -718,7 +723,7 @@ class GiskardWrapper(object):
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = str(urdf)
         urdf_body.joint_state_topic = str(js_topic)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, pose)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, urdf_body, False, pose)
         if js_topic:
             # FIXME publisher has to be removed, when object gets deleted
             # FIXME there could be sync error, if objects get added/removed by something else

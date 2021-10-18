@@ -2,6 +2,7 @@ from collections import defaultdict
 
 import betterpybullet as bpb
 from geometry_msgs.msg import PoseStamped, Quaternion
+from sortedcontainers import SortedDict
 
 from giskardpy import RobotName
 from giskardpy.data_types import BiDict, Collisions, Collision
@@ -10,7 +11,6 @@ from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.utils import logging
-
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world):
@@ -40,7 +40,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         map_T_o = bpb.Transform()
         map_T_o.origin = bpb.Vector3(0, 0, 0)
         map_T_o.rotation = bpb.Quaternion(0, 0, 0, 1)
-        o = create_object(shape, map_T_o)
+        o = create_object(link.name, shape, map_T_o)
         self.kw.add_collision_object(o)
         self.object_name_to_id[link.name] = o
 
@@ -57,8 +57,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         if self.query is None:
             self.query = defaultdict(set)
             for (link_a, _, link_b), dist in cut_off_distances.items():
-                # if link_b in self.robot.link_names:
-                #     continue
                 self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist))
         return self.query
 
@@ -74,16 +72,24 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        collisions = Collisions(self.world, collision_list_size)
         query = self.cut_off_distances_to_query(cut_off_distances)
 
         result = self.kw.get_closest_filtered_POD_batch(query)
+        collisions = self.bpb_result_to_collisions(result, collision_list_size)
+        return collisions
+
+    def bpb_result_to_list(self, result):
+        result_list = []
         for obj_a, contacts in result.items():
             map_T_a = obj_a.np_transform
-            link_a = self.object_name_to_id.inverse[obj_a]
+            link_a = obj_a.name
             for contact in contacts:  # type: ClosestPair
                 map_T_b = contact.obj_b.np_transform
-                link_b = self.object_name_to_id.inverse[contact.obj_b]
+                try:
+                    link_b = contact.obj_b.name
+                except Exception as e:
+                    result_list = []
+                    pass
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a)
                     map_P_b = map_T_b.dot(p.point_b)
@@ -95,7 +101,19 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                                   map_V_n=p.normal_world_b,
                                   map_P_pa=map_P_a,
                                   map_P_pb=map_P_b)
-                    collisions.add(c)
+                    result_list.append(c)
+        return result_list
+
+    def bpb_result_to_dict(self, result):
+        result_dict = {}
+        for c in self.bpb_result_to_list(result):
+            result_dict[c.link_a, c.link_b] = c
+        return SortedDict({k: v for k, v in sorted(result_dict.items())})
+
+    def bpb_result_to_collisions(self, result, collision_list_size=15):
+        collisions = Collisions(self.world, collision_list_size)
+        for c in self.bpb_result_to_list(result):
+            collisions.add(c)
         return collisions
 
     # @profile

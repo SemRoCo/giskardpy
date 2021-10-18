@@ -828,7 +828,7 @@ class QPController(object):
         except:
             pass
         else:
-            self._create_debug_pandas(substitutions, xdot_full=self.xdot_full)
+            self._create_debug_pandas(substitutions)
             upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]
             lower_violations = self.p_xdot[self.p_lb.data > self.p_xdot.data]
             if len(upper_violations) > 0 or len(lower_violations) > 0:

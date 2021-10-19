@@ -77,7 +77,7 @@ def transform_pose(target_frame, pose, timeout=5.0):
     return new_pose
 
 
-def lookup_transform(target_frame, source_frame, time=None, timeout=rospy.Duration(5.0)):
+def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
     if not target_frame:
         raise InvalidArgumentException('target frame can not be empty')
     if not source_frame:

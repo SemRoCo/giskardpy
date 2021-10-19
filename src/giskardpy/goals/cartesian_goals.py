@@ -106,7 +106,7 @@ class CartesianPositionStraight(Goal):
         self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)
 
     def make_constraints(self):
-        root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal'))
+        root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal_pose'))
         root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
         root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start'))
 

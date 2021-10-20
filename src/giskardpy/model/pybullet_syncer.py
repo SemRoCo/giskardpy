@@ -3,6 +3,7 @@ from collections import defaultdict
 from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
+from giskardpy import identifier
 from giskardpy.data_types import BiDict, Collisions, Collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_wrapper import ContactInfo
@@ -15,6 +16,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
 
     def __init__(self, world, gui=False):
         super(PyBulletSyncer, self).__init__(world)
+        pbw.start_pybullet(self.god_map.get_data(identifier.gui))
         pbw.start_pybullet(gui)
         self.object_name_to_bullet_id = BiDict()
 
@@ -89,12 +91,17 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         if self.has_world_changed():
             self.object_name_to_bullet_id = BiDict()
             pbw.clear_pybullet()
+            self.world.fast_all_fks = None
             self.fks = self.world.compute_all_fks()
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.add_object(link)
         else:
-            self.fks = self.world.compute_all_fks()
+            try:
+                self.fks = self.world.compute_all_fks()
+            except:
+                self.world.fast_all_fks = None
+                self.fks = self.world.compute_all_fks()
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.update_pose(link)

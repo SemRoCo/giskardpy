@@ -138,7 +138,7 @@ class CollisionWorldSynchronizer(object):
             return pickle.load(f)
 
     def get_pose(self, link_name):
-        pass
+        return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name)
 
     def set_joint_state_to_zero(self, group):
         group.state = JointStates()

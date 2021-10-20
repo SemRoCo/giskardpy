@@ -65,8 +65,9 @@ class GoalToConstraints(GetGoal):
         self.soft_constraints = {}
         self.vel_constraints = {}
         self.debug_expr = {}
-        if not (self.get_god_map().get_data(identifier.check_reachability)):
-            self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
+        if not (self.get_god_map().get_data(identifier.check_reachability)) and \
+                self.god_map.get_data(identifier.collision_checker) is not None:
+            self.add_collision_avoidance_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)
@@ -164,7 +165,7 @@ class GoalToConstraints(GetGoal):
                 d[key] = convert_dictionary_to_ros_message(value)
         return d
 
-    def add_collision_avoidance_soft_constraints(self, collision_cmds):
+    def add_collision_avoidance_constraints(self, collision_cmds):
         """
         Adds a constraint for each link that pushed it away from its closest point.
         :type collision_cmds: list of CollisionEntry

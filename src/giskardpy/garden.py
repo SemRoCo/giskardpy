@@ -11,12 +11,13 @@ from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
 import giskardpy.identifier as identifier
-import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy import RobotPrefix
 from giskardpy.data_types import order_map, KeyDefaultDict
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.tree.commands_remaining import CommandsRemaining
 from giskardpy.tree.exception_to_execute import ExceptionToExecute
-from giskardpy.utils.config_loader import load_robot_yaml, ros_load_robot_config
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.god_map import GodMap
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.world import WorldTree
@@ -78,13 +79,11 @@ def initialize_god_map():
         path_to_data_folder += u'/'
     god_map.set_data(identifier.data_folder, path_to_data_folder)
 
-    pbw.start_pybullet(god_map.get_data(identifier.gui))
     while not rospy.is_shutdown():
         try:
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                        JointTrajectoryControllerState,
                                                        timeout=5.0).joint_names
-            # controlled_joints = [PrefixName(j, ROBOTNAME) for j in controlled_joints]
             god_map.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
         except ROSException as e:
             logging.logerr(u'state topic not available')
@@ -98,7 +97,6 @@ def initialize_god_map():
     # weights
     for i, key in enumerate(god_map.get_data(identifier.joint_weights), start=1):
         set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
-        # world.robot.set_joint_weight_symbols(d, i)
 
     # limits
     for i, key in enumerate(god_map.get_data(identifier.joint_limits), start=1):
@@ -110,7 +108,18 @@ def initialize_god_map():
 
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
-    collision_scene = BetterPyBulletSyncer(world)
+    collision_checker = god_map.get_data(identifier.collision_checker)
+    if collision_checker == 'bpb':
+        logging.loginfo('Using bpb for collision checking.')
+        collision_scene = BetterPyBulletSyncer(world)
+    elif collision_checker == 'pybullet':
+        logging.loginfo('Using pybullet for collision checking.')
+        collision_scene = PyBulletSyncer(world)
+    else:
+        logging.logwarn('Unknown collision checker {}. Collision avoidance is disabled'.format(collision_checker))
+        collision_scene = CollisionWorldSynchronizer(world)
+        god_map.set_data(identifier.collision_checker, None)
+
     god_map.set_data(identifier.collision_scene, collision_scene)
     # sanity_check_derivatives(god_map)
     # sanity_check(god_map)
@@ -214,7 +223,8 @@ def grow_tree():
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
-    planning_4.add_plugin(CollisionChecker(u'collision checker'))
+    if god_map.get_data(identifier.collision_checker) is not None:
+        planning_4.add_plugin(CollisionChecker(u'collision checker'))
     # planning_4.add_plugin(VisualizationBehavior(u'visualization'))
     # planning_4.add_plugin(CollisionMarker(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
@@ -238,7 +248,7 @@ def grow_tree():
     planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         planning_3.add_child(running_is_success(VisualizationBehavior)(u'visualization', ensure_publish=True))
-    if god_map.get_data(identifier.enable_CPIMarker):
+    if god_map.get_data(identifier.enable_CPIMarker) and god_map.get_data(identifier.collision_checker) is not None:
         planning_3.add_child(running_is_success(CollisionMarker)(u'collision marker'))
     # ----------------------------------------------
     # ----------------------------------------------
@@ -256,7 +266,7 @@ def grow_tree():
         planning_2.add_child(running_is_failure(VisualizationBehavior)(u'visualization'))
     # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
     #     planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
-    if god_map.get_data(identifier.enable_CPIMarker):
+    if god_map.get_data(identifier.enable_CPIMarker) and god_map.get_data(identifier.collision_checker) is not None:
         planning_2.add_child(running_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------

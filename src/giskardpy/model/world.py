@@ -275,7 +275,6 @@ class WorldTree(object):
     #     return self._controlled_links
 
     def hard_reset(self):
-        logging.logerr('hard reset')
         self.state = JointStates()
         self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
         self.links = {self.root_link_name: Link(self.root_link_name)}
@@ -484,6 +483,21 @@ class WorldTree(object):
             p = PoseStamped()
             p.header.frame_id = str(root)
             p.pose = homo_matrix_to_pose(homo_m)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            pass
+        return p
+
+    @memoize
+    def compute_fk_pose_with_collision_offset(self, root, tip):
+        try:
+            root_T_tip = self.compute_fk_np(root, tip)
+            tip_link = self.links[tip]
+            root_T_tip = w.dot(root_T_tip, tip_link.collisions[0].link_T_geometry)
+            p = PoseStamped()
+            p.header.frame_id = str(root)
+            p.pose = homo_matrix_to_pose(root_T_tip)
         except Exception as e:
             print(e)
             traceback.print_exc()

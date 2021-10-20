@@ -4,7 +4,7 @@ fk_pose = world + [u'compute_fk_pose']
 fk_np = world + [u'compute_fk_np']
 joint_states = world + [u'state']
 controlled_joints = ['controlled_joints']
-collision_scene = ['bullet']
+collision_scene = ['collision_scene']
 
 # goal_params = [u'goal_params']
 trajectory = [u'traj']
@@ -110,6 +110,7 @@ tree_manager = behavior_tree + [u'tree_manager']
 
 # collision avoidance
 collision_avoidance = rosparam + [u'collision_avoidance']
+collision_checker = collision_avoidance + ['collision_checker']
 added_collision_checks = collision_avoidance + [u'added_collision_checks']
 
 self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance', u'override']

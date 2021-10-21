@@ -6,10 +6,11 @@ import threading
 from collections import namedtuple
 from queue import Queue
 
+import numpy as np
 import rospy
 import tf.transformations
 import yaml
-from geometry_msgs.msg import PoseStamped, Quaternion
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import Constraint
 from nav_msgs.srv import GetMap
 from py_trees import Status
@@ -222,7 +223,7 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use 
         return u'TwoDimRayMotionValidator'
 
 
-class BulletCollisionChecker(GiskardBehavior):
+class RobotBulletCollisionChecker(GiskardBehavior):
 
     def __init__(self, is_3D, collision_checker, tip_link=None, collision_offset=0.1):
         GiskardBehavior.__init__(self, str(self))
@@ -285,6 +286,59 @@ class BulletCollisionChecker(GiskardBehavior):
                 # Reset joint state
                 self.get_robot().joint_state = old_js
             return all(results)
+        else:
+            return True
+
+class PyBulletWorldObjectCollisionChecker(GiskardBehavior):
+
+    def __init__(self, is_3D, collision_checker, collision_object_name, collision_offset=0.1):
+        GiskardBehavior.__init__(self, str(self))
+        self.lock = threading.Lock()
+        self.init_pybullet_ids_and_joints()
+        self.collision_checker = collision_checker
+        self.is_3D = is_3D
+        self.collision_object_name = collision_object_name
+        self.collision_offset = collision_offset
+
+    def update_object_pose(self, p: Point, q: Quaternion):
+        try:
+            obj = self.get_world().get_object(self.collision_object_name)
+        except KeyError:
+            raise Exception(u'Could not find object with name {}.'.format(self.collision_object_name))
+        obj.base_pose = Pose(p, q)
+
+    def init_pybullet_ids_and_joints(self):
+        if 'pybullet' in sys.modules:
+            self.pybullet_initialized = True
+        else:
+            self.pybullet_initialized = False
+
+    def is_collision_free_ompl(self, state):
+        if self.collision_object_name is None:
+            raise Exception(u'Please set object for {}.'.format(str(self)))
+        if self.pybullet_initialized:
+            x = state.getX()
+            y = state.getY()
+            if self.is_3D:
+                z = state.getZ()
+                r = state.rotation()
+                rot = [r.x, r.y, r.z, r.w]
+            else:
+                z = 0
+                yaw = state.getYaw()
+                rot = p.getQuaternionFromEuler([0, 0, yaw])
+            # update pose
+            self.update_object_pose(Point(x, y, z), Quaternion(rot[0], rot[1], rot[2], rot[3]))
+            return self.collision_checker()
+        else:
+            return True
+
+    def is_collision_free(self, p: Point, q: Quaternion):
+        if self.collision_object_name is None:
+            raise Exception(u'Please set object for {}.'.format(str(self)))
+        if self.pybullet_initialized:
+            self.update_object_pose(p, q)
+            return self.collision_checker()
         else:
             return True
 
@@ -451,6 +505,80 @@ class GlobalPlanner(GetGoal):
         return self.tip_link == u'base_footprint' and \
                self.root_link == self.get_robot().get_root() and \
                self.is_global_path_needed()
+
+    def is_tip_object(self):
+        try:
+            self.world.get_object(self.tip_link)
+            return True
+        except KeyError:
+            return False
+
+    def is_object_external_collision_free(self, ignore_object_names):
+        self.update_collision_checker()
+        closest_points = self.god_map.get_data(identifier.closest_point)
+        collisions = []
+        for obj in self.world.get_objects():
+            if obj.get_name() in ignore_object_names:
+                continue
+            for link_name in obj.get_link_names():
+                if link_name in closest_points.external_collision:
+                    collisions.append(closest_points.get_external_collisions(link_name))
+        return len(collisions) == 0
+
+    def is_object_external_collision_free_except_robot(self):
+        return self.is_object_external_collision_free([self.get_robot().get_name()])
+
+    def _get_global_arm_positions(self, robot):
+        parent_of_tip_link = robot.get_parent_link_of_link()
+        if parent_of_tip_link == 'r_gripper_tool_frame':
+            root_for_tip_link = 'r_shoulder_pan_link'
+        elif parent_of_tip_link == 'l_gripper_tool_frame':
+            root_for_tip_link = 'l_shoulder_pan_link'
+        else:
+            raise Exception('waaaaaaaaaaaaaaaaat')
+        rob_link_names = self.get_robot().get_link_names_from_chain(root_for_tip_link, parent_of_tip_link)
+        rob_link_positions = []
+        for link_name in rob_link_names:
+            p = robot.get_fk_pose(robot.get_root(), link_name).pose
+            pos = transform_pose(self.get_god_map().get_data(identifier.map_frame), p).pose.position
+            rob_link_positions.append([pos.x, pos.y, pos.z])
+        return rob_link_positions
+
+    def _create_collision_box(self, robot, collision_sphere_name):
+        tip_coll_aabb_arr = np.array(p.getAABB(robot.get_pybullet_link_id(self.tip_link)))
+        dims = np.abs(tip_coll_aabb_arr[0] - tip_coll_aabb_arr[1])
+        world_body_box = make_world_body_box(name=collision_sphere_name, x_length=dims[0], y_length=dims[1], z_length=dims[2])
+        world_object_box = WorldObject.from_world_body(world_body_box)
+        self.world.add_object(world_object_box)
+        return world_object_box.name
+
+    def _rodrigues_rotation_formula(self, a, b):
+        # https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d
+        # https://en.wikipedia.org/wiki/Rodrigues'_rotation_formula#Matrix_notation
+        k = np.cross(a, b)
+        if np.count_nonzero(k) == 0:
+            return np.eye(3)
+        c = np.dot(a, b)
+        kx = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+        return np.eye(3) + kx + np.dot(kx, kx) * (1/ (1 + c))
+
+    def is_object_pickable(self, collision_box_name=u'is_object_pickable_box'):
+        robot = self.get_robot()
+        if robot and self.is_tip_object():
+            rob_link_positions = self._get_global_arm_positions()
+            for pos_a, pos_b in zip(rob_link_positions[:-1], rob_link_positions[0:]):
+                b_to_a = np.array(pos_a) - np.array(pos_b)
+                c = np.array(pos_b) + b_to_a/2.
+                cur_b = -b_to_a / 2.
+                target_b = np.array(pos_b) - c
+                rot_matrix = self._rodrigues_rotation_formula(cur_b, target_b)
+                self._create_collision_box(robot, collision_box_name)
+                self.unsafe_get_world().set_object_pose(collision_box_name, Pose(c[0], c[1], c[2], q))
+                collision_box = self.world.get_object(collision_box_name)
+                coll_checker = PyBulletWorldObjectCollisionChecker(True, self.is_object_external_collision_free_except_robot,
+                                                                   collision_box_name, collision_offset=0.01)
+                coll_checker.is_collision_free()
+
 
     def save_cart_goal(self, cart_c):
 
@@ -620,8 +748,7 @@ class GlobalPlanner(GetGoal):
         # Set two dimensional motion and state validator
         si = self.navigation_setup.getSpaceInformation()
         si.setMotionValidator(TwoDimRayMotionValidator(si, False, self.get_robot(), tip_link=u'base_footprint'))
-        collision_checker = BulletCollisionChecker(False, self.is_robot_external_collision_free,
-                                                   tip_link=u'base_footprint')
+        collision_checker = RobotBulletCollisionChecker(False, self.is_robot_external_collision_free, tip_link=u'base_footprint')
         si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker))
         si.setup()
 
@@ -640,7 +767,7 @@ class GlobalPlanner(GetGoal):
         # Set two dimensional motion and state validator
         si = self.movement_setup.getSpaceInformation()
         si.setMotionValidator(TwoDimRayMotionValidator(si, True, self.get_robot()))
-        collision_checker = BulletCollisionChecker(True, self.is_robot_external_collision_free)
+        collision_checker = RobotBulletCollisionChecker(True, self.is_robot_external_collision_free)
         si.setStateValidityChecker(ThreeDimStateValidator(si, collision_checker))
         si.setup()
 

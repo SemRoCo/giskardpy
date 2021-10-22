@@ -773,7 +773,8 @@ class GiskardTestWrapper(GiskardWrapper):
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         assert name in self.get_attached_objects().object_names
-        assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
+        if self.god_map.get_data(identifier.collision_checker) is not None:
+            assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
 
     def get_external_collisions(self, link, distance_threshold):
         """

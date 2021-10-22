@@ -103,6 +103,7 @@ class GoalToConstraints(GetGoal):
             symbols.update(str(s) for s in w.free_symbols(c.expression))
         return symbols
 
+    @profile
     def parse_constraints(self, cmd):
         """
         :type cmd: MoveCmd

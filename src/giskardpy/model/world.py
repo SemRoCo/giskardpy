@@ -1,3 +1,4 @@
+import itertools
 import numbers
 import traceback
 from copy import deepcopy
@@ -16,7 +17,8 @@ from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, Continu
     FixedJoint, MimicJoint
 from giskardpy.model.links import Link
 from giskardpy.model.urdf_object import hacky_urdf_parser_fix
-from giskardpy.utils import logging
+from giskardpy.utils import logging, utils
+import giskardpy.utils.math as mymath
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
     kdl_to_np, msg_to_homogeneous_matrix, np_point, np_vector
 from giskardpy.utils.utils import suppress_stderr, memoize
@@ -25,6 +27,7 @@ from giskardpy.utils.utils import suppress_stderr, memoize
 class WorldTree(object):
     def __init__(self, god_map=None):
         self.god_map = god_map  # type: GodMap
+        self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
         self._version = 0
@@ -35,6 +38,7 @@ class WorldTree(object):
         return self._version
 
     def _increase_version(self):
+        self.init_all_fks()
         self.soft_reset()
         self._version += 1
 
@@ -110,6 +114,7 @@ class WorldTree(object):
                                            collect_link_when=self.has_link_collisions)
         return links
 
+    @profile
     def reset_cache(self):
         # FIXME this sucks because it calls properties
         for method_name in dir(self):
@@ -154,6 +159,10 @@ class WorldTree(object):
     @cached_property
     def link_names_with_collisions(self):
         return set(link.name for link in self.links.values() if link.has_collisions())
+
+    @cached_property
+    def link_names_without_collisions(self):
+        return self.link_names.difference(self.link_names_with_collisions)
 
     @property
     def joint_names(self):
@@ -258,9 +267,11 @@ class WorldTree(object):
     def movable_joints(self):
         return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
 
+    @profile
     def soft_reset(self):
         self.reset_cache()
-        self.init_fast_fks()
+        # self.init_fast_fks()
+        self.recompute_fks()
         for group in self.groups.values():
             group.soft_reset()
         del self.link_names
@@ -276,6 +287,8 @@ class WorldTree(object):
 
     def hard_reset(self):
         self.state = JointStates()
+        # for link_name in self.link_names:
+        #     self.state[link_name]
         self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
@@ -285,6 +298,7 @@ class WorldTree(object):
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
         self.fast_all_fks = None
+        self.init_all_fks()
         self.soft_reset()
 
     def sync_with_paramserver(self):
@@ -504,10 +518,9 @@ class WorldTree(object):
             pass
         return p
 
-    @memoize
-    @profile
     def compute_fk_np(self, root, tip):
-        return self._fks[root, tip].call2(self.god_map.unsafe_get_values(self._fks[root, tip].str_params))
+        return self.get_fk(root, tip)
+        # return self._fks[root, tip].call2(self.god_map.unsafe_get_values(self._fks[root, tip].str_params))
 
     @profile
     def compute_all_fks(self):
@@ -581,6 +594,62 @@ class WorldTree(object):
         # for link in self.link_names_with_collisions:
         #     result[link] = fks_evaluated[self.fk_idx[link], :]
         # return result
+
+    @profile
+    def init_all_fks(self):
+        fks = []
+        idx_start = {}
+        idx_stop = {}
+        i = 0
+        for link_name in self.link_names:
+            if link_name == self.root_link_name:
+                continue
+            map_T_o = self.compose_fk_expression(self.root_link_name, link_name)
+            fks.append(map_T_o)
+            idx_start[link_name] = i
+            idx_stop[link_name] = i+4
+            i += 4
+        fks = w.vstack(fks)
+        fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
+
+        class FKs(object):
+            def __init__(self, f, god_map, idx_start, idx_stop):
+                self.f = f
+                self.god_map = god_map
+                self.idx_start = idx_start
+                self.idx_stop = idx_stop
+                self.map = god_map.unsafe_get_data(identifier.world).root_link_name
+
+            @profile
+            def recompute(self):
+                self.get_fk.memo.clear()
+                self.fks = self.f.call2(self.god_map.unsafe_get_values(self.f.str_params))
+
+            @memoize
+            @profile
+            def get_fk(self, root, tip):
+                if root == self.map:
+                    map_T_root = np.eye(4)
+                else:
+                    map_T_root = self.fks[self.idx_start[root]:self.idx_stop[root]]
+                if tip == self.map:
+                    map_T_tip = np.eye(4)
+                else:
+                    map_T_tip = self.fks[self.idx_start[tip]:self.idx_stop[tip]]
+                root_T_map = mymath.inverse_frame(map_T_root)
+                root_T_tip = np.dot(root_T_map, map_T_tip)
+                return root_T_tip
+
+        self._fk_computer = FKs(fast_all_fks, self.god_map, idx_start, idx_stop)
+
+    @profile
+    def recompute_fks(self):
+        self.compute_fk_pose_with_collision_offset.memo.clear()
+        self._fk_computer.recompute()
+
+    @profile
+    def get_fk(self, root, tip):
+        return self._fk_computer.get_fk(root, tip)
 
     @memoize
     def are_linked(self, link_a, link_b, non_controlled=False, fixed=False):
@@ -748,6 +817,10 @@ class SubWorldTree(WorldTree):
         self.name = name
         self.root_link_name = root_link_name
         self.world = world
+
+    @property
+    def _fk_computer(self):
+        return self.world._fk_computer
 
     def hard_reset(self):
         raise NotImplementedError('Can\'t hard reset a SubWorldTree.')

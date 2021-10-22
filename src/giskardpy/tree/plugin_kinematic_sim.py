@@ -25,5 +25,5 @@ class KinSimPlugin(GiskardBehavior):
                     if i == 0:
                         self.world.state[joint_name].position += cmd * self.sample_period
                     self.world.state[joint_name].set_derivative(i+1, cmd)
-        self.world.soft_reset()
+        self.world.recompute_fks()
         return Status.RUNNING

@@ -14,12 +14,10 @@ import giskardpy.identifier as identifier
 from giskardpy import RobotPrefix
 from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.tree.commands_remaining import CommandsRemaining
 from giskardpy.tree.exception_to_execute import ExceptionToExecute
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.god_map import GodMap
-from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.plugin import PluginBehavior
@@ -107,13 +105,14 @@ def initialize_god_map():
     god_map.set_data(identifier.order, order)
 
     world = WorldTree(god_map)
-    god_map.set_data(identifier.world, world)
     collision_checker = god_map.get_data(identifier.collision_checker)
     if collision_checker == 'bpb':
         logging.loginfo('Using bpb for collision checking.')
+        from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
         collision_scene = BetterPyBulletSyncer(world)
     elif collision_checker == 'pybullet':
         logging.loginfo('Using pybullet for collision checking.')
+        from giskardpy.model.pybullet_syncer import PyBulletSyncer
         collision_scene = PyBulletSyncer(world)
     else:
         logging.logwarn('Unknown collision checker {}. Collision avoidance is disabled'.format(collision_checker))

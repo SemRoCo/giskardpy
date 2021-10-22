@@ -55,9 +55,9 @@ class Goal(object):
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
-            return tf.transform_msg(target_frame, msg, timeout=timeout)
-        except LookupException as e:
             return self.world.transform_msg(target_frame, msg)
+        except KeyError as e:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)
 
     @property
     def robot(self):

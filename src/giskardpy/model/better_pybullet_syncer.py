@@ -78,6 +78,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         collisions = self.bpb_result_to_collisions(result, collision_list_size)
         return collisions
 
+    @profile
     def bpb_result_to_list(self, result):
         result_list = []
         for obj_a, contacts in result.items():
@@ -110,6 +111,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             result_dict[c.link_a, c.link_b] = c
         return SortedDict({k: v for k, v in sorted(result_dict.items())})
 
+    @profile
     def bpb_result_to_collisions(self, result, collision_list_size=15):
         collisions = Collisions(self.world, collision_list_size)
         for c in self.bpb_result_to_list(result):

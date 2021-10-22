@@ -1,3 +1,4 @@
+import numpy as np
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 
 
@@ -24,3 +25,14 @@ def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_pe
     (prediction_horizon**2+prediction_horizon)/2
     return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
 
+def inverse_frame(f1_T_f2):
+    """
+    :param f1_T_f2: 4x4 Matrix
+    :type f1_T_f2: Matrix
+    :return: f2_T_f1
+    :rtype: Matrix
+    """
+    f2_T_f1 = np.eye(4)
+    f2_T_f1[:3, :3] = f1_T_f2[:3, :3].T
+    f2_T_f1[:3, 3] = np.dot(-f2_T_f1[:3, :3], f1_T_f2[:3, 3])
+    return f2_T_f1

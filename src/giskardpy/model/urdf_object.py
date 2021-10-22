@@ -46,7 +46,6 @@ LIMITED_JOINTS = [PRISMATIC_JOINT, REVOLUTE_JOINT]
 
 
 class URDFObject(object):
-    @profile
     def __init__(self, urdf, *args, **kwargs):
         """
         :param urdf:
@@ -166,7 +165,6 @@ class URDFObject(object):
         return cls(r.to_xml_string(), *args, **kwargs)
 
     @classmethod
-    @profile
     def from_urdf_object(cls, urdf_object, *args, **kwargs):
         """
         :type urdf_object: URDFObject
@@ -506,7 +504,6 @@ class URDFObject(object):
         return False
 
     @memoize
-    @profile
     def get_urdf_str(self):
         return self._urdf_robot.to_xml_string()
 
@@ -643,7 +640,6 @@ class URDFObject(object):
     def __hash__(self):
         return hash(id(self))
 
-    @profile
     def reinitialize(self):
         self.reset_cache()
         self._urdf_robot = up.URDF.from_xml_string(self.get_urdf_str())

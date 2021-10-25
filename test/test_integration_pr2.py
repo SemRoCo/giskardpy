@@ -178,7 +178,7 @@ def zero_pose(resetted_giskard):
     :type resetted_giskard: PR2
     """
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_joint_goal(default_pose)
+    #resetted_giskard.send_and_check_joint_goal(default_pose)
     return resetted_giskard
 
 
@@ -388,6 +388,41 @@ class TestConstraints(object):
         zero_pose.set_joint_goal({
             joint_name: 0
         })
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
+
+    def test_JointPositionRange_without_JointGoals(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        joint_name = u'r_wrist_roll_joint'
+        upper_limit = 1.1
+        lower_limit = 1
+        zero_pose.set_json_goal(u'JointPositionRange',
+                                joint_name=joint_name,
+                                upper_limit=upper_limit,
+                                lower_limit=lower_limit)
+
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_goal()
+        assert zero_pose.get_robot().joint_state[joint_name].position <= upper_limit + 2e-3
+        assert zero_pose.get_robot().joint_state[joint_name].position >= lower_limit - 2e-3
+
+        zero_pose.set_json_goal(u'JointPositionRange',
+                                joint_name=joint_name,
+                                upper_limit=upper_limit,
+                                lower_limit=lower_limit)
+
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_goal()
+        assert zero_pose.get_robot().joint_state[joint_name].position <= upper_limit
+        assert zero_pose.get_robot().joint_state[joint_name].position >= lower_limit
+
+        zero_pose.set_json_goal(u'JointPositionRange',
+                                joint_name=joint_name,
+                                upper_limit=1000,
+                                lower_limit=-900)
+
         zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 

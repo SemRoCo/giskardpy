@@ -456,12 +456,7 @@ class JointPositionRange(Goal):
         self.lower_limit = lower_limit
         super(JointPositionRange, self).__init__(**kwargs)
         current_position = self.get_robot().joint_state[self.joint_name].position
-        if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
-            raise ConstraintInitalizationException(u'{} out of set limits. '
-                                                   u'{} <= {} <= {} is not true.'.format(self.joint_name,
-                                                                                         self.lower_limit,
-                                                                                         current_position,
-                                                                                         self.upper_limit))
+
 
     def make_constraints(self):
         joint_position = self.get_joint_position_symbol(self.joint_name)

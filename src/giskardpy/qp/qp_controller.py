@@ -522,6 +522,9 @@ class QPController(object):
         elif solver_name == u'cplex':
             from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             self.qp_solver = QPSolverCplex()
+        elif solver_name == u'python':
+            from giskardpy.qp.qp_solver_pkg_wrapper import QPSolverPackageWrapper
+            self.qp_solver = QPSolverPackageWrapper()
         else:
             raise KeyError(u'Solver \'{}\' not supported'.format(solver_name))
         logging.loginfo(u'Using QP Solver \'{}\''.format(solver_name))

@@ -196,14 +196,6 @@ class SelfCollisionAvoidance(Goal):
                                    1e4,
                                    w.max(0, upper_slack))
 
-        self.add_debug_expr('actual_distance', actual_distance)
-        self.add_debug_expr('dist', dist)
-        self.add_debug_vector('a_P_pa', a_P_pa)
-        self.add_debug_vector('pb_V_n', pb_V_n)
-        self.add_debug_vector('pb_P_b', w.position_of(pb_T_b))
-        self.add_debug_vector('pb_P_pa', pb_P_pa)
-        self.add_debug_matrix('b_T_a', b_T_a)
-
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
                             upper_error=100,

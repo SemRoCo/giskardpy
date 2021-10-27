@@ -1,17 +1,17 @@
 # giskardpy
 The core python library of the Giskard framework for constraint- and optimization-based robot motion control.
 
-## Installation instructions. Tested with Ubuntu 18.04 + melodic and 20.04 + Noetic
+## Installation instructions. Tested with Ubuntu 20.04 + Noetic
 
-Install the following python packages. When using 20.04, just install the latest version of everything and use pip3:
+Do this:
 ```
-sudo pip install pybullet
-sudo pip install scipy==1.2.2 # this is the last version for python 2.7
-sudo pip install casadi
-sudo pip install sortedcontainers
-sudo pip install hypothesis==4.34.0 # only needed if you want to run tests
-sudo pip install pandas==0.24.2
-sudo pip install numpy==1.16
+sudo pip3 install pybullet
+sudo pip3 install scipy
+sudo pip3 install casadi
+sudo pip3 install sortedcontainers
+sudo pip3 install hypothesis
+sudo pip3 install pandas
+sudo pip3 install numpy
 sudo apt install python3-dev 
 ```
 Install one of the following QP solver. The solvers are ordered by how fast they can solve the problem constructed by Giskard. QPOases is the fastest opensource solver for my usecase, that I have found. However, it is still significantly slower than the other two options:

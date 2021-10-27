@@ -12,6 +12,7 @@ sudo pip install sortedcontainers
 sudo pip install hypothesis==4.34.0 # only needed if you want to run tests
 sudo pip install pandas==0.24.2
 sudo pip install numpy==1.16
+sudo apt install python3-dev 
 ```
 Install one of the following QP solver. The solvers are ordered by how fast they can solve the problem constructed by Giskard. QPOases is the fastest opensource solver for my usecase, that I have found. However, it is still significantly slower than the other two options:
  - Gurobi:
@@ -40,6 +41,17 @@ rosdep install --ignore-src --from-paths .  # install dependencies available thr
 cd ..                                       # go to workspace directory
 catkin build                                # build packages
 source ~/giskardpy_ws/devel/setup.bash      # source new overlay
+```
+
+## Fast Custom Bullet Bindings
+Giskard will run much faster with Adrian Röfers bullet bindings instead of the official ones.
+```
+./scripts/build_pybullet.sh /my/awesome/library/dir
+
+```
+If everything worked fine, you should be able to do:
+```python
+import betterpybullet as bpb
 ```
 
 ### Tutorials

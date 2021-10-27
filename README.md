@@ -53,6 +53,11 @@ If everything worked fine, you should be able to do:
 ```python
 import betterpybullet as bpb
 ```
+Afterwards you can set the collision checker to ```bpb```.
+```yaml
+collision_avoidance:
+  collision_checker: bpb # one of [bpb, pybullet, disable]
+```
 
 ### Tutorials
 http://giskard.de/wiki:tutorials

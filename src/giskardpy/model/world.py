@@ -38,6 +38,7 @@ class WorldTree(object):
         return self._version
 
     def _increase_version(self):
+        self.reset_cache()
         self.init_all_fks()
         self.soft_reset()
         self._version += 1

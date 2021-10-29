@@ -177,10 +177,13 @@ class TestJointGoals(object):
 
 class TestConstraints(object):
     def test_pointing(self, better_pose):
+        """
+        :type better_pose: Boxy
+        """
         tip = u'head_mount_kinect2_rgb_optical_frame'
         goal_point = lookup_point(u'map', better_pose.r_tip)
         better_pose.pointing(tip, goal_point)
-        better_pose.send_and_check_goal()
+        better_pose.plan_and_execute()
 
         current_x = Vector3Stamped()
         current_x.header.frame_id = tip
@@ -191,7 +194,7 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
         goal_point = lookup_point(u'map', better_pose.r_tip)
-        better_pose.pointing(tip, goal_point, root=better_pose.r_tip)
+        better_pose.pointing(tip, goal_point, root_link=better_pose.r_tip)
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = better_pose.r_tip
@@ -204,7 +207,8 @@ class TestConstraints(object):
                                                                       [1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
 
-        better_pose.set_and_check_cart_goal(r_goal, better_pose.r_tip, u'base_footprint')
+        better_pose.set_cart_goal(r_goal, better_pose.r_tip, u'base_footprint')
+        better_pose.plan_and_execute()
 
         current_x = Vector3Stamped()
         current_x.header.frame_id = tip

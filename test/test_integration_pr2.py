@@ -995,7 +995,6 @@ class TestConstraints(object):
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.0})
 
         # TODO: calculate real and desired value and compare
-
         pass
 
     def test_open_close_dishwasher(self, kitchen_setup):

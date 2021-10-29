@@ -94,6 +94,8 @@ def update_parents(d, merge_key='parent'):
     :type d: dict
     :returns: dict
     """
+    if 'parent' not in d:
+        return d
     root_data = deepcopy(d)
     gen = find_parent_of_key(merge_key, root_data, [])
     while True:

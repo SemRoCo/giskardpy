@@ -10,7 +10,7 @@ from giskardpy.utils.tfwrapper import init as tf_init, lookup_point, transform_p
     transform_pose
 from utils_for_tests import Donbot, Boxy
 
-# TODO roslaunch iai_donbot_sim ros_control_sim.launch
+# TODO roslaunch iai_boxy_sim ros_control_sim.launch
 
 
 default_js = {
@@ -121,7 +121,7 @@ def giskard(request, ros):
 @pytest.fixture()
 def resetted_giskard(giskard):
     """
-    :type giskard: Donbot
+    :type giskard: Boxy
     """
     logging.loginfo(u'resetting giskard')
     giskard.clear_world()
@@ -132,41 +132,24 @@ def resetted_giskard(giskard):
 @pytest.fixture()
 def zero_pose(resetted_giskard):
     """
-    :type giskard: Donbot
+    :type giskard: Boxy
     """
     resetted_giskard.set_joint_goal(default_js)
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_goal()
+    resetted_giskard.plan_and_execute()
     return resetted_giskard
 
 
 @pytest.fixture()
 def better_pose(resetted_giskard):
     """
-    :type pocky_pose_setup: Donbot
-    :rtype: Donbot
+    :type pocky_pose_setup: Boxy
+    :rtype: Boxy
     """
     resetted_giskard.set_joint_goal(better_js)
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_goal()
+    resetted_giskard.plan_and_execute()
     return resetted_giskard
-
-
-@pytest.fixture()
-def fake_table_setup(zero_pose):
-    """
-    :type zero_pose: Donbot
-    :rtype: Donbot
-    """
-    p = PoseStamped()
-    p.header.frame_id = u'map'
-    p.pose.position.x = 0.9
-    p.pose.position.y = 0
-    p.pose.position.z = 0.2
-    p.pose.orientation.w = 1
-    zero_pose.add_box(pose=p)
-    return zero_pose
-
 
 @pytest.fixture()
 def kitchen_setup(better_pose):
@@ -176,7 +159,7 @@ def kitchen_setup(better_pose):
     better_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
                               tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
                          set_js_topic=u'/kitchen/cram_joint_states')
-    js = {k: 0.0 for k in better_pose.get_world().get_object(object_name).get_movable_joints()}
+    js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
     better_pose.set_kitchen_js(js)
     return better_pose
 
@@ -188,7 +171,8 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         zero_pose.allow_self_collision()
-        zero_pose.send_and_check_joint_goal(better_js)
+        zero_pose.set_joint_goal(better_js)
+        zero_pose.plan_and_execute()
 
 
 class TestConstraints(object):
@@ -248,8 +232,8 @@ class TestConstraints(object):
         tip_grasp_axis.vector.y = 1
 
         kitchen_setup.set_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.l_tip,
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.l_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -270,35 +254,30 @@ class TestConstraints(object):
                                             x_gripper,
                                             root_normal=x_goal)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()  # send goal to Giskard
+        kitchen_setup.plan_and_execute()  # send goal to Giskard
 
         kitchen_setup.set_json_goal(u'Open',
-                                    tip=kitchen_setup.l_tip,
-                                    object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    tip_link=kitchen_setup.l_tip,
+                                    environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()  # send goal to Giskard
+        kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.48})
 
         # Close drawer partially
-        kitchen_setup.set_json_goal(u'OpenDrawer',
-                                    tip=kitchen_setup.l_tip,
-                                    object_name=u'kitchen',
-                                    handle_link=handle_name,
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=kitchen_setup.l_tip,
+                                    environment_link=handle_name,
                                     distance_goal=0.2)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()  # send goal to Giskard
+        kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.2})
 
         kitchen_setup.set_json_goal(u'Close',
-                                    tip=kitchen_setup.l_tip,
-                                    object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    tip_link=kitchen_setup.l_tip,
+                                    environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()  # send goal to Giskard
+        kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.0})
-
-        pass

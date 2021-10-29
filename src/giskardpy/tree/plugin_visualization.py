@@ -13,7 +13,6 @@ class VisualizationBehavior(GiskardBehavior):
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.robot_base = self.get_robot().root_link_name
         return super(VisualizationBehavior, self).setup(timeout)
 
     def update(self):

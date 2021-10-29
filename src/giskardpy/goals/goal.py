@@ -290,8 +290,8 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix=u'{}/vel'.format(name_suffix))
-        if self._test_mode:
-            self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
+        # if self._test_mode:
+        #     self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
 
     def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
                                     weight=WEIGHT_BELOW_CA, name_suffix=u''):

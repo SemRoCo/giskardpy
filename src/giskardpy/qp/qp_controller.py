@@ -522,7 +522,7 @@ class QPController(object):
         elif solver_name == u'cplex':
             from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             self.qp_solver = QPSolverCplex()
-        elif solver_name == u'python':
+        elif solver_name == u'qp_solvers':
             from giskardpy.qp.qp_solver_pkg_wrapper import QPSolverPackageWrapper
             self.qp_solver = QPSolverPackageWrapper()
         else:

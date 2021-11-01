@@ -7,7 +7,7 @@ general_options:
       default: 0.001
       override: {}
     acceleration:
-      default: 1e-8
+      default: 0
       override: { }
     jerk:
       default: 0.001

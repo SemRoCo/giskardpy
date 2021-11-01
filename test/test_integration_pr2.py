@@ -178,7 +178,7 @@ def zero_pose(resetted_giskard):
     :type resetted_giskard: PR2
     """
     resetted_giskard.allow_all_collisions()
-    #resetted_giskard.send_and_check_joint_goal(default_pose)
+    resetted_giskard.send_and_check_joint_goal(default_pose)
     return resetted_giskard
 
 

@@ -54,13 +54,21 @@ class CollisionCheckerInterface(GiskardBehavior):
     def update_collision_checker(self):
         self.get_god_map().get_data(identifier.tree_manager).get_node(u'coll').update()
 
+    def is_robot_link_external_collision_free(self, link_name):
+        self.update_collision_checker()
+        closest_points = self.god_map.get_data(identifier.closest_point)
+        collisions = []
+        if link_name in closest_points.external_collision:
+            collisions.append(closest_points.get_external_collisions(link_name))
+        return len(collisions) == 0
+
     def is_robot_external_collision_free(self):
         self.update_collision_checker()
         closest_points = self.god_map.get_data(identifier.closest_point)
         collisions = []
-        for joint_name in self.get_robot().get_link_names():
-            if joint_name in closest_points.external_collision:
-                collisions.append(closest_points.get_external_collisions(joint_name))
+        for link_name in self.get_robot().get_link_names():
+            if link_name in closest_points.external_collision:
+                collisions.append(closest_points.get_external_collisions(link_name))
         return len(collisions) == 0
 
     def is_object_external_collision_free(self, object_name):
@@ -87,7 +95,7 @@ class CollisionCheckerInterface(GiskardBehavior):
         return self.are_objects_external_collision_free([self.get_robot().get_name()])
 
     def get_collisions(self, link_name):
-        all_collisions = self.get_god_map().get_data(identifier.closest_point)
+        all_collisions = self.get_god_map().get_data(identifier.closest_point).items()
         link_collisions = list()
         for c in all_collisions:
             if c.get_link_b() == link_name or c.get_link_a() == link_name:
@@ -336,7 +344,8 @@ class RobotBulletCollisionChecker(GiskardBehavior):
         self.lock = threading.Lock()
         self.init_pybullet_ids_and_joints()
         if collision_checker is None:
-            self.collision_checker = CollisionCheckerInterface.is_robot_external_collision_free
+            self._collision_checker = CollisionCheckerInterface()
+            self.collision_checker = self._collision_checker.is_robot_link_external_collision_free
         else:
             self.collision_checker = collision_checker
         self.is_3D = is_3D
@@ -393,8 +402,10 @@ class RobotBulletCollisionChecker(GiskardBehavior):
                 for joint_name, joint_state in zip(self.pybullet_joints, state_ik):
                     current_js[joint_name].position = joint_state
                 self.get_robot().joint_state = current_js
+                #self.get_god_map().get_data(identifier.tree_manager).get_node(u'visualization').initialise()
+                #self.get_god_map().get_data(identifier.tree_manager).get_node(u'visualization').update()
                 # Check if kitchen is colliding with robot
-                results.append(self.collision_checker())
+                results.append(self.collision_checker(self.tip_link))
                 # Reset joint state
                 self.get_robot().joint_state = old_js
             return all(results)
@@ -556,7 +567,22 @@ class CompoundBoxSpace:
                                              z_length=self.min_size)
         world_object_box = WorldObject.from_world_body(world_body_box)
         self.world.add_object(world_object_box)
-        return world_object_box.get_name()
+        world_body_box = make_world_body_box(name=collision_sphere_name+'start',
+                                             x_length=self.min_size,
+                                             y_length=self.min_size,
+                                             z_length=self.min_size)
+        world_object_box = WorldObject.from_world_body(world_body_box)
+        self.world.add_object(world_object_box)
+        self.world.set_object_pose(collision_sphere_name+'start', Pose(Point(pos_a[0], pos_a[1], pos_a[2]),
+                                                                       Quaternion(0,0,0,1)))
+        world_body_box = make_world_body_box(name=collision_sphere_name+'end',
+                                             x_length=self.min_size,
+                                             y_length=self.min_size,
+                                             z_length=self.min_size)
+        world_object_box = WorldObject.from_world_body(world_body_box)
+        self.world.add_object(world_object_box)
+        self.world.set_object_pose(collision_sphere_name+'end', Pose(Point(pos_b[0], pos_b[1], pos_b[2]),
+                                                                     Quaternion(0,0,0,1)))
 
     def _rodrigues_rotation_formula(self, a, b):
         # https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d
@@ -571,13 +597,21 @@ class CompoundBoxSpace:
         q = tf.transformations.quaternion_from_matrix(tf_m)
         return Quaternion(q[0], q[1], q[2], q[3])
 
-    def _get_pitch(self, pos_a, pos_b):
+    def _get_pitch_old(self, pos_a, pos_b):
         dx = pos_b[0] - pos_a[0]
         dy = pos_b[1] - pos_a[1]
         pos_c = pos_a + np.array([dx, dy, 0])
         g = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_b)) ** 2))
         h = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
         return -(np.pi + np.arcsin(g / h)) if (dx < 0) else -np.arcsin(g / h)
+
+    def _get_pitch(self, pos_a, pos_b):
+        dx = pos_b[0] - pos_a[0]
+        dy = pos_b[1] - pos_a[1]
+        dz = pos_b[2] - pos_a[2]
+        pos_c = pos_a + np.array([dx, dy, 0])
+        a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_a)) ** 2))
+        return -np.arctan2(dz, a)
 
     def _get_yaw(self, pos_a, pos_b):
         dx = pos_b[0] - pos_a[0]
@@ -594,6 +628,8 @@ class CompoundBoxSpace:
             collisions_per_pos = dict()
             # Get em
             for i, (pos_a, pos_b) in enumerate(zip(self.start_and_end_positions[:-1], self.start_and_end_positions[1:])):
+                if pos_a == pos_b:
+                    continue
                 b_to_a = np.array(pos_a) - np.array(pos_b)
                 c = np.array(pos_b) + b_to_a / 2.
                 # https://i.stack.imgur.com/f190Q.png, https://stackoverflow.com/questions/58469297/how-do-i-calculate-the-yaw-pitch-and-roll-of-a-point-in-3d/58469298#58469298
@@ -610,23 +646,36 @@ class CompoundBoxSpace:
                 self.world.set_object_pose(collision_box_name_i, Pose(Point(c[0], c[1], c[2]),
                                                                       Quaternion(q[0], q[1], q[2], q[3])))
                 if self.publish_collision_boxes:
-                    m = self.world.get_object(collision_box_name_i).as_marker_msg()
-                    m.header.frame_id = self.map_frame
-                    ma = MarkerArray()
-                    m.ns = u'world' + m.ns
-                    ma.markers.append(m)
-                    self.pub_collision_marker.publish(ma)
+                    self.pub_marker(collision_box_name_i)
+                self.collisionChecker.update_collisions_environment()
                 if not self.collisionChecker.is_object_external_collision_free(collision_box_name_i):
                     collisions_per_pos[i] = self.collisionChecker.get_collisions(collision_box_name_i)
-                if False and self.publish_collision_boxes:
-                    m = self.world.get_object(collision_box_name_i).as_marker_msg()
-                    m.action = m.DELETE
-                    ma = MarkerArray()
-                    m.ns = u'world' + m.ns
-                    ma.markers.append(m)
-                    self.pub_collision_marker.publish(ma)
+                if self.publish_collision_boxes:
+                    self.del_marker(collision_box_name_i)
                 self.world.remove_object(collision_box_name_i)
+                self.world.remove_object(collision_box_name_i+'start')
+                self.world.remove_object(collision_box_name_i+'end')
         return collisions
+
+    def pub_marker(self, name):
+        names = [name, name+'start', name+'end']
+        ma = MarkerArray()
+        for n in names:
+            m = self.world.get_object(n).as_marker_msg()
+            m.header.frame_id = self.map_frame
+            m.ns = u'world' + m.ns
+            ma.markers.append(m)
+        self.pub_collision_marker.publish(ma)
+
+    def del_marker(self, name):
+        names = [name, name+'start', name+'end']
+        ma = MarkerArray()
+        for n in names:
+            m = self.world.get_object(n).as_marker_msg()
+            m.action = m.DELETE
+            m.ns = u'world' + m.ns
+            ma.markers.append(m)
+        self.pub_collision_marker.publish(ma)
 
 class GlobalPlanner(GetGoal):
 
@@ -728,7 +777,7 @@ class GlobalPlanner(GetGoal):
         return rob_link_positions
 
     def is_object_pickable(self):
-        if True:  # self.is_tip_object():
+        if False:  # self.is_tip_object():
             global_rob_arm_positions = self._get_global_arm_positions()
             box_space = CompoundBoxSpace(self.get_world(), self.get_robot(), self.map_frame,
                                          CollisionCheckerInterface(), 0.1, global_rob_arm_positions)
@@ -739,6 +788,7 @@ class GlobalPlanner(GetGoal):
                 pass
                 # for k in collisions_per_pos create obj equal to self.tip_link
                 # find orientations for each box
+        return True
 
     def save_cart_goal(self, cart_c):
 
@@ -775,10 +825,10 @@ class GlobalPlanner(GetGoal):
         self.is_object_pickable()
 
         if self.is_global_navigation_needed():
-            CollisionCheckerInterface.update_collisions_environment()
+            self.collisionCheckerInterface.update_collisions_environment()
             trajectory = self.planNavigation()
         elif self.is_global_path_needed():
-            CollisionCheckerInterface.update_collisions_environment()
+            self.collisionCheckerInterface.update_collisions_environment()
             trajectory = self.planMovement()
         else:
             return Status.SUCCESS

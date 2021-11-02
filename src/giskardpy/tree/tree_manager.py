@@ -1,3 +1,7 @@
+import pydot
+from py_trees import Behaviour, Chooser, common, Selector, Sequence
+from py_trees.composites import Parallel
+
 from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.utils import logging
 from sortedcontainers import SortedList
@@ -189,6 +193,7 @@ class TreeManager(object):
         tree_node = TreeManager.ManagerNode(node=node, parent=parent, position=position)
         parent.add_child(tree_node)
         self.tree_nodes[node.name] = tree_node
+        node.setup(1.0)
 
     def remove_node(self, node_name):
         """
@@ -212,3 +217,121 @@ class TreeManager(object):
         """
         return self.tree_nodes[node_name].node
 
+
+def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
+    """
+    Render the dot tree to .dot, .svg, .png. files in the current
+    working directory. These will be named with the root behaviour name.
+
+    Args:
+        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
+        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
+        name (:obj:`str`): name to use for the created files (defaults to the root behaviour name)
+
+    Example:
+
+        Render a simple tree to dot/svg/png file:
+
+        .. graphviz:: dot/sequence.dot
+
+        .. code-block:: python
+
+            root = py_trees.composites.Sequence("Sequence")
+            for job in ["Action 1", "Action 2", "Action 3"]:
+                success_after_two = py_trees.behaviours.Count(name=job,
+                                                              fail_until=0,
+                                                              running_until=1,
+                                                              success_until=10)
+                root.add_child(success_after_two)
+            py_trees.display.render_dot_tree(root)
+
+    .. tip::
+
+        A good practice is to provide a command line argument for optional rendering of a program so users
+        can quickly visualise what tree the program will execute.
+    """
+    graph = generate_pydot_graph(root, visibility_level)
+    filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
+    logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
+    graph.write(filename_wo_extension + '.dot')
+    graph.write_png(filename_wo_extension + '.png')
+    graph.write_svg(filename_wo_extension + '.svg')
+
+
+def generate_pydot_graph(root, visibility_level):
+    """
+    Generate the pydot graph - this is usually the first step in
+    rendering the tree to file. See also :py:func:`render_dot_tree`.
+
+    Args:
+        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
+        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
+
+    Returns:
+        pydot.Dot: graph
+    """
+
+    def get_node_attributes(node, visibility_level):
+        blackbox_font_colours = {common.BlackBoxLevel.DETAIL: "dodgerblue",
+                                 common.BlackBoxLevel.COMPONENT: "lawngreen",
+                                 common.BlackBoxLevel.BIG_PICTURE: "white"
+                                 }
+        if isinstance(node, Chooser):
+            attributes = ('doubleoctagon', 'cyan', 'black')  # octagon
+        elif isinstance(node, Selector):
+            attributes = ('octagon', 'cyan', 'black')  # octagon
+        elif isinstance(node, Sequence):
+            attributes = ('box', 'orange', 'black')
+        elif isinstance(node, Parallel):
+            attributes = ('note', 'gold', 'black')
+        elif isinstance(node, PluginBehavior):
+            attributes = ('box', 'green', 'black')
+        # elif isinstance(node, PluginBase) or node.children != []:
+        #     attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
+        else:
+            attributes = ('ellipse', 'gray', 'black')
+        # if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
+        #     attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
+        return attributes
+
+    fontsize = 11
+    graph = pydot.Dot(graph_type='digraph')
+    graph.set_name(root.name.lower().replace(" ", "_"))
+    # fonts: helvetica, times-bold, arial (times-roman is the default, but this helps some viewers, like kgraphviewer)
+    graph.set_graph_defaults(fontname='times-roman')
+    graph.set_node_defaults(fontname='times-roman')
+    graph.set_edge_defaults(fontname='times-roman')
+    (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
+    node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize,
+                           fontcolor=node_font_colour)
+    graph.add_node(node_root)
+    names = [root.name]
+
+    def add_edges(root, root_dot_name, visibility_level):
+        if visibility_level < root.blackbox_level:
+            if isinstance(root, PluginBehavior):
+                childrens = []
+                names2 = []
+                for name, children in root.get_plugins().items():
+                    childrens.append(children)
+                    names2.append(name)
+            else:
+                childrens = root.children
+                names2 = [c.name for c in childrens]
+            for name, c in zip(names2, childrens):
+                (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
+                proposed_dot_name = name
+                while proposed_dot_name in names:
+                    proposed_dot_name = proposed_dot_name + "*"
+                names.append(proposed_dot_name)
+                node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
+                                  fontsize=fontsize, fontcolor=node_font_colour)
+                graph.add_node(node)
+                edge = pydot.Edge(root_dot_name, proposed_dot_name)
+                graph.add_edge(edge)
+                if (isinstance(c, PluginBehavior) and c.get_plugins() != []) or \
+                        (isinstance(c, Behaviour) and c.children != []):
+                    add_edges(c, proposed_dot_name, visibility_level)
+
+    add_edges(root, root.name, visibility_level)
+    return graph

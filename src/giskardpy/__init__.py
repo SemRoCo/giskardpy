@@ -18,6 +18,8 @@ ERROR = 2
 PRINT_LEVEL = NORMAL
 
 MAP = u'map'
+RobotName = 'robot'
+RobotPrefix = None
 
 # import casadi_wrapper as cas_wrapper
 

@@ -6,15 +6,16 @@ from threading import Thread
 import rospy
 from py_trees import Behaviour, Blackboard, Status
 
-from giskardpy.identifier import world, robot
+from giskardpy import identifier, RobotName
+from giskardpy.god_map import GodMap
+from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
 
 
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
-        self.god_map = Blackboard().god_map
-        self.world = None
-        self.robot = None
+        self.god_map = Blackboard().god_map # type: GodMap
+        self.world = self.get_god_map().unsafe_get_data(identifier.world)  # type: WorldTree
         super(GiskardBehavior, self).__init__(name)
 
     def get_god_map(self):
@@ -23,36 +24,53 @@ class GiskardBehavior(Behaviour):
         """
         return self.god_map
 
+    @property
+    def tree(self):
+        """
+        :rtype: giskardpy.tree.tree_manager.TreeManager
+        """
+        return self.god_map.unsafe_get_data(identifier.tree_manager)
+
+    @property
+    def collision_scene(self):
+        """
+        :rtype: giskardpy.model.collision_world_syncer.CollisionWorldSynchronizer
+        """
+        return self.god_map.unsafe_get_data(identifier.collision_scene)
+
+    @collision_scene.setter
+    def collision_scene(self, value):
+        self.god_map.unsafe_set_data(identifier.collision_scene, value)
+
+    @property
+    def robot(self):
+        """
+        :rtype: giskardpy.model.world.SubWorldTree
+        """
+        return self.world.groups[RobotName]
+
     def get_world(self):
         """
-        :rtype: giskardpy.world.World
+        :rtype: giskardpy.model.world.WorldTree
         """
-        if not self.world:
-            self.world = self.get_god_map().get_data(world)
         return self.world
 
     def unsafe_get_world(self):
         """
-        :rtype: giskardpy.world.World
+        :rtype: giskardpy.model.world.WorldTree
         """
-        if not self.world:
-            self.world = self.get_god_map().unsafe_get_data(world)
         return self.world
 
     def get_robot(self):
         """
-        :rtype: giskardpy.robot.Robot
+        :rtype: giskardpy.model.world.SubWorldTree
         """
-        if not self.robot:
-            self.robot = self.get_god_map().get_data(robot)
         return self.robot
 
     def unsafe_get_robot(self):
         """
-        :rtype: giskardpy.robot.Robot
+        :rtype: giskardpy.model.world.SubWorldTree
         """
-        if not self.robot:
-            self.robot = self.get_god_map().unsafe_get_data(robot)
         return self.robot
 
     def raise_to_blackboard(self, exception):

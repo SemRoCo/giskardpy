@@ -3,9 +3,13 @@ general_options:
   enable_gui: False
   test_mode: True
 plugins:
-    PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-      enabled: True
-    MaxTrajectoryLength:
-      enabled: False
-      length: 30 # will abort planning if the trajectory becomes longer than this many seconds
+  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+    enabled: True
+  CPIMarker: # contact visualization, slows planning down a little bit
+    enabled: True
+  PlotDebugTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+    enabled: True
+  MaxTrajectoryLength:
+    enabled: False
+    length: 30 # will abort planning if the trajectory becomes longer than this many seconds
 

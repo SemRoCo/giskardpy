@@ -2,11 +2,19 @@
 
 from __future__ import division
 
+import sys
+
 from defusedxml import minidom
 
 import rospy
 import random
-from Tkinter import *
+if sys.version_info[0] == 3:
+    # for Python3
+    from tkinter import *   ## notice lowercase 't' in tkinter here
+else:
+    # for Python2
+    from Tkinter import *   ## notice capitalized T in Tkinter
+
 from giskardpy.python_interface import GiskardWrapper
 # import xml.dom.minidom
 from sensor_msgs.msg import JointState

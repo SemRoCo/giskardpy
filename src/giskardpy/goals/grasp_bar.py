@@ -25,12 +25,12 @@ class GraspBar(Goal):
         self.root = root_link
         self.tip = tip_link
 
-        bar_center = tf.transform_point(self.root, bar_center)
+        bar_center = self.transform_msg(self.root, bar_center)
 
-        tip_grasp_axis = tf.transform_vector(self.tip, tip_grasp_axis)
+        tip_grasp_axis = self.transform_msg(self.tip, tip_grasp_axis)
         tip_grasp_axis.vector = tf.normalize(tip_grasp_axis.vector)
 
-        bar_axis = tf.transform_vector(self.root, bar_axis)
+        bar_axis = self.transform_msg(self.root, bar_axis)
         bar_axis.vector = tf.normalize(bar_axis.vector)
 
         self.bar_axis = bar_axis

@@ -1,18 +1,15 @@
-from time import time
 import keyword
 from collections import defaultdict
-from copy import deepcopy
 from multiprocessing import Queue
-from threading import Thread
+from time import time
 
 import hypothesis.strategies as st
 import numpy as np
 import rospy
-from actionlib_msgs.msg import GoalID
 from angles import shortest_angular_distance
 from control_msgs.msg import FollowJointTrajectoryActionGoal, FollowJointTrajectoryActionResult
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
-from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, MoveGoal
+from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
@@ -20,27 +17,28 @@ from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
 from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
+from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
+from tf2_py import LookupException
 from visualization_msgs.msg import Marker
 
-from giskardpy import identifier
-from giskardpy.data_types import KeyDefaultDict
-from giskardpy.utils.config_loader import ros_load_robot_config
+import giskardpy.utils.tfwrapper as tf
+from giskardpy import identifier, RobotName, RobotPrefix
+from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
-from giskardpy.identifier import robot, world
-from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.model.robot import Robot
-from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, to_joint_state_position_dict, \
-    logging
+from giskardpy.utils import logging, utils
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
 
-vector = lambda x: st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
+
+def vector(x):
+    return st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
+
 
 update_world_error_codes = {value: name for name, value in vars(UpdateWorldResponse).items() if
                             isinstance(value, int) and name[0].isupper()}
@@ -60,7 +58,6 @@ def move_result_error_code(code):
 
 def robot_urdfs():
     return st.sampled_from([u'urdfs/pr2.urdfs', u'urdfs/boxy.urdfs', u'urdfs/iai_donbot.urdfs'])
-    # return st.sampled_from([u'pr2.urdfs'])
 
 
 def angle_positive():
@@ -91,43 +88,44 @@ def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis,
             assert not np.any(np.isnan(expected_axis))
 
 
-def compare_poses(pose1, pose2, decimal=2):
+def compare_poses(actual_pose, desired_pose, decimal=2):
     """
-    :type pose1: Pose
-    :type pose2: Pose
+    :type actual_pose: Pose
+    :type desired_pose: Pose
     """
-    compare_points(pose1.position, pose2.position, decimal)
-    compare_orientations(pose1.orientation, pose2.orientation, decimal)
+    compare_points(actual_point=actual_pose.position,
+                   desired_point=desired_pose.position,
+                   decimal=decimal)
+    compare_orientations(actual_orientation=actual_pose.orientation,
+                         desired_orientation=desired_pose.orientation,
+                         decimal=decimal)
+
 
 def compare_points(actual_point, desired_point, decimal=2):
-    """
-    :type pose1: Point
-    :type pose2: Point
-    """
     np.testing.assert_almost_equal(actual_point.x, desired_point.x, decimal=decimal)
     np.testing.assert_almost_equal(actual_point.y, desired_point.y, decimal=decimal)
     np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
 
 
-def compare_orientations(orientation1, orientation2, decimal=2):
+def compare_orientations(actual_orientation, desired_orientation, decimal=2):
     """
-    :type orientation1: Quaternion
-    :type orientation2: Quaternion
+    :type actual_orientation: Quaternion
+    :type desired_orientation: Quaternion
     """
-    if isinstance(orientation1, Quaternion):
-        q1 = np.array([orientation1.x,
-                       orientation1.y,
-                       orientation1.z,
-                       orientation1.w])
+    if isinstance(actual_orientation, Quaternion):
+        q1 = np.array([actual_orientation.x,
+                       actual_orientation.y,
+                       actual_orientation.z,
+                       actual_orientation.w])
     else:
-        q1 = orientation1
-    if isinstance(orientation2, Quaternion):
-        q2 = np.array([orientation2.x,
-                       orientation2.y,
-                       orientation2.z,
-                       orientation2.w])
+        q1 = actual_orientation
+    if isinstance(desired_orientation, Quaternion):
+        q2 = np.array([desired_orientation.x,
+                       desired_orientation.y,
+                       desired_orientation.z,
+                       desired_orientation.w])
     else:
-        q2 = orientation2
+        q2 = desired_orientation
     try:
         np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
         np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
@@ -171,8 +169,7 @@ def rnd_joint_state2(draw, joint_limits):
 
 @composite
 def pr2_joint_state(draw):
-    pr2 = Robot.from_urdf_file(pr2_urdf())
-    return draw(rnd_joint_state(*pr2.get_joint_position_limits()))
+    pass
 
 
 def pr2_urdf():
@@ -205,6 +202,12 @@ def boxy_urdf():
     return urdf_string
 
 
+def hsr_urdf():
+    with open(u'urdfs/hsr.urdf', u'r') as f:
+        urdf_string = f.read()
+    return urdf_string
+
+
 def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
     if outer_limit is not None:
         return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
@@ -232,8 +235,7 @@ def unit_vector(length, elements=None):
         elements = float_no_nan_no_inf(min_dist_to_zero=1e-10)
     vector = st.lists(elements,
                       min_size=length,
-                      max_size=length).filter(lambda x: np.linalg.norm(x) > SMALL_NUMBER and
-                                                        np.linalg.norm(x) < BIG_NUMBER)
+                      max_size=length).filter(lambda x: SMALL_NUMBER < np.linalg.norm(x) < BIG_NUMBER)
 
     def normalize(v):
         v = [round(x, 4) for x in v]
@@ -256,35 +258,131 @@ def pykdl_frame_to_numpy(pykdl_frame):
                      [0, 0, 0, 1]])
 
 
+class GoalChecker(object):
+    def __init__(self, god_map):
+        """
+        :type god_map: giskardpy.god_map.GodMap
+        """
+        self.god_map = god_map
+        self.world = self.god_map.unsafe_get_data(identifier.world)
+        self.robot = self.god_map.unsafe_get_data(identifier.robot)
+
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)
+        except LookupException as e:
+            return self.world.transform_msg(target_frame, msg)
+
+
+class JointGoalChecker(GoalChecker):
+    def __init__(self, god_map, goal_state, decimal=2):
+        super(JointGoalChecker, self).__init__(god_map)
+        self.goal_state = goal_state
+        self.decimal = decimal
+
+    def get_current_joint_state(self):
+        """
+        :rtype: JointState
+        """
+        return rospy.wait_for_message('joint_states', JointState)
+
+    def __call__(self):
+        current_joint_state = JointStates.from_msg(self.get_current_joint_state())
+        self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
+
+    def compare_joint_state(self, current_js, goal_js, decimal=2):
+        """
+        :type current_js: dict
+        :type goal_js: dict
+        :type decimal: int
+        """
+        for joint_name in goal_js:
+            goal = goal_js[joint_name]
+            current = current_js[PrefixName(joint_name, None)].position
+            if self.world.is_joint_continuous(PrefixName(joint_name, RobotPrefix)):
+                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
+            else:
+                np.testing.assert_almost_equal(current, goal, decimal,
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
+
+
+class TranslationGoalChecker(GoalChecker):
+    def __init__(self, god_map, tip_link, root_link, expected):
+        super(TranslationGoalChecker, self).__init__(god_map)
+        self.expected = expected
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = self.transform_msg(self.root_link, self.expected)
+
+    def __call__(self):
+        expected = self.expected
+        current_pose = tf.lookup_pose(self.root_link, self.tip_link)
+        np.testing.assert_array_almost_equal(msg_to_list(expected.pose.position),
+                                             msg_to_list(current_pose.pose.position), decimal=2)
+
+
+class AlignPlanesGoalChecker(GoalChecker):
+    def __init__(self, god_map, tip_link, tip_normal, root_link, root_normal):
+        super(AlignPlanesGoalChecker, self).__init__(god_map)
+        self.tip_normal = tip_normal
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = self.transform_msg(self.root_link, root_normal)
+
+    def __call__(self):
+        expected = self.expected
+        current = self.transform_msg(self.root_link, self.tip_normal)
+        np.testing.assert_array_almost_equal(msg_to_list(expected.vector), msg_to_list(current.vector), decimal=2)
+
+
+class RotationGoalChecker(GoalChecker):
+    def __init__(self, god_map, tip_link, root_link, expected):
+        super(RotationGoalChecker, self).__init__(god_map)
+        self.expected = expected
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = self.transform_msg(self.root_link, self.expected)
+
+    def __call__(self):
+        expected = self.expected
+        current_pose = tf.lookup_pose(self.root_link, self.tip_link)
+
+        try:
+            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.orientation),
+                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
+        except AssertionError:
+            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.orientation),
+                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
+
+
 class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
-        if not ros_load_robot_config(config_file, test=True):
-            rospy.logerr('Could not set robot config as ROS parameter.')
-        rospy.set_param('~tree/PlotDebugTrajectory/enabled', True)
-        rospy.set_param('~tree/MaxTrajectoryLength/enabled', True)
+        rospy.set_param('~config', config_file)
+        rospy.set_param('~test', True)
 
-        self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
-        self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
         self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
-                                                FollowJointTrajectoryActionGoal, self.start_motion_cb,
+                                                 FollowJointTrajectoryActionGoal, self.start_motion_cb,
                                                  queue_size=100)
         self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
-                                               FollowJointTrajectoryActionResult, self.stop_motion_cb,
+                                                FollowJointTrajectoryActionResult, self.stop_motion_cb,
                                                 queue_size=100)
 
         self.tree = grow_tree()
-        self.loop_once()
-        # rospy.sleep(1)
+        self.god_map = Blackboard().god_map
+        self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
+        self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
         super(GiskardTestWrapper, self).__init__(node_name=u'tests')
         self.results = Queue(100)
-        self.default_root = self.get_robot().get_root()
+        self.default_root = self.robot.root_link_name.short_name
         self.map = u'map'
-        self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
-        self.tick_rate = 10
+        self.goal_checks = defaultdict(list)
 
         def create_publisher(topic):
             p = rospy.Publisher(topic, JointState, queue_size=10)
@@ -293,6 +391,34 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
+        self.original_number_of_links = len(self.world.links)
+
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)
+        except LookupException as e:
+            return self.world.transform_msg(target_frame, msg)
+
+    def wait_heartbeats(self, number=2):
+        tree = self.god_map.get_data(identifier.tree_manager).tree
+        c = tree.count
+        while tree.count < c + number:
+            rospy.sleep(0.001)
+
+    @property
+    def collision_scene(self):
+        """
+        :rtype: giskardpy.model.collision_world_syncer.CollisionWorldSynchronizer
+        """
+        return self.god_map.unsafe_get_data(identifier.collision_scene)
+
+    @property
+    def robot_self_collision_matrix(self):
+        """
+        :rtype: set
+        """
+        self.collision_scene.sync()
+        return self.collision_scene.collision_matrices[RobotName]
 
     def start_motion_cb(self, msg):
         self.time = time()
@@ -300,73 +426,37 @@ class GiskardTestWrapper(GiskardWrapper):
     def stop_motion_cb(self, msg):
         self.total_time_spend_moving += time() - self.time
 
-    def wait_for_synced(self):
-        sleeper = rospy.Rate(self.tick_rate)
-        self.loop_once()
-        # while self.tree.tip().name != u'has goal':
-        #     self.loop_once()
-        #     sleeper.sleep()
-        # self.loop_once()
-        # while self.tree.tip().name != u'has goal':
-        #     self.loop_once()
-        #     sleeper.sleep()
+    @property
+    def robot(self):
+        """
+        :rtype: giskardpy.model.world.SubWorldTree
+        """
+        return self.world.groups['robot']
 
-    def get_robot(self):
-        """
-        :rtype: Robot
-        """
-        return self.get_god_map().get_data(robot)
-
-    def get_god_map(self):
-        """
-        :rtype: giskardpy.god_map.GodMap
-        """
-        return Blackboard().god_map
-
-    def cb(self, msg):
-        """
-        :type msg: MoveActionResult
-        """
-        self.results.put(msg.result)
-
-    def loop_once(self):
+    def heart_beat(self, timer_thing):
         self.tree.tick()
-
-    def get_controlled_joint_names(self):
-        """
-        :rtype: dict
-        """
-        return self.get_robot().controlled_joints
-
-    def get_controllable_links(self):
-        return self.get_robot().get_controlled_links()
-
-    def get_current_joint_state(self):
-        """
-        :rtype: JointState
-        """
-        return rospy.wait_for_message('joint_states', JointState)
 
     def tear_down(self):
         rospy.sleep(1)
-        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
+        logging.loginfo('wtf')
+        self.heart.shutdown()
+        logging.loginfo(
+            u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo(u'stopping tree')
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
         rospy.sleep(0.5)
-        self.wait_for_synced()
-        current_js = self.get_world().get_object(object_name).joint_state
-        for joint_name, state in joint_state.items():
-            np.testing.assert_almost_equal(current_js[joint_name].position, state, 2)
+        current_js = self.world.groups[object_name].state
+        joint_names_without_prefix = set(j.short_name for j in current_js)
+        assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()
+        for joint_name, state in current_js.items():
+            if joint_name.short_name in joint_state:
+                np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
 
     def set_kitchen_js(self, joint_state, object_name=u'kitchen'):
         self.set_object_joint_state(object_name, joint_state)
-
-    #
-    # JOINT GOAL STUFF #################################################################################################
-    #
 
     def compare_joint_state(self, current_js, goal_js, decimal=2):
         """
@@ -374,35 +464,32 @@ class GiskardTestWrapper(GiskardWrapper):
         :type goal_js: dict
         :type decimal: int
         """
-        joint_names = set(current_js.keys()).intersection(set(goal_js.keys()))
-        for joint_name in joint_names:
+        for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
-            if self.get_robot().is_joint_continuous(joint_name):
+            if self.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
-                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
             else:
                 np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
 
-    def check_current_joint_state(self, expected, decimal=2):
-        current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
-        self.compare_joint_state(current_joint_state, expected, decimal=decimal)
+    #
+    # GOAL STUFF #################################################################################################
+    #
 
-    def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,)):
+    def set_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,), check=True):
         """
         :type goal: dict
         """
-        self.set_joint_goal(goal, weight=weight)
-        self.send_and_check_goal(expected_error_codes=expected_error_codes)
-        if expected_error_codes is not None and expected_error_codes[0] == MoveResult.SUCCESS:
-            self.check_current_joint_state(goal, decimal=decimal)
+        super(GiskardTestWrapper, self).set_joint_goal(goal, weight=weight)
+        if check:
+            self.add_goal_check(JointGoalChecker(self.god_map, goal, decimal))
 
-    #
-    # CART GOAL STUFF ##################################################################################################
-    #
     def teleport_base(self, goal_pose):
-        goal_pose = transform_pose(self.default_root, goal_pose)
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
               u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
@@ -412,47 +499,39 @@ class GiskardTestWrapper(GiskardWrapper):
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         self.set_base.call(goal)
-        self.loop_once()
         rospy.sleep(0.5)
-        self.loop_once()
 
-    def keep_position(self, tip, root=None):
-        if root is None:
-            root = self.default_root
-        goal = PoseStamped()
-        goal.header.frame_id = tip
-        goal.pose.orientation.w = 1
-        self.set_cart_goal(goal, tip, root)
-
-    def keep_orientation(self, tip, root=None):
-        goal = PoseStamped()
-        goal.header.frame_id = tip
-        goal.pose.orientation.w = 1
-        self.set_rotation_goal(goal, tip, root)
-
-    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
+    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
+                          **kwargs):
         if not root_link:
             root_link = self.default_root
         super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
                                                           weight=weight, **kwargs)
+        if check:
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
 
-    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
+    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
+                             **kwargs):
         if not root_link:
             root_link = self.default_root
         super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
                                                              weight=weight, **kwargs)
+        if check:
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
 
-
-    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
+    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None,
+                                      **kwargs):
         if not root_link:
             root_link = self.default_root
         super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link,
                                                                       max_velocity=max_velocity, weight=weight,
                                                                       **kwargs)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
+    def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
+                      angular_velocity=None, check=True):
         if not root_link:
             root_link = self.default_root
+
         if weight is not None:
             super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
                                                           tip_link,
@@ -467,140 +546,88 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           max_linear_velocity=linear_velocity,
                                                           max_angular_velocity=angular_velocity)
 
-    def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
+        if check:
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+
+    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
+                              weight=None, check=True):
+        if root_link is None:
+            root_link = self.robot.root_link_name
+        super(GiskardTestWrapper, self).set_align_planes_goal(tip_link, tip_normal, root_link, root_normal,
+                                                              max_angular_velocity, weight)
+        if check:
+            self.add_goal_check(AlignPlanesGoalChecker(self.god_map, tip_link, tip_normal, root_link, root_normal))
+
+    def add_goal_check(self, goal_checker):
+        self.goal_checks[self.number_of_cmds - 1].append(goal_checker)
+
+    def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
+                               angular_velocity=None, check=True):
         if not root_link:
             root_link = self.default_root
-        if weight is not None:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, max_linear_velocity=linear_velocity,
-                                                                   max_angular_velocity=angular_velocity)
-        else:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, max_linear_velocity=linear_velocity,
-                                                                   max_angular_velocity=angular_velocity)
+        super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight,
+                                                               max_linear_velocity=linear_velocity,
+                                                               max_angular_velocity=angular_velocity)
 
-
-    def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
-                                expected_error_codes=None):
-        goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(goal_pose, tip_link, root_link, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
-        self.loop_once()
-        self.send_and_check_goal(expected_error_codes)
-        self.loop_once()
-        if expected_error_codes is None:
-            self.check_cart_goal(tip_link, goal_pose_in_map)
-
-
-    def set_and_check_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
-                                expected_error_codes=None):
-        goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_straight_cart_goal(goal_pose, tip_link, root_link, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
-        self.loop_once()
-        self.send_and_check_goal(expected_error_codes)
-        self.loop_once()
-        if expected_error_codes is None:
-            self.check_cart_goal(tip_link, goal_pose_in_map)
-
-
-    def check_cart_goal(self, tip_link, goal_pose):
-        goal_in_base = transform_pose(u'map', goal_pose)
-        current_pose = lookup_pose(u'map', tip_link)
-        np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
-                                             msg_to_list(current_pose.pose.position), decimal=2)
-
-        try:
-            np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
-                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
-        except AssertionError:
-            np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
-                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
+        if check:
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
 
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def interrupt(self):
-        self.cancel_goal.publish(GoalID())
+    def plan_and_execute(self, expected_error_codes=None, stop_after=None):
+        return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after)
 
-    def check_reachability(self, expected_error_codes=None):
-        self.send_and_check_goal(expected_error_codes=expected_error_codes,
-                                 goal_type=MoveGoal.PLAN_AND_CHECK_REACHABILITY)
-
-    def get_as(self):
-        return Blackboard().get(u'~command')
-
-    def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, wait=True):
-        """
-        :rtype: MoveResult
-        """
-        if goal is None:
-            goal = MoveActionGoal()
-            goal.goal = self._get_goal()
-            goal.goal.type = goal_type
-        i = 0
-        self.loop_once()
-        t = time()
-        t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
-        self.loop_once()
-        t1.start()
-        sleeper = rospy.Rate(self.tick_rate)
-        while self.results.empty():
-            self.loop_once()
-            sleeper.sleep()
-            i += 1
-        t1.join()
-        t = time() - t
-        self.total_time_spend_giskarding += t
-        self.loop_once()
-        result = self.results.get()
-        return result
-
-    def send_goal_and_dont_wait(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, stop_after=20):
-        if goal is None:
-            goal = MoveActionGoal()
-            goal.goal = self._get_goal()
-            goal.goal.type = goal_type
-        i = 0
-        self.loop_once()
-        t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
-        self.loop_once()
-        t1.start()
-        sleeper = rospy.Rate(self.tick_rate)
-        while self.results.empty():
-            self.loop_once()
-            sleeper.sleep()
-            i += 1
-            if i > stop_after:
-                self.interrupt()
-        t1.join()
-        self.loop_once()
-        result = self.results.get()
-        return result
-
-    def send_and_check_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
-        r = self.send_goal(goal=goal, goal_type=goal_type)
-        for i in range(len(r.error_codes)):
-            error_code = r.error_codes[i]
-            error_message = r.error_messages[i]
-            if expected_error_codes is None:
-                expected_error_code = MoveResult.SUCCESS
+    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None):
+        try:
+            time_spend_giskarding = time()
+            if stop_after is None:
+                r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=True)
             else:
-                expected_error_code = expected_error_codes[i]
-            assert error_code == expected_error_code, \
-                u'in goal {}; got: {}, expected: {} | error_massage: {}'.format(i, move_result_error_code(error_code),
-                                                                                move_result_error_code(
-                                                                                    expected_error_code),
-                                                                                error_message)
-        self.are_joint_limits_violated()
+                super(GiskardTestWrapper, self).send_goal(goal_type, wait=False)
+                rospy.sleep(stop_after)
+                self.interrupt()
+                rospy.sleep(1)
+                r = self.get_result(rospy.Duration(3))
+            self.wait_heartbeats()
+            self.total_time_spend_giskarding += time() - time_spend_giskarding
+            for cmd_id in range(len(r.error_codes)):
+                error_code = r.error_codes[cmd_id]
+                error_message = r.error_messages[cmd_id]
+                if expected_error_codes is None:
+                    expected_error_code = MoveResult.SUCCESS
+                else:
+                    expected_error_code = expected_error_codes[cmd_id]
+                assert error_code == expected_error_code, \
+                    u'in goal {}; got: {}, expected: {} | error_massage: {}'.format(cmd_id,
+                                                                                    move_result_error_code(error_code),
+                                                                                    move_result_error_code(
+                                                                                        expected_error_code),
+                                                                                    error_message)
+            if error_code == MoveResult.SUCCESS:
+                try:
+                    for goal_checker in self.goal_checks[len(r.error_codes)]:
+                        goal_checker()
+                except:
+                    logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
+                    raise
+            self.are_joint_limits_violated()
+        finally:
+            self.goal_checks = defaultdict(list)
         return r.trajectory
 
     def get_result_trajectory_position(self):
-        trajectory = self.get_god_map().unsafe_get_data(identifier.trajectory)
+        trajectory = self.god_map.unsafe_get_data(identifier.trajectory)
         trajectory2 = {}
         for joint_name in trajectory.get_exact(0).keys():
             trajectory2[joint_name] = np.array([p[joint_name].position for t, p in trajectory.items()])
         return trajectory2
 
     def get_result_trajectory_velocity(self):
-        trajectory = self.get_god_map().get_data(identifier.trajectory)
+        trajectory = self.god_map.get_data(identifier.trajectory)
         trajectory2 = {}
         for joint_name in trajectory.get_exact(0).keys():
             trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])
@@ -609,15 +636,15 @@ class GiskardTestWrapper(GiskardWrapper):
     def are_joint_limits_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
-
-        for joint in self.get_robot().controlled_joints:
-            if not self.get_robot().is_joint_continuous(joint):
-                joint_limits = self.get_robot().get_joint_position_limits(joint)
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
+        for joint in controlled_joints:
+            if not self.robot.is_joint_continuous(joint):
+                joint_limits = self.robot.get_joint_position_limits(joint)
                 error_msg = u'{} has violated joint position limit'.format(joint)
                 np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
                 np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)
-            vel_limit = self.get_robot().get_joint_velocity_limit_expr(joint)
-            vel_limit = self.get_god_map().evaluate_expr(vel_limit) * 1.001
+            vel_limit = self.world.joint_limit_expr(joint, 1)[1]
+            vel_limit = self.god_map.evaluate_expr(vel_limit) * 1.001
             vel = trajectory_vel[joint]
             error_msg = u'{} has violated joint velocity limit {} > {}'.format(joint, vel, vel_limit)
             assert np.all(np.less_equal(vel, vel_limit)), error_msg
@@ -626,177 +653,141 @@ class GiskardTestWrapper(GiskardWrapper):
     #
     # BULLET WORLD #####################################################################################################
     #
-    def get_world(self):
+
+    @property
+    def world(self):
         """
-        :rtype: PyBulletWorld
+        :rtype: giskardpy.model.world.WorldTree
         """
-        return self.get_god_map().get_data(world)
+        return self.god_map.get_data(identifier.world)
 
     def clear_world(self):
-        assert super(GiskardTestWrapper, self).clear_world().error_codes == UpdateWorldResponse.SUCCESS
-        assert len(self.get_world().get_object_names()) == 0
-        assert len(self.get_object_names().object_names) == 0
-        # assert len(self.get_robot().get_attached_objects()) == 0
-        # assert self.get_world().has_object(u'plane')
+        return_val = super(GiskardTestWrapper, self).clear_world()
+        assert return_val.error_codes == UpdateWorldResponse.SUCCESS
+        assert len(self.world.groups) == 1
+        assert len(self.get_object_names().object_names) == 1
+        assert self.original_number_of_links == len(self.world.links)
 
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            old_link_names = self.world.groups[name].link_names
+            old_joint_names = self.world.groups[name].joint_names
         r = super(GiskardTestWrapper, self).remove_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
-        assert not self.get_world().has_object(name)
-        assert not name in self.get_object_names().object_names
+        assert not name in self.world.groups
+        assert name not in self.get_object_names().object_names
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            for old_link_name in old_link_names:
+                assert old_link_name not in self.world.link_names
+            for old_joint_name in old_joint_names:
+                assert old_joint_name not in self.world.joint_names
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
-            p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
-            p = transform_pose(u'map', p)
-            assert name in self.get_attached_objects().object_names, \
-                'there is no attached object named {}'.format(name)
-        r = super(GiskardTestWrapper, self).detach_object(name)
-        assert r.error_codes == expected_response, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_response))
-        if expected_response == UpdateWorldResponse.SUCCESS:
-            assert self.get_world().has_object(name)
-            assert not name in self.get_attached_objects().object_names, 'the object was not detached'
-            compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
+            expected_pose = self.robot.compute_fk_pose(self.robot.root_link_name, name)
+            response = super(GiskardTestWrapper, self).detach_object(name)
+            self.check_add_object_result(response, expected_response, expected_pose, name)
 
-    def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
-        r = super(GiskardTestWrapper, self).add_box(name, size, pose=pose)
-        assert r.error_codes == expected_response, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_response))
-        p = transform_pose(u'map', pose)
-        o_p = self.get_world().get_object(name).base_pose
-        assert self.get_world().has_object(name)
-        compare_poses(p.pose, o_p)
-        assert name in self.get_object_names().object_names
-        compare_poses(o_p, self.get_object_info(name).pose.pose)
-
-    def add_sphere(self, name=u'sphere', size=1., pose=None):
-        r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.get_object_names().object_names
-        o_p = self.get_world().get_object(name).base_pose
-        compare_poses(o_p, self.get_object_info(name).pose.pose)
-
-    def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
-        r = super(GiskardTestWrapper, self).add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.get_object_names().object_names
-
-    def add_mesh(self, name=u'cylinder', path=u'', pose=None, expected_error=UpdateWorldResponse.SUCCESS):
-        r = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=path, pose=pose)
-        assert r.error_codes == expected_error, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_error))
-        if expected_error == UpdateWorldResponse.SUCCESS:
-            assert self.get_world().has_object(name)
+    def check_add_object_result(self, response, error_code, pose, name):
+        assert response.error_codes == error_code, \
+            u'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
+                                            update_world_error_code(error_code))
+        if error_code == UpdateWorldResponse.SUCCESS:
+            p = tf.transform_pose(self.world.root_link_name, pose)
+            o_p = self.world.groups[name].base_pose
+            compare_poses(p.pose, o_p)
             assert name in self.get_object_names().object_names
-            o_p = self.get_world().get_object(name).base_pose
             compare_poses(o_p, self.get_object_info(name).pose.pose)
+            assert name not in self.get_attached_objects().object_names
         else:
-            assert not self.get_world().has_object(name)
-            assert name not in self.get_object_names().object_names
+            if error_code != UpdateWorldResponse.DUPLICATE_BODY_ERROR:
+                assert name not in self.world.groups
+                assert name not in self.get_object_names().object_names
 
-    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None):
-        r = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.get_object_names().object_names
+    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_box(name=name, size=size, frame_id=frame_id, position=position,
+                                                           orientation=orientation, pose=pose)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+        self.check_add_object_result(response, expected_error_code, pose, name)
 
-    def avoid_all_collisions(self, distance=0.5):
-        super(GiskardTestWrapper, self).avoid_all_collisions(distance)
-        self.loop_once()
+    def add_sphere(self, name=u'sphere', radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                   pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_sphere(name=name, radius=radius, pose=pose, frame_id=frame_id,
+                                                              position=position, orientation=orientation)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+        self.check_add_object_result(response, expected_error_code, pose, name)
+
+    def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0),
+                     orientation=(0, 0, 0, 1),
+                     pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_cylinder(name=name, height=height, radius=radius,
+                                                                frame_id=frame_id,
+                                                                position=position, orientation=orientation, pose=pose)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+        self.check_add_object_result(response, expected_error_code, pose, name)
+
+    def add_mesh(self, name=u'meshy', mesh=u'', frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                 pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=mesh, frame_id=frame_id, position=position,
+                                                            orientation=orientation, pose=pose)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+        self.check_add_object_result(response, expected_error_code, pose, name)
+
+    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None,
+                 expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
+        self.check_add_object_result(response, expected_error_code, pose, name)
+
+    def check_attach_object_result(self, response, expected_error_code, pose, name):
+        assert response.error_codes == expected_error_code, \
+            u'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
+                                            update_world_error_code(expected_error_code))
+        if expected_error_code == UpdateWorldResponse.SUCCESS:
+            assert name in [n.short_name for n in self.robot.link_names]
+            assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
+            current_pose = self.world.compute_fk_pose(self.world.root_link_name, name)
+            pose = tf.transform_pose(self.world.root_link_name, pose)
+            compare_poses(pose.pose, current_pose.pose)
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
-        scm = self.get_robot().get_self_collision_matrix()
-        if pose is None:
-            expected_pose = PoseStamped()
-            expected_pose.header.frame_id = frame_id
-            expected_pose.pose.position = Point(*position)
-            if orientation:
-                expected_pose.pose.orientation = Quaternion(*orientation)
-            else:
-                expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-        else:
-            expected_pose = deepcopy(pose)
-        r = super(GiskardTestWrapper, self).attach_box(name, size, frame_id, position, orientation, pose)
-        assert r.error_codes == expected_response, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_response))
-        if expected_response == UpdateWorldResponse.SUCCESS:
-            self.wait_for_synced()
-            assert name in self.get_controllable_links()
-            assert not self.get_world().has_object(name)
-            assert not name in self.get_object_names().object_names
-            assert name in self.get_attached_objects().object_names, 'object {} was not attached'
-            assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
-            assert len(scm) < len(self.get_robot().get_self_collision_matrix())
-            compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
-        self.loop_once()
+        response = super(GiskardTestWrapper, self).attach_box(name, size, frame_id, position, orientation, pose)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+        self.check_attach_object_result(response, expected_response, pose, name)
 
     def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
-                        expected_response=UpdateWorldResponse.SUCCESS):
-        scm = self.get_robot().get_self_collision_matrix()
-        expected_pose = PoseStamped()
-        expected_pose.header.frame_id = frame_id
-        expected_pose.pose.position = Point(*position)
-        if orientation:
-            expected_pose.pose.orientation = Quaternion(*orientation)
-        else:
-            expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-        r = super(GiskardTestWrapper, self).attach_cylinder(name, height, radius, frame_id, position, orientation)
-        assert r.error_codes == expected_response, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_response))
-        if expected_response == UpdateWorldResponse.SUCCESS:
-            self.wait_for_synced()
-            assert name in self.get_controllable_links()
-            assert not self.get_world().has_object(name)
-            assert not name in self.get_object_names().object_names
-            assert name in self.get_attached_objects().object_names
-            assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
-            assert len(scm) < len(self.get_robot().get_self_collision_matrix())
-            compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
-        self.loop_once()
+                        pose=None, expected_response=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).attach_cylinder(name=name, height=height, radius=radius,
+                                                                   frame_id=frame_id, position=position,
+                                                                   orientation=orientation, pose=pose)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+        self.check_attach_object_result(response, expected_response, pose, name)
 
     def attach_object(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
-        scm = self.get_robot().get_self_collision_matrix()
         r = super(GiskardTestWrapper, self).attach_object(name, frame_id)
+        self.wait_heartbeats()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
-        self.wait_for_synced()
-        assert name in self.get_controllable_links()
-        assert not self.get_world().has_object(name)
-        assert not name in self.get_object_names().object_names
         assert name in self.get_attached_objects().object_names
-        assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
-        assert len(scm) < len(self.get_robot().get_self_collision_matrix())
-        self.loop_once()
+        if self.god_map.get_data(identifier.collision_checker) is not None:
+            assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
 
     def get_external_collisions(self, link, distance_threshold):
         """
         :param distance_threshold:
         :rtype: list
         """
+        self.collision_scene.reset_cache()
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
-        collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                defaultdict(lambda: 0.3))
-        collisions = self.get_world().check_collisions(collision_matrix)
-        controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link)
-        controlled_parent_link = self.get_robot().get_child_link_of_joint(controlled_parent_joint)
+        collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
+                                                                                    defaultdict(lambda: 0.3))
+        collisions = self.collision_scene.check_collisions(collision_matrix)
+        controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link)
+        controlled_parent_link = self.robot.joints[controlled_parent_joint].child_link_name
         collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():
             if controlled_parent_link in key:
@@ -806,29 +797,28 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_cpi_geq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].get_contact_distance() >= distance_threshold, \
-                u'distance for {}: {} >= {}'.format(link,
-                                                    collisions[0].get_contact_distance(),
-                                                    distance_threshold)
+            assert collisions[0].contact_distance >= distance_threshold, \
+                u'distance for {}: {} >= {} ({} with {})'.format(link,
+                                                                 collisions[0].contact_distance,
+                                                                 distance_threshold,
+                                                                 collisions[0].original_link_a,
+                                                                 collisions[0].original_link_b)
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].get_contact_distance() <= distance_threshold, \
-                u'distance for {}: {} <= {}'.format(link,
-                                                    collisions[0].get_contact_distance(),
-                                                    distance_threshold)
+            assert collisions[0].contact_distance <= distance_threshold, \
+                u'distance for {}: {} <= {} ({} with {})'.format(link,
+                                                                 collisions[0].contact_distance,
+                                                                 distance_threshold,
+                                                                 collisions[0].original_link_a,
+                                                                 collisions[0].original_link_b)
 
     def move_base(self, goal_pose):
         """
         :type goal_pose: PoseStamped
         """
-        self.simple_base_pose_pub.publish(goal_pose)
-        rospy.sleep(.07)
-        self.wait_for_synced()
-        current_pose = self.get_robot().get_base_pose()
-        goal_pose = transform_pose(u'map', goal_pose)
-        compare_poses(goal_pose.pose, current_pose.pose, decimal=1)
+        pass
 
     def reset_base(self):
         p = PoseStamped()
@@ -843,29 +833,21 @@ class PR2(GiskardTestWrapper):
         self.l_tip = u'l_gripper_tool_frame'
         self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
-        super(PR2, self).__init__(u'pr2.yaml')
-        self.default_root = self.get_robot().get_root()
+        super(PR2, self).__init__(u'package://giskardpy/config/pr2.yaml')
 
     def move_base(self, goal_pose):
-        goal_pose = transform_pose(self.default_root, goal_pose)
-        js = {u'odom_x_joint': goal_pose.pose.position.x,
-              u'odom_y_joint': goal_pose.pose.position.y,
-              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
-        self.send_and_check_joint_goal(js)
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
+        self.plan_and_execute()
 
     def get_l_gripper_links(self):
-        return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',
-                u'l_gripper_r_finger_link', u'l_gripper_r_finger_link', u'l_gripper_palm_link']
+        if 'l_gripper' not in self.world.group_names:
+            self.world.register_group('l_gripper', 'l_wrist_roll_link')
+        return [str(x) for x in self.world.groups['l_gripper'].link_names_with_collisions]
 
     def get_r_gripper_links(self):
-        return [u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link', u'r_gripper_l_finger_link',
-                u'r_gripper_r_finger_link', u'r_gripper_r_finger_link', u'r_gripper_palm_link']
-
-    def get_r_upper_arm(self):
-        return [u'r_shoulder_lift_link', u'r_upper_arm_roll_link', u'r_upper_arm_link']
+        if 'r_gripper' not in self.world.group_names:
+            self.world.register_group('r_gripper', 'r_wrist_roll_link')
+        return [str(x) for x in self.world.groups['r_gripper'].link_names_with_collisions]
 
     def get_r_forearm_links(self):
         return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',
@@ -915,28 +897,16 @@ class PR2(GiskardTestWrapper):
         sjs.state.effort = [0, 0, 0, 0]
         self.l_gripper.call(sjs)
 
-    def move_pr2_base(self, goal_pose):
-        """
-        :type goal_pose: PoseStamped
-        """
-        self.simple_base_pose_pub.publish(goal_pose)
-
-    def reset_pr2_base(self):
-        p = PoseStamped()
-        p.header.frame_id = self.map
-        p.pose.orientation.w = 1
-        self.move_pr2_base(p)
-
 
 class Donbot(GiskardTestWrapper):
     def __init__(self):
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
         self.gripper_pub = rospy.Publisher(u'/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
-        super(Donbot, self).__init__(u'donbot.yaml')
+        super(Donbot, self).__init__(u'package://giskardpy/config/donbot.yaml')
 
     def move_base(self, goal_pose):
-        goal_pose = transform_pose(self.default_root, goal_pose)
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
               u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
@@ -971,10 +941,10 @@ class KMR_IIWA(GiskardTestWrapper):
     def __init__(self):
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
-        super(KMR_IIWA, self).__init__(u'kmr_iiwa.yaml')
+        super(KMR_IIWA, self).__init__(u'package://giskardpy/config/kmr_iiwa.yaml')
 
     def move_base(self, goal_pose):
-        goal_pose = transform_pose(self.default_root, goal_pose)
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
               u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
@@ -990,10 +960,10 @@ class Boxy(GiskardTestWrapper):
         self.camera_tip = u'camera_link'
         self.r_tip = u'right_gripper_tool_frame'
         self.l_tip = u'left_gripper_tool_frame'
-        super(Boxy, self).__init__(u'boxy_sim.yaml')
+        super(Boxy, self).__init__(u'package://giskardpy/config/boxy_sim.yaml')
 
     def move_base(self, goal_pose):
-        goal_pose = transform_pose(self.default_root, goal_pose)
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
               u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
@@ -1007,10 +977,10 @@ class Boxy(GiskardTestWrapper):
 class HSR(GiskardTestWrapper):
     def __init__(self):
         self.tip = u'hand_palm_link'
-        super(HSR, self).__init__(u'hsr.yaml')
+        super(HSR, self).__init__(u'package://giskardpy/config/hsr.yaml')
 
     def move_base(self, goal_pose):
-        goal_pose = transform_pose(self.default_root, goal_pose)
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {u'odom_x': goal_pose.pose.position.x,
               u'odom_y': goal_pose.pose.position.y,
               u'odom_t': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,

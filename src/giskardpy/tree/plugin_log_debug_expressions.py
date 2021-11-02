@@ -9,7 +9,7 @@ from giskardpy.tree.plugin import GiskardBehavior
 class LogDebugExpressionsPlugin(GiskardBehavior):
     def __init__(self, name):
         super(LogDebugExpressionsPlugin, self).__init__(name)
-        self.number_of_joints = len(self.get_robot().controlled_joints)
+        self.number_of_joints = len(self.world.controlled_joints)
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
 
     def initialise(self):

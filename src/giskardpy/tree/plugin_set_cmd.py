@@ -1,26 +1,39 @@
+import rospy
+from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.utils import logging
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.tree.plugin_action_server import GetGoal
-from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
+from giskardpy.utils import logging
 
 
 class SetCmd(GetGoal):
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
-        self.goal = None
         self.sample_period_backup = None
         self.rc_sample_period = self.get_god_map().get_data(identifier.rc_sample_period)
 
+    @property
+    def goal(self):
+        """
+        :rtype: MoveGoal
+        """
+        return self.god_map.get_data(identifier.goal_msg)
+
     def initialise(self):
         if self.goal is None:
-            self.goal = self.pop_goal()  # type: MoveGoal
+            self.god_map.set_data(identifier.goal_msg, self.pop_goal())
+            self.number_of_move_cmds = len(self.goal.cmd_seq)
+            self.god_map.set_data(identifier.number_of_move_cmds, self.number_of_move_cmds)
+            logging.loginfo('Goal has {} move commands(s).'.format(len(self.goal.cmd_seq)))
             self.get_god_map().set_data(identifier.cmd_id, -1)
             empty_result = MoveResult()
             empty_result.error_codes = [MoveResult.ERROR for _ in self.goal.cmd_seq]
             empty_result.error_messages = [u'' for _ in self.goal.cmd_seq]
+            if not empty_result.error_codes:
+                empty_result.error_codes = [MoveResult.ERROR]
+                empty_result.error_messages = ['']
             self.traj = []
             if len(self.goal.cmd_seq) == 0:
                 empty_result.error_codes = [MoveResult.INVALID_GOAL]
@@ -69,21 +82,15 @@ class SetCmd(GetGoal):
         return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(goal_type))) if int(bit) != 0]
 
     def update(self):
-        # TODO goal checks should probably be its own plugin?
-        skip_failures = self.get_god_map().get_data(identifier.skip_failures)
-        if not skip_failures and self.get_blackboard_exception():
-            self.goal = None
-            # self.get_god_map().set_data(identifier.next_move_goal, None)
+        if self.get_blackboard_exception() is not None:
             return Status.SUCCESS
-
         try:
             move_cmd = self.goal.cmd_seq.pop(0)  # type: MoveCmd
             self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
             cmd_id = self.get_god_map().get_data(identifier.cmd_id) + 1
             self.get_god_map().set_data(identifier.cmd_id, cmd_id)
+            logging.loginfo('Planning move commands #{}/{}.'.format(cmd_id + 1, self.number_of_move_cmds))
         except IndexError:
-            self.goal = None
-            # self.get_god_map().set_data(identifier.next_move_goal, None)
-            return Status.SUCCESS
+            return Status.FAILURE
 
-        return Status.RUNNING
+        return Status.SUCCESS

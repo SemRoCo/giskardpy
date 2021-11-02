@@ -3,40 +3,25 @@ from __future__ import division
 import errno
 import json
 import os
-from copy import deepcopy
-
-import subprocess
 import sys
-from collections import defaultdict, OrderedDict, deque
+from collections import OrderedDict
 from contextlib import contextmanager
 from functools import wraps
-from itertools import product, islice
+from itertools import product
 
 import numpy as np
-import pydot
 import pylab as plt
 import rospkg
 import rospy
-from future.builtins import isinstance
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
-from giskard_msgs.msg import WorldBody
-from numpy import pi
-from py_trees import common, Chooser, Selector, Sequence, Behaviour
-from py_trees.composites import Parallel
-from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
+from rospy_message_converter.message_converter import \
+    convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
 from sensor_msgs.msg import JointState
-from shape_msgs.msg import SolidPrimitive
-from std_msgs.msg import ColorRGBA
-from tf.transformations import quaternion_multiply, quaternion_conjugate
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from visualization_msgs.msg import Marker
 
 from giskardpy.utils import logging
-from giskardpy.tree.plugin import PluginBehavior
-from giskardpy.utils.tfwrapper import kdl_to_pose, np_to_kdl
-
+import matplotlib.colors as mcolors
 
 @contextmanager
 def suppress_stderr():
@@ -70,11 +55,6 @@ class NullContextManager(object):
 
     def __exit__(self, *args):
         pass
-
-
-
-
-
 
 
 #
@@ -142,6 +122,7 @@ def dict_to_joint_states(joint_state_dict):
         js.effort.append(0)
     return js
 
+
 def msg_to_list(thing):
     """
     :param thing: ros msg
@@ -206,10 +187,12 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     order = max(order, 2)
     if len(tj._points) <= 0:
         return
-    colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+    colors = list(mcolors.TABLEAU_COLORS.keys())
+    colors.append('k')
+
     titles = [u'position', u'velocity', u'acceleration', u'jerk', u'snap', u'crackle', u'pop']
-    line_styles = [u'', u'--', u'-.', u':']
-    fmts = [u''.join(i) for i in product(line_styles, colors)]
+    line_styles = [u'-', u'--', u'-.', u':']
+    fmts = list(product(line_styles, colors))
     data = [[] for i in range(order)]
     times = []
     names = list(sorted([i for i in tj._points[0.0].keys() if i in controlled_joints]))
@@ -248,13 +231,18 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         for i in range(order):
             axs[i].set_title(titles[i])
             # axs[i].set_ylim([-0.5, 0.5])
+    color_counter = 0
     for i in range(len(controlled_joints)):
         if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
             for j in range(order):
                 try:
-                    axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
-                except:
+                    axs[j].plot(times, data[j][:, i], color=fmts[color_counter][1], linestyle=fmts[color_counter][0],
+                                label=names[i])
+                except KeyError:
+                    logging.logwarn(u'Not enough colors to plot all joints, skipping {}.'.format(names[i]))
+                except Exception as e:
                     pass
+            color_counter += 1
 
     axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
 
@@ -272,7 +260,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
             if i == 1:
                 previous_file_name = file_name
             else:
-                previous_file_name = file_name.replace('.pdf', '{}.pdf'.format(i-1))
+                previous_file_name = file_name.replace('.pdf', '{}.pdf'.format(i - 1))
             current_file_name = file_name.replace('.pdf', '{}.pdf'.format(i))
             try:
                 os.rename(previous_file_name, current_file_name)
@@ -335,125 +323,6 @@ def write_to_tmp(filename, urdf_string):
     return new_path
 
 
-def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
-    """
-    Render the dot tree to .dot, .svg, .png. files in the current
-    working directory. These will be named with the root behaviour name.
-
-    Args:
-        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
-        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
-        name (:obj:`str`): name to use for the created files (defaults to the root behaviour name)
-
-    Example:
-
-        Render a simple tree to dot/svg/png file:
-
-        .. graphviz:: dot/sequence.dot
-
-        .. code-block:: python
-
-            root = py_trees.composites.Sequence("Sequence")
-            for job in ["Action 1", "Action 2", "Action 3"]:
-                success_after_two = py_trees.behaviours.Count(name=job,
-                                                              fail_until=0,
-                                                              running_until=1,
-                                                              success_until=10)
-                root.add_child(success_after_two)
-            py_trees.display.render_dot_tree(root)
-
-    .. tip::
-
-        A good practice is to provide a command line argument for optional rendering of a program so users
-        can quickly visualise what tree the program will execute.
-    """
-    graph = generate_pydot_graph(root, visibility_level)
-    filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
-    logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
-    graph.write(filename_wo_extension + '.dot')
-    graph.write_png(filename_wo_extension + '.png')
-    graph.write_svg(filename_wo_extension + '.svg')
-
-
-def generate_pydot_graph(root, visibility_level):
-    """
-    Generate the pydot graph - this is usually the first step in
-    rendering the tree to file. See also :py:func:`render_dot_tree`.
-
-    Args:
-        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
-        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
-
-    Returns:
-        pydot.Dot: graph
-    """
-
-    def get_node_attributes(node, visibility_level):
-        blackbox_font_colours = {common.BlackBoxLevel.DETAIL: "dodgerblue",
-                                 common.BlackBoxLevel.COMPONENT: "lawngreen",
-                                 common.BlackBoxLevel.BIG_PICTURE: "white"
-                                 }
-        if isinstance(node, Chooser):
-            attributes = ('doubleoctagon', 'cyan', 'black')  # octagon
-        elif isinstance(node, Selector):
-            attributes = ('octagon', 'cyan', 'black')  # octagon
-        elif isinstance(node, Sequence):
-            attributes = ('box', 'orange', 'black')
-        elif isinstance(node, Parallel):
-            attributes = ('note', 'gold', 'black')
-        elif isinstance(node, PluginBehavior):
-            attributes = ('box', 'green', 'black')
-        # elif isinstance(node, PluginBase) or node.children != []:
-        #     attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
-        else:
-            attributes = ('ellipse', 'gray', 'black')
-        # if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
-        #     attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
-        return attributes
-
-    fontsize = 11
-    graph = pydot.Dot(graph_type='digraph')
-    graph.set_name(root.name.lower().replace(" ", "_"))
-    # fonts: helvetica, times-bold, arial (times-roman is the default, but this helps some viewers, like kgraphviewer)
-    graph.set_graph_defaults(fontname='times-roman')
-    graph.set_node_defaults(fontname='times-roman')
-    graph.set_edge_defaults(fontname='times-roman')
-    (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
-    node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize,
-                           fontcolor=node_font_colour)
-    graph.add_node(node_root)
-    names = [root.name]
-
-    def add_edges(root, root_dot_name, visibility_level):
-        if visibility_level < root.blackbox_level:
-            if isinstance(root, PluginBehavior):
-                childrens = []
-                names2 = []
-                for name, children in root.get_plugins().items():
-                    childrens.append(children)
-                    names2.append(name)
-            else:
-                childrens = root.children
-                names2 = [c.name for c in childrens]
-            for name, c in zip(names2, childrens):
-                (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
-                proposed_dot_name = name
-                while proposed_dot_name in names:
-                    proposed_dot_name = proposed_dot_name + "*"
-                names.append(proposed_dot_name)
-                node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
-                                  fontsize=fontsize, fontcolor=node_font_colour)
-                graph.add_node(node)
-                edge = pydot.Edge(root_dot_name, proposed_dot_name)
-                graph.add_edge(edge)
-                if (isinstance(c, PluginBehavior) and c.get_plugins() != []) or \
-                        (isinstance(c, Behaviour) and c.children != []):
-                    add_edges(c, proposed_dot_name, visibility_level)
-
-    add_edges(root, root.name, visibility_level)
-    return graph
-
-
 def memoize(function):
     memo = function.memo = {}
 
@@ -471,6 +340,17 @@ def memoize(function):
 
     return wrapper
 
+
+def make_pose_from_parts(pose, frame_id, position, orientation):
+    if pose is None:
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
+        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
+        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
+    return pose
+
+
 def convert_ros_message_to_dictionary(message):
     # TODO there is probably a lib for that, but i'm to lazy to search
     type_str_parts = str(type(message)).split(u'.')
@@ -481,47 +361,10 @@ def convert_ros_message_to_dictionary(message):
          u'message': original_convert_ros_message_to_dictionary(message)}
     return d
 
+
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?
     return original_convert_dictionary_to_ros_message(json[u'message_type'], json[u'message'])
-
-def replace_jsons_with_ros_messages(d):
-    # TODO find message type
-    if isinstance(d, list):
-        result = list()
-        for i, element in enumerate(d):
-            result.append(replace_jsons_with_ros_messages(element))
-        return result
-    elif isinstance(d, dict):
-        if 'message_type' in d:
-            return convert_dictionary_to_ros_message(d)
-        else:
-            result = {}
-            for key, value in d.items():
-                result[key] = replace_jsons_with_ros_messages(value)
-            return result
-    return d
-
-def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_values):
-    """
-    :type traj: giskardpy.data_types.Trajectory
-    :return: JointTrajectory
-    """
-    trajectory_msg = JointTrajectory()
-    trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-    trajectory_msg.joint_names = controlled_joints
-    for time, traj_point in trajectory.items():
-        p = JointTrajectoryPoint()
-        p.time_from_start = rospy.Duration(time * sample_period)
-        for joint_name in controlled_joints:
-            if joint_name in traj_point:
-                p.positions.append(traj_point[joint_name].position)
-                if fill_velocity_values:
-                    p.velocities.append(traj_point[joint_name].velocity)
-            else:
-                raise NotImplementedError(u'generated traj does not contain all joints')
-        trajectory_msg.points.append(p)
-    return trajectory_msg
 
 
 def trajectory_to_np(tj, joint_names):
@@ -541,6 +384,3 @@ def trajectory_to_np(tj, joint_names):
     velocity = np.array(velocity)
     times = np.array(times)
     return names, position, velocity, times
-
-
-

@@ -2,13 +2,15 @@ from __future__ import division
 
 from collections import OrderedDict
 
-import numpy as np
 from giskard_msgs.msg import Constraint as Constraint_msg
+from tf2_py import LookupException
 
 import giskardpy.identifier as identifier
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException
-from giskardpy.model.robot import Robot
+from giskardpy.model.world import WorldTree
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
@@ -20,17 +22,23 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 class Goal(object):
     def __init__(self, god_map, control_horizon=None, **kwargs):
-        self._god_map = god_map
-        self.prediction_horizon = self.get_god_map().get_data(identifier.prediction_horizon)
-        self._test_mode = self.get_god_map().get_data(identifier.test_mode)
+        """
+        :type god_map: giskardpy.god_map.GodMap
+        :type control_horizon: int
+        :type kwargs: dict
+        """
+        self.god_map = god_map
+        self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
+        self._test_mode = self.god_map.get_data(identifier.test_mode)
         # last 2 velocities are 0 anyway
         if control_horizon is None:
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
         self._sub_goals = []
+        self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
 
     def _save_self_on_god_map(self):
-        self.get_god_map().set_data(self._get_identifier(), self)
+        self.god_map.set_data(self._get_identifier(), self)
 
     def make_constraints(self):
         pass
@@ -45,51 +53,33 @@ class Goal(object):
     def get_world_object_pose(self, object_name, link_name):
         pass
 
-    def get_god_map(self):
-        """
-        :rtype: giskardpy.god_map.GodMap
-        """
-        return self._god_map
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return self.world.transform_msg(target_frame, msg)
+        except KeyError as e:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)
 
-    def get_world(self):
+    @property
+    def robot(self):
         """
-        :rtype: giskardpy.world.World
+        :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.get_god_map().get_data(identifier.world)
-
-    def get_robot(self):
-        """
-        :rtype: Robot
-        """
-        return self.get_god_map().get_data(identifier.robot)
-
-    def get_world_unsafe(self):
-        """
-        :rtype: giskardpy.world.World
-        """
-        return self.get_god_map().unsafe_get_data(identifier.world)
-
-    def get_robot_unsafe(self):
-        """
-        :rtype: giskardpy.robot.Robot
-        """
-        return self.get_god_map().unsafe_get_data(identifier.robot)
+        return self.world.groups['robot']
 
     def get_joint_position_symbol(self, joint_name):
         """
         returns a symbol that referes to the given joint
         """
-        if not self.get_robot().has_joint(joint_name):
-            raise KeyError('Robot doesn\'t have joint named: {}'.format(joint_name))
-        key = identifier.joint_states + [joint_name, u'position']
-        return self._god_map.to_symbol(key)
+        if not self.world.has_joint(joint_name):
+            raise KeyError('World doesn\'t have joint named: {}'.format(joint_name))
+        return self.world.joints[joint_name].position_symbol
 
     def get_joint_velocity_symbols(self, joint_name):
         """
         returns a symbol that referes to the given joint
         """
         key = identifier.joint_states + [joint_name, u'velocity']
-        return self._god_map.to_symbol(key)
+        return self.god_map.to_symbol(key)
 
     def get_object_joint_position_symbol(self, object_name, joint_name):
         """
@@ -97,10 +87,10 @@ class Goal(object):
         """
         # TODO test me
         key = identifier.world + [u'get_object', (object_name,), u'joint_state', joint_name, u'position']
-        return self._god_map.to_symbol(key)
+        return self.god_map.to_symbol(key)
 
     def get_sampling_period_symbol(self):
-        return self._god_map.to_symbol(identifier.sample_period)
+        return self.god_map.to_symbol(identifier.sample_period)
 
     def __str__(self):
         return self.__class__.__name__
@@ -108,21 +98,21 @@ class Goal(object):
     def get_fk(self, root, tip):
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
-        :type root: str
-        :type tip: str
+        :type root: PrefixName
+        :type tip: PrefixName
         :return: root_T_tip
         """
-        return self.get_robot().get_fk_expression(root, tip)
+        return self.world.compose_fk_expression(root, tip)
 
     def get_fk_evaluated(self, root, tip):
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
         It is not dependent on the joint state.
-        :type root: str
-        :type tip: str
+        :type root: PrefixName
+        :type tip: PrefixName
         :return: root_T_tip
         """
-        return self.get_god_map().list_to_frame(identifier.fk_np + [(root, tip)])
+        return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
 
     def get_parameter_as_symbolic_expression(self, name):
         """
@@ -133,14 +123,22 @@ class Goal(object):
         if isinstance(name, str) and not hasattr(self, name):
             raise AttributeError(u'{} doesn\'t have attribute {}'.format(self.__class__.__name__, name))
         if isinstance(name, str):
-            return self.get_god_map().to_expr(self._get_identifier() + [name])
+            return self.god_map.to_expr(self._get_identifier() + [name])
         else:
-            return self.get_god_map().to_expr(self._get_identifier() + name)
+            return self.god_map.to_expr(self._get_identifier() + name)
 
     def get_expr_velocity(self, expr):
         return w.total_derivative(expr,
-                                  self.get_robot().get_joint_position_symbols(),
-                                  self.get_robot().get_joint_velocity_symbols())
+                                  self.joint_position_symbols,
+                                  self.joint_velocity_symbols)
+
+    @property
+    def joint_position_symbols(self):
+        return [self.get_joint_position_symbol(j) for j in self.world.joints if self.world.is_joint_movable(j)]
+
+    @property
+    def joint_velocity_symbols(self):
+        return [self.get_joint_velocity_symbols(j) for j in self.world.joints if self.world.is_joint_movable(j)]
 
     def get_fk_velocity(self, root, tip):
         r_T_t = self.get_fk(root, tip)
@@ -250,17 +248,17 @@ class Goal(object):
         :type name: str
         :type expr: w.Symbol
         """
-        name = str(self) + '/' + name
+        name = u'{}/{}'.format(self, name)
         self._debug_expressions[name] = expr
 
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
             for y in range(matrix_expr.shape[1]):
-                self.add_debug_expr(name + u'/{},{}'.format(x, y), matrix_expr[x, y])
+                self.add_debug_expr(u'{}/{},{}'.format(name, x, y), matrix_expr[x, y])
 
     def add_debug_vector(self, name, vector_expr):
         for x in range(vector_expr.shape[0]):
-            self.add_debug_expr(name + u'/{}'.format(x), vector_expr[x])
+            self.add_debug_expr(u'{}/{}'.format(name, x), vector_expr[x])
 
     def add_position_constraint(self, expr_current, expr_goal, reference_velocity, weight=WEIGHT_BELOW_CA,
                                 name_suffix=u''):
@@ -286,7 +284,8 @@ class Goal(object):
         if self._test_mode:
             self.add_debug_expr('{}/error'.format(name_suffix), w.norm(error))
 
-    def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4, name_suffix=u''):
+    def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4,
+                                         name_suffix=u''):
         trans_error = w.norm(frame_P_current)
         self.add_velocity_constraint(velocity_limit=max_velocity,
                                      weight=weight,
@@ -294,8 +293,8 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix=u'{}/vel'.format(name_suffix))
-        if self._test_mode:
-            self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
+        # if self._test_mode:
+        #     self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
 
     def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
                                     weight=WEIGHT_BELOW_CA, name_suffix=u''):
@@ -308,10 +307,10 @@ class Goal(object):
 
         error = root_V_goal_normal_intermediate - frame_V_current
 
-        self.add_constraint_vector(reference_velocities=[reference_velocity]*3,
+        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
-                                   weights=[weight]*3,
+                                   weights=[weight] * 3,
                                    expressions=frame_V_current[:3],
                                    name_suffixes=[u'{}/trans/x'.format(name_suffix),
                                                   u'{}/trans/y'.format(name_suffix),
@@ -349,10 +348,14 @@ class Goal(object):
                                      upper_slack_limit=max_violation,
                                      name_suffix=u'{}/q/vel'.format(name_suffix))
 
+
 def _prepend_prefix(prefix, d):
     new_dict = OrderedDict()
     for key, value in d.items():
         new_key = u'{}/{}'.format(prefix, key)
-        value.name = u'{}/{}'.format(prefix, value.name)
+        try:
+            value.name = u'{}/{}'.format(prefix, value.name)
+        except AttributeError:
+            pass
         new_dict[new_key] = value
     return new_dict

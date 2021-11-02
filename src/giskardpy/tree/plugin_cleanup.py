@@ -3,7 +3,7 @@ from copy import deepcopy
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.data_types import Trajectory
+from giskardpy.data_types import Trajectory, Collision, Collisions
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.tree_manager import TreeManager
 
@@ -16,10 +16,13 @@ class CleanUp(GiskardBehavior):
 
     def initialise(self):
         self.get_god_map().clear_cache()
-        self.get_god_map().set_data(identifier.closest_point, {})
+        self.god_map.set_data(identifier.goal_msg, None)
+        self.world.fast_all_fks = None
+        self.collision_scene.reset_cache()
+        self.get_god_map().set_data(identifier.closest_point, Collisions(self.world, 1))
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.get_god_map().set_data(identifier.time, 1)
-        current_js = self.get_god_map().get_data(identifier.joint_states)
+        current_js = deepcopy(self.get_god_map().get_data(identifier.joint_states))
         trajectory = Trajectory()
         trajectory.set(0, current_js)
         self.get_god_map().set_data(identifier.trajectory, trajectory)
@@ -29,7 +32,7 @@ class CleanUp(GiskardBehavior):
         self.get_god_map().set_data(identifier.general_options, deepcopy(self.general_options))
         self.get_god_map().set_data(identifier.next_move_goal, None)
         tree_manager = self.get_god_map().get_data(identifier.tree_manager) # type: TreeManager
-        tree_manager.get_node(u'visualization').clear_marker()
+        # tree_manager.get_node(u'visualization').clear_marker()
 
     def update(self):
         return Status.SUCCESS

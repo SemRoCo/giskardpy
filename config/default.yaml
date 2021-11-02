@@ -57,9 +57,9 @@ plugins:
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
   WorldVisualizationBehavior: # planning world visualization through markers, slows planning down a little bit
-    enabled: True
+    enabled: False
   CPIMarker: # contact visualization, slows planning down a little bit
-    enabled: True
+    enabled: False
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
     history: 5 # will save the x last plots
@@ -92,6 +92,7 @@ reachability_check:
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
+  collision_checker: bpb # one of [bpb, pybullet, disable]
   external_collision_avoidance:
     default:
       number_of_repeller: 1

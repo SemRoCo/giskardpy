@@ -12,18 +12,16 @@ class FreeVariable(object):
         """
         self._symbols = symbols
         self.name = str(self._symbols[0])
-        self._lower_limits = lower_limits
-        self._upper_limits = upper_limits
-        self._quadratic_weights = quadratic_weights
+        self.lower_limits = lower_limits
+        self.upper_limits = upper_limits
+        self.quadratic_weights = quadratic_weights
         assert max(self._symbols.keys()) == len(self._symbols) - 1
-        assert len(self._symbols) == len(self._quadratic_weights) + 1
+        assert len(self._symbols) == len(self.quadratic_weights) + 1
         self.order = len(self._symbols)
 
-        # def default_horizon_f(weight, t):
-        #     return weight
-
         self.horizon_functions = defaultdict(float)
-        self.horizon_functions.update(horizon_functions)
+        if horizon_functions is not None:
+            self.horizon_functions.update(horizon_functions)
 
     def get_symbol(self, order):
         try:
@@ -33,13 +31,13 @@ class FreeVariable(object):
 
     def get_lower_limit(self, order):
         try:
-            return self._lower_limits[order]
+            return self.lower_limits[order]
         except KeyError:
             raise KeyError(u'Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
 
     def get_upper_limit(self, order):
         try:
-            return self._upper_limits[order]
+            return self.upper_limits[order]
         except KeyError:
             raise KeyError(u'Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
 
@@ -52,18 +50,11 @@ class FreeVariable(object):
         except Exception:
             return False
 
-    def get_quadratic_weights(self, order):
-        try:
-            return self._quadratic_weights[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have weight for derivative of order {}'.format(self, order))
-
     def normalized_weight(self, t, order, prediction_horizon):
-        weight = self.get_quadratic_weights(order)
+        weight = self.quadratic_weights[order]
         start = weight * self.horizon_functions[order]
-        a = (weight - start) / (prediction_horizon)
+        a = (weight - start) / prediction_horizon
         weight = a*t + start
-        # weight = (self.get_quadratic_weights(order), t)
         return weight * (1 / self.get_upper_limit(order)) ** 2
 
     def __str__(self):

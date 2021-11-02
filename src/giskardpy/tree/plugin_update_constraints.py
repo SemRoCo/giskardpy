@@ -16,8 +16,9 @@ from giskardpy.exceptions import UnknownConstraintException, InvalidGoalExceptio
 from giskardpy.goals.goal import Goal
 from giskardpy.utils.logging import loginfo
 from giskardpy.tree.plugin_action_server import GetGoal
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, replace_jsons_with_ros_messages
+from giskardpy.utils.utils import convert_dictionary_to_ros_message
 import pkgutil
+from giskardpy import casadi_wrapper as w, RobotName
 
 
 def get_all_classes_in_package(package):
@@ -54,20 +55,19 @@ class GoalToConstraints(GetGoal):
     def update(self):
         # TODO make this interruptable
         # TODO try catch everything
-
+        loginfo(u'Parsing goal message.')
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
             return Status.FAILURE
 
         self.get_god_map().set_data(identifier.goals, {})
 
-        self.get_robot().create_constraints(self.get_god_map())
-
         self.soft_constraints = {}
         self.vel_constraints = {}
         self.debug_expr = {}
-        if not (self.get_god_map().get_data(identifier.check_reachability)):
-            self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
+        if not (self.get_god_map().get_data(identifier.check_reachability)) and \
+                self.god_map.get_data(identifier.collision_checker) is not None:
+            self.add_collision_avoidance_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)
@@ -86,25 +86,29 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
         self.get_blackboard().runtime = time()
 
-        controlled_joints = self.get_robot().controlled_joints
-
         if (self.get_god_map().get_data(identifier.check_reachability)):
             # FIXME reachability check is broken
             pass
         else:
-            joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
-                                            controlled_joints)
+            l = self.active_free_symbols()
+            joint_constraints = [v for v in self.world.joint_constraints.values() if v.name in l]
 
         self.get_god_map().set_data(identifier.free_variables, joint_constraints)
-
+        loginfo(u'Done parsing goal message.')
         return Status.SUCCESS
 
+    def active_free_symbols(self):
+        symbols = set()
+        for c in self.soft_constraints.values():
+            symbols.update(str(s) for s in w.free_symbols(c.expression))
+        return symbols
+
+    @profile
     def parse_constraints(self, cmd):
         """
         :type cmd: MoveCmd
         :rtype: dict
         """
-        loginfo(u'Parsing goal message.')
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
             try:
                 loginfo(u'Adding constraint of type: \'{}\''.format(constraint.type))
@@ -128,10 +132,10 @@ class GoalToConstraints(GetGoal):
             try:
                 if hasattr(constraint, u'parameter_value_pair'):
                     parsed_json = json.loads(constraint.parameter_value_pair)
-                    params = replace_jsons_with_ros_messages(parsed_json)
+                    params = self.replace_jsons_with_ros_messages(parsed_json)
                 else:
                     raise ConstraintInitalizationException(u'Only the json interface is supported at the moment. Create an issue if you want it.')
-                    # params = convert_ros_message_to_dictionary(constraint) #FIXME: might break stuff too
+                    # params = convert_ros_message_to_dictionary(constraint)
                     # del params[u'type']
 
                 c = C(god_map=self.god_map, **params)
@@ -154,9 +158,25 @@ class GoalToConstraints(GetGoal):
                 if not isinstance(e, GiskardException):
                     raise ConstraintInitalizationException(e)
                 raise e
-        loginfo(u'done parsing goal message')
 
-    def add_collision_avoidance_soft_constraints(self, collision_cmds):
+    def replace_jsons_with_ros_messages(self, d):
+        # TODO find message type
+        if isinstance(d, list):
+            result = list()
+            for i, element in enumerate(d):
+                result.append(self.replace_jsons_with_ros_messages(element))
+            return result
+        elif isinstance(d, dict):
+            if 'message_type' in d:
+                return convert_dictionary_to_ros_message(d)
+            else:
+                result = {}
+                for key, value in d.items():
+                    result[key] = self.replace_jsons_with_ros_messages(value)
+                return result
+        return d
+
+    def add_collision_avoidance_constraints(self, collision_cmds):
         """
         Adds a constraint for each link that pushed it away from its closest point.
         :type collision_cmds: list of CollisionEntry
@@ -165,26 +185,27 @@ class GoalToConstraints(GetGoal):
         soft_threshold = None
         for collision_cmd in collision_cmds:
             if collision_cmd.type == CollisionEntry.AVOID_ALL_COLLISIONS or \
-                    self.get_world().is_avoid_all_collision(collision_cmd):
+                    self.collision_scene.is_avoid_all_collision(collision_cmd):
                 soft_threshold = collision_cmd.min_dist
 
-        if not collision_cmds or not self.get_world().is_allow_all_collision(collision_cmds[-1]):
+        if not collision_cmds or not self.collision_scene.is_allow_all_collision(collision_cmds[-1]):
             self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
-        if not collision_cmds or (not self.get_world().is_allow_all_collision(collision_cmds[-1]) and
-                                  not self.get_world().is_allow_all_self_collision(collision_cmds[-1])):
+        if not collision_cmds or (not self.collision_scene.is_allow_all_collision(collision_cmds[-1]) and
+                                  not self.collision_scene.is_allow_all_self_collision(collision_cmds[-1])):
             self.add_self_collision_avoidance_constraints()
 
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
         soft_constraints = {}
         vel_constraints = {}
         debug_expr = {}
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        for joint_name in self.get_robot().controlled_joints:
-            child_links = self.get_robot().get_directly_controllable_collision_links(joint_name)
+        for joint_name in controlled_joints:
+            child_links = self.robot.get_directly_controlled_child_links_with_collisions(joint_name)
             if child_links:
                 number_of_repeller = config[joint_name][u'number_of_repeller']
                 for i in range(number_of_repeller):
-                    child_link = self.get_robot().get_child_link_of_joint(joint_name)
+                    child_link = self.robot.joints[joint_name].child_link_name
                     hard_threshold = config[joint_name][u'hard_threshold']
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
@@ -213,11 +234,15 @@ class GoalToConstraints(GetGoal):
         vel_constraints = {}
         debug_expr = {}
         config = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        for link_a_o, link_b_o in self.get_robot().get_self_collision_matrix():
-            link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
-            if not self.get_robot().link_order(link_a, link_b):
-                link_a, link_b = link_b, link_a
-            counter[link_a, link_b] += 1
+        for link_a_o, link_b_o in self.collision_scene.collision_matrices[RobotName]:
+            try:
+                link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
+                if not self.robot.link_order(link_a, link_b):
+                    link_a, link_b = link_b, link_a
+                counter[link_a, link_b] += 1
+            except KeyError as e:
+                # no controlled joint between both links
+                pass
 
         for link_a, link_b in counter:
             num_of_constraints = min(1, counter[link_a, link_b])

@@ -374,11 +374,11 @@ class TestConstraints(object):
         # go_up_pose.header.frame_id = u'refills_finger'
         # go_up_pose.pose.position.z += 0.2
         # go_up_pose.pose.orientation.w = 1
-        zero_pose.align_planes(u'refills_finger', root_normal, u'base_footprint', root_normal)
+        zero_pose.set_align_planes_goal(u'refills_finger', root_normal, u'base_footprint', root_normal)
         zero_pose.set_and_check_cart_goal(grasp_pose, u'refills_tool_frame')
 
         zero_pose.set_joint_goal(perceive_pose_for_shelf)
-        zero_pose.align_planes(u'refills_finger', root_normal, u'base_footprint', root_normal)
+        zero_pose.set_align_planes_goal(u'refills_finger', root_normal, u'base_footprint', root_normal)
         zero_pose.send_and_check_goal()
 
     def test_pointing(self, better_pose):
@@ -569,7 +569,7 @@ class TestCollisionAvoidanceGoals(object):
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'base_footprint'
         root_normal.vector.z = 1
-        better_pose.align_planes(pocky, tip_normal, u'base_footprint', root_normal)
+        better_pose.set_align_planes_goal(pocky, tip_normal, u'base_footprint', root_normal)
 
         pocky_goal = PoseStamped()
         pocky_goal.header.frame_id = pocky
@@ -719,7 +719,7 @@ class TestCollisionAvoidanceGoals(object):
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'base_footprint'
         root_normal.vector.z = 1
-        shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
+        shelf_setup.set_align_planes_goal(box, tip_normal, u'base_footprint', root_normal)
         shelf_setup.send_and_check_goal()
 
         box_goal = PoseStamped()
@@ -736,7 +736,7 @@ class TestCollisionAvoidanceGoals(object):
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'base_footprint'
         root_normal.vector.z = 1
-        shelf_setup.align_planes(box, tip_normal, u'odom', root_normal, weight=Constraint_msg.WEIGHT_ABOVE_CA)
+        shelf_setup.set_align_planes_goal(box, tip_normal, u'odom', root_normal, weight=Constraint_msg.WEIGHT_ABOVE_CA)
 
         tip_normal = Vector3Stamped()
         tip_normal.header.frame_id = box
@@ -745,7 +745,7 @@ class TestCollisionAvoidanceGoals(object):
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'map'
         root_normal.vector.y = 1
-        shelf_setup.align_planes(box, tip_normal, u'odom', root_normal, weight=Constraint_msg.WEIGHT_ABOVE_CA)
+        shelf_setup.set_align_planes_goal(box, tip_normal, u'odom', root_normal, weight=Constraint_msg.WEIGHT_ABOVE_CA)
         shelf_setup.send_and_check_goal()
 
     def test_allow_self_collision2(self, zero_pose):

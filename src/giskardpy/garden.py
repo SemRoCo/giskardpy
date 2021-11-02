@@ -1,22 +1,26 @@
-import functools
 from collections import defaultdict
 from copy import deepcopy
 
-import py_trees
-import py_trees_ros
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, running_is_success
+from py_trees.meta import failure_is_success, success_is_failure, running_is_success, running_is_failure, \
+    failure_is_running
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
 import giskardpy.identifier as identifier
+from giskardpy import RobotPrefix
+from giskardpy.data_types import order_map, KeyDefaultDict
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.global_planner import GlobalPlanner
-import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy.data_types import BiDict, KeyDefaultDict
+from giskardpy.tree.commands_remaining import CommandsRemaining
+from giskardpy.tree.exception_to_execute import ExceptionToExecute
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.god_map import GodMap
+from giskardpy.model.world import WorldTree
+from giskardpy.tree.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.tree.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.tree.plugin_append_zero_velocity import AppendZeroVelocity
@@ -25,43 +29,39 @@ from giskardpy.tree.plugin_collision_checker import CollisionChecker
 from giskardpy.tree.plugin_collision_marker import CollisionMarker
 from giskardpy.tree.plugin_configuration import ConfigurationPlugin
 from giskardpy.tree.plugin_goal_reached import GoalReachedPlugin
-from giskardpy.tree.plugin_if import IF
+from giskardpy.tree.plugin_if import IF, IfFunction
 from giskardpy.tree.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plugin_tip_stuck_checker import TipStuckChecker
-from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
 from giskardpy.tree.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.tree.plugin_log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.tree.plugin_loop_detector import LoopDetector
+from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plugin_plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plugin_plot_trajectory import PlotTrajectory
-from giskardpy.tree.plugin_post_processing import PostProcessing
-from giskardpy.tree.plugin_pybullet import WorldUpdatePlugin
+from giskardpy.tree.set_error_code import SetErrorCode
 from giskardpy.tree.plugin_send_trajectory import SendTrajectory
 from giskardpy.tree.plugin_set_cmd import SetCmd
 from giskardpy.tree.plugin_tf_publisher import TFPublisher
 from giskardpy.tree.plugin_time import TimePlugin
 from giskardpy.tree.plugin_update_constraints import GoalToConstraints
 from giskardpy.tree.plugin_visualization import VisualizationBehavior
-from giskardpy.tree.plugin_world_visualization import WorldVisualizationBehavior
-from giskardpy.model.pybullet_world import PyBulletWorld
-from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
+from giskardpy.tree.tree_manager import TreeManager, render_dot_tree
+from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
-from giskardpy.utils.utils import create_path, render_dot_tree
-from giskardpy.model.world_object import WorldObject
+from giskardpy.utils.utils import create_path
 
-# TODO hardcode this somewhere else
-order_map = BiDict({
-    0: u'position',
-    1: u'velocity',
-    2: u'acceleration',
-    3: u'jerk',
-    4: u'snap',
-    5: u'crackle',
-    6: u'pop'
-})
+
+def load_config_file():
+    old_params = rospy.get_param('~')
+    if rospy.has_param('~test'):
+        test = rospy.get_param('~test')
+    else:
+        test = False
+    config_file_name = rospy.get_param('~{}'.format(u'config'))
+    ros_load_robot_config(config_file_name, old_data=old_params, test=test)
 
 
 def initialize_god_map():
@@ -69,6 +69,9 @@ def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
+
+    load_config_file()
+
     god_map.set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
     god_map.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
     path_to_data_folder = god_map.get_data(identifier.data_folder)
@@ -83,6 +86,7 @@ def initialize_god_map():
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                        JointTrajectoryControllerState,
                                                        timeout=5.0).joint_names
+            god_map.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
         except ROSException as e:
             logging.logerr(u'state topic not available')
             logging.logerr(str(e))
@@ -92,52 +96,42 @@ def initialize_god_map():
 
     set_default_in_override_block(identifier.external_collision_avoidance, god_map)
     set_default_in_override_block(identifier.self_collision_avoidance, god_map)
-
-    world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
-    god_map.set_data(identifier.world, world)
-    robot = WorldObject(god_map.get_data(identifier.robot_description),
-                        None,
-                        controlled_joints)
-    world.add_robot(robot, None, controlled_joints,
-                    ignored_pairs=god_map.get_data(identifier.ignored_self_collisions),
-                    added_pairs=god_map.get_data(identifier.added_self_collisions))
-
-    sanity_check_derivatives(god_map)
-
     # weights
     for i, key in enumerate(god_map.get_data(identifier.joint_weights), start=1):
-        d = set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
-        world.robot.set_joint_weight_symbols(d, i)
-
+        set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
 
     # limits
     for i, key in enumerate(god_map.get_data(identifier.joint_limits), start=1):
-        d_linear = set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'],
-                                                 god_map)
-        d_angular = set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'],
-                                                  god_map)
-        world.robot.set_joint_limit_symbols(d_linear, d_angular, i)
+        set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], god_map)
+        set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], god_map)
 
-    order = len(god_map.get_data(identifier.joint_weights))+1
+    order = len(god_map.get_data(identifier.joint_weights)) + 1
     god_map.set_data(identifier.order, order)
 
-    # joint symbols
-    for o in range(order):
-        key = order_map[o]
-        joint_position_symbols = {}
-        for joint_name in world.robot.get_movable_joints():
-            joint_position_symbols[joint_name] = god_map.to_symbol(identifier.joint_states + [joint_name, key])
-        world.robot.set_joint_symbols(joint_position_symbols, o)
+    world = WorldTree(god_map)
+    collision_checker = god_map.get_data(identifier.collision_checker)
+    if collision_checker == 'bpb':
+        logging.loginfo('Using bpb for collision checking.')
+        from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
+        collision_scene = BetterPyBulletSyncer(world)
+    elif collision_checker == 'pybullet':
+        logging.loginfo('Using pybullet for collision checking.')
+        from giskardpy.model.pybullet_syncer import PyBulletSyncer
+        collision_scene = PyBulletSyncer(world)
+    else:
+        logging.logwarn('Unknown collision checker {}. Collision avoidance is disabled'.format(collision_checker))
+        collision_scene = CollisionWorldSynchronizer(world)
+        god_map.set_data(identifier.collision_checker, None)
 
-    world.robot.reinitialize()
-
-    world.robot.init_self_collision_matrix()
+    god_map.set_data(identifier.collision_scene, collision_scene)
+    # sanity_check_derivatives(god_map)
     # sanity_check(god_map)
     return god_map
 
 
 def sanity_check(god_map):
     check_velocity_limits_reachable(god_map)
+
 
 def sanity_check_derivatives(god_map):
     weights = god_map.get_data(identifier.joint_weights)
@@ -147,6 +141,7 @@ def sanity_check_derivatives(god_map):
     if len(weights) != len(limits):
         raise AttributeError(u'Weights and limits are not defined for the same number of derivatives')
 
+
 def check_derivatives(entries, name):
     """
     :type entries: dict
@@ -154,10 +149,13 @@ def check_derivatives(entries, name):
     allowed_derivates = list(order_map.values())[1:]
     for weight in entries:
         if weight not in allowed_derivates:
-            raise AttributeError(u'{} set for unknown derivative: {} not in {}'.format(name, weight, list(allowed_derivates)))
+            raise AttributeError(
+                u'{} set for unknown derivative: {} not in {}'.format(name, weight, list(allowed_derivates)))
     weight_ids = [order_map.inverse[x] for x in entries]
     if max(weight_ids) != len(weight_ids):
-        raise AttributeError(u'{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
+        raise AttributeError(
+            u'{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
+
 
 def check_velocity_limits_reachable(god_map):
     # TODO a more general version of this
@@ -216,17 +214,23 @@ def grow_tree():
 
     god_map = initialize_god_map()
     # ----------------------------------------------
+    sync = Sequence(u'Synchronize')
+    sync.add_child(WorldUpdater(u'update world'))
+    sync.add_child(ConfigurationPlugin(u'update robot configuration', RobotPrefix))
+    sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
+    sync.add_child(CollisionSceneUpdater(u'update collision scene'))
+    sync.add_child(running_is_success(VisualizationBehavior)(u'visualize collision scene'))
+    # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js1'))
-    wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
+    wait_for_goal.add_child(sync)
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
-    planning_4.add_plugin(CollisionChecker(u'coll'))
-    # if god_map.safe_get_data(identifier.enable_collision_marker):
-    #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
+    if god_map.get_data(identifier.collision_checker) is not None:
+        planning_4.add_plugin(CollisionChecker(u'collision checker'))
+    # planning_4.add_plugin(VisualizationBehavior(u'visualization'))
+    # planning_4.add_plugin(CollisionMarker(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
     planning_4.add_plugin(TipStuckChecker(u'tip stuck checker'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
@@ -248,26 +252,27 @@ def grow_tree():
     planning_3.add_child(AppendZeroVelocity(u'append zero velocity'))
     planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_3.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
-    if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
-        planning_3.add_child(WorldVisualizationBehavior(u'world_visualization', ensure_publish=True))
-    if god_map.get_data(identifier.enable_CPIMarker):
-        planning_3.add_child(CollisionMarker(u'cpi marker'))
+        planning_3.add_child(running_is_success(VisualizationBehavior)(u'visualization', ensure_publish=True))
+    if god_map.get_data(identifier.enable_CPIMarker) and god_map.get_data(identifier.collision_checker) is not None:
+        planning_3.add_child(running_is_success(CollisionMarker)(u'collision marker'))
     # ----------------------------------------------
     # ----------------------------------------------
+    execute_canceled = Sequence(u'execute canceled')
+    execute_canceled.add_child(GoalCanceled(u'goal canceled', action_server_name))
+    execute_canceled.add_child(SetErrorCode(u'set error code'))
     publish_result = failure_is_success(Selector)(u'monitor execution')
-    publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
+    publish_result.add_child(execute_canceled)
     publish_result.add_child(SendTrajectory(u'send traj'))
     # ----------------------------------------------
     # ----------------------------------------------
     planning_2 = failure_is_success(Selector)(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
-    if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
-        planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
-    if god_map.get_data(identifier.enable_CPIMarker):
-        planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
+        planning_2.add_child(running_is_failure(VisualizationBehavior)(u'visualization'))
+    # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
+    #     planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
+    if god_map.get_data(identifier.enable_CPIMarker) and god_map.get_data(identifier.collision_checker) is not None:
+        planning_2.add_child(running_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')
@@ -275,33 +280,36 @@ def grow_tree():
     move_robot.add_child(publish_result)
     # ----------------------------------------------
     # ----------------------------------------------
-    planning_1 = Sequence(u'planning I')
-    planning_1.add_child(GlobalPlanner(u'global planner', action_server_name))
-    planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
-    planning_1.add_child(planning_2)
+    # planning_1 = Sequence(u'planning I')
     # ----------------------------------------------
-    post_processing = failure_is_success(Sequence)(u'post planning')
-    # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
+    planning = failure_is_success(Sequence)(u'planning')
+    planning.add_child(IF(u'command set?', identifier.next_move_goal))
+    planning.add_child(GlobalPlanner(u'global planner', action_server_name))
+    planning.add_child(GoalToConstraints(u'update constraints', action_server_name))
+    planning.add_child(planning_2)
+    # planning.add_child(planning_1)
+    # planning.add_child(SetErrorCode(u'set error code'))
     if god_map.get_data(identifier.PlotTrajectory_enabled):
         kwargs = god_map.get_data(identifier.PlotTrajectory)
-        post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
+        planning.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
         kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
-        post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
-    post_processing.add_child(PostProcessing(u'evaluate result'))
-    # ----------------------------------------------
-    planning = success_is_failure(Sequence)(u'planning')
-    planning.add_child(IF(u'goal_set?', identifier.next_move_goal))
-    planning.add_child(planning_1)
-    planning.add_child(post_processing)
+        planning.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
 
-    process_move_goal = failure_is_success(Selector)(u'process move goal')
-    process_move_goal.add_child(planning)
-    process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
+    process_move_cmd = success_is_failure(Sequence)(u'Process move commands')
+    process_move_cmd.add_child(SetCmd(u'set move cmd', action_server_name))
+    process_move_cmd.add_child(planning)
+    process_move_cmd.add_child(SetErrorCode(u'set error code'))
+
+    process_move_goal = failure_is_success(Selector)(u'Process goal')
+    process_move_goal.add_child(process_move_cmd)
+    process_move_goal.add_child(ExceptionToExecute('clear exception'))
+    process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
+
 
     # ----------------------------------------------
     # ----------------------------------------------
-    root = Sequence(u'root')
+    root = Sequence(u'Giskard')
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)

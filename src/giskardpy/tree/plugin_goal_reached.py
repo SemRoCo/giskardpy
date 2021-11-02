@@ -16,16 +16,17 @@ def make_velocity_threshold(god_map,
                             max_translation_cut_off=0.01,
                             max_rotation_cut_off=0.06):
     joint_convergence_threshold = god_map.get_data(identifier.joint_convergence_threshold)
-    robot = god_map.get_data(identifier.robot)
+    controlled_joints = god_map.get_data(identifier.controlled_joints)
+    world = god_map.get_data(identifier.world)
     thresholds = []
-    for joint_name in sorted(robot.controlled_joints):
-        velocity_limit = robot.get_joint_limit_expr_evaluated(joint_name, 1, god_map)
+    for joint_name in controlled_joints:
+        velocity_limit, _ = world.get_joint_velocity_limits(joint_name)
         if velocity_limit is None:
             velocity_limit = 1
         velocity_limit *= joint_convergence_threshold
-        if robot.is_joint_prismatic(joint_name):
+        if world.is_joint_prismatic(joint_name):
             velocity_limit = min(max(min_translation_cut_off, velocity_limit), max_translation_cut_off)
-        elif robot.is_joint_rotational(joint_name):
+        elif world.is_joint_rotational(joint_name):
             velocity_limit = min(max(min_rotation_cut_off, velocity_limit), max_rotation_cut_off)
         thresholds.append(velocity_limit)
     return np.array(thresholds)
@@ -45,12 +46,12 @@ class GoalReachedPlugin(GiskardBehavior):
     @profile
     def update(self):
         planning_time = self.get_god_map().get_data(identifier.time)
-
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
         if planning_time - self.above_threshold_time >= self.window_size:
-            velocities = np.array([self.get_robot().joint_state[j].velocity for j in sorted(self.get_robot().controlled_joints)])
+            velocities = np.array([self.world.state[j].velocity for j in controlled_joints])
             below_threshold = np.all(np.abs(velocities[:self.number_of_controlled_joints]) < self.thresholds)
             if below_threshold:
-                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time * self.sample_period,
+                logging.loginfo(u'Found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * self.sample_period,
                                                                                        time() - self.get_blackboard().runtime))
                 return Status.SUCCESS
         return Status.RUNNING

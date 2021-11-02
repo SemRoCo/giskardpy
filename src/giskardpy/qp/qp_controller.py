@@ -13,7 +13,8 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.utils.utils import memoize, logging, create_path
+from giskardpy.utils import logging
+from giskardpy.utils.utils import memoize, create_path
 
 
 def save_pandas(dfs, names, path):
@@ -24,9 +25,9 @@ def save_pandas(dfs, names, path):
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
-                    csv_string += column.add_prefix(column_name + u'||').to_csv()
+                    csv_string += column.add_prefix(column_name + u'||').to_csv(float_format='%.4f')
             else:
-                csv_string += df.to_csv()
+                csv_string += df.to_csv(float_format='%.4f')
         file_name2 = '{}{}.csv'.format(folder_name, name)
         with open(file_name2, 'w') as f:
             f.write(csv_string)
@@ -539,6 +540,7 @@ class QPController(object):
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
         self.retry_weight_factor = retry_weight_factor
+        self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
         if constraints is not None:
@@ -634,6 +636,10 @@ class QPController(object):
     def _compile_big_ass_M(self):
         t = time()
         free_symbols = w.free_symbols(self.big_ass_M)
+        debug_free_symbols = w.free_symbols(self.debug_v)
+        free_symbols = set(free_symbols)
+        free_symbols.update(debug_free_symbols)
+        free_symbols = list(free_symbols)
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              free_symbols)
 
@@ -673,13 +679,14 @@ class QPController(object):
         return result
 
     def save_all_pandas(self):
-        if self.p_xdot is not None:
-            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_xdot],
-                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'xdot'],
+        if hasattr(self, 'p_xdot') and self.p_xdot is not None:
+            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
+                         self.p_xdot],
+                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
                         u'../tmp_data')
         else:
-            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub],
-                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub'],
+            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
+                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
                         u'../tmp_data')
 
     def __is_nan_in_array(self, name, p_array):
@@ -778,7 +785,7 @@ class QPController(object):
         bA_filter = np.ones(self.A.height, dtype=bool)
         ll = self.H.number_of_constraint_vel_variables() + self.H.number_of_contraint_error_variables()
         bA_filter[-ll:] = b_filter[-ll:]
-        return b_filter, bA_filter
+        return np.array(b_filter), np.array(bA_filter)
 
     @profile
     def filter_zero_weight_stuff(self, b_filter, bA_filter):
@@ -843,7 +850,7 @@ class QPController(object):
         if self.xdot_full is None:
             return None
         # for debugging to might want to execute this line to create named panda matrices
-        # self._create_debug_pandas(substitutions, self.xdot_full)
+        # self._create_debug_pandas(substitutions)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
@@ -856,7 +863,7 @@ class QPController(object):
         except:
             pass
         else:
-            self._create_debug_pandas(substitutions, xdot_full=self.xdot_full)
+            self._create_debug_pandas(substitutions)
             upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]
             lower_violations = self.p_xdot[self.p_lb.data > self.p_xdot.data]
             if len(upper_violations) > 0 or len(lower_violations) > 0:
@@ -947,8 +954,7 @@ class QPController(object):
         plt.savefig(u'tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self, substitutions, xdot_full=None):
-        xdot_full = deepcopy(xdot_full)
+    def _create_debug_pandas(self, substitutions):
         self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.state[str(self.sample_period)]
@@ -978,10 +984,10 @@ class QPController(object):
         self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, [u'data'],
                                       dtype=float)
         self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
-        if xdot_full is not None:
-            self.p_xdot = pd.DataFrame(xdot_full, filtered_b_names, [u'data'], dtype=float)
+        if self.xdot_full is not None:
+            self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, [u'data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
-            xH = np.dot((xdot_full ** 2).T, H)
+            xH = np.dot((self.xdot_full ** 2).T, H)
             self.p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)

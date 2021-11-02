@@ -12,32 +12,18 @@ class KinSimPlugin(GiskardBehavior):
         super(KinSimPlugin, self).__init__(name)
 
     def initialise(self):
-        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
+        self.sample_period = self.god_map.get_data(identifier.sample_period)
         super(KinSimPlugin, self).initialise()
 
     @profile
     def update(self):
-        next_cmds = self.get_god_map().get_data(identifier.qp_solver_solution)
-        current_js = self.get_god_map().get_data(identifier.joint_states)
-        next_js = None
+        next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
         if next_cmds:
-            next_js = JointStates()
-            for key, sjs in current_js.items():
-                if self.get_robot().is_joint_mimic(key):
-                    continue
-                joint_name = str(self.get_robot().get_joint_position_symbol(key))
-                vel_cmds = next_cmds[0]
-                if joint_name in vel_cmds:
-                    cmd = vel_cmds[joint_name]
-                    derivative_cmds = [x[joint_name] for x in next_cmds]
-                else:
-                    cmd = 0.0
-                    derivative_cmds = []
-                next_js[key].position = sjs.position + cmd * self.sample_period
-                for i, derivative_cmd in enumerate(derivative_cmds):
-                    next_js[key].set_derivative(i+1, derivative_cmd)
-        if next_js is not None:
-            self.get_god_map().set_data(identifier.joint_states, next_js)
-        else:
-            self.get_god_map().set_data(identifier.joint_states, current_js)
+            for i, cmds in enumerate(next_cmds):
+                for joint_symbol, cmd in cmds.items():
+                    joint_name = self.god_map.expr_to_key[joint_symbol][-2]
+                    if i == 0:
+                        self.world.state[joint_name].position += cmd * self.sample_period
+                    self.world.state[joint_name].set_derivative(i+1, cmd)
+        self.world.recompute_fks()
         return Status.RUNNING

@@ -1,3 +1,5 @@
+from giskardpy.utils import logging
+
 try:
     # Python 2
     from Queue import Empty, Queue
@@ -14,7 +16,6 @@ from py_trees import Blackboard, Status
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import PreemptedException
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils.utils import traj_to_msg, logging
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
@@ -36,7 +37,8 @@ class ActionServerHandler(object):
         :type goal: MoveGoal
         """
         self.goal_queue.put(goal)
-        self.result_queue.get()()
+        result_cb = self.result_queue.get()
+        result_cb()
 
     def pop_goal(self):
         try:
@@ -120,7 +122,8 @@ class GetGoal(ActionServerBehavior):
 
 class GoalCanceled(ActionServerBehavior):
     def update(self):
-        if self.get_as().is_preempt_requested():
+        if self.get_as().is_preempt_requested() and self.get_blackboard_exception() is None:
+            logging.logerr('preempted')
             self.raise_to_blackboard(PreemptedException(u''))
         if self.get_blackboard_exception() is not None:
             return Status.SUCCESS
@@ -139,10 +142,11 @@ class SendResult(ActionServerBehavior):
 
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        controlled_joints = self.get_robot().controlled_joints
-        result.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, True)
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
+        result.trajectory = trajectory.to_msg(sample_period, controlled_joints, True)
 
         if result.error_codes[-1] == MoveResult.PREEMPTED:
+            logging.logerr('Goal preempted')
             self.get_as().send_preempted(result)
             return Status.SUCCESS
         if skip_failures:
@@ -156,7 +160,7 @@ class SendResult(ActionServerBehavior):
                 self.get_as().send_aborted(result)
                 return Status.SUCCESS
             else:
-                logging.loginfo(u'Successfully executed goal.')
+                logging.loginfo(u'----------------Successfully executed goal.----------------')
         self.get_as().send_result(result)
         return Status.SUCCESS
 

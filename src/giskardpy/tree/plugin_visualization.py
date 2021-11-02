@@ -1,62 +1,48 @@
-import hashlib
-
 import py_trees
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils.tfwrapper import pose_to_kdl, kdl_to_pose
+
 
 class VisualizationBehavior(GiskardBehavior):
     def __init__(self, name, ensure_publish=False):
         super(VisualizationBehavior, self).__init__(name)
         self.ensure_publish = ensure_publish
+        self.marker_ids = {}
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.robot_base = self.get_robot().get_root()
-        self.ids = set()
         return super(VisualizationBehavior, self).setup(timeout)
 
     def update(self):
         markers = []
         time_stamp = rospy.Time()
-        robot = self.get_robot()
-        get_fk = robot.get_fk_pose
-        links = [x for x in self.get_robot().get_link_names() if robot.has_link_visuals(x)]
+        links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
-            marker = robot.link_as_marker(link_name)
-            if marker is None:
-                continue
-
-            marker.header.frame_id = self.robot_base
-            marker.action = Marker.ADD
-            marker.id = int(hashlib.md5(link_name.encode('utf-8')).hexdigest()[:6],
-                            16)  # FIXME find a better way to give the same link the same id
-            self.ids.add(marker.id)
-            marker.ns = u'planning_visualization'
-            marker.header.stamp = time_stamp
-
-            fk = get_fk(self.robot_base, link_name).pose
-
-            if robot.has_non_identity_visual_offset(link_name):
-                marker.pose = kdl_to_pose(pose_to_kdl(fk) * pose_to_kdl(marker.pose))
-            else:
-                marker.pose = fk
-            markers.append(marker)
+            for marker in self.world.links[link_name].collision_visualization_markers().markers:
+                marker.header.frame_id = str(self.world.root_link_name)
+                marker.action = Marker.ADD
+                if link_name not in self.marker_ids:
+                    self.marker_ids[link_name] = len(self.marker_ids)
+                marker.id = self.marker_ids[link_name]
+                marker.ns = u'planning_visualization'
+                marker.header.stamp = time_stamp
+                marker.pose = self.collision_scene.get_pose(link_name).pose
+                markers.append(marker)
 
         self.publisher.publish(markers)
         if self.ensure_publish:
             rospy.sleep(0.1)
-        return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.RUNNING
 
     def clear_marker(self):
         msg = MarkerArray()
-        for i in self.ids:
+        for i in self.marker_ids.values():
             marker = Marker()
             marker.action = Marker.DELETE
             marker.id = i
             marker.ns = u'planning_visualization'
             msg.markers.append(marker)
         self.publisher.publish(msg)
-        self.ids = set()
+        self.marker_ids = {}

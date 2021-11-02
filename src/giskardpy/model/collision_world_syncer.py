@@ -32,8 +32,8 @@ class CollisionWorldSynchronizer(object):
         self.world_version = -1
 
     def has_world_changed(self):
-        if self.world_version != self.world.version:
-            self.world_version = self.world.version
+        if self.world_version != self.world.model_version:
+            self.world_version = self.world.model_version
             return True
         return False
 
@@ -57,6 +57,7 @@ class CollisionWorldSynchronizer(object):
         """
         pass
 
+    @profile
     def calc_collision_matrix(self, group_name, link_combinations=None, d=0.05, d2=0.0, non_controlled=False, steps=10):
         """
         :type group_name: str

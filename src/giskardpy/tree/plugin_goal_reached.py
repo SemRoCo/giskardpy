@@ -52,6 +52,6 @@ class GoalReachedPlugin(GiskardBehavior):
             below_threshold = np.all(np.abs(velocities[:self.number_of_controlled_joints]) < self.thresholds)
             if below_threshold:
                 logging.loginfo(u'Found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * self.sample_period,
-                                                                                       time() - self.get_blackboard().runtime))
+                                                                                       self.get_runtime()))
                 return Status.SUCCESS
         return Status.RUNNING

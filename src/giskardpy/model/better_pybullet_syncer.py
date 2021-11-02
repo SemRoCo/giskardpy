@@ -82,6 +82,8 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def bpb_result_to_list(self, result):
         result_list = []
         for obj_a, contacts in result.items():
+            if not contacts:
+                continue
             map_T_a = obj_a.np_transform
             link_a = obj_a.name
             for contact in contacts:  # type: ClosestPair

@@ -15,6 +15,7 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
     def initialise(self):
         self.trajectory = self.get_god_map().get_data(identifier.debug_trajectory)
 
+    @profile
     def update(self):
         debug_data = self.get_god_map().get_data(identifier.debug_expressions_evaluated)
         if len(debug_data) > 0:

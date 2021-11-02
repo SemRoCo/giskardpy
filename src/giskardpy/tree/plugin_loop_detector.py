@@ -27,7 +27,7 @@ class LoopDetector(GiskardBehavior):
             sample_period = self.get_god_map().get_data(identifier.sample_period)
             logging.loginfo(u'found loop, stopped planning.')
             logging.loginfo(u'found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
-                                                                                   time() - self.get_blackboard().runtime))
+                                                                                   self.get_runtime()))
             return Status.SUCCESS
         self.past_joint_states.add(rounded_js)
         return Status.RUNNING

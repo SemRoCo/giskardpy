@@ -6,7 +6,7 @@ from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 from py_trees.meta import failure_is_success, success_is_failure, running_is_success, running_is_failure, \
-    failure_is_running
+    failure_is_running, inverter
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -16,6 +16,7 @@ from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.tree.commands_remaining import CommandsRemaining
 from giskardpy.tree.exception_to_execute import ExceptionToExecute
+from giskardpy.tree.start_timer import StartTimer
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
@@ -267,6 +268,7 @@ def grow_tree():
     #     planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
     if god_map.get_data(identifier.enable_CPIMarker) and god_map.get_data(identifier.collision_checker) is not None:
         planning_2.add_child(running_is_failure(CollisionMarker)(u'cpi marker'))
+    planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')

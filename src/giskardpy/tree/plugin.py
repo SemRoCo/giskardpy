@@ -2,6 +2,7 @@ import traceback
 from collections import OrderedDict
 from threading import RLock
 from threading import Thread
+from time import time
 
 import rospy
 from py_trees import Behaviour, Blackboard, Status
@@ -23,6 +24,9 @@ class GiskardBehavior(Behaviour):
         :rtype: giskardpy.god_map.GodMap
         """
         return self.god_map
+
+    def get_runtime(self):
+        return time() - self.get_blackboard().runtime
 
     @property
     def tree(self):

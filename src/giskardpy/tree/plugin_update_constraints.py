@@ -84,7 +84,6 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().set_data(identifier.constraints, self.soft_constraints)
         self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
-        self.get_blackboard().runtime = time()
 
         if (self.get_god_map().get_data(identifier.check_reachability)):
             # FIXME reachability check is broken
@@ -166,6 +165,7 @@ class GoalToConstraints(GetGoal):
                 d[key] = convert_dictionary_to_ros_message(value)
         return d
 
+    @profile
     def add_collision_avoidance_constraints(self, collision_cmds):
         """
         Adds a constraint for each link that pushed it away from its closest point.
@@ -184,6 +184,7 @@ class GoalToConstraints(GetGoal):
                                   not self.collision_scene.is_allow_all_self_collision(collision_cmds[-1])):
             self.add_self_collision_avoidance_constraints()
 
+    @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
         soft_constraints = {}
         vel_constraints = {}
@@ -218,6 +219,7 @@ class GoalToConstraints(GetGoal):
         self.vel_constraints.update(vel_constraints)
         self.debug_expr.update(debug_expr)
 
+    @profile
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
         soft_constraints = {}

@@ -24,7 +24,6 @@ from tf.transformations import quaternion_about_axis
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pw
 from giskardpy.model.utils import make_world_body_box
-from giskardpy.model.world_object import WorldObject
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.plugin_action_server import GetGoal
 from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
@@ -136,16 +135,17 @@ class AbstractMotionValidator(ob.MotionValidator, GiskardBehavior):  # TODO: use
 
     def init_ignore_objects(self, ignore_objects=None):
         if ignore_objects is None:
-            ignore_objects = self.get_world().hidden_objects
+            ignore_objects = [] #self.get_world().hidden_objects
         else:
-            ignore_objects.extend(self.get_world().hidden_objects)
-        self.ignore_object_ids = [self.object_in_motion.get_pybullet_id()]
-        for ignore_object in ignore_objects:
-            if ignore_object in self.get_world()._objects:
-                obj = self.get_world()._objects[ignore_object]
-                self.ignore_object_ids.append(obj.get_pybullet_id())
-            else:
-                raise KeyError('Cannot find object of name {} in the PyBulletWorld.'.format(ignore_object))
+            ignore_objects = [] #.extend(self.get_world().hidden_objects)
+        self.ignore_object_ids = [self.god_map.get_data(identifier.collision_scene).object_name_to_id[self.object_in_motion.name]]
+        # self.ignore_object_ids = [self.object_in_motion.get_pybullet_id()]
+        #for ignore_object in ignore_objects:
+        #    if ignore_object in self.get_world()._objects:
+        #        obj = self.get_world()._objects[ignore_object]
+        #        self.ignore_object_ids.append(obj.get_pybullet_id())
+        #    else:
+        #        raise KeyError('Cannot find object of name {} in the PyBulletWorld.'.format(ignore_object))
 
     def update_tip_link(self, tip_link):
         self.tip_link = tip_link
@@ -559,51 +559,23 @@ class CompoundBoxSpace:
         if self.publish_collision_boxes:
             self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
 
-    def _create_collision_box(self, pos_a, pos_b, collision_sphere_name):
+    def _create_collision_box(self, pose, pos_a, pos_b, collision_sphere_name):
         dist = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b))**2))
         world_body_box = make_world_body_box(name=collision_sphere_name,
                                              x_length=dist,
                                              y_length=self.min_size,
                                              z_length=self.min_size)
-        world_object_box = WorldObject.from_world_body(world_body_box)
-        self.world.add_object(world_object_box)
+        self.world.add_world_body(world_body_box, pose)
         world_body_box = make_world_body_box(name=collision_sphere_name+'start',
                                              x_length=self.min_size,
                                              y_length=self.min_size,
                                              z_length=self.min_size)
-        world_object_box = WorldObject.from_world_body(world_body_box)
-        self.world.add_object(world_object_box)
-        self.world.set_object_pose(collision_sphere_name+'start', Pose(Point(pos_a[0], pos_a[1], pos_a[2]),
-                                                                       Quaternion(0,0,0,1)))
+        self.world.add_world_body(world_body_box, Pose(Point(pos_a[0], pos_a[1], pos_a[2]), Quaternion(0,0,0,1)))
         world_body_box = make_world_body_box(name=collision_sphere_name+'end',
                                              x_length=self.min_size,
                                              y_length=self.min_size,
                                              z_length=self.min_size)
-        world_object_box = WorldObject.from_world_body(world_body_box)
-        self.world.add_object(world_object_box)
-        self.world.set_object_pose(collision_sphere_name+'end', Pose(Point(pos_b[0], pos_b[1], pos_b[2]),
-                                                                     Quaternion(0,0,0,1)))
-
-    def _rodrigues_rotation_formula(self, a, b):
-        # https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d
-        # https://en.wikipedia.org/wiki/Rodrigues'_rotation_formula#Matrix_notation
-        k = np.cross(a, b)
-        if np.count_nonzero(k) == 0:
-            return Quaternion(0, 0, 0, 1)
-        c = np.dot(a, b)
-        kx = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
-        m = np.eye(3) + kx + np.dot(kx, kx) * (1 / (1 + c))
-        tf_m = np.vstack((np.vstack((m, np.array([[0,0,0]]))).T, np.array([[0,0,0,1]]))).T
-        q = tf.transformations.quaternion_from_matrix(tf_m)
-        return Quaternion(q[0], q[1], q[2], q[3])
-
-    def _get_pitch_old(self, pos_a, pos_b):
-        dx = pos_b[0] - pos_a[0]
-        dy = pos_b[1] - pos_a[1]
-        pos_c = pos_a + np.array([dx, dy, 0])
-        g = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_b)) ** 2))
-        h = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
-        return -(np.pi + np.arcsin(g / h)) if (dx < 0) else -np.arcsin(g / h)
+        self.world.add_world_body(world_body_box, Pose(Point(pos_b[0], pos_b[1], pos_b[2]), Quaternion(0,0,0,1)))
 
     def _get_pitch(self, pos_a, pos_b):
         dx = pos_b[0] - pos_a[0]
@@ -642,9 +614,10 @@ class CompoundBoxSpace:
                 #    min_size = np.min(np.array(tip_coll_aabb))
                 #else:
                 #    min_size = box_max_size
-                self._create_collision_box(pos_a, pos_b, collision_box_name_i)
-                self.world.set_object_pose(collision_box_name_i, Pose(Point(c[0], c[1], c[2]),
-                                                                      Quaternion(q[0], q[1], q[2], q[3])))
+                self._create_collision_box(Pose(Point(c[0], c[1], c[2]), Quaternion(q[0], q[1], q[2], q[3]),
+                                                pos_a, pos_b, collision_box_name_i))
+                #self.world.set_object_pose(collision_box_name_i, Pose(Point(c[0], c[1], c[2]),
+                #                                                      Quaternion(q[0], q[1], q[2], q[3])))
                 if self.publish_collision_boxes:
                     self.pub_marker(collision_box_name_i)
                 self.collisionChecker.update_collisions_environment()
@@ -682,7 +655,7 @@ class GlobalPlanner(GetGoal):
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
 
-        self.robot = self.get_robot()
+        #self.robot = self.robot
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.l_tip = 'l_gripper_tool_frame'
         self.r_tip = 'r_gripper_tool_frame'
@@ -697,8 +670,7 @@ class GlobalPlanner(GetGoal):
         self.navigation_config = 'slow_without_refine'  # todo: load value from rosparam
         self.movement_config = 'fast_without_refine'
 
-        self.setupNavigation()
-        self.setupMovement()
+        self.initialised_planners = False
         self.collisionCheckerInterface = CollisionCheckerInterface()
 
     def get_cart_goal(self, cmd):
@@ -819,6 +791,11 @@ class GlobalPlanner(GetGoal):
         cart_c = self.get_cart_goal(move_cmd)
         if not cart_c:
             return Status.SUCCESS
+
+        if not self.initialised_planners:
+            self.setupNavigation()
+            self.setupMovement()
+            self.initialised_planners = True
 
         # Parse and save the Cartesian Goal Constraint
         self.save_cart_goal(cart_c)

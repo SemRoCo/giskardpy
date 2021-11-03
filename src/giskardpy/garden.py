@@ -80,7 +80,7 @@ def initialize_god_map():
         path_to_data_folder += u'/'
     god_map.set_data(identifier.data_folder, path_to_data_folder)
 
-    pbw.start_pybullet(god_map.get_data(identifier.gui))
+    #pbw.start_pybullet(god_map.get_data(identifier.gui))
     while not rospy.is_shutdown():
         try:
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
@@ -224,7 +224,7 @@ def grow_tree():
     wait_for_goal = Sequence(u'wait for goal')
     wait_for_goal.add_child(sync)
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
+    #wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
     if god_map.get_data(identifier.collision_checker) is not None:

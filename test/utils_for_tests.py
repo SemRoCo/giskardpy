@@ -1,6 +1,5 @@
 from time import time
 import keyword
-import yaml
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
@@ -25,7 +24,6 @@ from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging, identifier
-from giskardpy.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld

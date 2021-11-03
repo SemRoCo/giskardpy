@@ -482,7 +482,8 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
-        return self.send_goal(MoveGoal.CHECK_REACHABILITY, wait)
+        raise NotImplementedError('reachability check is not implemented')
+        # return self.send_goal(MoveGoal.CHECK_REACHABILITY, wait)
 
     def plan(self, wait=True):
         """

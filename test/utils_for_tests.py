@@ -438,7 +438,6 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def tear_down(self):
         rospy.sleep(1)
-        logging.loginfo('wtf')
         self.heart.shutdown()
         logging.loginfo(
             u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))

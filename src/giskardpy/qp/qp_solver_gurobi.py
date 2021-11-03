@@ -58,17 +58,13 @@ class QPSolverGurobi(QPSolver):
         self.qpProblem.setMObjective(H, None, 0.0)
         self.started = False
 
-    @profile
     def update(self, H, g, A, lb, ub, lbA, ubA):
-        # self.init(H, g, A, lb, ub, lbA, ubA)
-        # return
         self.x.lb = lb
         self.x.ub = ub
         self.qpProblem.remove(self.qpProblem.getConstrs())
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
         self.qpProblem.setMObjective(H, None, 0.0)
-        pass
 
     def print_debug(self):
         # TODO use MinRHS etc to analyse solution

@@ -32,7 +32,6 @@ from giskardpy.tree.plugin_configuration import ConfigurationPlugin
 from giskardpy.tree.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.tree.plugin_if import IF, IfFunction
 from giskardpy.tree.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.tree.plugin_tip_stuck_checker import TipStuckChecker
 from giskardpy.tree.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.tree.plugin_log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.plugin_log_trajectory import LogTrajPlugin
@@ -233,7 +232,6 @@ def grow_tree():
     # planning_4.add_plugin(VisualizationBehavior(u'visualization'))
     # planning_4.add_plugin(CollisionMarker(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
-    planning_4.add_plugin(TipStuckChecker(u'tip stuck checker'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
     planning_4.add_plugin(LogTrajPlugin(u'log'))
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):

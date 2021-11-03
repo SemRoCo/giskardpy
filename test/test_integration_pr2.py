@@ -235,12 +235,13 @@ def kitchen_setup_avoid_collisions(resetted_giskard):
     :return:
     """
     resetted_giskard.avoid_all_collisions(distance=0.05)
-    resetted_giskard.send_and_check_joint_goal(gaya_pose)
+    resetted_giskard.set_joint_goal(gaya_pose)
+    resetted_giskard.plan_and_execute()
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
                               tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
                               set_js_topic=u'/kitchen/cram_joint_states')
-    js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_movable_joints()}
+    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
 

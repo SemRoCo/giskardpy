@@ -1,13 +1,15 @@
+import traceback
 from collections import defaultdict
 
 from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy import identifier
+from giskardpy import identifier, RobotName
 from giskardpy.data_types import BiDict, Collisions, Collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_wrapper import ContactInfo
 from giskardpy.model.world import WorldTree
+from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
 
 
@@ -16,8 +18,9 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
 
     def __init__(self, world, gui=False):
         super(PyBulletSyncer, self).__init__(world)
-        pbw.start_pybullet(self.god_map.get_data(identifier.gui))
+        # pbw.start_pybullet(self.god_map.get_data(identifier.gui))
         pbw.start_pybullet(gui)
+        pbw.deactivate_rendering()
         self.object_name_to_bullet_id = BiDict()
 
     @profile
@@ -87,7 +90,9 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         """
         :type world: giskardpy.model.world.WorldTree
         """
-        pbw.deactivate_rendering()
+        # logging.logwarn(self.world.version)
+        # if self.world.model_version == 6:
+        #     traceback.print_stack()
         if self.has_world_changed():
             self.object_name_to_bullet_id = BiDict()
             pbw.clear_pybullet()
@@ -96,7 +101,10 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.add_object(link)
+            self.init_collision_matrix(RobotName)
+            # logging.logwarn('synced world')
         else:
+            # logging.logwarn('updated world')
             try:
                 self.fks = self.world.compute_all_fks()
             except:
@@ -105,7 +113,6 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.update_pose(link)
-        pbw.activate_rendering()
 
     def get_pose(self, link_name):
         map_T_link = PoseStamped()

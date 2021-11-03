@@ -30,18 +30,71 @@ class WorldTree(object):
         self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
-        self._version = 0
-        self.hard_reset()
+        self._state_version = 0
+        self._model_version = 0
+        self.delete_all_but_robot()
 
     @property
     def version(self):
-        return self._version
+        return self._model_version, self._state_version
 
-    def _increase_version(self):
-        self.reset_cache()
+    @property
+    def model_version(self):
+        return self._model_version
+
+    @property
+    def state_version(self):
+        return self._state_version
+
+    def _clear_memo(self, f):
+        try:
+            if hasattr(f, 'memo'):
+                f.memo.clear()
+            else:
+                del f
+        except:
+            pass
+
+    @profile
+    def notify_state_change(self):
+        self._clear_memo(self.compute_fk_pose)
+        self._clear_memo(self.compute_fk_pose_with_collision_offset)
+        self._recompute_fks()
+        self._state_version += 1
+
+    @profile
+    def notify_model_change(self):
+        for group in self.groups.values():
+            group.reset_cache()
+        try:
+            del self.link_names
+        except:
+            pass # property wasn't called
+        try:
+            del self.link_names_with_collisions
+        except:
+            pass # property wasn't called
+        try:
+            del self.movable_joints_as_set
+        except:
+            pass # property wasn't called
+        try:
+            del self.movable_joints
+        except:
+            pass # property wasn't called
+        self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
+        self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
+        self._clear_memo(self.compute_chain_reduced_to_controlled_joints)
+        self._clear_memo(self.get_movable_parent_joint)
+        self._clear_memo(self.get_controlled_parent_joint_of_link)
+        self._clear_memo(self.get_controlled_parent_joint_of_joint)
+        self._clear_memo(self.compute_split_chain)
+        self._clear_memo(self.are_linked)
+        self._clear_memo(self.compose_fk_expression)
+        self._clear_memo(self.compute_chain)
         self.init_all_fks()
-        self.soft_reset()
-        self._version += 1
+        self.notify_state_change()
+        self._model_version += 1
 
     def search_branch(self, joint_name,
                       stop_at_joint_when=None, stop_at_link_when=None,
@@ -115,22 +168,12 @@ class WorldTree(object):
                                            collect_link_when=self.has_link_collisions)
         return links
 
-    @profile
-    def reset_cache(self):
-        # FIXME this sucks because it calls properties
-        for method_name in dir(self):
-            try:
-                getattr(self, method_name).memo.clear()
-            except:
-                pass
-
     def register_group(self, name, root_link_name):
         if root_link_name not in self.links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         if name in self.groups:
             raise DuplicateNameException('Group with name {} already exists'.format(name))
         self.groups[name] = SubWorldTree(name, root_link_name, self)
-        self._increase_version()
 
     @property
     def group_names(self):
@@ -169,8 +212,11 @@ class WorldTree(object):
     def joint_names(self):
         return list(self.joints.keys())
 
+    @property
+    def joint_names_as_set(self):
+        return set(self.joints.keys())
+
     def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None):
-        # create group?
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name in self.groups:
@@ -184,7 +230,7 @@ class WorldTree(object):
         connecting_joint = FixedJoint(name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix),
                                       parent_link_name=parent_link.name,
                                       child_link_name=child_link.name)
-        self.link_joint_to_links(connecting_joint, child_link)
+        self._link_joint_to_links(connecting_joint, child_link)
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
@@ -197,7 +243,7 @@ class WorldTree(object):
                 urdf_joint = urdf.joint_map[child_joint_name]
                 joint = Joint.from_urdf(urdf_joint, prefix, parent_link.name, child_link.name, self.god_map)
 
-                self.link_joint_to_links(joint, child_link)
+                self._link_joint_to_links(joint, child_link)
                 helper(urdf, child_link)
 
         helper(parsed_urdf, child_link)
@@ -260,36 +306,20 @@ class WorldTree(object):
             link = Link.from_world_body(msg)
             joint = FixedJoint(PrefixName(msg.name, self.connection_prefix), parent_link.name, link.name,
                                parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
-            self.link_joint_to_links(joint, link)
+            self._link_joint_to_links(joint, link)
             self.register_group(msg.name, link.name)
-        self._increase_version()
+            self.notify_model_change()
 
-    @property
+    @cached_property
     def movable_joints(self):
         return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
 
-    @profile
-    def soft_reset(self):
-        self.reset_cache()
-        # self.init_fast_fks()
-        self.recompute_fks()
-        for group in self.groups.values():
-            group.soft_reset()
-        del self.link_names
-        del self.link_names_with_collisions
+    @cached_property
+    def movable_joints_as_set(self):
+        return set(j.name for j in self.joints.values() if isinstance(j, MovableJoint))
 
-    # def get_controlled_links(self):
-    #     # FIXME expensive
-    #     if not self._controlled_links:
-    #         self._controlled_links = set()
-    #         for joint_name in self.controlled_joints:
-    #             self._controlled_links.update(self.get_sub_tree_link_names_with_collision(joint_name))
-    #     return self._controlled_links
-
-    def hard_reset(self):
+    def delete_all_but_robot(self):
         self.state = JointStates()
-        # for link_name in self.link_names:
-        #     self.state[link_name]
         self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
@@ -299,8 +329,7 @@ class WorldTree(object):
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
         self.fast_all_fks = None
-        self.init_all_fks()
-        self.soft_reset()
+        self.notify_model_change()
 
     def sync_with_paramserver(self):
         # FIXME this is probable being called repeatedly, creating huge min max expressions over time
@@ -310,20 +339,20 @@ class WorldTree(object):
                                                                          [u'linear', u'override', key]))
             d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
                                                                           [u'angular', u'override', key]))
-            self.set_joint_limits(d_linear, d_angular, i)
+            self._set_joint_limits(d_linear, d_angular, i)
         for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
             def default(joint_name):
                 return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
 
             d = KeyDefaultDict(default)
-            self.set_joint_weights(i, d)
-        self._increase_version()
+            self._set_joint_weights(i, d)
+        self.notify_model_change()
 
     @property
     def joint_constraints(self):
         return {j.name: j.free_variable for j in self.joints.values() if j.has_free_variables()}
 
-    def link_joint_to_links(self, joint, child_link):
+    def _link_joint_to_links(self, joint, child_link):
         """
         :type joint: Joint
         :type child_link: Link
@@ -351,7 +380,7 @@ class WorldTree(object):
         joint.parent_T_child = fk
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
-        self._increase_version()
+        self.notify_model_change()
 
     def move_group(self, group_name, new_parent_link_name):
         group = self.groups[group_name]
@@ -382,7 +411,7 @@ class WorldTree(object):
                 helper(child_joint.child_link_name)
 
         helper(joint.child_link_name)
-        self._increase_version()
+        self.notify_model_change()
 
     def link_order(self, link_a, link_b):
         """
@@ -428,6 +457,7 @@ class WorldTree(object):
         return joint
 
     @profile
+    @memoize
     def compute_chain(self, root_link_name, tip_link_name, joints, links, fixed, non_controlled):
         # FIXME memoizing this function results in weird errors...
         chain = []
@@ -470,6 +500,7 @@ class WorldTree(object):
             tip_chain = tip_chain[1:]
         return root_chain, [connection] if links else [], tip_chain
 
+    @memoize
     def compose_fk_expression(self, root_link, tip_link):
         fk = w.eye(4)
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, joints=True, links=False, fixed=True,
@@ -521,7 +552,6 @@ class WorldTree(object):
 
     def compute_fk_np(self, root, tip):
         return self.get_fk(root, tip)
-        # return self._fks[root, tip].call2(self.god_map.unsafe_get_values(self._fks[root, tip].str_params))
 
     @profile
     def compute_all_fks(self):
@@ -567,8 +597,6 @@ class WorldTree(object):
     @profile
     def compute_all_fks_matrix(self):
         fks = []
-        # self.fk_idx = {}
-        # i = 0
         for link in self.links.values():
             if link.name == self.root_link_name:
                 continue
@@ -576,8 +604,6 @@ class WorldTree(object):
                 map_T_o = self.compose_fk_expression(self.root_link_name, link.name)
                 map_T_geo = w.dot(map_T_o, link.collisions[0].link_T_geometry)
                 fks.append(map_T_geo)
-                # self.fk_idx[link.name] = i
-                # i += 4
         fks = w.vstack(fks)
         fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
 
@@ -591,10 +617,6 @@ class WorldTree(object):
                 return fast_all_fks.call2(self.god_map.unsafe_get_values(self.f.str_params))
 
         return ComputeFKs(fast_all_fks, self.god_map)
-        # result = {}
-        # for link in self.link_names_with_collisions:
-        #     result[link] = fks_evaluated[self.fk_idx[link], :]
-        # return result
 
     @profile
     def init_all_fks(self):
@@ -644,8 +666,7 @@ class WorldTree(object):
         self._fk_computer = FKs(fast_all_fks, self.god_map, idx_start, idx_stop)
 
     @profile
-    def recompute_fks(self):
-        self.compute_fk_pose_with_collision_offset.memo.clear()
+    def _recompute_fks(self):
         self._fk_computer.recompute()
 
     @profile
@@ -664,7 +685,7 @@ class WorldTree(object):
                                                               non_controlled=non_controlled)
         return not chain1 and not connection and not chain2
 
-    def set_joint_limits(self, linear_limits, angular_limits, order):
+    def _set_joint_limits(self, linear_limits, angular_limits, order):
         for joint in self.joints.values():
             if self.is_joint_fixed(joint.name) or self.is_joint_mimic(joint.name):
                 continue
@@ -690,7 +711,7 @@ class WorldTree(object):
                 joint.free_variable.lower_limits[order] = w.max(old_lower_limits,
                                                                 -new_limits[joint.name])
 
-    def set_joint_weights(self, order, weights):
+    def _set_joint_weights(self, order, weights):
         for joint_name, joint in self.joints.items():
             if self.is_joint_movable(joint_name) and not self.is_joint_mimic(joint_name):
                 joint.free_variable.quadratic_weights[order] = weights[joint_name]
@@ -823,7 +844,7 @@ class SubWorldTree(WorldTree):
     def _fk_computer(self):
         return self.world._fk_computer
 
-    def hard_reset(self):
+    def delete_all_but_robot(self):
         raise NotImplementedError('Can\'t hard reset a SubWorldTree.')
 
     @property
@@ -833,9 +854,6 @@ class SubWorldTree(WorldTree):
     @property
     def _fks(self):
         return self.world._fks
-
-    def soft_reset(self):
-        self.reset_cache()
 
     @property
     def state(self):
@@ -848,13 +866,30 @@ class SubWorldTree(WorldTree):
     def state(self, value):
         self.world.state = value
 
+    def notify_model_change(self):
+        raise NotImplementedError()
+
     def reset_cache(self):
-        super(SubWorldTree, self).reset_cache()
-        del self.joints
-        del self.links
-        del self.link_names
-        del self.link_names_with_collisions
-        del self.groups
+        try:
+            del self.joints
+        except:
+            pass # property wasn't called
+        try:
+            del self.links
+        except:
+            pass # property wasn't called
+        try:
+            del self.link_names
+        except:
+            pass # property wasn't called
+        try:
+            del self.link_names_with_collisions
+        except:
+            pass # property wasn't called
+        try:
+            del self.groups
+        except:
+            pass # property wasn't called
 
     @property
     def god_map(self):
@@ -901,10 +936,16 @@ class SubWorldTree(WorldTree):
 
         return helper(self.root_link)
 
+    def compute_fk_pose(self, root, tip):
+        return self.world.compute_fk_pose(root, tip)
+
+    def compute_fk_pose_with_collision_offset(self, root, tip):
+        return self.world.compute_fk_pose_with_collision_offset(root, tip)
+
     def register_group(self, name, root_link_name):
         raise NotImplementedError()
 
-    def link_joint_to_links(self, joint):
+    def _link_joint_to_links(self, connecting_joint, child_link):
         raise NotImplementedError()
 
     def add_urdf_joint(self, urdf_joint):

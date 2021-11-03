@@ -235,7 +235,7 @@ class WorldUpdater(GiskardBehavior):
 
     def clear_world(self):
         # assumes that parent has god map lock
-        self.world.hard_reset()
+        self.world.delete_all_but_robot()
         for plugin_name in self.added_plugin_names:
             self.tree.remove_node(plugin_name)
         self.added_plugin_names = []

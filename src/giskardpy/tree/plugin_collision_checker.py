@@ -7,7 +7,6 @@ from py_trees import Status
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
 import giskardpy.identifier as identifier
-from giskardpy import RobotName
 from giskardpy.model import pybullet_wrapper
 from giskardpy.tree.plugin import GiskardBehavior
 

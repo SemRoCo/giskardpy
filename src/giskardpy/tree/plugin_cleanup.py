@@ -3,9 +3,8 @@ from copy import deepcopy
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.data_types import Trajectory, Collision, Collisions
+from giskardpy.data_types import Trajectory, Collisions
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.tree.tree_manager import TreeManager
 
 
 class CleanUp(GiskardBehavior):
@@ -31,8 +30,8 @@ class CleanUp(GiskardBehavior):
         # to reverse update godmap changes
         self.get_god_map().set_data(identifier.general_options, deepcopy(self.general_options))
         self.get_god_map().set_data(identifier.next_move_goal, None)
-        tree_manager = self.get_god_map().get_data(identifier.tree_manager) # type: TreeManager
-        # tree_manager.get_node(u'visualization').clear_marker()
+        if hasattr(self.get_blackboard(), 'runtime'):
+            del self.get_blackboard().runtime
 
     def update(self):
         return Status.SUCCESS

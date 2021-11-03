@@ -215,12 +215,8 @@ class Collision(object):
                          contact_distance=self.contact_distance)
 
 
-class CollisionMatrix(dict):
-    pass
-
-
 class Collisions(object):
-
+    @profile
     def __init__(self, world, collision_list_size):
         """
         :type robot: giskardpy.model.world.WorldTree

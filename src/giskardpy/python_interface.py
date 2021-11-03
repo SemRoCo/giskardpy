@@ -11,10 +11,12 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
+from tf.transformations import quaternion_multiply
 
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
+     to_joint_state_position_dict, to_tf_quaternion
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
@@ -26,8 +28,10 @@ class GiskardWrapper(object):
             self._update_world_srv = rospy.ServiceProxy(u'{}/update_world'.format(node_name), UpdateWorld)
             self._get_object_names_srv = rospy.ServiceProxy(u'{}/get_object_names'.format(node_name), GetObjectNames)
             self._get_object_info_srv = rospy.ServiceProxy(u'{}/get_object_info'.format(node_name), GetObjectInfo)
-            self._update_rviz_markers_srv = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(node_name), UpdateRvizMarkers)
-            self._get_attached_objects_srv = rospy.ServiceProxy(u'{}/get_attached_objects'.format(node_name), GetAttachedObjects)
+            self._update_rviz_markers_srv = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(node_name),
+                                                               UpdateRvizMarkers)
+            self._get_attached_objects_srv = rospy.ServiceProxy(u'{}/get_attached_objects'.format(node_name),
+                                                                GetAttachedObjects)
             self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(node_name))
             self._client.wait_for_server()
@@ -50,7 +54,29 @@ class GiskardWrapper(object):
         """
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def get_robot_links(self):
+        """
+        Returns a list of the robots links
+        :rtype: dict
+        """
+        return self.robot_urdf.get_link_names()
+
+    def get_joint_states(self, topic=u'joint_states', timeout=1):
+        """
+        Returns a dictionary of all joints (key) and their position (value)
+        :param topic: joint_state topic
+        :param timeout: duration to wait for JointState msg
+        :return: OrderedDict[str, float]
+        """
+        try:
+            msg = rospy.wait_for_message(topic, JointState, rospy.Duration(timeout))
+            return to_joint_state_position_dict(msg)
+        except rospy.ROSException:
+            rospy.logwarn("get_joint_states: wait_for_message timeout")
+            return {}
+
+    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
+                      weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
@@ -249,6 +275,7 @@ class GiskardWrapper(object):
         :type root_normal: Vector3Stamped
         :param max_angular_velocity: rad/s, default 0.5
         :type max_angular_velocity: float
+        :param weight: default WEIGHT_BELOW_CA
         :type weight: float
         """
         if root_link is None:
@@ -337,6 +364,30 @@ class GiskardWrapper(object):
                            max_linear_velocity=max_linear_velocity,
                            max_angular_velocity=max_angular_velocity,
                            weight=weight)
+
+    def set_pull_door_goal(self, tip_link, object_name_prefix, object_link_name, angle_goal,
+                           weight=WEIGHT_ABOVE_CA):
+        """
+        :type tip_link: str
+        :param tip_link: tip of manipulator (gripper) which is used
+        :type object_name_prefix: object name link prefix
+        :param object_name_prefix: string
+        :type object_link_name str
+        :param object_link_name name of the object link name
+        :type object_link_name str
+        :param object_link_name handle to grasp
+        :type angle_goal: float
+        :param angle_goal: how far to open
+        :type weight float
+        :param weight Default = WEIGHT_ABOVE_CA
+        """
+        self.set_json_goal(u'OpenDoor',
+                           tip_link=tip_link,
+                           object_name=object_name_prefix,
+                           object_link_name=object_link_name,
+                           angle_goal=angle_goal,
+                           weight=weight
+                           )
 
     def update_god_map(self, updates):
         """
@@ -442,6 +493,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def allow_self_collision(self):
+        """
+        Allows the collision with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -450,6 +504,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def avoid_self_collision(self):
+        """
+        Avoid collisions with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -647,7 +704,8 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self._update_world_srv.call(req)
 
-    def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+    def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0),
+                     orientation=(0, 0, 0, 1),
                      pose=None):
         """
         If pose is used, frame_id, position and orientation are ignored.
@@ -672,7 +730,7 @@ class GiskardWrapper(object):
             pose.pose.position = Point(*position)
             pose.pose.orientation = Quaternion(*orientation)
         object.shape.type = SolidPrimitive.CYLINDER
-        object.shape.dimensions = [0,0]
+        object.shape.dimensions = [0, 0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
@@ -687,6 +745,8 @@ class GiskardWrapper(object):
         :type frame_id: str
         :type position: list
         :type orientation: list
+        :type pose: PoseStamped
+        :param pose: pose of the box
         :rtype: UpdateWorldResponse
         """
 
@@ -706,7 +766,10 @@ class GiskardWrapper(object):
         Add a cylinder to the world and attach it to the robot at frame_id.
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
-        :type size: list
+        :type height: int
+        :param height: height of the cylinder. Default = 1
+        :type radius: int
+        :param radius: radius of the cylinder. Default = 1
         :type frame_id: str
         :type position: list
         :type orientation: list
@@ -807,7 +870,7 @@ class GiskardWrapper(object):
     def update_rviz_markers(self, object_names):
         """
         republishes visualization markers for rviz
-        :type name: list
+        :type object_names: list
         :rtype: UpdateRvizMarkersResponse
         """
         return self._update_rviz_markers_srv(object_names)

@@ -5,7 +5,7 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 Install the following python packages. When using 20.04, just install the latest version of everything:
 ```
-sudo pip install pybullet
+sudo pip install pybullet==3.0.8 # last known version to work with python 2.7
 sudo pip install scipy==1.2.2 # this is the last version for python 2.7
 sudo pip install casadi
 sudo pip install sortedcontainers

@@ -107,7 +107,7 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-        for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
+        for constraint in itertools.chain(cmd.constraints):
             try:
                 loginfo(u'Adding constraint of type: \'{}\''.format(constraint.type))
                 C = self.allowed_constraint_types[constraint.type]
@@ -128,15 +128,8 @@ class GoalToConstraints(GetGoal):
                                                                                          available_constraints))
 
             try:
-                if hasattr(constraint, u'parameter_value_pair'):
-                    parsed_json = json.loads(constraint.parameter_value_pair)
-                    params = self.replace_jsons_with_ros_messages(parsed_json)
-                else:
-                    raise ConstraintInitalizationException(
-                        u'Only the json interface is supported at the moment. Create an issue if you want it.')
-                    # params = convert_ros_message_to_dictionary(constraint)
-                    # del params[u'type']
-
+                parsed_json = json.loads(constraint.parameter_value_pair)
+                params = self.replace_jsons_with_ros_messages(parsed_json)
                 c = C(god_map=self.god_map, **params)
             except Exception as e:
                 traceback.print_exc()

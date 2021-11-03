@@ -5,7 +5,7 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd, JointConstraint
+    MoveCmd
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from sensor_msgs.msg import JointState
@@ -189,7 +189,7 @@ class GiskardWrapper(object):
         :type max_velocity: float
         """
         constraint = Constraint()
-        constraint.type = JointConstraint.JOINT
+        constraint.type = 'JointPositionList'
         if isinstance(goal_state, JointState):
             goal_state = goal_state
         else:

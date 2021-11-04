@@ -56,6 +56,7 @@ RUN mkdir ros_catkin_ws && \
     git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \
     git clone https://github.com/code-iai/omni_pose_follower.git && \
     cd .. && \
+    vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src && \
     apt-get update && \
     rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} -y && \
     python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \

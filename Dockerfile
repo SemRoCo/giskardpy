@@ -31,12 +31,11 @@ RUN apt-get update && \
     ros-noetic-urdfdom-py \
     ros-noetic-py-trees \
     ros-noetic-py-trees-ros \
-    ros-noetic-catkin \
     build-essential && \
     rosdep init && \
     rosdep update && \
     rm -rf /var/lib/apt/lists/*
-
+ #ros-noetic-catkin 
 COPY dependencies.txt dependencies.txt
 RUN pip install -r dependencies.txt  
 

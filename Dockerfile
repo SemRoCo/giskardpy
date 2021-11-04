@@ -45,55 +45,26 @@ RUN apt-get update && \
     rosdep update && \
     rm -rf /var/lib/apt/lists/*
 
-
-
 COPY dependencies.txt dependencies.txt
 RUN pip install -r dependencies.txt  
 
-###################
-# download/build the ROS source
-#RUN mkdir ros_catkin_ws && \
-#    cd ros_catkin_ws && \
-#    mkdir src && \
-#   cd src && \
-#    git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git && \
-#    rm -rf /var/lib/apt/lists/*
-#RUN apt-get update && \
-#          wstool init \                                
-#	  wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/master/rosinstall/catkin.rosinstall \
-#          wstool update && \
-#    rm -rf /var/lib/apt/lists/*
-#RUN git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git
-#RUN git clone --branch noetic https://github.com/SemRoCo/qpOASES.git
-#RUN git clone https://github.com/code-iai/omni_pose_follower.git
-# RUN cd ..
-# RUN echo "$PWD"
-# RUN vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src
-#RUN apt-get update
-#RUN rosdep install --from-paths . --ignore-packages-from-source --rosdistro ${ROS_DISTRO} -y
-# RUN python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release
-#RUN rm -rf /var/lib/apt/lists/*
-#RUN catkin build
-
-# RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
-# WORKDIR /
-################
 RUN mkdir ros_catkin_ws && \
     cd ros_catkin_ws && \
     rosinstall_generator ${ROS_PKG} vision_msgs --rosdistro ${ROS_DISTRO} --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
     mkdir src && \
-    cd src && \
+    vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src && \
     git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git && \
-    rm -rf /var/lib/apt/lists/*
-RUN git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git
-RUN git clone --branch noetic https://github.com/SemRoCo/qpOASES.git
-RUN git clone https://github.com/code-iai/omni_pose_follower.git
-#RUN cd ..
-#RUN vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src 
-RUN apt-get update && \
-    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \
+    git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
+    git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \
+    git clone https://github.com/code-iai/omni_pose_follower.git && \
+    apt-get update && \
+    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} -y && \
     python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
     rm -rf /var/lib/apt/lists/*
 
+# setup entrypoint
+COPY ./packages/ros_entrypoint.sh /ros_entrypoint.sh
 RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["bash"]
 WORKDIR /

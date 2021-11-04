@@ -1,5 +1,6 @@
 ARG BASE_IMAGE=ubuntu:focal
 FROM ${BASE_IMAGE}
+ARG ROS_PKG=ros_base
 ENV ROS_DISTRO=noetic
 ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
 ENV ROS_PYTHON_VERSION=3
@@ -58,6 +59,7 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
     && git clone https://github.com/code-iai/omni_pose_follower.git \
     # Install dependencies
     && cd $CATKIN_WS \
+    && vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src \
     && rosdep install -y --from-paths . --ignore-src --rosdistro ${ROS_DISTRO} \
     && python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release \
     # Build catkin workspace

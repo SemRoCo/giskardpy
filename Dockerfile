@@ -89,9 +89,9 @@ RUN git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git
 RUN git clone --branch noetic https://github.com/SemRoCo/qpOASES.git
 RUN git clone https://github.com/code-iai/omni_pose_follower.git
 RUN cd ..
-RUN vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src 
+#RUN vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src 
 RUN apt-get update && \
-    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} -y && \
+    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \
     python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
     rm -rf /var/lib/apt/lists/*
 

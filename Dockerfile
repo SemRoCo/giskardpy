@@ -6,6 +6,9 @@ ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
 ENV ROS_PYTHON_VERSION=3
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /workspace
+
 # add the ROS deb repo to the apt sources list
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -45,26 +48,20 @@ RUN apt-get update && \
 COPY dependencies.txt dependencies.txt
 RUN pip install -r dependencies.txt  
 
-ENV CATKIN_WS=/root/catkin_ws
-RUN mkdir -p $CATKIN_WS/src
-WORKDIR $CATKIN_WS/src
+RUN mkdir ros_catkin_ws && \
+    cd ros_catkin_ws && \
+    rosinstall_generator desktop --rosdistro noetic --deps --tar > noetic-desktop.rosinstall && \
+    mkdir ./src && \
+    cd src && \
+    git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git && \
+    git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
+    git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \
+    git clone https://github.com/code-iai/omni_pose_follower.git && \
+    vcs import --input noetic-desktop.rosinstall ./src && \ 
+    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro noetic -y && \
+    python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
+    rm -rf /var/lib/apt/lists/*
 
-# Initialize local catkin workspace
-RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
-    && apt-get update \
-    # ROS File Server
-    && git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git \
-    && git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git \
-    && git clone --branch noetic https://github.com/SemRoCo/qpOASES.git \
-    && git clone https://github.com/code-iai/omni_pose_follower.git \
-    # Install dependencies
-    && cd $CATKIN_WS \
-    && vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src \
-    && rosdep install -y --from-paths . --ignore-src --rosdistro ${ROS_DISTRO} \
-    && python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release \
-    # Build catkin workspace
-    && catkin_make
-
-# Always source ros_catkin_entrypoint.sh when launching bash (e.g. when attaching to container)
-RUN echo "source /ros_catkin_entrypoint.sh" >> /root/.bashrc
+RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
+WORKDIR /
 

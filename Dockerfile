@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=ubuntu:focal
 FROM ${BASE_IMAGE}
-ARG ROS_PKG=ros_base
+ARG ROS_PKG=desktop
 ENV ROS_DISTRO=noetic
 ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
 ENV ROS_PYTHON_VERSION=3
@@ -35,6 +35,7 @@ RUN apt-get update && \
             python3-wstool \
             python3-catkin-tools \
             python3-vcstool \
+            ros-noetic-desktop \
             ros-noetic-urdfdom-py \
             ros-noetic-py-trees \
             ros-noetic-py-trees-ros \

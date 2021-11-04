@@ -1,7 +1,10 @@
-FROM ros:noetic
+ARG BASE_IMAGE=ubuntu:focal
+FROM ${BASE_IMAGE}
+ENV ROS_DISTRO=noetic
+ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
+ENV ROS_PYTHON_VERSION=3
 
-SHELL ["/bin/bash","-c"]
-
+ENV DEBIAN_FRONTEND=noninteractive
 # add the ROS deb repo to the apt sources list
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -36,7 +39,7 @@ RUN apt-get update \
     && rosdep init  \
     && rosdep update \
     && rm -rf /var/lib/apt/lists/*
- #ros-noetic-catkin 
+
 COPY dependencies.txt dependencies.txt
 RUN pip install -r dependencies.txt  
 
@@ -45,7 +48,8 @@ RUN mkdir -p $CATKIN_WS/src
 WORKDIR $CATKIN_WS/src
 
 # Initialize local catkin workspace
-RUN apt-get update \
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
+    && apt-get update \
     # ROS File Server
     && git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git \
     && git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git \
@@ -60,8 +64,3 @@ RUN apt-get update \
 # Always source ros_catkin_entrypoint.sh when launching bash (e.g. when attaching to container)
 RUN echo "source /ros_catkin_entrypoint.sh" >> /root/.bashrc
 
-COPY ./ros_catkin_entrypoint.sh /
-RUN chmod +x /ros_catkin_entrypoint.sh
-
-ENTRYPOINT ["/ros_catkin_entrypoint.sh"]
-CMD ["bash"]

@@ -17,8 +17,5 @@ node {
             echo "Tests passed"
         }
     }
-     stage ('Email Notification'){
-         mail bcc: '', body: 'Thanks', cc: '', from: '', replyTo: '', subject: 'Jenkinsjob Successful', to: 'alok.natheee@gmail.com'
-     }
 }
   

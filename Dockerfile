@@ -59,6 +59,7 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
     # Install dependencies
     && cd $CATKIN_WS \
     && rosdep install -y --from-paths . --ignore-src --rosdistro ${ROS_DISTRO} \
+    && python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
     # Build catkin workspace
     && catkin_make
 

@@ -242,5 +242,8 @@ class Link(object):
                 return True
         return False
 
+    def has_children(self):
+        return len(self.child_joint_names) != 0
+
     def __repr__(self):
         return str(self.name)

@@ -148,6 +148,21 @@ class WorldTree(object):
                                            collect_link_when=self.has_link_collisions)
         return links
 
+    def get_children_with_collision(self, joint_name):
+        links, joints = self.search_branch(joint_name,
+                                           stop_at_link_when=self.has_link_collisions,
+                                           collect_link_when=self.has_link_collisions)
+        return links
+
+    def get_parent_with_collisions(self, joint_name):
+        """
+        :param joint_name:
+        :return:
+        """
+        def has_link_in_joint_collision(joint):
+            return self.links[joint.parent_link_name].has_collisions()
+        return self.search_for_parent_joint(joint_name, stop_when=has_link_in_joint_collision).parent_link_name
+
     def get_siblings_with_collisions(self, joint_name):
         """
         Goes up the tree until the first controlled joint and then down again until another controlled joint or

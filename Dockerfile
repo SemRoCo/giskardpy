@@ -18,23 +18,24 @@ RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main"
 RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
 
 # install bootstrap dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libpython3-dev \
-    python3-rosdep \
-    python3-pip \
-    python3-rosinstall \
-    python3-rosinstall-generator \
-    python3-wstool \
-    python3-catkin-tools \
-    python3-vcstool \
-    ros-noetic-urdfdom-py \
-    ros-noetic-py-trees \
-    ros-noetic-py-trees-ros \
-    build-essential && \
-    rosdep init && \
-    rosdep update && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    && libpython3-dev \
+    && python3-rosdep \
+    && python3-pip \
+    && python3-rosinstall \
+    && python3-rosinstall-generator \
+    && python3-wstool \
+    && python3-catkin-tools \
+    && python3-vcstool \
+    && ros-noetic-urdfdom-py \
+    && ros-noetic-py-trees \
+    && ros-noetic-py-trees-ros \
+    && ros-noetic-catkin \
+    && build-essential \
+    && rosdep init  \
+    && rosdep update \
+    && rm -rf /var/lib/apt/lists/*
  #ros-noetic-catkin 
 COPY dependencies.txt dependencies.txt
 RUN pip install -r dependencies.txt  
@@ -44,9 +45,7 @@ RUN mkdir -p $CATKIN_WS/src
 WORKDIR $CATKIN_WS/src
 
 # Initialize local catkin workspace
-RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
-    # Update apt-get because its cache is always cleared after installs to keep image size down
-    && apt-get update \
+RUN apt-get update \
     # ROS File Server
     && git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git \
     && git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git \

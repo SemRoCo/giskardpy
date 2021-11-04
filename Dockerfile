@@ -63,8 +63,8 @@ RUN mkdir ros_catkin_ws && \
     rm -rf /var/lib/apt/lists/*
 
 # setup entrypoint
-COPY ./packages/ros_entrypoint.sh /ros_entrypoint.sh
+#COPY ./packages/ros_entrypoint.sh /ros_entrypoint.sh
 RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
-ENTRYPOINT ["/ros_entrypoint.sh"]
-CMD ["bash"]
+#ENTRYPOINT ["/ros_entrypoint.sh"]
+#CMD ["bash"]
 WORKDIR /

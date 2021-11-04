@@ -23,19 +23,19 @@ RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E
 # install bootstrap dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    libpython3-dev \
-    python3-rosdep \
-    python3-pip \
-    python3-rosinstall \
-    python3-rosinstall-generator \
-    python3-wstool \
-    python3-catkin-tools \
-    python3-vcstool \
-    ros-noetic-urdfdom-py \
-    ros-noetic-py-trees \
-    ros-noetic-py-trees-ros \
-    ros-noetic-catkin \
-    build-essential && \
+            libpython3-dev \
+            python3-rosdep \
+            python3-pip \
+            python3-rosinstall \
+            python3-rosinstall-generator \
+            python3-wstool \
+            python3-catkin-tools \
+            python3-vcstool \
+            ros-noetic-urdfdom-py \
+            ros-noetic-py-trees \
+            ros-noetic-py-trees-ros \
+            ros-noetic-catkin \
+            build-essential && \
     rosdep init && \
     rosdep update && \
     rm -rf /var/lib/apt/lists/*

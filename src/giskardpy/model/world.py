@@ -216,7 +216,7 @@ class WorldTree(object):
     def joint_names_as_set(self):
         return set(self.joints.keys())
 
-    def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None):
+    def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None): #todo: use prefix
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name in self.groups:
@@ -325,7 +325,7 @@ class WorldTree(object):
         self.joints = {}
         self.groups = {}
         try:
-            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
+            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None) # fixme
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
         self.fast_all_fks = None
@@ -434,7 +434,7 @@ class WorldTree(object):
 
     @property
     def controlled_joints(self):
-        return self.god_map.unsafe_get_data(identifier.controlled_joints)
+        return self.god_map.unsafe_get_data(identifier.controlled_joints)['pr2_a']
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name):

@@ -154,7 +154,7 @@ class JointGoalPublisher(object):
     def __init__(self):
         description = get_param('robot_description')
 
-        self. giskard_wrapper = GiskardWrapper()
+        self.giskard_wrapper = GiskardWrapper()
 
         self.free_joints = {}
         self.joint_list = [] # for maintaining the original order of the joints
@@ -168,7 +168,7 @@ class JointGoalPublisher(object):
         #self.pub_def_vels = get_param("publish_default_velocities", False)
         #self.pub_def_efforts = get_param("publish_default_efforts", False)
 
-        msg = rospy.wait_for_message(u'/whole_body_controller/state', JointTrajectoryControllerState)
+        msg = rospy.wait_for_message(u'/pr2_a/whole_body_controller/state', JointTrajectoryControllerState)
         self.giskard_joints = msg.joint_names
 
 

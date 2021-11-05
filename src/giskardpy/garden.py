@@ -50,7 +50,7 @@ from giskardpy.tree.tree_manager import TreeManager, render_dot_tree
 from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
-from giskardpy.utils.utils import create_path
+from giskardpy.utils.utils import create_path, get_name_spaces
 
 
 def load_config_file():
@@ -67,11 +67,12 @@ def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
+    name_spaces = get_name_spaces()
 
     load_config_file()
 
     god_map.set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
-    god_map.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+    god_map.set_data(identifier.robot_description, rospy.get_param(u'{}/robot_description'.format(name_spaces[0])))
     path_to_data_folder = god_map.get_data(identifier.data_folder)
     # fix path to data folder
     if not path_to_data_folder.endswith(u'/'):
@@ -80,10 +81,13 @@ def initialize_god_map():
 
     while not rospy.is_shutdown():
         try:
-            controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
-                                                       JointTrajectoryControllerState,
-                                                       timeout=5.0).joint_names
-            god_map.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
+            controlled_joints = dict() # maybe fill with PrefixName?
+            for name_space in name_spaces:
+                joint_names = rospy.wait_for_message(u'{}/whole_body_controller/state'.format(name_space),
+                                                     JointTrajectoryControllerState,
+                                                     timeout=5.0).joint_names
+                controlled_joints[name_space] = list(sorted(joint_names))
+            god_map.set_data(identifier.controlled_joints, controlled_joints)
         except ROSException as e:
             logging.logerr(u'state topic not available')
             logging.logerr(str(e))

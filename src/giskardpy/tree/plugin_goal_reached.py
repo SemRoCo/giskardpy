@@ -16,7 +16,7 @@ def make_velocity_threshold(god_map,
                             max_translation_cut_off=0.01,
                             max_rotation_cut_off=0.06):
     joint_convergence_threshold = god_map.get_data(identifier.joint_convergence_threshold)
-    controlled_joints = god_map.get_data(identifier.controlled_joints)
+    controlled_joints = god_map.get_data(identifier.controlled_joints)['pr2_a']
     world = god_map.get_data(identifier.world)
     thresholds = []
     for joint_name in controlled_joints:
@@ -46,7 +46,7 @@ class GoalReachedPlugin(GiskardBehavior):
     @profile
     def update(self):
         planning_time = self.get_god_map().get_data(identifier.time)
-        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)['pr2_a']
         if planning_time - self.above_threshold_time >= self.window_size:
             velocities = np.array([self.world.state[j].velocity for j in controlled_joints])
             below_threshold = np.all(np.abs(velocities[:self.number_of_controlled_joints]) < self.thresholds)

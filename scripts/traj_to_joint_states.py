@@ -9,7 +9,7 @@ import PyKDL as kdl
 
 class TrajToJS(object):
     def __init__(self, odom_x_joint, odom_y_joint, odom_z_joint, odom_frame):
-        self.traj_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
+        self.traj_sub = rospy.Subscriber('/pr2_a/whole_body_controller/follow_joint_trajectory/goal',
                                          FollowJointTrajectoryActionGoal, self.cb, queue_size=10)
         self.joint_state_pub = rospy.Publisher('/giskard/traj/joint_states', JointState, queue_size=10)
         self.odom_x = odom_x_joint

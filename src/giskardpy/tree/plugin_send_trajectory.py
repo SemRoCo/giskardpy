@@ -13,7 +13,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
-    def __init__(self, name, action_namespace=u'/whole_body_controller/follow_joint_trajectory'):
+    def __init__(self, name, action_namespace=u'/pr2_a/whole_body_controller/follow_joint_trajectory'):
         GiskardBehavior.__init__(self, name)
         loginfo(u'waiting for action server \'{}\' to appear'.format(action_namespace))
         ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
@@ -28,7 +28,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)['pr2_a']
         goal.trajectory = trajectory.to_msg(sample_period, controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
 

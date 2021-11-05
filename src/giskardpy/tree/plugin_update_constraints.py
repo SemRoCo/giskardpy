@@ -182,7 +182,7 @@ class GoalToConstraints(GetGoal):
         soft_constraints = {}
         vel_constraints = {}
         debug_expr = {}
-        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)['pr2_a']
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
         for joint_name in controlled_joints:
             child_links = self.robot.get_directly_controlled_child_links_with_collisions(joint_name)

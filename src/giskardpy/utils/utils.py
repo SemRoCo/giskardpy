@@ -384,3 +384,11 @@ def trajectory_to_np(tj, joint_names):
     velocity = np.array(velocity)
     times = np.array(times)
     return names, position, velocity, times
+
+def get_name_spaces():
+    if rospy.has_param('/giskard/name_spaces'):
+        name_spaces = rospy.get_param('/giskard/name_spaces', [])
+        if len(name_spaces) == 0:
+            raise Exception()
+        else:
+            return name_spaces

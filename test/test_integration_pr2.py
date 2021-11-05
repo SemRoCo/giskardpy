@@ -25,7 +25,7 @@ from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
 from test_integration_pr2_without_base import gaya_pose
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
-    JointGoalChecker
+    JointGoalChecker, Robots
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -130,7 +130,8 @@ def ros(request):
     tf_init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
-
+    rospy.set_param('/giskard/name_spaces',
+                    ['/pr2_a', '/pr2_b'])
     rospy.set_param('/joint_trajectory_splitter/state_topics',
                     ['/whole_body_controller/base/state',
                      '/whole_body_controller/body/state'])
@@ -142,6 +143,7 @@ def ros(request):
 
     def kill_ros():
         joint_trajectory_splitter.stop()
+        rospy.delete_param('/giskard/name_spaces')
         rospy.delete_param('/joint_trajectory_splitter/state_topics')
         rospy.delete_param('/joint_trajectory_splitter/client_topics')
         logging.loginfo(u'shutdown ros')
@@ -161,6 +163,16 @@ def giskard(request, ros):
     request.addfinalizer(c.tear_down)
     return c
 
+@pytest.fixture(scope=u'module')
+def giskard_more_robots(request, ros):
+    name_spaces = rospy.get_param('/giskard/name_spaces', [])
+    if len(name_spaces) < 1:
+        raise Exception()
+    r = Robots(name_spaces, [PR2]*len(name_spaces))
+    for c in r.robots:
+        request.addfinalizer(c.tear_down)
+    return r
+
 
 @pytest.fixture()
 def resetted_giskard(giskard):
@@ -176,6 +188,21 @@ def resetted_giskard(giskard):
 
 
 @pytest.fixture()
+def resetted_giskard_more_robots(giskard_more_robots):
+    """
+    :type giskard: PR2
+    """
+    logging.loginfo(u'resetting giskard')
+    for g in giskard_more_robots.robots:
+        g.open_l_gripper()
+        g.open_r_gripper()
+        g.clear_world()
+        g.reset_base()
+    return giskard_more_robots
+
+
+
+@pytest.fixture()
 def zero_pose(resetted_giskard):
     """
     :type resetted_giskard: PR2
@@ -184,6 +211,17 @@ def zero_pose(resetted_giskard):
     resetted_giskard.set_joint_goal(default_pose)
     resetted_giskard.plan_and_execute()
     return resetted_giskard
+
+
+@pytest.fixture()
+def zero_pose_more_robots(resetted_giskard_more_robots):
+    """
+    :type resetted_giskard: PR2
+    """
+    resetted_giskard_more_robots.allow_all_collisions()
+    resetted_giskard_more_robots.set_joint_goal(default_pose)
+    resetted_giskard_more_robots.plan_and_execute()
+    return resetted_giskard_more_robots
 
 
 @pytest.fixture()
@@ -1520,7 +1558,7 @@ class TestConstraints(object):
 
 
 class TestCartGoals(object):
-    def test_rotate_gripper(self, zero_pose):
+    def test_rotate_gripper(self, zero_pose_more_robots):
         """
         :type zero_pose: PR2
         """

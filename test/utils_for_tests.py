@@ -30,7 +30,7 @@ from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, get_name_spaces
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -366,12 +366,18 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.set_param('~config', config_file)
         rospy.set_param('~test', True)
 
-        self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
-                                                 FollowJointTrajectoryActionGoal, self.start_motion_cb,
-                                                 queue_size=100)
-        self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
-                                                FollowJointTrajectoryActionResult, self.stop_motion_cb,
-                                                queue_size=100)
+        self.start_motion_subs = list()
+        self.stop_motion_subs = list()
+        name_spaces = get_name_spaces()
+        for name_space in name_spaces:
+            start_sub = rospy.Subscriber('{}/whole_body_controller/follow_joint_trajectory/goal'.format(name_space),
+                                         FollowJointTrajectoryActionGoal, self.start_motion_cb,
+                                         queue_size=100)
+            self.start_motion_subs.append(start_sub)
+            stop_sub = rospy.Subscriber('{}/whole_body_controller/follow_joint_trajectory/result'.format(name_space),
+                                        FollowJointTrajectoryActionResult, self.stop_motion_cb,
+                                        queue_size=100)
+            self.stop_motion_subs.append(stop_sub)
 
         self.tree = grow_tree()
         self.god_map = Blackboard().god_map
@@ -381,7 +387,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.results = Queue(100)
         self.default_root = self.robot.root_link_name.short_name
         self.map = u'map'
-        self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
+        self.set_base = rospy.ServiceProxy('/pr2_a/base_simulator/set_joint_states', SetJointState)
         self.goal_checks = defaultdict(list)
 
         def create_publisher(topic):
@@ -635,7 +641,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def are_joint_limits_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
-        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)['pr2_a']
         for joint in controlled_joints:
             if not self.robot.is_joint_continuous(joint):
                 joint_limits = self.robot.get_joint_position_limits(joint)
@@ -825,13 +831,19 @@ class GiskardTestWrapper(GiskardWrapper):
         p.pose.orientation.w = 1
         self.teleport_base(p)
 
+class Robots():
+    def __init__(self, robot_names, robot_types):
+        if len(robot_names) != len(robot_types):
+            raise Exception()
+        self.robots = [robot_type(robot_name) for (robot_name, robot_type) in zip(robot_names, robot_types)]
 
 class PR2(GiskardTestWrapper):
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
-        self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
-        self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
+        self.r_gripper = rospy.ServiceProxy(u'{}/r_gripper_simulator/set_joint_states'.format(name), SetJointState)
+        self.l_gripper = rospy.ServiceProxy(u'{}/l_gripper_simulator/set_joint_states'.format(name), SetJointState)
         super(PR2, self).__init__(u'package://giskardpy/config/pr2.yaml')
 
     def move_base(self, goal_pose):

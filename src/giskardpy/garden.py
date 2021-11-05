@@ -51,6 +51,7 @@ from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.utils import create_path
+import giskardpy.utils.tfwrapper as tf
 
 
 def load_config_file():

@@ -289,7 +289,7 @@ class WorldTree(object):
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
         :type pose: Pose
         """
-        if parent_link_name is None:
+        if parent_link_name is None or parent_link_name == '':
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
@@ -839,6 +839,14 @@ class SubWorldTree(WorldTree):
         self.name = name
         self.root_link_name = root_link_name
         self.world = world
+
+    @property
+    def attachment_joint_name(self):
+        return self.world.links[self.root_link_name].parent_joint_name
+
+    @property
+    def attachment_link_name(self):
+        return self.world.get_parent_link_of_link(self.world.groups[self.name].root_link_name)
 
     @property
     def _fk_computer(self):

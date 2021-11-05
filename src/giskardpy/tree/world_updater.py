@@ -151,11 +151,9 @@ class WorldUpdater(GiskardBehavior):
                 self.clear_markers()
                 try:
                     if req.operation == UpdateWorldRequest.ADD:
-                        if req.rigidly_attached:
-                            self.attach_object(req)
-                        else:
-                            self.add_object(req)
-
+                        self.add_object(req)
+                    elif req.operation == UpdateWorldRequest.ATTACH:
+                        self.attach_object(req)
                     elif req.operation == UpdateWorldRequest.REMOVE:
                         # why not to detach objects here:
                         #   - during attaching, bodies turn to objects
@@ -164,9 +162,6 @@ class WorldUpdater(GiskardBehavior):
                         # if self.get_robot().has_joint(req.body.name):
                         #     self.detach_object(req)
                         self.remove_object(req.body.name)
-                    elif req.operation == UpdateWorldRequest.ALTER:
-                        self.remove_object(req.body.name)
-                        self.add_object(req)
                     elif req.operation == UpdateWorldRequest.REMOVE_ALL:
                         self.clear_world()
                     elif req.operation == UpdateWorldRequest.DETACH:
@@ -180,7 +175,7 @@ class WorldUpdater(GiskardBehavior):
         except Exception as e:
             response = UpdateWorldResponse()
             response.error_codes = UpdateWorldResponse.BUSY
-            logging.logwarn('Can\'t update world while Giskard is busy.')
+            logging.logwarn('Rejected world update because Giskard is busy.')
             return response
         finally:
             self.timer_state = self.STALL
@@ -192,36 +187,43 @@ class WorldUpdater(GiskardBehavior):
         """
         # assumes that parent has god map lock
         world_body = req.body
-        global_pose = transform_pose(self.map_frame, req.pose).pose
-        self.world.add_world_body(world_body, global_pose)
+        global_pose = transform_pose(req.parent_link, req.pose).pose
+        self.world.add_world_body(world_body, global_pose, req.parent_link)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
-        logging.loginfo('Added object {} to world.'.format(req.body.name))
+        logging.loginfo('Added object \'{}\' at \'{}\'.'.format(req.body.name, req.parent_link))
         if world_body.joint_state_topic:
             plugin_name = str(PrefixName(world_body.name, 'js'))
             plugin = ConfigurationPlugin(plugin_name, prefix=None, joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
-            logging.loginfo('Added configuration plugin for {} to tree.'.format(req.body.name))
+            logging.loginfo('Added configuration plugin for \'{}\' to tree.'.format(req.body.name))
 
     def detach_object(self, req):
         # assumes that parent has god map lock
-        self.world.move_group(req.body.name,
-                              self.world.root_link_name)
-        logging.loginfo('Detached {}.'.format(req.body.name))
+        if req.body.name not in self.world.groups:
+            raise UnknownBodyException('Can\'t detach \'{}\' because it doesn\'t exist.'.format(req.body.name))
+        req.parent_link = self.world.root_link_name
+        self.attach_object(req)
 
     def attach_object(self, req):
         """
         :type req: UpdateWorldRequest
         """
-        if req.pose.header.frame_id not in self.robot.link_names:
-            raise UnknownBodyException('Robot has no link \'{}\'.'.format(req.pose.header.frame_id))
         # assumes that parent has god map lock
+        if req.parent_link not in self.world.link_names:
+            raise UnknownBodyException('There is no link named \'{}\'.'.format(req.parent_link))
         if req.body.name not in self.world.groups:
             self.add_object(req)
-        attachment_point = PrefixName(req.pose.header.frame_id, RobotPrefix)
-        self.world.move_group(req.body.name, attachment_point)
-        logging.loginfo('Attached {} to {}.'.format(req.body.name, attachment_point))
+        elif self.world.groups[req.body.name].root_link_name != req.parent_link:
+            old_parent_link = self.world.groups[req.body.name].attachment_link_name
+            self.world.move_group(req.body.name, req.parent_link)
+            logging.loginfo('Attached \'{}\' from \'{}\' to \'{}\'.'.format(req.body.name,
+                                                                            old_parent_link,
+                                                                            req.parent_link))
+        else:
+            logging.logwarn('Didn\'t update world because \'{}\' is already attached to \'{}\'.'.format(req.body.name,
+                                                                                                        req.parent_link))
 
     def remove_object(self, name):
         # assumes that parent has god map lock
@@ -231,7 +233,7 @@ class WorldUpdater(GiskardBehavior):
         if name in tree.tree_nodes:
             tree.remove_node(name)
             self.added_plugin_names.remove(name)
-        logging.loginfo('Deleted {}'.format(name))
+        logging.loginfo('Deleted \'{}\''.format(name))
 
     def clear_world(self):
         # assumes that parent has god map lock

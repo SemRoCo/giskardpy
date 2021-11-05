@@ -9,14 +9,14 @@ import pytest
 import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
-from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
+from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
+from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
@@ -2563,8 +2563,9 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = u'map'
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, pose=p)
-        zero_pose.add_box(object_name, pose=p, expected_error_code=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
+        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p,
+                          expected_error_code=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
 
     def test_add_remove_sphere(self, zero_pose):
         """
@@ -2577,7 +2578,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = 1.6
         p.pose.orientation.w = 1
-        zero_pose.add_sphere(object_name, pose=p)
+        zero_pose.add_sphere(object_name, radius=1, pose=p)
         zero_pose.remove_object(object_name)
 
     def test_add_remove_cylinder(self, zero_pose):
@@ -2591,7 +2592,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        zero_pose.add_cylinder(object_name, pose=p)
+        zero_pose.add_cylinder(object_name, height=1, radius=1, pose=p)
         zero_pose.remove_object(object_name)
 
     def test_add_urdf_body(self, kitchen_setup):
@@ -2613,7 +2614,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = zero_pose.r_tip
+        box_pose.pose.position = Point(0.05, 0, 0, )
+        box_pose.pose.orientation = Quaternion(1, 0, 0, 0)
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, box_pose)
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
@@ -2635,7 +2640,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
         zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
@@ -2649,7 +2658,7 @@ class TestCollisionAvoidanceGoals(object):
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
-        zero_pose.add_box(pocky, pose=p)
+        zero_pose.add_box(pocky, size=[1,1,1], pose=p)
         for i in range(3):
             zero_pose.attach_object(pocky, zero_pose.r_tip)
             zero_pose.detach_object(pocky)
@@ -2660,7 +2669,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation.w = 1
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
         zero_pose.remove_object(pocky)
 
     def test_attach_existing_box(self, zero_pose):
@@ -2686,11 +2699,11 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = u'map'
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, pose=p)
+        zero_pose.add_box(object_name, size=[1,1,1], pose=p)
         zero_pose.attach_object(object_name, frame_id=zero_pose.r_tip)
         zero_pose.detach_object(object_name)
         zero_pose.remove_object(object_name)
-        zero_pose.add_box(object_name, pose=p)
+        zero_pose.add_box(object_name, size=[1,1,1], pose=p)
         assert zero_pose.get_attached_objects().object_names == []
 
     def test_attach_existing_box2(self, zero_pose):
@@ -2726,7 +2739,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(1, 0, 0, 0)
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
@@ -2779,7 +2796,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = 1.6
         p.pose.orientation.w = 1
-        zero_pose.add_box(object_name, pose=p)
+        zero_pose.add_box(object_name, size=[1,1,1], pose=p)
         zero_pose.remove_object(object_name)
 
     def test_invalid_update_world(self, zero_pose):

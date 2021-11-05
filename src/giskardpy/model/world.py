@@ -26,7 +26,8 @@ from giskardpy.utils.utils import suppress_stderr, memoize
 class WorldTree(object):
     def __init__(self, god_map=None):
         self.god_map = god_map  # type: GodMap
-        self.god_map.set_data(identifier.world, self)
+        if self.god_map is not None:
+            self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
         self._state_version = 0
@@ -248,7 +249,8 @@ class WorldTree(object):
         helper(parsed_urdf, child_link)
         if group_name is not None:
             self.register_group(group_name, child_link.name)
-        self.sync_with_paramserver()
+        if self.god_map is not None:
+            self.sync_with_paramserver()
 
     def get_parent_link_of_link(self, link_name):
         """
@@ -319,7 +321,10 @@ class WorldTree(object):
 
     def _clear(self):
         self.state = JointStates()
-        self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
+        if self.god_map is not None:
+            self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
+        else:
+            self.root_link_name = 'map'
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
         self.groups = {}

@@ -1,7 +1,7 @@
-from giskard_msgs.msg import MoveResult
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskard_msgs.msg import MoveResult
 from giskardpy.exceptions import UnreachableException, MAX_NWSR_REACHEDException, \
     QPSolverException, UnknownBodyException, ImplementationException, OutOfJointLimitsException, \
     HardConstraintsViolatedException, PhysicsWorldException, ConstraintException, UnknownConstraintException, \

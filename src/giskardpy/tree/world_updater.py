@@ -23,7 +23,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.tree.plugin_configuration import ConfigurationPlugin
+from giskardpy.tree.sync_configuration import ConfigurationPlugin
 from giskardpy.tree.tree_manager import TreeManager
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose

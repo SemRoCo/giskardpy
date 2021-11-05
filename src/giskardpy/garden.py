@@ -11,38 +11,40 @@ import giskardpy.identifier as identifier
 from giskardpy import RobotPrefix
 from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.tree.AsyncComposite import PluginBehavior
 from giskardpy.tree.commands_remaining import CommandsRemaining
 from giskardpy.tree.exception_to_execute import ExceptionToExecute
+from giskardpy.tree.goal_canceled import GoalCanceled
+from giskardpy.tree.goal_received import GoalReceived
+from giskardpy.tree.send_result import SendResult
 from giskardpy.tree.start_timer import StartTimer
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.collision_scene_updater import CollisionSceneUpdater
-from giskardpy.tree.plugin import PluginBehavior
-from giskardpy.tree.plugin_action_server import GoalReceived, SendResult, GoalCanceled
-from giskardpy.tree.plugin_append_zero_velocity import AppendZeroVelocity
-from giskardpy.tree.plugin_cleanup import CleanUp
-from giskardpy.tree.plugin_collision_checker import CollisionChecker
-from giskardpy.tree.plugin_collision_marker import CollisionMarker
-from giskardpy.tree.plugin_configuration import ConfigurationPlugin
-from giskardpy.tree.plugin_goal_reached import GoalReachedPlugin
+from giskardpy.tree.append_zero_velocity import AppendZeroVelocity
+from giskardpy.tree.cleanup import CleanUp
+from giskardpy.tree.collision_checker import CollisionChecker
+from giskardpy.tree.collision_marker import CollisionMarker
+from giskardpy.tree.sync_configuration import ConfigurationPlugin
+from giskardpy.tree.goal_reached import GoalReachedPlugin
 from giskardpy.tree.plugin_if import IF, IfFunction
-from giskardpy.tree.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.tree.plugin_kinematic_sim import KinSimPlugin
-from giskardpy.tree.plugin_log_debug_expressions import LogDebugExpressionsPlugin
-from giskardpy.tree.plugin_log_trajectory import LogTrajPlugin
-from giskardpy.tree.plugin_loop_detector import LoopDetector
-from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
-from giskardpy.tree.plugin_plot_debug_expressions import PlotDebugExpressions
-from giskardpy.tree.plugin_plot_trajectory import PlotTrajectory
+from giskardpy.tree.instantaneous_controller import ControllerPlugin
+from giskardpy.tree.kinematic_sim import KinSimPlugin
+from giskardpy.tree.log_debug_expressions import LogDebugExpressionsPlugin
+from giskardpy.tree.log_trajectory import LogTrajPlugin
+from giskardpy.tree.loop_detector import LoopDetector
+from giskardpy.tree.max_trajectory_length import MaxTrajectoryLength
+from giskardpy.tree.plot_debug_expressions import PlotDebugExpressions
+from giskardpy.tree.plot_trajectory import PlotTrajectory
 from giskardpy.tree.set_error_code import SetErrorCode
-from giskardpy.tree.plugin_send_trajectory import SendTrajectory
-from giskardpy.tree.plugin_set_cmd import SetCmd
-from giskardpy.tree.plugin_tf_publisher import TFPublisher
-from giskardpy.tree.plugin_time import TimePlugin
-from giskardpy.tree.plugin_update_constraints import GoalToConstraints
-from giskardpy.tree.plugin_visualization import VisualizationBehavior
-from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
+from giskardpy.tree.send_trajectory import SendTrajectory
+from giskardpy.tree.set_cmd import SetCmd
+from giskardpy.tree.tf_publisher import TFPublisher
+from giskardpy.tree.time import TimePlugin
+from giskardpy.tree.update_constraints import GoalToConstraints
+from giskardpy.tree.visualization import VisualizationBehavior
+from giskardpy.tree.shaking_detector import WiggleCancel
 from giskardpy.tree.tree_manager import TreeManager, render_dot_tree
 from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
@@ -67,6 +69,7 @@ def initialize_god_map():
     blackboard.god_map = god_map
 
     world = WorldTree(god_map)
+    world.delete_all_but_robot()
 
     collision_checker = god_map.get_data(identifier.collision_checker)
     if collision_checker == 'bpb':

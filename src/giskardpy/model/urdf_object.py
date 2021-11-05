@@ -1,6 +1,7 @@
-import numpy as np
 from copy import deepcopy
 from itertools import chain
+
+import numpy as np
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose, Vector3, Quaternion, Point
 from std_msgs.msg import ColorRGBA
@@ -8,13 +9,10 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
-from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
-from giskardpy.utils.utils import suppress_stderr, memoize
+from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
+    hacky_urdf_parser_fix
 from giskardpy.utils.tfwrapper import normalize
-
-
-
-
+from giskardpy.utils.utils import suppress_stderr, memoize
 
 FIXED_JOINT = u'fixed'
 REVOLUTE_JOINT = u'revolute'
@@ -49,7 +47,6 @@ class URDFObject(object):
                 getattr(self, method_name).memo.clear()
             except:
                 pass
-
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -507,7 +504,6 @@ class URDFObject(object):
                 link_name = children[0]
         return link_name
 
-
     @memoize
     def get_non_base_movement_root(self):
         l = self.get_root()
@@ -728,7 +724,7 @@ class URDFObject(object):
                               geometry.length)
         elif isinstance(geometry, up.Mesh):
             m.type = Marker.MESH_RESOURCE
-            m.scale = Vector3(1,1,1)
+            m.scale = Vector3(1, 1, 1)
             m.mesh_resource = geometry.filename
         else:
             raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))

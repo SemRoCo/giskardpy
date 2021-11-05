@@ -210,7 +210,7 @@ class WorldUpdater(GiskardBehavior):
         if req.body.name not in self.world.groups:
             self.add_object(req)
         elif self.world.groups[req.body.name].root_link_name != req.parent_link:
-            old_parent_link = self.world.groups[req.body.name].attachment_link_name
+            old_parent_link = self.world.groups[req.body.name].parent_link_of_root
             self.world.move_group(req.body.name, req.parent_link)
             logging.loginfo('Attached \'{}\' from \'{}\' to \'{}\'.'.format(req.body.name,
                                                                             old_parent_link,

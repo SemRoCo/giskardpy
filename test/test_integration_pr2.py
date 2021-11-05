@@ -2648,6 +2648,32 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
+    def test_attach_remove_sphere(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.attach_sphere(pocky, 1, zero_pose.r_tip, p)
+        zero_pose.detach_object(pocky)
+        zero_pose.remove_object(pocky)
+
+    def test_attach_remove_cylinder(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.attach_cylinder(pocky, 1, 1, zero_pose.r_tip, p)
+        zero_pose.detach_object(pocky)
+        zero_pose.remove_object(pocky)
+
     def test_attach_remove_box2(self, zero_pose):
         """
         :type zero_pose: PR2

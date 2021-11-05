@@ -12,11 +12,13 @@ from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
-from giskardpy import RobotName
+from giskardpy import RobotName, identifier
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.model.urdf_object import URDFObject
-from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
-from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, make_pose_from_parts
+from giskardpy.god_map import GodMap
+from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder, make_world_body_sphere
+from giskardpy.model.world import WorldTree
+from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, \
+    make_pose_from_parts, suppress_stderr, suppress_stdout
 
 DEFAULT_WORLD_TIMEOUT = 500
 
@@ -34,7 +36,10 @@ class GiskardWrapper(object):
             self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(node_name))
             self._client.wait_for_server()
-        self.robot_urdf = URDFObject(rospy.get_param(u'robot_description'))
+        self._god_map = GodMap.init_from_paramserver(node_name)
+        self._world = WorldTree(self._god_map)
+        self._world.delete_all_but_robot()
+
         self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
@@ -51,7 +56,7 @@ class GiskardWrapper(object):
         Returns the name of the robot's root link
         :rtype: str
         """
-        return self.robot_urdf.get_root()
+        return self._world.groups[RobotName].root_link_name
 
     def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
@@ -656,7 +661,7 @@ class GiskardWrapper(object):
         req.parent_link = parent_link
         return self._update_world_srv.call(req)
 
-    def attach_cylinder(self, name, height, radius, pose, parent_link, timeout=DEFAULT_WORLD_TIMEOUT):
+    def attach_cylinder(self, name, height, radius, parent_link, pose, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Add a cylinder to the world and attach it to the robot at frame_id.
         If pose is used, frame_id, position and orientation are ignored.
@@ -668,6 +673,22 @@ class GiskardWrapper(object):
         req.operation = UpdateWorldRequest.ADD
         req.timeout = timeout
         req.body = cylinder
+        req.pose = pose
+        req.parent_link = parent_link
+        return self._update_world_srv.call(req)
+
+    def attach_sphere(self, name, radius, parent_link, pose, timeout=DEFAULT_WORLD_TIMEOUT):
+        """
+        Add a cylinder to the world and attach it to the robot at frame_id.
+        If pose is used, frame_id, position and orientation are ignored.
+        :type name: str
+        :rtype: UpdateWorldResponse
+        """
+        sphere = make_world_body_sphere(name, radius)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = sphere
         req.pose = pose
         req.parent_link = parent_link
         return self._update_world_srv.call(req)

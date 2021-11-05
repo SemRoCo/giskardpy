@@ -1,14 +1,11 @@
 from collections import defaultdict
-from copy import deepcopy
 
 import rospy
-from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 from py_trees.meta import failure_is_success, success_is_failure, running_is_success, running_is_failure, \
-    failure_is_running, inverter
+    failure_is_running
 from py_trees_ros.trees import BehaviourTree
-from rospy import ROSException
 
 import giskardpy.identifier as identifier
 from giskardpy import RobotPrefix
@@ -51,10 +48,9 @@ from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.utils import create_path
-import giskardpy.utils.tfwrapper as tf
 
 
-def load_config_file():
+def upload_config_file_to_paramserver():
     old_params = rospy.get_param('~')
     if rospy.has_param('~test'):
         test = rospy.get_param('~test')
@@ -65,48 +61,13 @@ def load_config_file():
 
 
 def initialize_god_map():
-    god_map = GodMap()
+    upload_config_file_to_paramserver()
+    god_map = GodMap.init_from_paramserver(rospy.get_name())
     blackboard = Blackboard
     blackboard.god_map = god_map
 
-    load_config_file()
-
-    god_map.set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
-    god_map.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
-    path_to_data_folder = god_map.get_data(identifier.data_folder)
-    # fix path to data folder
-    if not path_to_data_folder.endswith(u'/'):
-        path_to_data_folder += u'/'
-    god_map.set_data(identifier.data_folder, path_to_data_folder)
-
-    while not rospy.is_shutdown():
-        try:
-            controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
-                                                       JointTrajectoryControllerState,
-                                                       timeout=5.0).joint_names
-            god_map.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
-        except ROSException as e:
-            logging.logerr(u'state topic not available')
-            logging.logerr(str(e))
-        else:
-            break
-        rospy.sleep(0.5)
-
-    set_default_in_override_block(identifier.external_collision_avoidance, god_map)
-    set_default_in_override_block(identifier.self_collision_avoidance, god_map)
-    # weights
-    for i, key in enumerate(god_map.get_data(identifier.joint_weights), start=1):
-        set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
-
-    # limits
-    for i, key in enumerate(god_map.get_data(identifier.joint_limits), start=1):
-        set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], god_map)
-        set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], god_map)
-
-    order = len(god_map.get_data(identifier.joint_weights)) + 1
-    god_map.set_data(identifier.order, order)
-
     world = WorldTree(god_map)
+
     collision_checker = god_map.get_data(identifier.collision_checker)
     if collision_checker == 'bpb':
         logging.loginfo('Using bpb for collision checking.')
@@ -120,8 +81,8 @@ def initialize_god_map():
         logging.logwarn('Unknown collision checker {}. Collision avoidance is disabled'.format(collision_checker))
         collision_scene = CollisionWorldSynchronizer(world)
         god_map.set_data(identifier.collision_checker, None)
-
     god_map.set_data(identifier.collision_scene, collision_scene)
+
     # sanity_check_derivatives(god_map)
     # sanity_check(god_map)
     return god_map
@@ -190,21 +151,6 @@ def process_joint_specific_params(identifier_, default, override, god_map):
         d.update(override)
     god_map.set_data(identifier_, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
-
-
-def set_default_in_override_block(block_identifier, god_map):
-    default_value = god_map.get_data(block_identifier[:-1] + [u'default'])
-    override = god_map.get_data(block_identifier)
-    d = defaultdict(lambda: default_value)
-    if isinstance(override, dict):
-        if isinstance(default_value, dict):
-            for key, value in override.items():
-                o = deepcopy(default_value)
-                o.update(value)
-                override[key] = o
-        d.update(override)
-    god_map.set_data(block_identifier, d)
-    return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
 
 
 def grow_tree():

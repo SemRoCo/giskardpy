@@ -1,4 +1,3 @@
-import itertools
 import numbers
 import traceback
 from copy import deepcopy
@@ -16,8 +15,8 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
     FixedJoint, MimicJoint
 from giskardpy.model.links import Link
-from giskardpy.model.urdf_object import hacky_urdf_parser_fix
-from giskardpy.utils import logging, utils
+from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.utils import logging
 import giskardpy.utils.math as mymath
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
     kdl_to_np, msg_to_homogeneous_matrix, np_point, np_vector
@@ -32,7 +31,7 @@ class WorldTree(object):
         self.fast_all_fks = None
         self._state_version = 0
         self._model_version = 0
-        self.delete_all_but_robot()
+        self._clear()
 
     @property
     def version(self):
@@ -318,16 +317,16 @@ class WorldTree(object):
     def movable_joints_as_set(self):
         return set(j.name for j in self.joints.values() if isinstance(j, MovableJoint))
 
-    def delete_all_but_robot(self):
+    def _clear(self):
         self.state = JointStates()
         self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
         self.groups = {}
-        try:
-            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
-        except KeyError:
-            logging.logwarn('Can\'t add robot, because it is not on the param server')
+
+    def delete_all_but_robot(self):
+        self._clear()
+        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
         self.fast_all_fks = None
         self.notify_model_change()
 
@@ -845,7 +844,7 @@ class SubWorldTree(WorldTree):
         return self.world.links[self.root_link_name].parent_joint_name
 
     @property
-    def attachment_link_name(self):
+    def parent_link_of_root(self):
         return self.world.get_parent_link_of_link(self.world.groups[self.name].root_link_name)
 
     @property

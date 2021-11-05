@@ -13,25 +13,7 @@ from giskardpy.utils.utils import suppress_stderr, memoize
 from giskardpy.utils.tfwrapper import normalize
 
 
-def robot_name_from_urdf_string(urdf_string):
-    return urdf_string.split('robot name="')[1].split('"')[0]
 
-def hacky_urdf_parser_fix(urdf_str):
-    # TODO this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
-    fixed_urdf = ''
-    delete = False
-    black_list = ['transmission', 'gazebo']
-    black_open = ['<{}'.format(x) for x in black_list]
-    black_close = ['</{}'.format(x) for x in black_list]
-    for line in urdf_str.split('\n'):
-        if len([x for x in black_open if x in line]) > 0:
-            delete = True
-        if len([x for x in black_close if x in line]) > 0:
-            delete = False
-            continue
-        if not delete:
-            fixed_urdf += line + '\n'
-    return fixed_urdf
 
 
 FIXED_JOINT = u'fixed'

@@ -1,4 +1,3 @@
-import itertools
 import numbers
 import traceback
 from copy import deepcopy
@@ -8,6 +7,7 @@ import numpy as np
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3
 
+import giskardpy.utils.math as mymath
 from giskardpy import casadi_wrapper as w, RobotName, identifier
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
@@ -16,9 +16,8 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
     FixedJoint, MimicJoint
 from giskardpy.model.links import Link
-from giskardpy.model.urdf_object import hacky_urdf_parser_fix
-from giskardpy.utils import logging, utils
-import giskardpy.utils.math as mymath
+from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
     kdl_to_np, msg_to_homogeneous_matrix, np_point, np_vector
 from giskardpy.utils.utils import suppress_stderr, memoize
@@ -27,12 +26,13 @@ from giskardpy.utils.utils import suppress_stderr, memoize
 class WorldTree(object):
     def __init__(self, god_map=None):
         self.god_map = god_map  # type: GodMap
-        self.god_map.set_data(identifier.world, self)
+        if self.god_map is not None:
+            self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
         self._state_version = 0
         self._model_version = 0
-        self.delete_all_but_robot()
+        self._clear()
 
     @property
     def version(self):
@@ -69,19 +69,19 @@ class WorldTree(object):
         try:
             del self.link_names
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.link_names_with_collisions
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.movable_joints_as_set
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.movable_joints
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
         self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
         self._clear_memo(self.compute_chain_reduced_to_controlled_joints)
@@ -264,7 +264,8 @@ class WorldTree(object):
         helper(parsed_urdf, child_link)
         if group_name is not None:
             self.register_group(group_name, child_link.name)
-        self.sync_with_paramserver()
+        if self.god_map is not None:
+            self.sync_with_paramserver()
 
     def get_parent_link_of_link(self, link_name):
         """
@@ -304,7 +305,7 @@ class WorldTree(object):
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
         :type pose: Pose
         """
-        if parent_link_name is None:
+        if parent_link_name is None or parent_link_name == '':
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
@@ -333,16 +334,19 @@ class WorldTree(object):
     def movable_joints_as_set(self):
         return set(j.name for j in self.joints.values() if isinstance(j, MovableJoint))
 
-    def delete_all_but_robot(self):
+    def _clear(self):
         self.state = JointStates()
-        self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
+        if self.god_map is not None:
+            self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
+        else:
+            self.root_link_name = 'map'
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
         self.groups = {}
-        try:
-            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
-        except KeyError:
-            logging.logwarn('Can\'t add robot, because it is not on the param server')
+
+    def delete_all_but_robot(self):
+        self._clear()
+        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
         self.fast_all_fks = None
         self.notify_model_change()
 
@@ -395,6 +399,11 @@ class WorldTree(object):
         joint.parent_T_child = fk
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
+        self.notify_model_change()
+
+    def update_joint_parent_T_child(self, joint_name, new_parent_T_child):
+        joint = self.joints[joint_name]
+        joint.parent_T_child = new_parent_T_child
         self.notify_model_change()
 
     def move_group(self, group_name, new_parent_link_name):
@@ -645,7 +654,7 @@ class WorldTree(object):
             map_T_o = self.compose_fk_expression(self.root_link_name, link_name)
             fks.append(map_T_o)
             idx_start[link_name] = i
-            idx_stop[link_name] = i+4
+            idx_stop[link_name] = i + 4
             i += 4
         fks = w.vstack(fks)
         fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
@@ -856,6 +865,14 @@ class SubWorldTree(WorldTree):
         self.world = world
 
     @property
+    def attachment_joint_name(self):
+        return self.world.links[self.root_link_name].parent_joint_name
+
+    @property
+    def parent_link_of_root(self):
+        return self.world.get_parent_link_of_link(self.world.groups[self.name].root_link_name)
+
+    @property
     def _fk_computer(self):
         return self.world._fk_computer
 
@@ -888,23 +905,23 @@ class SubWorldTree(WorldTree):
         try:
             del self.joints
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.links
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.link_names
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.link_names_with_collisions
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.groups
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
 
     @property
     def god_map(self):

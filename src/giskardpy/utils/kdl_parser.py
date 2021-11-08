@@ -1,8 +1,9 @@
 import numpy as np
 
 import PyKDL as kdl
-from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 import urdf_parser_py.urdf as up
+
+from giskardpy.model.utils import hacky_urdf_parser_fix
 
 
 def euler_to_quat(r, p, y):

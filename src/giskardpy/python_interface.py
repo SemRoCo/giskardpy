@@ -5,23 +5,25 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd, JointConstraint
+    MoveCmd
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
-from giskardpy import RobotName
+from giskardpy import RobotName, identifier
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.model.urdf_object import URDFObject
-from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
-from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, make_pose_from_parts
+from giskardpy.god_map import GodMap
+from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder, make_world_body_sphere
+from giskardpy.model.world import WorldTree
+from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, \
+    make_pose_from_parts, suppress_stderr, suppress_stdout
 
 DEFAULT_WORLD_TIMEOUT = 500
 
-class GiskardWrapper(object):
 
+class GiskardWrapper(object):
     def __init__(self, node_name=u'giskard'):
         giskard_topic = u'{}/command'.format(node_name)
         if giskard_topic is not None:
@@ -34,7 +36,10 @@ class GiskardWrapper(object):
             self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(node_name))
             self._client.wait_for_server()
-        self.robot_urdf = URDFObject(rospy.get_param(u'robot_description'))
+        self._god_map = GodMap.init_from_paramserver(node_name)
+        self._world = WorldTree(self._god_map)
+        self._world.delete_all_but_robot()
+
         self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
@@ -51,7 +56,7 @@ class GiskardWrapper(object):
         Returns the name of the robot's root link
         :rtype: str
         """
-        return self.robot_urdf.get_root()
+        return self._world.groups[RobotName].root_link_name
 
     def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
@@ -109,10 +114,9 @@ class GiskardWrapper(object):
         """
         constraint = Constraint()
         constraint.type = u'CartesianPosition'
-        params = {}
-        params[u'root_link'] = root_link
-        params[u'tip_link'] = tip_link
-        params[u'goal'] = convert_ros_message_to_dictionary(goal_pose)
+        params = {u'root_link': root_link,
+                  u'tip_link': tip_link,
+                  u'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
             params[u'max_velocity'] = max_velocity
         if weight:
@@ -138,10 +142,9 @@ class GiskardWrapper(object):
         """
         constraint = Constraint()
         constraint.type = u'CartesianPositionStraight'
-        params = {}
-        params[u'root_link'] = root_link
-        params[u'tip_link'] = tip_link
-        params[u'goal'] = convert_ros_message_to_dictionary(goal_pose)
+        params = {u'root_link': root_link,
+                  u'tip_link': tip_link,
+                  u'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
             params[u'max_velocity'] = max_velocity
         if weight:
@@ -166,10 +169,9 @@ class GiskardWrapper(object):
         """
         constraint = Constraint()
         constraint.type = u'CartesianOrientation'
-        params = {}
-        params[u'root_link'] = root_link
-        params[u'tip_link'] = tip_link
-        params[u'goal'] = convert_ros_message_to_dictionary(goal_pose)
+        params = {u'root_link': root_link,
+                  u'tip_link': tip_link,
+                  u'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
             params[u'max_velocity'] = max_velocity
         if weight:
@@ -189,7 +191,7 @@ class GiskardWrapper(object):
         :type max_velocity: float
         """
         constraint = Constraint()
-        constraint.type = JointConstraint.JOINT
+        constraint.type = 'JointPositionList'
         if isinstance(goal_state, JointState):
             goal_state = goal_state
         else:
@@ -198,8 +200,7 @@ class GiskardWrapper(object):
                 goal_state2.name.append(joint_name)
                 goal_state2.position.append(joint_position)
             goal_state = goal_state2
-        params = {}
-        params[u'goal_state'] = convert_ros_message_to_dictionary(goal_state)
+        params = {u'goal_state': convert_ros_message_to_dictionary(goal_state)}
         if weight is not None:
             params[u'weight'] = weight
         if max_velocity is not None:
@@ -488,7 +489,7 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
-        return self.send_goal(MoveGoal.CHECK_REACHABILITY, wait)
+        raise NotImplementedError('reachability check is not implemented')
 
     def plan(self, wait=True):
         """
@@ -540,7 +541,9 @@ class GiskardWrapper(object):
         the parameter server.
         :rtype: UpdateWorldResponse
         """
-        req = UpdateWorldRequest(UpdateWorldRequest.REMOVE_ALL, timeout, WorldBody(), False, PoseStamped())
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.REMOVE_ALL
+        req.timeout = timeout
         return self._update_world_srv.call(req)
 
     def remove_object(self, name, timeout=DEFAULT_WORLD_TIMEOUT):
@@ -552,71 +555,73 @@ class GiskardWrapper(object):
         """
         object = WorldBody()
         object.name = str(name)
-        req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, timeout, object, False, PoseStamped())
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.REMOVE
+        req.timeout = timeout
+        req.body = object
         return self._update_world_srv.call(req)
 
-    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
+    def add_box(self, name, size, pose, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
         :param size: (x length, y length, z length) in m
         :type size: list
-        :type frame_id: str
-        :type position: list
-        :type orientation: list
         :type pose: PoseStamped
         :rtype: UpdateWorldResponse
         """
         box = make_world_body_box(name, size[0], size[1], size[2])
-        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, box, False, pose)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = box
+        req.pose = pose
+        req.parent_link = 'map'
         return self._update_world_srv.call(req)
 
-    def add_sphere(self, name=u'sphere', radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                   pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
+    def add_sphere(self, name, radius, pose, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
         :param radius: in m
-        :type radius: list
-        :type frame_id: str
-        :type position: list
-        :type orientation: list
+        :type radius: float
         :type pose: PoseStamped
         :rtype: UpdateWorldResponse
         """
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.shape.type = SolidPrimitive.SPHERE
         object.shape.dimensions.append(radius)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, object, False, pose)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = object
+        req.pose = pose
+        req.parent_link = 'map'
         return self._update_world_srv.call(req)
 
-    def add_mesh(self, name=u'mesh', mesh=u'', frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                 pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
+    def add_mesh(self, name, mesh, pose, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
         :param mesh: path to the meshes location. e.g. package://giskardpy/test/urdfs/meshes/bowl_21.obj
-        :type frame_id: str
-        :type position: list
-        :type orientation: list
         :type pose: PoseStamped
         :rtype: UpdateWorldResponse
         """
         object = WorldBody()
         object.type = WorldBody.MESH_BODY
         object.name = str(name)
-        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.mesh = mesh
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, object, False, pose)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = object
+        req.pose = pose
+        req.parent_link = 'map'
         return self._update_world_srv.call(req)
 
-    def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                     pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
+    def add_cylinder(self, name, height, radius, pose, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
@@ -624,74 +629,89 @@ class GiskardWrapper(object):
         :type height: float
         :param radius: in m
         :type radius: float
-        :type frame_id: str
-        :type position: list
-        :type orientation: list
         :type pose: PoseStamped
         :rtype: UpdateWorldResponse
         """
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.shape.type = SolidPrimitive.CYLINDER
         object.shape.dimensions = [0,0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, object, False, pose)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = object
+        req.pose = pose
+        req.parent_link = 'map'
         return self._update_world_srv.call(req)
 
-    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
-                   timeout=DEFAULT_WORLD_TIMEOUT):
+    def attach_box(self, name, size, parent_link, pose, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Add a box to the world and attach it to the robot at frame_id.
         If pose is used, frame_id, position and orientation are ignored.
+        :param parent_link:
+        :param pose:
+        :param timeout:
         :type name: str
         :type size: list
-        :type frame_id: str
-        :type position: list
-        :type orientation: list
         :rtype: UpdateWorldResponse
         """
-
         box = make_world_body_box(name, size[0], size[1], size[2])
-        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
-
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, box, True, pose)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ATTACH
+        req.timeout = timeout
+        req.body = box
+        req.pose = pose
+        req.parent_link = parent_link
         return self._update_world_srv.call(req)
 
-    def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
-                        pose=None, timeout=DEFAULT_WORLD_TIMEOUT):
+    def attach_cylinder(self, name, height, radius, parent_link, pose, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Add a cylinder to the world and attach it to the robot at frame_id.
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
-        :type size: list
-        :type frame_id: str
-        :type position: list
-        :type orientation: list
         :rtype: UpdateWorldResponse
         """
         cylinder = make_world_body_cylinder(name, height, radius)
-        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
-
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, cylinder, True, pose)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = cylinder
+        req.pose = pose
+        req.parent_link = parent_link
         return self._update_world_srv.call(req)
 
-    def attach_object(self, name, link_frame_id, timeout=DEFAULT_WORLD_TIMEOUT):
+    def attach_sphere(self, name, radius, parent_link, pose, timeout=DEFAULT_WORLD_TIMEOUT):
+        """
+        Add a cylinder to the world and attach it to the robot at frame_id.
+        If pose is used, frame_id, position and orientation are ignored.
+        :type name: str
+        :rtype: UpdateWorldResponse
+        """
+        sphere = make_world_body_sphere(name, radius)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = sphere
+        req.pose = pose
+        req.parent_link = parent_link
+        return self._update_world_srv.call(req)
+
+    def attach_object(self, name, parent_link, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Attach an already existing object at link_frame_id of the robot.
         :type name: str
-        :param link_frame_id: name of a robot link
-        :type link_frame_id: str
+        :param parent_link: name of a robot link
+        :type parent_link: str
         :return: UpdateWorldResponse
         """
         req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ATTACH
         req.timeout = timeout
-        req.rigidly_attached = True
+        req.parent_link = parent_link
         req.body.name = name
-        req.pose.header.frame_id = link_frame_id
-        req.operation = UpdateWorldRequest.ADD
         return self._update_world_srv.call(req)
 
     def detach_object(self, object_name, timeout=DEFAULT_WORLD_TIMEOUT):
@@ -729,7 +749,12 @@ class GiskardWrapper(object):
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = str(urdf)
         urdf_body.joint_state_topic = str(js_topic)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, timeout, urdf_body, False, pose)
+        req = UpdateWorldRequest()
+        req.operation = UpdateWorldRequest.ADD
+        req.timeout = timeout
+        req.body = urdf_body
+        req.pose = pose
+        req.parent_link = 'map'
         if js_topic:
             # FIXME publisher has to be removed, when object gets deleted
             # FIXME there could be sync error, if objects get added/removed by something else

@@ -13,7 +13,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
-from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
+from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
 from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
@@ -372,6 +372,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
                                                 FollowJointTrajectoryActionResult, self.stop_motion_cb,
                                                 queue_size=100)
+        self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+                                                UpdateTransform)
 
         self.tree = grow_tree()
         self.god_map = Blackboard().god_map
@@ -392,6 +394,18 @@ class GiskardTestWrapper(GiskardWrapper):
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
         self.original_number_of_links = len(self.world.links)
+
+    def set_localization(self, map_T_odom):
+        """
+        :type map_T_odom: PoseStamped
+        """
+        req = UpdateTransformRequest()
+        req.transform.translation = map_T_odom.pose.position
+        req.transform.rotation = map_T_odom.pose.orientation
+        assert self.set_localization_srv(req).success
+        self.wait_heartbeats(10)
+        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot.root_link_name)
+        compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
@@ -417,7 +431,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         :rtype: set
         """
-        self.collision_scene.sync()
+        self.wait_heartbeats()
         return self.collision_scene.collision_matrices[RobotName]
 
     def start_motion_cb(self, msg):
@@ -608,7 +622,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                     error_message)
             if error_code == MoveResult.SUCCESS:
                 try:
-                    for goal_checker in self.goal_checks[len(r.error_codes)]:
+                    for goal_checker in self.goal_checks[len(r.error_codes)-1]:
                         goal_checker()
                 except:
                     logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
@@ -705,27 +719,23 @@ class GiskardTestWrapper(GiskardWrapper):
                 assert name not in self.world.groups
                 assert name not in self.get_object_names().object_names
 
-    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_box(name=name, size=size, frame_id=frame_id, position=position,
-                                                           orientation=orientation, pose=pose)
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+    def add_box(self, name, size, pose, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_box(name=name,
+                                                           size=size,
+                                                           pose=pose)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
-    def add_sphere(self, name=u'sphere', radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                   pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_sphere(name=name, radius=radius, pose=pose, frame_id=frame_id,
-                                                              position=position, orientation=orientation)
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+    def add_sphere(self, name, radius=1, pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_sphere(name=name,
+                                                              radius=radius,
+                                                              pose=pose)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
-    def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0),
-                     orientation=(0, 0, 0, 1),
-                     pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_cylinder(name=name, height=height, radius=radius,
-                                                                frame_id=frame_id,
-                                                                position=position, orientation=orientation, pose=pose)
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+    def add_cylinder(self, name, height, radius, pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_cylinder(name=name,
+                                                                height=height,
+                                                                radius=radius,
+                                                                pose=pose)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
     def add_mesh(self, name=u'meshy', mesh=u'', frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
@@ -740,33 +750,42 @@ class GiskardTestWrapper(GiskardWrapper):
         response = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
-    def check_attach_object_result(self, response, expected_error_code, pose, name):
+    def check_attach_object_result(self, response, expected_error_code, pose, name, parent_link):
         assert response.error_codes == expected_error_code, \
             u'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
                                             update_world_error_code(expected_error_code))
         if expected_error_code == UpdateWorldResponse.SUCCESS:
-            assert name in [n.short_name for n in self.robot.link_names]
+            assert name in [n.short_name for n in self.world.link_names]
             assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
+            assert self.world.groups[name].parent_link_of_root == parent_link
             current_pose = self.world.compute_fk_pose(self.world.root_link_name, name)
             pose = tf.transform_pose(self.world.root_link_name, pose)
             compare_poses(pose.pose, current_pose.pose)
 
-    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
-                   expected_response=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).attach_box(name, size, frame_id, position, orientation, pose)
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
-        self.check_attach_object_result(response, expected_response, pose, name)
+    def attach_box(self, name, size, parent_link, pose, expected_response=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).attach_box(name=name,
+                                                              size=size,
+                                                              parent_link=parent_link,
+                                                              pose=pose)
+        self.check_attach_object_result(response, expected_response, pose, name, parent_link)
 
-    def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
-                        pose=None, expected_response=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).attach_cylinder(name=name, height=height, radius=radius,
-                                                                   frame_id=frame_id, position=position,
-                                                                   orientation=orientation, pose=pose)
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
-        self.check_attach_object_result(response, expected_response, pose, name)
+    def attach_cylinder(self, name, height, radius, parent_link, pose, expected_response=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).attach_cylinder(name=name,
+                                                                   height=height,
+                                                                   radius=radius,
+                                                                   parent_link=parent_link,
+                                                                   pose=pose)
+        self.check_attach_object_result(response, expected_response, pose, name, parent_link)
 
-    def attach_object(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
-        r = super(GiskardTestWrapper, self).attach_object(name, frame_id)
+    def attach_sphere(self, name, radius, parent_link, pose, expected_response=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).attach_sphere(name=name,
+                                                                 radius=radius,
+                                                                 parent_link=parent_link,
+                                                                 pose=pose)
+        self.check_attach_object_result(response, expected_response, pose, name, parent_link)
+
+    def attach_object(self, name, parent_link, expected_response=UpdateWorldResponse.SUCCESS):
+        r = super(GiskardTestWrapper, self).attach_object(name, parent_link)
         self.wait_heartbeats()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -774,6 +793,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert name in self.get_attached_objects().object_names
         if self.god_map.get_data(identifier.collision_checker) is not None:
             assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
+            assert self.world.groups[name].parent_link_of_root == parent_link
 
     def get_external_collisions(self, link, distance_threshold):
         """
@@ -823,6 +843,8 @@ class GiskardTestWrapper(GiskardWrapper):
         p = PoseStamped()
         p.header.frame_id = self.map
         p.pose.orientation.w = 1
+        self.set_localization(p)
+        self.wait_heartbeats()
         self.teleport_base(p)
 
 

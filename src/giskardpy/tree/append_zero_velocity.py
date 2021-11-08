@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 from py_trees import Status
 
 import giskardpy.identifier as identifier

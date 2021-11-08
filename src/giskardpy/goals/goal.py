@@ -14,9 +14,9 @@ from giskardpy.model.world import WorldTree
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
-WEIGHT_ABOVE_CA = 2500  # Constraint_msg.WEIGHT_ABOVE_CA
-WEIGHT_COLLISION_AVOIDANCE = 50  # Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
-WEIGHT_BELOW_CA = 1  # Constraint_msg.WEIGHT_BELOW_CA
+WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
+WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
+WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 

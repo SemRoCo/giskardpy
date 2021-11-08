@@ -2,23 +2,23 @@ import difflib
 import inspect
 import itertools
 import json
+import pkgutil
 import traceback
-from collections import OrderedDict
 from collections import defaultdict
-from time import time
-from giskard_msgs.msg import MoveCmd, CollisionEntry
+
 from py_trees import Status
+
 import giskardpy.goals
 import giskardpy.identifier as identifier
-from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
+from giskard_msgs.msg import MoveCmd, CollisionEntry
+from giskardpy import casadi_wrapper as w, RobotName
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
+from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.goals.goal import Goal
+from giskardpy.tree.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
-from giskardpy.tree.plugin_action_server import GetGoal
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
-import pkgutil
-from giskardpy import casadi_wrapper as w, RobotName
 
 
 def get_all_classes_in_package(package):
@@ -85,13 +85,12 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
 
-        if (self.get_god_map().get_data(identifier.check_reachability)):
-            # FIXME reachability check is broken
-            pass
-        else:
-            l = self.active_free_symbols()
-            joint_constraints = [v for v in self.world.joint_constraints.values() if v.name in l]
+        if self.get_god_map().get_data(identifier.check_reachability):
+            self.raise_to_blackboard(NotImplementedError('reachability check is not implemented'))
+            return Status.SUCCESS
 
+        l = self.active_free_symbols()
+        joint_constraints = [v for v in self.world.joint_constraints.values() if v.name in l]
         self.get_god_map().set_data(identifier.free_variables, joint_constraints)
         loginfo(u'Done parsing goal message.')
         return Status.SUCCESS
@@ -108,7 +107,7 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-        for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
+        for constraint in itertools.chain(cmd.constraints):
             try:
                 loginfo(u'Adding constraint of type: \'{}\''.format(constraint.type))
                 C = self.allowed_constraint_types[constraint.type]
@@ -129,14 +128,8 @@ class GoalToConstraints(GetGoal):
                                                                                          available_constraints))
 
             try:
-                if hasattr(constraint, u'parameter_value_pair'):
-                    parsed_json = json.loads(constraint.parameter_value_pair)
-                    params = self.replace_jsons_with_ros_messages(parsed_json)
-                else:
-                    raise ConstraintInitalizationException(u'Only the json interface is supported at the moment. Create an issue if you want it.')
-                    # params = convert_ros_message_to_dictionary(constraint)
-                    # del params[u'type']
-
+                parsed_json = json.loads(constraint.parameter_value_pair)
+                params = self.replace_jsons_with_ros_messages(parsed_json)
                 c = C(god_map=self.god_map, **params)
             except Exception as e:
                 traceback.print_exc()

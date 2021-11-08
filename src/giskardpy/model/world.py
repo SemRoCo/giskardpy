@@ -7,6 +7,7 @@ import numpy as np
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3
 
+import giskardpy.utils.math as mymath
 from giskardpy import casadi_wrapper as w, RobotName, identifier
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
@@ -17,7 +18,6 @@ from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, Continu
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
-import giskardpy.utils.math as mymath
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
     kdl_to_np, msg_to_homogeneous_matrix, np_point, np_vector
 from giskardpy.utils.utils import suppress_stderr, memoize
@@ -69,19 +69,19 @@ class WorldTree(object):
         try:
             del self.link_names
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.link_names_with_collisions
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.movable_joints_as_set
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.movable_joints
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
         self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
         self._clear_memo(self.compute_chain_reduced_to_controlled_joints)
@@ -386,6 +386,11 @@ class WorldTree(object):
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()
 
+    def update_joint_parent_T_child(self, joint_name, new_parent_T_child):
+        joint = self.joints[joint_name]
+        joint.parent_T_child = new_parent_T_child
+        self.notify_model_change()
+
     def move_group(self, group_name, new_parent_link_name):
         group = self.groups[group_name]
         joint_name = self.links[group.root_link_name].parent_joint_name
@@ -634,7 +639,7 @@ class WorldTree(object):
             map_T_o = self.compose_fk_expression(self.root_link_name, link_name)
             fks.append(map_T_o)
             idx_start[link_name] = i
-            idx_stop[link_name] = i+4
+            idx_stop[link_name] = i + 4
             i += 4
         fks = w.vstack(fks)
         fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
@@ -885,23 +890,23 @@ class SubWorldTree(WorldTree):
         try:
             del self.joints
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.links
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.link_names
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.link_names_with_collisions
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
         try:
             del self.groups
         except:
-            pass # property wasn't called
+            pass  # property wasn't called
 
     @property
     def god_map(self):

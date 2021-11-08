@@ -2,6 +2,8 @@ import traceback
 from multiprocessing import Lock
 from xml.etree.ElementTree import ParseError
 
+from giskardpy.tree.sync_localization import SyncLocalization
+
 try:
     # Python 2
     from Queue import Empty, Queue
@@ -23,7 +25,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.tree.sync_configuration import ConfigurationPlugin
+from giskardpy.tree.sync_configuration import SyncConfiguration
 from giskardpy.tree.tree_manager import TreeManager
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose
@@ -188,10 +190,18 @@ class WorldUpdater(GiskardBehavior):
         logging.loginfo('Added object \'{}\' at \'{}\'.'.format(req.body.name, req.parent_link))
         if world_body.joint_state_topic:
             plugin_name = str(PrefixName(world_body.name, 'js'))
-            plugin = ConfigurationPlugin(plugin_name, prefix=None, joint_state_topic=world_body.joint_state_topic)
+            plugin = SyncConfiguration(plugin_name, group_name=world_body.name,
+                                       joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo('Added configuration plugin for \'{}\' to tree.'.format(req.body.name))
+        if world_body.tf_root_link_name:
+            plugin_name = str(PrefixName(world_body.name, 'localization'))
+            plugin = SyncLocalization(plugin_name, group_name=world_body.name,
+                                      tf_root_link_name=world_body.tf_root_link_name)
+            self.tree.insert_node(plugin, 'Synchronize', 1)
+            self.added_plugin_names.append(plugin_name)
+            logging.loginfo('Added localization plugin for \'{}\' to tree.'.format(req.body.name))
 
     def detach_object(self, req):
         # assumes that parent has god map lock
@@ -222,12 +232,15 @@ class WorldUpdater(GiskardBehavior):
     def remove_object(self, name):
         # assumes that parent has god map lock
         self.world.delete_group(name)
+        self._remove_plugin(str(PrefixName(name, 'js')))
+        self._remove_plugin(str(PrefixName(name, 'localization')))
+        logging.loginfo('Deleted \'{}\''.format(name))
+
+    def _remove_plugin(self, name):
         tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
-        name = str(PrefixName(name, 'js'))
         if name in tree.tree_nodes:
             tree.remove_node(name)
             self.added_plugin_names.remove(name)
-        logging.loginfo('Deleted \'{}\''.format(name))
 
     def clear_world(self):
         # assumes that parent has god map lock

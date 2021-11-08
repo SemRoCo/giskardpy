@@ -8,7 +8,7 @@ from py_trees.meta import failure_is_success, success_is_failure, running_is_suc
 from py_trees_ros.trees import BehaviourTree
 
 import giskardpy.identifier as identifier
-from giskardpy import RobotPrefix
+from giskardpy import RobotPrefix, RobotName
 from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.tree.AsyncComposite import PluginBehavior
@@ -18,6 +18,7 @@ from giskardpy.tree.goal_canceled import GoalCanceled
 from giskardpy.tree.goal_received import GoalReceived
 from giskardpy.tree.send_result import SendResult
 from giskardpy.tree.start_timer import StartTimer
+from giskardpy.tree.sync_localization import SyncLocalization
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
@@ -26,7 +27,7 @@ from giskardpy.tree.append_zero_velocity import AppendZeroVelocity
 from giskardpy.tree.cleanup import CleanUp
 from giskardpy.tree.collision_checker import CollisionChecker
 from giskardpy.tree.collision_marker import CollisionMarker
-from giskardpy.tree.sync_configuration import ConfigurationPlugin
+from giskardpy.tree.sync_configuration import SyncConfiguration
 from giskardpy.tree.goal_reached import GoalReachedPlugin
 from giskardpy.tree.plugin_if import IF, IfFunction
 from giskardpy.tree.instantaneous_controller import ControllerPlugin
@@ -163,7 +164,8 @@ def grow_tree():
     # ----------------------------------------------
     sync = Sequence(u'Synchronize')
     sync.add_child(WorldUpdater(u'update world'))
-    sync.add_child(ConfigurationPlugin(u'update robot configuration', RobotPrefix))
+    sync.add_child(SyncConfiguration(u'update robot configuration', RobotName))
+    sync.add_child(SyncLocalization(u'update robot localization', RobotName))
     sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
     sync.add_child(CollisionSceneUpdater(u'update collision scene'))
     sync.add_child(running_is_success(VisualizationBehavior)(u'visualize collision scene'))

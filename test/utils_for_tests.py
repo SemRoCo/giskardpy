@@ -13,7 +13,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
-from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
+from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
 from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
@@ -372,6 +372,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
                                                 FollowJointTrajectoryActionResult, self.stop_motion_cb,
                                                 queue_size=100)
+        self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+                                                UpdateTransform)
 
         self.tree = grow_tree()
         self.god_map = Blackboard().god_map
@@ -392,6 +394,18 @@ class GiskardTestWrapper(GiskardWrapper):
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
         self.original_number_of_links = len(self.world.links)
+
+    def set_localization(self, map_T_odom):
+        """
+        :type map_T_odom: PoseStamped
+        """
+        req = UpdateTransformRequest()
+        req.transform.translation = map_T_odom.pose.position
+        req.transform.rotation = map_T_odom.pose.orientation
+        assert self.set_localization_srv(req).success
+        self.wait_heartbeats(10)
+        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot.root_link_name)
+        compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
@@ -608,7 +622,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                     error_message)
             if error_code == MoveResult.SUCCESS:
                 try:
-                    for goal_checker in self.goal_checks[len(r.error_codes)]:
+                    for goal_checker in self.goal_checks[len(r.error_codes)-1]:
                         goal_checker()
                 except:
                     logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
@@ -829,6 +843,8 @@ class GiskardTestWrapper(GiskardWrapper):
         p = PoseStamped()
         p.header.frame_id = self.map
         p.pose.orientation.w = 1
+        self.set_localization(p)
+        self.wait_heartbeats()
         self.teleport_base(p)
 
 

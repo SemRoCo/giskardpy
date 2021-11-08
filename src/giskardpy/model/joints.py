@@ -119,21 +119,12 @@ class Joint(object):
                             lower_limits[0] = urdf_joint.limit.lower
                             upper_limits[0] = urdf_joint.limit.upper
                         except AttributeError:
-                            lower_limits[0] = None
-                            upper_limits[0] = None
-                else:
-                    lower_limits[0] = None
-                    upper_limits[0] = None
+                            pass
                 try:
                     lower_limits[1] = -urdf_joint.limit.velocity
                     upper_limits[1] = urdf_joint.limit.velocity
                 except AttributeError:
-                    lower_limits[1] = None
-                    upper_limits[1] = None
-                lower_limits[2] = -100
-                upper_limits[2] = 100
-                lower_limits[3] = -100
-                upper_limits[3] = 100
+                    pass
 
                 free_variable = FreeVariable(symbols={
                     0: god_map.to_symbol(identifier.joint_states + [joint.name, 'position']),
@@ -143,7 +134,7 @@ class Joint(object):
                 },
                     lower_limits=lower_limits,
                     upper_limits=upper_limits,
-                    quadratic_weights={1: 0, 2: 0, 3: 0},
+                    quadratic_weights={},
                     horizon_functions={1: 0.1})
                 joint.set_free_variables([free_variable])
         return joint
@@ -188,6 +179,9 @@ class MovableJoint(Joint):
 class OneDofJoint(MovableJoint):
     @property
     def free_variable(self):
+        """
+        :rtype: FreeVariable
+        """
         return self.free_variables[0]
 
     @property
@@ -201,6 +195,13 @@ class OneDofJoint(MovableJoint):
     @property
     def velocity_limit(self):
         return self.free_variable.get_upper_limit(1)
+
+    def delete_limits(self):
+        self.free_variable.lower_limits = {}
+        self.free_variable.upper_limits = {}
+
+    def delete_weights(self):
+        self.free_variable.quadratic_weights = {}
 
 
 class RevoluteJoint(OneDofJoint):

@@ -5037,6 +5037,18 @@ class TestReachability():
         zero_pose.set_joint_goal(js)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
+
+class TestConfigFile(object):
+    def test_prediction_horizon1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.set_joint_goal(gaya_pose)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(default_pose)
+        zero_pose.plan_and_execute()
+
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])

@@ -1,6 +1,7 @@
 import numpy as np
 
 import PyKDL as kdl
+import rospy
 import urdf_parser_py.urdf as up
 
 from giskardpy.model.utils import hacky_urdf_parser_fix
@@ -28,7 +29,7 @@ def urdf_pose_to_kdl_frame(pose):
 def urdf_joint_to_kdl_joint(jnt):
     origin_frame = urdf_pose_to_kdl_frame(jnt.origin)
     if jnt.joint_type == 'fixed':
-        return kdl.Joint(jnt.name, kdl.Joint)
+        return kdl.Joint(jnt.name)
     axis = kdl.Vector(*jnt.axis)
     if jnt.joint_type == 'revolute':
         return kdl.Joint(jnt.name, origin_frame.p,
@@ -40,7 +41,7 @@ def urdf_joint_to_kdl_joint(jnt):
         return kdl.Joint(jnt.name, origin_frame.p,
                          origin_frame.M * axis, kdl.Joint.TransAxis)
     print("Unknown joint type: %s." % jnt.joint_type)
-    return kdl.Joint(jnt.name, kdl.Joint)
+    return kdl.Joint(jnt.name)
 
 def urdf_inertial_to_kdl_rbi(i):
     origin = urdf_pose_to_kdl_frame(i.origin)
@@ -74,22 +75,47 @@ def kdl_tree_from_urdf_model(urdf):
     return tree
 
 
+def kdl_joint_limits_from_urdf_model(urdf, joint_names):
+    min = kdl.JntArray(len(joint_names))
+    max = kdl.JntArray(len(joint_names))
+    for i, joint_name in enumerate(joint_names):
+        joint = urdf.joint_map[joint_name]
+        if joint.limit.lower is not None:
+            min[i] = joint.limit.lower
+        else:
+            rospy.logerr(u'Joint {} has no lower limits.'.format(joint_name))
+        if joint.limit.upper is not None:
+            max[i] = joint.limit.upper
+        else:
+            rospy.logerr(u'Joint {} has no upper limits.'.format(joint_name))
+    return min, max
+
+
+def joint_names_from_kdl_chain(chain):
+    joints = []
+    for i in range(chain.getNrOfSegments()):
+        joint = chain.getSegment(i).getJoint()
+        if joint.getType() != 8:
+            joints.append(str(joint.getName()))
+    return joints
+
+
 class KDL(object):
     class KDLRobot(object):
-        def __init__(self, chain):
+        def __init__(self, joints, chain, chain_min, chain_max):
+            self.joints = joints
             self.chain = chain
+            self.chain_min = chain_min
+            self.chain_max = chain_max
             self.fksolver = kdl.ChainFkSolverPos_recursive(self.chain)
+            self.iksolver_vel = kdl.ChainIkSolverVel_pinv(self.chain)
+            self.iksolver = kdl.ChainIkSolverPos_NR_JL(self.chain, self.chain_min, self.chain_max,
+                                                       self.fksolver, self.iksolver_vel)
             self.jac_solver = kdl.ChainJntToJacSolver(self.chain)
             self.jacobian = kdl.Jacobian(self.chain.getNrOfJoints())
-            self.joints = self.get_joints()
 
         def get_joints(self):
-            joints = []
-            for i in range(self.chain.getNrOfSegments()):
-                joint = self.chain.getSegment(i).getJoint()
-                if joint.getType() != 8:
-                    joints.append(str(joint.getName()))
-            return joints
+            return joint_names_from_kdl_chain(self.chain)
 
         def fk(self, js_dict):
             js = [js_dict[j] for j in self.joints]
@@ -116,18 +142,32 @@ class KDL(object):
                  [0, 0, 0, 1], ]
             return np.array(r)
 
+        def ik(self, js_dict, frame):
+            js = [js_dict[j] for j in self.joints]
+            theta_out = kdl.JntArray(len(js))
+            theta_init = kdl.JntArray(len(js))
+            for i in range(len(js)):
+                theta_init[i] = js[i]
+            self.iksolver.CartToJnt(theta_init, frame, theta_out)
+            return theta_out
+
     def __init__(self, urdf):
         if urdf.endswith(u'.urdfs'):
             with open(urdf, u'r') as file:
                 urdf = file.read()
-        r = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
-        self.tree = kdl_tree_from_urdf_model(r)
+        self.urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
+        self.tree = kdl_tree_from_urdf_model(self.urdf)
         self.robots = {}
+
+    def get_joints(self, chain):
+        return joint_names_from_kdl_chain(chain)
 
     def get_robot(self, root, tip):
         root = str(root)
         tip = str(tip)
         if (root, tip) not in self.robots:
-            self.chain = self.tree.getChain(root, tip)
-            self.robots[root, tip] = self.KDLRobot(self.chain)
+            chain = self.tree.getChain(root, tip)
+            joints = self.get_joints(chain)
+            chain_min, chain_max = kdl_joint_limits_from_urdf_model(self.urdf, joints)
+            self.robots[root, tip] = self.KDLRobot(joints, chain, chain_min, chain_max)
         return self.robots[root, tip]

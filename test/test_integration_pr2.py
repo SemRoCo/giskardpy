@@ -2467,14 +2467,14 @@ class TestCartesianPath(object):
                                                      tip_link=tip_link,
                                                      goal=milk_grasp_pre_pose)
 
-        kitchen_setup_avoid_collisions.send_and_check_goal()
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      tip_link=tip_link,
                                                      goal=milk_pose)
 
-        kitchen_setup_avoid_collisions.send_and_check_goal()
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
         # grasp milk
         kitchen_setup_avoid_collisions.attach_object(milk_name, tip_link)
@@ -2487,15 +2487,16 @@ class TestCartesianPath(object):
             raise Exception('Wrong tip link')
 
         kitchen_setup_avoid_collisions.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup_avoid_collisions.default_root)
-        kitchen_setup_avoid_collisions.send_and_check_goal()
-        kitchen_setup_avoid_collisions.send_and_check_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
         # place milk back
         kitchen_setup_avoid_collisions.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup_avoid_collisions.default_root)
-        kitchen_setup_avoid_collisions.send_and_check_goal()
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
         kitchen_setup_avoid_collisions.set_cart_goal(milk_pose, milk_name, kitchen_setup_avoid_collisions.default_root)
-        kitchen_setup_avoid_collisions.send_and_check_goal()
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
         # kitchen_setup.keep_position(kitchen_setup_avoid_collisions.r_tip)
         if tip_link == kitchen_setup_avoid_collisions.l_tip:

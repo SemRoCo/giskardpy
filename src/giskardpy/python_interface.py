@@ -13,6 +13,7 @@ from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
 from giskardpy import RobotName, identifier
+from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder, make_world_body_sphere
@@ -56,7 +57,7 @@ class GiskardWrapper(object):
         Returns the name of the robot's root link
         :rtype: str
         """
-        return self._world.groups[RobotName].root_link_name
+        return str(self._world.groups[RobotName].root_link_name)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
@@ -362,6 +363,8 @@ class GiskardWrapper(object):
                     kwargs[k].append(convert_ros_message_to_dictionary(i))
             if isinstance(v, Message):
                 kwargs[k] = convert_ros_message_to_dictionary(v)
+            if isinstance(v, PrefixName):
+                kwargs[k] = str(v)
         constraint.parameter_value_pair = json.dumps(kwargs)
         self.cmd_seq[-1].constraints.append(constraint)
 

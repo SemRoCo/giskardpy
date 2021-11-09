@@ -83,7 +83,7 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if group.are_linked(link_a, link_b, non_controlled) \
+            if group.are_static_linked(link_a, link_b, non_controlled) \
                     or link_a == link_b \
                     or link_a in self.ignored_pairs \
                     or link_b in self.ignored_pairs \

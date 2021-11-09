@@ -43,9 +43,9 @@ general_options:
         default: 30
         override: {}
 qp_solver:
-  name: cplex # one of [qpoases, gurobi, cplex]
+  name: gurobi # one of [qpoases, gurobi, cplex]
   # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
-  prediction_horizon: 5
+  prediction_horizon: 9
   hard_constraint_handling:
     retries_with_relaxed_constraints: 5 # per goal
     added_slack: 100

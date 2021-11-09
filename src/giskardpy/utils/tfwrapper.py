@@ -150,6 +150,16 @@ def lookup_point(target_frame, source_frame, time=None):
     return p
 
 
+def list_to_kdl(pose):
+    return PyKDL.Frame(PyKDL.Rotation.Quaternion(pose[1][0],
+                                                 pose[1][1],
+                                                 pose[1][2],
+                                                 pose[1][3]),
+                       PyKDL.Vector(pose[0][0],
+                                    pose[0][1],
+                                    pose[0][2]))
+
+
 def pose_to_kdl(pose):
     """Convert a geometry_msgs Transform message to a PyKDL Frame.
 
@@ -361,6 +371,16 @@ def np_to_pose(matrix):
     :rtype: Pose
     """
     return kdl_to_pose(np_to_kdl(matrix))
+
+def np_to_pose_stamped(matrix, frame_id):
+    """
+    :type matrix: np.ndarray
+    :rtype: PoseStamped
+    """
+    p = PoseStamped()
+    p.header.frame_id = frame_id
+    p.pose = np_to_pose(matrix)
+    return p
 
 
 # Code copied from user jarvisschultz from ROS answers

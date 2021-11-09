@@ -233,8 +233,6 @@ class GodMap(object):
             set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], self)
             set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], self)
 
-        order = len(self.get_data(identifier.joint_weights)) + 1
-        self.set_data(identifier.order, order)
         return self
 
     def __copy__(self):

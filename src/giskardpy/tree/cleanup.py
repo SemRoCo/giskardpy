@@ -11,7 +11,7 @@ class CleanUp(GiskardBehavior):
     def __init__(self, name):
         super(CleanUp, self).__init__(name)
         # FIXME this is the smallest hack to reverse (some) update godmap changes, constraints need some kind of finalize
-        self.general_options = deepcopy(self.get_god_map().get_data(identifier.general_options))
+        self.rosparams = deepcopy(self.get_god_map().get_data(identifier.rosparam))
 
     def initialise(self):
         self.get_god_map().clear_cache()
@@ -28,7 +28,8 @@ class CleanUp(GiskardBehavior):
         trajectory = Trajectory()
         self.get_god_map().set_data(identifier.debug_trajectory, trajectory)
         # to reverse update godmap changes
-        self.get_god_map().set_data(identifier.general_options, deepcopy(self.general_options))
+        self.get_god_map().set_data(identifier.rosparam, deepcopy(self.rosparams))
+        self.world.sync_with_paramserver()
         self.get_god_map().set_data(identifier.next_move_goal, None)
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime

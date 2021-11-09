@@ -65,9 +65,6 @@ class GoalToConstraints(GetGoal):
         self.soft_constraints = {}
         self.vel_constraints = {}
         self.debug_expr = {}
-        if not (self.get_god_map().get_data(identifier.check_reachability)) and \
-                self.god_map.get_data(identifier.collision_checker) is not None:
-            self.add_collision_avoidance_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)
@@ -79,6 +76,10 @@ class GoalToConstraints(GetGoal):
             self.raise_to_blackboard(e)
             traceback.print_exc()
             return Status.SUCCESS
+
+        if not (self.get_god_map().get_data(identifier.check_reachability)) and \
+                self.god_map.get_data(identifier.collision_checker) is not None:
+            self.add_collision_avoidance_constraints(move_cmd.collisions)
 
         self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
         self.get_god_map().set_data(identifier.constraints, self.soft_constraints)

@@ -15,6 +15,7 @@ from giskardpy.exceptions import DuplicateNameException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
     FixedJoint, MimicJoint
+from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
@@ -353,15 +354,15 @@ class WorldTree(object):
         self.notify_model_change()
 
     def sync_with_paramserver(self):
-        # FIXME this is probable being called repeatedly, creating huge min max expressions over time
-        for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
+        self._delete_joint_limits()
+        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits))+1):
             order_identifier = identifier.joint_limits + [order_map[i]]
             d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
                                                                          [u'linear', u'override', key]))
             d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
                                                                           [u'angular', u'override', key]))
             self._set_joint_limits(d_linear, d_angular, i)
-        for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
+        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights))+1):
             def default(joint_name):
                 return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
 
@@ -716,31 +717,22 @@ class WorldTree(object):
                                                               non_controlled=non_controlled)
         return not chain1 and not connection and not chain2
 
+    def _delete_joint_limits(self):
+        for joint_name in self.movable_joints:  # type: OneDofJoint
+            joint = self.joints[joint_name]
+            joint.delete_limits()
+            joint.delete_weights()
+
     def _set_joint_limits(self, linear_limits, angular_limits, order):
-        for joint in self.joints.values():
+        for joint in self.joints.values():  # type: OneDofJoint
             if self.is_joint_fixed(joint.name) or self.is_joint_mimic(joint.name):
                 continue
             if self.is_joint_rotational(joint.name):
                 new_limits = angular_limits
             else:
                 new_limits = linear_limits
-
-            old_upper_limits = joint.free_variable.upper_limits[order]
-            old_upper_limits_str = str(old_upper_limits)
-            if old_upper_limits_str.startswith('fmin') or old_upper_limits_str.startswith('fmax'):
-                continue
-            if old_upper_limits is None:
-                joint.free_variable.upper_limits[order] = new_limits[joint.name]
-            else:
-                joint.free_variable.upper_limits[order] = w.min(old_upper_limits,
-                                                                new_limits[joint.name])
-
-            old_lower_limits = joint.free_variable.lower_limits[order]
-            if old_lower_limits is None:
-                joint.free_variable.lower_limits[order] = new_limits[joint.name]
-            else:
-                joint.free_variable.lower_limits[order] = w.max(old_lower_limits,
-                                                                -new_limits[joint.name])
+            joint.free_variable.set_upper_limit(order, new_limits[joint.name])
+            joint.free_variable.set_lower_limit(order, -new_limits[joint.name])
 
     def _set_joint_weights(self, order, weights):
         for joint_name, joint in self.joints.items():

@@ -54,7 +54,7 @@ RUN mkdir ros_catkin_ws && \
     cd ros_catkin_ws && \
     rosinstall_generator desktop_full --rosdistro noetic --deps --tar > noetic-desktop_full.rosinstall && \
     mkdir ./src && \
-    cd src && \
+    cd ./src && \
     git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git && \
     git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
     git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \

@@ -51,6 +51,8 @@ class CollisionCheckerInterface(GiskardBehavior):
 
     def update_collisions_environment(self):
         self.get_god_map().get_data(identifier.tree_manager).get_node(u'collision checker').initialise()
+        self.collision_scene.sync()
+        rospy.sleep(2.0)
 
     def update_collision_checker(self):
         self.get_god_map().get_data(identifier.tree_manager).get_node(u'collision checker').update()
@@ -120,44 +122,35 @@ class PathLengthAndGoalOptimizationObjective(ob.PathLengthOptimizationObjective)
         return ob.Cost(self.getSpaceInformation().distance(s1, s2))
 
 
-class AbstractMotionValidator(ob.MotionValidator, GiskardBehavior):  # TODO: use collision shapes of links with fixed joints inbetween
+class AbstractMotionValidator(ob.MotionValidator):  # TODO: use collision shapes of links with fixed joints inbetween
 
-    def __init__(self, si, is_3D, object_in_motion, tip_link=None):
+    def __init__(self, si, is_3D, object_in_motion, collision_scene, tip_link=None):
         ob.MotionValidator.__init__(self, si)
-        GiskardBehavior.__init__(self, str(self))
-        if 'pybullet' not in sys.modules:
-            raise Exception('For two dimensional motion validation the python module pybullet is needed.')
         self.lock = threading.Lock()
-        self.collision_world = self.get_god_map().get_data(identifier.collision_scene)
+        self.collision_scene = collision_scene
         self.tip_link = tip_link
         self.object_in_motion = object_in_motion
         self.is_3D = is_3D
         self.collision_aabbs = list()
-        self.init_ignore_objects()
-        self.update_collision_shape()
+        self.ignore_object_ids = list()
+        self.map_frame = 'map'
+        self.update()
 
-    def init_ignore_objects(self, ignore_objects=None):
-        if ignore_objects is None:
-            ignore_objects = [] #self.get_world().hidden_objects
-        else:
-            ignore_objects = [] #.extend(self.get_world().hidden_objects)
-        self.ignore_object_ids = [self.object_in_motion.name]
-        # self.ignore_object_ids = [self.object_in_motion.get_pybullet_id()]
-        #for ignore_object in ignore_objects:
-        #    if ignore_object in self.get_world()._objects:
-        #        obj = self.get_world()._objects[ignore_object]
-        #        self.ignore_object_ids.append(obj.get_pybullet_id())
-        #    else:
-        #        raise KeyError('Cannot find object of name {} in the PyBulletWorld.'.format(ignore_object))
+    def update_ignore_object_ids(self):
+        self.ignore_object_ids = [self.collision_scene.object_name_to_bullet_id[link_name]
+                                  for link_name in self.object_in_motion.link_names_with_collisions]
 
-    def update_tip_link(self, tip_link):
-        self.tip_link = tip_link
-        self.update_collision_shape()
+    def update(self, tip_link=None):
+        if tip_link is not None:
+            self.tip_link = tip_link
+        if self.tip_link is not None:
+            self.update_collision_shape()
+            self.update_ignore_object_ids()
 
     def get_collision_info(self, link_name):
         if self.object_in_motion.has_link_collisions(link_name):
-            link_id = self.collision_world.object_name_to_bullet_id[link_name]
-            cur_pose = self.collision_world.fks[link_name]
+            link_id = self.collision_scene.object_name_to_bullet_id[link_name]
+            cur_pose = self.collision_scene.fks[link_name]
             cur_pos = cur_pose[:3]
             aabbs = p.getAABB(link_id)
             aabbs_ind = [aabb - cur_pos for aabb in aabbs]
@@ -206,7 +199,7 @@ class AbstractMotionValidator(ob.MotionValidator, GiskardBehavior):  # TODO: use
     def update_collision_shape(self):
         """
         If tip link is not used for interaction and has collision information, we use only this information for
-        continous collision checking. Otherwise, we check the parent links of the tip link for fixed links and
+        continuous collision checking. Otherwise, we check the parent links of the tip link for fixed links and
         their collision information. If there were no fixed parent links with collision information added,
         we search for collision information in the childs links if possible.
         Further we model interaction tip_links such that it makes sense to search,
@@ -216,7 +209,7 @@ class AbstractMotionValidator(ob.MotionValidator, GiskardBehavior):  # TODO: use
         """
         self.collision_aabbs = list()
         if self.tip_link is not None:
-            tip_joint_name = self.collision_world.world.links[self.tip_link].parent_joint_name
+            tip_joint_name = self.collision_scene.world.links[self.tip_link].parent_joint_name
             tip_link_interaction = not self.object_in_motion.links[self.tip_link].has_children()
             # Get tip link collision and return if possible
             if not tip_link_interaction:
@@ -227,21 +220,41 @@ class AbstractMotionValidator(ob.MotionValidator, GiskardBehavior):  # TODO: use
             # Get parent or child link collision
             parent_link_name = None
             try:
-                parent_link_name = self.collision_world.world.get_parent_with_collisions(tip_joint_name)
+                parent_link_name = self.object_in_motion.get_parent_link_with_collisions(tip_joint_name)
             except KeyError:
                 pass
             if parent_link_name is not None:
                 self.collision_aabbs.append(self.get_collision_info(parent_link_name))
             elif not tip_link_interaction:
-                child_link_names = self.collision_world.world.get_children_with_collision(tip_joint_name)
+                child_link_names = self.object_in_motion.get_direct_children_with_collisions(tip_joint_name)
                 if len(child_link_names) > 0:
                     self.collision_aabbs.append(self.get_collision_info(child_link_names[0]))
             # Add siblings if tip has no children
             if tip_link_interaction:
-                sibling_link_names = self.collision_world.world.get_siblings_with_collisions(tip_joint_name)
+                sibling_link_names = self.object_in_motion.get_siblings_with_collisions(tip_joint_name)
                 if len(sibling_link_names) > 0:
                     self.collision_aabbs.append(self.get_collision_info(sibling_link_names[0]))
         return len(self.collision_aabbs) > 0
+
+    def update_collision_shape_new(self):
+        """
+        If tip link is not used for interaction and has collision information, we use only this information for
+        continuous collision checking. Otherwise, we check the parent links of the tip link for fixed links and
+        their collision information. If there were no fixed parent links with collision information added,
+        we search for collision information in the childs links if possible.
+        Further we model interaction tip_links such that it makes sense to search,
+        for neighboring links and their collision information. Since the joints
+        of these links are normally not fixed, we assume that they are.
+
+        """
+        self.collision_aabbs = list()
+        if self.tip_link is not None:
+            controlled_parent_joint_name = self.object_in_motion.get_controlled_parent_joint_of_link(self.tip_link)
+            child_links_with_collision, _ = self.object_in_motion.search_branch(controlled_parent_joint_name,
+                                                                                collect_link_when=self.object_in_motion.has_link_collisions)
+            for link_name in child_links_with_collision:
+                self.collision_aabbs.append(self.get_collision_info(link_name))
+            return len(self.collision_aabbs) > 0
 
     def aabb_to_3d_points(self, d, u):
         d_new = [d[0], d[1], u[2]]
@@ -269,8 +282,8 @@ class AbstractMotionValidator(ob.MotionValidator, GiskardBehavior):  # TODO: use
 
 class RayMotionValidator(AbstractMotionValidator):
 
-    def __init__(self, si, is_3D, object_in_motion, tip_link=None):
-        super(RayMotionValidator, self).__init__(si, is_3D, object_in_motion, tip_link)
+    def __init__(self, si, is_3D, object_in_motion, collision_scene, tip_link=None):
+        super(RayMotionValidator, self).__init__(si, is_3D, object_in_motion, collision_scene, tip_link)
 
     def checkMotion(self, s1, s2):
         # checkMotion calls checkMotion with Map anc checkMotion with Bullet
@@ -299,10 +312,13 @@ class RayMotionValidator(AbstractMotionValidator):
                 # If the aabb box is not from the self.tip_link, add the translation from the
                 # self.tip_link to the collision info link.
                 if collision_info.link != self.tip_link:
-                    tip_link_2_coll_link_pose = lookup_pose(self.tip_link, collision_info.link)
-                    point = tip_link_2_coll_link_pose.pose.position
-                    query_b = [[point.x + q_b[0], point.y + q_b[1], point.z + q_b[2]] for q_b in deepcopy(query_b)]
-                    query_e = [[point.x + q_e[0], point.y + q_e[1], point.z + q_e[2]] for q_e in deepcopy(query_e)]
+                    map_2_tip_link_pos = lookup_pose(self.map_frame, self.tip_link).pose.position
+                    map_2_coll_link_pos = lookup_pose(self.map_frame, collision_info.link).pose.position
+                    point = [map_2_coll_link_pos.x - map_2_tip_link_pos.x,
+                             map_2_coll_link_pos.y - map_2_tip_link_pos.y,
+                             map_2_coll_link_pos.z - map_2_tip_link_pos.z]
+                    query_b = [[point[0] + q_b[0], point[1] + q_b[1], point[2] + q_b[2]] for q_b in deepcopy(query_b)]
+                    query_e = [[point[0] + q_e[0], point[1] + q_e[1], point[2] + q_e[2]] for q_e in deepcopy(query_e)]
                 query_res = p.rayTestBatch(query_b, query_e)
                 collision_free = all([obj == -1 or obj in self.ignore_object_ids for obj, _, _, _, _ in query_res])
                 if not collision_free:
@@ -667,7 +683,7 @@ class GlobalPlanner(GetGoal):
 
         self._planner_solve_params = {}  # todo: load values from rosparam
         self.navigation_config = 'slow_without_refine'  # todo: load value from rosparam
-        self.movement_config = 'fast_without_refine'
+        self.movement_config = 'slow_without_refine'
 
         self.initialised_planners = False
         self.collisionCheckerInterface = CollisionCheckerInterface()
@@ -738,36 +754,6 @@ class GlobalPlanner(GetGoal):
 
     def is_tip_object(self):
         return self.robot.get_parent_link_of_link(self.tip_link) in [self.r_tip, self.l_tip]
-
-    def _get_global_arm_positions(self):
-        parent_of_tip_link = self.robot.get_parent_link_of_link(self.tip_link) if self.is_tip_object() else self.tip_link
-        if parent_of_tip_link == self.r_tip:
-            root_for_tip_link = 'r_shoulder_pan_link'
-        elif parent_of_tip_link == self.l_tip:
-            root_for_tip_link = 'l_shoulder_pan_link'
-        else:
-            raise Exception('waaaaaaaaaaaaaaaaat')
-        rob_link_names = self.get_robot().get_link_names_from_chain(root_for_tip_link, parent_of_tip_link)
-        rob_link_positions = []
-        for link_name in rob_link_names:
-            p = self.robot.get_fk(self.robot.get_root(), link_name)
-            pos = transform_pose(self.get_god_map().get_data(identifier.map_frame), p).pose.position
-            rob_link_positions.append([pos.x, pos.y, pos.z])
-        return rob_link_positions
-
-    def is_object_pickable(self):
-        if False:  # self.is_tip_object():
-            global_rob_arm_positions = self._get_global_arm_positions()
-            box_space = CompoundBoxSpace(self.get_world(), self.get_robot(), self.map_frame,
-                                         CollisionCheckerInterface(), 0.1, global_rob_arm_positions)
-            collisions = box_space.get_collisions()
-            if len(collisions.values()) == 0:
-                return True
-            else:
-                pass
-                # for k in collisions_per_pos create obj equal to self.tip_link
-                # find orientations for each box
-        return True
 
     def save_cart_goal(self, cart_c):
 
@@ -920,7 +906,17 @@ class GlobalPlanner(GetGoal):
         #    planner.setRange(0.1)
         # else:
         planner = og.ABITstar(si)
-        self._planner_solve_params[planner.getName()] = {
+        self._planner_solve_params['kABITstar'] = {
+            'slow_without_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5),
+            'fast_without_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'fast_with_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5)
+        }
+        self._planner_solve_params['ABITstar'] = {
             'slow_without_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
                                                    max_refine_iterations=0, min_refine_thresh=0.5),
             'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
@@ -941,7 +937,7 @@ class GlobalPlanner(GetGoal):
 
         # Set two dimensional motion and state validator
         si = self.navigation_setup.getSpaceInformation()
-        si.setMotionValidator(RayMotionValidator(si, False, self.get_robot(), tip_link=u'base_footprint'))
+        si.setMotionValidator(RayMotionValidator(si, False, self.get_robot(), self.collision_scene, tip_link=u'base_footprint'))
         collision_checker = RobotBulletCollisionChecker(False, tip_link=u'base_footprint')
         si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker))
         si.setup()
@@ -960,7 +956,7 @@ class GlobalPlanner(GetGoal):
 
         # Set two dimensional motion and state validator
         si = self.movement_setup.getSpaceInformation()
-        si.setMotionValidator(RayMotionValidator(si, True, self.get_robot()))
+        si.setMotionValidator(RayMotionValidator(si, True, self.get_robot(), self.collision_scene))
         collision_checker = RobotBulletCollisionChecker(True)
         si.setStateValidityChecker(ThreeDimStateValidator(si, collision_checker))
         si.setup()
@@ -1014,7 +1010,7 @@ class GlobalPlanner(GetGoal):
         self.movement_setup.getSpaceInformation().getStateValidityChecker().update(self.tip_link)
         # self.movement_setup.getSpaceInformation().getMotionValidator().update_tip_link(self.tip_link)
         si = self.movement_setup.getSpaceInformation()
-        si.setMotionValidator(RayMotionValidator(si, True, self.get_robot(), tip_link=self.tip_link))
+        si.setMotionValidator(RayMotionValidator(si, True, self.get_robot(), self.collision_scene, tip_link=self.tip_link))
 
         start = self.get_start_state(self.kitchen_space)
         goal = self.get_goal_state(self.kitchen_space)

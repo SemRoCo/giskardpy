@@ -1,4 +1,12 @@
-RUN docker pull ros:noetic
+ARG BASE_IMAGE=ros:noetic
+FROM ${BASE_IMAGE}
+
+ARG ROS_PKG=ros_base
+ENV ROS_DISTRO=noetic
+ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
+ENV ROS_PYTHON_VERSION=3
+
+ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /workspace
 
 # add the ROS deb repo to the apt sources list

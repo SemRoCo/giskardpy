@@ -61,8 +61,8 @@ RUN pip install -r dependencies.txt
 #    rm -rf /var/lib/apt/lists/*
 ##########################
 RUN mkdir -p ~/catkin_ws/src 
-RUN cd ~/catkin_ws/                   
-RUN catkin_make                                 
+RUN cd ~/catkin_ws/
+RUN catkin init
 RUN cd src                              
 RUN wstool init 
 RUN wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall 
@@ -70,7 +70,7 @@ RUN wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-deve
 RUN wstool update 
 RUN rosdep install --ignore-src --from-paths . 
 RUN cd ..                                      
-RUN catkin_make                         
+RUN catkin build                      
 
 RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
 WORKDIR /

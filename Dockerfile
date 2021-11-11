@@ -60,6 +60,7 @@ RUN pip install -r dependencies.txt
 #   python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
 #    rm -rf /var/lib/apt/lists/*
 ##########################
+RUN source /opt/ros/noetic/setup.bash
 RUN mkdir -p ~/catkin_ws/src 
 RUN cd ~/catkin_ws/
 RUN catkin init

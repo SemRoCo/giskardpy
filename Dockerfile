@@ -35,6 +35,7 @@ RUN apt-get update && \
             python3-wstool \
             python3-catkin-tools \
             python3-vcstool \
+            python3-mock \
             ros-noetic-desktop \
             ros-noetic-desktop-full \
             ros-noetic-urdfdom-py \

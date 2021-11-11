@@ -53,15 +53,19 @@ RUN pip install -r dependencies.txt
 
 RUN mkdir ros_catkin_ws && \
     cd ros_catkin_ws && \
-    catkin init  && \                               # init workspace, you might have to pip install catkin-tools
-    cd src   && \                                   # go to source directory of workspace
-    wstool init && \                                # init rosinstall
-    wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall && \
-                                            # update rosinstall file
-    wstool update  && \                             # pull source repositories
-    rosdep install --ignore-src --from-paths . && \ # install dependencies available through apt
-    cd ..    && \                                   # go to workspace directory
-    catkin build      && \                          # build packages
-    source ~/giskardpy_ws/devel/setup.bash             
-WORKDIR /
+    rosinstall_generator ${ROS_PKG} vision_msgs --rosdistro ${ROS_DISTRO} --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
+    mkdir src && \
+    cd src && \
+    git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git && \
+    git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
+    git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \
+    git clone https://github.com/code-iai/omni_pose_follower.git && \
+    cd .. && \
+    vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src && \
+    apt-get update && \
+    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} -y && \
+    python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
+    rm -rf /var/lib/apt/lists/*
 
+RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
+WORKDIR /

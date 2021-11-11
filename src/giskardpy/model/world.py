@@ -149,13 +149,21 @@ class WorldTree(object):
                                            collect_link_when=self.has_link_collisions)
         return links
 
-    def get_children_with_collision(self, joint_name):
+    def get_direct_children_with_collisions(self, joint_name):
         links, joints = self.search_branch(joint_name,
                                            stop_at_link_when=self.has_link_collisions,
                                            collect_link_when=self.has_link_collisions)
         return links
 
-    def get_parent_with_collisions(self, joint_name):
+    def get_children_with_collisions(self, joint_name):
+        def has_no_children(link_name):
+            return not self.links[link_name].has_children()
+        links, joints = self.search_branch(joint_name,
+                                           stop_at_link_when=has_no_children,
+                                           collect_link_when=self.has_link_collisions)
+        return links
+
+    def get_parent_link_with_collisions(self, joint_name):
         """
         :param joint_name:
         :return:
@@ -164,6 +172,17 @@ class WorldTree(object):
             joint = self.joints[joint_name]
             return self.links[joint.parent_link_name].has_collisions()
         joint_name = self.search_for_parent_joint(joint_name, stop_when=has_link_in_joint_collision)
+        return self.joints[joint_name].parent_link_name
+
+    def get_parents_with_collisions(self, joint_name):
+        """
+        :param joint_name:
+        :return:
+        """
+        def is_root(joint_name):
+            return self.root_link == joint_name
+        joint_name = self.search_branch(joint_name, collect_link_when=self.has_link_collisions,
+                                        stop_at_joint_when=is_root)
         return self.joints[joint_name].parent_link_name
 
     def get_siblings_with_collisions(self, joint_name):

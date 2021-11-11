@@ -53,7 +53,7 @@ RUN pip install -r dependencies.txt
 RUN mkdir ros_catkin_ws && \
     cd ros_catkin_ws && \
     mkdir ./src && \
-    cd src && \
+    cd ./src && \
     wstool init && \
     wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall && \
     apt-get update && \

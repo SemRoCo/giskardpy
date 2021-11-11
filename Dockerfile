@@ -52,13 +52,15 @@ RUN pip install -r dependencies.txt
 
 RUN mkdir ros_catkin_ws && \
     cd ros_catkin_ws && \
+    rosinstall_generator desktop --rosdistro noetic --deps --tar > noetic-desktop.rosinstall
     mkdir ./src && \
-    cd ./src && \
-    wstool init && \
-    wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall && \
+    cd src && \
+    git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
+    git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \
+    git clone https://github.com/code-iai/omni_pose_follower.git && \
+    vcs import --input noetic-desktop.rosinstall ./src && \
     apt-get update && \
     rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \
-    cd .. && \
     python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
     rm -rf /var/lib/apt/lists/*
 

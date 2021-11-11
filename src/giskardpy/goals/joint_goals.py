@@ -451,7 +451,7 @@ class AvoidJointLimits(Goal):
         :param weight: float, default WEIGHT_BELOW_CA
         """
         super(AvoidJointLimits, self).__init__(**kwargs)
-        for joint_name in self.god_map.get_data(identifier.controlled_joints)['pr2_a']:
+        for joint_name in self.god_map.get_data(identifier.controlled_joints)['/pr2_a']:
             if self.world.is_joint_revolute(joint_name):
                 self.add_constraints_of_goal(AvoidJointLimitsRevolute(joint_name=joint_name,
                                                                       percentage=percentage,

@@ -28,7 +28,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)['pr2_a']
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)['/pr2_a']
         goal.trajectory = trajectory.to_msg(sample_period, controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
 

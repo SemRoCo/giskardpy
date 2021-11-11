@@ -60,8 +60,9 @@ RUN mkdir ros_catkin_ws && \
     git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
     git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \
     git clone https://github.com/code-iai/omni_pose_follower.git && \
+    cd .. && \
     apt-get update && \
-    rosdep install --ignore-src --from-paths . && \
+    rosdep install --ignore-src --from-paths . --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \ 
     python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
     rm -rf /var/lib/apt/lists/*
 

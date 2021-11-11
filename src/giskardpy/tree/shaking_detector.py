@@ -45,6 +45,7 @@ class WiggleCancel(GiskardBehavior):
         self.js_samples = [[] for _ in range(len(self.keys))]
 
     def update(self):
+        return Status.RUNNING
         latest_points = self.get_god_map().get_data(identifier.joint_states)
 
         for i, key in enumerate(self.keys):

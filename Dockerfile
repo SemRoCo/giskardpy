@@ -58,7 +58,7 @@ RUN mkdir ros_catkin_ws && \
     cd src && \
     git clone --branch noetic-devel https://github.com/Alok018/giskardpy.git && \
     git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
-    #git clone --branch noetic https://github.com/SemRoCo/qpOASES.git && \
+    git clone https://github.com/coin-or/qpOASES.git && \
     git clone https://github.com/code-iai/omni_pose_follower.git && \
     cd .. && \
     vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src && \

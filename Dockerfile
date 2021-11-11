@@ -49,16 +49,31 @@ RUN apt-get update && \
 
 COPY dependencies.txt dependencies.txt
 RUN pip install -r dependencies.txt  
-
-RUN mkdir ros_catkin_ws && \
-    cd ros_catkin_ws && \
-    rosinstall_generator ${ROS_PKG} giskardpy --rosdistro noetic --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
-    mkdir ./src && \
-    vcs import --input noetic-desktop_full.rosinstall ./src && \
-    apt-get update && \
-    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \
-    python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
+#######
+#RUN mkdir ros_catkin_ws && \
+#    cd ros_catkin_ws && \
+#    rosinstall_generator ${ROS_PKG} giskardpy --rosdistro noetic --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
+#    mkdir ./src && \
+#    vcs import --input noetic-desktop_full.rosinstall ./src && \
+#    apt-get update && \
+#    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \
+#   python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
+#    rm -rf /var/lib/apt/lists/*
+##########################
+RUN source /opt/ros/kinetic/setup.bash && \         # start using ROS kinetic. Replace with melodic, if you are using it.
+    mkdir -p ~/giskardpy_ws/src  && \               # create directory for workspace
+    cd ~/giskardpy_ws && \                        # go to workspace directory
+    catkin init   && \                              # init workspace, you might have to pip install catkin-tools
+    cd src   && \                                  # go to source directory of workspace
+    wstool init     && \                            # init rosinstall
+    wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall && \
+                                            # update rosinstall file
+    wstool update    && \                           # pull source repositories
+    rosdep install --ignore-src --from-paths .  && \ # install dependencies available through apt
+    cd .. && \                                      # go to workspace directory
+    catkin build && \                            # build packages
     rm -rf /var/lib/apt/lists/*
+#    source ~/giskardpy_ws/devel/setup.bash      # source new overlay
 
 RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
 WORKDIR /

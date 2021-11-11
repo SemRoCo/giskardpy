@@ -49,30 +49,19 @@ RUN apt-get update && \
 
 COPY dependencies.txt dependencies.txt
 RUN pip install -r dependencies.txt  
-#######
-#RUN mkdir ros_catkin_ws && \
-#    cd ros_catkin_ws && \
-#    rosinstall_generator ${ROS_PKG} giskardpy --rosdistro noetic --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
-#    mkdir ./src && \
-#    vcs import --input noetic-desktop_full.rosinstall ./src && \
-#    apt-get update && \
-#    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \
-#   python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
-#    rm -rf /var/lib/apt/lists/*
-##########################
-RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
-RUN mkdir -p ~/catkin_ws/src 
-RUN cd ~/catkin_ws/
-RUN catkin init
-RUN cd ./src                              
-RUN wstool init 
-RUN wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall 
-                                            
-RUN wstool update 
-RUN rosdep install --ignore-src --from-paths . 
-RUN cd ..                                      
-RUN catkin build                      
 
+RUN mkdir ros_catkin_ws && \
+    cd ros_catkin_ws && \
+    mkdir ./src && \
+    cd src && \
+    wstool init && \
+    wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall && \
+    apt-get update && \
+    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \
+    cd .. && \
+    python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
+    rm -rf /var/lib/apt/lists/*
 
+RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc                  
 WORKDIR /
 

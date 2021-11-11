@@ -7,3 +7,4 @@ pybullet==3.0.6
 hypothesis==4.34.0
 pandas==1.3.3
 sortedcontainers
+qpoases>=3.2.1

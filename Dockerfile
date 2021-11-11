@@ -64,7 +64,7 @@ RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc
 RUN mkdir -p ~/catkin_ws/src 
 RUN cd ~/catkin_ws/
 RUN catkin init
-RUN cd src                              
+RUN cd ./src                              
 RUN wstool init 
 RUN wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall 
                                             

@@ -2316,7 +2316,7 @@ class TestCartesianPath(object):
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
     def test_pathAroundKitchenIsland_with_global_planner(self, kitchen_setup_avoid_collisions):
-        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartesianPath::test_pathAroundKitchenIsland_with_global_planner
         """
         :type kitchen_setup_avoid_collisions: PR2
         """
@@ -2336,6 +2336,7 @@ class TestCartesianPath(object):
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         goal_c = base_pose
 
+        kitchen_setup_avoid_collisions.set_json_goal(u'SetPredictionHorizon', prediction_horizon=1)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      tip_link=tip_link,
                                                      root_link=kitchen_setup_avoid_collisions.get_root(),
@@ -2420,6 +2421,8 @@ class TestCartesianPath(object):
 
 
     def test_ease_fridge_with_cart_goals_and_global_planner(self, kitchen_setup_avoid_collisions):
+        rospy.sleep(10.0)#0.5
+
         tip_link = kitchen_setup_avoid_collisions.r_tip
         milk_name = u'milk'
 

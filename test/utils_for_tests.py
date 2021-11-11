@@ -460,7 +460,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
-        rospy.sleep(0.5)
+        rospy.sleep(10.0)#0.5
         current_js = self.world.groups[object_name].state
         joint_names_without_prefix = set(j.short_name for j in current_js)
         assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()

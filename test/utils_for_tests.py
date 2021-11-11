@@ -359,7 +359,7 @@ class RotationGoalChecker(GoalChecker):
 
 
 class GiskardTestWrapper(GiskardWrapper):
-    def __init__(self, config_file):
+    def __init__(self, config_file, robot_namespace=''):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
@@ -383,7 +383,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.god_map = Blackboard().god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
-        super(GiskardTestWrapper, self).__init__(node_name=u'tests')
+        super(GiskardTestWrapper, self).__init__(node_name=u'tests', robot_namespace=robot_namespace)
         self.results = Queue(100)
         self.default_root = self.robot.root_link_name.short_name
         self.map = u'map'
@@ -641,7 +641,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def are_joint_limits_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
-        controlled_joints = self.god_map.get_data(identifier.controlled_joints)['pr2_a']
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)['/pr2_a']
         for joint in controlled_joints:
             if not self.robot.is_joint_continuous(joint):
                 joint_limits = self.robot.get_joint_position_limits(joint)
@@ -838,13 +838,13 @@ class Robots():
         self.robots = [robot_type(robot_name) for (robot_name, robot_type) in zip(robot_names, robot_types)]
 
 class PR2(GiskardTestWrapper):
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, namespace):
+        self.name = namespace
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
-        self.r_gripper = rospy.ServiceProxy(u'{}/r_gripper_simulator/set_joint_states'.format(name), SetJointState)
-        self.l_gripper = rospy.ServiceProxy(u'{}/l_gripper_simulator/set_joint_states'.format(name), SetJointState)
-        super(PR2, self).__init__(u'package://giskardpy/config/pr2.yaml')
+        self.r_gripper = rospy.ServiceProxy(u'{}/r_gripper_simulator/set_joint_states'.format(namespace), SetJointState)
+        self.l_gripper = rospy.ServiceProxy(u'{}/l_gripper_simulator/set_joint_states'.format(namespace), SetJointState)
+        super(PR2, self).__init__(u'package://giskardpy/config/pr2.yaml', namespace)
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')

@@ -35,7 +35,7 @@ class done_cb(object):
 
 
 class JointTrajectorySplitter:
-    def __init__(self, name_space):
+    def __init__(self):
         self.action_clients = []
         self.joint_names = []
         while not rospy.has_param('~state_topics'):
@@ -44,17 +44,11 @@ class JointTrajectorySplitter:
         while not rospy.has_param('~client_topics'):
             logging.loginfo('waiting for param ' + '~client_topics')
             rospy.sleep(1)
-        state_topics = rospy.get_param('~state_topics', [])
-        rospy.logerr(state_topics)
-        client_topics = rospy.get_param('~client_topics', [])
-        if name_space is not None:
-            self.state_topics = ['{}{}'.format(name_space, state_topic) for state_topic in state_topics]
-            self.client_topics = ['{}{}'.format(name_space, client_topic) for client_topic in client_topics]
-            self.whole_body_controller_state = '{}/whole_body_controller/state'.format(name_space)
-            self.whole_body_controller_follow_joint_trajectory = '{}/whole_body_controller/follow_joint_trajectory'.format(
-                name_space)
-        else:
-            raise Exception()
+        self.state_topics = rospy.get_param('~state_topics', [])
+        self.client_topics = rospy.get_param('~client_topics', [])
+        namespace = rospy.get_namespace()
+        self.whole_body_controller_state = namespace + 'whole_body_controller/state'
+        self.whole_body_controller_follow_joint_trajectory = namespace + 'whole_body_controller/follow_joint_trajectory'
         self.number_of_clients = len(self.state_topics)
         if self.number_of_clients != len(self.client_topics):
             logging.logerr('number of state and action topics do not match')
@@ -69,7 +63,6 @@ class JointTrajectorySplitter:
             waiting_for_topic = True
             while waiting_for_topic:
                 try:
-                    rospy.logerr(self.state_topics[i])
                     rospy.wait_for_message(self.state_topics[i], AnyMsg, timeout=10)
                     waiting_for_topic = False
                     type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
@@ -281,10 +274,4 @@ class JointTrajectorySplitter:
 
 if __name__ == '__main__':
     rospy.init_node('joint_trajectory_splitter')
-    if rospy.has_param('~/giskard/name_spaces'):
-        name_spaces = rospy.get_param('/giskard/name_spaces', [])
-        if len(name_spaces) != 0:
-            for name_space in name_spaces:
-                j = JointTrajectorySplitter(name_space)
-        else:
-            raise Exception()
+    j = JointTrajectorySplitter()

@@ -130,19 +130,22 @@ def ros(request):
     tf_init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
-    rospy.set_param('/giskard/name_spaces',
-                    ['/pr2_a', '/pr2_b'])
-    rospy.set_param('/joint_trajectory_splitter/state_topics',
-                    ['/whole_body_controller/base/state',
-                     '/whole_body_controller/body/state'])
-    rospy.set_param('/joint_trajectory_splitter/client_topics',
-                    ['/whole_body_controller/base/follow_joint_trajectory',
-                     '/whole_body_controller/body/follow_joint_trajectory'])
-    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
-    joint_trajectory_splitter = launch.launch(node)
+    name_spaces =  ['/pr2_a', '/pr2_b']
+    rospy.set_param('/giskard/name_spaces', name_spaces)
+    joint_trajectory_splitters = []
+    for name_space in name_spaces:
+        rospy.set_param(u'{}/joint_trajectory_splitter/state_topics'.format(name_space),
+                        ['{}/whole_body_controller/base/state'.format(name_space),
+                         '{}/whole_body_controller/body/state'.format(name_space)])
+        rospy.set_param(u'{}/joint_trajectory_splitter/client_topics'.format(name_space),
+                        ['{}/whole_body_controller/base/follow_joint_trajectory'.format(name_space),
+                         '{}/whole_body_controller/body/follow_joint_trajectory'.format(name_space)])
+        node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter',
+                                   namespace=name_space)
+        joint_trajectory_splitters.append(launch.launch(node))
 
     def kill_ros():
-        joint_trajectory_splitter.stop()
+        [j.stop() for j in joint_trajectory_splitters]
         rospy.delete_param('/giskard/name_spaces')
         rospy.delete_param('/joint_trajectory_splitter/state_topics')
         rospy.delete_param('/joint_trajectory_splitter/client_topics')
@@ -159,7 +162,7 @@ def ros(request):
 
 @pytest.fixture(scope=u'module')
 def giskard(request, ros):
-    c = PR2()
+    c = PR2('/pr2_a/')
     request.addfinalizer(c.tear_down)
     return c
 

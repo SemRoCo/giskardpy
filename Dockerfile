@@ -60,9 +60,8 @@ RUN pip install -r dependencies.txt
 #   python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
 #    rm -rf /var/lib/apt/lists/*
 ##########################
-RUN source /opt/ros/kinetic/setup.bash && \         # start using ROS kinetic. Replace with melodic, if you are using it.
-    mkdir -p ~/giskardpy_ws/src  && \               # create directory for workspace
-    cd ~/giskardpy_ws && \                        # go to workspace directory
+RUN mkdir ros_catkin_ws && \
+    cd ros_catkin_ws && \                        # go to workspace directory
     catkin init   && \                              # init workspace, you might have to pip install catkin-tools
     cd src   && \                                  # go to source directory of workspace
     wstool init     && \                            # init rosinstall

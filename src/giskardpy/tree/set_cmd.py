@@ -4,7 +4,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import InvalidGoalException
-from giskardpy.tree.plugin_action_server import GetGoal
+from giskardpy.tree.get_goal import GetGoal
 from giskardpy.utils import logging
 
 

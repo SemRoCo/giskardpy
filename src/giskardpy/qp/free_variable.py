@@ -1,4 +1,5 @@
 from collections import defaultdict
+import giskardpy.casadi_wrapper as w
 
 
 class FreeVariable(object):
@@ -12,16 +13,20 @@ class FreeVariable(object):
         """
         self._symbols = symbols
         self.name = str(self._symbols[0])
-        self.lower_limits = lower_limits
-        self.upper_limits = upper_limits
+        self.default_lower_limits = lower_limits
+        self.default_upper_limits = upper_limits
+        self.lower_limits = {}
+        self.upper_limits = {}
         self.quadratic_weights = quadratic_weights
         assert max(self._symbols.keys()) == len(self._symbols) - 1
-        assert len(self._symbols) == len(self.quadratic_weights) + 1
-        self.order = len(self._symbols)
 
         self.horizon_functions = defaultdict(float)
         if horizon_functions is not None:
             self.horizon_functions.update(horizon_functions)
+
+    @property
+    def order(self):
+        return len(self.quadratic_weights) + 1
 
     def get_symbol(self, order):
         try:
@@ -30,16 +35,28 @@ class FreeVariable(object):
             raise KeyError(u'Free variable {} doesn\'t have symbol for derivative of order {}'.format(self, order))
 
     def get_lower_limit(self, order):
-        try:
+        if order in self.default_lower_limits and order in self.lower_limits:
+            return w.max(self.default_lower_limits[order], self.lower_limits[order])
+        if order in self.default_lower_limits:
+            return self.default_lower_limits[order]
+        if order in self.lower_limits:
             return self.lower_limits[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
+        raise KeyError(u'Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
+
+    def set_lower_limit(self, order, limit):
+        self.lower_limits[order] = limit
+
+    def set_upper_limit(self, order, limit):
+        self.upper_limits[order] = limit
 
     def get_upper_limit(self, order):
-        try:
+        if order in self.default_upper_limits and order in self.upper_limits:
+            return w.min(self.default_upper_limits[order], self.upper_limits[order])
+        if order in self.default_upper_limits:
+            return self.default_upper_limits[order]
+        if order in self.upper_limits:
             return self.upper_limits[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
+        raise KeyError(u'Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
 
     def has_position_limits(self):
         try:

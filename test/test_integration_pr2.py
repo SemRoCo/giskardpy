@@ -9,14 +9,14 @@ import pytest
 import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
-from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
+from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
+from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
@@ -1561,6 +1561,23 @@ class TestConstraints(object):
 
 
 class TestCartGoals(object):
+    def test_move_base(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        map_T_odom = PoseStamped()
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/3, [0,0,1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.plan_and_execute()
+
     def test_rotate_gripper(self, zero_pose_more_robots):
         """
         :type zero_pose: PR2
@@ -2604,8 +2621,9 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = u'map'
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, pose=p)
-        zero_pose.add_box(object_name, pose=p, expected_error_code=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
+        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p,
+                          expected_error_code=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
 
     def test_add_remove_sphere(self, zero_pose):
         """
@@ -2618,7 +2636,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = 1.6
         p.pose.orientation.w = 1
-        zero_pose.add_sphere(object_name, pose=p)
+        zero_pose.add_sphere(object_name, radius=1, pose=p)
         zero_pose.remove_object(object_name)
 
     def test_add_remove_cylinder(self, zero_pose):
@@ -2632,7 +2650,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        zero_pose.add_cylinder(object_name, pose=p)
+        zero_pose.add_cylinder(object_name, height=1, radius=1, pose=p)
         zero_pose.remove_object(object_name)
 
     def test_add_urdf_body(self, kitchen_setup):
@@ -2654,7 +2672,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = zero_pose.r_tip
+        box_pose.pose.position = Point(0.05, 0, 0, )
+        box_pose.pose.orientation = Quaternion(1, 0, 0, 0)
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, box_pose)
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
@@ -2676,7 +2698,37 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
+        zero_pose.detach_object(pocky)
+        zero_pose.remove_object(pocky)
+
+    def test_attach_remove_sphere(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.attach_sphere(pocky, 1, zero_pose.r_tip, p)
+        zero_pose.detach_object(pocky)
+        zero_pose.remove_object(pocky)
+
+    def test_attach_remove_cylinder(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.attach_cylinder(pocky, 1, 1, zero_pose.r_tip, p)
         zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
@@ -2690,7 +2742,7 @@ class TestCollisionAvoidanceGoals(object):
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
-        zero_pose.add_box(pocky, pose=p)
+        zero_pose.add_box(pocky, size=[1,1,1], pose=p)
         for i in range(3):
             zero_pose.attach_object(pocky, zero_pose.r_tip)
             zero_pose.detach_object(pocky)
@@ -2701,7 +2753,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation.w = 1
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
         zero_pose.remove_object(pocky)
 
     def test_attach_existing_box(self, zero_pose):
@@ -2727,11 +2783,11 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = u'map'
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, pose=p)
+        zero_pose.add_box(object_name, size=[1,1,1], pose=p)
         zero_pose.attach_object(object_name, frame_id=zero_pose.r_tip)
         zero_pose.detach_object(object_name)
         zero_pose.remove_object(object_name)
-        zero_pose.add_box(object_name, pose=p)
+        zero_pose.add_box(object_name, size=[1,1,1], pose=p)
         assert zero_pose.get_attached_objects().object_names == []
 
     def test_attach_existing_box2(self, zero_pose):
@@ -2767,7 +2823,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(1, 0, 0, 0)
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
@@ -2820,7 +2880,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = 1.6
         p.pose.orientation.w = 1
-        zero_pose.add_box(object_name, pose=p)
+        zero_pose.add_box(object_name, size=[1,1,1], pose=p)
         zero_pose.remove_object(object_name)
 
     def test_invalid_update_world(self, zero_pose):
@@ -5017,6 +5077,160 @@ class TestReachability():
         zero_pose.check_reachability()
         zero_pose.set_joint_goal(js)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
+
+
+class TestConfigFile(object):
+    def test_prediction_horizon1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.set_joint_goal(gaya_pose)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(default_pose)
+        zero_pose.plan_and_execute()
+
+    def test_bowl_and_cup_prediction_horizon1(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        :return:
+        """
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
+        bowl_name = u'bowl'
+        cup_name = u'cup'
+        percentage = 50
+        drawer_handle = u'sink_area_left_middle_drawer_handle'
+        drawer_joint = u'sink_area_left_middle_drawer_main_joint'
+
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+
+        # grasp drawer handle
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = drawer_handle
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = drawer_handle
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.l_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=0.4)  # TODO: check for real length
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.l_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = drawer_handle
+        x_goal.vector.x = -1
+
+        kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip,
+                                            x_gripper,
+                                            root_normal=x_goal)
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+
+        # open drawer
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=kitchen_setup.l_tip,
+                                    environment_link=drawer_handle)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
+
+        # spawn cup
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = u'iai_kitchen/sink_area_left_middle_drawer_main'
+        cup_pose.pose.position = Point(0.1, 0.2, -.05)
+        cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder(cup_name, height=0.07, radius=0.04, pose=cup_pose)
+
+        # spawn bowl
+        bowl_pose = PoseStamped()
+        bowl_pose.header.frame_id = u'iai_kitchen/sink_area_left_middle_drawer_main'
+        bowl_pose.pose.position = Point(0.1, -0.2, -.05)
+        bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder(bowl_name, height=0.05, radius=0.07, pose=bowl_pose)
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+
+        # grasp bowl
+        l_goal = deepcopy(bowl_pose)
+        l_goal.pose.position.z += .2
+        l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+                                                                      [0, 0, -1, 0],
+                                                                      [-1, 0, 0, 0],
+                                                                      [0, 0, 0, 1]]))
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+
+        # grasp cup
+        r_goal = deepcopy(cup_pose)
+        r_goal.pose.position.z += .2
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+                                                                      [0, 0, -1, 0],
+                                                                      [-1, 0, 0, 0],
+                                                                      [0, 0, 0, 1]]))
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+
+        l_goal.pose.position.z -= .2
+        r_goal.pose.position.z -= .2
+        kitchen_setup.allow_collision([CollisionEntry.ALL], bowl_name, [CollisionEntry.ALL])
+        kitchen_setup.allow_collision([CollisionEntry.ALL], cup_name, [CollisionEntry.ALL])
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+
+        kitchen_setup.attach_object(bowl_name, kitchen_setup.l_tip)
+        kitchen_setup.attach_object(cup_name, kitchen_setup.r_tip)
+
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = u'base_footprint'
+        base_goal.pose.position.x = -.1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_goal)
+
+        # place bowl and cup
+        bowl_goal = PoseStamped()
+        bowl_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        bowl_goal.pose.position = Point(.2, 0, .05)
+        bowl_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        cup_goal = PoseStamped()
+        cup_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        cup_goal.pose.position = Point(.15, 0.25, .07)
+        cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+
+        kitchen_setup.detach_object(bowl_name)
+        kitchen_setup.detach_object(cup_name)
+        kitchen_setup.allow_collision([], cup_name, [])
+        kitchen_setup.allow_collision([], bowl_name, [])
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
 
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])

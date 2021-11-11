@@ -10,9 +10,9 @@ from pybullet import resetJointState, getNumJoints, resetBasePositionAndOrientat
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 
 import giskardpy
-from giskardpy import DEBUG, MAP
+from giskardpy import DEBUG
 from giskardpy.exceptions import DuplicateNameException
-from giskardpy.model.urdf_object import robot_name_from_urdf_string
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
@@ -136,19 +136,6 @@ def createCollisionShape(shapeType, radius=None, halfExtents=None, height=None, 
     if collisionFrameOrientation is not None:
         kwargs['collisionFrameOrientation'] = collisionFrameOrientation
     return p.createCollisionShape(**kwargs)
-
-def pybullet_pose_to_msg(pose):
-    """
-    :type pose: tuple
-    :rtype: PoseStamped
-    """
-    [position, orientation] = pose
-    pose = PoseStamped()
-    pose.header.frame_id = MAP
-    pose.pose.position = Point(*position)
-    pose.pose.orientation = Quaternion(*orientation)
-    return pose
-
 
 def msg_to_pybullet_pose(msg):
     """

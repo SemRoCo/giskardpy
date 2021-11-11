@@ -6,9 +6,10 @@ import numpy as np
 from hypothesis import given, assume
 
 import giskardpy.casadi_wrapper as w
-from giskardpy.goals.open_close import WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.data_types import FreeVariable, Constraint, VelocityConstraint
+from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import GodMap
+from giskardpy.qp.constraint import Constraint, VelocityConstraint
+from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import QPController
 from utils_for_tests import float_no_nan_no_inf
 

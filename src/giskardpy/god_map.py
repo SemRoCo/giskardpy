@@ -1,13 +1,29 @@
 import copy
 import numbers
-from copy import copy
+from collections import defaultdict
+from copy import copy, deepcopy
 from multiprocessing import Lock
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
 
-from giskardpy import casadi_wrapper as w
+from giskardpy import casadi_wrapper as w, identifier
+from giskardpy.data_types import KeyDefaultDict
 
+
+def set_default_in_override_block(block_identifier, god_map):
+    default_value = god_map.get_data(block_identifier[:-1] + [u'default'])
+    override = god_map.get_data(block_identifier)
+    d = defaultdict(lambda: default_value)
+    if isinstance(override, dict):
+        if isinstance(default_value, dict):
+            for key, value in override.items():
+                o = deepcopy(default_value)
+                o.update(value)
+                override[key] = o
+        d.update(override)
+    god_map.set_data(block_identifier, d)
+    return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
 
 def get_member(identifier, member):
     """
@@ -175,6 +191,52 @@ class GodMap(object):
         self.last_expr_values = {}
         self.shortcuts = {}
         self.lock = Lock()
+
+    @classmethod
+    def init_from_paramserver(cls, node_name, name_spaces):
+        import rospy
+        from control_msgs.msg import JointTrajectoryControllerState
+        from rospy import ROSException
+        from giskardpy.utils import logging
+        from giskardpy.data_types import order_map
+
+        self = cls()
+        self.set_data(identifier.rosparam, rospy.get_param(node_name))
+        self.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+        path_to_data_folder = self.get_data(identifier.data_folder)
+        # fix path to data folder
+        if not path_to_data_folder.endswith(u'/'):
+            path_to_data_folder += u'/'
+        self.set_data(identifier.data_folder, path_to_data_folder)
+
+        while not rospy.is_shutdown():
+            try:
+                controlled_joints = dict()  # maybe fill with PrefixName?
+                for name_space in name_spaces:
+                    joint_names = rospy.wait_for_message(u'{}/whole_body_controller/state'.format(name_space),
+                                                         JointTrajectoryControllerState,
+                                                         timeout=5.0).joint_names
+                    controlled_joints[name_space] = list(sorted(joint_names))
+                self.set_data(identifier.controlled_joints, controlled_joints)
+            except ROSException as e:
+                logging.logerr(u'state topic not available')
+                logging.logerr(str(e))
+            else:
+                break
+            rospy.sleep(0.5)
+
+        set_default_in_override_block(identifier.external_collision_avoidance, self)
+        set_default_in_override_block(identifier.self_collision_avoidance, self)
+        # weights
+        for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
+            set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], self)
+
+        # limits
+        for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], self)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], self)
+
+        return self
 
     def __copy__(self):
         god_map_copy = GodMap()

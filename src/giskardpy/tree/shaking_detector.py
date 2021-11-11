@@ -7,7 +7,7 @@ from giskardpy.utils import logging
 from giskardpy.exceptions import ShakingException
 from giskardpy.tree.plugin import GiskardBehavior
 # fast
-from giskardpy.tree.plugin_goal_reached import make_velocity_threshold
+from giskardpy.tree.goal_reached import make_velocity_threshold
 
 
 class WiggleCancel(GiskardBehavior):

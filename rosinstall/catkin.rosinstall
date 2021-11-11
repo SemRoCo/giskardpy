@@ -10,3 +10,7 @@
     local-name: giskard_msgs
     uri: https://github.com/SemRoCo/giskard_msgs.git
     version: devel
+- git: 
+    local-name: omni_pose_follower
+    uri: https://github.com/code-iai/omni_pose_follower.git
+    version: master

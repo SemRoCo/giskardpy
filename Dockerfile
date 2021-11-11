@@ -1,12 +1,4 @@
-ARG BASE_IMAGE=ubuntu:focal
-FROM ${BASE_IMAGE}
-ARG ROS_PKG=desktop_full
-ENV ROS_DISTRO=noetic
-ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
-ENV ROS_PYTHON_VERSION=3
-
-ENV DEBIAN_FRONTEND=noninteractive
-
+RUN docker pull ros:noetic
 WORKDIR /workspace
 
 # add the ROS deb repo to the apt sources list
@@ -53,19 +45,15 @@ RUN pip install -r dependencies.txt
 
 RUN mkdir ros_catkin_ws && \
     cd ros_catkin_ws && \
-    rosinstall_generator desktop_full --rosdistro noetic --deps --tar > noetic-desktop_full.rosinstall && \
-    rosinstall_generator https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall && \
-    mkdir ./src && \
-    vcs import --input noetic-desktop_full.rosinstall ./src && \
-    #cd src && \
-    #git clone --branch devel https://github.com/SemRoCo/giskard_msgs.git && \
-    #git clone https://github.com/code-iai/omni_pose_follower.git && \
-    #cd .. && \
-    apt-get update && \
-    rosdep install --ignore-src --from-paths . --rosdistro ${ROS_DISTRO} --skip-keys python3-pykdl -y && \ 
-    python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN echo 'source ${ROS_ROOT}/setup.bash' >> /root/.bashrc                  
+    catkin init  && \                               # init workspace, you might have to pip install catkin-tools
+    cd src   && \                                   # go to source directory of workspace
+    wstool init && \                                # init rosinstall
+    wstool merge https://raw.githubusercontent.com/Alok018/giskardpy/noetic-devel/rosinstall/catkin.rosinstall && \
+                                            # update rosinstall file
+    wstool update  && \                             # pull source repositories
+    rosdep install --ignore-src --from-paths . && \ # install dependencies available through apt
+    cd ..    && \                                   # go to workspace directory
+    catkin build      && \                          # build packages
+    source ~/giskardpy_ws/devel/setup.bash             
 WORKDIR /
 

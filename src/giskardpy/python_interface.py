@@ -24,7 +24,7 @@ DEFAULT_WORLD_TIMEOUT = 500
 
 
 class GiskardWrapper(object):
-    def __init__(self, node_name=u'giskard', robot_namespace=''):
+    def __init__(self, node_name=u'giskard', namespace='/'):
         giskard_topic = u'{}/command'.format(node_name)
         if giskard_topic is not None:
             self._client = SimpleActionClient(giskard_topic, MoveAction)
@@ -36,7 +36,7 @@ class GiskardWrapper(object):
             self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(node_name))
             self._client.wait_for_server()
-        self._god_map = GodMap.init_from_paramserver(node_name, robot_namespace=robot_namespace)
+        self._god_map = GodMap.init_from_paramserver(node_name, namespace=namespace)
         self._world = WorldTree(self._god_map)
         self._world.delete_all_but_robot()
 

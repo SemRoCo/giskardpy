@@ -63,12 +63,11 @@ def upload_config_file_to_paramserver():
     ros_load_robot_config(config_file_name, old_data=old_params, test=test)
 
 
-def initialize_god_map():
+def initialize_god_map(namespace):
     upload_config_file_to_paramserver()
-    god_map = GodMap.init_from_paramserver(rospy.get_name())
+    god_map = GodMap.init_from_paramserver(rospy.get_name(), namespace)
     blackboard = Blackboard
     blackboard.god_map = god_map
-    name_spaces = get_name_spaces()
 
     world = WorldTree(god_map)
     world.delete_all_but_robot()
@@ -158,10 +157,10 @@ def process_joint_specific_params(identifier_, default, override, god_map):
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 
 
-def grow_tree():
+def grow_tree(namespace):
     action_server_name = u'~command'
 
-    god_map = initialize_god_map()
+    god_map = initialize_god_map(namespace)
     # ----------------------------------------------
     sync = Sequence(u'Synchronize')
     sync.add_child(WorldUpdater(u'update world'))

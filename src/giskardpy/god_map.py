@@ -193,7 +193,7 @@ class GodMap(object):
         self.lock = Lock()
 
     @classmethod
-    def init_from_paramserver(cls, node_name, name_spaces):
+    def init_from_paramserver(cls, node_name, namespace='/'):
         import rospy
         from control_msgs.msg import JointTrajectoryControllerState
         from rospy import ROSException
@@ -202,7 +202,7 @@ class GodMap(object):
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        self.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+        self.set_data(identifier.robot_description, rospy.get_param(u'{}robot_description'.format(namespace)))
         path_to_data_folder = self.get_data(identifier.data_folder)
         # fix path to data folder
         if not path_to_data_folder.endswith(u'/'):
@@ -212,11 +212,10 @@ class GodMap(object):
         while not rospy.is_shutdown():
             try:
                 controlled_joints = dict()  # maybe fill with PrefixName?
-                for name_space in name_spaces:
-                    joint_names = rospy.wait_for_message(u'{}/whole_body_controller/state'.format(name_space),
-                                                         JointTrajectoryControllerState,
-                                                         timeout=5.0).joint_names
-                    controlled_joints[name_space] = list(sorted(joint_names))
+                joint_names = rospy.wait_for_message(u'{}whole_body_controller/state'.format(namespace),
+                                                     JointTrajectoryControllerState,
+                                                     timeout=5.0).joint_names
+                controlled_joints[namespace] = list(sorted(joint_names))
                 self.set_data(identifier.controlled_joints, controlled_joints)
             except ROSException as e:
                 logging.logerr(u'state topic not available')

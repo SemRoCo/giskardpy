@@ -359,27 +359,27 @@ class RotationGoalChecker(GoalChecker):
 
 
 class GiskardTestWrapper(GiskardWrapper):
-    def __init__(self, config_file, robot_namespace=''):
+    def __init__(self, config_file, namespace=''):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
         rospy.set_param('~config', config_file)
         rospy.set_param('~test', True)
 
-        self.start_motion_sub = rospy.Subscriber('{}whole_body_controller/follow_joint_trajectory/goal'.format(robot_namespace),
+        self.start_motion_sub = rospy.Subscriber('{}whole_body_controller/follow_joint_trajectory/goal'.format(namespace),
                                                  FollowJointTrajectoryActionGoal, self.start_motion_cb,
                                                  queue_size=100)
-        self.stop_motion_sub = rospy.Subscriber('{}whole_body_controller/follow_joint_trajectory/result'.format(robot_namespace),
+        self.stop_motion_sub = rospy.Subscriber('{}whole_body_controller/follow_joint_trajectory/result'.format(namespace),
                                                 FollowJointTrajectoryActionResult, self.stop_motion_cb,
                                                 queue_size=100)
-        self.set_localization_srv = rospy.ServiceProxy('{}map_odom_transform_publisher/update_map_odom_transform'.format(robot_namespace),
+        self.set_localization_srv = rospy.ServiceProxy('{}map_odom_transform_publisher/update_map_odom_transform'.format(namespace),
                                                        UpdateTransform)
 
-        self.tree = grow_tree()
+        self.tree = grow_tree(namespace)
         self.god_map = Blackboard().god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
-        super(GiskardTestWrapper, self).__init__(node_name=u'tests', robot_namespace=robot_namespace)
+        super(GiskardTestWrapper, self).__init__(node_name=u'tests', namespace=namespace)
         self.results = Queue(100)
         self.default_root = self.robot.root_link_name.short_name
         self.map = u'map'
@@ -854,8 +854,8 @@ class Robots():
         self.robots = [robot_type(robot_name) for (robot_name, robot_type) in zip(robot_names, robot_types)]
 
 class PR2(GiskardTestWrapper):
-    def __init__(self, namespace):
-        self.name = namespace
+    def __init__(self, namespace='/'):
+        self.namespace = namespace
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
         self.r_gripper = rospy.ServiceProxy(u'{}/r_gripper_simulator/set_joint_states'.format(namespace), SetJointState)

@@ -266,7 +266,9 @@ class PrismaticJoint(OneDofJoint):
 
 
 class MimicJoint(MovableJoint):
-    pass
+    # FIXME limits are not supported
+    def delete_limits(self):
+        pass
 
 
 class MimicedPrismaticJoint(PrismaticJoint, MimicJoint):
@@ -298,3 +300,9 @@ class MimicedPrismaticJoint(PrismaticJoint, MimicJoint):
         self.parent_T_child = w.dot(self.parent_T_child, w.translation3(translation_axis[0],
                                                                         translation_axis[1],
                                                                         translation_axis[2]))
+
+    def delete_limits(self):
+        pass
+
+    def delete_weights(self):
+        pass

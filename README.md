@@ -46,7 +46,7 @@ source ~/giskardpy_ws/devel/setup.bash      # source new overlay
 ## Fast Custom Bullet Bindings
 Giskard will run much faster with Adrian Röfers bullet bindings instead of the official ones.
 ```
-./scripts/build_pybullet.sh /my/awesome/library/dir
+./scripts/build_better_pybullet.sh /my/awesome/library/dir
 
 ```
 If everything worked fine, you should be able to do:

@@ -815,6 +815,15 @@ class WorldTree(object):
         result.vector = Vector3(*t_V_p[:3])
         return result
 
+    def get_random_joint_state(self, joint_name):
+        try:
+            lower_limit, upper_limit = self.get_joint_position_limits(joint_name)
+        except KeyError:
+            return np.random.random() * np.pi * 2
+        lower_limit = max(lower_limit, -10)
+        upper_limit = min(upper_limit, 10)
+        return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
+
     def compute_joint_limits(self, joint_name, order):
         lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
         if not isinstance(lower_limit, numbers.Number) and lower_limit is not None:

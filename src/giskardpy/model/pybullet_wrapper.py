@@ -52,7 +52,7 @@ def random_string(size=6):
 
 
 @profile
-def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientation=None):
+def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientation=None, client_id=0):
     """
     Loads a URDF string into the bullet world.
     :param urdf_string: XML string of the URDF to load.
@@ -78,7 +78,7 @@ def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientat
     filename = write_to_tmp(u'{}.urdf'.format(random_string()), resolved_urdf)
     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
         id = p.loadURDF(filename, position, orientation,
-                        flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+                        flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT, physicsClientId=client_id)
     os.remove(filename)
     return id
 
@@ -94,18 +94,18 @@ def activate_rendering():
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
 
-def stop_pybullet():
-    p.disconnect()
+def stop_pybullet(client_id=0):
+    p.disconnect(physicsClientId=client_id)
 
 
-def start_pybullet(gui, gravity=0):
-    if not p.isConnected():
+def start_pybullet(gui, gravity=0, client_id=0):
+    if not p.isConnected(physicsClientId=client_id):
         if gui:
             # TODO expose opengl2 option for gui?
             server_id = p.connect(p.GUI, options=u'--opengl2')  # or p.DIRECT for non-graphical version
         else:
             server_id = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
-        p.setGravity(0, 0, gravity)
+        p.setGravity(0, 0, gravity, physicsClientId=client_id)
         return server_id
 
 

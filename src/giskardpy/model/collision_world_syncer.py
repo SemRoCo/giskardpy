@@ -262,6 +262,82 @@ class CollisionWorldSynchronizer(object):
                         raise UnknownBodyException(
                             u'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
 
+    def update_collision_checker(self):
+        self.sync()
+        collisions = self.check_collisions(self.collision_matrix, self.collision_list_size)
+        self.god_map.set_data(identifier.closest_point, collisions)
+
+    def _cal_max_param(self, parameter_name):
+        external_distances = self.god_map.get_data(identifier.external_collision_avoidance)
+        self_distances = self.god_map.get_data(identifier.self_collision_avoidance)
+        default_distance = max(external_distances.default_factory()[parameter_name],
+                               self_distances.default_factory()[parameter_name])
+        for value in external_distances.values():
+            default_distance = max(default_distance, value[parameter_name])
+        for value in self_distances.values():
+            default_distance = max(default_distance, value[parameter_name])
+        return default_distance
+
+    def update_collision_environment(self):
+        self.sync()
+        collision_goals = self.god_map.get_data(identifier.collision_goal)
+        external_distances = self.god_map.get_data(identifier.external_collision_avoidance)
+        self_distances = self.god_map.get_data(identifier.self_collision_avoidance)
+        # FIXME check all dict entries
+        default_distance = self._cal_max_param(u'soft_threshold')
+
+        max_distances = defaultdict(lambda: default_distance)
+        # override max distances based on external distances dict
+        for link_name in self.robot.link_names_with_collisions:
+            controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link_name)
+            distance = external_distances[controlled_parent_joint][u'soft_threshold']
+            for child_link_name in self.robot.get_directly_controlled_child_links_with_collisions(
+                    controlled_parent_joint):
+                max_distances[child_link_name] = distance
+
+        for link_name in self_distances:
+            distance = self_distances[link_name][u'soft_threshold']
+            if link_name in max_distances:
+                max_distances[link_name] = max(distance, max_distances[link_name])
+            else:
+                max_distances[link_name] = distance
+
+        added_checks = self.god_map.get_data(identifier.added_collision_checks)
+        for link_name, distance in added_checks.items():
+            if link_name in max_distances:
+                max_distances[link_name] = max(distance, max_distances[link_name])
+            else:
+                max_distances[link_name] = distance
+
+        self.collision_matrix = self.collision_goals_to_collision_matrix(deepcopy(collision_goals), max_distances)
+        self.collision_list_size = self._cal_max_param(u'number_of_repeller')
+
+    def is_robot_link_external_collision_free(self, link_name):
+        self.update_collision_checker()
+        closest_points = self.god_map.get_data(identifier.closest_point)
+        collisions = []
+        if link_name in closest_points.external_collision:
+            collisions.append(closest_points.get_external_collisions(link_name))
+        return len(collisions) == 0
+
+    def is_robot_external_collision_free(self):
+        self.update_collision_checker()
+        closest_points = self.god_map.get_data(identifier.closest_point)
+        collisions = []
+        for link_name in self.robot.link_names:
+            if link_name in closest_points.external_collision:
+                collisions.append(closest_points.get_external_collisions(link_name))
+        return len(collisions) == 0
+
+    def is_object_external_collision_free(self, object_name):
+        self.update_collision_checker()
+        obj = self.world.links[object_name]
+        closest_points = self.god_map.get_data(identifier.closest_point)
+        for link_name in obj.get_link_names():
+            if link_name in closest_points.external_collision:
+                return False
+        return True
+
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
         """
         :param collision_goals: list of CollisionEntry

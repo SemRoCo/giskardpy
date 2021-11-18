@@ -2452,7 +2452,7 @@ class TestCartesianPath(object):
 
         milk_grasp_pre_pose = PoseStamped()
         milk_grasp_pre_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
-        milk_grasp_pre_pose.pose.position = Point(-0.1, 0, 0.12)
+        milk_grasp_pre_pose.pose.position = Point(-0.2, 0, 0.12)
         milk_grasp_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         kitchen_setup_avoid_collisions.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)

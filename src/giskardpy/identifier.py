@@ -94,6 +94,8 @@ GoalReached_window_size = plugins + [u'GoalReached', u'window_size']
 
 TFPublisher = plugins + [u'TFPublisher']
 
+global_planner_needed = plugins + [u'GlobalPlannerNeeded', u'global_planner_needed']
+
 # reachability check
 reachability_check = rosparam + [u'reachability_check']
 rc_sample_period = reachability_check + [u'sample_period']

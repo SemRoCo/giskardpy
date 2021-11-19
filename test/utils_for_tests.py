@@ -847,11 +847,78 @@ class GiskardTestWrapper(GiskardWrapper):
         self.wait_heartbeats()
         self.teleport_base(p)
 
-class Robots():
+
+class GiskardTree(GiskardTestWrapper):
+    def __init__(self, namespaces):
+        self.tree = grow_tree(namespaces)
+        god_map = Blackboard().god_map
+        super().__init__(god_map)
+        self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
+        self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
+
+    def heart_beat(self, timer_thing):
+        self.tree.tick()
+
+    def tear_down(self):
+        rospy.sleep(1)
+        self.heart.shutdown()
+        logging.loginfo(
+            u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
+        logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
+        logging.loginfo(u'stopping tree')
+
+
+class Robot(GiskardTree):
+    def __init__(self, config_file, namespace=''):
+        super().__init__([])
+        rospy.set_param('~config', config_file)
+
+        self.start_motion_sub = rospy.Subscriber(
+            '{}whole_body_controller/follow_joint_trajectory/goal'.format(namespace),
+            FollowJointTrajectoryActionGoal, self.start_motion_cb,
+            queue_size=100)
+        self.stop_motion_sub = rospy.Subscriber(
+            '{}whole_body_controller/follow_joint_trajectory/result'.format(namespace),
+            FollowJointTrajectoryActionResult, self.stop_motion_cb,
+            queue_size=100)
+        self.set_localization_srv = rospy.ServiceProxy(
+            '{}map_odom_transform_publisher/update_map_odom_transform'.format(namespace),
+            UpdateTransform)
+        self.set_base = rospy.ServiceProxy('/pr2_a/base_simulator/set_joint_states', SetJointState)
+
+    def set_localization(self, map_T_odom):
+        """
+        :type map_T_odom: PoseStamped
+        """
+        req = UpdateTransformRequest()
+        req.transform.translation = map_T_odom.pose.position
+        req.transform.rotation = map_T_odom.pose.orientation
+        assert self.set_localization_srv(req).success
+        self.wait_heartbeats(10)
+        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot.root_link_name)
+        compare_poses(p2.pose, map_T_odom.pose)
+
+    def teleport_base(self, goal_pose):
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
+        js = {u'odom_x_joint': goal_pose.pose.position.x,
+              u'odom_y_joint': goal_pose.pose.position.y,
+              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
+        goal = SetJointStateRequest()
+        goal.state = position_dict_to_joint_states(js)
+        self.set_base.call(goal)
+        rospy.sleep(0.5)
+
+
+class Robots(GiskardTree):
     def __init__(self, robot_names, robot_types):
+        super().__init__(robot_names)
         if len(robot_names) != len(robot_types):
             raise Exception()
-        self.robots = [robot_type(robot_name) for (robot_name, robot_type) in zip(robot_names, robot_types)]
+        self.robots = [robot_type(namespace=robot_name) for (robot_name, robot_type) in zip(robot_names, robot_types)]
+
 
 class PR2(GiskardTestWrapper):
     def __init__(self, namespace='/'):

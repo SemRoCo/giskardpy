@@ -211,11 +211,10 @@ class GodMap(object):
 
         while not rospy.is_shutdown():
             try:
-                controlled_joints = dict()  # maybe fill with PrefixName?
                 joint_names = rospy.wait_for_message(u'{}whole_body_controller/state'.format(namespace),
                                                      JointTrajectoryControllerState,
                                                      timeout=5.0).joint_names
-                controlled_joints[namespace] = list(sorted(joint_names))
+                controlled_joints = list(sorted(joint_names))
                 self.set_data(identifier.controlled_joints, controlled_joints)
             except ROSException as e:
                 logging.logerr(u'state topic not available')

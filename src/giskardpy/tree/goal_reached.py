@@ -16,7 +16,7 @@ def make_velocity_threshold(god_map,
                             max_translation_cut_off=0.01,
                             max_rotation_cut_off=0.06):
     joint_convergence_threshold = god_map.get_data(identifier.joint_convergence_threshold)
-    controlled_joints = god_map.get_data(identifier.controlled_joints)['/pr2_a/']
+    controlled_joints = god_map.get_data(identifier.controlled_joints)
     world = god_map.get_data(identifier.world)
     thresholds = []
     for joint_name in controlled_joints:

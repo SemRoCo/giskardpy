@@ -130,16 +130,16 @@ def ros(request):
     tf_init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
-    name_spaces =  ['/pr2_a', '/pr2_b']
+    name_spaces =  ['/pr2_a/', '/pr2_b/']
     rospy.set_param('/giskard/name_spaces', name_spaces)
     joint_trajectory_splitters = []
     for name_space in name_spaces:
-        rospy.set_param(u'{}/joint_trajectory_splitter/state_topics'.format(name_space),
-                        ['{}/whole_body_controller/base/state'.format(name_space),
-                         '{}/whole_body_controller/body/state'.format(name_space)])
-        rospy.set_param(u'{}/joint_trajectory_splitter/client_topics'.format(name_space),
-                        ['{}/whole_body_controller/base/follow_joint_trajectory'.format(name_space),
-                         '{}/whole_body_controller/body/follow_joint_trajectory'.format(name_space)])
+        rospy.set_param(u'{}joint_trajectory_splitter/state_topics'.format(name_space),
+                        ['{}whole_body_controller/base/state'.format(name_space),
+                         '{}whole_body_controller/body/state'.format(name_space)])
+        rospy.set_param(u'{}joint_trajectory_splitter/client_topics'.format(name_space),
+                        ['{}whole_body_controller/base/follow_joint_trajectory'.format(name_space),
+                         '{}whole_body_controller/body/follow_joint_trajectory'.format(name_space)])
         node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter',
                                    namespace=name_space)
         joint_trajectory_splitters.append(launch.launch(node))

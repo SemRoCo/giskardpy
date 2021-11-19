@@ -444,7 +444,7 @@ class WorldTree(object):
 
     @property
     def controlled_joints(self):
-        return self.god_map.unsafe_get_data(identifier.controlled_joints)['/pr2_a/']
+        return self.god_map.unsafe_get_data(identifier.controlled_joints)
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name):

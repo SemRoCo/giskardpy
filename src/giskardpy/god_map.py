@@ -209,18 +209,18 @@ class GodMap(object):
             path_to_data_folder += u'/'
         self.set_data(identifier.data_folder, path_to_data_folder)
 
-        while not rospy.is_shutdown():
-            try:
-                controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
-                                                           JointTrajectoryControllerState,
-                                                           timeout=5.0).joint_names
-                self.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
-            except ROSException as e:
-                logging.logerr(u'state topic not available')
-                logging.logerr(str(e))
-            else:
-                break
-            rospy.sleep(0.5)
+        # while not rospy.is_shutdown():
+        #     try:
+        #         controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
+        #                                                    JointTrajectoryControllerState,
+        #                                                    timeout=5.0).joint_names
+        #         self.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
+        #     except ROSException as e:
+        #         logging.logerr(u'state topic not available')
+        #         logging.logerr(str(e))
+        #     else:
+        #         break
+        #     rospy.sleep(0.5)
 
         set_default_in_override_block(identifier.external_collision_avoidance, self)
         set_default_in_override_block(identifier.self_collision_avoidance, self)

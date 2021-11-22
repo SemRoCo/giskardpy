@@ -1,35 +1,85 @@
+import control_msgs
+from rospy import ROSException
+from rostopic import ROSTopicException
+from sensor_msgs.msg import JointState
+
+try:
+    import pr2_controllers_msgs.msg
+except ImportError:
+    pass
 import py_trees
+import rospy
+import rostopic
 from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryResult
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryResult, \
+    JointTrajectoryControllerState
 from py_trees_ros.actions import ActionClient
 
 import giskardpy.identifier as identifier
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
-from giskardpy.tree.plugin import GiskardBehavior
 
 
-class SendTrajectory(ActionClient, GiskardBehavior):
+class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
-    def __init__(self, name, action_namespace=u'/whole_body_controller/follow_joint_trajectory'):
-        GiskardBehavior.__init__(self, name)
-        loginfo(u'waiting for action server \'{}\' to appear'.format(action_namespace))
-        ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
-        loginfo(u'successfully connected to action server')
-        self.fill_velocity_values = self.get_god_map().get_data(identifier.fill_velocity_values)
+    supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction,
+                              pr2_controllers_msgs.msg.JointTrajectoryAction]
+    supported_state_types = [control_msgs.msg.JointTrajectoryControllerState,
+                             pr2_controllers_msgs.msg.JointTrajectoryControllerState]
 
-    def setup(self, timeout):
-        return super(SendTrajectory, self).setup(timeout)
+    def __init__(self, name, namespace, state_topic, fill_velocity_values=True):
+        GiskardBehavior.__init__(self, name)
+        self.action_namespace = namespace
+        self.fill_velocity_values = fill_velocity_values
+
+        loginfo('Waiting for action server \'{}\' to appear.'.format(self.action_namespace))
+        action_msg_type = None
+        while not action_msg_type:
+            try:
+                action_msg_type, _, _ = rostopic.get_topic_class('{}/goal'.format(self.action_namespace))
+                try:
+                    action_msg_type = eval(action_msg_type._type.replace('/', '.msg.')[:-4])
+                    if action_msg_type not in self.supported_action_types:
+                        raise TypeError()
+                except Exception as e:
+                    raise TypeError('Action server of type \'{}\' is not supported. '
+                                    'Must be one of: {}'.format(action_msg_type, self.supported_action_types))
+            except ROSTopicException as e:
+                logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(self.action_namespace))
+                rospy.sleep(2)
+
+        ActionClient.__init__(self, name, action_msg_type, None, self.action_namespace)
+        loginfo('Successfully connected to \'{}\'.'.format(self.action_namespace))
+
+        loginfo('Waiting for state topic \'{}\' to appear.'.format(state_topic))
+        msg = None
+        while not msg:
+            try:
+                status_msg_type, _, _ = rostopic.get_topic_class(state_topic)
+                if status_msg_type not in self.supported_state_types:
+                    raise TypeError('State topic of type \'{}\' is not supported. '
+                                    'Must be one of: {}'.format(status_msg_type, self.supported_state_types))
+                msg = rospy.wait_for_message(state_topic, status_msg_type, timeout=2.0)
+                if isinstance(msg, JointState):
+                    self.controlled_joints = msg.name
+                elif isinstance(msg, control_msgs.msg.JointTrajectoryControllerState) \
+                    or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
+                    self.controlled_joints = msg.joint_names
+            except ROSException as e:
+                logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
+        self.world.register_controlled_joints(self.controlled_joints)
+        loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
+
 
     def initialise(self):
-        super(SendTrajectory, self).initialise()
+        super(SendFollowJointTrajectory, self).initialise()
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
-        goal.trajectory = trajectory.to_msg(sample_period, controlled_joints, self.fill_velocity_values)
+        goal.trajectory = trajectory.to_msg(sample_period, self.controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
 
     def update(self):
@@ -47,18 +97,19 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         # pity there is no 'is_connected' api like there is for c++
         if not self.sent_goal:
             self.action_client.send_goal(self.action_goal)
-            logging.loginfo(u'Sending trajectory to robot.')
+            logging.loginfo('Sending trajectory to \'{}\'.'.format(self.action_namespace))
             self.sent_goal = True
             self.feedback_message = "sent goal to the action server"
             return py_trees.Status.RUNNING
         if self.action_client.get_state() == GoalStatus.ABORTED:
             result = self.action_client.get_result()
             self.feedback_message = self.error_code_to_str[result.error_code]
+            logging.logerr('fail {}'.format(self.feedback_message))
             return py_trees.Status.FAILURE
         result = self.action_client.get_result()
         if result:
             self.feedback_message = "goal reached"
-            logging.loginfo(u'Robot successfully executed the trajectory.')
+            logging.loginfo('{} successfully executed the trajectory.'.format(self.action_namespace))
             return py_trees.Status.SUCCESS
         else:
             self.feedback_message = "moving"

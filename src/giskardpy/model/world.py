@@ -11,7 +11,7 @@ import giskardpy.utils.math as mymath
 from giskardpy import casadi_wrapper as w, RobotName, identifier
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
-from giskardpy.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
     FixedJoint, MimicJoint
@@ -444,7 +444,22 @@ class WorldTree(object):
 
     @property
     def controlled_joints(self):
-        return self.god_map.unsafe_get_data(identifier.controlled_joints)
+        try:
+            return self.god_map.unsafe_get_data(identifier.controlled_joints)
+        except KeyError:
+            return []
+
+    def register_controlled_joints(self, controlled_joints):
+        old_controlled_joints = set(self.controlled_joints)
+        new_controlled_joints = set(controlled_joints)
+        double_joints = old_controlled_joints.intersection(new_controlled_joints)
+        if double_joints:
+            raise DuplicateNameException('Controlled joints \'{}\' are already registered!'.format(double_joints))
+        unknown_joints = new_controlled_joints.difference(self.joint_names_as_set)
+        if unknown_joints:
+            raise UnknownBodyException('Trying to register unknown joints: \'{}\''.format(unknown_joints))
+        old_controlled_joints.update(new_controlled_joints)
+        self.god_map.set_data(identifier.controlled_joints, list(sorted(old_controlled_joints)))
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name):

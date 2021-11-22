@@ -117,3 +117,6 @@ ignored_self_collisions = self_collision_avoidance[:-1] + [u'ignore']
 added_self_collisions = self_collision_avoidance[:-1] + [u'add']
 
 external_collision_avoidance = collision_avoidance + [u'external_collision_avoidance', u'override']
+
+# action server
+action_server = rosparam + ['action_server']

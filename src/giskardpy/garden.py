@@ -12,6 +12,7 @@ from giskardpy import RobotPrefix, RobotName
 from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.tree.AsyncComposite import PluginBehavior
+from giskardpy.tree.better_parallel import Parallel, ParallelPolicy
 from giskardpy.tree.commands_remaining import CommandsRemaining
 from giskardpy.tree.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.goal_canceled import GoalCanceled
@@ -39,7 +40,7 @@ from giskardpy.tree.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plot_trajectory import PlotTrajectory
 from giskardpy.tree.set_error_code import SetErrorCode
-from giskardpy.tree.send_trajectory import SendTrajectory
+from giskardpy.tree.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.set_cmd import SetCmd
 from giskardpy.tree.tf_publisher import TFPublisher
 from giskardpy.tree.time import TimePlugin
@@ -162,6 +163,13 @@ def grow_tree():
 
     god_map = initialize_god_map()
     # ----------------------------------------------
+    # This has to be called first, because it sets the controlled joints.
+    execution_action_server = Parallel('execution action servers', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
+    action_servers = god_map.get_data(identifier.action_server)
+    for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
+        execution_action_server.add_child(SendFollowJointTrajectory(execution_action_server_name,
+                                                                    **params))
+    # ----------------------------------------------
     sync = Sequence(u'Synchronize')
     sync.add_child(WorldUpdater(u'update world'))
     sync.add_child(SyncConfiguration(u'update robot configuration', RobotName))
@@ -209,7 +217,7 @@ def grow_tree():
     execute_canceled.add_child(SetErrorCode(u'set error code'))
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(execute_canceled)
-    publish_result.add_child(SendTrajectory(u'send traj'))
+    publish_result.add_child(execution_action_server)
     # ----------------------------------------------
     # ----------------------------------------------
     planning_2 = failure_is_success(Selector)(u'planning II')

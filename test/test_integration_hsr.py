@@ -8,11 +8,9 @@ from giskard_msgs.msg import MoveResult
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy import RobotName, RobotPrefix
-from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import init as tf_init
-from utils_for_tests import PR2, HSR
+import giskardpy.utils.tfwrapper as tf
+from utils_for_tests import PR2, HSR, compare_poses
 
 default_pose = {
     u'arm_flex_joint': 0.0,
@@ -42,7 +40,7 @@ def ros(request):
 
     logging.loginfo(u'init ros')
     rospy.init_node(u'tests')
-    tf_init(60)
+    tf.init(60)
 
     def kill_ros():
         logging.loginfo(u'shutdown ros')
@@ -80,7 +78,7 @@ def zero_pose(resetted_giskard):
     """
     resetted_giskard.set_joint_goal(default_pose)
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_goal()
+    resetted_giskard.plan_and_execute()
     return resetted_giskard
 
 
@@ -108,16 +106,23 @@ class TestJointGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
         zero_pose.move_base(p)
 
-    def test_torso_lift_joint(self, zero_pose):
+    def test_mimic_joints(self, zero_pose):
         """
         :type zero_pose: HSR
         """
+        zero_pose.open_gripper()
+        hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
+        compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
+
         js = {'torso_lift_joint': 0.1}
-        zero_pose.set_joint_goal(js)
-        zero_pose.send_and_check_goal()
-        # TODO you can do this by evaluation the joint expression
-        np.testing.assert_almost_equal(zero_pose.get_world().state[PrefixName('arm_lift_joint', RobotPrefix)].position,
-                                       0.2, decimal=2)
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()
+        np.testing.assert_almost_equal(zero_pose.world.state['arm_lift_joint'].position, 0.2, decimal=2)
+        base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        compare_poses(base_T_torso2.pose, base_T_torso.pose)
+        pass
 
 
 class TestCartGoals(object):

@@ -41,15 +41,7 @@ class Joint(object):
             rotation_offset = None
 
         if urdf_joint.mimic is not None:
-            if urdf_joint.type == 'revolute':
-                joint = RevoluteJoint(name=joint_name,
-                                      parent_link_name=parent_link_name,
-                                      child_link_name=child_link_name,
-                                      translation_offset=translation_offset,
-                                      rotation_offset=rotation_offset,
-                                      god_map=god_map,
-                                      axis=urdf_joint.axis)
-            elif urdf_joint.type == 'prismatic':
+            if urdf_joint.type == 'prismatic':
                 joint = MimicedPrismaticJoint(name=joint_name,
                                               parent_link_name=parent_link_name,
                                               child_link_name=child_link_name,
@@ -60,16 +52,31 @@ class Joint(object):
                                               multiplier=urdf_joint.mimic.multiplier,
                                               offset=urdf_joint.mimic.offset,
                                               mimed_joint_name=PrefixName(urdf_joint.mimic.joint, prefix))
+            elif urdf_joint.type == 'revolute':
+                joint = MimicedRevoluteJoint(name=joint_name,
+                                             parent_link_name=parent_link_name,
+                                             child_link_name=child_link_name,
+                                             translation_offset=translation_offset,
+                                             rotation_offset=rotation_offset,
+                                             god_map=god_map,
+                                             axis=urdf_joint.axis,
+                                             multiplier=urdf_joint.mimic.multiplier,
+                                             offset=urdf_joint.mimic.offset,
+                                             mimed_joint_name=PrefixName(urdf_joint.mimic.joint, prefix))
             elif urdf_joint.type == 'continuous':
-                joint = ContinuousJoint(name=joint_name,
-                                        parent_link_name=parent_link_name,
-                                        child_link_name=child_link_name,
-                                        translation_offset=translation_offset,
-                                        rotation_offset=rotation_offset,
-                                        god_map=god_map,
-                                        axis=urdf_joint.axis)
+                joint = MimicedContinuousJoint(name=joint_name,
+                                               parent_link_name=parent_link_name,
+                                               child_link_name=child_link_name,
+                                               translation_offset=translation_offset,
+                                               rotation_offset=rotation_offset,
+                                               god_map=god_map,
+                                               axis=urdf_joint.axis,
+                                               multiplier=urdf_joint.mimic.multiplier,
+                                               offset=urdf_joint.mimic.offset,
+                                               mimed_joint_name=PrefixName(urdf_joint.mimic.joint, prefix))
             else:
-                raise NotImplementedError('Joint of type {} is not supported'.format(urdf_joint.type))
+                raise NotImplementedError('Joint type \'{}\' of \'{}\' is not implemented.'.format(urdf_joint.name,
+                                                                                                   urdf_joint.type))
         else:
             if urdf_joint.type == 'fixed':
                 joint = FixedJoint(name=joint_name,
@@ -102,12 +109,11 @@ class Joint(object):
                                         god_map=god_map,
                                         axis=urdf_joint.axis)
             else:
-                raise NotImplementedError('Joint of type {} is not supported'.format(urdf_joint.type))
+                raise NotImplementedError('Joint type \'{}\' of \'{}\' is not implemented.'.format(urdf_joint.name,
+                                                                                                   urdf_joint.type))
 
         if isinstance(joint, MovableJoint):
-            if isinstance(joint, MimicJoint):
-                joint.set_free_variables([])
-            else:
+            if not isinstance(joint, MimicJoint):
                 lower_limits = {}
                 upper_limits = {}
                 if not urdf_joint.type == 'continuous':
@@ -151,10 +157,8 @@ class MovableJoint(Joint):
         :type name: PrefixName
         :type parent_link_name: Link
         :type child_link_name: Link
-        :type free_variable: FreeVariable
         :type translation_offset: list
         :type rotation_offset: list
-        :type free_variable: giskardpy.qp.free_variable.FreeVariable
         """
         super(MovableJoint, self).__init__(name=name,
                                            parent_link_name=parent_link_name,
@@ -182,11 +186,11 @@ class OneDofJoint(MovableJoint):
         """
         :rtype: FreeVariable
         """
-        return self.free_variables[0]
+        return self._free_variables[0]
 
     @property
     def position_symbol(self):
-        return self.free_variable.get_symbol(0)
+        return self._free_variables[0].get_symbol(0)
 
     @property
     def position_limits(self):
@@ -219,9 +223,9 @@ class RevoluteJoint(OneDofJoint):
 
     def set_free_variables(self, free_variables):
         super(RevoluteJoint, self).set_free_variables(free_variables)
+        expr = self.position_symbol
         self.parent_T_child = w.dot(self.parent_T_child,
-                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis),
-                                                                      self.free_variable.get_symbol(0)))
+                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis), expr))
 
 
 class ContinuousJoint(OneDofJoint):
@@ -239,9 +243,9 @@ class ContinuousJoint(OneDofJoint):
 
     def set_free_variables(self, free_variables):
         super(ContinuousJoint, self).set_free_variables(free_variables)
+        expr = self.position_symbol
         self.parent_T_child = w.dot(self.parent_T_child,
-                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis),
-                                                                      self.free_variable.get_symbol(0)))
+                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis), expr))
 
 
 class PrismaticJoint(OneDofJoint):
@@ -259,50 +263,144 @@ class PrismaticJoint(OneDofJoint):
 
     def set_free_variables(self, free_variables):
         super(PrismaticJoint, self).set_free_variables(free_variables)
-        translation_axis = (w.point3(*self.axis) * self.free_variable.get_symbol(0))
-        self.parent_T_child = w.dot(self.parent_T_child, w.translation3(translation_axis[0],
-                                                                        translation_axis[1],
-                                                                        translation_axis[2]))
-
-
-class MimicJoint(MovableJoint):
-    # FIXME limits are not supported
-    def delete_limits(self):
-        pass
-
-
-class MimicedPrismaticJoint(PrismaticJoint, MimicJoint):
-    def __init__(self, name, parent_link_name, child_link_name, god_map, axis, mimed_joint_name, multiplier, offset,
-                 parent_T_child=None, translation_offset=None, rotation_offset=None):
-        super(MimicedPrismaticJoint, self).__init__(name=name,
-                                                    parent_link_name=parent_link_name,
-                                                    child_link_name=child_link_name,
-                                                    god_map=god_map,
-                                                    axis=axis,
-                                                    parent_T_child=parent_T_child,
-                                                    translation_offset=translation_offset,
-                                                    rotation_offset=rotation_offset)
-        self.axis = axis
-        self.mimed_joint_name = mimed_joint_name
-        self.multiplier = multiplier
-        self.offset = offset
-
-    @property
-    def position_symbol(self):
-        mimed_free_variable = self.god_map.to_symbol(identifier.joint_states + [self.mimed_joint_name, 'position'])
-        multiplier = 1 if self.multiplier is None else self.multiplier
-        offset = 0 if self.offset is None else self.offset
-        return mimed_free_variable * multiplier + offset
-
-    def set_free_variables(self, free_variables):
         expr = self.position_symbol
         translation_axis = (w.point3(*self.axis) * expr)
         self.parent_T_child = w.dot(self.parent_T_child, w.translation3(translation_axis[0],
                                                                         translation_axis[1],
                                                                         translation_axis[2]))
 
+
+class MimicJoint(OneDofJoint):
+    def __init__(self, name, parent_link_name, child_link_name, god_map, mimed_joint_name, multiplier, offset,
+                 parent_T_child=None, translation_offset=None, rotation_offset=None):
+        OneDofJoint.__init__(self,
+                             name=name,
+                             parent_link_name=parent_link_name,
+                             child_link_name=child_link_name,
+                             god_map=god_map,
+                             parent_T_child=parent_T_child,
+                             translation_offset=translation_offset,
+                             rotation_offset=rotation_offset)
+        self.mimed_joint_name = mimed_joint_name
+        self.multiplier = multiplier
+        self.offset = offset
+
+    def _apply_mimic(self, expr):
+        multiplier = 1 if self.multiplier is None else self.multiplier
+        offset = 0 if self.offset is None else self.offset
+        return expr * multiplier + offset
+
+    @property
+    def position_symbol(self):
+        mimed_free_variable = self._free_variables[0].get_symbol(0)
+        return self._apply_mimic(mimed_free_variable)
+
+    @property
+    def position_limits(self):
+        lower_limit = self._apply_mimic(self.free_variable.get_lower_limit(0))
+        upper_limit = self._apply_mimic(self.free_variable.get_upper_limit(0))
+        return lower_limit, upper_limit
+
+    @property
+    def velocity_limit(self):
+        return self._apply_mimic(self.free_variable.get_upper_limit(1))
+
+    @property
+    def free_variables(self):
+        return []
+
     def delete_limits(self):
+        """
+        This will get deleted over references to the mimed joint.
+        """
         pass
 
     def delete_weights(self):
+        """
+        This will get deleted over references to the mimed joint.
+        """
         pass
+
+
+class MimicedPrismaticJoint(MimicJoint, PrismaticJoint):
+    def __init__(self, name, parent_link_name, child_link_name, god_map, axis, mimed_joint_name, multiplier, offset,
+                 parent_T_child=None, translation_offset=None, rotation_offset=None):
+        PrismaticJoint.__init__(self,
+                                name=name,
+                                parent_link_name=parent_link_name,
+                                child_link_name=child_link_name,
+                                axis=axis,
+                                god_map=god_map,
+                                parent_T_child=parent_T_child,
+                                translation_offset=translation_offset,
+                                rotation_offset=rotation_offset)
+        MimicJoint.__init__(self,
+                            name=name,
+                            parent_link_name=parent_link_name,
+                            child_link_name=child_link_name,
+                            god_map=god_map,
+                            mimed_joint_name=mimed_joint_name,
+                            multiplier=multiplier,
+                            offset=offset,
+                            parent_T_child=parent_T_child,
+                            translation_offset=translation_offset,
+                            rotation_offset=rotation_offset)
+
+    def set_free_variables(self, free_variables):
+        PrismaticJoint.set_free_variables(self, free_variables)
+
+
+class MimicedRevoluteJoint(MimicJoint, RevoluteJoint):
+    def __init__(self, name, parent_link_name, child_link_name, god_map, axis, mimed_joint_name, multiplier, offset,
+                 parent_T_child=None, translation_offset=None, rotation_offset=None):
+        RevoluteJoint.__init__(self,
+                               name=name,
+                               parent_link_name=parent_link_name,
+                               child_link_name=child_link_name,
+                               axis=axis,
+                               god_map=god_map,
+                               parent_T_child=parent_T_child,
+                               translation_offset=translation_offset,
+                               rotation_offset=rotation_offset)
+        MimicJoint.__init__(self,
+                            name=name,
+                            parent_link_name=parent_link_name,
+                            child_link_name=child_link_name,
+                            god_map=god_map,
+                            mimed_joint_name=mimed_joint_name,
+                            multiplier=multiplier,
+                            offset=offset,
+                            parent_T_child=parent_T_child,
+                            translation_offset=translation_offset,
+                            rotation_offset=rotation_offset)
+
+    def set_free_variables(self, free_variables):
+        RevoluteJoint.set_free_variables(self, free_variables)
+
+
+class MimicedContinuousJoint(MimicJoint, ContinuousJoint):
+    def __init__(self, name, parent_link_name, child_link_name, god_map, axis, mimed_joint_name, multiplier, offset,
+                 parent_T_child=None, translation_offset=None, rotation_offset=None):
+        ContinuousJoint.__init__(self,
+                                 name=name,
+                                 parent_link_name=parent_link_name,
+                                 child_link_name=child_link_name,
+                                 axis=axis,
+                                 god_map=god_map,
+                                 parent_T_child=parent_T_child,
+                                 translation_offset=translation_offset,
+                                 rotation_offset=rotation_offset)
+        MimicJoint.__init__(self,
+                            name=name,
+                            parent_link_name=parent_link_name,
+                            child_link_name=child_link_name,
+                            god_map=god_map,
+                            mimed_joint_name=mimed_joint_name,
+                            multiplier=multiplier,
+                            offset=offset,
+                            parent_T_child=parent_T_child,
+                            translation_offset=translation_offset,
+                            rotation_offset=rotation_offset)
+
+    def set_free_variables(self, free_variables):
+        ContinuousJoint.set_free_variables(self, free_variables)

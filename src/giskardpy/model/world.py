@@ -248,10 +248,17 @@ class WorldTree(object):
                 helper(urdf, child_link)
 
         helper(parsed_urdf, child_link)
+        self._set_free_variables_on_mimic_joints()
         if group_name is not None:
             self.register_group(group_name, child_link.name)
         if self.god_map is not None:
             self.sync_with_paramserver()
+
+    def _set_free_variables_on_mimic_joints(self):
+        for joint_name, joint in self.joints.items():  # type: (PrefixName, MimicJoint)
+            if self.is_joint_mimic(joint_name):
+                mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
+                joint.set_free_variables(mimed_joint.free_variables)
 
     def get_parent_link_of_link(self, link_name):
         """

@@ -4,7 +4,7 @@ import pickle
 
 import casadi as ca
 import numpy as np
-from casadi import sign, cos, sin, sqrt, atan2, acos
+from casadi import sign, cos, sin, sqrt, atan2, acos, substitute
 from numpy import pi
 
 from giskardpy.utils import logging

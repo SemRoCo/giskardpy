@@ -93,8 +93,15 @@ class JointPositionPrismatic(Goal):
         weight = self.get_parameter_as_symbolic_expression(u'weight')
 
         try:
+            # if self.world.is_joint_mimic(self.joint_name):
+            #     mimed_joint_name = self.world.joints[self.joint_name].mimed_joint_name
+            #     mimed_joint_symbol = self.get_joint_position_symbol(mimed_joint_name)
+            #     mimied_limit = self.world.joint_limit_expr(self.joint_name, 1)[1]
+            #     limit_expr = w.substitute(current_joint, mimed_joint_symbol, mimied_limit)
+            # else:
+            limit_expr = self.world.joint_limit_expr(self.joint_name, 1)[1]
             max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
-                                 self.world.joint_limit_expr(self.joint_name, 1)[1])
+                                 limit_expr)
         except IndexError:
             max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
 

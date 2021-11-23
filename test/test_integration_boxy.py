@@ -248,7 +248,7 @@ class TestConstraints(object):
         kitchen_setup.set_json_goal(u'Open',
                                     tip_link=kitchen_setup.l_tip,
                                     environment_link=handle_name,
-                                    distance_goal=0.2)
+                                    goal_joint_state=0.2)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object

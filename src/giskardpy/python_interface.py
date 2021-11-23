@@ -56,7 +56,7 @@ class GiskardWrapper(object):
         Returns the name of the robot's root link
         :rtype: str
         """
-        return self._world.groups[RobotName].root_link_name
+        return str(self._world.groups[RobotName].root_link_name)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """

@@ -1,2 +1,18 @@
 parent: !include default.yaml
+action_server:
+  base:
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+  torso:
+    namespace: /whole_body_controller/torso/follow_joint_trajectory
+    state_topic: /whole_body_controller/torso/state
+  neck:
+    namespace: /whole_body_controller/neck/follow_joint_trajectory
+    state_topic: /whole_body_controller/neck/state
+  left_arm:
+    namespace: /whole_body_controller/left_arm/follow_joint_trajectory
+    state_topic: /whole_body_controller/left_arm/state
+  right_arm:
+    namespace: /whole_body_controller/right_arm/follow_joint_trajectory
+    state_topic: /whole_body_controller/right_arm/state
 

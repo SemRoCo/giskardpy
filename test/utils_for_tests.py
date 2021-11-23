@@ -1014,20 +1014,15 @@ class HSR(GiskardTestWrapper):
         self.plan_and_execute()
 
     def open_gripper(self):
-        js = {u'hand_l_spring_proximal_joint': 0.7,
-              u'hand_r_spring_proximal_joint': 0.7}
-        self.set_joint_goal(js)
-        self.plan_and_execute()
+        self.command_gripper(1.24)
 
     def close_gripper(self):
-        js = {u'hand_l_spring_proximal_joint': 0,
-              u'hand_r_spring_proximal_joint': 0}
+        self.command_gripper(0)
+
+    def command_gripper(self, width):
+        js = {u'hand_motor_joint': width}
         self.set_joint_goal(js)
         self.plan_and_execute()
-
-    # def command_gripper(self, width):
-    #     js = {u'hand_motor_joint': width}
-    #     self.send_and_check_joint_goal(js)
 
 
 def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):

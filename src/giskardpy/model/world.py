@@ -321,11 +321,11 @@ class WorldTree(object):
 
     @cached_property
     def movable_joints(self):
-        return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
+        return [j.name for j in self.joints.values() if isinstance(j, MovableJoint) and not isinstance(j, MimicJoint)]
 
     @cached_property
     def movable_joints_as_set(self):
-        return set(j.name for j in self.joints.values() if isinstance(j, MovableJoint))
+        return set(self.movable_joints)
 
     def _clear(self):
         self.state = JointStates()

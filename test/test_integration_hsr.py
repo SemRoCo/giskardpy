@@ -94,7 +94,7 @@ def box_setup(zero_pose):
     p.pose.position.y = 0
     p.pose.position.z = 0.1
     p.pose.orientation.w = 1
-    zero_pose.add_box(size=[1, 1, 1], pose=p)
+    zero_pose.add_box(name='box', size=[1, 1, 1], pose=p)
     return zero_pose
 
 
@@ -122,7 +122,6 @@ class TestJointGoals(object):
         base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
-        pass
 
 
 class TestCartGoals(object):
@@ -134,7 +133,9 @@ class TestCartGoals(object):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
 
 class TestCollisionAvoidanceGoals(object):
@@ -147,7 +148,8 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.position.z = 0.5
         r_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.plan_and_execute()
 
     def test_self_collision_avoidance2(self, zero_pose):
         """
@@ -162,13 +164,16 @@ class TestCollisionAvoidanceGoals(object):
             u'wrist_flex_joint': -1.55,
             u'wrist_roll_joint': 0.11,
         }
-        zero_pose.send_and_check_joint_goal(js)
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = u'hand_palm_link'
         goal_pose.pose.position.x = 0.5
         goal_pose.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.tip)
+        zero_pose.set_cart_goal(goal_pose, zero_pose.tip)
+        zero_pose.plan_and_execute()
 
     def test_attached_collision1(self, box_setup):
         """
@@ -189,21 +194,23 @@ class TestCollisionAvoidanceGoals(object):
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
-        box_setup.set_and_check_cart_goal(grasp_pose, box_setup.tip)
+        box_setup.set_cart_goal(grasp_pose, box_setup.tip)
+        box_setup.plan_and_execute()
         box_setup.attach_object(box_name, box_setup.tip)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = box_setup.default_root
-        base_goal.pose.position.x -= 1
+        base_goal.pose.position.x -= 0.5
         base_goal.pose.orientation.w = 1
         box_setup.move_base(base_goal)
 
     def test_collision_avoidance(self, zero_pose):
         """
-        :type box_setup: HSR
+        :type zero_pose: HSR
         """
         js = {u'arm_flex_joint': -np.pi / 2}
-        zero_pose.send_and_check_joint_goal(js)
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
 
         p = PoseStamped()
         p.header.frame_id = u'map'
@@ -211,7 +218,8 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = 0.5
         p.pose.orientation.w = 1
-        zero_pose.add_box(size=[1, 1, 0.01], pose=p)
+        zero_pose.add_box(name='box', size=[1, 1, 0.01], pose=p)
 
         js = {u'arm_flex_joint': 0}
-        zero_pose.send_and_check_joint_goal(js, expected_error_codes=[MoveResult.SHAKING])
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()

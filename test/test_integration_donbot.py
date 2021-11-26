@@ -586,17 +586,19 @@ class TestCollisionAvoidanceGoals(object):
         }
         # zero_pose.wrapper.set_self_collision_distance(0.025)
         zero_pose.allow_self_collision()
-        zero_pose.send_and_check_joint_goal(goal_js)
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.plan_and_execute()
 
         arm_goal = PoseStamped()
         arm_goal.header.frame_id = zero_pose.gripper_tip
         arm_goal.pose.position.y = -.1
         arm_goal.pose.orientation.w = 1
         # zero_pose.wrapper.set_self_collision_distance(0.025)
-        zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
 
     def test_avoid_self_collision2(self, self_collision_pose):
-        self_collision_pose.send_and_check_goal()
+        self_collision_pose.plan_and_execute()
         map_T_root = tf.lookup_pose(u'map', u'base_footprint')
         expected_pose = Pose()
         expected_pose.orientation.w = 1
@@ -610,5 +612,5 @@ class TestCollisionAvoidanceGoals(object):
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'asdf'
         zero_pose.set_collision_entries([ce])
-        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_OBJECT])
-        zero_pose.send_and_check_goal()
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_OBJECT])
+        zero_pose.plan_and_execute()

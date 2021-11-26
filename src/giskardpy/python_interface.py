@@ -317,7 +317,7 @@ class GiskardWrapper(object):
         """
         self.set_json_goal(u'UpdateGodMap', updates=updates)
 
-    def pointing(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
         """
         Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
         :param tip_link: name of the tip of the kin chain

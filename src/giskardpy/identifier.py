@@ -110,7 +110,6 @@ tree_tick_rate = behavior_tree + [u'tree_tick_rate']
 # collision avoidance
 collision_avoidance = rosparam + [u'collision_avoidance']
 collision_checker = collision_avoidance + ['collision_checker']
-added_collision_checks = collision_avoidance + [u'added_collision_checks']
 
 self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance', u'override']
 ignored_self_collisions = self_collision_avoidance[:-1] + [u'ignore']

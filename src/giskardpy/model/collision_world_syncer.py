@@ -26,6 +26,7 @@ class CollisionWorldSynchronizer(object):
             self.ignored_pairs = set()
         try:
             self.added_pairs = self.god_map.get_data(identifier.added_self_collisions)
+            self.added_pairs = set(x if self.world.link_order(*x) else tuple(reversed(x)) for x in self.added_pairs)
         except KeyError as e:
             self.added_pairs = set()
 
@@ -128,7 +129,7 @@ class CollisionWorldSynchronizer(object):
 
         logging.logdebug(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
         self.world.state = joint_state_tmp
-
+        unknown.update(self.added_pairs)
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]
 

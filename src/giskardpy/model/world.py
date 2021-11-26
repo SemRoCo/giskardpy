@@ -19,8 +19,7 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
-    kdl_to_np, msg_to_homogeneous_matrix, np_point, np_vector
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize
 
 
@@ -314,7 +313,7 @@ class WorldTree(object):
         else:
             link = Link.from_world_body(msg)
             joint = FixedJoint(PrefixName(msg.name, self.connection_prefix), parent_link.name, link.name,
-                               parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
+                               parent_T_child=w.Matrix(msg_to_homogeneous_matrix(pose)))
             self._link_joint_to_links(joint, link)
             self.register_group(msg.name, link.name)
             self.notify_model_change()
@@ -774,7 +773,7 @@ class WorldTree(object):
         :type point: PointStamped
         :rtype: PointStamped
         """
-        f_P_p = np_point(point.point.x, point.point.y, point.point.z)
+        f_P_p = msg_to_homogeneous_matrix(point)
         t_T_f = self.compute_fk_np(target_frame, point.header.frame_id)
         t_P_p = np.dot(t_T_f, f_P_p)
         result = PointStamped()
@@ -788,7 +787,7 @@ class WorldTree(object):
         :type vector: Vector3Stamped
         :rtype: Vector3Stamped
         """
-        f_V_p = np_vector(vector.vector.x, vector.vector.y, vector.vector.z)
+        f_V_p = msg_to_homogeneous_matrix(vector)
         t_T_f = self.compute_fk_np(target_frame, vector.header.frame_id)
         t_V_p = np.dot(t_T_f, f_V_p)
         result = Vector3Stamped()

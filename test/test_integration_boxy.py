@@ -158,7 +158,7 @@ class TestConstraints(object):
         """
         tip = u'head_mount_kinect2_rgb_optical_frame'
         goal_point = lookup_point(u'map', better_pose.r_tip)
-        better_pose.pointing(tip, goal_point)
+        better_pose.set_pointing_goal(tip, goal_point)
         better_pose.plan_and_execute()
 
         current_x = Vector3Stamped()
@@ -170,7 +170,7 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
         goal_point = lookup_point(u'map', better_pose.r_tip)
-        better_pose.pointing(tip, goal_point, root_link=better_pose.r_tip)
+        better_pose.set_pointing_goal(tip, goal_point, root_link=better_pose.r_tip)
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = better_pose.r_tip

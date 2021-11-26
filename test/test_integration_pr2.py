@@ -794,14 +794,14 @@ class TestConstraints(object):
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
-        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
+        kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis)
         kitchen_setup.plan_and_execute()
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
         base_goal.pose.position.y = 2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
-        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
+        kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis)
         gaya_pose2 = deepcopy(gaya_pose)
         del gaya_pose2['head_pan_joint']
         del gaya_pose2['head_tilt_joint']
@@ -822,7 +822,7 @@ class TestConstraints(object):
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
-        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
+        kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
 
         rospy.loginfo("Starting pointing")
         r_goal = PoseStamped()

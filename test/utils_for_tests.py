@@ -8,7 +8,7 @@ import numpy as np
 import rospy
 from angles import shortest_angular_distance
 from control_msgs.msg import FollowJointTrajectoryActionGoal, FollowJointTrajectoryActionResult
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
@@ -23,7 +23,7 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
 from visualization_msgs.msg import Marker
-
+import giskardpy.utils.math as mymath
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
@@ -338,6 +338,28 @@ class AlignPlanesGoalChecker(GoalChecker):
         np.testing.assert_array_almost_equal(msg_to_list(expected.vector), msg_to_list(current.vector), decimal=2)
 
 
+class PointingGoalChecker(GoalChecker):
+    def __init__(self, god_map, tip_link, goal_point, root_link=None, pointing_axis=None):
+        super(PointingGoalChecker, self).__init__(god_map)
+        self.tip_link = tip_link
+        self.root_link = root_link
+        if pointing_axis:
+            self.tip_V_pointer = pointing_axis
+            self.tip_V_pointer = self.transform_msg(self.tip_link, goal_point)
+        else:
+            self.tip_V_pointer = Vector3Stamped()
+            self.tip_V_pointer.vector.z = 1
+            self.tip_V_pointer.header.frame_id = tip_link
+        self.tip_V_pointer = tf.msg_to_homogeneous_matrix(self.tip_V_pointer)
+        self.goal_point = goal_point
+
+    def __call__(self):
+        tip_P_goal = tf.msg_to_homogeneous_matrix(self.transform_msg(self.tip_link, self.goal_point))
+        tip_P_goal[-1] = 0
+        tip_P_goal = tip_P_goal / np.linalg.norm(tip_P_goal)
+        np.testing.assert_array_almost_equal(tip_P_goal, self.tip_V_pointer, decimal=2)
+
+
 class RotationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected):
         super(RotationGoalChecker, self).__init__(god_map)
@@ -542,26 +564,34 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
                       angular_velocity=None, check=True):
-        if not root_link:
-            root_link = self.default_root
+        kwargs = {
+            'goal_pose': goal_pose,
+            'tip_link': tip_link,
+            'root_link': root_link,
+            'check': check,
+        }
+        if root_link:
+            kwargs['root_link'] = root_link
+        if weight:
+            kwargs['weight'] = weight
+        if linear_velocity:
+            kwargs['max_linear_velocity'] = linear_velocity
+        if angular_velocity:
+            kwargs['max_angular_velocity'] = angular_velocity
+        self.set_translation_goal(**kwargs)
+        self.set_rotation_goal(**kwargs)
 
-        if weight is not None:
-            super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
-                                                          tip_link,
-                                                          root_link,
-                                                          weight=weight,
-                                                          max_linear_velocity=linear_velocity,
-                                                          max_angular_velocity=angular_velocity)
-        else:
-            super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
-                                                          tip_link,
-                                                          root_link,
-                                                          max_linear_velocity=linear_velocity,
-                                                          max_angular_velocity=angular_velocity)
-
-        if check:
-            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
-            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
+        super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
+                                                          goal_point=goal_point,
+                                                          root_link=root_link,
+                                                          pointing_axis=pointing_axis,
+                                                          weight=weight)
+        self.add_goal_check(PointingGoalChecker(self.god_map,
+                                                tip_link=tip_link,
+                                                goal_point=goal_point,
+                                                root_link=root_link if root_link else self.get_root(),
+                                                pointing_axis=pointing_axis))
 
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
                               weight=None, check=True):
@@ -935,7 +965,8 @@ class Donbot(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.z,
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
-        self.send_and_check_joint_goal(js)
+        self.set_joint_goal(js)
+        self.plan_and_execute()
 
     def open_gripper(self):
         self.set_gripper(0.109)
@@ -953,27 +984,8 @@ class Donbot(GiskardTestWrapper):
         goal.pos = width * 1000
         self.gripper_pub.publish(goal)
         rospy.sleep(0.5)
-        js = self.get_current_joint_state()
-        index = js.name.index(gripper_joint)
-        np.testing.assert_almost_equal(js.position[index], width, decimal=3)
-
-
-class KMR_IIWA(GiskardTestWrapper):
-    def __init__(self):
-        self.camera_tip = u'camera_link'
-        self.gripper_tip = u'gripper_tool_frame'
-        super(KMR_IIWA, self).__init__(u'package://giskardpy/config/kmr_iiwa.yaml')
-
-    def move_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {u'odom_x_joint': goal_pose.pose.position.x,
-              u'odom_y_joint': goal_pose.pose.position.y,
-              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
-        self.allow_all_collisions()
-        self.send_and_check_joint_goal(js)
+        self.wait_heartbeats()
+        np.testing.assert_almost_equal(self.world.state[gripper_joint].position, width, decimal=3)
 
 
 class Boxy(GiskardTestWrapper):

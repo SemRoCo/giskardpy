@@ -34,8 +34,8 @@ def main(stdscr):
     stdscr.nodelay(True)
     curses.init_pair(1, curses.COLOR_YELLOW, curses.COLOR_BLACK)
     curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
-    rospy.init_node(u'joint_limit_observer')
-    while not rospy.has_param(u'/robot_description'):
+    rospy.init_node('joint_limit_observer')
+    while not rospy.has_param('/robot_description'):
         stdscr.addstr(0, 0, "waiting for parameter /robot_description")
         stdscr.refresh()
         cmd = stdscr.getch()
@@ -43,8 +43,8 @@ def main(stdscr):
             if cmd == 113: # q pressed
                 sys.exit()
             cmd = stdscr.getch()
-    robot_desc = rospy.get_param(u'robot_description')
-    js_topic = u'/joint_states' if len(sys.argv) == 1 else sys.argv[1]
+    robot_desc = rospy.get_param('robot_description')
+    js_topic = '/joint_states' if len(sys.argv) == 1 else sys.argv[1]
     robot = urdf_object.URDFObject(robot_desc)
     joint_limits = robot.get_all_joint_limits()
     num_joints = len(joint_limits)
@@ -83,9 +83,9 @@ def main(stdscr):
                 joint_pos_without_offset = joint_pos - 2 * math.pi * math.copysign((abs(joint_pos) + math.pi) // (2 * math.pi), joint_pos)
                 js_range = upper - lower
                 relative = int(round(scale_steps / js_range * (joint_pos_without_offset - lower)))
-                s = u'-' * (scale_steps + 1)
-                s_form = u'{}{}{}'.format(s[:relative], u'0', s[relative + 1:])
-                output.append(u'     inf [{}]      inf   {}'.format(s_form, joint_name))
+                s = '-' * (scale_steps + 1)
+                s_form = '{}{}{}'.format(s[:relative], '0', s[relative + 1:])
+                output.append('     inf [{}]      inf   {}'.format(s_form, joint_name))
                 output_color.append(curses.color_pair(0))
             else:
                 js_range = upper - lower
@@ -96,9 +96,9 @@ def main(stdscr):
                     output_color[-1] = curses.color_pair(2)
                 elif limit_distance < js_range * warning_threshold:
                     output_color[-1] = curses.color_pair(1)
-                s = u'-' * (scale_steps + 1)
-                s_form = u'{}{}{}'.format(s[:relative], u'0', s[relative + 1:])
-                output.append(u'{:8.2f} [{}] {:8.2f}   {}'.format(lower, s_form, upper, joint_name))
+                s = '-' * (scale_steps + 1)
+                s_form = '{}{}{}'.format(s[:relative], '0', s[relative + 1:])
+                output.append('{:8.2f} [{}] {:8.2f}   {}'.format(lower, s_form, upper, joint_name))
 
         for i in range(num_joints):
             if(curses.has_colors()):

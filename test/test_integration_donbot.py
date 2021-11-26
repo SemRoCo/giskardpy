@@ -13,34 +13,34 @@ from utils_for_tests import Donbot, compare_poses
 
 
 floor_detection_js = {
-    u'ur5_shoulder_pan_joint': -1.63407260576,
-    u'ur5_shoulder_lift_joint': -1.4751423041,
-    u'ur5_elbow_joint': 0.677300930023,
-    u'ur5_wrist_1_joint': -2.12363607088,
-    u'ur5_wrist_2_joint': -1.50967580477,
-    u'ur5_wrist_3_joint': 1.55717146397,
+    'ur5_shoulder_pan_joint': -1.63407260576,
+    'ur5_shoulder_lift_joint': -1.4751423041,
+    'ur5_elbow_joint': 0.677300930023,
+    'ur5_wrist_1_joint': -2.12363607088,
+    'ur5_wrist_2_joint': -1.50967580477,
+    'ur5_wrist_3_joint': 1.55717146397,
 }
 
 better_js = {
-    u'ur5_shoulder_pan_joint': -np.pi / 2,
-    u'ur5_shoulder_lift_joint': -2.44177755311,
-    u'ur5_elbow_joint': 2.15026930371,
-    u'ur5_wrist_1_joint': 0.291547812391,
-    u'ur5_wrist_2_joint': np.pi / 2,
-    u'ur5_wrist_3_joint': np.pi / 2
+    'ur5_shoulder_pan_joint': -np.pi / 2,
+    'ur5_shoulder_lift_joint': -2.44177755311,
+    'ur5_elbow_joint': 2.15026930371,
+    'ur5_wrist_1_joint': 0.291547812391,
+    'ur5_wrist_2_joint': np.pi / 2,
+    'ur5_wrist_3_joint': np.pi / 2
 }
 
 self_collision_js = {
-    u'ur5_shoulder_pan_joint': -1.57,
-    u'ur5_shoulder_lift_joint': -1.35,
-    u'ur5_elbow_joint': 2.4,
-    u'ur5_wrist_1_joint': 0.66,
-    u'ur5_wrist_2_joint': 1.57,
-    u'ur5_wrist_3_joint': 1.28191862405e-15,
+    'ur5_shoulder_pan_joint': -1.57,
+    'ur5_shoulder_lift_joint': -1.35,
+    'ur5_elbow_joint': 2.4,
+    'ur5_wrist_1_joint': 0.66,
+    'ur5_wrist_2_joint': 1.57,
+    'ur5_wrist_3_joint': 1.28191862405e-15,
 }
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def giskard(request, ros):
     c = Donbot()
     request.addfinalizer(c.tear_down)
@@ -66,7 +66,7 @@ def fake_table_setup(zero_pose):
     :rtype: Donbot
     """
     p = PoseStamped()
-    p.header.frame_id = u'map'
+    p.header.frame_id = 'map'
     p.pose.position.x = 0.9
     p.pose.position.y = 0
     p.pose.position.z = 0.2
@@ -113,12 +113,12 @@ class TestJointGoals(object):
         """
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal({
-            u'ur5_shoulder_pan_joint': -0.15841275850404912,
-            u'ur5_shoulder_lift_joint': -2.2956998983966272,
-            u'ur5_elbow_joint': 2.240689277648926,
-            u'ur5_wrist_1_joint': -2.608211342488424,
-            u'ur5_wrist_2_joint': -2.7356796900378626,
-            u'ur5_wrist_3_joint': -2.5249870459186,
+            'ur5_shoulder_pan_joint': -0.15841275850404912,
+            'ur5_shoulder_lift_joint': -2.2956998983966272,
+            'ur5_elbow_joint': 2.240689277648926,
+            'ur5_wrist_1_joint': -2.608211342488424,
+            'ur5_wrist_2_joint': -2.7356796900378626,
+            'ur5_wrist_3_joint': -2.5249870459186,
         })
         zero_pose.set_joint_goal({})
         zero_pose.plan_and_execute()
@@ -128,24 +128,24 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         js = {
-            u'ur5_shoulder_pan_joint': -1.5438225905,
-            u'ur5_shoulder_lift_joint': -1.20804578463,
-            u'ur5_elbow_joint': -2.21223670641,
-            u'ur5_wrist_1_joint': -1.5827181975,
-            u'ur5_wrist_2_joint': -4.71748859087,
-            u'ur5_wrist_3_joint': -1.57543737093,
+            'ur5_shoulder_pan_joint': -1.5438225905,
+            'ur5_shoulder_lift_joint': -1.20804578463,
+            'ur5_elbow_joint': -2.21223670641,
+            'ur5_wrist_1_joint': -1.5827181975,
+            'ur5_wrist_2_joint': -4.71748859087,
+            'ur5_wrist_3_joint': -1.57543737093,
         }
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
         js2 = {
-            u'ur5_shoulder_pan_joint': -np.pi / 2,
-            u'ur5_shoulder_lift_joint': -np.pi / 2,
-            u'ur5_elbow_joint': -2.3,
-            u'ur5_wrist_1_joint': -np.pi / 2,
-            u'ur5_wrist_2_joint': 0,
-            u'ur5_wrist_3_joint': -np.pi / 2,
+            'ur5_shoulder_pan_joint': -np.pi / 2,
+            'ur5_shoulder_lift_joint': -np.pi / 2,
+            'ur5_elbow_joint': -2.3,
+            'ur5_wrist_1_joint': -np.pi / 2,
+            'ur5_wrist_2_joint': 0,
+            'ur5_wrist_3_joint': -np.pi / 2,
         }
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(js2)
@@ -156,15 +156,15 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         js = {
-            u'odom_x_joint': 1,
-            u'odom_y_joint': 1,
-            u'odom_z_joint': 1,
-            u'ur5_shoulder_pan_joint': -1.5438225905,
-            u'ur5_shoulder_lift_joint': -1.20804578463,
-            u'ur5_elbow_joint': -2.21223670641,
-            u'ur5_wrist_1_joint': -1.5827181975,
-            u'ur5_wrist_2_joint': -4.71748859087,
-            u'ur5_wrist_3_joint': -1.57543737093,
+            'odom_x_joint': 1,
+            'odom_y_joint': 1,
+            'odom_z_joint': 1,
+            'ur5_shoulder_pan_joint': -1.5438225905,
+            'ur5_shoulder_lift_joint': -1.20804578463,
+            'ur5_elbow_joint': -2.21223670641,
+            'ur5_wrist_1_joint': -1.5827181975,
+            'ur5_wrist_2_joint': -4.71748859087,
+            'ur5_wrist_3_joint': -1.57543737093,
         }
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(js)
@@ -185,12 +185,12 @@ class TestConstraints(object):
         """
         :type better_pose: Donbot
         """
-        tip = u'rs_camera_link'
-        goal_point = tf.lookup_point(u'map', u'base_footprint')
+        tip = 'rs_camera_link'
+        goal_point = tf.lookup_point('map', 'base_footprint')
         better_pose.set_pointing_goal(tip, goal_point)
         better_pose.plan_and_execute()
 
-        goal_point = tf.lookup_point(u'map', tip)
+        goal_point = tf.lookup_point('map', tip)
         better_pose.set_pointing_goal(tip, goal_point, root_link=tip)
 
 
@@ -213,12 +213,12 @@ class TestCartGoals(object):
         :type zero_pose: Donbot
         """
         start_pose = {
-            u'ur5_elbow_joint': 2.14547738764,
-            u'ur5_shoulder_lift_joint': -1.177280122,
-            u'ur5_shoulder_pan_joint': -1.8550731481,
-            u'ur5_wrist_1_joint': -3.70994178242,
-            u'ur5_wrist_2_joint': -1.30010203311,
-            u'ur5_wrist_3_joint': 1.45079807832,
+            'ur5_elbow_joint': 2.14547738764,
+            'ur5_shoulder_lift_joint': -1.177280122,
+            'ur5_shoulder_pan_joint': -1.8550731481,
+            'ur5_wrist_1_joint': -3.70994178242,
+            'ur5_wrist_2_joint': -1.30010203311,
+            'ur5_wrist_3_joint': 1.45079807832,
         }
 
         zero_pose.allow_self_collision()
@@ -226,7 +226,7 @@ class TestCartGoals(object):
         zero_pose.plan_and_execute()
 
         goal_pose = PoseStamped()
-        goal_pose.header.frame_id = u'base_link'
+        goal_pose.header.frame_id = 'base_link'
         goal_pose.pose.position.x = -0.512
         goal_pose.pose.position.y = -1.036126
         goal_pose.pose.position.z = 0.605
@@ -245,7 +245,7 @@ class TestCartGoals(object):
         """
 
         goal_pose = PoseStamped()
-        goal_pose.header.frame_id = u'base_link'
+        goal_pose.header.frame_id = 'base_link'
         goal_pose.pose.position.x = 0.212
         goal_pose.pose.position.y = -0.314
         goal_pose.pose.position.z = 0.873
@@ -266,13 +266,13 @@ class TestCartGoals(object):
         hand_goal.header.frame_id = better_pose.gripper_tip
         hand_goal.pose.position.z = 1
         hand_goal.pose.orientation.w = 1
-        better_pose.set_cart_goal(hand_goal, better_pose.gripper_tip, u'base_footprint', check=False)
+        better_pose.set_cart_goal(hand_goal, better_pose.gripper_tip, 'base_footprint', check=False)
         better_pose.plan_and_execute()
         hand_goal = PoseStamped()
         hand_goal.header.frame_id = better_pose.gripper_tip
         hand_goal.pose.position.z = -0.2
         hand_goal.pose.orientation.w = 1
-        better_pose.set_cart_goal(hand_goal, better_pose.gripper_tip, u'base_footprint')
+        better_pose.set_cart_goal(hand_goal, better_pose.gripper_tip, 'base_footprint')
         better_pose.plan_and_execute()
         pass
 
@@ -294,11 +294,11 @@ class TestCartGoals(object):
             ]
         ))
         better_pose.allow_all_collisions()
-        better_pose.set_cart_goal(hand_goal, u'ur5_wrist_2_link', u'base_footprint', weight=WEIGHT_BELOW_CA)
+        better_pose.set_cart_goal(hand_goal, 'ur5_wrist_2_link', 'base_footprint', weight=WEIGHT_BELOW_CA)
         better_pose.plan_and_execute()
         hand_goal.pose.position.y = 0.05
         # better_pose.allow_all_collisions()
-        better_pose.set_cart_goal(hand_goal, u'ur5_wrist_2_link', u'base_footprint', weight=WEIGHT_BELOW_CA)
+        better_pose.set_cart_goal(hand_goal, 'ur5_wrist_2_link', 'base_footprint', weight=WEIGHT_BELOW_CA)
         better_pose.plan_and_execute()
         pass
 
@@ -310,7 +310,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
-        pocky = u'http://muh#pocky'
+        pocky = 'http://muh#pocky'
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0.05
@@ -321,9 +321,9 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: Donbot
         """
-        box = u'box'
+        box = 'box'
         p = PoseStamped()
-        p.header.frame_id = u'map'
+        p.header.frame_id = 'map'
         p.pose.position.y = -0.75
         p.pose.position.z = 0.5
         p.pose.orientation = Quaternion(0, 0, 0, 1)
@@ -436,7 +436,7 @@ class TestCollisionAvoidanceGoals(object):
         better_pose.add_cylinder('bup', height=0.2, radius=0.01, pose=p)
 
         eef_goal = PoseStamped()
-        eef_goal.header.frame_id = u'cylinder'
+        eef_goal.header.frame_id = 'cylinder'
         eef_goal.pose.position.z -= 0.2
         eef_goal.pose.orientation.w = 1
         better_pose.set_cart_goal(eef_goal, 'cylinder', weight=WEIGHT_BELOW_CA)
@@ -447,7 +447,7 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: Donbot
         """
         goal_js = {
-            u'ur5_shoulder_lift_joint': .5,
+            'ur5_shoulder_lift_joint': .5,
         }
         zero_pose.set_joint_goal(goal_js, check=False)
         zero_pose.plan_and_execute()
@@ -464,7 +464,7 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: Donbot
         """
         goal_js = {
-            u'ur5_shoulder_lift_joint': .5,
+            'ur5_shoulder_lift_joint': .5,
         }
         # zero_pose.wrapper.set_self_collision_distance(0.025)
         zero_pose.allow_self_collision()
@@ -481,7 +481,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_self_collision2(self, self_collision_pose):
         self_collision_pose.plan_and_execute()
-        map_T_root = tf.lookup_pose(u'map', u'base_footprint')
+        map_T_root = tf.lookup_pose('map', 'base_footprint')
         expected_pose = Pose()
         expected_pose.orientation.w = 1
         compare_poses(map_T_root.pose, expected_pose)
@@ -492,7 +492,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
-        ce.body_b = u'asdf'
+        ce.body_b = 'asdf'
         zero_pose.set_collision_entries([ce])
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_OBJECT])
         zero_pose.plan_and_execute()

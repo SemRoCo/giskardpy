@@ -13,7 +13,7 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length
 
-PKG = u'giskardpy'
+PKG = 'giskardpy'
 
 
 class TestGodMap(unittest.TestCase):
@@ -35,15 +35,15 @@ class TestGodMap(unittest.TestCase):
     def test_set_get_integer(self, key, number):
         db = GodMap()
         db.set_data([key], number)
-        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
+        self.assertEqual(db.get_data([key]), number, msg='key={}, number={}'.format(key, number))
 
     @given(variable_name(),
            st.integers())
     def test_set_get_integer2(self, key, number):
         db = GodMap()
         db.set_data([key], number)
-        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
-        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
+        self.assertEqual(db.get_data([key]), number, msg='key={}, number={}'.format(key, number))
+        self.assertEqual(db.get_data([key]), number, msg='key={}, number={}'.format(key, number))
 
     @given(variable_name(),
            st.floats(allow_nan=False))
@@ -65,11 +65,11 @@ class TestGodMap(unittest.TestCase):
             self.assertEqual(db.get_data([key, k]), v)
 
     def test_namedtuple1(self):
-        Frame = namedtuple(u'Frame', [u'pos'])
+        Frame = namedtuple('Frame', ['pos'])
         db = GodMap()
-        db.set_data([u'f12'], Frame(pos=2))
+        db.set_data(['f12'], Frame(pos=2))
         with self.assertRaises(AttributeError):
-            db.set_data([u'f12', u'pos'], 42)
+            db.set_data(['f12', 'pos'], 42)
 
     @given(variable_name(),
            variable_name(),

@@ -45,7 +45,7 @@ def get_full_frame_name(frame_name):
                 return tf_frame
         except ValueError:
             continue
-    raise KeyError(u'Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
+    raise KeyError('Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
 
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
@@ -224,7 +224,7 @@ def msg_to_kdl(msg):
     elif isinstance(msg, Vector3):
         return point_to_kdl(msg)
     else:
-        raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
+        raise TypeError('can\'t convert {} to kdl'.format(type(msg)))
 
 
 def normalize(msg):
@@ -429,7 +429,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     ma = MarkerArray()
     x = Marker()
     x.action = x.ADD
-    x.ns = u'debug'
+    x.ns = 'debug'
     x.id = id_
     x.type = x.CUBE
     x.header.frame_id = pose_stamped.header.frame_id
@@ -449,7 +449,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     ma.markers.append(x)
     y = Marker()
     y.action = y.ADD
-    y.ns = u'debug'
+    y.ns = 'debug'
     y.id = id_ + 1
     y.type = y.CUBE
     y.header.frame_id = pose_stamped.header.frame_id
@@ -469,7 +469,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     ma.markers.append(y)
     z = Marker()
     z.action = z.ADD
-    z.ns = u'debug'
+    z.ns = 'debug'
     z.id = id_ + 2
     z.type = z.CUBE
     z.header.frame_id = pose_stamped.header.frame_id

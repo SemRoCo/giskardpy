@@ -31,11 +31,11 @@ class SendResult(ActionServerBehavior):
 
         else:
             if not self.all_goals_succeeded(result):
-                logging.logwarn(u'Failed to execute goal.')
+                logging.logwarn('Failed to execute goal.')
                 self.get_as().send_aborted(result)
                 return Status.SUCCESS
             else:
-                logging.loginfo(u'----------------Successfully executed goal.----------------')
+                logging.loginfo('----------------Successfully executed goal.----------------')
         self.get_as().send_result(result)
         return Status.SUCCESS
 

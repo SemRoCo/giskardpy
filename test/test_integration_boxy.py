@@ -11,7 +11,7 @@ from utils_for_tests import Donbot, Boxy
 # TODO roslaunch iai_boxy_sim ros_control_sim.launch
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def giskard(request, ros):
     c = Boxy()
     request.addfinalizer(c.tear_down)
@@ -33,8 +33,8 @@ class TestConstraints(object):
         """
         :type better_pose: Boxy
         """
-        tip = u'head_mount_kinect2_rgb_optical_frame'
-        goal_point = lookup_point(u'map', better_pose.r_tip)
+        tip = 'head_mount_kinect2_rgb_optical_frame'
+        goal_point = lookup_point('map', better_pose.r_tip)
         better_pose.set_pointing_goal(tip, goal_point)
         better_pose.plan_and_execute()
 
@@ -46,7 +46,7 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
-        goal_point = lookup_point(u'map', better_pose.r_tip)
+        goal_point = lookup_point('map', better_pose.r_tip)
         better_pose.set_pointing_goal(tip, goal_point, root_link=better_pose.r_tip)
 
         r_goal = PoseStamped()
@@ -60,7 +60,7 @@ class TestConstraints(object):
                                                                       [1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
 
-        better_pose.set_cart_goal(r_goal, better_pose.r_tip, u'base_footprint')
+        better_pose.set_cart_goal(r_goal, better_pose.r_tip, 'base_footprint')
         better_pose.plan_and_execute()
 
         current_x = Vector3Stamped()
@@ -75,8 +75,8 @@ class TestConstraints(object):
         """"
         :type kitchen_setup: Boxy
         """
-        handle_frame_id = u'iai_kitchen/sink_area_left_middle_drawer_handle'
-        handle_name = u'sink_area_left_middle_drawer_handle'
+        handle_frame_id = 'iai_kitchen/sink_area_left_middle_drawer_handle'
+        handle_name = 'sink_area_left_middle_drawer_handle'
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_frame_id
         bar_axis.vector.y = 1
@@ -88,7 +88,7 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
         tip_grasp_axis.vector.y = 1
 
-        kitchen_setup.set_json_goal(u'GraspBar',
+        kitchen_setup.set_json_goal('GraspBar',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=kitchen_setup.l_tip,
                                     tip_grasp_axis=tip_grasp_axis,
@@ -113,28 +113,28 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
 
-        kitchen_setup.set_json_goal(u'Open',
+        kitchen_setup.set_json_goal('Open',
                                     tip_link=kitchen_setup.l_tip,
                                     environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.48})
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.48})
 
         # Close drawer partially
-        kitchen_setup.set_json_goal(u'Open',
+        kitchen_setup.set_json_goal('Open',
                                     tip_link=kitchen_setup.l_tip,
                                     environment_link=handle_name,
                                     goal_joint_state=0.2)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.2})
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.2})
 
-        kitchen_setup.set_json_goal(u'Close',
+        kitchen_setup.set_json_goal('Close',
                                     tip_link=kitchen_setup.l_tip,
                                     environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.0})
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.0})

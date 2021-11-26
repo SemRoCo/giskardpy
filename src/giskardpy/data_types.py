@@ -116,7 +116,7 @@ class Trajectory(object):
 
     def set(self, time, point):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:
-            raise KeyError(u'Cannot append a trajectory point that is before the current end time of the trajectory.')
+            raise KeyError('Cannot append a trajectory point that is before the current end time of the trajectory.')
         self._points[time] = point
 
     def delete(self, time):
@@ -154,7 +154,7 @@ class Trajectory(object):
                     if fill_velocity_values:
                         p.velocities.append(traj_point[joint_name].velocity)
                 else:
-                    raise NotImplementedError(u'generated traj does not contain all joints')
+                    raise NotImplementedError('generated traj does not contain all joints')
             trajectory_msg.points.append(p)
         return trajectory_msg
 
@@ -456,11 +456,11 @@ class PrefixName(object):
         return self.long_name.__contains__(item.__str__())
 
 order_map = BiDict({
-    0: u'position',
-    1: u'velocity',
-    2: u'acceleration',
-    3: u'jerk',
-    4: u'snap',
-    5: u'crackle',
-    6: u'pop'
+    0: 'position',
+    1: 'velocity',
+    2: 'acceleration',
+    3: 'jerk',
+    4: 'snap',
+    5: 'crackle',
+    6: 'pop'
 })

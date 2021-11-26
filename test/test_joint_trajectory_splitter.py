@@ -38,7 +38,7 @@ class Clients(object):
         return self.statuses[i].status_list[0].status
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def init_ros():
     rospy.init_node('JointTrajectorySplitterTest')
 
@@ -103,14 +103,14 @@ def get_long_trajectory_goal():
     return goal
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def ros_launch():
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
     return launch
 
 
-@pytest.fixture(scope=u'function')
+@pytest.fixture(scope='function')
 def launch_state_publisher1(request, init_ros, ros_launch):
     rospy.set_param('/state_publisher1/joint_names', ['joint1', 'joint2'])
     node = roslaunch.core.Node('giskardpy', 'state_publisher.py', name='state_publisher1', output='screen')
@@ -126,7 +126,7 @@ def launch_state_publisher1(request, init_ros, ros_launch):
     request.addfinalizer(fin)
 
 
-@pytest.fixture(scope=u'function')
+@pytest.fixture(scope='function')
 def launch_state_publisher2(request, init_ros, ros_launch):
     rospy.set_param('/state_publisher2/joint_names', ['joint3', 'joint4'])
     node = roslaunch.core.Node('giskardpy', 'state_publisher.py', name='state_publisher2', output='screen')
@@ -142,7 +142,7 @@ def launch_state_publisher2(request, init_ros, ros_launch):
     request.addfinalizer(fin)
 
 
-@pytest.fixture(scope=u'function')
+@pytest.fixture(scope='function')
 def launch_timeout_test_nodes(request, init_ros, ros_launch, launch_state_publisher1, launch_state_publisher2):
     node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1',
                                output='screen')
@@ -183,7 +183,7 @@ def launch_timeout_test_nodes(request, init_ros, ros_launch, launch_state_publis
     return r
 
 
-@pytest.fixture(scope=u'function')
+@pytest.fixture(scope='function')
 def launch_successful_test_nodes(request, init_ros, ros_launch, launch_state_publisher1, launch_state_publisher2):
     node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1',
                                output='screen')
@@ -226,7 +226,7 @@ def launch_successful_test_nodes(request, init_ros, ros_launch, launch_state_pub
     return r
 
 
-@pytest.fixture(scope=u'function')
+@pytest.fixture(scope='function')
 def launch_invalid_joints_test_nodes(request, init_ros, ros_launch, launch_state_publisher1, launch_state_publisher2):
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
@@ -272,7 +272,7 @@ def launch_invalid_joints_test_nodes(request, init_ros, ros_launch, launch_state
     return r
 
 
-@pytest.fixture(scope=u'function')
+@pytest.fixture(scope='function')
 def launch_failing_goal_test_nodes(request, init_ros, ros_launch, launch_state_publisher1, launch_state_publisher2):
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()

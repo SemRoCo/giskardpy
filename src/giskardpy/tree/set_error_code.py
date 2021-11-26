@@ -32,13 +32,13 @@ class SetErrorCode(GiskardBehavior):
             for i in range(len(result.error_codes) - cmd_id):
                 result.error_codes[cmd_id + i] = error_code
                 result.error_messages[cmd_id + i] = error_message
-            logging.logwarn(u'Goal preempted: \'{}\'.'.format(error_message))
+            logging.logwarn('Goal preempted: \'{}\'.'.format(error_message))
         else:
             if self.print:
                 if error_code == MoveResult.SUCCESS:
-                    logging.loginfo(u'Planning succeeded.')
+                    logging.loginfo('Planning succeeded.')
                 else:
-                    logging.logwarn(u'Planning failed: {}.'.format(error_message))
+                    logging.logwarn('Planning failed: {}.'.format(error_message))
         self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
 
@@ -50,7 +50,7 @@ class SetErrorCode(GiskardBehavior):
         try:
             error_message = str(exception)
         except:
-            error_message = u''
+            error_message = ''
         error_code = MoveResult.SUCCESS
 
         # qp exceptions

@@ -689,5 +689,5 @@ class TestCASWrapper(unittest.TestCase):
     def test_to_str(self):
         expr = w.norm(w.quaternion_from_axis_angle(w.Matrix(w.create_symbols(['v1', 'v2','v3'])),
                                                                           w.Symbol('alpha')))
-        assert w.to_str(expr) == u'sqrt((((sq((v1*sin((alpha/2))))+sq((v2*sin((alpha/2)))))+sq((v3*sin((alpha/2)))))+sq(cos((alpha/2)))))'
+        assert w.to_str(expr) == 'sqrt((((sq((v1*sin((alpha/2))))+sq((v2*sin((alpha/2)))))+sq((v3*sin((alpha/2)))))+sq(cos((alpha/2)))))'
 

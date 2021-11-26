@@ -58,7 +58,7 @@ def exception_to_response(e, req):
     else:
         traceback.print_exc()
         return UpdateWorldResponse(UpdateWorldResponse.ERROR,
-                                   u'{}: {}'.format(e.__class__.__name__,
+                                   '{}: {}'.format(e.__class__.__name__,
                                                     str(e)))
 
 
@@ -80,13 +80,13 @@ class WorldUpdater(GiskardBehavior):
 
     def setup(self, timeout=5.0):
         # TODO make service name a parameter
-        self.marker_publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
-        self.get_object_names = rospy.Service(u'~get_object_names', GetObjectNames, self.get_object_names)
-        self.get_object_info = rospy.Service(u'~get_object_info', GetObjectInfo, self.get_object_info)
-        self.get_attached_objects = rospy.Service(u'~get_attached_objects', GetAttachedObjects,
+        self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
+        self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
+        self.get_object_names = rospy.Service('~get_object_names', GetObjectNames, self.get_object_names)
+        self.get_object_info = rospy.Service('~get_object_info', GetObjectInfo, self.get_object_info)
+        self.get_attached_objects = rospy.Service('~get_attached_objects', GetAttachedObjects,
                                                   self.get_attached_objects)
-        # self.dump_state_srv = rospy.Service(u'~dump_state', Trigger, self.dump_state_cb)
+        # self.dump_state_srv = rospy.Service('~dump_state', Trigger, self.dump_state_cb)
         return super(WorldUpdater, self).setup(timeout)
 
     def get_object_names(self, req):
@@ -164,7 +164,7 @@ class WorldUpdater(GiskardBehavior):
                         self.detach_object(req)
                     else:
                         return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                                   u'Received invalid operation code: {}'.format(req.operation))
+                                                   'Received invalid operation code: {}'.format(req.operation))
                     return UpdateWorldResponse()
                 except Exception as e:
                     return exception_to_response(e, req)
@@ -265,9 +265,9 @@ class WorldUpdater(GiskardBehavior):
     #         os.mkdir(folder_path)
     #         robot = self.unsafe_get_robot()
     #         world = self.unsafe_get_world()
-    #         with open("{}/dump.txt".format(folder_path), u'w') as f:
+    #         with open("{}/dump.txt".format(folder_path), 'w') as f:
     #             tree_manager = self.get_god_map().unsafe_get_data(identifier.tree_manager)  # type: TreeManager
-    #             joint_state_message = tree_manager.get_node(u'js1').lock.get()
+    #             joint_state_message = tree_manager.get_node('js1').lock.get()
     #             f.write("initial_robot_joint_state_dict = ")
     #             write_dict(to_joint_state_position_dict(joint_state_message), f)
     #             f.write("try:\n" +
@@ -305,7 +305,7 @@ class WorldUpdater(GiskardBehavior):
     #                 pose = robot.compute_fk_pose(parent, object_name)
     #                 world_object = robot.get_sub_tree_at_joint(object_name)
     #                 f.write("#attach {}\n".format(object_name))
-    #                 with open("{}/{}.urdf".format(folder_path, object_name), u'w') as f_urdf:
+    #                 with open("{}/{}.urdf".format(folder_path, object_name), 'w') as f_urdf:
     #                     f_urdf.write(world_object.original_urdf)
     #
     #                 f.write('with open(\'{}/{}.urdf\', \"r\") as f:\n'.format(folder_path, object_name))
@@ -323,7 +323,7 @@ class WorldUpdater(GiskardBehavior):
     #
     #             for object_name, world_object in world.get_objects().items():  # type: (str, WorldObject)
     #                 f.write("#add {}\n".format(object_name))
-    #                 with open("{}/{}.urdf".format(folder_path, object_name), u'w') as f_urdf:
+    #                 with open("{}/{}.urdf".format(folder_path, object_name), 'w') as f_urdf:
     #                     f_urdf.write(world_object.original_urdf)
     #
     #                 f.write('with open(\'{}/{}.urdf\', \"r\") as f:\n'.format(folder_path, object_name))
@@ -347,7 +347,7 @@ class WorldUpdater(GiskardBehavior):
     #
     #             last_goal = self.get_god_map().unsafe_get_data(identifier.next_move_goal)
     #             if last_goal:
-    #                 f.write(u'last_goal_dict = ')
+    #                 f.write('last_goal_dict = ')
     #                 write_dict(convert_ros_message_to_dictionary(last_goal), f)
     #                 f.write(
     #                     "last_goal_msg = convert_dictionary_to_ros_message('giskard_msgs/MoveCmd', last_goal_dict)\n")
@@ -358,8 +358,8 @@ class WorldUpdater(GiskardBehavior):
     #                 f.write("last_action_goal.goal = last_move_goal\n")
     #                 f.write("zero_pose.send_and_check_goal(goal=last_action_goal)\n")
     #             else:
-    #                 f.write(u'#no goal\n')
-    #         logging.loginfo(u'saved dump to {}'.format(folder_path))
+    #                 f.write('#no goal\n')
+    #         logging.loginfo('saved dump to {}'.format(folder_path))
     #     except:
     #         logging.logerr('failed to dump state pls try again')
     #         res = TriggerResponse()

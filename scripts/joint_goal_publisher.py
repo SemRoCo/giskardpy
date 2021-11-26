@@ -168,7 +168,7 @@ class JointGoalPublisher(object):
         #self.pub_def_vels = get_param("publish_default_velocities", False)
         #self.pub_def_efforts = get_param("publish_default_efforts", False)
 
-        msg = rospy.wait_for_message(u'/whole_body_controller/state', JointTrajectoryControllerState)
+        msg = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState)
         self.giskard_joints = msg.joint_names
 
 
@@ -295,7 +295,7 @@ class JointGoalPublisherGui(Frame):
         """
         sets the value of every slider to its corresponding current joint state
         """
-        msg = rospy.wait_for_message(u'joint_states', JointState)
+        msg = rospy.wait_for_message('joint_states', JointState)
         for i in range(len(msg.name)):
             if msg.name[i] in self.sliders:
                 self.sliders[msg.name[i]].set(msg.position[i])

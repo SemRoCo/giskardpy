@@ -12,7 +12,7 @@ from giskardpy.data_types import KeyDefaultDict
 
 
 def set_default_in_override_block(block_identifier, god_map):
-    default_value = god_map.get_data(block_identifier[:-1] + [u'default'])
+    default_value = god_map.get_data(block_identifier[:-1] + ['default'])
     override = god_map.get_data(block_identifier)
     d = defaultdict(lambda: default_value)
     if isinstance(override, dict):
@@ -185,7 +185,7 @@ class GodMap(object):
 
     def __init__(self):
         self._data = {}
-        self.expr_separator = u'_'
+        self.expr_separator = '_'
         self.key_to_expr = {}
         self.expr_to_key = {}
         self.last_expr_values = {}
@@ -202,21 +202,21 @@ class GodMap(object):
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        self.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+        self.set_data(identifier.robot_description, rospy.get_param('robot_description'))
         path_to_data_folder = self.get_data(identifier.data_folder)
         # fix path to data folder
-        if not path_to_data_folder.endswith(u'/'):
-            path_to_data_folder += u'/'
+        if not path_to_data_folder.endswith('/'):
+            path_to_data_folder += '/'
         self.set_data(identifier.data_folder, path_to_data_folder)
 
         # while not rospy.is_shutdown():
         #     try:
-        #         controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
+        #         controlled_joints = rospy.wait_for_message('/whole_body_controller/state',
         #                                                    JointTrajectoryControllerState,
         #                                                    timeout=5.0).joint_names
         #         self.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
         #     except ROSException as e:
-        #         logging.logerr(u'state topic not available')
+        #         logging.logerr('state topic not available')
         #         logging.logerr(str(e))
         #     else:
         #         break
@@ -226,12 +226,12 @@ class GodMap(object):
         set_default_in_override_block(identifier.self_collision_avoidance, self)
         # weights
         for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
-            set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], self)
+            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self)
 
         # limits
         for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], self)
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], self)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self)
 
         return self
 
@@ -270,7 +270,7 @@ class GodMap(object):
                 return result
             return self.shortcuts[identifier].c(self._data)
         except Exception as e:
-            e2 = type(e)(u'{}; path: {}'.format(e, identifier))
+            e2 = type(e)('{}; path: {}'.format(e, identifier))
             raise e2
 
     def get_data(self, identifier):
@@ -295,7 +295,7 @@ class GodMap(object):
         if identifier not in self.key_to_expr:
             expr = w.Symbol(self.expr_separator.join([str(x) for x in identifier]))
             if expr in self.expr_to_key:
-                raise Exception(u'{} not allowed in key'.format(self.expr_separator))
+                raise Exception('{} not allowed in key'.format(self.expr_separator))
             self.key_to_expr[identifier] = expr
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
@@ -323,7 +323,7 @@ class GodMap(object):
         elif isinstance(data, np.ndarray):
             return self.list_to_symbol_matrix(identifier, data)
         else:
-            raise NotImplementedError(u'to_expr not implemented for type {}.'.format(type(data)))
+            raise NotImplementedError('to_expr not implemented for type {}.'.format(type(data)))
 
     def list_to_symbol_matrix(self, identifier, data):
         def replace_nested_list(l, f, start_index=None):
@@ -454,11 +454,11 @@ class GodMap(object):
         :type value: object
         """
         if len(identifier) == 0:
-            raise ValueError(u'key is empty')
+            raise ValueError('key is empty')
         namespace = identifier[0]
         if namespace not in self._data:
             if len(identifier) > 1:
-                raise KeyError(u'Can not access member of unknown namespace: {}'.format(identifier))
+                raise KeyError('Can not access member of unknown namespace: {}'.format(identifier))
             else:
                 self._data[namespace] = value
         else:

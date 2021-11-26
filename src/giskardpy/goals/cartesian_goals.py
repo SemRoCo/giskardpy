@@ -43,7 +43,7 @@ class CartesianPosition(Goal):
                                                                   **kwargs))
 
     def make_constraints(self):
-        r_P_g = w.position_of(self.get_parameter_as_symbolic_expression(u'goal_pose'))
+        r_P_g = w.position_of(self.get_parameter_as_symbolic_expression('goal_pose'))
         r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
         self.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
@@ -52,7 +52,7 @@ class CartesianPosition(Goal):
 
     def __str__(self):
         s = super(CartesianPosition, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
 
 
 class CartesianOrientation(Goal):
@@ -87,7 +87,7 @@ class CartesianOrientation(Goal):
 
     def __str__(self):
         s = super(CartesianOrientation, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
 
 
 class CartesianPositionStraight(Goal):
@@ -115,7 +115,7 @@ class CartesianPositionStraight(Goal):
                                         frame_P_goal=root_P_goal,
                                         reference_velocity=self.reference_velocity,
                                         weight=self.weight,
-                                        name_suffix=u'goal')
+                                        name_suffix='goal')
 
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
                                                          root_V_start,
@@ -124,7 +124,7 @@ class CartesianPositionStraight(Goal):
         self.add_point_goal_constraints(frame_P_goal=nearest,
                                         frame_P_current=root_P_tip,
                                         reference_velocity=self.reference_velocity,
-                                        name_suffix=u'line',
+                                        name_suffix='line',
                                         weight=self.weight * 2)
 
         if self.max_velocity is not None:
@@ -211,7 +211,7 @@ class TranslationVelocityLimit(Goal):
 
     def __str__(self):
         s = super(TranslationVelocityLimit, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
 
 
 class RotationVelocityLimit(Goal):
@@ -248,7 +248,7 @@ class RotationVelocityLimit(Goal):
 
     def __str__(self):
         s = super(RotationVelocityLimit, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
 
 
 class CartesianVelocityLimit(Goal):

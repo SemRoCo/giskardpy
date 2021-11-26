@@ -10,7 +10,7 @@ import giskardpy.utils.tfwrapper as tf
 from utils_for_tests import PR2, HSR, compare_poses
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def giskard(request, ros):
     c = HSR()
     request.addfinalizer(c.tear_down)
@@ -24,7 +24,7 @@ def box_setup(zero_pose):
     :rtype: PR2
     """
     p = PoseStamped()
-    p.header.frame_id = u'map'
+    p.header.frame_id = 'map'
     p.pose.position.x = 1.2
     p.pose.position.y = 0
     p.pose.position.z = 0.1
@@ -36,7 +36,7 @@ def box_setup(zero_pose):
 class TestJointGoals(object):
     def test_move_base(self, zero_pose):
         p = PoseStamped()
-        p.header.frame_id = u'map'
+        p.header.frame_id = 'map'
         p.pose.position.y = -0.3
         p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
         zero_pose.move_base(p)
@@ -91,20 +91,20 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: HSR
         """
         js = {
-            u'arm_flex_joint': 0.0,
-            u'arm_lift_joint': 0.0,
-            u'arm_roll_joint': -1.52,
-            u'head_pan_joint': -0.09,
-            u'head_tilt_joint': -0.62,
-            u'wrist_flex_joint': -1.55,
-            u'wrist_roll_joint': 0.11,
+            'arm_flex_joint': 0.0,
+            'arm_lift_joint': 0.0,
+            'arm_roll_joint': -1.52,
+            'head_pan_joint': -0.09,
+            'head_tilt_joint': -0.62,
+            'wrist_flex_joint': -1.55,
+            'wrist_roll_joint': 0.11,
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
         goal_pose = PoseStamped()
-        goal_pose.header.frame_id = u'hand_palm_link'
+        goal_pose.header.frame_id = 'hand_palm_link'
         goal_pose.pose.position.x = 0.5
         goal_pose.pose.orientation.w = 1
         zero_pose.set_cart_goal(goal_pose, zero_pose.tip)
@@ -114,9 +114,9 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: HSR
         """
-        box_name = u'asdf'
+        box_name = 'asdf'
         box_pose = PoseStamped()
-        box_pose.header.frame_id = u'map'
+        box_pose.header.frame_id = 'map'
         box_pose.pose.position = Point(0.85, 0.3, .66)
         box_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
@@ -143,18 +143,18 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: HSR
         """
-        js = {u'arm_flex_joint': -np.pi / 2}
+        js = {'arm_flex_joint': -np.pi / 2}
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
         p = PoseStamped()
-        p.header.frame_id = u'map'
+        p.header.frame_id = 'map'
         p.pose.position.x = 0.9
         p.pose.position.y = 0
         p.pose.position.z = 0.5
         p.pose.orientation.w = 1
         zero_pose.add_box(name='box', size=[1, 1, 0.01], pose=p)
 
-        js = {u'arm_flex_joint': 0}
+        js = {'arm_flex_joint': 0}
         zero_pose.set_joint_goal(js, check=False)
         zero_pose.plan_and_execute()

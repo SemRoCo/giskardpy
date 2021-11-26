@@ -78,14 +78,14 @@ class QPSolver(object):
                 success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
                 if success == PyReturnValue.MAX_NWSR_REACHED:
                     self.started = False
-                    raise MAX_NWSR_REACHEDException(u'Failed to initialize QP-problem.')
+                    raise MAX_NWSR_REACHEDException('Failed to initialize QP-problem.')
             else:
                 success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
                 if success == PyReturnValue.MAX_NWSR_REACHED:
                     logging.logwarn('max nwsr or cpu time reached')
                     success = PyReturnValue.SUCCESSFUL_RETURN
                     # self.started = False
-                    # raise MAX_NWSR_REACHEDException(u'Failed to hot start QP-problem.')
+                    # raise MAX_NWSR_REACHEDException('Failed to hot start QP-problem.')
             if success == PyReturnValue.SUCCESSFUL_RETURN:
                 self.started = True
                 break
@@ -116,14 +116,14 @@ class QPSolver(object):
                 number_of_retries += 1
                 continue
             else:
-                logging.loginfo(u'{}; retrying with A rounded to 5 decimal places'.format(self.STATUS_VALUE_DICT[success]))
+                logging.loginfo('{}; retrying with A rounded to 5 decimal places'.format(self.STATUS_VALUE_DICT[success]))
                 r = 5
                 A = np.round(A, r)
                 nWSR = None
                 self.started = False
         else:  # if not break
             self.started = False
-            message = u'{}'.format(self.STATUS_VALUE_DICT[success])
+            message = '{}'.format(self.STATUS_VALUE_DICT[success])
             if success in [PyReturnValue.INIT_FAILED_INFEASIBILITY,
                            PyReturnValue.QP_INFEASIBLE,
                            PyReturnValue.HOTSTART_STOPPED_INFEASIBILITY,

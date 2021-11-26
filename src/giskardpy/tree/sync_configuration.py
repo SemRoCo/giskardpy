@@ -17,7 +17,7 @@ class SyncConfiguration(GiskardBehavior):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, name, group_name, joint_state_topic=u'joint_states', tf_root_link_name=None):
+    def __init__(self, name, group_name, joint_state_topic='joint_states', tf_root_link_name=None):
         """
         :type js_identifier: str
         """

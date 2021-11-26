@@ -124,7 +124,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
 
     def __add_pybullet_bug_fix_hack(self):
         if self.hack_name not in self.object_name_to_bullet_id:
-            path = resolve_ros_iris(u'package://giskardpy/urdfs/tiny_ball.urdf')
+            path = resolve_ros_iris('package://giskardpy/urdfs/tiny_ball.urdf')
             with open(path, 'r') as f:
                 self.object_name_to_bullet_id[self.hack_name] = pbw.load_urdf_string_into_bullet(f.read())
 

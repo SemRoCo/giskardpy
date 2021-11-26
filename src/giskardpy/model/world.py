@@ -276,13 +276,13 @@ class WorldTree(object):
                 new_link_b = chain[i - 1]
                 break
         else:
-            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+            raise KeyError('no controlled joint in chain between {} and {}'.format(link_a, link_b))
         for i, thing in enumerate(reversed(chain)):
             if i % 2 == 1 and thing in self.controlled_joints:
                 new_link_a = chain[len(chain) - i]
                 break
         else:
-            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+            raise KeyError('no controlled joint in chain between {} and {}'.format(link_a, link_b))
         return new_link_a, new_link_b
 
     @memoize
@@ -347,9 +347,9 @@ class WorldTree(object):
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits))+1):
             order_identifier = identifier.joint_limits + [order_map[i]]
             d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                         [u'linear', u'override', key]))
+                                                                         ['linear', 'override', key]))
             d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                          [u'angular', u'override', key]))
+                                                                          ['angular', 'override', key]))
             self._set_joint_limits(d_linear, d_angular, i)
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights))+1):
             def default(joint_name):

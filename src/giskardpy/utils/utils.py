@@ -165,7 +165,7 @@ def create_path(path):
 
 
 def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0,
-                    scaling=0.2, normalize_position=False, tick_stride=1.0, file_name=u'trajectory.pdf', history=5):
+                    scaling=0.2, normalize_position=False, tick_stride=1.0, file_name='trajectory.pdf', history=5):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
@@ -190,8 +190,8 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     colors = list(mcolors.TABLEAU_COLORS.keys())
     colors.append('k')
 
-    titles = [u'position', u'velocity', u'acceleration', u'jerk', u'snap', u'crackle', u'pop']
-    line_styles = [u'-', u'--', u'-.', u':']
+    titles = ['position', 'velocity', 'acceleration', 'jerk', 'snap', 'crackle', 'pop']
+    line_styles = ['-', '--', '-.', ':']
     fmts = list(product(line_styles, colors))
     data = [[] for i in range(order)]
     times = []
@@ -239,14 +239,14 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
                     axs[j].plot(times, data[j][:, i], color=fmts[color_counter][1], linestyle=fmts[color_counter][0],
                                 label=names[i])
                 except KeyError:
-                    logging.logwarn(u'Not enough colors to plot all joints, skipping {}.'.format(names[i]))
+                    logging.logwarn('Not enough colors to plot all joints, skipping {}.'.format(names[i]))
                 except Exception as e:
                     pass
             color_counter += 1
 
     axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
 
-    axs[-1].set_xlabel(u'time [s]')
+    axs[-1].set_xlabel('time [s]')
     for i in range(order):
         axs[i].grid()
 
@@ -277,10 +277,10 @@ def resolve_ros_iris_in_urdf(input_urdf):
     :return: URDF with replaced ROS IRIs.
     :rtype: str
     """
-    output_urdf = u''
-    for line in input_urdf.split(u'\n'):
+    output_urdf = ''
+    for line in input_urdf.split('\n'):
         output_urdf += resolve_ros_iris(line)
-        output_urdf += u'\n'
+        output_urdf += '\n'
     return output_urdf
 
 
@@ -293,14 +293,14 @@ def resolve_ros_iris(path):
     :param path:
     :return:
     """
-    if u'package://' in path:
-        split = path.split(u'package://')
+    if 'package://' in path:
+        split = path.split('package://')
         prefix = split[0]
         result = prefix
         for suffix in split[1:]:
-            package_name, suffix = suffix.split(u'/', 1)
+            package_name, suffix = suffix.split('/', 1)
             real_path = rospack.get_path(package_name)
-            result += u'{}/{}'.format(real_path, suffix)
+            result += '{}/{}'.format(real_path, suffix)
         return result
     else:
         return path
@@ -316,9 +316,9 @@ def write_to_tmp(filename, urdf_string):
     :return: Complete path to where the urdfs was written, e.g. '/tmp/pr2.urdfs'
     :rtype: str
     """
-    new_path = u'/tmp/giskardpy/{}'.format(filename)
+    new_path = '/tmp/giskardpy/{}'.format(filename)
     create_path(new_path)
-    with open(new_path, u'w') as o:
+    with open(new_path, 'w') as o:
         o.write(urdf_string)
     return new_path
 
@@ -345,7 +345,7 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
     if pose is None:
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
+        pose.header.frame_id = str(frame_id) if frame_id is not None else 'map'
         pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
         pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
     return pose
@@ -353,18 +353,18 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
 
 def convert_ros_message_to_dictionary(message):
     # TODO there is probably a lib for that, but i'm to lazy to search
-    type_str_parts = str(type(message)).split(u'.')
-    part1 = type_str_parts[0].split(u'\'')[1]
-    part2 = type_str_parts[-1].split(u'\'')[0]
-    message_type = u'{}/{}'.format(part1, part2)
-    d = {u'message_type': message_type,
-         u'message': original_convert_ros_message_to_dictionary(message)}
+    type_str_parts = str(type(message)).split('.')
+    part1 = type_str_parts[0].split('\'')[1]
+    part2 = type_str_parts[-1].split('\'')[0]
+    message_type = '{}/{}'.format(part1, part2)
+    d = {'message_type': message_type,
+         'message': original_convert_ros_message_to_dictionary(message)}
     return d
 
 
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?
-    return original_convert_dictionary_to_ros_message(json[u'message_type'], json[u'message'])
+    return original_convert_dictionary_to_ros_message(json['message_type'], json['message'])
 
 
 def trajectory_to_np(tj, joint_names):

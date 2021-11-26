@@ -20,7 +20,7 @@ def ros(request):
 
     def kill_ros():
         logging.loginfo('shutdown ros')
-        rospy.signal_shutdown(u'die')
+        rospy.signal_shutdown('die')
         try:
             logging.loginfo('deleting tmp test folder')
             # shutil.rmtree(folder_name)
@@ -68,9 +68,9 @@ def kitchen_setup(better_pose):
     :type better_pose: GiskardTestWrapper
     :return: GiskardTestWrapper
     """
-    object_name = u'kitchen'
+    object_name = 'kitchen'
     better_pose.add_urdf(object_name, rospy.get_param('kitchen_description'),
-                              tf.lookup_pose(u'map', 'iai_kitchen/world'), '/kitchen/joint_states',
+                              tf.lookup_pose('map', 'iai_kitchen/world'), '/kitchen/joint_states',
                               set_js_topic='/kitchen/cram_joint_states')
     js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
     better_pose.set_kitchen_js(js)

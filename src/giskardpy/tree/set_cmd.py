@@ -30,23 +30,23 @@ class SetCmd(GetGoal):
             self.get_god_map().set_data(identifier.cmd_id, -1)
             empty_result = MoveResult()
             empty_result.error_codes = [MoveResult.ERROR for _ in self.goal.cmd_seq]
-            empty_result.error_messages = [u'' for _ in self.goal.cmd_seq]
+            empty_result.error_messages = ['' for _ in self.goal.cmd_seq]
             if not empty_result.error_codes:
                 empty_result.error_codes = [MoveResult.ERROR]
                 empty_result.error_messages = ['']
             self.traj = []
             if len(self.goal.cmd_seq) == 0:
                 empty_result.error_codes = [MoveResult.INVALID_GOAL]
-                self.raise_to_blackboard(InvalidGoalException(u'goal empty'))
+                self.raise_to_blackboard(InvalidGoalException('goal empty'))
             self.get_god_map().set_data(identifier.result_message, empty_result)
             if self.is_plan(self.goal.type):
                 if self.sample_period_backup is not None:
                     self.get_god_map().set_data(identifier.sample_period, self.sample_period_backup)
                     self.sample_period_backup = None
             else:
-                error_message = u'Invalid move action goal type: {}'.format(self.goal.type)
+                error_message = 'Invalid move action goal type: {}'.format(self.goal.type)
                 logging.logwarn(error_message)
-                logging.logwarn(u'Goal rejected.')
+                logging.logwarn('Goal rejected.')
                 self.raise_to_blackboard(InvalidGoalException(error_message))
             if self.is_check_reachability(self.goal.type):
                 self.sample_period_backup = self.get_god_map().get_data(identifier.sample_period)

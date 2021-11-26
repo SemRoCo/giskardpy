@@ -2,56 +2,12 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveResult
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy.utils import logging
 import giskardpy.utils.tfwrapper as tf
 from utils_for_tests import PR2, HSR, compare_poses
-
-default_pose = {
-    u'arm_flex_joint': 0.0,
-    u'arm_lift_joint': 0.0,
-    u'arm_roll_joint': 0.0,
-    u'head_pan_joint': 0.0,
-    u'head_tilt_joint': 0.0,
-    u'odom_t': 0.0,
-    u'odom_x': 0.0,
-    u'odom_y': 0.0,
-    u'wrist_flex_joint': 0.0,
-    u'wrist_roll_joint': 0.0,
-    u'hand_l_spring_proximal_joint': 0,
-    u'hand_r_spring_proximal_joint': 0
-}
-
-folder_name = u'tmp_data/'
-
-
-@pytest.fixture(scope=u'module')
-def ros(request):
-    try:
-        logging.loginfo(u'deleting tmp test folder')
-        # shutil.rmtree(folder_name)
-    except Exception:
-        pass
-
-    logging.loginfo(u'init ros')
-    rospy.init_node(u'tests')
-    tf.init(60)
-
-    def kill_ros():
-        logging.loginfo(u'shutdown ros')
-        rospy.signal_shutdown(u'die')
-        try:
-            logging.loginfo(u'deleting tmp test folder')
-            # shutil.rmtree(folder_name)
-        except Exception:
-            pass
-
-    request.addfinalizer(kill_ros)
 
 
 @pytest.fixture(scope=u'module')
@@ -59,27 +15,6 @@ def giskard(request, ros):
     c = HSR()
     request.addfinalizer(c.tear_down)
     return c
-
-
-@pytest.fixture()
-def resetted_giskard(giskard):
-    """
-    :type giskard: HSR
-    """
-    logging.loginfo(u'resetting giskard')
-    giskard.clear_world()
-    return giskard
-
-
-@pytest.fixture()
-def zero_pose(resetted_giskard):
-    """
-    :type giskard: PR2
-    """
-    resetted_giskard.set_joint_goal(default_pose)
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.plan_and_execute()
-    return resetted_giskard
 
 
 @pytest.fixture()

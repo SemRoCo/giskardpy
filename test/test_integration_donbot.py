@@ -1,29 +1,16 @@
-from copy import deepcopy
-
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, CollisionEntry, \
-    Constraint as Constraint_msg
+from giskard_msgs.msg import MoveResult, CollisionEntry
 from giskardpy.goals.goal import WEIGHT_BELOW_CA
-from giskardpy.utils import logging
 from utils_for_tests import Donbot, compare_poses
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
-
-default_js = {
-    u'ur5_elbow_joint': 0.0,
-    u'ur5_shoulder_lift_joint': 0.0,
-    u'ur5_shoulder_pan_joint': 0.0,
-    u'ur5_wrist_1_joint': 0.0,
-    u'ur5_wrist_2_joint': 0.0,
-    u'ur5_wrist_3_joint': 0.0
-}
 
 floor_detection_js = {
     u'ur5_shoulder_pan_joint': -1.63407260576,
@@ -52,73 +39,12 @@ self_collision_js = {
     u'ur5_wrist_3_joint': 1.28191862405e-15,
 }
 
-folder_name = u'tmp_data/'
-
-
-@pytest.fixture(scope=u'module')
-def ros(request):
-    try:
-        logging.loginfo(u'deleting tmp test folder')
-        # shutil.rmtree(folder_name)
-    except Exception:
-        pass
-
-        logging.loginfo(u'init ros')
-    rospy.init_node(u'tests')
-    tf.init(60)
-
-    def kill_ros():
-        logging.loginfo(u'shutdown ros')
-        rospy.signal_shutdown(u'die')
-        try:
-            logging.loginfo(u'deleting tmp test folder')
-            # shutil.rmtree(folder_name)
-        except Exception:
-            pass
-
-    request.addfinalizer(kill_ros)
-
 
 @pytest.fixture(scope=u'module')
 def giskard(request, ros):
     c = Donbot()
     request.addfinalizer(c.tear_down)
     return c
-
-
-@pytest.fixture()
-def resetted_giskard(giskard):
-    """
-    :type giskard: Donbot
-    """
-    logging.loginfo(u'resetting giskard')
-    giskard.clear_world()
-    giskard.reset_base()
-    giskard.open_gripper()
-    return giskard
-
-
-@pytest.fixture()
-def zero_pose(resetted_giskard):
-    """
-    :type resetted_giskard: Donbot
-    """
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.set_joint_goal(default_js)
-    resetted_giskard.plan_and_execute()
-    return resetted_giskard
-
-
-@pytest.fixture()
-def better_pose(resetted_giskard):
-    """
-    :type resetted_giskard: Donbot
-    :rtype: Donbot
-    """
-    resetted_giskard.set_joint_goal(better_js)
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.plan_and_execute()
-    return resetted_giskard
 
 
 @pytest.fixture()
@@ -146,50 +72,6 @@ def fake_table_setup(zero_pose):
     p.pose.position.z = 0.2
     p.pose.orientation.w = 1
     zero_pose.add_box(name='box', size=[1, 1, 1], pose=p)
-    return zero_pose
-
-
-@pytest.fixture()
-def shelf_setup(better_pose):
-    """
-    :type better_pose: Donbot
-    :rtype: Donbot
-    """
-    layer1 = u'layer1'
-    p = PoseStamped()
-    p.header.frame_id = u'map'
-    p.pose.position.x = 0
-    p.pose.position.y = -1.25
-    p.pose.position.z = 1
-    p.pose.orientation.w = 1
-    better_pose.add_box(layer1, size=[1, 0.5, 0.02], pose=p)
-
-    layer2 = u'layer2'
-    p = PoseStamped()
-    p.header.frame_id = u'map'
-    p.pose.position.x = 0
-    p.pose.position.y = -1.25
-    p.pose.position.z = 1.3
-    p.pose.orientation.w = 1
-    better_pose.add_box(layer2, size=[1, 0.5, 0.02], pose=p)
-
-    back = u'back'
-    p = PoseStamped()
-    p.header.frame_id = u'map'
-    p.pose.position.x = 0
-    p.pose.position.y = -1.5
-    p.pose.position.z = 1
-    p.pose.orientation.w = 1
-    better_pose.add_box(back, size=[1, 0.05, 2], pose=p)
-    return better_pose
-
-
-@pytest.fixture()
-def kitchen_setup(zero_pose):
-    object_name = u'kitchen'
-    zero_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'), u'/kitchen/joint_states',
-                       tf.lookup_transform(u'map', u'iai_kitchen/world'),
-                       set_js_topic=u'/kitchen/cram_joint_states')
     return zero_pose
 
 

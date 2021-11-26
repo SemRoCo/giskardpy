@@ -9,12 +9,8 @@ import rospy
 from angles import shortest_angular_distance
 from control_msgs.msg import FollowJointTrajectoryActionGoal, FollowJointTrajectoryActionResult
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3Stamped
-from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
-from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
-from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
 from rospy import Timer
@@ -23,17 +19,23 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
 from visualization_msgs.msg import Marker
-import giskardpy.utils.math as mymath
+
 import giskardpy.utils.tfwrapper as tf
+from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
+from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
+from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
+from iai_wsg_50_msgs.msg import PositionCmd
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
+
+folder_name = u'tmp_data/'
 
 
 def vector(x):
@@ -381,6 +383,9 @@ class RotationGoalChecker(GoalChecker):
 
 
 class GiskardTestWrapper(GiskardWrapper):
+    default_pose = {}
+    better_pose = {}
+
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
@@ -395,7 +400,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                 FollowJointTrajectoryActionResult, self.stop_motion_cb,
                                                 queue_size=100)
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-                                                UpdateTransform)
+                                                       UpdateTransform)
 
         self.tree = grow_tree()
         self.god_map = Blackboard().god_map
@@ -652,7 +657,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                     error_message)
             if error_code == MoveResult.SUCCESS:
                 try:
-                    for goal_checker in self.goal_checks[len(r.error_codes)-1]:
+                    for goal_checker in self.goal_checks[len(r.error_codes) - 1]:
                         goal_checker()
                 except:
                     logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
@@ -869,6 +874,9 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         pass
 
+    def reset(self):
+        pass
+
     def reset_base(self):
         p = PoseStamped()
         p.header.frame_id = self.map
@@ -879,6 +887,44 @@ class GiskardTestWrapper(GiskardWrapper):
 
 
 class PR2(GiskardTestWrapper):
+    default_pose = {'r_elbow_flex_joint': -0.15,
+                    'r_forearm_roll_joint': 0,
+                    'r_shoulder_lift_joint': 0,
+                    'r_shoulder_pan_joint': 0,
+                    'r_upper_arm_roll_joint': 0,
+                    'r_wrist_flex_joint': -0.10001,
+                    'r_wrist_roll_joint': 0,
+                    'l_elbow_flex_joint': -0.15,
+                    'l_forearm_roll_joint': 0,
+                    'l_shoulder_lift_joint': 0,
+                    'l_shoulder_pan_joint': 0,
+                    'l_upper_arm_roll_joint': 0,
+                    'l_wrist_flex_joint': -0.10001,
+                    'l_wrist_roll_joint': 0,
+                    'torso_lift_joint': 0.2,
+                    'head_pan_joint': 0,
+                    'head_tilt_joint': 0}
+
+    better_pose = {u'r_shoulder_pan_joint': -1.7125,
+                   u'r_shoulder_lift_joint': -0.25672,
+                   u'r_upper_arm_roll_joint': -1.46335,
+                   u'r_elbow_flex_joint': -2.12,
+                   u'r_forearm_roll_joint': 1.76632,
+                   u'r_wrist_flex_joint': -0.10001,
+                   u'r_wrist_roll_joint': 0.05106,
+                   u'l_shoulder_pan_joint': 1.9652,
+                   u'l_shoulder_lift_joint': - 0.26499,
+                   u'l_upper_arm_roll_joint': 1.3837,
+                   u'l_elbow_flex_joint': -2.12,
+                   u'l_forearm_roll_joint': 16.99,
+                   u'l_wrist_flex_joint': - 0.10001,
+                   u'l_wrist_roll_joint': 0,
+                   u'torso_lift_joint': 0.2,
+
+                   u'head_pan_joint': 0,
+                   u'head_tilt_joint': 0,
+                   }
+
     def __init__(self):
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
@@ -948,8 +994,23 @@ class PR2(GiskardTestWrapper):
         sjs.state.effort = [0, 0, 0, 0]
         self.l_gripper.call(sjs)
 
+    def reset(self):
+        self.open_l_gripper()
+        self.open_r_gripper()
+        self.clear_world()
+        self.reset_base()
+
 
 class Donbot(GiskardTestWrapper):
+    default_pose = {
+        u'ur5_elbow_joint': 0.0,
+        u'ur5_shoulder_lift_joint': 0.0,
+        u'ur5_shoulder_pan_joint': 0.0,
+        u'ur5_wrist_1_joint': 0.0,
+        u'ur5_wrist_2_joint': 0.0,
+        u'ur5_wrist_3_joint': 0.0
+    }
+
     def __init__(self):
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
@@ -987,8 +1048,61 @@ class Donbot(GiskardTestWrapper):
         self.wait_heartbeats()
         np.testing.assert_almost_equal(self.world.state[gripper_joint].position, width, decimal=3)
 
+    def reset(self):
+        self.clear_world()
+        self.reset_base()
+        self.open_gripper()
+
 
 class Boxy(GiskardTestWrapper):
+    default_pose = {
+        u'neck_shoulder_pan_joint': 0.0,
+        u'neck_shoulder_lift_joint': 0.0,
+        u'neck_elbow_joint': 0.0,
+        u'neck_wrist_1_joint': 0.0,
+        u'neck_wrist_2_joint': 0.0,
+        u'neck_wrist_3_joint': 0.0,
+        u'triangle_base_joint': 0.0,
+        u'left_arm_0_joint': 0.0,
+        u'left_arm_1_joint': 0.0,
+        u'left_arm_2_joint': 0.0,
+        u'left_arm_3_joint': 0.0,
+        u'left_arm_4_joint': 0.0,
+        u'left_arm_5_joint': 0.0,
+        u'left_arm_6_joint': 0.0,
+        u'right_arm_0_joint': 0.0,
+        u'right_arm_1_joint': 0.0,
+        u'right_arm_2_joint': 0.0,
+        u'right_arm_3_joint': 0.0,
+        u'right_arm_4_joint': 0.0,
+        u'right_arm_5_joint': 0.0,
+        u'right_arm_6_joint': 0.0,
+    }
+
+    better_pose = {
+        u'neck_shoulder_pan_joint': -1.57,
+        u'neck_shoulder_lift_joint': -1.88,
+        u'neck_elbow_joint': -2.0,
+        u'neck_wrist_1_joint': 0.139999387693,
+        u'neck_wrist_2_joint': 1.56999999998,
+        u'neck_wrist_3_joint': 0,
+        u'triangle_base_joint': -0.24,
+        u'left_arm_0_joint': -0.68,
+        u'left_arm_1_joint': 1.08,
+        u'left_arm_2_joint': -0.13,
+        u'left_arm_3_joint': -1.35,
+        u'left_arm_4_joint': 0.3,
+        u'left_arm_5_joint': 0.7,
+        u'left_arm_6_joint': -0.01,
+        u'right_arm_0_joint': 0.68,
+        u'right_arm_1_joint': -1.08,
+        u'right_arm_2_joint': 0.13,
+        u'right_arm_3_joint': 1.35,
+        u'right_arm_4_joint': -0.3,
+        u'right_arm_5_joint': -0.7,
+        u'right_arm_6_joint': 0.01,
+    }
+
     def __init__(self):
         self.camera_tip = u'camera_link'
         self.r_tip = u'right_gripper_tool_frame'
@@ -1007,8 +1121,27 @@ class Boxy(GiskardTestWrapper):
         self.set_joint_goal(js)
         self.plan_and_execute()
 
+    def reset(self):
+        self.clear_world()
+        self.reset_base()
+
 
 class HSR(GiskardTestWrapper):
+    default_pose = {
+        u'arm_flex_joint': 0.0,
+        u'arm_lift_joint': 0.0,
+        u'arm_roll_joint': 0.0,
+        u'head_pan_joint': 0.0,
+        u'head_tilt_joint': 0.0,
+        u'odom_t': 0.0,
+        u'odom_x': 0.0,
+        u'odom_y': 0.0,
+        u'wrist_flex_joint': 0.0,
+        u'wrist_roll_joint': 0.0,
+        u'hand_l_spring_proximal_joint': 0,
+        u'hand_r_spring_proximal_joint': 0
+    }
+
     def __init__(self):
         self.tip = u'hand_palm_link'
         super(HSR, self).__init__(u'package://giskardpy/config/hsr.yaml')
@@ -1035,6 +1168,17 @@ class HSR(GiskardTestWrapper):
         js = {u'hand_motor_joint': width}
         self.set_joint_goal(js)
         self.plan_and_execute()
+
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        self.move_base(p)
+
+    def reset(self):
+        self.clear_world()
+        self.close_gripper()
+        self.reset_base()
 
 
 def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):

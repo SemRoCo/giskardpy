@@ -1,36 +1,30 @@
 from collections import defaultdict
 
 import rospy
-from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 from py_trees.meta import failure_is_success, success_is_failure, running_is_success, running_is_failure, \
     failure_is_running
 from py_trees_ros.trees import BehaviourTree
 
 import giskardpy.identifier as identifier
-from giskardpy import RobotPrefix, RobotName
+from giskard_msgs.msg import MoveAction
+from giskardpy import RobotName
 from giskardpy.data_types import order_map, KeyDefaultDict
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.tree.AsyncComposite import PluginBehavior
-from giskardpy.tree.better_parallel import Parallel, ParallelPolicy
-from giskardpy.tree.commands_remaining import CommandsRemaining
-from giskardpy.tree.exception_to_execute import ExceptionToExecute
-from giskardpy.tree.goal_canceled import GoalCanceled
-from giskardpy.tree.goal_received import GoalReceived
-from giskardpy.tree.send_result import SendResult
-from giskardpy.tree.start_timer import StartTimer
-from giskardpy.tree.sync_localization import SyncLocalization
-from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.god_map import GodMap
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.world import WorldTree
-from giskardpy.tree.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.append_zero_velocity import AppendZeroVelocity
+from giskardpy.tree.async_composite import PluginBehavior
+from giskardpy.tree.better_parallel import Parallel, ParallelPolicy
 from giskardpy.tree.cleanup import CleanUp
 from giskardpy.tree.collision_checker import CollisionChecker
 from giskardpy.tree.collision_marker import CollisionMarker
-from giskardpy.tree.sync_configuration import SyncConfiguration
+from giskardpy.tree.collision_scene_updater import CollisionSceneUpdater
+from giskardpy.tree.commands_remaining import CommandsRemaining
+from giskardpy.tree.exception_to_execute import ExceptionToExecute
+from giskardpy.tree.goal_canceled import GoalCanceled
 from giskardpy.tree.goal_reached import GoalReachedPlugin
-from giskardpy.tree.plugin_if import IF, IfFunction
+from giskardpy.tree.goal_received import GoalReceived
 from giskardpy.tree.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.kinematic_sim import KinSimPlugin
 from giskardpy.tree.log_debug_expressions import LogDebugExpressionsPlugin
@@ -39,17 +33,23 @@ from giskardpy.tree.loop_detector import LoopDetector
 from giskardpy.tree.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plot_trajectory import PlotTrajectory
-from giskardpy.tree.set_error_code import SetErrorCode
+from giskardpy.tree.plugin_if import IF
+from giskardpy.tree.send_result import SendResult
 from giskardpy.tree.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.set_cmd import SetCmd
+from giskardpy.tree.set_error_code import SetErrorCode
+from giskardpy.tree.shaking_detector import WiggleCancel
+from giskardpy.tree.start_timer import StartTimer
+from giskardpy.tree.sync_configuration import SyncConfiguration
+from giskardpy.tree.sync_localization import SyncLocalization
 from giskardpy.tree.tf_publisher import TFPublisher
 from giskardpy.tree.time import TimePlugin
+from giskardpy.tree.tree_manager import TreeManager, render_dot_tree
 from giskardpy.tree.update_constraints import GoalToConstraints
 from giskardpy.tree.visualization import VisualizationBehavior
-from giskardpy.tree.shaking_detector import WiggleCancel
-from giskardpy.tree.tree_manager import TreeManager, render_dot_tree
 from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.utils import create_path
 
@@ -136,13 +136,12 @@ def check_velocity_limits_reachable(god_map):
                             u'can reach at most \'{:.4}\' '
                             u'with to prediction horizon of \'{}\' '
                             u'and jerk limit of \'{}\', '
-                            u'but limit in urdf/config is \'{}\''.format(
-                joint_name,
-                velocity_limit_horizon,
-                prediction_horizon,
-                jerk_limit,
-                velocity_limit
-            ))
+                            u'but limit in urdf/config is \'{}\''.format(joint_name,
+                                                                         velocity_limit_horizon,
+                                                                         prediction_horizon,
+                                                                         jerk_limit,
+                                                                         velocity_limit
+                                                                         ))
             print_help = True
     if print_help:
         logging.logwarn(u'Check utils.py/max_velocity_from_horizon_and_jerk for help.')
@@ -185,7 +184,7 @@ def grow_tree():
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
     if god_map.get_data(identifier.collision_checker) is not None:
         planning_4.add_plugin(CollisionChecker(u'collision checker'))
-    planning_4.add_plugin(VisualizationBehavior(u'visualization'))
+    # planning_4.add_plugin(VisualizationBehavior(u'visualization'))
     # planning_4.add_plugin(CollisionMarker(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
@@ -260,7 +259,6 @@ def grow_tree():
     process_move_goal.add_child(process_move_cmd)
     process_move_goal.add_child(ExceptionToExecute('clear exception'))
     process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
-
 
     # ----------------------------------------------
     # ----------------------------------------------

@@ -1,90 +1,14 @@
 import numpy as np
 import pytest
-import roslaunch
-import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix
-import giskardpy.utils.tfwrapper as tf
-from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import init as tf_init, lookup_point, transform_point, \
+
+from giskardpy.utils.tfwrapper import lookup_point, transform_point, \
     transform_pose
 from utils_for_tests import Donbot, Boxy
 
+
 # TODO roslaunch iai_boxy_sim ros_control_sim.launch
-
-
-default_js = {
-    u'neck_shoulder_pan_joint': 0.0,
-    u'neck_shoulder_lift_joint': 0.0,
-    u'neck_elbow_joint': 0.0,
-    u'neck_wrist_1_joint': 0.0,
-    u'neck_wrist_2_joint': 0.0,
-    u'neck_wrist_3_joint': 0.0,
-    u'triangle_base_joint': 0.0,
-    u'left_arm_0_joint': 0.0,
-    u'left_arm_1_joint': 0.0,
-    u'left_arm_2_joint': 0.0,
-    u'left_arm_3_joint': 0.0,
-    u'left_arm_4_joint': 0.0,
-    u'left_arm_5_joint': 0.0,
-    u'left_arm_6_joint': 0.0,
-    u'right_arm_0_joint': 0.0,
-    u'right_arm_1_joint': 0.0,
-    u'right_arm_2_joint': 0.0,
-    u'right_arm_3_joint': 0.0,
-    u'right_arm_4_joint': 0.0,
-    u'right_arm_5_joint': 0.0,
-    u'right_arm_6_joint': 0.0,
-}
-better_js = {
-    u'neck_shoulder_pan_joint': -1.57,
-    u'neck_shoulder_lift_joint': -1.88,
-    u'neck_elbow_joint': -2.0,
-    u'neck_wrist_1_joint': 0.139999387693,
-    u'neck_wrist_2_joint': 1.56999999998,
-    u'neck_wrist_3_joint': 0,
-    u'triangle_base_joint': -0.24,
-    u'left_arm_0_joint': -0.68,
-    u'left_arm_1_joint': 1.08,
-    u'left_arm_2_joint': -0.13,
-    u'left_arm_3_joint': -1.35,
-    u'left_arm_4_joint': 0.3,
-    u'left_arm_5_joint': 0.7,
-    u'left_arm_6_joint': -0.01,
-    u'right_arm_0_joint': 0.68,
-    u'right_arm_1_joint': -1.08,
-    u'right_arm_2_joint': 0.13,
-    u'right_arm_3_joint': 1.35,
-    u'right_arm_4_joint': -0.3,
-    u'right_arm_5_joint': -0.7,
-    u'right_arm_6_joint': 0.01,
-}
-
-folder_name = u'tmp_data/'
-
-
-@pytest.fixture(scope=u'module')
-def ros(request):
-    try:
-        logging.loginfo(u'deleting tmp test folder')
-        # shutil.rmtree(folder_name)
-    except Exception:
-        pass
-
-        logging.loginfo(u'init ros')
-    rospy.init_node(u'tests')
-    tf_init(60)
-
-    def kill_ros():
-        logging.loginfo(u'shutdown ros')
-        rospy.signal_shutdown(u'die')
-        try:
-            logging.loginfo(u'deleting tmp test folder')
-            # shutil.rmtree(folder_name)
-        except Exception:
-            pass
-
-    request.addfinalizer(kill_ros)
 
 
 @pytest.fixture(scope=u'module')
@@ -94,60 +18,13 @@ def giskard(request, ros):
     return c
 
 
-@pytest.fixture()
-def resetted_giskard(giskard):
-    """
-    :type giskard: Boxy
-    """
-    logging.loginfo(u'resetting giskard')
-    giskard.clear_world()
-    giskard.reset_base()
-    return giskard
-
-
-@pytest.fixture()
-def zero_pose(resetted_giskard):
-    """
-    :type giskard: Boxy
-    """
-    resetted_giskard.set_joint_goal(default_js)
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.plan_and_execute()
-    return resetted_giskard
-
-
-@pytest.fixture()
-def better_pose(resetted_giskard):
-    """
-    :type pocky_pose_setup: Boxy
-    :rtype: Boxy
-    """
-    resetted_giskard.set_joint_goal(better_js)
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.plan_and_execute()
-    return resetted_giskard
-
-@pytest.fixture()
-def kitchen_setup(better_pose):
-    # better_pose.allow_all_collisions()
-    # better_pose.send_and_check_joint_goal(gaya_pose)
-    object_name = u'kitchen'
-    better_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
-                         set_js_topic=u'/kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
-    better_pose.set_kitchen_js(js)
-    return better_pose
-
-
-
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
         """
         :type zero_pose: Donbot
         """
         zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(better_js)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute()
 
 

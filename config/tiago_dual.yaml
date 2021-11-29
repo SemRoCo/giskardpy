@@ -1,0 +1,23 @@
+parent: !include default.yaml
+collision_avoidance:
+  external_collision_avoidance:
+    override:
+      odom_z_joint: # this affects all links between this and the next controlled joint
+        hard_threshold: 0.02 # at this distance in [cm] that can not be surpassed
+        soft_threshold: 0.7 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
+action_server:
+  base:
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+  torso:
+    namespace: /torso_controller/follow_joint_trajectory
+    state_topic: /torso_controller/state
+  neck:
+    namespace: /head_controller/follow_joint_trajectory
+    state_topic: /head_controller/state
+  left_arm:
+    namespace: /arm_left_controller/follow_joint_trajectory
+    state_topic: /arm_left_controller/state
+  right_arm:
+    namespace: /arm_right_controller/follow_joint_trajectory
+    state_topic: /arm_right_controller/state

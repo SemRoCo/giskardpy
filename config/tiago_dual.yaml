@@ -8,8 +8,7 @@ collision_avoidance:
 action_server:
   base:
     plugin: SendFollowJointTrajectoryDiffDrive
-    namespace: /base_controller/follow_joint_trajectory
-    state_topic: /base_controller/state
+    namespace: /mobile_base_controller
   torso:
     plugin: SendFollowJointTrajectory
     namespace: /torso_controller/follow_joint_trajectory

@@ -16,6 +16,7 @@ from py_trees import Blackboard
 from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
+from std_srvs.srv import Trigger, TriggerRequest
 from tf.transformations import rotation_from_matrix, quaternion_matrix, quaternion_about_axis
 from tf2_py import LookupException
 from visualization_msgs.msg import Marker
@@ -26,6 +27,7 @@ from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
+from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
@@ -685,18 +687,19 @@ class GiskardTestWrapper(GiskardWrapper):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
-        for joint in controlled_joints:
-            if not self.robot.is_joint_continuous(joint):
-                joint_limits = self.robot.get_joint_position_limits(joint)
-                error_msg = '{} has violated joint position limit'.format(joint)
-                np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
-                np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)
-            vel_limit = self.world.joint_limit_expr(joint, 1)[1]
-            vel_limit = self.god_map.evaluate_expr(vel_limit) * 1.001
-            vel = trajectory_vel[joint]
-            error_msg = '{} has violated joint velocity limit {} > {}'.format(joint, vel, vel_limit)
-            assert np.all(np.less_equal(vel, vel_limit)), error_msg
-            assert np.all(np.greater_equal(vel, -vel_limit)), error_msg
+        for joint_name in controlled_joints:
+            if isinstance(self.robot.joints[joint_name], OneDofJoint):
+                if not self.robot.is_joint_continuous(joint_name):
+                    joint_limits = self.robot.get_joint_position_limits(joint_name)
+                    error_msg = '{} has violated joint position limit'.format(joint_name)
+                    np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1], error_msg)
+                    np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0], error_msg)
+                vel_limit = self.world.joint_limit_expr(joint_name, 1)[1]
+                vel_limit = self.god_map.evaluate_expr(vel_limit) * 1.001
+                vel = trajectory_vel[joint_name]
+                error_msg = '{} has violated joint velocity limit {} > {}'.format(joint_name, vel, vel_limit)
+                assert np.all(np.less_equal(vel, vel_limit)), error_msg
+                assert np.all(np.greater_equal(vel, -vel_limit)), error_msg
 
     #
     # BULLET WORLD #####################################################################################################
@@ -1151,6 +1154,7 @@ class TiagoDual(GiskardTestWrapper):
 
     def __init__(self):
         super(TiagoDual, self).__init__('package://giskardpy/config/tiago_dual.yaml')
+        self.base_reset = rospy.ServiceProxy('/diff_drive_vel_integrator/reset', Trigger)
 
     def move_base(self, goal_pose):
         self.allow_all_collisions()
@@ -1158,13 +1162,7 @@ class TiagoDual(GiskardTestWrapper):
         self.plan_and_execute()
 
     def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        # p.pose.position.x = 1
-        p.pose.position.y = 1
-        # p.pose.orientation.w = 1
-        # p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
-        self.move_base(p)
+        self.base_reset.call(TriggerRequest())
 
     def reset(self):
         self.clear_world()

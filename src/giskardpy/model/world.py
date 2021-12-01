@@ -14,13 +14,13 @@ from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
-    FixedJoint, MimicJoint, DiffDriveJoint
+    FixedJoint, MimicJoint, DiffDriveWheelsJoint
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
-from giskardpy.utils.utils import suppress_stderr, memoize, limits_from_urdf_joint
+from giskardpy.utils.utils import suppress_stderr, memoize
 
 
 class WorldTree(object):
@@ -226,12 +226,12 @@ class WorldTree(object):
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
-        child_link = Link(name=PrefixName(parsed_urdf.get_root(), prefix))
-        connecting_joint = FixedJoint(name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix),
-                                      parent_link_name=parent_link.name,
-                                      child_link_name=child_link.name)
-        self._link_joint_to_links(connecting_joint, child_link)
-        child_link2 = self._add_diff_drive_joint(child_link.name, parsed_urdf)
+        # self._add_fixed_joint(map, odom,
+        #                       joint_name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix))
+        base_footprint, odom = self._add_diff_drive_joint(urdf=parsed_urdf,
+                                                          map_link=parent_link,
+                                                          prefix=prefix)
+
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
             if short_name not in urdf.child_map:
@@ -246,25 +246,46 @@ class WorldTree(object):
                 self._link_joint_to_links(joint, child_link)
                 helper(urdf, child_link)
 
-        helper(parsed_urdf, child_link2)
+        helper(parsed_urdf, base_footprint)
 
         self._set_free_variables_on_mimic_joints()
         if group_name is not None:
-            self.register_group(group_name, child_link.name)
+            self.register_group(group_name, odom.name)
         if self.god_map is not None:
             self.sync_with_paramserver()
 
-    def _add_diff_drive_joint(self, odom_link, urdf):
-        rot_joint, mid_link = urdf.child_map[odom_link][0]
-        trans_joint, base_footprint = urdf.child_map[mid_link][0]
-        trans_lower_limits, trans_upper_limits = limits_from_urdf_joint(urdf.joint_map[rot_joint])
-        rot_lower_limits, rot_upper_limits = limits_from_urdf_joint(urdf.joint_map[trans_joint])
-        joint = DiffDriveJoint(PrefixName('diff_drive', None), odom_link, base_footprint, self.god_map)
-        joint.create_free_variables(identifier.joint_states, trans_lower_limits, trans_upper_limits,
-                                    rot_lower_limits, rot_upper_limits)
-        child_link = Link.from_urdf(urdf.link_map[base_footprint], None)
-        self._link_joint_to_links(joint, child_link)
-        return child_link
+    def _add_fixed_joint(self, parent_link, child_link, joint_name=None):
+        if joint_name is None:
+            joint_name = '{}_{}_fixed_joint'.format(parent_link.name, child_link.name)
+        connecting_joint = FixedJoint(name=joint_name,
+                                      parent_link_name=parent_link.name,
+                                      child_link_name=child_link.name)
+        self._link_joint_to_links(connecting_joint, child_link)
+
+    def _add_diff_drive_joint(self, urdf, map_link, odom_link_name='odom', prefix=None):
+        # create odom and link to map with fixed joint
+        odom = Link(name=PrefixName(odom_link_name, prefix))
+        self._add_fixed_joint(parent_link=map_link,
+                              child_link=odom,
+                              joint_name=PrefixName(PrefixName(urdf.name, prefix), self.connection_prefix))
+
+        # create urdf root link and fix to odom with diff drive
+        base_footprint_name = urdf.get_root()
+        base_footprint = Link.from_urdf(urdf.link_map[base_footprint_name], None)
+
+        trans_lower_limits = {1: -1}
+        trans_upper_limits = {1: 1}
+        rot_lower_limits = {1: -1}
+        rot_upper_limits = {1: 1}
+        # diff_drive_joint = DiffDriveJoint(name=PrefixName('diff_drive', None),
+        diff_drive_joint = DiffDriveWheelsJoint(name=PrefixName('diff_drive', None),
+                                                parent_link_name=odom_link_name,
+                                                child_link_name=base_footprint_name,
+                                                god_map=self.god_map)
+        diff_drive_joint.create_free_variables(identifier.joint_states, trans_lower_limits, trans_upper_limits,
+                                               rot_lower_limits, rot_upper_limits)
+        self._link_joint_to_links(diff_drive_joint, base_footprint)
+        return base_footprint, odom
 
     def _set_free_variables_on_mimic_joints(self):
         for joint_name, joint in self.joints.items():  # type: (PrefixName, MimicJoint)
@@ -363,7 +384,7 @@ class WorldTree(object):
     def sync_with_paramserver(self):
         new_lin_limits = {}
         new_ang_limits = {}
-        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits))+1):
+        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits)) + 1):
             order_identifier = identifier.joint_limits + [order_map[i]]
             d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
                                                                          ['linear', 'override', key]))
@@ -376,7 +397,7 @@ class WorldTree(object):
             joint.update_limits(new_lin_limits, new_ang_limits)
 
         new_weights = {}
-        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights))+1):
+        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights)) + 1):
             def default(joint_name):
                 return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
 
@@ -393,7 +414,7 @@ class WorldTree(object):
     def joint_constraints(self):
         joint_constraints = []
         for joint_name, joint in self.joints.items():
-            if joint.has_free_variables(): # FIXME check name clashes
+            if joint.has_free_variables():  # FIXME check name clashes
                 joint_constraints.extend(joint.free_variable_list)
         return joint_constraints
 

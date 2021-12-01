@@ -34,17 +34,18 @@ class CartesianPosition(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        if self.max_velocity is not None:
-            self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
-                                                                  tip_link=tip_link,
-                                                                  weight=weight,
-                                                                  max_velocity=max_velocity,
-                                                                  hard=False,
-                                                                  **kwargs))
+        # if self.max_velocity is not None:
+        #     self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
+        #                                                           tip_link=tip_link,
+        #                                                           weight=weight,
+        #                                                           max_velocity=max_velocity,
+        #                                                           hard=False,
+        #                                                           **kwargs))
 
     def make_constraints(self):
         r_P_g = w.position_of(self.get_parameter_as_symbolic_expression('goal_pose'))
         r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        self.add_debug_vector('trans', r_P_c)
         self.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.reference_velocity,
@@ -79,6 +80,8 @@ class CartesianOrientation(Goal):
         r_R_g = w.rotation_of(self.get_parameter_as_symbolic_expression('goal_pose'))
         r_R_c = self.get_fk(self.root_link, self.tip_link)
         c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link)
+        axis, angle = w.axis_angle_from_matrix(r_R_c)
+        self.add_debug_expr('angle', angle)
         self.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=r_R_g,
                                            current_R_frame_eval=c_R_r_eval,

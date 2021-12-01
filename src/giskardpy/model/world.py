@@ -14,13 +14,13 @@ from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
-    FixedJoint, MimicJoint
+    FixedJoint, MimicJoint, DiffDriveJoint
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
-from giskardpy.utils.utils import suppress_stderr, memoize
+from giskardpy.utils.utils import suppress_stderr, memoize, limits_from_urdf_joint
 
 
 class WorldTree(object):
@@ -231,7 +231,7 @@ class WorldTree(object):
                                       parent_link_name=parent_link.name,
                                       child_link_name=child_link.name)
         self._link_joint_to_links(connecting_joint, child_link)
-
+        child_link2 = self._add_diff_drive_joint(child_link.name, parsed_urdf)
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
             if short_name not in urdf.child_map:
@@ -246,18 +246,31 @@ class WorldTree(object):
                 self._link_joint_to_links(joint, child_link)
                 helper(urdf, child_link)
 
-        helper(parsed_urdf, child_link)
+        helper(parsed_urdf, child_link2)
+
         self._set_free_variables_on_mimic_joints()
         if group_name is not None:
             self.register_group(group_name, child_link.name)
         if self.god_map is not None:
             self.sync_with_paramserver()
 
+    def _add_diff_drive_joint(self, odom_link, urdf):
+        rot_joint, mid_link = urdf.child_map[odom_link][0]
+        trans_joint, base_footprint = urdf.child_map[mid_link][0]
+        trans_lower_limits, trans_upper_limits = limits_from_urdf_joint(urdf.joint_map[rot_joint])
+        rot_lower_limits, rot_upper_limits = limits_from_urdf_joint(urdf.joint_map[trans_joint])
+        joint = DiffDriveJoint(PrefixName('diff_drive', None), odom_link, base_footprint, self.god_map)
+        joint.create_free_variables(identifier.joint_states, trans_lower_limits, trans_upper_limits,
+                                    rot_lower_limits, rot_upper_limits)
+        child_link = Link.from_urdf(urdf.link_map[base_footprint], None)
+        self._link_joint_to_links(joint, child_link)
+        return child_link
+
     def _set_free_variables_on_mimic_joints(self):
         for joint_name, joint in self.joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
                 mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
-                joint.set_free_variables(mimed_joint.free_variables)
+                joint.create_free_variables(mimed_joint.free_variables)
 
     def get_parent_link_of_link(self, link_name):
         """
@@ -342,26 +355,47 @@ class WorldTree(object):
         self.fast_all_fks = None
         self.notify_model_change()
 
+    def _set_joint_limits(self, linear_limits, angular_limits, order):
+        for joint_name in self.movable_joints:  # type: OneDofJoint
+            joint = self.joints[joint_name]
+            joint.update_limits(linear_limits, angular_limits, order)
+
     def sync_with_paramserver(self):
-        self._delete_joint_limits()
+        new_lin_limits = {}
+        new_ang_limits = {}
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits))+1):
             order_identifier = identifier.joint_limits + [order_map[i]]
             d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
                                                                          ['linear', 'override', key]))
             d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
                                                                           ['angular', 'override', key]))
-            self._set_joint_limits(d_linear, d_angular, i)
+            new_lin_limits[i] = d_linear
+            new_ang_limits[i] = d_angular
+        for joint_name in self.movable_joints:  # type: OneDofJoint
+            joint = self.joints[joint_name]
+            joint.update_limits(new_lin_limits, new_ang_limits)
+
+        new_weights = {}
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights))+1):
             def default(joint_name):
                 return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
 
             d = KeyDefaultDict(default)
-            self._set_joint_weights(i, d)
+            new_weights[i] = d
+            # self._set_joint_weights(i, d)
+        for joint_name in self.movable_joints:
+            joint = self.joints[joint_name]
+            if not self.is_joint_mimic(joint_name):
+                joint.update_weights(new_weights)
         self.notify_model_change()
 
     @property
     def joint_constraints(self):
-        return {j.name: j.free_variable for j in self.joints.values() if j.has_free_variables()}
+        joint_constraints = []
+        for joint_name, joint in self.joints.items():
+            if joint.has_free_variables(): # FIXME check name clashes
+                joint_constraints.extend(joint.free_variable_list)
+        return joint_constraints
 
     def _link_joint_to_links(self, joint, child_link):
         """
@@ -722,26 +756,8 @@ class WorldTree(object):
             joint.delete_limits()
             joint.delete_weights()
 
-    def _set_joint_limits(self, linear_limits, angular_limits, order):
-        for joint in self.joints.values():  # type: OneDofJoint
-            if self.is_joint_fixed(joint.name) or self.is_joint_mimic(joint.name):
-                continue
-            if self.is_joint_rotational(joint.name):
-                new_limits = angular_limits
-            else:
-                new_limits = linear_limits
-            joint.free_variable.set_upper_limit(order, new_limits[joint.name])
-            joint.free_variable.set_lower_limit(order, -new_limits[joint.name])
-
-    def _set_joint_weights(self, order, weights):
-        for joint_name, joint in self.joints.items():
-            if self.is_joint_movable(joint_name) and not self.is_joint_mimic(joint_name):
-                joint.free_variable.quadratic_weights[order] = weights[joint_name]
-
     def joint_limit_expr(self, joint_name, order):
-        upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)
-        lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
-        return lower_limit, upper_limit
+        return self.joints[joint_name].get_limit_expressions(order)
 
     def transform_msg(self, target_frame, msg):
         if isinstance(msg, PoseStamped):

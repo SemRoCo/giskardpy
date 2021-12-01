@@ -18,17 +18,7 @@ from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, External
 from giskardpy.goals.goal import Goal
 from giskardpy.tree.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import convert_dictionary_to_ros_message
-
-
-def get_all_classes_in_package(package):
-    classes = {}
-    for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-        module = __import__('giskardpy.goals.{}'.format(modname), fromlist="dummy")
-        for name2, value2 in inspect.getmembers(module, inspect.isclass):
-            if issubclass(value2, Goal):
-                classes[name2] = value2
-    return classes
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package
 
 
 class GoalToConstraints(GetGoal):
@@ -40,7 +30,7 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals)
+        self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals, Goal)
 
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
@@ -91,8 +81,8 @@ class GoalToConstraints(GetGoal):
             return Status.SUCCESS
 
         l = self.active_free_symbols()
-        joint_constraints = [v for v in self.world.joint_constraints.values() if v.name in l]
-        self.get_god_map().set_data(identifier.free_variables, joint_constraints)
+        free_variables = list(sorted([v for v in self.world.joint_constraints if v.name in l], key=lambda x: x.name))
+        self.get_god_map().set_data(identifier.free_variables, free_variables)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
 

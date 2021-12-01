@@ -1,8 +1,10 @@
 from __future__ import division
 
 import errno
+import inspect
 import json
 import os
+import pkgutil
 import sys
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -56,6 +58,36 @@ class NullContextManager(object):
     def __exit__(self, *args):
         pass
 
+
+def get_all_classes_in_package(package, parent_class=None):
+    classes = {}
+    for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
+        module = __import__('{}.{}'.format(package.__name__, modname), fromlist="dummy")
+        for name2, value2 in inspect.getmembers(module, inspect.isclass):
+            if parent_class is None or issubclass(value2, parent_class):
+                classes[name2] = value2
+    return classes
+
+
+def limits_from_urdf_joint(urdf_joint):
+    lower_limits = {}
+    upper_limits = {}
+    if not urdf_joint.type == 'continuous':
+        try:
+            lower_limits[0] = max(urdf_joint.safety_controller.soft_lower_limit, urdf_joint.limit.lower)
+            upper_limits[0] = min(urdf_joint.safety_controller.soft_upper_limit, urdf_joint.limit.upper)
+        except AttributeError:
+            try:
+                lower_limits[0] = urdf_joint.limit.lower
+                upper_limits[0] = urdf_joint.limit.upper
+            except AttributeError:
+                pass
+    try:
+        lower_limits[1] = -urdf_joint.limit.velocity
+        upper_limits[1] = urdf_joint.limit.velocity
+    except AttributeError:
+        pass
+    return lower_limits, upper_limits
 
 #
 # CONVERSION FUNCTIONS FOR ROS MESSAGES

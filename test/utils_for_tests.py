@@ -16,7 +16,7 @@ from py_trees import Blackboard
 from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
-from tf.transformations import rotation_from_matrix, quaternion_matrix
+from tf.transformations import rotation_from_matrix, quaternion_matrix, quaternion_about_axis
 from tf2_py import LookupException
 from visualization_msgs.msg import Marker
 
@@ -304,11 +304,11 @@ class JointGoalChecker(GoalChecker):
             if self.world.is_joint_continuous(PrefixName(joint_name, RobotPrefix)):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                            goal))
+                                                                                           goal))
             else:
                 np.testing.assert_almost_equal(current, goal, decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                            goal))
+                                                                                           goal))
 
 
 class TranslationGoalChecker(GoalChecker):
@@ -510,11 +510,11 @@ class GiskardTestWrapper(GiskardWrapper):
             if self.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                            goal))
+                                                                                           goal))
             else:
                 np.testing.assert_almost_equal(current, goal, decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                            goal))
+                                                                                           goal))
 
     #
     # GOAL STUFF #################################################################################################
@@ -533,9 +533,9 @@ class GiskardTestWrapper(GiskardWrapper):
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         self.set_base.call(goal)
@@ -651,10 +651,10 @@ class GiskardTestWrapper(GiskardWrapper):
                     expected_error_code = expected_error_codes[cmd_id]
                 assert error_code == expected_error_code, \
                     'in goal {}; got: {}, expected: {} | error_massage: {}'.format(cmd_id,
-                                                                                    move_result_error_code(error_code),
-                                                                                    move_result_error_code(
-                                                                                        expected_error_code),
-                                                                                    error_message)
+                                                                                   move_result_error_code(error_code),
+                                                                                   move_result_error_code(
+                                                                                       expected_error_code),
+                                                                                   error_message)
             if error_code == MoveResult.SUCCESS:
                 try:
                     for goal_checker in self.goal_checks[len(r.error_codes) - 1]:
@@ -723,7 +723,7 @@ class GiskardTestWrapper(GiskardWrapper):
         r = super(GiskardTestWrapper, self).remove_object(name)
         assert r.error_codes == expected_response, \
             'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_response))
+                                           update_world_error_code(expected_response))
         assert not name in self.world.groups
         assert name not in self.get_object_names().object_names
         if expected_response == UpdateWorldResponse.SUCCESS:
@@ -741,7 +741,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_add_object_result(self, response, error_code, pose, name):
         assert response.error_codes == error_code, \
             'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
-                                            update_world_error_code(error_code))
+                                           update_world_error_code(error_code))
         if error_code == UpdateWorldResponse.SUCCESS:
             p = tf.transform_pose(self.world.root_link_name, pose)
             o_p = self.world.groups[name].base_pose
@@ -788,7 +788,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_attach_object_result(self, response, expected_error_code, pose, name, parent_link):
         assert response.error_codes == expected_error_code, \
             'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
-                                            update_world_error_code(expected_error_code))
+                                           update_world_error_code(expected_error_code))
         if expected_error_code == UpdateWorldResponse.SUCCESS:
             assert name in [n.short_name for n in self.world.link_names]
             assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
@@ -824,7 +824,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.wait_heartbeats()
         assert r.error_codes == expected_response, \
             'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_response))
+                                           update_world_error_code(expected_response))
         assert name in self.get_attached_objects().object_names
         if self.god_map.get_data(identifier.collision_checker) is not None:
             assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
@@ -853,20 +853,20 @@ class GiskardTestWrapper(GiskardWrapper):
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance >= distance_threshold, \
                 'distance for {}: {} >= {} ({} with {})'.format(link,
-                                                                 collisions[0].contact_distance,
-                                                                 distance_threshold,
-                                                                 collisions[0].original_link_a,
-                                                                 collisions[0].original_link_b)
+                                                                collisions[0].contact_distance,
+                                                                distance_threshold,
+                                                                collisions[0].original_link_a,
+                                                                collisions[0].original_link_b)
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance <= distance_threshold, \
                 'distance for {}: {} <= {} ({} with {})'.format(link,
-                                                                 collisions[0].contact_distance,
-                                                                 distance_threshold,
-                                                                 collisions[0].original_link_a,
-                                                                 collisions[0].original_link_b)
+                                                                collisions[0].contact_distance,
+                                                                distance_threshold,
+                                                                collisions[0].original_link_a,
+                                                                collisions[0].original_link_b)
 
     def move_base(self, goal_pose):
         """
@@ -1022,9 +1022,9 @@ class Donbot(GiskardTestWrapper):
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.set_joint_goal(js)
         self.plan_and_execute()
@@ -1114,9 +1114,9 @@ class Boxy(GiskardTestWrapper):
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.set_joint_goal(js)
         self.plan_and_execute()
@@ -1125,48 +1125,46 @@ class Boxy(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
 
+
 class TiagoDual(GiskardTestWrapper):
     default_pose = {
-        'neck_shoulder_pan_joint': 0.0,
-        'neck_shoulder_lift_joint': 0.0,
-        'neck_elbow_joint': 0.0,
-        'neck_wrist_1_joint': 0.0,
-        'neck_wrist_2_joint': 0.0,
-        'neck_wrist_3_joint': 0.0,
-        'triangle_base_joint': 0.0,
-        'left_arm_0_joint': 0.0,
-        'left_arm_1_joint': 0.0,
-        'left_arm_2_joint': 0.0,
-        'left_arm_3_joint': 0.0,
-        'left_arm_4_joint': 0.0,
-        'left_arm_5_joint': 0.0,
-        'left_arm_6_joint': 0.0,
-        'right_arm_0_joint': 0.0,
-        'right_arm_1_joint': 0.0,
-        'right_arm_2_joint': 0.0,
-        'right_arm_3_joint': 0.0,
-        'right_arm_4_joint': 0.0,
-        'right_arm_5_joint': 0.0,
-        'right_arm_6_joint': 0.0,
+        'torso_lift_joint': 2.220446049250313e-16,
+        'head_1_joint': 0.0,
+        'head_2_joint': 0.0,
+        'arm_left_1_joint': 0.0,
+        'arm_left_2_joint': 0.0,
+        'arm_left_3_joint': 0.0,
+        'arm_left_4_joint': 0.0,
+        'arm_left_5_joint': 0.0,
+        'arm_left_6_joint': 0.0,
+        'arm_left_7_joint': 0.0,
+        'arm_right_1_joint': 0.0,
+        'arm_right_2_joint': 0.0,
+        'arm_right_3_joint': 0.0,
+        'arm_right_4_joint': 0.0,
+        'arm_right_5_joint': 0.0,
+        'arm_right_6_joint': 0.0,
+        'arm_right_7_joint': 0.0,
+        # 'odom_rot_joint': 0.0,
+        # 'odom_trans_joint': 0.0,
     }
 
     def __init__(self):
-        self.camera_tip = 'camera_link'
-        self.r_tip = 'right_gripper_tool_frame'
-        self.l_tip = 'left_gripper_tool_frame'
         super(TiagoDual, self).__init__('package://giskardpy/config/tiago_dual.yaml')
 
     def move_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
-        self.set_joint_goal(js)
+        self.set_cart_goal(goal_pose, 'base_footprint', 'odom')
         self.plan_and_execute()
+
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        # p.pose.position.x = 1
+        p.pose.position.y = 1
+        # p.pose.orientation.w = 1
+        # p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+        self.move_base(p)
 
     def reset(self):
         self.clear_world()
@@ -1198,9 +1196,9 @@ class HSR(GiskardTestWrapper):
         js = {'odom_x': goal_pose.pose.position.x,
               'odom_y': goal_pose.pose.position.y,
               'odom_t': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                 goal_pose.pose.orientation.y,
-                                                                 goal_pose.pose.orientation.z,
-                                                                 goal_pose.pose.orientation.w]))[0]}
+                                                                goal_pose.pose.orientation.y,
+                                                                goal_pose.pose.orientation.z,
+                                                                goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.set_joint_goal(js)
         self.plan_and_execute()

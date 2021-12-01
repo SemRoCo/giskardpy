@@ -6,6 +6,7 @@ from py_trees.meta import failure_is_success, success_is_failure, running_is_suc
     failure_is_running
 from py_trees_ros.trees import BehaviourTree
 
+import giskardpy
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveAction
 from giskardpy import RobotName
@@ -51,7 +52,7 @@ from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
-from giskardpy.utils.utils import create_path
+from giskardpy.utils.utils import create_path, get_all_classes_in_package
 
 
 def upload_config_file_to_paramserver():
@@ -165,9 +166,11 @@ def grow_tree():
     # This has to be called first, because it sets the controlled joints.
     execution_action_server = Parallel('execution action servers', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
     action_servers = god_map.get_data(identifier.action_server)
+    behaviors = get_all_classes_in_package(giskardpy.tree)
     for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-        execution_action_server.add_child(SendFollowJointTrajectory(execution_action_server_name,
-                                                                    **params))
+        C = behaviors[params['plugin']]
+        del params['plugin']
+        execution_action_server.add_child(C(execution_action_server_name, **params))
     # ----------------------------------------------
     sync = Sequence('Synchronize')
     sync.add_child(WorldUpdater('update world'))
@@ -191,8 +194,8 @@ def grow_tree():
     planning_4.add_plugin(LogTrajPlugin('log'))
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
         planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
-    planning_4.add_plugin(WiggleCancel('wiggle'))
-    planning_4.add_plugin(LoopDetector('loop detector'))
+    # planning_4.add_plugin(WiggleCancel('wiggle'))
+    # planning_4.add_plugin(LoopDetector('loop detector'))
     planning_4.add_plugin(GoalReachedPlugin('goal reached'))
     planning_4.add_plugin(TimePlugin('time'))
     if god_map.get_data(identifier.MaxTrajectoryLength_enabled):

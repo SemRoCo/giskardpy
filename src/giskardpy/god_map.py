@@ -8,7 +8,7 @@ import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.data_types import KeyDefaultDict
+from giskardpy.data_types import KeyDefaultDict, PrefixName
 
 
 def set_default_in_override_block(block_identifier, god_map):
@@ -193,16 +193,17 @@ class GodMap(object):
         self.lock = Lock()
 
     @classmethod
-    def init_from_paramserver(cls, node_name, namespace='/'):
+    def init_from_paramserver(cls, node_name, namespaces=None):
         import rospy
         from control_msgs.msg import JointTrajectoryControllerState
         from rospy import ROSException
         from giskardpy.utils import logging
         from giskardpy.data_types import order_map
-
+        if namespaces is None:
+            namespaces = ['/']
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        self.set_data(identifier.robot_description, rospy.get_param(u'{}robot_description'.format(namespace)))
+        self.set_data(identifier.robot_description, rospy.get_param(u'{}robot_description'.format(namespaces[0])))
         path_to_data_folder = self.get_data(identifier.data_folder)
         # fix path to data folder
         if not path_to_data_folder.endswith(u'/'):
@@ -211,10 +212,13 @@ class GodMap(object):
 
         while not rospy.is_shutdown():
             try:
-                joint_names = rospy.wait_for_message(u'{}whole_body_controller/state'.format(namespace),
-                                                     JointTrajectoryControllerState,
-                                                     timeout=5.0).joint_names
-                controlled_joints = list(sorted(joint_names))
+                prefix_joint_names = []
+                for namespace in namespaces:
+                    joint_names = rospy.wait_for_message(u'{}whole_body_controller/state'.format(namespace),
+                                                         JointTrajectoryControllerState,
+                                                         timeout=5.0).joint_names
+                    prefix_joint_names.extend([PrefixName(j_n, namespace[:-1]) for j_n in joint_names])
+                controlled_joints = list(sorted(prefix_joint_names))
                 self.set_data(identifier.controlled_joints, controlled_joints)
             except ROSException as e:
                 logging.logerr(u'state topic not available')

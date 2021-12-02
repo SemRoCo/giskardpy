@@ -63,14 +63,14 @@ def upload_config_file_to_paramserver():
     ros_load_robot_config(config_file_name, old_data=old_params, test=test)
 
 
-def initialize_god_map(namespace):
+def initialize_god_map(namespaces=None):
     upload_config_file_to_paramserver()
-    god_map = GodMap.init_from_paramserver(rospy.get_name(), namespace)
+    god_map = GodMap.init_from_paramserver(rospy.get_name(), namespaces)
     blackboard = Blackboard
     blackboard.god_map = god_map
 
     world = WorldTree(god_map)
-    world.delete_all_but_robot()
+    world.delete_all_but_robot(prefix_list=namespaces)
 
     collision_checker = god_map.get_data(identifier.collision_checker)
     if collision_checker == 'bpb':
@@ -157,10 +157,10 @@ def process_joint_specific_params(identifier_, default, override, god_map):
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 
 
-def grow_tree(namespace):
+def grow_tree(namespaces=None):
     action_server_name = u'~command'
 
-    god_map = initialize_god_map(namespace)
+    god_map = initialize_god_map(namespaces)
     # ----------------------------------------------
     sync = Sequence(u'Synchronize')
     sync.add_child(WorldUpdater(u'update world'))

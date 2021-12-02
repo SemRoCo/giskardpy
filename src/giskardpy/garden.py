@@ -187,7 +187,7 @@ def grow_tree():
     planning_4 = PluginBehavior('planning IIII', sleep=0)
     if god_map.get_data(identifier.collision_checker) is not None:
         planning_4.add_plugin(CollisionChecker('collision checker'))
-    planning_4.add_plugin(VisualizationBehavior('visualization'))
+    # planning_4.add_plugin(VisualizationBehavior('visualization'))
     # planning_4.add_plugin(CollisionMarker('cpi marker'))
     planning_4.add_plugin(ControllerPlugin('controller'))
     planning_4.add_plugin(KinSimPlugin('kin sim'))
@@ -205,9 +205,9 @@ def grow_tree():
     # ----------------------------------------------
     planning_3 = Sequence('planning III', sleep=0)
     planning_3.add_child(planning_4)
-    planning_3.add_child(running_is_success(TimePlugin)('time for zero velocity'))
-    planning_3.add_child(AppendZeroVelocity('append zero velocity'))
-    planning_3.add_child(running_is_success(LogTrajPlugin)('log zero velocity'))
+    # planning_3.add_child(running_is_success(TimePlugin)('time for zero velocity'))
+    # planning_3.add_child(AppendZeroVelocity('append zero velocity'))
+    # planning_3.add_child(running_is_success(LogTrajPlugin)('log zero velocity'))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         planning_3.add_child(running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
     if god_map.get_data(identifier.enable_CPIMarker) and god_map.get_data(identifier.collision_checker) is not None:

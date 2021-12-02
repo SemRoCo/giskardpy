@@ -75,8 +75,10 @@ collision_avoidance:
       - [plate, ur5_upper_arm_link]
 action_server:
   base:
+    plugin: SendFollowJointTrajectory
     namespace: /whole_body_controller/base/follow_joint_trajectory
     state_topic: /whole_body_controller/base/state
   body:
+    plugin: SendFollowJointTrajectory
     namespace: /whole_body_controller/body/follow_joint_trajectory
     state_topic: /whole_body_controller/body/state

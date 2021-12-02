@@ -226,11 +226,15 @@ class WorldTree(object):
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
-        # self._add_fixed_joint(map, odom,
-        #                       joint_name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix))
-        base_footprint, odom = self._add_diff_drive_joint(urdf=parsed_urdf,
-                                                          map_link=parent_link,
-                                                          prefix=prefix)
+        if False:
+            base_footprint, odom = self._add_diff_drive_joint(urdf=parsed_urdf,
+                                                              map_link=parent_link,
+                                                              prefix=prefix)
+        else:
+            odom = Link.from_urdf(parsed_urdf.link_map[parsed_urdf.get_root()], None)
+            base_footprint = odom
+            self._add_fixed_joint(parent_link, odom,
+                                  joint_name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix))
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name

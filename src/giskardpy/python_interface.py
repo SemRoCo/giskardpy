@@ -24,7 +24,7 @@ DEFAULT_WORLD_TIMEOUT = 500
 
 
 class GiskardWrapper(object):
-    def __init__(self, node_name=u'giskard', namespace='/'):
+    def __init__(self, node_name=u'giskard', namespaces=None):
         giskard_topic = u'{}/command'.format(node_name)
         if giskard_topic is not None:
             self._client = SimpleActionClient(giskard_topic, MoveAction)
@@ -36,9 +36,9 @@ class GiskardWrapper(object):
             self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(node_name))
             self._client.wait_for_server()
-        self._god_map = GodMap.init_from_paramserver(node_name, namespace=namespace)
+        self._god_map = GodMap.init_from_paramserver(node_name, namespaces=namespaces)
         self._world = WorldTree(self._god_map)
-        self._world.delete_all_but_robot()
+        self._world.delete_all_but_robot(prefix_list=namespaces)
 
         self.collisions = []
         self.clear_cmds()
@@ -58,7 +58,8 @@ class GiskardWrapper(object):
         """
         return self._world.groups[RobotName].root_link_name
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
+                      weight=None, rob_name=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
@@ -74,8 +75,8 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
-        self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
+        self.set_translation_goal(goal_pose, tip_link, root_link, rob_name=rob_name, weight=weight, max_velocity=max_linear_velocity)
+        self.set_rotation_goal(goal_pose, tip_link, root_link, rob_name=rob_name, weight=weight, max_velocity=max_angular_velocity)
 
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
                                weight=None):

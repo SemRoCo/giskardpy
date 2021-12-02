@@ -164,8 +164,9 @@ def grow_tree(namespaces=None):
     # ----------------------------------------------
     sync = Sequence(u'Synchronize')
     sync.add_child(WorldUpdater(u'update world'))
-    sync.add_child(SyncConfiguration(u'update robot configuration', RobotName))
-    sync.add_child(SyncLocalization(u'update robot localization', RobotName))
+    sync.add_child(SyncConfiguration(u'update robot configuration0', RobotName, namespaces[0]))
+    sync.add_child(SyncConfiguration(u'update robot configuration1', RobotName, namespaces[1]))
+    #sync.add_child(SyncLocalization(u'update robot localization', RobotName)) fixme:
     sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
     sync.add_child(CollisionSceneUpdater(u'update collision scene'))
     sync.add_child(running_is_success(VisualizationBehavior)(u'visualize collision scene'))

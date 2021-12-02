@@ -75,10 +75,14 @@ def kdl_tree_from_urdf_model(urdf):
     return tree
 
 
-def kdl_joint_limits_from_urdf_model(urdf, joint_names):
+def kdl_joint_limits_from_urdf_model(urdf, joint_names, static_joints=None):
     min = kdl.JntArray(len(joint_names))
     max = kdl.JntArray(len(joint_names))
     for i, joint_name in enumerate(joint_names):
+        if static_joints and joint_name in static_joints:
+            min[i] = 0
+            max[i] = 0
+            continue
         joint = urdf.joint_map[joint_name]
         if joint.limit.lower is not None:
             min[i] = joint.limit.lower
@@ -162,12 +166,12 @@ class KDL(object):
     def get_joints(self, chain):
         return joint_names_from_kdl_chain(chain)
 
-    def get_robot(self, root, tip):
+    def get_robot(self, root, tip, static_joints=None):
         root = str(root)
         tip = str(tip)
         if (root, tip) not in self.robots:
             chain = self.tree.getChain(root, tip)
             joints = self.get_joints(chain)
-            chain_min, chain_max = kdl_joint_limits_from_urdf_model(self.urdf, joints)
+            chain_min, chain_max = kdl_joint_limits_from_urdf_model(self.urdf, joints, static_joints=static_joints)
             self.robots[root, tip] = self.KDLRobot(joints, chain, chain_min, chain_max)
         return self.robots[root, tip]

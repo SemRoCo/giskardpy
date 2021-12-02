@@ -681,6 +681,7 @@ class TestConstraints(object):
 
         tip = 'head_mount_kinect_rgb_link'
         goal_point = tf.lookup_point('map', 'iai_kitchen/iai_fridge_door_handle')
+        goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
@@ -709,6 +710,7 @@ class TestConstraints(object):
         rospy.loginfo("Starting looking")
         tip = 'head_mount_kinect_rgb_link'
         goal_point = tf.lookup_point('map', kitchen_setup.r_tip)
+        goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
@@ -728,15 +730,6 @@ class TestConstraints(object):
 
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, 'base_footprint', weight=WEIGHT_BELOW_CA)
         kitchen_setup.plan_and_execute()
-
-        rospy.loginfo("Starting testing")
-        current_x = Vector3Stamped()
-        current_x.header.frame_id = tip
-        current_x.vector.x = 1
-
-        expected_x = tf.lookup_point(tip, kitchen_setup.r_tip)
-        np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
-        np.testing.assert_almost_equal(expected_x.point.z, 0, 2)
 
     def test_open_fridge(self, kitchen_setup):
         """

@@ -348,14 +348,14 @@ class PointingGoalChecker(GoalChecker):
         self.tip_link = tip_link
         self.root_link = root_link
         if pointing_axis:
-            self.tip_V_pointer = pointing_axis
-            self.tip_V_pointer = self.transform_msg(self.tip_link, goal_point)
+            self.tip_V_pointer = self.transform_msg(self.tip_link, pointing_axis)
         else:
             self.tip_V_pointer = Vector3Stamped()
             self.tip_V_pointer.vector.z = 1
             self.tip_V_pointer.header.frame_id = tip_link
         self.tip_V_pointer = tf.msg_to_homogeneous_matrix(self.tip_V_pointer)
-        self.goal_point = goal_point
+        self.goal_point = self.transform_msg(self.root_link, goal_point)
+        self.goal_point.header.stamp = rospy.Time()
 
     def __call__(self):
         tip_P_goal = tf.msg_to_homogeneous_matrix(self.transform_msg(self.tip_link, self.goal_point))

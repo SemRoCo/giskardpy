@@ -19,8 +19,8 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world, gui=False):
         super(PyBulletSyncer, self).__init__(world)
         # pbw.start_pybullet(self.god_map.get_data(identifier.gui))
-        pbw.start_pybullet(gui)
-        pbw.deactivate_rendering()
+        self.client_id = pbw.start_pybullet(gui)
+        pbw.deactivate_rendering(client_id=self.client_id)
         self.object_name_to_bullet_id = BiDict()
 
     @profile
@@ -33,14 +33,15 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         orientation = pose[4:]
         self.object_name_to_bullet_id[link.name] = pbw.load_urdf_string_into_bullet(link.as_urdf(),
                                                                                     position=position,
-                                                                                    orientation=orientation)
+                                                                                    orientation=orientation,
+                                                                                    client_id=self.client_id)
 
     @profile
     def update_pose(self, link):
         pose = self.fks[link.name]
         position = pose[:3]
         orientation = pose[4:]
-        pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[link.name], position, orientation)
+        pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[link.name], position, orientation, physicsClientId=self.client_id)
 
     def check_collisions2(self, link_combinations, distance):
         in_collision = set()
@@ -62,12 +63,13 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
+        pbw.p.stepSimulation(physicsClientId=self.client_id)
         collisions = Collisions(self.world, collision_list_size)
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
             link_b_id = self.object_name_to_bullet_id[link_b]
             robot_link_id = self.object_name_to_bullet_id[robot_link]
             contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
-                                                                      distance * 1.1)]
+                                                                      distance * 1.1, physicsClientId=self.client_id)]
             if len(contacts) > 0:
                 for contact in contacts:  # type: ContactInfo
                     collision = Collision(link_a=robot_link,
@@ -83,7 +85,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.object_name_to_bullet_id[link_a]
         link_id_b = self.object_name_to_bullet_id[link_b]
-        return len(pbw.getClosestPoints(link_id_a, link_id_b, distance)) > 0
+        return len(pbw.getClosestPoints(link_id_a, link_id_b, distance, physicsClientId=self.client_id)) > 0
 
     @profile
     def sync(self):
@@ -95,7 +97,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         #     traceback.print_stack()
         if self.has_world_changed():
             self.object_name_to_bullet_id = BiDict()
-            pbw.clear_pybullet()
+            pbw.clear_pybullet(client_id=self.client_id)
             self.world.fast_all_fks = None
             self.fks = self.world.compute_all_fks()
             for link_name, link in self.world.links.items():
@@ -116,7 +118,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
 
     def get_pose(self, link_name):
         map_T_link = PoseStamped()
-        position, orientation = pbw.getBasePositionAndOrientation(self.object_name_to_bullet_id[link_name])
+        position, orientation = pbw.getBasePositionAndOrientation(self.object_name_to_bullet_id[link_name], physicsClientId=self.client_id)
         map_T_link.header.frame_id = self.world.root_link_name
         map_T_link.pose.position = Point(*position)
         map_T_link.pose.orientation = Quaternion(*orientation)
@@ -126,13 +128,13 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         if self.hack_name not in self.object_name_to_bullet_id:
             path = resolve_ros_iris(u'package://giskardpy/urdfs/tiny_ball.urdf')
             with open(path, 'r') as f:
-                self.object_name_to_bullet_id[self.hack_name] = pbw.load_urdf_string_into_bullet(f.read())
+                self.object_name_to_bullet_id[self.hack_name] = pbw.load_urdf_string_into_bullet(f.read(), client_id=self.client_id)
 
     def __move_hack(self, pose):
         position = [pose.position.x, pose.position.y, pose.position.z]
         orientation = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
         pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[self.hack_name],
-                                            position, orientation)
+                                            position, orientation, client_id=self.client_id)
 
     def __should_flip_collision(self, position_on_a_in_map, link_a):
         """
@@ -150,7 +152,8 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         try:
             contact_info3 = ContactInfo(
                 *[x for x in pbw.getClosestPoints(hack_id,
-                                                  body_a_id, 0.001) if
+                                                  body_a_id, 0.001,
+                                                  physicsClientId=self.client_id) if
                   abs(x[8] + 0.005) < 0.0005][0])
             return not contact_info3.body_unique_id_b == body_a_id
         except Exception as e:

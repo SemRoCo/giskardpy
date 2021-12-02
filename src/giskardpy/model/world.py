@@ -172,8 +172,8 @@ class WorldTree(object):
     def register_group(self, name, root_link_name):
         if root_link_name not in self.links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
-        if name in self.groups:
-            raise DuplicateNameException('Group with name {} already exists'.format(name))
+        #if name in self.groups:
+        #    raise DuplicateNameException('Group with name {} already exists'.format(name)) #fixme
         self.groups[name] = SubWorldTree(name, root_link_name, self)
 
     @property
@@ -220,9 +220,9 @@ class WorldTree(object):
     def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None): #todo: use prefix
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
-        if group_name in self.groups:
-            raise DuplicateNameException(
-                'Failed to add group \'{}\' because one with such a name already exists'.format(group_name))
+        #if group_name in self.groups:
+        #    raise DuplicateNameException(
+        #        'Failed to add group \'{}\' because one with such a name already exists'.format(group_name)) #fixme
         if parent_link_name is None:
             parent_link = self.root_link
         else:
@@ -286,7 +286,7 @@ class WorldTree(object):
             joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
         return joint
 
-    def add_world_body(self, msg, pose, parent_link_name=None):
+    def add_world_body(self, msg, pose, parent_link_name=None, prefix=None):
         """
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
         :type pose: Pose
@@ -303,7 +303,7 @@ class WorldTree(object):
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link.name,
                           group_name=msg.name,
-                          prefix=None)
+                          prefix=prefix)
         else:
             link = Link.from_world_body(msg)
             joint = FixedJoint(PrefixName(msg.name, self.connection_prefix), parent_link.name, link.name,
@@ -330,9 +330,14 @@ class WorldTree(object):
         self.joints = {}
         self.groups = {}
 
-    def delete_all_but_robot(self):
+    def delete_all_but_robot(self, prefix_list=None):
         self._clear()
-        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
+        if prefix_list is None:
+            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
+        else:
+            for prefix in prefix_list:
+                self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName,
+                              prefix=prefix[:-1])
         self.fast_all_fks = None
         self.notify_model_change()
 

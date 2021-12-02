@@ -30,7 +30,7 @@ from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, get_name_spaces
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -359,31 +359,31 @@ class RotationGoalChecker(GoalChecker):
 
 
 class GiskardTestWrapper(GiskardWrapper):
-    def __init__(self, config_file, namespace=''):
+    def __init__(self, config_file, namespaces=None):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
         rospy.set_param('~config', config_file)
         rospy.set_param('~test', True)
 
-        self.start_motion_sub = rospy.Subscriber('{}whole_body_controller/follow_joint_trajectory/goal'.format(namespace),
+        self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
                                                  FollowJointTrajectoryActionGoal, self.start_motion_cb,
                                                  queue_size=100)
-        self.stop_motion_sub = rospy.Subscriber('{}whole_body_controller/follow_joint_trajectory/result'.format(namespace),
+        self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
                                                 FollowJointTrajectoryActionResult, self.stop_motion_cb,
                                                 queue_size=100)
-        self.set_localization_srv = rospy.ServiceProxy('{}map_odom_transform_publisher/update_map_odom_transform'.format(namespace),
-                                                       UpdateTransform)
+        self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+                                                UpdateTransform)
 
-        self.tree = grow_tree(namespace)
+        self.tree = grow_tree(namespaces)
         self.god_map = Blackboard().god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
-        super(GiskardTestWrapper, self).__init__(node_name=u'tests', namespace=namespace)
+        super(GiskardTestWrapper, self).__init__(node_name=u'tests', namespaces=namespaces)
         self.results = Queue(100)
         self.default_root = self.robot.root_link_name.short_name
         self.map = u'map'
-        self.set_base = rospy.ServiceProxy('/pr2_a/base_simulator/set_joint_states', SetJointState)
+        self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
         self.goal_checks = defaultdict(list)
 
         def create_publisher(topic):
@@ -541,7 +541,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                       **kwargs)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
-                      angular_velocity=None, check=True):
+                      angular_velocity=None, check=True, rob_name=None):
         if not root_link:
             root_link = self.default_root
 
@@ -551,13 +551,15 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           root_link,
                                                           weight=weight,
                                                           max_linear_velocity=linear_velocity,
-                                                          max_angular_velocity=angular_velocity)
+                                                          max_angular_velocity=angular_velocity,
+                                                          rob_name=rob_name)
         else:
             super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
                                                           tip_link,
                                                           root_link,
                                                           max_linear_velocity=linear_velocity,
-                                                          max_angular_velocity=angular_velocity)
+                                                          max_angular_velocity=angular_velocity,
+                                                          rob_name=rob_name)
 
         if check:
             self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
@@ -649,7 +651,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def are_joint_limits_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
-        controlled_joints = self.god_map.get_data(identifier.controlled_joints)['/pr2_a']
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         for joint in controlled_joints:
             if not self.robot.is_joint_continuous(joint):
                 joint_limits = self.robot.get_joint_position_limits(joint)
@@ -848,86 +850,93 @@ class GiskardTestWrapper(GiskardWrapper):
         self.teleport_base(p)
 
 
-class GiskardTree(GiskardTestWrapper):
-    def __init__(self, namespaces):
-        self.tree = grow_tree(namespaces)
-        god_map = Blackboard().god_map
-        super().__init__(god_map)
-        self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
-        self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
+class PR22(GiskardTestWrapper):
+    def __init__(self, robot_names):
+        self.robot_names = robot_names
+        self.r_tips = {}
+        self.l_tips = {}
+        self.r_grippers = {}
+        self.l_grippers = {}
+        self.set_localization_srvs = {}
+        super(PR22, self).__init__(u'package://giskardpy/config/pr2.yaml', namespaces=self.robot_names)
+        for robot_name in robot_names:
+            self.r_tips[robot_name] = u'r_gripper_tool_frame'
+            self.l_tips[robot_name] = u'l_gripper_tool_frame'
+            self.r_grippers[robot_name] = rospy.ServiceProxy(u'{}r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+            self.l_grippers[robot_name] = rospy.ServiceProxy(u'{}l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+            self.set_localization_srvs[robot_name] = rospy.ServiceProxy('{}map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+                                                                        UpdateTransform)
 
-    def heart_beat(self, timer_thing):
-        self.tree.tick()
+    def move_base(self, goal_pose):
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
+        self.plan_and_execute()
 
-    def tear_down(self):
-        rospy.sleep(1)
-        self.heart.shutdown()
-        logging.loginfo(
-            u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
-        logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
-        logging.loginfo(u'stopping tree')
+    def get_l_gripper_links(self):
+        if 'l_gripper' not in self.world.group_names:
+            self.world.register_group('l_gripper', 'l_wrist_roll_link')
+        return [str(x) for x in self.world.groups['l_gripper'].link_names_with_collisions]
 
+    def get_r_gripper_links(self):
+        if 'r_gripper' not in self.world.group_names:
+            self.world.register_group('r_gripper', 'r_wrist_roll_link')
+        return [str(x) for x in self.world.groups['r_gripper'].link_names_with_collisions]
 
-class Robot(GiskardTree):
-    def __init__(self, config_file, namespace=''):
-        super().__init__([])
-        rospy.set_param('~config', config_file)
+    def get_r_forearm_links(self):
+        return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',
+                u'r_forearm_link']
 
-        self.start_motion_sub = rospy.Subscriber(
-            '{}whole_body_controller/follow_joint_trajectory/goal'.format(namespace),
-            FollowJointTrajectoryActionGoal, self.start_motion_cb,
-            queue_size=100)
-        self.stop_motion_sub = rospy.Subscriber(
-            '{}whole_body_controller/follow_joint_trajectory/result'.format(namespace),
-            FollowJointTrajectoryActionResult, self.stop_motion_cb,
-            queue_size=100)
-        self.set_localization_srv = rospy.ServiceProxy(
-            '{}map_odom_transform_publisher/update_map_odom_transform'.format(namespace),
-            UpdateTransform)
-        self.set_base = rospy.ServiceProxy('/pr2_a/base_simulator/set_joint_states', SetJointState)
+    def get_allow_l_gripper(self, body_b=u'box'):
+        links = self.get_l_gripper_links()
+        return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, [link], body_b, []) for link in links]
 
-    def set_localization(self, map_T_odom):
-        """
-        :type map_T_odom: PoseStamped
-        """
-        req = UpdateTransformRequest()
-        req.transform.translation = map_T_odom.pose.position
-        req.transform.rotation = map_T_odom.pose.orientation
-        assert self.set_localization_srv(req).success
-        self.wait_heartbeats(10)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot.root_link_name)
-        compare_poses(p2.pose, map_T_odom.pose)
+    def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
+        links = self.get_l_gripper_links()
+        return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
 
-    def teleport_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {u'odom_x_joint': goal_pose.pose.position.x,
-              u'odom_y_joint': goal_pose.pose.position.y,
-              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
-        goal = SetJointStateRequest()
-        goal.state = position_dict_to_joint_states(js)
-        self.set_base.call(goal)
-        rospy.sleep(0.5)
+    def open_r_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+                          u'r_gripper_r_finger_tip_joint']
+        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.r_grippers[robot_name].call(sjs)
 
+    def close_r_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+                          u'r_gripper_r_finger_tip_joint']
+        sjs.state.position = [0, 0, 0, 0]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.r_grippers[robot_name].call(sjs)
 
-class Robots(GiskardTree):
-    def __init__(self, robot_names, robot_types):
-        super().__init__(robot_names)
-        if len(robot_names) != len(robot_types):
-            raise Exception()
-        self.robots = [robot_type(namespace=robot_name) for (robot_name, robot_type) in zip(robot_names, robot_types)]
+    def open_l_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+                          u'l_gripper_r_finger_tip_joint']
+        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.l_grippers[robot_name].call(sjs)
 
+    def close_l_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+                          u'l_gripper_r_finger_tip_joint']
+        sjs.state.position = [0, 0, 0, 0]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.l_grippers[robot_name].call(sjs)
+                
 
 class PR2(GiskardTestWrapper):
-    def __init__(self, namespace='/'):
-        self.namespace = namespace
+    def __init__(self):
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
-        self.r_gripper = rospy.ServiceProxy(u'{}/r_gripper_simulator/set_joint_states'.format(namespace), SetJointState)
-        self.l_gripper = rospy.ServiceProxy(u'{}/l_gripper_simulator/set_joint_states'.format(namespace), SetJointState)
-        super(PR2, self).__init__(u'package://giskardpy/config/pr2.yaml', namespace)
+        self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
+        self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
+        super(PR2, self).__init__(u'package://giskardpy/config/pr2.yaml')
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')

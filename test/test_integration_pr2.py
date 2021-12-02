@@ -25,7 +25,7 @@ from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
 from test_integration_pr2_without_base import gaya_pose
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
-    JointGoalChecker, Robots
+    JointGoalChecker, PR22
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -116,6 +116,12 @@ pick_up_pose = {
 folder_name = u'tmp_data/'
 
 
+def dict_with_prefix(d, prefix):
+    n_d = dict()
+    for k, v in d.items():
+        n_d[prefix+k] = v
+    return n_d
+
 @pytest.fixture(scope=u'module')
 def ros(request):
     try:
@@ -171,9 +177,8 @@ def giskard_more_robots(request, ros):
     name_spaces = rospy.get_param('/giskard/name_spaces', [])
     if len(name_spaces) < 1:
         raise Exception()
-    r = Robots(name_spaces, [PR2]*len(name_spaces))
-    for c in r.robots:
-        request.addfinalizer(c.tear_down)
+    r = PR22(name_spaces)
+    request.addfinalizer(r.tear_down)
     return r
 
 
@@ -196,11 +201,11 @@ def resetted_giskard_more_robots(giskard_more_robots):
     :type giskard: PR2
     """
     logging.loginfo(u'resetting giskard')
-    for g in giskard_more_robots.robots:
-        g.open_l_gripper()
-        g.open_r_gripper()
-        g.clear_world()
-        g.reset_base()
+    for r_n in giskard_more_robots.robot_names:
+        giskard_more_robots.open_l_gripper(r_n)
+        giskard_more_robots.open_r_gripper(r_n)
+    #giskard_more_robots.clear_world() # fixme
+    #giskard_more_robots.reset_base()
     return giskard_more_robots
 
 
@@ -222,7 +227,7 @@ def zero_pose_more_robots(resetted_giskard_more_robots):
     :type resetted_giskard: PR2
     """
     resetted_giskard_more_robots.allow_all_collisions()
-    resetted_giskard_more_robots.set_joint_goal(default_pose)
+    resetted_giskard_more_robots.set_joint_goal(dict_with_prefix(default_pose, resetted_giskard_more_robots.robot_names[0]))
     resetted_giskard_more_robots.plan_and_execute()
     return resetted_giskard_more_robots
 
@@ -1582,11 +1587,14 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
+        robot_names = zero_pose_more_robots.robot_names
+        rob_a = robot_names[0]
+        rob_b = robot_names[1]
         r_goal = PoseStamped()
-        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.header.frame_id = zero_pose_more_robots.r_tips[rob_a]
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1, 0, 0]))
-        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip)
-        zero_pose.plan_and_execute()
+        zero_pose_more_robots.set_cart_goal(r_goal, zero_pose_more_robots.r_tips[rob_a], rob_name=rob_a)
+        zero_pose_more_robots.plan_and_execute()
 
     def test_keep_position1(self, zero_pose):
         """

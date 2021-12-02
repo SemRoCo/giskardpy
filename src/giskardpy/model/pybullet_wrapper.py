@@ -83,10 +83,10 @@ def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientat
     return id
 
 
-def deactivate_rendering():
-    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-    p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 0)
-    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+def deactivate_rendering(client_id=0):
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0, physicsClientId=client_id)
+    p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 0, physicsClientId=client_id)
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0, physicsClientId=client_id)
 
 
 def activate_rendering():
@@ -154,8 +154,8 @@ def msg_to_pybullet_pose(msg):
     return position, orientation
 
 
-def clear_pybullet():
-    p.resetSimulation()
+def clear_pybullet(client_id=0):
+    p.resetSimulation(physicsClientId=client_id)
 
 
 def get_body_names():

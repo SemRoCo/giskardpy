@@ -228,12 +228,14 @@ class OneDofJoint(MovableJoint):
         except KeyError as e:
             # joint is currently not active
             return
-        acc = new_cmds[1][self.free_variable.name]
-        jerk = new_cmds[2][self.free_variable.name]
         self.world.state[self.name].position += vel * dt
         self.world.state[self.name].velocity = vel
-        self.world.state[self.name].acceleration = acc
-        self.world.state[self.name].jerk = jerk
+        if 1 in new_cmds:
+            acc = new_cmds[1][self.free_variable.name]
+            self.world.state[self.name].acceleration = acc
+        if 2 in new_cmds:
+            jerk = new_cmds[2][self.free_variable.name]
+            self.world.state[self.name].jerk = jerk
 
     def delete_limits(self):
         self.free_variable.lower_limits = {}

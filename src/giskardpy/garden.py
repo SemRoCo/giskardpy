@@ -179,7 +179,7 @@ def grow_tree():
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
     if god_map.get_data(identifier.collision_checker) is not None:
         planning_4.add_plugin(CollisionChecker(u'collision checker'))
-    # planning_4.add_plugin(VisualizationBehavior(u'visualization'))
+    planning_4.add_plugin(VisualizationBehavior(u'visualization')) # visualization during planning
     # planning_4.add_plugin(CollisionMarker(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))

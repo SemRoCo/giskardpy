@@ -81,8 +81,8 @@ plugins:
     publish_world_objects: False
     tf_topic: /tf
   MaxTrajectoryLength:
-    enabled: False
-    length: 30 # will abort planning if the trajectory becomes longer than this many seconds
+    enabled: True
+    length: 3 # will abort planning if the trajectory becomes longer than this many seconds
 reachability_check:
   sample_period: 0.5
   prismatic_velocity: 2.0
@@ -92,7 +92,7 @@ reachability_check:
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
-  collision_checker: bpb # one of [bpb, pybullet, disable]
+  collision_checker: disable # one of [bpb, pybullet, disable]
   external_collision_avoidance:
     default:
       number_of_repeller: 1

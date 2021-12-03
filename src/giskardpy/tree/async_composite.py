@@ -11,12 +11,16 @@ from giskardpy.utils import logging
 
 class PluginBehavior(GiskardBehavior):
 
-    def __init__(self, name, sleep=.5):
+    def __init__(self, name, hz=None, sleep=.5):
         self._plugins = OrderedDict()
         self.set_status(Status.INVALID)
         self.status_lock = RLock()
         self.sleep = sleep
         self.looped_once = False
+        if hz is not None:
+            self.sleeper = rospy.Rate(hz)
+        else:
+            self.sleeper = None
         super(PluginBehavior, self).__init__(name)
 
     def get_plugins(self):
@@ -102,6 +106,8 @@ class PluginBehavior(GiskardBehavior):
                         if not self.is_running():
                             return
                 self.looped_once = True
+                if self.sleeper:
+                    self.sleeper.sleep()
         except Exception as e:
             traceback.print_exc()
             # TODO make 'exception' string a parameter somewhere

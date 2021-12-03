@@ -1003,6 +1003,15 @@ class PR2(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
 
+class PR2CloseLoop(PR2):
+
+    def __init__(self):
+        self.r_tip = 'r_gripper_tool_frame'
+        self.l_tip = 'l_gripper_tool_frame'
+        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
+        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
+        GiskardTestWrapper.__init__(self, 'package://giskardpy/config/pr2_closed_loop.yaml')
+
 
 class Donbot(GiskardTestWrapper):
     default_pose = {

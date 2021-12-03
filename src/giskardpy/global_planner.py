@@ -312,10 +312,6 @@ class RayMotionValidator(AbstractMotionValidator):
     def __init__(self, si, is_3D, object_in_motion, collision_scene, tip_link, debug=False, raytester=None, js=None,
                  points_supplier=None):
         AbstractMotionValidator.__init__(self, si, is_3D, tip_link)
-        self.si = si
-        self.lock = threading.Lock()
-        self.is_3D = is_3D
-        self.tip_link = tip_link
         self.hitting = {}
         self.debug = debug
         self.js = js

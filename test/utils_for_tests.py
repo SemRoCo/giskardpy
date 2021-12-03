@@ -26,7 +26,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
-from giskardpy.garden import grow_tree
+from giskardpy.garden import grow_tree, let_there_be_motions
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
@@ -404,7 +404,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
-        self.tree = grow_tree()
+        self.tree = let_there_be_motions()
         self.god_map = Blackboard().god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
@@ -1012,6 +1012,15 @@ class PR2CloseLoop(PR2):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         GiskardTestWrapper.__init__(self, 'package://giskardpy/config/pr2_closed_loop.yaml')
 
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        self.move_base(p)
+
+    def reset(self):
+        self.clear_world()
+        self.reset_base()
 
 class Donbot(GiskardTestWrapper):
     default_pose = {

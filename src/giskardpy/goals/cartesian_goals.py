@@ -80,8 +80,6 @@ class CartesianOrientation(Goal):
         r_R_g = w.rotation_of(self.get_parameter_as_symbolic_expression('goal_pose'))
         r_R_c = self.get_fk(self.root_link, self.tip_link)
         c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link)
-        axis, angle = w.axis_angle_from_matrix(r_R_c)
-        self.add_debug_expr('angle', angle)
         self.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=r_R_g,
                                            current_R_frame_eval=c_R_r_eval,

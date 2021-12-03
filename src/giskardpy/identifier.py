@@ -117,5 +117,6 @@ added_self_collisions = self_collision_avoidance[:-1] + ['add']
 
 external_collision_avoidance = collision_avoidance + ['external_collision_avoidance', 'override']
 
-# action server
-action_server = rosparam + ['action_server']
+# robot interface
+robot_interface = rosparam + ['robot_interface']
+robot_interface_mode = robot_interface + ['mode']

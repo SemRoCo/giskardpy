@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from giskardpy.garden import grow_tree
+from giskardpy.garden import grow_tree, let_there_be_motions
 from giskardpy import identifier
 
 # TODO add pytest to package xml
@@ -11,7 +11,7 @@ from giskardpy.utils.dependency_checking import check_dependencies
 if __name__ == '__main__':
     rospy.init_node('giskard')
     check_dependencies()
-    tree = grow_tree()
+    tree = let_there_be_motions()
     tree_tick_rate = 1. / rospy.get_param(rospy.get_name() +'/' +'/'.join(identifier.tree_tick_rate[1:]))
 
     sleeper = rospy.Rate(tree_tick_rate)

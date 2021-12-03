@@ -159,14 +159,33 @@ def process_joint_specific_params(identifier_, default, override, god_map):
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 
 
-def grow_tree():
+def let_there_be_motions():
     action_server_name = '~command'
-
     god_map = initialize_god_map()
+    mode = god_map.get_data(identifier.robot_interface_mode)
+    del god_map.get_data(identifier.robot_interface)['mode']
+    if mode == 'open_loop':
+        tree = grow_tree(action_server_name, god_map)
+    elif mode == 'closed_loop':
+        tree = grow_tree_closed_loop(action_server_name, god_map)
+    else:
+        raise KeyError('Robot interface mode \'{}\' is not supported.'.format(mode))
+
+    path = god_map.get_data(identifier.data_folder) + 'tree'
+    create_path(path)
+    render_dot_tree(tree.root, name=path)
+
+    tree.setup(30)
+    tree_m = TreeManager(tree)
+    god_map.set_data(identifier.tree_manager, tree_m)
+    return tree
+
+
+def grow_tree(action_server_name, god_map):
     # ----------------------------------------------
     # This has to be called first, because it sets the controlled joints.
     execution_action_server = Parallel('execution action servers', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
-    action_servers = god_map.get_data(identifier.action_server)
+    action_servers = god_map.get_data(identifier.robot_interface)
     behaviors = get_all_classes_in_package(giskardpy.tree)
     for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
         C = behaviors[params['plugin']]
@@ -175,7 +194,7 @@ def grow_tree():
     # ----------------------------------------------
     sync = Sequence('Synchronize')
     sync.add_child(WorldUpdater('update world'))
-    sync.add_child(SyncConfiguration('update robot configuration', RobotName))
+    sync.add_child(running_is_success(SyncConfiguration)('update robot configuration', RobotName))
     sync.add_child(SyncLocalization('update robot localization', RobotName))
     sync.add_child(TFPublisher('publish tf', **god_map.get_data(identifier.TFPublisher)))
     sync.add_child(CollisionSceneUpdater('update collision scene'))
@@ -273,38 +292,9 @@ def grow_tree():
     root.add_child(move_robot)
     root.add_child(SendResult('send result', action_server_name, MoveAction))
 
-    tree = BehaviourTree(root)
+    return BehaviourTree(root)
 
-    # if god_map.get_data(identifier.debug):
-    #     def post_tick(snapshot_visitor, behaviour_tree):
-    #         logging.logdebug('\n' + py_trees.display.ascii_tree(behaviour_tree.root,
-    #                                                              snapshot_information=snapshot_visitor))
-    #
-    #     snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
-    #     tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
-    #     tree.visitors.append(snapshot_visitor)
-    path = god_map.get_data(identifier.data_folder) + 'tree'
-    create_path(path)
-    render_dot_tree(root, name=path)
-
-    tree.setup(30)
-    tree_m = TreeManager(tree)
-    god_map.set_data(identifier.tree_manager, tree_m)
-    return tree
-
-def grow_tree_closed_loop():
-    action_server_name = '~command'
-
-    god_map = initialize_god_map()
-    # ----------------------------------------------
-    # This has to be called first, because it sets the controlled joints.
-    # execution_action_server = Parallel('execution action servers', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
-    # action_servers = god_map.get_data(identifier.action_server)
-    # behaviors = get_all_classes_in_package(giskardpy.tree)
-    # for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-    #     C = behaviors[params['plugin']]
-    #     del params['plugin']
-    #     execution_action_server.add_child(C(execution_action_server_name, **params))
+def grow_tree_closed_loop(action_server_name, god_map):
     # ----------------------------------------------
     sync = Sequence('Synchronize')
     sync.add_child(WorldUpdater('update world'))
@@ -325,8 +315,13 @@ def grow_tree_closed_loop():
     # planning_4.add_plugin(CollisionMarker('cpi marker'))
     planning_4.add_plugin(ControllerPlugin('controller'))
     # planning_4.add_plugin(KinSimPlugin('kin sim'))
-    planning_4.add_plugin(JointGroupPosController('pub cmd'))
-    planning_4.add_plugin(SyncConfiguration('update robot configuration', RobotName))
+    action_servers = god_map.get_data(identifier.robot_interface)
+    behaviors = get_all_classes_in_package(giskardpy.tree)
+    for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
+        C = behaviors[params['plugin']]
+        del params['plugin']
+        planning_4.add_plugin(C(execution_action_server_name, **params))
+    # planning_4.add_plugin(SyncConfiguration('update robot configuration', RobotName))
     planning_4.add_plugin(LogTrajPlugin('log'))
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
         planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
@@ -408,21 +403,4 @@ def grow_tree_closed_loop():
     # root.add_child(move_robot)
     root.add_child(SendResult('send result', action_server_name, MoveAction))
 
-    tree = BehaviourTree(root)
-
-    # if god_map.get_data(identifier.debug):
-    #     def post_tick(snapshot_visitor, behaviour_tree):
-    #         logging.logdebug('\n' + py_trees.display.ascii_tree(behaviour_tree.root,
-    #                                                              snapshot_information=snapshot_visitor))
-    #
-    #     snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
-    #     tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
-    #     tree.visitors.append(snapshot_visitor)
-    path = god_map.get_data(identifier.data_folder) + 'tree'
-    create_path(path)
-    render_dot_tree(root, name=path)
-
-    tree.setup(30)
-    tree_m = TreeManager(tree)
-    god_map.set_data(identifier.tree_manager, tree_m)
-    return tree
+    return BehaviourTree(root)

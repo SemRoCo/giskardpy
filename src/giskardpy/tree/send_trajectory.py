@@ -70,6 +70,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                     self.controlled_joints = msg.joint_names
             except ROSException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
+                rospy.sleep(2)
         self.world.register_controlled_joints(self.controlled_joints)
         loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
 

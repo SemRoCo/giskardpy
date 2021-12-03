@@ -230,10 +230,10 @@ class OneDofJoint(MovableJoint):
             return
         self.world.state[self.name].position += vel * dt
         self.world.state[self.name].velocity = vel
-        if 1 in new_cmds:
+        if len(new_cmds) >= 2:
             acc = new_cmds[1][self.free_variable.name]
             self.world.state[self.name].acceleration = acc
-        if 2 in new_cmds:
+        if len(new_cmds) >= 3:
             jerk = new_cmds[2][self.free_variable.name]
             self.world.state[self.name].jerk = jerk
 

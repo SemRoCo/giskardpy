@@ -389,11 +389,25 @@ class WorldTree(object):
         new_lin_limits = {}
         new_ang_limits = {}
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits)) + 1):
-            order_identifier = identifier.joint_limits + [order_map[i]]
-            d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                         ['linear', 'override', key]))
-            d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                          ['angular', 'override', key]))
+            diff = order_map[i]
+            class Linear(object):
+                def __init__(self, god_map, diff):
+                    self.god_map = god_map
+                    self.diff = diff
+
+                def __call__(self, key):
+                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['linear', 'override', key])
+
+            class Angular(object):
+                def __init__(self, god_map, diff):
+                    self.god_map = god_map
+                    self.diff = diff
+
+                def __call__(self, key):
+                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['linear', 'override', key])
+
+            d_linear = KeyDefaultDict(Linear(self.god_map, diff))
+            d_angular = KeyDefaultDict(Angular(self.god_map, diff))
             new_lin_limits[i] = d_linear
             new_ang_limits[i] = d_angular
         for joint_name in self.movable_joints:  # type: OneDofJoint

@@ -63,7 +63,6 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        pbw.p.stepSimulation(physicsClientId=self.client_id)
         collisions = Collisions(self.world, collision_list_size)
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
             link_b_id = self.object_name_to_bullet_id[link_b]

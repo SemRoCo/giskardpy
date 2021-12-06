@@ -295,7 +295,7 @@ class WorldTree(object):
         for joint_name, joint in self.joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
                 mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
-                joint.create_free_variables(mimed_joint.free_variables)
+                joint.set_mimed_free_variable(mimed_joint.free_variable)
 
     def get_parent_link_of_link(self, link_name):
         """

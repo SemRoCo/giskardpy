@@ -316,7 +316,7 @@ def grow_tree_closed_loop(action_server_name, god_map):
         C = behaviors[params['plugin']]
         del params['plugin']
         planning_4.add_plugin(C(execution_action_server_name, **params))
-    # planning_4.add_plugin(SyncConfiguration2('update robot configuration', RobotName))
+    planning_4.add_plugin(SyncConfiguration2('update robot configuration', RobotName))
     # planning_4.add_plugin(LogTrajPlugin('log'))
     if god_map.get_data(identifier.collision_checker) is not None:
         planning_4.add_plugin(CollisionChecker('collision checker'))

@@ -119,11 +119,6 @@ class Joint(object):
                 joint.create_free_variables(where_am_i=identifier.joint_states,
                                             lower_limits=lower_limits,
                                             upper_limits=upper_limits)
-            else:
-                lower_limits, upper_limits = limits_from_urdf_joint(urdf_joint)
-                joint.create_free_variables(where_am_i=identifier.joint_states,
-                                            lower_limits=lower_limits,
-                                            upper_limits=upper_limits)
         return joint
 
 
@@ -354,7 +349,7 @@ class MimicJoint(OneDofJoint):
 
     @property
     def position_symbol(self):
-        mimed_free_variable = self._free_variables[0].get_symbol(0)
+        mimed_free_variable = self._free_variables['position'].get_symbol(0)
         return self._apply_mimic(mimed_free_variable)
 
     @property
@@ -371,34 +366,18 @@ class MimicJoint(OneDofJoint):
     def free_variables(self):
         return []
 
-    def delete_limits(self):
-        """
-        This will get deleted over references to the mimed joint.
-        """
+    def update_limits(self, linear_limits, angular_limits):
         pass
 
-    def delete_weights(self):
-        """
-        This will get deleted over references to the mimed joint.
-        """
+    def update_state(self, new_cmds, dt):
         pass
 
-    def update_limits(self, linear_limits, angular_limits, order):
+    def update_weights(self, weights):
         pass
 
-    def create_free_variables(self, where_am_i, lower_limits, upper_limits, horizon_function=None):
-        free_variable = FreeVariable(
-            symbols={
-                0: self.god_map.to_symbol(where_am_i + [self.mimed_joint_name, 'position']),
-                1: self.god_map.to_symbol(where_am_i + [self.mimed_joint_name, 'velocity']),
-                2: self.god_map.to_symbol(where_am_i + [self.mimed_joint_name, 'acceleration']),
-                3: self.god_map.to_symbol(where_am_i + [self.mimed_joint_name, 'jerk']),
-            },
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
-            quadratic_weights={},
-            horizon_functions={1: 0.1})
-        super(OneDofJoint, self).create_free_variables(position=free_variable)
+    def set_mimed_free_variable(self, free_variable):
+        self._free_variables = {'position': free_variable}
+        self.update_parent_T_child()
 
 
 class MimicedPrismaticJoint(MimicJoint, PrismaticJoint):

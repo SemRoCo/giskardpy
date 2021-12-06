@@ -349,7 +349,7 @@ class MimicJoint(OneDofJoint):
 
     @property
     def position_symbol(self):
-        mimed_free_variable = self._free_variables[0].get_symbol(0)
+        mimed_free_variable = self._free_variables['position'].get_symbol(0)
         return self._apply_mimic(mimed_free_variable)
 
     @property
@@ -366,20 +366,18 @@ class MimicJoint(OneDofJoint):
     def free_variables(self):
         return []
 
-    def delete_limits(self):
-        """
-        This will get deleted over references to the mimed joint.
-        """
+    def update_limits(self, linear_limits, angular_limits):
         pass
 
-    def delete_weights(self):
-        """
-        This will get deleted over references to the mimed joint.
-        """
+    def update_state(self, new_cmds, dt):
         pass
 
-    def update_limits(self, linear_limits, angular_limits, order):
+    def update_weights(self, weights):
         pass
+
+    def set_mimed_free_variable(self, free_variable):
+        self._free_variables = {'position': free_variable}
+        self.update_parent_T_child()
 
 
 class MimicedPrismaticJoint(MimicJoint, PrismaticJoint):

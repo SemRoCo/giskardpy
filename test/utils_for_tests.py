@@ -292,10 +292,7 @@ class JointGoalChecker(GoalChecker):
 
     def __call__(self):
         current_joint_state = JointStates.from_msg(self.get_current_joint_state())
-        try:
-            self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
-        except Exception as e:
-            print(e)
+        self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
 
     def compare_joint_state(self, current_js, goal_js, decimal=2):
         """
@@ -695,8 +692,9 @@ class GiskardTestWrapper(GiskardWrapper):
                 if not self.robot.is_joint_continuous(joint_name):
                     joint_limits = self.robot.get_joint_position_limits(joint_name)
                     error_msg = '{} has violated joint position limit'.format(joint_name)
-                    np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1], error_msg)
-                    np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0], error_msg)
+                    eps = 0.0001
+                    np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1]+eps, error_msg)
+                    np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0]+eps, error_msg)
                 vel_limit = self.world.joint_limit_expr(joint_name, 1)[1]
                 vel_limit = self.god_map.evaluate_expr(vel_limit) * 1.001
                 vel = trajectory_vel[joint_name]
@@ -1155,7 +1153,7 @@ class Boxy(GiskardTestWrapper):
 class BoxyCloseLoop(Boxy):
 
     def __init__(self, config=None):
-        super().__init__('package://giskardpy/config/pr2_closed_loop.yaml')
+        super().__init__('package://giskardpy/config/boxy_closed_loop.yaml')
 
     def reset_base(self):
         p = PoseStamped()

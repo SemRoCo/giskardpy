@@ -1,48 +1,44 @@
-from threading import Thread
+from copy import deepcopy
 
 import rospy
-from geometry_msgs.msg import Twist
-from py_trees import Status
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
-from trajectory_msgs.msg import JointTrajectoryPoint
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import KeyDefaultDict
-from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy.tree.cmd_publisher import CommandPublisher
 
 
-class JointStatePublisher(GiskardBehavior):
-    def __init__(self, name, namespace):
-        super().__init__(name)
+class JointStatePublisher(CommandPublisher):
+    def __init__(self, name, namespace, hz=100):
         self.namespace = namespace
         self.cmd_topic = '{}/command'.format(self.namespace)
         self.cmd_pub = rospy.Publisher(self.cmd_topic, JointState, queue_size=10)
         self.joint_names = rospy.get_param('{}/controlled_joints'.format(self.namespace))
-        self.world.register_controlled_joints(self.joint_names)
+        super().__init__(name, hz)
 
-    def initialise(self):
-        self.sample_period = self.god_map.get_data(identifier.sample_period)
-
-        def f(joint_symbol):
-            return self.god_map.expr_to_key[joint_symbol][-2]
-
-        self.symbol_to_joint_map = KeyDefaultDict(f)
-        super().initialise()
-
-    def update(self):
-        # next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
-        # for joint_symbol in next_cmds[0]:
-        #     joint_name = self.symbol_to_joint_map[joint_symbol]
-        #     self.world.joints[joint_name].update_state(next_cmds, self.sample_period)
-        # self.world.notify_state_change()
+    def publish_joint_state(self, time):
         msg = JointState()
-        msg.header.stamp = rospy.get_rostime()
+        js = deepcopy(self.world.state)
+        try:
+            qp_data = self.god_map.get_data(identifier.qp_solver_solution)
+        except Exception:
+            return
         for joint_name in self.joint_names:
             msg.name.append(joint_name)
-            msg.position.append(self.world.state[joint_name].position)
-            msg.velocity.append(self.world.state[joint_name].velocity)
-        # print(self.world.state['odom_z_joint'].velocity)
+            try:
+                key = str(self.god_map.key_to_expr[tuple(identifier.joint_states + [joint_name, 'position'])])
+                dt = ((time.current_real - self.stamp).to_sec())# - 1/self.hz)
+                # if joint_name == 'neck_shoulder_pan_joint':
+                #     print(dt)
+                jerk = qp_data[2][key]
+                # acceleration = qp_data[1][key]
+                # velocity = qp_data[0][key]
+                acceleration = js[joint_name].acceleration + jerk * dt
+                velocity = js[joint_name].velocity + acceleration * dt
+                position = js[joint_name].position + velocity * dt
+            except KeyError:
+                position = js[joint_name].position
+                velocity = js[joint_name].velocity
+            msg.position.append(position)
+            msg.velocity.append(velocity)
+        msg.header.stamp = time.current_real
         self.cmd_pub.publish(msg)
-        return Status.RUNNING

@@ -1,0 +1,14 @@
+parent: !include default.yaml
+robot_interface:
+  mode: closed_loop # closed_loop or open_loop
+  body:
+#    plugin: JointGroupPosController
+#    namespace: /joint_group_pos_controller
+    plugin: JointStatePublisher
+    namespace: /body_controller
+general_options:
+  sample_period: 0.05 # time[s] between points of generated joint trajectory
+plugins:
+  GoalReached:
+    joint_convergence_threshold: 0.001 # when the velocities fall below this value, the planning succeeds
+    window_size: 21 # in sample points, should be identical to WiggleCancel window_size

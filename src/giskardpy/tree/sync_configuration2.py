@@ -59,8 +59,8 @@ class SyncConfiguration2(GiskardBehavior):
             self.last_time = js.header.stamp
             # self.world.state.update(self.mjs)
             for joint_name, next_state in self.mjs.items():
-                self.world.state[joint_name].acceleration = (next_state.velocity - self.world.state[joint_name].velocity)/dt
-                self.world.state[joint_name].velocity = next_state.velocity
+                # self.world.state[joint_name].acceleration = (next_state.velocity - self.world.state[joint_name].velocity)/dt
+                # self.world.state[joint_name].velocity = next_state.velocity
                 self.world.state[joint_name].position = next_state.position
             self.world.notify_state_change()
         except Empty:

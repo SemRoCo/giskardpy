@@ -292,7 +292,10 @@ class JointGoalChecker(GoalChecker):
 
     def __call__(self):
         current_joint_state = JointStates.from_msg(self.get_current_joint_state())
-        self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
+        try:
+            self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
+        except Exception as e:
+            print(e)
 
     def compare_joint_state(self, current_js, goal_js, decimal=2):
         """
@@ -1124,11 +1127,14 @@ class Boxy(GiskardTestWrapper):
         'right_arm_6_joint': 0.01,
     }
 
-    def __init__(self):
+    def __init__(self, config=None):
         self.camera_tip = 'camera_link'
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
-        super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml')
+        if config is None:
+            super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml')
+        else:
+            super(Boxy, self).__init__(config)
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -1146,6 +1152,20 @@ class Boxy(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
 
+class BoxyCloseLoop(Boxy):
+
+    def __init__(self, config=None):
+        super().__init__('package://giskardpy/config/pr2_closed_loop.yaml')
+
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        self.move_base(p)
+
+    def reset(self):
+        self.clear_world()
+        self.reset_base()
 
 class TiagoDual(GiskardTestWrapper):
     default_pose = {

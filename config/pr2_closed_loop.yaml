@@ -7,6 +7,7 @@ robot_interface:
     plugin: JointStatePublisher
     namespace: /body_controller
 general_options:
+  sample_period: 0.03 # time[s] between points of generated joint trajectory
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
@@ -25,12 +26,12 @@ general_options:
   joint_limits: # giskard will use the min of this number and limits from the urdf
     velocity:
       linear: # m/s
-        default: 1
+        default: 0.5
         override:
           odom_x_joint: 0.5
           odom_y_joint: 0.5
       angular: # rad/s
-        default: 1
+        default: 0.5
         override:
           odom_z_joint: 0.6
           head_pan_joint: 0.5
@@ -60,6 +61,10 @@ general_options:
 #      angular: # rad/s**3
 #        default: 250
 #        override: { }
+plugins:
+  GoalReached:
+    joint_convergence_threshold: 0.001 # when the velocities fall below this value, the planning succeeds
+    window_size: 21 # in sample points, should be identical to WiggleCancel window_size
 collision_avoidance:
   external_collision_avoidance:
     default:

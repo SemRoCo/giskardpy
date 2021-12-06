@@ -2,26 +2,29 @@ import traceback
 from collections import OrderedDict
 from threading import RLock, Thread
 
+import numpy as np
 import rospy
 from py_trees import Status, Blackboard
 
+from giskardpy import identifier
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils import logging
 
 
 class PluginBehavior(GiskardBehavior):
 
-    def __init__(self, name, hz=None, sleep=.5):
+    def __init__(self, name, hz=False, sleep=.5):
+        super(PluginBehavior, self).__init__(name)
         self._plugins = OrderedDict()
         self.set_status(Status.INVALID)
         self.status_lock = RLock()
         self.sleep = sleep
         self.looped_once = False
         if hz is not None:
+            hz = 1/self.god_map.get_data(identifier.sample_period)
             self.sleeper = rospy.Rate(hz)
         else:
             self.sleeper = None
-        super(PluginBehavior, self).__init__(name)
 
     def get_plugins(self):
         return self._plugins
@@ -54,6 +57,7 @@ class PluginBehavior(GiskardBehavior):
         self.looped_once = False
         with self.status_lock:
             self.set_status(Status.RUNNING)
+        self.sleeps = []
         self.update_thread = Thread(target=self.loop_over_plugins)
         self.update_thread.start()
         super(PluginBehavior, self).initialise()
@@ -70,6 +74,9 @@ class PluginBehavior(GiskardBehavior):
             self.set_status(Status.FAILURE)
         try:
             self.update_thread.join()
+            data = np.array(self.sleeps)
+            print(np.average(data))
+            print(np.std(data))
         except Exception as e:
             # FIXME sometimes terminate gets called without init being called
             # happens when a previous plugin fails
@@ -107,7 +114,9 @@ class PluginBehavior(GiskardBehavior):
                             return
                 self.looped_once = True
                 if self.sleeper:
+                    a = rospy.get_rostime()
                     self.sleeper.sleep()
+                    self.sleeps.append((rospy.get_rostime() - a).to_sec())
         except Exception as e:
             traceback.print_exc()
             # TODO make 'exception' string a parameter somewhere

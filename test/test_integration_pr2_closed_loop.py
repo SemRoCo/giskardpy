@@ -119,11 +119,16 @@ def fake_table_setup(pocky_pose_setup):
 
 
 class TestJointGoals(object):
-    def test_joint_movement1(self, zero_pose):
+    def test_joint_movement1(self, resetted_giskard):
         """
         :type zero_pose: PR2
         """
-        zero_pose.allow_all_collisions()
-        zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.plan_and_execute()
+        resetted_giskard.allow_all_collisions()
+        # resetted_giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
+        resetted_giskard.plan_and_execute()
+        resetted_giskard.allow_all_collisions()
+        # resetted_giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        resetted_giskard.set_joint_goal(pocky_pose)
+        resetted_giskard.plan_and_execute()
 

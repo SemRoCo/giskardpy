@@ -32,11 +32,11 @@ class JointStatePublisher(GiskardBehavior):
         super().initialise()
 
     def update(self):
-        next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
-        for joint_symbol in next_cmds[0]:
-            joint_name = self.symbol_to_joint_map[joint_symbol]
-            self.world.joints[joint_name].update_state(next_cmds, self.sample_period)
-        self.world.notify_state_change()
+        # next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
+        # for joint_symbol in next_cmds[0]:
+        #     joint_name = self.symbol_to_joint_map[joint_symbol]
+        #     self.world.joints[joint_name].update_state(next_cmds, self.sample_period)
+        # self.world.notify_state_change()
         msg = JointState()
         msg.header.stamp = rospy.get_rostime()
         for joint_name in self.joint_names:

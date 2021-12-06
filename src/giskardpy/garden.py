@@ -43,6 +43,7 @@ from giskardpy.tree.set_error_code import SetErrorCode
 from giskardpy.tree.shaking_detector import WiggleCancel
 from giskardpy.tree.start_timer import StartTimer
 from giskardpy.tree.sync_configuration import SyncConfiguration
+from giskardpy.tree.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.sync_localization import SyncLocalization
 from giskardpy.tree.tf_publisher import TFPublisher
 from giskardpy.tree.time import TimePlugin
@@ -308,21 +309,22 @@ def grow_tree_closed_loop(action_server_name, god_map):
     wait_for_goal.add_child(sync)
     wait_for_goal.add_child(GoalReceived('has goal', action_server_name, MoveAction))
     # ----------------------------------------------
-    planning_4 = PluginBehavior('planning IIII', hz=20, sleep=0)
-    if god_map.get_data(identifier.collision_checker) is not None:
-        planning_4.add_plugin(CollisionChecker('collision checker'))
-    # planning_4.add_plugin(VisualizationBehavior('visualization'))
-    # planning_4.add_plugin(CollisionMarker('cpi marker'))
-    planning_4.add_plugin(ControllerPlugin('controller'))
-    # planning_4.add_plugin(KinSimPlugin('kin sim'))
+    planning_4 = PluginBehavior('planning IIII', hz=True, sleep=0)
     action_servers = god_map.get_data(identifier.robot_interface)
     behaviors = get_all_classes_in_package(giskardpy.tree)
     for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
         C = behaviors[params['plugin']]
         del params['plugin']
         planning_4.add_plugin(C(execution_action_server_name, **params))
-    # planning_4.add_plugin(SyncConfiguration('update robot configuration', RobotName))
-    planning_4.add_plugin(LogTrajPlugin('log'))
+    # planning_4.add_plugin(SyncConfiguration2('update robot configuration', RobotName))
+    # planning_4.add_plugin(LogTrajPlugin('log'))
+    if god_map.get_data(identifier.collision_checker) is not None:
+        planning_4.add_plugin(CollisionChecker('collision checker'))
+    # planning_4.add_plugin(VisualizationBehavior('visualization'))
+    # planning_4.add_plugin(CollisionMarker('cpi marker'))
+    planning_4.add_plugin(ControllerPlugin('controller'))
+    planning_4.add_plugin(KinSimPlugin('kin sim'))
+
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
         planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
     # planning_4.add_plugin(WiggleCancel('wiggle'))
@@ -377,9 +379,9 @@ def grow_tree_closed_loop(action_server_name, god_map):
     planning.add_child(planning_2)
     # planning.add_child(planning_1)
     # planning.add_child(SetErrorCode('set error code'))
-    if god_map.get_data(identifier.PlotTrajectory_enabled):
-        kwargs = god_map.get_data(identifier.PlotTrajectory)
-        planning.add_child(PlotTrajectory('plot trajectory', **kwargs))
+    # if god_map.get_data(identifier.PlotTrajectory_enabled):
+    #     kwargs = god_map.get_data(identifier.PlotTrajectory)
+    #     planning.add_child(PlotTrajectory('plot trajectory', **kwargs))
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
         kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
         planning.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))

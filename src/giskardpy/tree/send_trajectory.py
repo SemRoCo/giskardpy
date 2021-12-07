@@ -11,8 +11,7 @@ import py_trees
 import rospy
 import rostopic
 from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryResult, \
-    JointTrajectoryControllerState
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryResult
 from py_trees_ros.actions import ActionClient
 
 import giskardpy.identifier as identifier
@@ -25,10 +24,14 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
-    supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction,
-                              pr2_controllers_msgs.msg.JointTrajectoryAction]
-    supported_state_types = [control_msgs.msg.JointTrajectoryControllerState,
-                             pr2_controllers_msgs.msg.JointTrajectoryControllerState]
+    try:
+        supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction,
+                                  pr2_controllers_msgs.msg.JointTrajectoryAction]
+        supported_state_types = [control_msgs.msg.JointTrajectoryControllerState,
+                                 pr2_controllers_msgs.msg.JointTrajectoryControllerState]
+    except NameError:
+        supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction]
+        supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
     def __init__(self, name, namespace, state_topic, fill_velocity_values=True):
         GiskardBehavior.__init__(self, name)
@@ -66,14 +69,13 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 if isinstance(msg, JointState):
                     self.controlled_joints = msg.name
                 elif isinstance(msg, control_msgs.msg.JointTrajectoryControllerState) \
-                    or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
+                        or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
                     self.controlled_joints = msg.joint_names
             except ROSException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
                 rospy.sleep(2)
         self.world.register_controlled_joints(self.controlled_joints)
         loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
-
 
     def initialise(self):
         super(SendFollowJointTrajectory, self).initialise()

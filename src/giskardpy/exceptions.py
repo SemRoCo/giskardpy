@@ -79,6 +79,10 @@ class ShakingException(PlanningException):
 class UnreachableException(PlanningException):
     pass
 
+# int64 GLOBALPLANNER_FAILED # if global planner failed
+class GlobalPlanningException(PlanningException):
+    pass
+
 # errors during execution
 # int64 EXECUTION_ERROR # if no execution code fits
 # int64 PREEMPTED # goal got canceled via action server interface

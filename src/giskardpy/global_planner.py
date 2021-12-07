@@ -23,6 +23,7 @@ from copy import deepcopy
 
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pw
+from giskardpy.exceptions import GlobalPlanningException
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.get_goal import GetGoal
@@ -977,6 +978,8 @@ class GlobalPlanner(GetGoal):
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
 
+        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot']
+
         # self.robot = self.robot
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.l_tip = 'l_gripper_tool_frame'
@@ -997,7 +1000,7 @@ class GlobalPlanner(GetGoal):
 
     def get_cart_goal(self, cmd):
         try:
-            return next(c for c in cmd.constraints if c.type == "CartesianPose")
+            return next(c for c in cmd.constraints if c.type in self.supported_cart_goals)
         except StopIteration:
             return None
 
@@ -1059,10 +1062,10 @@ class GlobalPlanner(GetGoal):
             js = self.get_god_map().get_data(identifier.joint_states)
             trajectory = planner.plan(js)
         else:
-            return Status.SUCCESS
+            raise GlobalPlanningException('Global planner was called although it is not needed.')
 
         if len(trajectory) == 0:
-            return Status.FAILURE
+            raise GlobalPlanningException('Global Planner did not found a solution.')
         poses = []
         for i, point in enumerate(trajectory):
             if i == 0:
@@ -1232,8 +1235,7 @@ class OMPLPlanner(object):
         time_solving_intial = 0
         # Find solution
         while num_try < max_initial_iterations and time_solving_intial < max_initial_solve_time and \
-                planner_status.getStatus() not in [ob.PlannerStatus.APPROXIMATE_SOLUTION,
-                                                   ob.PlannerStatus.EXACT_SOLUTION]:
+                planner_status.getStatus() not in [ob.PlannerStatus.EXACT_SOLUTION]:
             planner_status = self.setup.solve(initial_solve_time)
             time_solving_intial += self.setup.getLastPlanComputationTime()
             num_try += 1
@@ -1241,7 +1243,7 @@ class OMPLPlanner(object):
         refine_iteration = 0
         v_min = 1e6
         time_solving_refine = 0
-        if planner_status.getStatus() in [ob.PlannerStatus.APPROXIMATE_SOLUTION, ob.PlannerStatus.EXACT_SOLUTION]:
+        if planner_status.getStatus() in [ob.PlannerStatus.EXACT_SOLUTION]:
             while v_min > min_refine_thresh and refine_iteration < max_refine_iterations and \
                     time_solving_refine < max_refine_solve_time:
                 if 'ABITstar' in self.setup.getPlanner().getName() and min_refine_thresh is not None:

@@ -15,12 +15,14 @@ class GlobalPlannerNeeded(GetGoal):
         GetGoal.__init__(self, name, as_name)
 
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
+        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot']
+
         self.pose_goal = None
         self.__goal_dict = None
 
     def get_cart_goal(self, cmd):
         try:
-            return next(c for c in cmd.constraints if c.type == "CartesianPose")
+            return next(c for c in cmd.constraints if c.type in self.supported_cart_goals)
         except StopIteration:
             return None
 
@@ -100,12 +102,18 @@ class GlobalPlannerNeeded(GetGoal):
         # Check if move_cmd exists
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
-            return Status.FAILURE
+            self.get_god_map().set_data(identifier.global_planner_needed, False)
+            return Status.RUNNING
 
         # Check if move_cmd contains a Cartesian Goal
         cart_c = self.get_cart_goal(move_cmd)
         if not cart_c:
-            return Status.FAILURE
+            self.get_god_map().set_data(identifier.global_planner_needed, False)
+            return Status.RUNNING
+
+        if cart_c.type == 'CartesianPathCarrot':
+            self.get_god_map().set_data(identifier.global_planner_needed, True)
+            return Status.RUNNING
 
         # Parse and save the Cartesian Goal Constraint
         self.save_cart_goal(cart_c)
@@ -117,4 +125,4 @@ class GlobalPlannerNeeded(GetGoal):
         else:
             self.get_god_map().set_data(identifier.global_planner_needed, False)
 
-        return Status.SUCCESS
+        return Status.RUNNING

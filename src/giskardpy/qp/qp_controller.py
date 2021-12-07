@@ -10,7 +10,7 @@ import pandas as pd
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import OutOfJointLimitsException, \
-    HardConstraintsViolatedException
+    HardConstraintsViolatedException, PlanningException
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
@@ -846,7 +846,7 @@ class QPController(object):
             #         any_nan |= self.__is_nan_in_array(name, a)
             #     if any_nan:
             #         raise e
-            raise
+            raise PlanningException()
         if self.xdot_full is None:
             return None
         # for debugging to might want to execute this line to create named panda matrices

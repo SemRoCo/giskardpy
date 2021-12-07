@@ -31,7 +31,7 @@ from giskardpy.tree.collision_checker import CollisionChecker
 from giskardpy.tree.collision_marker import CollisionMarker
 from giskardpy.tree.sync_configuration import SyncConfiguration
 from giskardpy.tree.goal_reached import GoalReachedPlugin
-from giskardpy.tree.plugin_if import IF, IfFunction
+from giskardpy.tree.plugin_if import IF, IfFunction, IF_NOT
 from giskardpy.tree.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.kinematic_sim import KinSimPlugin
 from giskardpy.tree.log_debug_expressions import LogDebugExpressionsPlugin
@@ -193,10 +193,23 @@ def grow_tree():
     if god_map.get_data(identifier.MaxTrajectoryLength_enabled):
         kwargs = god_map.get_data(identifier.MaxTrajectoryLength)
         planning_4.add_plugin(MaxTrajectoryLength(u'traj length check', **kwargs))
+    # ---------------------------------------------
+    qp_solving = failure_is_running(Sequence)(u'qp solving')
+    qp_solving.add_child(IF_NOT(u'skip to global planner?', identifier.global_planner_needed))
+    qp_solving.add_child(planning_4)
+    global_planning = success_is_failure(Sequence)(u'global planning')
+    global_planning.add_child(IF(u'global planner needed?', identifier.global_planner_needed))
+    if god_map.get_data(identifier.enable_VisualizationBehavior):
+        global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
+    global_planning.add_child(GlobalPlanner(u'global planner', action_server_name))
+    trajectory_planning = PluginBehavior(u'trajectory planning', sleep=0)
+    trajectory_planning.add_plugin(GlobalPlannerNeeded(u'GlobalPlannerNeeded', action_server_name))
+    trajectory_planning.add_plugin(qp_solving)
+    trajectory_planning.add_plugin(global_planning)
     # ----------------------------------------------
     # ----------------------------------------------
     planning_3 = Sequence(u'planning III', sleep=0)
-    planning_3.add_child(planning_4)
+    planning_3.add_child(trajectory_planning)
     planning_3.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
     planning_3.add_child(AppendZeroVelocity(u'append zero velocity'))
     planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
@@ -234,13 +247,6 @@ def grow_tree():
     # ----------------------------------------------
     planning = failure_is_success(Sequence)(u'planning')
     planning.add_child(IF(u'command set?', identifier.next_move_goal))
-    global_planning = failure_is_success(Sequence)(u'global planning')
-    global_planning.add_child(GlobalPlannerNeeded(u'GlobalPlannerNeeded', action_server_name))
-    global_planning.add_child(IF(u'global planner needed?', identifier.global_planner_needed))
-    if god_map.get_data(identifier.enable_VisualizationBehavior):
-        global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
-    global_planning.add_child(GlobalPlanner(u'global planner', action_server_name))
-    planning.add_child(global_planning)
     planning.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning.add_child(planning_2)
     # planning.add_child(planning_1)

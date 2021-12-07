@@ -1,6 +1,10 @@
+from copy import deepcopy
+
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskard_msgs.msg import Constraint
+from giskardpy.exceptions import PlanningException
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.qp.qp_controller import QPController
 
@@ -48,9 +52,29 @@ class ControllerPlugin(GiskardBehavior):
     def update(self):
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)
-
-        next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
-        self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
-        self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
+        try:
+            next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
+            self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
+            self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
+        except PlanningException:
+            supported_global_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot']
+            failed_move_cmd = self.god_map.get_data(identifier.next_move_goal) # type: MoveCmd
+            if any([c.type in supported_global_cart_goals for c in failed_move_cmd.constraints]):
+                global_move_cmd = deepcopy(failed_move_cmd)
+                global_move_cmd.constraints = list()
+                for c in failed_move_cmd.constraints:
+                    if c.type in supported_global_cart_goals:
+                        n_c = Constraint()
+                        n_c.type = 'CartesianPathCarrot'
+                        n_c.parameter_value_pair = c.parameter_value_pair
+                        global_move_cmd.constraints.append(n_c)
+                    else:
+                        global_move_cmd.constraints.append(c)
+                self.get_god_map().set_data(identifier.next_move_goal, global_move_cmd)
+                cmd_id = self.get_god_map().get_data(identifier.cmd_id) + 1
+                self.get_god_map().set_data(identifier.cmd_id, cmd_id)
+                return Status.FAILURE
+            else:
+                raise
 
         return Status.RUNNING

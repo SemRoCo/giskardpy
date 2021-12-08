@@ -299,6 +299,19 @@ class TestCartGoals(object):
         better_pose.plan_and_execute()
         pass
 
+    def test_base_driving(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
+        zero_pose.teleport_base(p)
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position.y = 1
+        p.pose.orientation.w = 1
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.set_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
     def test_shoulder_singularity(self, better_pose):
         """
         :type better_pose: Donbot

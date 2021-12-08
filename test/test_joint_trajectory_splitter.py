@@ -8,7 +8,9 @@ import rospy
 import trajectory_msgs.msg
 from actionlib_msgs.msg import GoalStatusArray
 
+from giskard_msgs.msg import MoveResult
 from giskardpy.utils import logging
+from utils_for_tests import BaseBot
 
 
 class Clients(object):
@@ -36,11 +38,6 @@ class Clients(object):
     def get_other_state(self, i):
         rospy.sleep(1)
         return self.statuses[i].status_list[0].status
-
-
-@pytest.fixture(scope='module')
-def init_ros():
-    rospy.init_node('JointTrajectorySplitterTest')
 
 
 def get_simple_trajectory_goal():
@@ -104,9 +101,30 @@ def get_long_trajectory_goal():
 
 
 @pytest.fixture(scope='module')
-def ros_launch():
+def ros_launch(request, ros):
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
+
+    with open('urdfs/2d_base_bot.urdf', 'r') as f:
+        urdf = f.read()
+        rospy.set_param('robot_description', urdf)
+    joint_state_publisher = roslaunch.core.Node('joint_state_publisher', 'joint_state_publisher',
+                                                'joint_state_publisher')
+    joint_state_publisher = launch.launch(joint_state_publisher)
+    localization = roslaunch.core.Node(package='tf',
+                                       node_type='static_transform_publisher',
+                                       name='localization',
+                                       args='0 0 0 0 0 0 map base_footprint 100')
+    localization = launch.launch(localization)
+
+    def stop_joint_state_publisher():
+        joint_state_publisher.stop()
+        localization.stop()
+        while joint_state_publisher.is_alive() or localization.is_alive():
+            logging.loginfo('waiting for nodes to finish')
+            rospy.sleep(0.2)
+
+    request.addfinalizer(stop_joint_state_publisher)
     return launch
 
 
@@ -144,7 +162,7 @@ def launch_state_publisher2(request, init_ros, ros_launch):
 
 @pytest.fixture(scope='function')
 def launch_timeout_test_nodes(request, init_ros, ros_launch, launch_state_publisher1, launch_state_publisher2):
-    node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1',
+    node = roslaunch.core.Node('giskardpy', 'fake_servers.py', name='successful_action_server1',
                                output='screen')
     process1 = ros_launch.launch(node)
 
@@ -185,11 +203,11 @@ def launch_timeout_test_nodes(request, init_ros, ros_launch, launch_state_publis
 
 @pytest.fixture(scope='function')
 def launch_successful_test_nodes(request, init_ros, ros_launch, launch_state_publisher1, launch_state_publisher2):
-    node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1',
+    node = roslaunch.core.Node('giskardpy', 'fake_servers.py', name='successful_action_server1',
                                output='screen')
     process1 = ros_launch.launch(node)
 
-    node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server2',
+    node = roslaunch.core.Node('giskardpy', 'fake_servers.py', name='successful_action_server2',
                                output='screen')
     process2 = ros_launch.launch(node)
 
@@ -231,7 +249,7 @@ def launch_invalid_joints_test_nodes(request, init_ros, ros_launch, launch_state
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
 
-    node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1',
+    node = roslaunch.core.Node('giskardpy', 'fake_servers.py', name='successful_action_server1',
                                output='screen')
     process1 = launch.launch(node)
 
@@ -277,7 +295,7 @@ def launch_failing_goal_test_nodes(request, init_ros, ros_launch, launch_state_p
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
 
-    node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1',
+    node = roslaunch.core.Node('giskardpy', 'fake_servers.py', name='successful_action_server1',
                                output='screen')
     process1 = launch.launch(node)
 
@@ -316,6 +334,60 @@ def launch_failing_goal_test_nodes(request, init_ros, ros_launch, launch_state_p
                                    '/failing_action_server1/status'])
     rospy.sleep(2)
     return r
+
+
+@pytest.fixture(scope='function')
+def giskard(request, ros):
+    c = BaseBot()
+    request.addfinalizer(c.tear_down)
+    return c
+
+
+@pytest.fixture(scope='function')
+def launch_fake_servers(request, ros_launch):
+    nodes = []
+    for action_sever_type, name_space, joint_names in request.param:
+        rospy.set_param('{}/type'.format(name_space), action_sever_type)
+        rospy.set_param('{}/name_space'.format(name_space), name_space)
+        rospy.set_param('{}/joint_names'.format(name_space), joint_names)
+        node = roslaunch.core.Node('giskardpy', 'fake_servers.py',
+                                   name=name_space,
+                                   output='screen')
+        nodes.append(ros_launch.launch(node))
+
+    def fin():
+        for node in nodes:
+            node.stop()
+            while node.is_alive():
+                logging.loginfo('waiting for nodes to finish')
+                rospy.sleep(0.2)
+
+    request.addfinalizer(fin)
+    rospy.sleep(1)
+
+
+class Tester(object):
+    @pytest.mark.parametrize('launch_fake_servers', [[['SuccessfulActionServer', 'xy', ['joint_x', 'joint_y']],
+                                                      ['SuccessfulActionServer', 'z', ['rot_z']]]],
+                             indirect=True)
+    def test_success(self, launch_fake_servers, giskard):
+        giskard.set_joint_goal({
+            'joint_x': 1,
+            'joint_y': -1,
+            'rot_z': 0.2,
+        }, check=False)
+        giskard.plan_and_execute()
+
+    @pytest.mark.parametrize('launch_fake_servers', [[['SuccessfulActionServer', 'xy', ['joint_x', 'joint_y']],
+                                                      ['FailingActionServer', 'z', ['rot_z']]]],
+                             indirect=True)
+    def test_success_fail(self, launch_fake_servers, giskard):
+        giskard.set_joint_goal({
+            'joint_x': 1,
+            'joint_y': -1,
+            'rot_z': 0.2,
+        }, check=False)
+        giskard.plan_and_execute(expected_error_codes=[MoveResult.EXECUTION_ERROR])
 
 
 def test_timeout(launch_timeout_test_nodes):

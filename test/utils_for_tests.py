@@ -3,6 +3,8 @@ from collections import defaultdict
 from multiprocessing import Queue
 from time import time
 
+import actionlib
+import control_msgs
 import hypothesis.strategies as st
 import numpy as np
 import rospy
@@ -1058,6 +1060,22 @@ class Donbot(GiskardTestWrapper):
         self.open_gripper()
 
 
+class BaseBot(GiskardTestWrapper):
+    default_pose = {
+        'joint_x': 0.0,
+        'joint_y': 0.0,
+        'rot_z': 0.0,
+    }
+
+    def __init__(self):
+        super().__init__('package://giskardpy/config/base_bot.yaml')
+
+    def reset(self):
+        self.clear_world()
+        # self.set_joint_goal(self.default_pose)
+        # self.plan_and_execute()
+
+
 class Boxy(GiskardTestWrapper):
     default_pose = {
         'neck_shoulder_pan_joint': 0.0,
@@ -1281,3 +1299,32 @@ def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, i
     rospy.sleep(0.3)
 
     pub.publish(m)
+
+
+class SuccessfulActionServer(object):
+    def __init__(self):
+        self.name_space = rospy.get_param('~name_space')
+        self.joint_names = rospy.get_param('~joint_names')
+        self.state = {j:0 for j in self.joint_names}
+        self.pub = rospy.Publisher('{}/state'.format(self.name_space), control_msgs.msg.JointTrajectoryControllerState,
+                                   queue_size=10)
+        self.timer = rospy.Timer(rospy.Duration(0.1), self.state_cb)
+        self._as = actionlib.SimpleActionServer(self.name_space, control_msgs.msg.FollowJointTrajectoryAction,
+                                                execute_cb=self.execute_cb, auto_start=False)
+        self._as.start()
+        self._as.register_preempt_callback(self.preempt_requested)
+
+    def state_cb(self, timer_event):
+        msg = control_msgs.msg.JointTrajectoryControllerState()
+        msg.header.stamp = timer_event.current_real
+        msg.joint_names = self.joint_names
+        self.pub.publish(msg)
+
+    def preempt_requested(self):
+        print('cancel called')
+        self._as.set_preempted()
+
+    def execute_cb(self, goal):
+        rospy.sleep(goal.trajectory.points[-1].time_from_start)
+        if self._as.is_active():
+            self._as.set_succeeded()

@@ -2450,10 +2450,10 @@ class TestCartesianPath(object):
         milk_lift_pre_pose.pose.position = Point(0, 0, 0.22)
         milk_lift_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        milk_grasp_pre_pose = PoseStamped()
-        milk_grasp_pre_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
-        milk_grasp_pre_pose.pose.position = Point(-0.2, 0, 0.12)
-        milk_grasp_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+        #milk_grasp_pre_pose = PoseStamped()
+        #milk_grasp_pre_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        #milk_grasp_pre_pose.pose.position = Point(-0.2, 0, 0.12)
+        #milk_grasp_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         kitchen_setup_avoid_collisions.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
 
@@ -2468,7 +2468,7 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      tip_link=tip_link,
-                                                     goal=milk_grasp_pre_pose)
+                                                     goal=milk_pose)
 
         kitchen_setup_avoid_collisions.plan_and_execute()
 
@@ -2511,10 +2511,10 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.detach_object(milk_name)
 
-        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
-                                                     root_link=kitchen_setup_avoid_collisions.default_root,
-                                                     tip_link=tip_link,
-                                                     goal=milk_grasp_pre_pose)
+        #kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+        #                                             root_link=kitchen_setup_avoid_collisions.default_root,
+        #                                             tip_link=tip_link,
+        #                                             goal=milk_grasp_pre_pose)
         kitchen_setup_avoid_collisions.send_and_check_goal()
 
         kitchen_setup_avoid_collisions.send_and_check_joint_goal(gaya_pose)

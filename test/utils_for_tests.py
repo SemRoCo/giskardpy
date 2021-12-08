@@ -522,11 +522,12 @@ class GiskardTestWrapper(GiskardWrapper):
     # GOAL STUFF #################################################################################################
     #
 
-    def set_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,), check=True):
+    def set_joint_goal(self, goal, weight=None, hard=False, decimal=2, expected_error_codes=(MoveResult.SUCCESS,),
+                       check=True):
         """
         :type goal: dict
         """
-        super(GiskardTestWrapper, self).set_joint_goal(goal, weight=weight)
+        super(GiskardTestWrapper, self).set_joint_goal(goal, weight=weight, hard=hard)
         if check:
             self.add_goal_check(JointGoalChecker(self.god_map, goal, decimal))
 

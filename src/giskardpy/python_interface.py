@@ -180,7 +180,7 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, goal_state, weight=None, max_velocity=None):
+    def set_joint_goal(self, goal_state, weight=None, max_velocity=None, hard=False):
         """
         This goal will move the robots joint to the desired configuration.
         :param goal_state: Can either be a joint state messages or a dict mapping joint name to position. 
@@ -205,6 +205,7 @@ class GiskardWrapper(object):
             params['weight'] = weight
         if max_velocity is not None:
             params['max_velocity'] = max_velocity
+        params['hard'] = hard
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 

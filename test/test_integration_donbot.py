@@ -6,7 +6,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, CollisionEntry
-from giskardpy.goals.goal import WEIGHT_BELOW_CA
+from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from utils_for_tests import Donbot, compare_poses
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
@@ -206,6 +206,29 @@ class TestCartGoals(object):
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [1, 0, 0]))
         zero_pose.allow_self_collision()
         zero_pose.set_cart_goal(p, zero_pose.gripper_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
+
+    def test_cart_goal2(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        js = {
+            'ur5_shoulder_pan_joint': 3.141554832458496,
+            'ur5_shoulder_lift_joint': -1.3695076147662562,
+            'ur5_elbow_joint': 0.5105495452880859,
+            'ur5_wrist_1_joint': -0.7200177351581019,
+            'ur5_wrist_2_joint': -0.22007495561708623,
+            'ur5_wrist_3_joint': 0,
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+        p = PoseStamped()
+        p.header.frame_id = 'camera_link'
+        p.pose.position = Point(0, 1, 0)
+        p.pose.orientation.w = 1
+        zero_pose.allow_self_collision()
+        zero_pose.set_translation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_BELOW_CA)
+        zero_pose.set_rotation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_ABOVE_CA)
         zero_pose.plan_and_execute()
 
     def test_endless_wiggling1(self, zero_pose):

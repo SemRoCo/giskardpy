@@ -11,6 +11,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
+from tf.transformations import quaternion_multiply
 
 from giskardpy import RobotName, identifier
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
@@ -58,7 +59,8 @@ class GiskardWrapper(object):
         """
         return str(self._world.groups[RobotName].root_link_name)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
+                      weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
@@ -223,6 +225,7 @@ class GiskardWrapper(object):
         :type root_normal: Vector3Stamped
         :param max_angular_velocity: rad/s, default 0.5
         :type max_angular_velocity: float
+        :param weight: default WEIGHT_BELOW_CA
         :type weight: float
         """
         if root_link is None:
@@ -417,6 +420,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def allow_self_collision(self):
+        """
+        Allows the collision with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -425,6 +431,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def avoid_self_collision(self):
+        """
+        Avoid collisions with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -631,7 +640,7 @@ class GiskardWrapper(object):
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
         object.shape.type = SolidPrimitive.CYLINDER
-        object.shape.dimensions = [0,0]
+        object.shape.dimensions = [0, 0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
         req = UpdateWorldRequest()
@@ -785,7 +794,7 @@ class GiskardWrapper(object):
     def update_rviz_markers(self, object_names):
         """
         republishes visualization markers for rviz
-        :type name: list
+        :type object_names: list
         :rtype: UpdateRvizMarkersResponse
         """
         return self._update_rviz_markers_srv(object_names)

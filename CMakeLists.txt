@@ -178,7 +178,7 @@ catkin_install_python(PROGRAMS
 	scripts/tf_base_joint_state_publisher.py
 	scripts/traj_to_joint_states.py
 	scripts/urdf_merger.py
-	test/joint_trajectory_splitter/fake_servers.py
+	scripts/fake_servers.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

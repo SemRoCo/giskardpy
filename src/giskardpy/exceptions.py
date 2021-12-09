@@ -122,6 +122,10 @@ class PreemptedException(ExecutionException):
     pass
 
 
+class ExecutionPreemptedException(ExecutionException):
+    pass
+
+
 class ExecutionTimeoutException(ExecutionException):
     pass
 

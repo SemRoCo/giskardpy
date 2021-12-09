@@ -88,6 +88,8 @@ class SetErrorCode(GiskardBehavior):
             error_code = MoveResult.EXECUTION_ERROR
             if isinstance(exception, PreemptedException):
                 error_code = MoveResult.PREEMPTED
+            elif isinstance(exception, ExecutionPreemptedException):
+                error_code = MoveResult.EXECUTION_PREEMPTED
             elif isinstance(exception, ExecutionTimeoutException):
                 error_code = MoveResult.EXECUTION_TIMEOUT
             elif isinstance(exception, ExecutionSucceededPrematurely):

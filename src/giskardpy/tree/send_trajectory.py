@@ -1,15 +1,12 @@
-from typing import Union
-
 import control_msgs
-from genpy import Duration
-from rospy import ROSException, Time
+from rospy import ROSException
 from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 
 from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
-    ExecutionTimeoutException, PreemptedException, ExecutionSucceededPrematurely
+    ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
 
 try:
     import pr2_controllers_msgs.msg
@@ -100,8 +97,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         goal.trajectory = trajectory.to_msg(sample_period, self.controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
         deadline = self.action_goal.trajectory.header.stamp + \
-                        self.action_goal.trajectory.points[-1].time_from_start + \
-                        self.action_goal.goal_time_tolerance
+                   self.action_goal.trajectory.points[-1].time_from_start + \
+                   self.action_goal.goal_time_tolerance
         self.min_deadline = deadline - self.goal_time_tolerance
         self.max_deadline = deadline + self.goal_time_tolerance
         self.cancel_tries = 0
@@ -153,7 +150,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 self.raise_to_blackboard(ExecutionTimeoutException(msg))
             else:
                 msg = '\'{}\' preempted. Stopping execution.'.format(self.action_namespace)
-                self.raise_to_blackboard(PreemptedException(msg))
+                self.raise_to_blackboard(ExecutionPreemptedException(msg))
             logging.logerr(msg)
             return py_trees.Status.FAILURE
 
@@ -189,11 +186,12 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         Args:
             new_status (:class:`~py_trees.common.Status`): the behaviour is transitioning to this new status
         """
-        self.logger.debug("%s.terminate(%s)" % (self.__class__.__name__, "%s->%s" % (self.status, new_status) if self.status != new_status else "%s" % new_status))
+        self.logger.debug("%s.terminate(%s)" % (self.__class__.__name__, "%s->%s" % (
+        self.status, new_status) if self.status != new_status else "%s" % new_status))
         if self.action_client is not None and self.sent_goal:
             motion_state = self.action_client.get_state()
             if ((motion_state == GoalStatus.PENDING) or (motion_state == GoalStatus.ACTIVE) or
-               (motion_state == GoalStatus.PREEMPTING) or (motion_state == GoalStatus.RECALLING)):
+                    (motion_state == GoalStatus.PREEMPTING) or (motion_state == GoalStatus.RECALLING)):
                 logging.logwarn('Cancelling \'{}\''.format(self.action_namespace))
                 self.action_client.cancel_goal()
         self.sent_goal = False

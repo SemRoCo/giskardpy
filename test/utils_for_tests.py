@@ -645,20 +645,24 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def plan_and_execute(self, expected_error_codes=None, stop_after=None):
-        return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after)
+    def plan_and_execute(self, expected_error_codes=None, stop_after=None, wait=True):
+        return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
 
-    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None):
+    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None,
+                  wait=True):
         try:
             time_spend_giskarding = time()
-            if stop_after is None:
-                r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=True)
-            else:
+            if stop_after is not None:
                 super(GiskardTestWrapper, self).send_goal(goal_type, wait=False)
                 rospy.sleep(stop_after)
                 self.interrupt()
                 rospy.sleep(1)
                 r = self.get_result(rospy.Duration(3))
+            elif not wait:
+                super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
+                return
+            else:
+                r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
             self.wait_heartbeats()
             self.total_time_spend_giskarding += time() - time_spend_giskarding
             for cmd_id in range(len(r.error_codes)):

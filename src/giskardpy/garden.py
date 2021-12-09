@@ -8,7 +8,7 @@ from py_trees_ros.trees import BehaviourTree
 
 import giskardpy
 import giskardpy.identifier as identifier
-from giskard_msgs.msg import MoveAction
+from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import RobotName
 from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.god_map import GodMap
@@ -35,6 +35,7 @@ from giskardpy.tree.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plot_trajectory import PlotTrajectory
 from giskardpy.tree.plugin_if import IF
+from giskardpy.tree.publish_feedback import PublishFeedback
 from giskardpy.tree.send_result import SendResult
 from giskardpy.tree.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.set_cmd import SetCmd
@@ -218,6 +219,7 @@ def grow_tree():
     execute_canceled.add_child(GoalCanceled('goal canceled', action_server_name))
     execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
     publish_result = failure_is_success(Selector)('monitor execution')
+    publish_result.add_child(success_is_failure(PublishFeedback)('publish feedback', action_server_name, MoveFeedback.EXECUTION))
     publish_result.add_child(execute_canceled)
     publish_result.add_child(execution_action_server)
     publish_result.add_child(SetErrorCode('set error code', 'Execution'))
@@ -225,6 +227,7 @@ def grow_tree():
     # ----------------------------------------------
     planning_2 = failure_is_success(Selector)('planning II')
     planning_2.add_child(GoalCanceled('goal canceled', action_server_name))
+    planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback', action_server_name, MoveFeedback.PLANNING))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         planning_2.add_child(running_is_failure(VisualizationBehavior)('visualization'))
     # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
@@ -260,6 +263,8 @@ def grow_tree():
     process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
 
     process_move_goal = failure_is_success(Selector)('Process goal')
+    process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback', action_server_name,
+                                                                    MoveFeedback.PLANNING))
     process_move_goal.add_child(process_move_cmd)
     process_move_goal.add_child(ExceptionToExecute('clear exception'))
     process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))

@@ -5,7 +5,7 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd
+    MoveCmd, MoveFeedback
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from sensor_msgs.msg import JointState
@@ -25,6 +25,8 @@ DEFAULT_WORLD_TIMEOUT = 500
 
 
 class GiskardWrapper(object):
+    last_feedback: MoveFeedback = None
+
     def __init__(self, node_name='giskard'):
         giskard_topic = '{}/command'.format(node_name)
         if giskard_topic is not None:
@@ -40,11 +42,13 @@ class GiskardWrapper(object):
         self._god_map = GodMap.init_from_paramserver(node_name)
         self._world = WorldTree(self._god_map)
         self._world.delete_all_but_robot()
-
         self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
         rospy.sleep(.3)
+
+    def _feedback_cb(self, msg):
+        self.last_feedback = msg
 
     def get_robot_name(self):
         """
@@ -512,7 +516,7 @@ class GiskardWrapper(object):
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()
         else:
-            self._client.send_goal(goal)
+            self._client.send_goal(goal, feedback_cb=self._feedback_cb)
 
     def get_collision_entries(self):
         return self.cmd_seq
@@ -536,7 +540,8 @@ class GiskardWrapper(object):
         :type timeout: rospy.Duration
         :rtype: MoveResult
         """
-        self._client.wait_for_result(timeout)
+        if not self._client.wait_for_result(timeout):
+            raise TimeoutError('Timeout while waiting for goal.')
         return self._client.get_result()
 
     def clear_world(self, timeout=DEFAULT_WORLD_TIMEOUT):

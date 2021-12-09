@@ -5,6 +5,8 @@ import control_msgs.msg
 import rospy
 from control_msgs.msg import FollowJointTrajectoryResult, FollowJointTrajectoryGoal
 
+from giskardpy.utils import logging
+
 
 class FakeActionServer(object):
 
@@ -29,7 +31,7 @@ class FakeActionServer(object):
         self.pub.publish(msg)
 
     def preempt_requested(self):
-        print('cancel called')
+        logging.loginfo('cancel called')
         self._as.set_preempted()
 
     def execute_cb(self, goal: FollowJointTrajectoryGoal):

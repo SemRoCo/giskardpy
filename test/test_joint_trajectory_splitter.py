@@ -1,10 +1,10 @@
 import pytest
 import roslaunch
 import rospy
-from actionlib_msgs.msg import GoalStatusArray
+from actionlib_msgs.msg import GoalStatusArray, GoalID
 from control_msgs.msg import FollowJointTrajectoryResult
 
-from giskard_msgs.msg import MoveResult
+from giskard_msgs.msg import MoveResult, MoveFeedback
 from giskardpy.utils import logging
 from utils_for_tests import BaseBot
 
@@ -156,3 +156,25 @@ class Tester(object):
             'rot_z': 0.1,
         }, check=False)
         giskard.plan_and_execute(expected_error_codes=[MoveResult.EXECUTION_SUCCEEDED_PREMATURELY])
+
+    @pytest.mark.parametrize('launch_fake_servers', [
+        [['xy', ['joint_x', 'joint_y'], 1, FollowJointTrajectoryResult.SUCCESSFUL],
+         ['z', ['rot_z'], 1, FollowJointTrajectoryResult.SUCCESSFUL]],
+    ],
+                             indirect=True)
+    def test_external_preempt(self, launch_fake_servers, giskard):
+        pub = rospy.Publisher('/xy/cancel', GoalID, queue_size=1)
+        giskard.set_joint_goal({
+            'joint_x': 1,
+            'joint_y': -0.3,
+            'rot_z': 0.1,
+        }, check=False)
+        giskard.plan_and_execute(wait=False)
+        while pub.get_num_connections() < 1 or \
+                giskard.last_feedback is None or \
+                giskard.last_feedback.state != MoveFeedback.EXECUTION:
+            rospy.sleep(0.1)
+        pub.publish(GoalID())
+        r = giskard.get_result()
+        assert r.error_codes[0] == MoveResult.EXECUTION_PREEMPTED
+        pass

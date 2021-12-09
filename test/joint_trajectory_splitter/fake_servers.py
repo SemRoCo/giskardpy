@@ -3,7 +3,7 @@
 import actionlib
 import control_msgs.msg
 import rospy
-from control_msgs.msg import FollowJointTrajectoryResult
+from control_msgs.msg import FollowJointTrajectoryResult, FollowJointTrajectoryGoal
 
 
 class FakeActionServer(object):
@@ -32,8 +32,10 @@ class FakeActionServer(object):
         print('cancel called')
         self._as.set_preempted()
 
-    def execute_cb(self, goal):
-        rospy.sleep(self.sleep_percent * goal.trajectory.points[-1].time_from_start)
+    def execute_cb(self, goal: FollowJointTrajectoryGoal):
+        wait_until = goal.trajectory.header.stamp + self.sleep_percent * goal.trajectory.points[-1].time_from_start
+        while rospy.get_rostime() < wait_until:
+            rospy.sleep(0.1)
         if self._as.is_active():
             result = control_msgs.msg.FollowJointTrajectoryResult()
             result.error_code = self.result

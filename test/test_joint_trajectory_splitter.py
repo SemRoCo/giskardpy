@@ -98,9 +98,10 @@ def launch_fake_servers(request, ros_launch):
 class Tester(object):
     # TODO test external cancel
 
-    @pytest.mark.parametrize('launch_fake_servers', [[
-        ['xy', ['joint_x', 'joint_y'], 1, FollowJointTrajectoryResult.SUCCESSFUL],
-        ['z', ['rot_z'], 1, FollowJointTrajectoryResult.SUCCESSFUL]]],
+    @pytest.mark.parametrize('launch_fake_servers', [
+        [['xy', ['joint_x', 'joint_y'], 1, FollowJointTrajectoryResult.SUCCESSFUL],
+         ['z', ['rot_z'], 1, FollowJointTrajectoryResult.SUCCESSFUL]],
+    ],
                              indirect=True)
     def test_success(self, launch_fake_servers, giskard):
         giskard.set_joint_goal({
@@ -126,14 +127,32 @@ class Tester(object):
         }, check=False)
         giskard.plan_and_execute(expected_error_codes=[MoveResult.FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED])
 
-    @pytest.mark.parametrize('launch_fake_servers', [[
-        ['xy', ['joint_x', 'joint_y'], 1, FollowJointTrajectoryResult.SUCCESSFUL],
-        ['z', ['rot_z'], 10, FollowJointTrajectoryResult.SUCCESSFUL]]],
+    @pytest.mark.parametrize('launch_fake_servers', [
+        [['xy', ['joint_x', 'joint_y'], 1, FollowJointTrajectoryResult.SUCCESSFUL],
+         ['z', ['rot_z'], 10, FollowJointTrajectoryResult.SUCCESSFUL]],
+        [['xy', ['joint_x', 'joint_y'], 10, FollowJointTrajectoryResult.SUCCESSFUL],
+         ['z', ['rot_z'], 1, FollowJointTrajectoryResult.SUCCESSFUL]]
+    ],
                              indirect=True)
-    def test_success_timeout(self, launch_fake_servers, giskard):
+    def test_timeout(self, launch_fake_servers, giskard):
         giskard.set_joint_goal({
-            'joint_x': 1,
-            'joint_y': -1,
-            'rot_z': 0.2,
+            'joint_x': 0.3,
+            'joint_y': -0.3,
+            'rot_z': 0.1,
         }, check=False)
         giskard.plan_and_execute(expected_error_codes=[MoveResult.EXECUTION_TIMEOUT])
+
+    @pytest.mark.parametrize('launch_fake_servers', [
+        [['xy', ['joint_x', 'joint_y'], 0.5, FollowJointTrajectoryResult.SUCCESSFUL],
+         ['z', ['rot_z'], 1, FollowJointTrajectoryResult.SUCCESSFUL]],
+        [['xy', ['joint_x', 'joint_y'], 1, FollowJointTrajectoryResult.SUCCESSFUL],
+         ['z', ['rot_z'], 0.5, FollowJointTrajectoryResult.SUCCESSFUL]]
+    ],
+                             indirect=True)
+    def test_too_quick(self, launch_fake_servers, giskard):
+        giskard.set_joint_goal({
+            'joint_x': 0.3,
+            'joint_y': -0.3,
+            'rot_z': 0.1,
+        }, check=False)
+        giskard.plan_and_execute(expected_error_codes=[MoveResult.EXECUTION_SUCCEEDED_PREMATURELY])

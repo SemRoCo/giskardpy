@@ -90,6 +90,8 @@ class SetErrorCode(GiskardBehavior):
                 error_code = MoveResult.PREEMPTED
             elif isinstance(exception, ExecutionTimeoutException):
                 error_code = MoveResult.EXECUTION_TIMEOUT
+            elif isinstance(exception, ExecutionSucceededPrematurely):
+                error_code = MoveResult.EXECUTION_SUCCEEDED_PREMATURELY
             elif isinstance(exception, FollowJointTrajectory_INVALID_GOAL):
                 error_code = MoveResult.FollowJointTrajectory_INVALID_GOAL
             elif isinstance(exception, FollowJointTrajectory_INVALID_JOINTS):

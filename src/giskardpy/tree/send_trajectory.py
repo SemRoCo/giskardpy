@@ -1,12 +1,15 @@
+from typing import Union
+
 import control_msgs
-from rospy import ROSException
+from genpy import Duration
+from rospy import ROSException, Time
 from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 
 from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
-    ExecutionTimeoutException, PreemptedException
+    ExecutionTimeoutException, PreemptedException, ExecutionSucceededPrematurely
 
 try:
     import pr2_controllers_msgs.msg
@@ -26,7 +29,8 @@ from giskardpy.utils.logging import loginfo
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
-    deadline: rospy.Time
+    min_deadline: rospy.Time
+    max_deadline: rospy.Time
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
@@ -39,10 +43,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction]
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
-    def __init__(self, name, namespace, state_topic, fill_velocity_values=True):
+    def __init__(self, name, namespace, state_topic, goal_time_tolerance=0.1, fill_velocity_values=True):
         GiskardBehavior.__init__(self, name)
         self.action_namespace = namespace
         self.fill_velocity_values = fill_velocity_values
+        self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
         loginfo('Waiting for action server \'{}\' to appear.'.format(self.action_namespace))
         action_msg_type = None
@@ -94,9 +99,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         goal.trajectory = trajectory.to_msg(sample_period, self.controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
-        self.deadline = self.action_goal.trajectory.header.stamp + \
+        deadline = self.action_goal.trajectory.header.stamp + \
                         self.action_goal.trajectory.points[-1].time_from_start + \
                         self.action_goal.goal_time_tolerance
+        self.min_deadline = deadline - self.goal_time_tolerance
+        self.max_deadline = deadline + self.goal_time_tolerance
         self.cancel_tries = 0
 
     def update(self):
@@ -107,6 +114,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         overriding this shit because of the fucking prints
         """
+        current_time = rospy.get_rostime()
         self.logger.debug("{0}.update()".format(self.__class__.__name__))
         if not self.action_client:
             self.feedback_message = "no action client, did you call setup() on your tree?"
@@ -139,7 +147,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             self.raise_to_blackboard(e)
             return py_trees.Status.FAILURE
         if self.action_client.get_state() in [GoalStatus.PREEMPTED, GoalStatus.PREEMPTING]:
-            if rospy.get_rostime() > self.deadline:
+            if rospy.get_rostime() > self.max_deadline:
                 msg = '\'{}\' preempted, ' \
                       'probably because it took to long to execute the goal.'.format(self.action_namespace)
                 self.raise_to_blackboard(ExecutionTimeoutException(msg))
@@ -148,7 +156,19 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 self.raise_to_blackboard(PreemptedException(msg))
             logging.logerr(msg)
             return py_trees.Status.FAILURE
-        if rospy.get_rostime() > self.deadline:
+
+        result = self.action_client.get_result()
+        if result:
+            if current_time < self.min_deadline:
+                msg = '\'{}\' executed too quickly, stopping execution.'.format(self.action_namespace)
+                e = ExecutionSucceededPrematurely(msg)
+                self.raise_to_blackboard(e)
+                return py_trees.Status.FAILURE
+            self.feedback_message = "goal reached"
+            logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
+            return py_trees.Status.SUCCESS
+
+        if current_time > self.max_deadline:
             self.action_client.cancel_goal()
             msg = 'Cancelling \'{}\' because it took to long to execute the goal.'.format(self.action_namespace)
             logging.logerr(msg)
@@ -159,11 +179,21 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 return py_trees.Status.FAILURE
             return py_trees.Status.RUNNING
 
-        result = self.action_client.get_result()
-        if result:
-            self.feedback_message = "goal reached"
-            logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
-            return py_trees.Status.SUCCESS
-        else:
-            self.feedback_message = "moving"
-            return py_trees.Status.RUNNING
+        self.feedback_message = "moving"
+        return py_trees.Status.RUNNING
+
+    def terminate(self, new_status):
+        """
+        If running and the current goal has not already succeeded, cancel it.
+
+        Args:
+            new_status (:class:`~py_trees.common.Status`): the behaviour is transitioning to this new status
+        """
+        self.logger.debug("%s.terminate(%s)" % (self.__class__.__name__, "%s->%s" % (self.status, new_status) if self.status != new_status else "%s" % new_status))
+        if self.action_client is not None and self.sent_goal:
+            motion_state = self.action_client.get_state()
+            if ((motion_state == GoalStatus.PENDING) or (motion_state == GoalStatus.ACTIVE) or
+               (motion_state == GoalStatus.PREEMPTING) or (motion_state == GoalStatus.RECALLING)):
+                logging.logwarn('Cancelling \'{}\''.format(self.action_namespace))
+                self.action_client.cancel_goal()
+        self.sent_goal = False

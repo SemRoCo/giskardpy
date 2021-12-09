@@ -126,6 +126,10 @@ class ExecutionTimeoutException(ExecutionException):
     pass
 
 
+class ExecutionSucceededPrematurely(ExecutionException):
+    pass
+
+
 # -----------------------------------------------------------------------------------------------------------------------
 class ImplementationException(GiskardException):
     pass

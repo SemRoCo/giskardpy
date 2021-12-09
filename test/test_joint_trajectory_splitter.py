@@ -96,8 +96,6 @@ def launch_fake_servers(request, ros_launch):
 
 
 class Tester(object):
-    # TODO test external cancel
-
     @pytest.mark.parametrize('launch_fake_servers', [
         [['xy', ['joint_x', 'joint_y'], 1, FollowJointTrajectoryResult.SUCCESSFUL],
          ['z', ['rot_z'], 1, FollowJointTrajectoryResult.SUCCESSFUL]],

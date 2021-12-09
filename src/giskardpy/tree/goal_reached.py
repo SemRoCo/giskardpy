@@ -46,7 +46,7 @@ class GoalReachedPlugin(GiskardBehavior):
     @profile
     def update(self):
         planning_time = self.get_god_map().get_data(identifier.time)
-        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)['/pr2_a']
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
         if planning_time - self.above_threshold_time >= self.window_size:
             velocities = np.array([self.world.state[j].velocity for j in controlled_joints])
             below_threshold = np.all(np.abs(velocities[:self.number_of_controlled_joints]) < self.thresholds)

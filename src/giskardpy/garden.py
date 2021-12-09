@@ -39,7 +39,7 @@ from giskardpy.tree.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plot_trajectory import PlotTrajectory
 from giskardpy.tree.set_error_code import SetErrorCode
-from giskardpy.tree.send_trajectory import SendTrajectory
+from giskardpy.tree.send_trajectory import SendTrajectory, SendTrajectories
 from giskardpy.tree.set_cmd import SetCmd
 from giskardpy.tree.tf_publisher import TFPublisher
 from giskardpy.tree.time import TimePlugin
@@ -164,8 +164,11 @@ def grow_tree(namespaces=None):
     # ----------------------------------------------
     sync = Sequence(u'Synchronize')
     sync.add_child(WorldUpdater(u'update world'))
-    sync.add_child(SyncConfiguration(u'update robot configuration0', RobotName, namespaces[0]))
-    sync.add_child(SyncConfiguration(u'update robot configuration1', RobotName, namespaces[1]))
+    if namespaces is None:
+        sync.add_child(SyncConfiguration(u'update robot configuration0', RobotName, '/'))
+    else:
+        for namespace in namespaces:
+            sync.add_child(SyncConfiguration(u'{}: update robot configuration'.format(namespace), RobotName, namespace))
     #sync.add_child(SyncLocalization(u'update robot localization', RobotName)) fixme:
     sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
     sync.add_child(CollisionSceneUpdater(u'update collision scene'))
@@ -210,7 +213,13 @@ def grow_tree(namespaces=None):
     execute_canceled.add_child(SetErrorCode(u'set error code'))
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(execute_canceled)
-    publish_result.add_child(SendTrajectory(u'send traj'))
+    if namespaces is None:
+        publish_result.add_child(SendTrajectory(u'send traj'))
+    else:
+        #send_trajectories = PluginBehavior('Send Trajectories')
+        #send_trajectories.add_plugin(SendTrajectories(u'Send Trajectories: {}'.format(' '.join(namespaces)), namespaces))
+        for namespace in namespaces:
+            publish_result.add_child(SendTrajectory('send traj {}'.format(namespace), ros_namespace=namespace))
     # ----------------------------------------------
     # ----------------------------------------------
     planning_2 = failure_is_success(Selector)(u'planning II')

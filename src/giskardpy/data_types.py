@@ -137,14 +137,17 @@ class Trajectory(object):
     def values(self):
         return self._points.values()
 
-    def to_msg(self, sample_period, controlled_joints, fill_velocity_values):
+    def to_msg(self, sample_period, controlled_joints, fill_velocity_values, prefix=None):
         """
         :type traj: giskardpy.data_types.Trajectory
         :return: JointTrajectory
         """
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-        trajectory_msg.joint_names = controlled_joints
+        if prefix is None:
+            trajectory_msg.joint_names = [str(c) for c in controlled_joints]
+        else:
+            trajectory_msg.joint_names = [str(j).replace(prefix, '') for j in controlled_joints if prefix in str(j)]
         for time, traj_point in self.items():
             p = JointTrajectoryPoint()
             p.time_from_start = rospy.Duration(time * sample_period)

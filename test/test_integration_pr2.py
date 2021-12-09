@@ -168,7 +168,7 @@ def ros(request):
 
 @pytest.fixture(scope=u'module')
 def giskard(request, ros):
-    c = PR2('/pr2_a/')
+    c = PR2()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -311,6 +311,14 @@ class TestFk(object):
 
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_all_collisions()
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.plan_and_execute()
+
+    def test_joint_movement11(self, zero_pose_more_robots):
         """
         :type zero_pose: PR2
         """

@@ -220,9 +220,9 @@ class WorldTree(object):
     def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None): #todo: use prefix
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
-        #if group_name in self.groups:
-        #    raise DuplicateNameException(
-        #        'Failed to add group \'{}\' because one with such a name already exists'.format(group_name)) #fixme
+        if group_name in self.groups:
+            raise DuplicateNameException(
+                'Failed to add group \'{}\' because one with such a name already exists'.format(group_name)) #fixme
         if parent_link_name is None:
             parent_link = self.root_link
         else:
@@ -336,8 +336,10 @@ class WorldTree(object):
             self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
         else:
             for prefix in prefix_list:
-                self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName,
-                              prefix=prefix[:-1])
+                if prefix == prefix_list[0]:
+                    self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=prefix[:-1])
+                else:
+                    self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=prefix, prefix=prefix[:-1])
         self.fast_all_fks = None
         self.notify_model_change()
 

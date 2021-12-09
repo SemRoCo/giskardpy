@@ -17,14 +17,20 @@ class SyncConfiguration(GiskardBehavior):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, name, group_name, prefix, joint_state_topic=u'joint_states', tf_root_link_name=None):
+    def __init__(self, name, group_name, prefix=None, joint_state_topic=u'joint_states', tf_root_link_name=None):
         """
         :type js_identifier: str
         """
         super(SyncConfiguration, self).__init__(name)
         self.mjs = None
+        self.prefix = prefix
         self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
-        self.joint_state_topic = prefix + joint_state_topic
+        if self.prefix is not None:
+            if self.prefix[-1] == '/':
+                self.prefix = prefix[:-1]
+            self.joint_state_topic = u'{}{}'.format(prefix, joint_state_topic)
+        else:
+            self.joint_state_topic = joint_state_topic
         self.group_name = group_name
         self.group = self.world.groups[self.group_name]  # type: SubWorldTree
         if tf_root_link_name is None:
@@ -50,7 +56,7 @@ class SyncConfiguration(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = JointStates.from_msg(js, None)
+            self.mjs = JointStates.from_msg(js, self.prefix)
         except Empty:
             pass
 

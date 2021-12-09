@@ -9,14 +9,49 @@ from giskardpy.utils.logging import loginfo
 from giskardpy.tree.plugin import GiskardBehavior
 
 
+class SendTrajectories(GiskardBehavior):
+
+    def __init__(self, name, ros_namespaces):
+        GiskardBehavior.__init__(self, name)
+        self.ros_namespaces = ros_namespaces
+        self.action_clients = dict()
+        self.succeeded = dict()
+
+    def setup(self, timeout):
+        for _, action_client in self.action_clients.items():
+            action_client.setup(timeout)
+
+    def initialise(self):
+        for ros_namespace in self.ros_namespaces:
+            action_clients = SendTrajectory(u'{}{}'.format(ros_namespace, self.name), ros_namespace=ros_namespace)
+            action_clients.initialise()
+
+    def update(self):
+        for name, action_client in self.action_clients.items():
+            r = action_client.update()
+            if r == py_trees.Status.RUNNING:
+                pass
+            elif r == py_trees.Status.INVALID or py_trees.Status.FAILURE:
+                return r
+            else:
+                self.succeeded[name] = True
+        if len(self.succeeded.values()) == len(self.action_clients.values()) and all(self.succeeded.values()):
+            self.succeeded = dict()
+            return py_trees.Status.SUCCESS
+        else:
+            return py_trees.Status.RUNNING
+
+
 class SendTrajectory(ActionClient, GiskardBehavior):
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
-    def __init__(self, name, action_namespace=u'/pr2_a/whole_body_controller/follow_joint_trajectory'):
+    def __init__(self, name, ros_namespace='/', action_namespace=u'whole_body_controller/follow_joint_trajectory'):
         GiskardBehavior.__init__(self, name)
-        loginfo(u'waiting for action server \'{}\' to appear'.format(action_namespace))
-        ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
+        self.ros_namespace = ros_namespace
+        full_action_namespace = u'{}{}'.format(self.ros_namespace, action_namespace)
+        loginfo(u'waiting for action server \'{}\' to appear'.format(full_action_namespace))
+        ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, full_action_namespace)
         loginfo(u'successfully connected to action server')
         self.fill_velocity_values = self.get_god_map().get_data(identifier.fill_velocity_values)
 
@@ -28,8 +63,9 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)['/pr2_a']
-        goal.trajectory = trajectory.to_msg(sample_period, controlled_joints, self.fill_velocity_values)
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
+        goal.trajectory = trajectory.to_msg(sample_period, controlled_joints, self.fill_velocity_values,
+                                            prefix=self.ros_namespace if self.ros_namespace != '/' else None)
         self.action_goal = goal
 
     def update(self):

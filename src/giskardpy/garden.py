@@ -216,10 +216,11 @@ def grow_tree():
     # ----------------------------------------------
     execute_canceled = Sequence('execute canceled')
     execute_canceled.add_child(GoalCanceled('goal canceled', action_server_name))
-    execute_canceled.add_child(SetErrorCode('set error code'))
+    execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
     publish_result = failure_is_success(Selector)('monitor execution')
     publish_result.add_child(execute_canceled)
     publish_result.add_child(execution_action_server)
+    publish_result.add_child(SetErrorCode('set error code', 'Execution'))
     # ----------------------------------------------
     # ----------------------------------------------
     planning_2 = failure_is_success(Selector)('planning II')
@@ -256,7 +257,7 @@ def grow_tree():
     process_move_cmd = success_is_failure(Sequence)('Process move commands')
     process_move_cmd.add_child(SetCmd('set move cmd', action_server_name))
     process_move_cmd.add_child(planning)
-    process_move_cmd.add_child(SetErrorCode('set error code'))
+    process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
 
     process_move_goal = failure_is_success(Selector)('Process goal')
     process_move_goal.add_child(process_move_cmd)

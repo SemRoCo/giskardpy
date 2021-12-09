@@ -3,6 +3,11 @@ from rospy import ROSException
 from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 
+from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
+    FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
+    FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
+    ExecutionTimeoutException, PreemptedException
+
 try:
     import pr2_controllers_msgs.msg
 except ImportError:
@@ -21,6 +26,7 @@ from giskardpy.utils.logging import loginfo
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
+    deadline: rospy.Time
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
@@ -43,6 +49,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         while not action_msg_type:
             try:
                 action_msg_type, _, _ = rostopic.get_topic_class('{}/goal'.format(self.action_namespace))
+                if action_msg_type is None:
+                    raise ROSTopicException()
                 try:
                     action_msg_type = eval(action_msg_type._type.replace('/', '.msg.')[:-4])
                     if action_msg_type not in self.supported_action_types:
@@ -62,6 +70,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         while not msg:
             try:
                 status_msg_type, _, _ = rostopic.get_topic_class(state_topic)
+                if status_msg_type is None:
+                    raise ROSTopicException()
                 if status_msg_type not in self.supported_state_types:
                     raise TypeError('State topic of type \'{}\' is not supported. '
                                     'Must be one of: {}'.format(status_msg_type, self.supported_state_types))
@@ -84,6 +94,10 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         goal.trajectory = trajectory.to_msg(sample_period, self.controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
+        self.deadline = self.action_goal.trajectory.header.stamp + \
+                        self.action_goal.trajectory.points[-1].time_from_start + \
+                        self.action_goal.goal_time_tolerance
+        self.cancel_tries = 0
 
     def update(self):
         """
@@ -107,12 +121,48 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if self.action_client.get_state() == GoalStatus.ABORTED:
             result = self.action_client.get_result()
             self.feedback_message = self.error_code_to_str[result.error_code]
-            logging.logerr('fail {}'.format(self.feedback_message))
+            msg = '\'{}\' failed to execute goal. Error: \'{}\''.format(self.action_namespace,
+                                                                        self.error_code_to_str[result.error_code])
+            logging.logerr(msg)
+            if result.error_code == FollowJointTrajectoryResult.INVALID_GOAL:
+                e = FollowJointTrajectory_INVALID_GOAL(msg)
+            elif result.error_code == FollowJointTrajectoryResult.INVALID_JOINTS:
+                e = FollowJointTrajectory_INVALID_JOINTS(msg)
+            elif result.error_code == FollowJointTrajectoryResult.OLD_HEADER_TIMESTAMP:
+                e = FollowJointTrajectory_OLD_HEADER_TIMESTAMP(msg)
+            elif result.error_code == FollowJointTrajectoryResult.PATH_TOLERANCE_VIOLATED:
+                e = FollowJointTrajectory_PATH_TOLERANCE_VIOLATED(msg)
+            elif result.error_code == FollowJointTrajectoryResult.GOAL_TOLERANCE_VIOLATED:
+                e = FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(msg)
+            else:
+                e = ExecutionException(msg)
+            self.raise_to_blackboard(e)
             return py_trees.Status.FAILURE
+        if self.action_client.get_state() in [GoalStatus.PREEMPTED, GoalStatus.PREEMPTING]:
+            if rospy.get_rostime() > self.deadline:
+                msg = '\'{}\' preempted, ' \
+                      'probably because it took to long to execute the goal.'.format(self.action_namespace)
+                self.raise_to_blackboard(ExecutionTimeoutException(msg))
+            else:
+                msg = '\'{}\' preempted. Stopping execution.'.format(self.action_namespace)
+                self.raise_to_blackboard(PreemptedException(msg))
+            logging.logerr(msg)
+            return py_trees.Status.FAILURE
+        if rospy.get_rostime() > self.deadline:
+            self.action_client.cancel_goal()
+            msg = 'Cancelling \'{}\' because it took to long to execute the goal.'.format(self.action_namespace)
+            logging.logerr(msg)
+            self.cancel_tries += 1
+            if self.cancel_tries > 5:
+                logging.logwarn('\'{}\' didn\'t cancel execution after 5 tries.'.format(self.action_namespace))
+                self.raise_to_blackboard(ExecutionTimeoutException(msg))
+                return py_trees.Status.FAILURE
+            return py_trees.Status.RUNNING
+
         result = self.action_client.get_result()
         if result:
             self.feedback_message = "goal reached"
-            logging.loginfo('{} successfully executed the trajectory.'.format(self.action_namespace))
+            logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
             return py_trees.Status.SUCCESS
         else:
             self.feedback_message = "moving"

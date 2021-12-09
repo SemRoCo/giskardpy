@@ -3,13 +3,16 @@
 import actionlib
 import control_msgs.msg
 import rospy
+from control_msgs.msg import FollowJointTrajectoryResult
 
 
-class SuccessfulActionServer(object):
+class FakeActionServer(object):
 
     def __init__(self):
         self.name_space = rospy.get_param('~name_space')
         self.joint_names = rospy.get_param('~joint_names')
+        self.sleep_percent = rospy.get_param('~sleep_factor')
+        self.result = rospy.get_param('~result')
         self.state = {j:0 for j in self.joint_names}
         self.pub = rospy.Publisher('{}/state'.format(self.name_space), control_msgs.msg.JointTrajectoryControllerState,
                                    queue_size=10)
@@ -30,24 +33,17 @@ class SuccessfulActionServer(object):
         self._as.set_preempted()
 
     def execute_cb(self, goal):
-        rospy.sleep(goal.trajectory.points[-1].time_from_start)
+        rospy.sleep(self.sleep_percent * goal.trajectory.points[-1].time_from_start)
         if self._as.is_active():
-            self._as.set_succeeded()
+            result = control_msgs.msg.FollowJointTrajectoryResult()
+            result.error_code = self.result
+            if self.result == FollowJointTrajectoryResult.SUCCESSFUL:
+                self._as.set_succeeded(result)
+            else:
+                self._as.set_aborted(result)
 
-
-class FailingActionServer(SuccessfulActionServer):
-    def execute_cb(self, goal):
-        rospy.sleep(goal.trajectory.points[1].time_from_start)
-        result = control_msgs.msg.FollowJointTrajectoryResult()
-        result.error_code = control_msgs.msg.FollowJointTrajectoryResult.GOAL_TOLERANCE_VIOLATED
-        if self._as.is_active():
-            self._as.set_aborted(result)
 
 if __name__ == '__main__':
     rospy.init_node('SuccessfulActionServer')
-    action_sever_type = rospy.get_param('~type')
-    if action_sever_type == 'SuccessfulActionServer':
-        server = SuccessfulActionServer()
-    else:
-        server = FailingActionServer()
+    server = FakeActionServer()
     rospy.spin()

@@ -29,6 +29,7 @@ from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
+from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
@@ -387,6 +388,7 @@ class RotationGoalChecker(GoalChecker):
 
 
 class GiskardTestWrapper(GiskardWrapper):
+    god_map: GodMap
     default_pose = {}
     better_pose = {}
 
@@ -484,10 +486,22 @@ class GiskardTestWrapper(GiskardWrapper):
     def tear_down(self):
         rospy.sleep(1)
         self.heart.shutdown()
+        # TODO it is strange that I need to kill the services... should be investigated. (:
+        self.tree.blackboard_exchange.get_blackboard_variables_srv.shutdown()
+        self.tree.blackboard_exchange.open_blackboard_watcher_srv.shutdown()
+        self.tree.blackboard_exchange.close_blackboard_watcher_srv.shutdown()
+        self.kill_all_services()
         logging.loginfo(
             'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo('total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo('stopping tree')
+
+    def kill_all_services(self):
+        for value in self.god_map.get_data(identifier.tree_manager).tree_nodes.values():
+            node = value.node
+            for attribute_name, attribute in vars(node).items():
+                if isinstance(attribute, rospy.Service):
+                    attribute.shutdown(reason='life is pain')
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)

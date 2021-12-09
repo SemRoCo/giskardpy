@@ -8,7 +8,7 @@
     <child link="link1"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1.0" lower="-3" upper="3" velocity=".5"/>
+    <limit effort="1.0" lower="-3" upper="3" velocity=".1"/>
   </joint>
 
   <link name="link1"/>
@@ -18,7 +18,7 @@
     <child link="link2"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     <axis xyz="0 1 0"/>
-    <limit effort="1.0" lower="-3" upper="3" velocity=".5"/>
+    <limit effort="1.0" lower="-3" upper="3" velocity=".1"/>
   </joint>
 
   <link name="link2"/>
@@ -28,7 +28,7 @@
     <child link="eef"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     <axis xyz="0 0 1"/>
-    <limit effort="1.0" velocity=".5"/>
+    <limit effort="1.0" velocity=".1"/>
   </joint>
 
   <link name="eef">

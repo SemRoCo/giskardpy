@@ -2051,6 +2051,7 @@ class TestWayPoints(object):
 
 class TestShaking(object):
     def test_wiggle_prismatic_joint_neglectable_shaking(self, kitchen_setup):
+        #FIXME
         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
@@ -2069,16 +2070,18 @@ class TestShaking(object):
                                             joint_name=joint,
                                             goal=0.0,
                                             )
-                kitchen_setup.send_goal()
+                kitchen_setup.plan_and_execute()
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=joint,
                                             noise_amplitude=amplitude_threshold - 0.05,
                                             goal=goal,
                                             frequency=target_freq
                                             )
-                kitchen_setup.send_and_check_goal()
+                kitchen_setup.plan_and_execute()
 
     def test_wiggle_revolute_joint_neglectable_shaking(self, kitchen_setup):
+        # FIXME
         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
@@ -2095,14 +2098,15 @@ class TestShaking(object):
                                             joint_name=joint,
                                             goal=0.0,
                                             )
-                kitchen_setup.send_goal()
+                kitchen_setup.plan_and_execute()
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=joint,
                                             noise_amplitude=amplitude_threshold - 0.05,
                                             goal=-1.0,
                                             frequency=target_freq
                                             )
-                kitchen_setup.send_and_check_goal()
+                kitchen_setup.plan_and_execute()
 
     def test_wiggle_continuous_joint_neglectable_shaking(self, kitchen_setup):
         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
@@ -2120,17 +2124,21 @@ class TestShaking(object):
                                             joint_name=continuous_joint,
                                             goal=5.0,
                                             )
-                kitchen_setup.send_goal()
+                kitchen_setup.plan_and_execute()
                 target_freq = float(f)
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionContinuous',
                                             joint_name=continuous_joint,
                                             goal=-5.0,
                                             noise_amplitude=amplitude_threshold - 0.05,
                                             frequency=target_freq
                                             )
-                kitchen_setup.send_and_check_goal()
+                kitchen_setup.plan_and_execute()
 
     def test_wiggle_revolute_joint_shaking(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         max_detectable_freq = int(1 / (2 * sample_period))
@@ -2145,21 +2153,21 @@ class TestShaking(object):
                                             joint_name=joint,
                                             goal=0.5,
                                             )
-                kitchen_setup.send_goal()
+                kitchen_setup.plan_and_execute()
                 target_freq = float(f)
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=joint,
                                             goal=0.0,
                                             frequency=target_freq
                                             )
-                kitchen_setup.send_and_check_goal()
-                # r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
-                # assert len(r.error_codes) != 0
-                # error_code = r.error_codes[0]
-                # assert error_code == MoveResult.SHAKING
-                # error_message = r.error_messages[0]
-                # freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-                # assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+                r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_wiggle_prismatic_joint_shaking(self, kitchen_setup):
         """
@@ -2179,21 +2187,21 @@ class TestShaking(object):
                                             joint_name=joint,
                                             goal=0.02,
                                             )
-                kitchen_setup.send_goal()
+                kitchen_setup.plan_and_execute()
                 target_freq = float(f)
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=joint,
                                             goal=0.0,
                                             frequency=target_freq
                                             )
-                kitchen_setup.plan_and_execute()
-                # r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
-                # assert len(r.error_codes) != 0
-                # error_code = r.error_codes[0]
-                # assert error_code == MoveResult.SHAKING
-                # error_message = r.error_messages[0]
-                # freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-                # assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+                r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_wiggle_continuous_joint_shaking(self, kitchen_setup):
         """
@@ -2213,23 +2221,26 @@ class TestShaking(object):
                                             joint_name=continuous_joint,
                                             goal=5.0,
                                             )
-                kitchen_setup.send_goal()
+                kitchen_setup.plan_and_execute()
                 target_freq = float(f)
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionContinuous',
                                             joint_name=continuous_joint,
                                             goal=-5.0,
                                             frequency=target_freq
                                             )
-                kitchen_setup.plan_and_execute()
-                # r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
-                # assert len(r.error_codes) != 0
-                # error_code = r.error_codes[0]
-                # assert error_code == MoveResult.SUCCESS
-                # error_message = r.error_messages[0]
-                # freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-                # assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+                r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_only_revolute_joint_shaking(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
@@ -2248,24 +2259,28 @@ class TestShaking(object):
                                                 joint_name=revolute_joint,
                                                 goal=0.0,
                                                 )
-                    kitchen_setup.send_goal()
+                    kitchen_setup.plan_and_execute()
 
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=revolute_joint,
                                             goal=0.0,
                                             noise_amplitude=amplitude_threshold + 0.02,
                                             frequency=target_freq
                                             )
-                kitchen_setup.send_and_check_goal()
-                # r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
-                # assert len(r.error_codes) != 0
-                # error_code = r.error_codes[0]
-                # assert error_code == MoveResult.SHAKING
-                # error_message = r.error_messages[0]
-                # freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-                # assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+                r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_only_revolute_joint_neglectable_shaking(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        # FIXME
         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
@@ -2278,21 +2293,20 @@ class TestShaking(object):
         for revolute_joint in ['r_wrist_flex_joint', 'head_pan_joint']:  # max vel. of 1.0 and 0.5
             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
                 target_freq = float(f)
-
                 if f == min_wiggle_frequency:
                     kitchen_setup.set_json_goal('JointPositionRevolute',
                                                 joint_name=revolute_joint,
                                                 goal=0.0,
                                                 )
-                    kitchen_setup.send_goal()
-
+                    kitchen_setup.plan_and_execute()
+                kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=revolute_joint,
                                             goal=0.0,
                                             noise_amplitude=amplitude_threshold - 0.02,
                                             frequency=target_freq
                                             )
-                r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                r = kitchen_setup.plan_and_execute()
                 if any(map(lambda c: c == MoveResult.SHAKING, r.error_codes)):
                     error_message = r.error_messages[0]
                     freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)

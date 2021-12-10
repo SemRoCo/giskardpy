@@ -688,7 +688,7 @@ class GiskardTestWrapper(GiskardWrapper):
             self.are_joint_limits_violated()
         finally:
             self.goal_checks = defaultdict(list)
-        return r.trajectory
+        return r
 
     def get_result_trajectory_position(self):
         trajectory = self.god_map.unsafe_get_data(identifier.trajectory)

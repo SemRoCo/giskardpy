@@ -195,8 +195,8 @@ def grow_tree():
     planning_4.add_plugin(LogTrajPlugin('log'))
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
         planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
-    # planning_4.add_plugin(WiggleCancel('wiggle'))
-    # planning_4.add_plugin(LoopDetector('loop detector'))
+    planning_4.add_plugin(WiggleCancel('wiggle'))
+    planning_4.add_plugin(LoopDetector('loop detector'))
     planning_4.add_plugin(GoalReachedPlugin('goal reached'))
     planning_4.add_plugin(TimePlugin('time'))
     if god_map.get_data(identifier.MaxTrajectoryLength_enabled):

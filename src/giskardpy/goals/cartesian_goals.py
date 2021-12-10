@@ -96,6 +96,7 @@ class CartesianOrientation(Goal):
 class CartesianPositionStraight(Goal):
     def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
+        super(CartesianPositionStraight, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.reference_velocity = reference_velocity
@@ -104,7 +105,6 @@ class CartesianPositionStraight(Goal):
         self.root_link = root_link
         self.tip_link = tip_link
         self.goal_pose = self.transform_msg(self.root_link, goal)
-        super(CartesianPositionStraight, self).__init__(**kwargs)
 
         self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)
 

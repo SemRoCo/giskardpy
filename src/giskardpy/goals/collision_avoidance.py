@@ -244,7 +244,7 @@ class CollisionAvoidanceHint(Goal):
             spring_threshold = max(spring_threshold, max_threshold)
 
         # register collision checks TODO make function
-        added_checks = self.god_map.get_data(identifier.added_collision_checks)
+        added_checks = self.god_map.get_data(identifier.added_self_collisions)
         if tip_link in added_checks:
             added_checks[tip_link] = max(added_checks[tip_link], spring_threshold)
         else:

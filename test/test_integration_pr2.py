@@ -206,6 +206,7 @@ class TestConstraints(object):
         """
         :type zero_pose: PR2
         """
+        #FIXME
         joint_name = 'head_pan_joint'
         lower_limit, upper_limit = zero_pose.robot.joints[joint_name].position_limits
         lower_limit *= 0.5
@@ -219,8 +220,8 @@ class TestConstraints(object):
         }, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        assert zero_pose.robot.state[joint_name].position <= upper_limit + 2e-3
-        assert zero_pose.robot.state[joint_name].position >= lower_limit - 2e-3
+        assert zero_pose.robot.state[joint_name].position <= upper_limit + 3e-3
+        assert zero_pose.robot.state[joint_name].position >= lower_limit - 3e-3
 
         zero_pose.set_json_goal('JointPositionRange',
                                 joint_name=joint_name,
@@ -248,6 +249,7 @@ class TestConstraints(object):
         """
         :type kitchen_setup: PR2
         """
+        # FIXME
         # FIXME bouncy
         tip = 'base_footprint'
         base_pose = PoseStamped()
@@ -433,6 +435,7 @@ class TestConstraints(object):
         """
         :type zero_pose: PR2
         """
+        # FIXME
         base_linear_velocity = 0.1
         base_angular_velocity = 0.2
         zero_pose.limit_cartesian_velocity(
@@ -528,6 +531,7 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
+        # FIXME
         joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
         old_torso_value = pocky_pose_setup.god_map.get_data(
             joint_velocity_weight + ['torso_lift_joint'])
@@ -1300,6 +1304,7 @@ class TestConstraints(object):
         """"
         :type kitchen_setup: PR2
         """
+        # FIXME
         handle_name = [
             # 'oven_area_area_middle_upper_drawer_handle',
             'oven_area_area_middle_lower_drawer_handle',

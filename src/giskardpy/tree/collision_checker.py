@@ -81,6 +81,17 @@ class CollisionChecker(GiskardBehavior):
                 max_distances[link_name] = max(distance, max_distances[link_name])
             else:
                 max_distances[link_name] = distance
+
+        try:
+            added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
+            for link_name, distance in added_checks.items():
+                if link_name in max_distances:
+                    max_distances[link_name] = max(distance, max_distances[link_name])
+                else:
+                    max_distances[link_name] = distance
+        except KeyError:
+            # no collision checks added
+            pass
         return max_distances
 
     @profile

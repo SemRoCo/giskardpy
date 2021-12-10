@@ -501,30 +501,39 @@ class AvoidJointLimits(Goal):
 
 
 class JointPositionRange(Goal):
-    def __init__(self, joint_name, upper_limit, lower_limit, **kwargs):
+    def __init__(self, joint_name, upper_limit, lower_limit, hard=False, **kwargs):
         super(JointPositionRange, self).__init__(**kwargs)
         self.joint_name = joint_name
         if self.world.is_joint_continuous(joint_name):
             raise NotImplementedError('Can\'t limit range of continues joint \'{}\'.'.format(self.joint_name))
         self.upper_limit = upper_limit
         self.lower_limit = lower_limit
-        current_position = self.world.state[self.joint_name].position
-        if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
-            raise ConstraintInitalizationException('{} out of set limits. '
-                                                   '{} <= {} <= {} is not true.'.format(self.joint_name,
-                                                                                         self.lower_limit,
-                                                                                         current_position,
-                                                                                         self.upper_limit))
+        self.hard = hard
+        if self.hard:
+            current_position = self.world.state[self.joint_name].position
+            if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
+                raise ConstraintInitalizationException('{} out of set limits. '
+                                                       '{} <= {} <= {} is not true.'.format(self.joint_name,
+                                                                                             self.lower_limit,
+                                                                                             current_position,
+                                                                                             self.upper_limit))
 
     def make_constraints(self):
         joint_position = self.get_joint_position_symbol(self.joint_name)
-        self.add_constraint(reference_velocity=self.world.joint_limit_expr(self.joint_name, 1)[1],
-                            lower_error=self.lower_limit - joint_position,
-                            upper_error=self.upper_limit - joint_position,
-                            weight=WEIGHT_BELOW_CA,
-                            expression=joint_position,
-                            lower_slack_limit=0,
-                            upper_slack_limit=0)
+        if self.hard:
+            self.add_constraint(reference_velocity=self.world.joint_limit_expr(self.joint_name, 1)[1],
+                                lower_error=self.lower_limit - joint_position,
+                                upper_error=self.upper_limit - joint_position,
+                                weight=WEIGHT_BELOW_CA,
+                                expression=joint_position,
+                                lower_slack_limit=0,
+                                upper_slack_limit=0)
+        else:
+            self.add_constraint(reference_velocity=self.world.joint_limit_expr(self.joint_name, 1)[1],
+                                lower_error=self.lower_limit - joint_position,
+                                upper_error=self.upper_limit - joint_position,
+                                weight=WEIGHT_BELOW_CA,
+                                expression=joint_position)
 
     def __str__(self):
         s = super(JointPositionRange, self).__str__()

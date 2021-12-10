@@ -238,7 +238,8 @@ class TestConstraints(object):
         zero_pose.set_json_goal('JointPositionRange',
                                 joint_name=joint_name,
                                 upper_limit=10,
-                                lower_limit=9)
+                                lower_limit=9,
+                                hard=True)
         zero_pose.set_joint_goal({
             joint_name: 0
         }, check=False)

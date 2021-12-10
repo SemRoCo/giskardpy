@@ -21,15 +21,6 @@ floor_detection_js = {
     'ur5_wrist_3_joint': 1.55717146397,
 }
 
-better_js = {
-    'ur5_shoulder_pan_joint': -np.pi / 2,
-    'ur5_shoulder_lift_joint': -2.44177755311,
-    'ur5_elbow_joint': 2.15026930371,
-    'ur5_wrist_1_joint': 0.291547812391,
-    'ur5_wrist_2_joint': np.pi / 2,
-    'ur5_wrist_3_joint': np.pi / 2
-}
-
 self_collision_js = {
     'ur5_shoulder_pan_joint': -1.57,
     'ur5_shoulder_lift_joint': -1.35,

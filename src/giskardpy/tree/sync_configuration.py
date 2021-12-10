@@ -39,7 +39,7 @@ class SyncConfiguration(GiskardBehavior):
 
     def setup(self, timeout=0.0):
         msg = None
-        while msg is None:
+        while msg is None and not rospy.is_shutdown():
             try:
                 msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
             except ROSException as e:

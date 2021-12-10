@@ -1035,6 +1035,15 @@ class Donbot(GiskardTestWrapper):
         'ur5_wrist_3_joint': 0.0
     }
 
+    better_pose = {
+        'ur5_shoulder_pan_joint': -np.pi / 2,
+        'ur5_shoulder_lift_joint': -2.44177755311,
+        'ur5_elbow_joint': 2.15026930371,
+        'ur5_wrist_1_joint': 0.291547812391,
+        'ur5_wrist_2_joint': np.pi / 2,
+        'ur5_wrist_3_joint': np.pi / 2
+    }
+
     def __init__(self):
         self.camera_tip = 'camera_link'
         self.gripper_tip = 'gripper_tool_frame'

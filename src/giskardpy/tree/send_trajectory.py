@@ -48,7 +48,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         loginfo('Waiting for action server \'{}\' to appear.'.format(self.action_namespace))
         action_msg_type = None
-        while not action_msg_type:
+        while not action_msg_type and not rospy.is_shutdown():
             try:
                 action_msg_type, _, _ = rostopic.get_topic_class('{}/goal'.format(self.action_namespace))
                 if action_msg_type is None:
@@ -69,7 +69,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         loginfo('Waiting for state topic \'{}\' to appear.'.format(state_topic))
         msg = None
-        while not msg:
+        while not msg and not rospy.is_shutdown():
             try:
                 status_msg_type, _, _ = rostopic.get_topic_class(state_topic)
                 if status_msg_type is None:

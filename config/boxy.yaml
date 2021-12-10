@@ -1,1 +1,22 @@
 parent: !include default.yaml
+action_server:
+  base:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+  torso:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/torso/follow_joint_trajectory
+    state_topic: /whole_body_controller/torso/state
+  neck:
+    plugin: SendFollowJointTrajectory
+    namespace: /scaled_pos_traj_controller/follow_joint_trajectory
+    state_topic: /scaled_pos_traj_controller/state
+  left_arm:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/left_arm/follow_joint_trajectory
+    state_topic: /whole_body_controller/left_arm/state
+  right_arm:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/right_arm/follow_joint_trajectory
+    state_topic: /whole_body_controller/right_arm/state

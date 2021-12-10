@@ -30,7 +30,7 @@ class Open(Goal):
                                                    **kwargs))
 
     def __str__(self):
-        return u'{}/{}'.format(super(Open, self).__str__(), self.tip_link, self.handle_link)
+        return '{}/{}'.format(super(Open, self).__str__(), self.tip_link, self.handle_link)
 
 
 class Close(Goal):

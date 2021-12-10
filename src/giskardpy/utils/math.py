@@ -36,3 +36,14 @@ def inverse_frame(f1_T_f2):
     f2_T_f1[:3, :3] = f1_T_f2[:3, :3].T
     f2_T_f1[:3, 3] = np.dot(-f2_T_f1[:3, :3], f1_T_f2[:3, 3])
     return f2_T_f1
+
+def angle_between_vector(v1, v2):
+    """
+    :type v1: Vector3
+    :type v2: Vector3
+    :rtype: float
+    """
+    return np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+
+def normalize(v):
+    return v / np.linalg.norm(v)

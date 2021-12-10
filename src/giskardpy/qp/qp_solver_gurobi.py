@@ -119,7 +119,7 @@ class QPSolverGurobi(QPSolver):
                 break
             elif success in {gurobipy.GRB.NUMERIC} and i < tries-1:
                 self.print_debug()
-                logging.logwarn(u'Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
+                logging.logwarn('Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
                     self.STATUS_VALUE_DICT[success],
                     decimal_places
                 ))
@@ -132,7 +132,7 @@ class QPSolverGurobi(QPSolver):
         else:
             # self.print_debug()
             self.started = False
-            error_message = u'{}'.format(self.STATUS_VALUE_DICT[success])
+            error_message = '{}'.format(self.STATUS_VALUE_DICT[success])
             if success == gurobipy.GRB.INFEASIBLE:
                 raise InfeasibleException(error_message)
             raise QPSolverException(error_message)

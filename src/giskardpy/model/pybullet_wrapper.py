@@ -17,16 +17,16 @@ from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
 
-JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
-                                      u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
-                                      u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
-                                      u'parent_frame_pos', u'parent_frame_orn', u'parent_index'])
+JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
+                                      'joint_damping', 'joint_friction', 'joint_lower_limit', 'joint_upper_limit',
+                                      'joint_max_force', 'joint_max_velocity', 'link_name', 'joint_axis',
+                                      'parent_frame_pos', 'parent_frame_orn', 'parent_index'])
 
-ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', u'body_unique_id_b', u'link_index_a',
-                                          u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
-                                          u'contact_distance', u'normal_force', u'lateralFriction1',
-                                          u'lateralFrictionDir1',
-                                          u'lateralFriction2', u'lateralFrictionDir2'])
+ContactInfo = namedtuple('ContactInfo', ['contact_flag', 'body_unique_id_a', 'body_unique_id_b', 'link_index_a',
+                                          'link_index_b', 'position_on_a', 'position_on_b', 'contact_normal_on_b',
+                                          'contact_distance', 'normal_force', 'lateralFriction1',
+                                          'lateralFrictionDir1',
+                                          'lateralFriction2', 'lateralFrictionDir2'])
 
 render = True
 
@@ -48,7 +48,7 @@ def random_string(size=6):
     :return: Generated random sequence of chars.
     :rtype: str
     """
-    return u''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
+    return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
 
 
 @profile
@@ -73,9 +73,9 @@ def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientat
         orientation = [0,0,0,1]
     object_name = robot_name_from_urdf_string(urdf_string)
     if object_name in get_body_names():
-        raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))
+        raise DuplicateNameException('an object with name \'{}\' already exists in pybullet'.format(object_name))
     resolved_urdf = resolve_ros_iris_in_urdf(urdf_string)
-    filename = write_to_tmp(u'{}.urdf'.format(random_string()), resolved_urdf)
+    filename = write_to_tmp('{}.urdf'.format(random_string()), resolved_urdf)
     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
         id = p.loadURDF(filename, position, orientation,
                         flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
@@ -102,7 +102,7 @@ def start_pybullet(gui, gravity=0):
     if not p.isConnected():
         if gui:
             # TODO expose opengl2 option for gui?
-            server_id = p.connect(p.GUI, options=u'--opengl2')  # or p.DIRECT for non-graphical version
+            server_id = p.connect(p.GUI, options='--opengl2')  # or p.DIRECT for non-graphical version
         else:
             server_id = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
         p.setGravity(0, 0, gravity)

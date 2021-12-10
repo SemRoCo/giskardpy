@@ -7,7 +7,7 @@ from giskardpy.utils import logging
 from giskardpy.exceptions import ShakingException
 from giskardpy.tree.plugin import GiskardBehavior
 # fast
-from giskardpy.tree.goal_reached import make_velocity_threshold
+# from giskardpy.tree.goal_reached import make_velocity_threshold
 
 
 class WiggleCancel(GiskardBehavior):
@@ -19,6 +19,17 @@ class WiggleCancel(GiskardBehavior):
         self.max_angular_velocity = 10.5
         self.max_linear_velocity = 10.5
 
+    def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
+        joint_convergence_threshold = self.god_map.get_data(identifier.joint_convergence_threshold)
+        free_variables = self.god_map.get_data(identifier.free_variables)
+        thresholds = []
+        for free_variable in free_variables:  # type: FreeVariable
+            velocity_limit = self.god_map.evaluate_expr(free_variable.get_upper_limit(1))
+            velocity_limit *= joint_convergence_threshold
+            velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
+            thresholds.append(velocity_limit)
+        return np.array(thresholds)
+
     def initialise(self):
         super(WiggleCancel, self).initialise()
         self.js_samples = []
@@ -29,7 +40,7 @@ class WiggleCancel(GiskardBehavior):
         self.thresholds = []
         self.velocity_limits = []
         for joint_name, threshold in zip(self.get_robot().controlled_joints,
-                                         make_velocity_threshold(self.get_god_map())):
+                                         self.make_velocity_threshold()):
             _, velocity_limit = self.world.get_joint_velocity_limits(joint_name)
             if self.world.is_joint_prismatic(joint_name):
                 velocity_limit = min(self.max_linear_velocity, velocity_limit)
@@ -71,7 +82,7 @@ class WiggleCancel(GiskardBehavior):
                 # self.get_god_map().set_data(identifier.time, len(trajectory.keys()))
                 if len(trajectory.keys()) >= self.num_samples_in_fft:
                     logging.loginfo(str(e))
-                    logging.loginfo(u'cutting off last second')
+                    logging.loginfo('cutting off last second')
                     return Status.SUCCESS
             raise e
 
@@ -119,22 +130,22 @@ class WiggleCancel(GiskardBehavior):
                 yf = fft[i]
                 # yf = np.fft.rfft(yy)
                 xf = np.fft.rfftfreq(N, d=sample_period)
-                plt.plot(xf, np.abs(yf.real), label=u'real')
-                # plt.plot(xf, np.abs(yf.imag), label=u'img')
+                plt.plot(xf, np.abs(yf.real), label='real')
+                # plt.plot(xf, np.abs(yf.imag), label='img')
             plt.show()
 
         fft = (velocity_limits * np.array(fft).T).T
         violations = fft[:, freq_idx:].T > amplitude_thresholds
         if np.any(violations):
             filtered_keys = self.keys[mask]
-            violation_str = u''
+            violation_str = ''
             for i in range(violations.shape[1]):
                 if np.any(violations[:, i]):
                     joint = filtered_keys[i]
                     velocity_limit = velocity_limits[i]
-                    hertz_str = u', '.join(u'{} hertz: {} > {}'.format(freq[freq_idx:][j],
+                    hertz_str = ', '.join('{} hertz: {} > {}'.format(freq[freq_idx:][j],
                                                                      fft[:, freq_idx:].T[:, i][j] / velocity_limit,
                                                                      amplitude_threshold) for j, x in
                                          enumerate(violations[:, i]) if x)
-                    violation_str += u'\nshaking of joint: \'{}\' at '.format(joint) + hertz_str
-            raise ShakingException(u'endless wiggling detected' + violation_str)
+                    violation_str += '\nshaking of joint: \'{}\' at '.format(joint) + hertz_str
+            raise ShakingException('endless wiggling detected' + violation_str)

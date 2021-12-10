@@ -30,16 +30,16 @@ class AlignPlanes(Goal):
 
     def __str__(self):
         s = super(AlignPlanes, self).__str__()
-        return u'{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
+        return '{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
                                                  self.tip_V_tip_normal.vector.x,
                                                  self.tip_V_tip_normal.vector.y,
                                                  self.tip_V_tip_normal.vector.z)
 
     def make_constraints(self):
-        tip_V_tip_normal = self.get_parameter_as_symbolic_expression(u'tip_V_tip_normal')
+        tip_V_tip_normal = self.get_parameter_as_symbolic_expression('tip_V_tip_normal')
         root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
-        root_V_root_normal = self.get_parameter_as_symbolic_expression(u'root_V_root_normal')
+        root_V_root_normal = self.get_parameter_as_symbolic_expression('root_V_root_normal')
         self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_root_normal,
                                          reference_velocity=self.max_velocity,

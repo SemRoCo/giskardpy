@@ -116,7 +116,7 @@ class Trajectory(object):
 
     def set(self, time, point):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:
-            raise KeyError(u'Cannot append a trajectory point that is before the current end time of the trajectory.')
+            raise KeyError('Cannot append a trajectory point that is before the current end time of the trajectory.')
         self._points[time] = point
 
     def delete(self, time):
@@ -144,10 +144,8 @@ class Trajectory(object):
         """
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-        if prefix is None:
-            trajectory_msg.joint_names = [str(c) for c in controlled_joints]
-        else:
-            trajectory_msg.joint_names = [str(j).replace(prefix, '') for j in controlled_joints if prefix in str(j)]
+        trajectory_msg.joint_names = controlled_joints
+        controlled_joints = [str(PrefixName(j, prefix)) for j in controlled_joints]
         for time, traj_point in self.items():
             p = JointTrajectoryPoint()
             p.time_from_start = rospy.Duration(time * sample_period)
@@ -157,7 +155,7 @@ class Trajectory(object):
                     if fill_velocity_values:
                         p.velocities.append(traj_point[joint_name].velocity)
                 else:
-                    raise NotImplementedError(u'generated traj does not contain all joints')
+                    raise NotImplementedError('generated traj does not contain all joints')
             trajectory_msg.points.append(p)
         return trajectory_msg
 
@@ -459,11 +457,11 @@ class PrefixName(object):
         return self.long_name.__contains__(item.__str__())
 
 order_map = BiDict({
-    0: u'position',
-    1: u'velocity',
-    2: u'acceleration',
-    3: u'jerk',
-    4: u'snap',
-    5: u'crackle',
-    6: u'pop'
+    0: 'position',
+    1: 'velocity',
+    2: 'acceleration',
+    3: 'jerk',
+    4: 'snap',
+    5: 'crackle',
+    6: 'pop'
 })

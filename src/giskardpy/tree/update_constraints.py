@@ -18,17 +18,7 @@ from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, External
 from giskardpy.goals.goal import Goal
 from giskardpy.tree.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import convert_dictionary_to_ros_message
-
-
-def get_all_classes_in_package(package):
-    classes = {}
-    for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-        module = __import__('giskardpy.goals.{}'.format(modname), fromlist="dummy")
-        for name2, value2 in inspect.getmembers(module, inspect.isclass):
-            if issubclass(value2, Goal):
-                classes[name2] = value2
-    return classes
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package
 
 
 class GoalToConstraints(GetGoal):
@@ -40,7 +30,7 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals)
+        self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals, Goal)
 
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
@@ -55,7 +45,7 @@ class GoalToConstraints(GetGoal):
     def update(self):
         # TODO make this interruptable
         # TODO try catch everything
-        loginfo(u'Parsing goal message.')
+        loginfo('Parsing goal message.')
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
             return Status.FAILURE
@@ -69,7 +59,7 @@ class GoalToConstraints(GetGoal):
         try:
             self.parse_constraints(move_cmd)
         except AttributeError:
-            self.raise_to_blackboard(InvalidGoalException(u'couldn\'t transform goal'))
+            self.raise_to_blackboard(InvalidGoalException('couldn\'t transform goal'))
             traceback.print_exc()
             return Status.SUCCESS
         except Exception as e:
@@ -91,9 +81,9 @@ class GoalToConstraints(GetGoal):
             return Status.SUCCESS
 
         l = self.active_free_symbols()
-        joint_constraints = [v for v in self.world.joint_constraints.values() if v.name in l]
-        self.get_god_map().set_data(identifier.free_variables, joint_constraints)
-        loginfo(u'Done parsing goal message.')
+        free_variables = list(sorted([v for v in self.world.joint_constraints if v.name in l], key=lambda x: x.name))
+        self.get_god_map().set_data(identifier.free_variables, free_variables)
+        loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
     def active_free_symbols(self):
@@ -110,7 +100,7 @@ class GoalToConstraints(GetGoal):
         """
         for constraint in itertools.chain(cmd.constraints):
             try:
-                loginfo(u'Adding constraint of type: \'{}\''.format(constraint.type))
+                loginfo('Adding constraint of type: \'{}\''.format(constraint.type))
                 C = self.allowed_constraint_types[constraint.type]
             except KeyError:
                 matches = ''
@@ -121,11 +111,11 @@ class GoalToConstraints(GetGoal):
                         matches = matches + s + '\n'
                 if matches != '':
                     raise UnknownConstraintException(
-                        u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type, matches))
+                        'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type, matches))
                 else:
                     available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
                     raise UnknownConstraintException(
-                        u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type,
+                        'unknown constraint {}. available constraint types:\n{}'.format(constraint.type,
                                                                                          available_constraints))
 
             try:
@@ -135,7 +125,7 @@ class GoalToConstraints(GetGoal):
             except Exception as e:
                 traceback.print_exc()
                 doc_string = C.__init__.__doc__
-                error_msg = u'Initialization of "{}" constraint failed: \n {} \n'.format(C.__name__, e)
+                error_msg = 'Initialization of "{}" constraint failed: \n {} \n'.format(C.__name__, e)
                 if doc_string is not None:
                     error_msg = error_msg + doc_string
                 if not isinstance(e, GiskardException):
@@ -188,14 +178,14 @@ class GoalToConstraints(GetGoal):
         for joint_name in controlled_joints:
             child_links = self.robot.get_directly_controlled_child_links_with_collisions(joint_name)
             if child_links:
-                number_of_repeller = config[joint_name][u'number_of_repeller']
+                number_of_repeller = config[joint_name]['number_of_repeller']
                 for i in range(number_of_repeller):
                     child_link = self.robot.joints[joint_name].child_link_name
-                    hard_threshold = config[joint_name][u'hard_threshold']
+                    hard_threshold = config[joint_name]['hard_threshold']
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
                     else:
-                        soft_threshold = config[joint_name][u'soft_threshold']
+                        soft_threshold = config[joint_name]['soft_threshold']
                     constraint = ExternalCollisionAvoidance(god_map=self.god_map,
                                                             link_name=child_link,
                                                             hard_threshold=hard_threshold,
@@ -233,26 +223,26 @@ class GoalToConstraints(GetGoal):
         for link_a, link_b in counter:
             num_of_constraints = min(1, counter[link_a, link_b])
             for i in range(num_of_constraints):
-                key = u'{}, {}'.format(link_a, link_b)
-                key_r = u'{}, {}'.format(link_b, link_a)
+                key = '{}, {}'.format(link_a, link_b)
+                key_r = '{}, {}'.format(link_b, link_a)
                 # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
                 if key in config:
-                    hard_threshold = config[key][u'hard_threshold']
-                    soft_threshold = config[key][u'soft_threshold']
-                    number_of_repeller = config[key][u'number_of_repeller']
+                    hard_threshold = config[key]['hard_threshold']
+                    soft_threshold = config[key]['soft_threshold']
+                    number_of_repeller = config[key]['number_of_repeller']
                 elif key_r in config:
-                    hard_threshold = config[key_r][u'hard_threshold']
-                    soft_threshold = config[key_r][u'soft_threshold']
-                    number_of_repeller = config[key_r][u'number_of_repeller']
+                    hard_threshold = config[key_r]['hard_threshold']
+                    soft_threshold = config[key_r]['soft_threshold']
+                    number_of_repeller = config[key_r]['number_of_repeller']
                 else:
                     # TODO minimum is not the best if i reduce to the links next to the controlled chains
                     #   should probably add symbols that retrieve the values for the current pair
-                    hard_threshold = min(config[link_a][u'hard_threshold'],
-                                         config[link_b][u'hard_threshold'])
-                    soft_threshold = min(config[link_a][u'soft_threshold'],
-                                         config[link_b][u'soft_threshold'])
-                    number_of_repeller = min(config[link_a][u'number_of_repeller'],
-                                             config[link_b][u'number_of_repeller'])
+                    hard_threshold = min(config[link_a]['hard_threshold'],
+                                         config[link_b]['hard_threshold'])
+                    soft_threshold = min(config[link_a]['soft_threshold'],
+                                         config[link_b]['soft_threshold'])
+                    number_of_repeller = min(config[link_a]['number_of_repeller'],
+                                             config[link_b]['number_of_repeller'])
                 constraint = SelfCollisionAvoidance(god_map=self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,

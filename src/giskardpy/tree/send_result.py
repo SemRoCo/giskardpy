@@ -15,10 +15,10 @@ class SendResult(ActionServerBehavior):
         Blackboard().set('exception', None)  # FIXME move this to reset?
         result = self.get_god_map().get_data(identifier.result_message)
 
-        trajectory = self.get_god_map().get_data(identifier.trajectory)
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
-        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
-        result.trajectory = trajectory.to_msg(sample_period, controlled_joints, True)
+        # trajectory = self.get_god_map().get_data(identifier.trajectory)
+        # sample_period = self.get_god_map().get_data(identifier.sample_period)
+        # controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
+        # result.trajectory = trajectory.to_msg(sample_period, controlled_joints, True)
 
         if result.error_codes[-1] == MoveResult.PREEMPTED:
             logging.logerr('Goal preempted')
@@ -31,11 +31,11 @@ class SendResult(ActionServerBehavior):
 
         else:
             if not self.all_goals_succeeded(result):
-                logging.logwarn(u'Failed to execute goal.')
+                logging.logwarn('Failed to execute goal.')
                 self.get_as().send_aborted(result)
                 return Status.SUCCESS
             else:
-                logging.loginfo(u'----------------Successfully executed goal.----------------')
+                logging.loginfo('----------------Successfully executed goal.----------------')
         self.get_as().send_result(result)
         return Status.SUCCESS
 

@@ -35,8 +35,8 @@ class Pointing(Goal):
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root, self.tip)
-        root_P_goal_point = self.get_parameter_as_symbolic_expression(u'root_P_goal_point')
-        tip_V_pointing_axis = self.get_parameter_as_symbolic_expression(u'tip_V_pointing_axis')
+        root_P_goal_point = self.get_parameter_as_symbolic_expression('root_P_goal_point')
+        tip_V_pointing_axis = self.get_parameter_as_symbolic_expression('tip_V_pointing_axis')
 
         root_V_goal_axis = root_P_goal_point - w.position_of(root_T_tip)
         root_V_goal_axis /= w.norm(root_V_goal_axis)  # FIXME avoid /0
@@ -49,4 +49,4 @@ class Pointing(Goal):
 
     def __str__(self):
         s = super(Pointing, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root, self.tip)
+        return '{}/{}/{}'.format(s, self.root, self.tip)

@@ -28,5 +28,5 @@ class PlotDebugExpressions(GiskardBehavior):
                                 file_name='debug.pdf', history=self.history)
             except Exception:
                 traceback.print_exc()
-                logwarn(u'failed to save debug. pdf')
+                logwarn('failed to save debug. pdf')
         return Status.SUCCESS

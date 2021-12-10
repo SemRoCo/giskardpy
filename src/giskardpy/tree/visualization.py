@@ -12,7 +12,7 @@ class VisualizationBehavior(GiskardBehavior):
         self.marker_ids = {}
 
     def setup(self, timeout):
-        self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
+        self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         return super(VisualizationBehavior, self).setup(timeout)
 
     def update(self):
@@ -26,7 +26,7 @@ class VisualizationBehavior(GiskardBehavior):
                 if link_name not in self.marker_ids:
                     self.marker_ids[link_name] = len(self.marker_ids)
                 marker.id = self.marker_ids[link_name]
-                marker.ns = u'planning_visualization'
+                marker.ns = 'planning_visualization'
                 marker.header.stamp = time_stamp
                 marker.pose = self.collision_scene.get_pose(link_name).pose
                 markers.append(marker)
@@ -42,7 +42,7 @@ class VisualizationBehavior(GiskardBehavior):
             marker = Marker()
             marker.action = Marker.DELETE
             marker.id = i
-            marker.ns = u'planning_visualization'
+            marker.ns = 'planning_visualization'
             msg.markers.append(marker)
         self.publisher.publish(msg)
         self.marker_ids = {}

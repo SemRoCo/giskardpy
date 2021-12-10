@@ -14,10 +14,10 @@ from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cyli
 from giskardpy.utils.tfwrapper import normalize
 from giskardpy.utils.utils import suppress_stderr, memoize
 
-FIXED_JOINT = u'fixed'
-REVOLUTE_JOINT = u'revolute'
-CONTINUOUS_JOINT = u'continuous'
-PRISMATIC_JOINT = u'prismatic'
+FIXED_JOINT = 'fixed'
+REVOLUTE_JOINT = 'revolute'
+CONTINUOUS_JOINT = 'continuous'
+PRISMATIC_JOINT = 'prismatic'
 JOINT_TYPES = [FIXED_JOINT, REVOLUTE_JOINT, CONTINUOUS_JOINT, PRISMATIC_JOINT]
 MOVABLE_JOINT_TYPES = [REVOLUTE_JOINT, CONTINUOUS_JOINT, PRISMATIC_JOINT]
 ROTATIONAL_JOINT_TYPES = [REVOLUTE_JOINT, CONTINUOUS_JOINT]
@@ -81,19 +81,19 @@ class URDFObject(object):
                 geometry = up.Cylinder(world_body.shape.dimensions[world_body.shape.CYLINDER_RADIUS],
                                        world_body.shape.dimensions[world_body.shape.CYLINDER_HEIGHT])
             elif world_body.shape.type == world_body.shape.CONE:
-                raise TypeError(u'primitive shape cone not supported')
+                raise TypeError('primitive shape cone not supported')
             elif world_body.type == world_body.MESH_BODY:
                 geometry = up.Mesh(world_body.mesh)
             else:
-                raise CorruptShapeException(u'primitive shape \'{}\' not supported'.format(world_body.shape.type))
+                raise CorruptShapeException('primitive shape \'{}\' not supported'.format(world_body.shape.type))
             try:
                 link = up.Link(world_body.name)
-                link.add_aggregate(u'visual', up.Visual(geometry,
-                                                        material=up.Material(u'green', color=up.Color(0, 1, 0, 1))))
-                link.add_aggregate(u'collision', up.Collision(geometry))
+                link.add_aggregate('visual', up.Visual(geometry,
+                                                        material=up.Material('green', color=up.Color(0, 1, 0, 1))))
+                link.add_aggregate('collision', up.Collision(geometry))
             except AssertionError:
                 link = up.Link(world_body.name,
-                               visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
+                               visual=up.Visual(geometry, material=up.Material('green', color=up.Color(0, 1, 0, 1))),
                                collision=up.Collision(geometry))
             links.append(link)
         elif world_body.type == world_body.URDF_BODY:
@@ -101,7 +101,7 @@ class URDFObject(object):
             o.set_name(world_body.name)
             return o
         else:
-            raise CorruptShapeException(u'world body type \'{}\' not supported'.format(world_body.type))
+            raise CorruptShapeException('world body type \'{}\' not supported'.format(world_body.type))
         return cls.from_parts(world_body.name, links, joints, *args, **kwargs)
 
     @classmethod
@@ -115,14 +115,14 @@ class URDFObject(object):
         shape = [object_state.size.y,
                  object_state.size.x,
                  object_state.size.z]
-        if object_state.has_visual and object_state.mesh_path == u'':
+        if object_state.has_visual and object_state.mesh_path == '':
             geometry = up.Box(shape)
         elif object_state.has_visual:
             geometry = up.Mesh(object_state.mesh_path)
         else:
-            raise CorruptShapeException(u'object state has no visual')
+            raise CorruptShapeException('object state has no visual')
         link = up.Link(object_state.object_id,
-                       visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
+                       visual=up.Visual(geometry, material=up.Material('green', color=up.Color(0, 1, 0, 1))),
                        collision=up.Collision(geometry))
         links.append(link)
         return cls.from_parts(object_state.object_id, links, joints, *args, **kwargs)
@@ -136,7 +136,7 @@ class URDFObject(object):
         :rtype: URDFObject
         """
         r = up.Robot(robot_name)
-        r.version = u'1.0'
+        r.version = '1.0'
         for link in links:
             r.add_link(link)
         for joint in joints:
@@ -496,7 +496,7 @@ class URDFObject(object):
             children = self.get_child_links_of_link(link_name)
             children_with_collision = [x for x in children if self.has_link_collision(x)]
             if len(children_with_collision) > 1 or len(children) > 1:
-                raise TypeError(u'first collision link is not unique')
+                raise TypeError('first collision link is not unique')
             elif len(children_with_collision) == 1:
                 link_name = children_with_collision[0]
                 break
@@ -542,19 +542,19 @@ class URDFObject(object):
         """
         if urdf_object.get_name() in self.get_link_names():
             raise DuplicateNameException(
-                u'\'{}\' already has link with name \'{}\'.'.format(self.get_name(), urdf_object.get_name()))
+                '\'{}\' already has link with name \'{}\'.'.format(self.get_name(), urdf_object.get_name()))
         if urdf_object.get_name() in self.get_joint_names():
             raise DuplicateNameException(
-                u'\'{}\' already has joint with name \'{}\'.'.format(self.get_name(), urdf_object.get_name()))
+                '\'{}\' already has joint with name \'{}\'.'.format(self.get_name(), urdf_object.get_name()))
         if parent_link not in self.get_link_names():
             raise UnknownBodyException(
-                u'can not attach \'{}\' to non existent parent link \'{}\' of \'{}\''.format(urdf_object.get_name(),
+                'can not attach \'{}\' to non existent parent link \'{}\' of \'{}\''.format(urdf_object.get_name(),
                                                                                              parent_link,
                                                                                              self.get_name()))
         if len(set(urdf_object.get_link_names()).intersection(set(self.get_link_names()))) != 0:
-            raise DuplicateNameException(u'can not merge urdfs that share link names')
+            raise DuplicateNameException('can not merge urdfs that share link names')
         if len(set(urdf_object.get_joint_names()).intersection(set(self.get_joint_names()))) != 0:
-            raise DuplicateNameException(u'can not merge urdfs that share joint names')
+            raise DuplicateNameException('can not merge urdfs that share joint names')
 
         origin = up.Pose([np.round(pose.position.x, round_to),
                           np.round(pose.position.y, round_to),
@@ -597,7 +597,7 @@ class URDFObject(object):
         try:
             sub_tree = self.get_sub_tree_at_joint(joint_name)
         except KeyError:
-            raise KeyError(u'can\'t detach at unknown joint: {}'.format(joint_name))
+            raise KeyError('can\'t detach at unknown joint: {}'.format(joint_name))
         for link in sub_tree.get_link_names():
             self._urdf_robot.remove_aggregate(self.get_urdf_link(link))
         for joint in chain([joint_name], sub_tree.get_joint_names()):
@@ -624,7 +624,7 @@ class URDFObject(object):
 
     def robot_name_to_root_joint(self, name):
         # TODO should this really be a class function?
-        return u'{}'.format(name)
+        return '{}'.format(name)
 
     @memoize
     def get_parent_link_of_link(self, link_name):
@@ -693,17 +693,17 @@ class URDFObject(object):
                 leaves.append(link_name)
         return leaves
 
-    def as_marker_msg(self, ns=u'', id=1):
+    def as_marker_msg(self, ns='', id=1):
         """
         :param ns:
         :param id:
         :rtype: Marker
         """
         if len(self.get_link_names()) > 1:
-            raise TypeError(u'only urdfs objects with a single link can be turned into marker')
+            raise TypeError('only urdfs objects with a single link can be turned into marker')
         link = self.get_urdf_link(self.get_link_names()[0])
         m = Marker()
-        m.ns = u'{}/{}'.format(ns, self.get_name())
+        m.ns = '{}/{}'.format(ns, self.get_name())
         m.id = id
         if link.visual:
             geometry = link.visual.geometry
@@ -727,7 +727,7 @@ class URDFObject(object):
             m.scale = Vector3(1, 1, 1)
             m.mesh_resource = geometry.filename
         else:
-            raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
+            raise Exception('world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
         m.color = ColorRGBA(0, 1, 0, 0.5)
         return m
 

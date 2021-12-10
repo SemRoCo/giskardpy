@@ -2,7 +2,7 @@ import pydot
 from py_trees import Behaviour, Chooser, common, Selector, Sequence
 from py_trees.composites import Parallel
 
-from giskardpy.tree.AsyncComposite import PluginBehavior
+from giskardpy.tree.async_composite import PluginBehavior
 from giskardpy.utils import logging
 from sortedcontainers import SortedList
 

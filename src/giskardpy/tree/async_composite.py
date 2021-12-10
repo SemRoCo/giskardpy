@@ -30,7 +30,7 @@ class PluginBehavior(GiskardBehavior):
         """
         name = plugin.name
         if name in self._plugins:
-            raise KeyError(u'A plugin with name "{}" already exists.'.format(name))
+            raise KeyError('A plugin with name "{}" already exists.'.format(name))
         with self.status_lock:
             self._plugins[name] = plugin
 
@@ -69,7 +69,7 @@ class PluginBehavior(GiskardBehavior):
         except Exception as e:
             # FIXME sometimes terminate gets called without init being called
             # happens when a previous plugin fails
-            logging.logwarn(u'terminate was called before init')
+            logging.logwarn('terminate was called before init')
         self.stop_plugins()
         super(PluginBehavior, self).terminate(new_status)
 
@@ -98,7 +98,7 @@ class PluginBehavior(GiskardBehavior):
                             status = node.status
                         if status is not None:
                             self.set_status(status)
-                        assert self.my_status is not None, u'{} did not return a status'.format(plugin_name)
+                        assert self.my_status is not None, '{} did not return a status'.format(plugin_name)
                         if not self.is_running():
                             return
                 self.looped_once = True

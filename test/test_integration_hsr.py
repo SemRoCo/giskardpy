@@ -2,86 +2,19 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveResult
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy import RobotName, RobotPrefix
-from giskardpy.data_types import PrefixName
-from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import init as tf_init
-from utils_for_tests import PR2, HSR
-
-default_pose = {
-    u'arm_flex_joint': 0.0,
-    u'arm_lift_joint': 0.0,
-    u'arm_roll_joint': 0.0,
-    u'head_pan_joint': 0.0,
-    u'head_tilt_joint': 0.0,
-    u'odom_t': 0.0,
-    u'odom_x': 0.0,
-    u'odom_y': 0.0,
-    u'wrist_flex_joint': 0.0,
-    u'wrist_roll_joint': 0.0,
-    u'hand_l_spring_proximal_joint': 0,
-    u'hand_r_spring_proximal_joint': 0
-}
-
-folder_name = u'tmp_data/'
+import giskardpy.utils.tfwrapper as tf
+from utils_for_tests import PR2, HSR, compare_poses
 
 
-@pytest.fixture(scope=u'module')
-def ros(request):
-    try:
-        logging.loginfo(u'deleting tmp test folder')
-        # shutil.rmtree(folder_name)
-    except Exception:
-        pass
-
-    logging.loginfo(u'init ros')
-    rospy.init_node(u'tests')
-    tf_init(60)
-
-    def kill_ros():
-        logging.loginfo(u'shutdown ros')
-        rospy.signal_shutdown(u'die')
-        try:
-            logging.loginfo(u'deleting tmp test folder')
-            # shutil.rmtree(folder_name)
-        except Exception:
-            pass
-
-    request.addfinalizer(kill_ros)
-
-
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def giskard(request, ros):
     c = HSR()
     request.addfinalizer(c.tear_down)
     return c
-
-
-@pytest.fixture()
-def resetted_giskard(giskard):
-    """
-    :type giskard: HSR
-    """
-    logging.loginfo(u'resetting giskard')
-    giskard.clear_world()
-    return giskard
-
-
-@pytest.fixture()
-def zero_pose(resetted_giskard):
-    """
-    :type giskard: PR2
-    """
-    resetted_giskard.set_joint_goal(default_pose)
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_goal()
-    return resetted_giskard
 
 
 @pytest.fixture()
@@ -91,33 +24,39 @@ def box_setup(zero_pose):
     :rtype: PR2
     """
     p = PoseStamped()
-    p.header.frame_id = u'map'
+    p.header.frame_id = 'map'
     p.pose.position.x = 1.2
     p.pose.position.y = 0
     p.pose.position.z = 0.1
     p.pose.orientation.w = 1
-    zero_pose.add_box(size=[1, 1, 1], pose=p)
+    zero_pose.add_box(name='box', size=[1, 1, 1], pose=p)
     return zero_pose
 
 
 class TestJointGoals(object):
     def test_move_base(self, zero_pose):
         p = PoseStamped()
-        p.header.frame_id = u'map'
+        p.header.frame_id = 'map'
         p.pose.position.y = -0.3
         p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
         zero_pose.move_base(p)
 
-    def test_torso_lift_joint(self, zero_pose):
+    def test_mimic_joints(self, zero_pose):
         """
         :type zero_pose: HSR
         """
+        zero_pose.open_gripper()
+        hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
+        compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
+
         js = {'torso_lift_joint': 0.1}
-        zero_pose.set_joint_goal(js)
-        zero_pose.send_and_check_goal()
-        # TODO you can do this by evaluation the joint expression
-        np.testing.assert_almost_equal(zero_pose.get_world().state[PrefixName('arm_lift_joint', RobotPrefix)].position,
-                                       0.2, decimal=2)
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()
+        np.testing.assert_almost_equal(zero_pose.world.state['arm_lift_joint'].position, 0.2, decimal=2)
+        base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
 
 class TestCartGoals(object):
@@ -129,7 +68,9 @@ class TestCartGoals(object):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
 
 class TestCollisionAvoidanceGoals(object):
@@ -142,36 +83,40 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.position.z = 0.5
         r_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.plan_and_execute()
 
     def test_self_collision_avoidance2(self, zero_pose):
         """
         :type zero_pose: HSR
         """
         js = {
-            u'arm_flex_joint': 0.0,
-            u'arm_lift_joint': 0.0,
-            u'arm_roll_joint': -1.52,
-            u'head_pan_joint': -0.09,
-            u'head_tilt_joint': -0.62,
-            u'wrist_flex_joint': -1.55,
-            u'wrist_roll_joint': 0.11,
+            'arm_flex_joint': 0.0,
+            'arm_lift_joint': 0.0,
+            'arm_roll_joint': -1.52,
+            'head_pan_joint': -0.09,
+            'head_tilt_joint': -0.62,
+            'wrist_flex_joint': -1.55,
+            'wrist_roll_joint': 0.11,
         }
-        zero_pose.send_and_check_joint_goal(js)
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
         goal_pose = PoseStamped()
-        goal_pose.header.frame_id = u'hand_palm_link'
+        goal_pose.header.frame_id = 'hand_palm_link'
         goal_pose.pose.position.x = 0.5
         goal_pose.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.tip)
+        zero_pose.set_cart_goal(goal_pose, zero_pose.tip)
+        zero_pose.plan_and_execute()
 
     def test_attached_collision1(self, box_setup):
         """
         :type box_setup: HSR
         """
-        box_name = u'asdf'
+        box_name = 'asdf'
         box_pose = PoseStamped()
-        box_pose.header.frame_id = u'map'
+        box_pose.header.frame_id = 'map'
         box_pose.pose.position = Point(0.85, 0.3, .66)
         box_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
@@ -184,29 +129,32 @@ class TestCollisionAvoidanceGoals(object):
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
-        box_setup.set_and_check_cart_goal(grasp_pose, box_setup.tip)
+        box_setup.set_cart_goal(grasp_pose, box_setup.tip)
+        box_setup.plan_and_execute()
         box_setup.attach_object(box_name, box_setup.tip)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = box_setup.default_root
-        base_goal.pose.position.x -= 1
+        base_goal.pose.position.x -= 0.5
         base_goal.pose.orientation.w = 1
         box_setup.move_base(base_goal)
 
     def test_collision_avoidance(self, zero_pose):
         """
-        :type box_setup: HSR
+        :type zero_pose: HSR
         """
-        js = {u'arm_flex_joint': -np.pi / 2}
-        zero_pose.send_and_check_joint_goal(js)
+        js = {'arm_flex_joint': -np.pi / 2}
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
 
         p = PoseStamped()
-        p.header.frame_id = u'map'
+        p.header.frame_id = 'map'
         p.pose.position.x = 0.9
         p.pose.position.y = 0
         p.pose.position.z = 0.5
         p.pose.orientation.w = 1
-        zero_pose.add_box(size=[1, 1, 0.01], pose=p)
+        zero_pose.add_box(name='box', size=[1, 1, 0.01], pose=p)
 
-        js = {u'arm_flex_joint': 0}
-        zero_pose.send_and_check_joint_goal(js, expected_error_codes=[MoveResult.SHAKING])
+        js = {'arm_flex_joint': 0}
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()

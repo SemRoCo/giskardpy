@@ -8,18 +8,18 @@ from giskardpy import identifier
 from giskardpy.utils import logging
 from giskardpy.utils.dependency_checking import check_dependencies
 
-if __name__ == u'__main__':
-    rospy.init_node(u'giskard')
+if __name__ == '__main__':
+    rospy.init_node('giskard')
     check_dependencies()
     tree = grow_tree()
-    tree_tick_rate = 1. / rospy.get_param(rospy.get_name() +u'/' +u'/'.join(identifier.tree_tick_rate[1:]))
+    tree_tick_rate = 1. / rospy.get_param(rospy.get_name() +'/' +'/'.join(identifier.tree_tick_rate[1:]))
 
     sleeper = rospy.Rate(tree_tick_rate)
-    logging.loginfo(u'giskard is ready')
+    logging.loginfo('giskard is ready')
     while not rospy.is_shutdown():
         try:
             tree.tick()
             sleeper.sleep()
         except KeyboardInterrupt:
             break
-    logging.loginfo(u'\n')
+    logging.loginfo('\n')

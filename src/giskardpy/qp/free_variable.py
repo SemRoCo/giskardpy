@@ -32,7 +32,7 @@ class FreeVariable(object):
         try:
             return self._symbols[order]
         except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have symbol for derivative of order {}'.format(self, order))
+            raise KeyError('Free variable {} doesn\'t have symbol for derivative of order {}'.format(self, order))
 
     def get_lower_limit(self, order):
         if order in self.default_lower_limits and order in self.lower_limits:
@@ -41,7 +41,7 @@ class FreeVariable(object):
             return self.default_lower_limits[order]
         if order in self.lower_limits:
             return self.lower_limits[order]
-        raise KeyError(u'Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
+        raise KeyError('Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
 
     def set_lower_limit(self, order, limit):
         self.lower_limits[order] = limit
@@ -56,7 +56,7 @@ class FreeVariable(object):
             return self.default_upper_limits[order]
         if order in self.upper_limits:
             return self.upper_limits[order]
-        raise KeyError(u'Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
+        raise KeyError('Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
 
     def has_position_limits(self):
         try:

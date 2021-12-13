@@ -263,7 +263,7 @@ class CollisionWorldSynchronizer(object):
                         raise UnknownBodyException(
                             'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
 
-    def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
+    def collision_goals_to_collision_matrix(self, collision_goals, min_dist, added_checks):
         """
         :param collision_goals: list of CollisionEntry
         :type collision_goals: list
@@ -283,7 +283,7 @@ class CollisionWorldSynchronizer(object):
             else:
                 link_bs = collision_entry.link_bs
             for link_b in link_bs:
-                key = (collision_entry.robot_links[0], collision_entry.body_b, link_b)
+                key = (collision_entry.robot_links[0], None, link_b)
                 r_key = (link_b, collision_entry.body_b, collision_entry.robot_links[0])
                 if self.is_allow_collision(collision_entry):
                     if self.all_link_bs(collision_entry):
@@ -299,6 +299,12 @@ class CollisionWorldSynchronizer(object):
                     min_allowed_distance[key] = min_dist[key[0]]
                 else:
                     raise Exception('todo')
+        for (link_a, link_b), distance in added_checks.items():
+            key = (link_a, None, link_b)
+            if key in min_allowed_distance:
+                min_allowed_distance[key] = max(distance, min_allowed_distance[key])
+            else:
+                min_allowed_distance[key] = distance
         return min_allowed_distance
 
     def get_robot_collision_matrix(self, min_dist):
@@ -308,9 +314,9 @@ class CollisionWorldSynchronizer(object):
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
             if self.robot.link_order(link1, link2):
-                collision_matrix2[link1, robot_name, link2] = min_dist[link1]
+                collision_matrix2[link1, None, link2] = min_dist[link1]
             else:
-                collision_matrix2[link2, robot_name, link1] = min_dist[link1]
+                collision_matrix2[link2, None, link1] = min_dist[link1]
         return collision_matrix2
 
     def verify_collision_entries(self, collision_goals):

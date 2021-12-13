@@ -264,7 +264,7 @@ class Collisions(object):
             self.external_collision[key].add(collision)
             self.number_of_external_collisions[key] = min(self.collision_list_size,
                                                           self.number_of_external_collisions[key] + 1)
-            key_long = (collision.original_link_a, collision.body_b, collision.original_link_b)
+            key_long = (collision.original_link_a, None, collision.original_link_b)
             if key_long not in self.external_collision_long_key:
                 self.external_collision_long_key[key_long] = collision
             else:

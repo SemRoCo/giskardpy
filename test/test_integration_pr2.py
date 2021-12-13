@@ -267,7 +267,8 @@ class TestConstraints(object):
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
-        kitchen_setup.avoid_all_collisions(0.1)
+        # kitchen_setup.avoid_all_collisions(0.1)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.set_json_goal('CollisionAvoidanceHint',
                                     tip_link='base_link',
                                     max_threshold=0.4,

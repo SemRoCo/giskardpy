@@ -228,7 +228,7 @@ class CollisionAvoidanceHint(Goal):
         """
         super(CollisionAvoidanceHint, self).__init__(**kwargs)
         self.link_name = tip_link
-        self.key = (tip_link, object_name, object_link_name)
+        self.key = (tip_link, None, object_link_name)
         self.body_b = object_name
         self.link_b = object_link_name
         self.body_b_hash = object_name.__hash__()
@@ -243,16 +243,7 @@ class CollisionAvoidanceHint(Goal):
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        # register collision checks TODO make function
-        try:
-            added_checks = self.god_map.get_data(identifier.added_collision_checks)
-        except KeyError:
-            added_checks = {}
-        if tip_link in added_checks:
-            added_checks[tip_link] = max(added_checks[tip_link], spring_threshold)
-        else:
-            added_checks[tip_link] = spring_threshold
-        self.god_map.set_data(identifier.added_collision_checks, added_checks)
+        self.add_collision_check(self.world.links[tip_link].name, self.world.links[object_link_name].name, spring_threshold)
 
         self.avoidance_hint = tf.transform_vector(self.root_link, avoidance_hint)
         self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
@@ -267,10 +258,6 @@ class CollisionAvoidanceHint(Goal):
                                                                   self.key,
                                                                   'contact_distance'])
 
-    def get_body_b(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
-                                                                  self.key, 'get_body_b_hash', tuple()])
-
     def get_link_b(self):
         return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
                                                                   self.key, 'get_link_b_hash', tuple()])
@@ -281,7 +268,6 @@ class CollisionAvoidanceHint(Goal):
         max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
         max_threshold = self.get_parameter_as_symbolic_expression('threshold')
         spring_threshold = self.get_parameter_as_symbolic_expression('threshold2')
-        body_b_hash = self.get_body_b()
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.max(actual_distance, 0)
 
@@ -295,7 +281,6 @@ class CollisionAvoidanceHint(Goal):
 
         weight = w.if_less_eq(actual_distance, max_threshold, weight,
                               spring_weight)
-        weight = w.if_eq(body_b_hash, self.body_b_hash, weight, 0)
         weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
 
         root_V_avoidance_hint = self.get_parameter_as_symbolic_expression('avoidance_hint')
@@ -306,6 +291,8 @@ class CollisionAvoidanceHint(Goal):
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
         # FIXME really?
+        self.add_debug_expr('dist', actual_distance)
+        self.add_debug_expr('dist', actual_distance)
         self.add_constraint(name_suffix='avoidance_hint',
                             reference_velocity=max_velocity,
                             lower_error=max_velocity,

@@ -3,6 +3,8 @@ from collections import defaultdict
 from multiprocessing import Queue
 from time import time
 
+import actionlib
+import control_msgs
 import hypothesis.strategies as st
 import numpy as np
 import rospy
@@ -26,7 +28,8 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
-from giskardpy.garden import grow_tree, let_there_be_motions
+from giskardpy.garden import let_there_be_motions
+from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
@@ -385,6 +388,7 @@ class RotationGoalChecker(GoalChecker):
 
 
 class GiskardTestWrapper(GiskardWrapper):
+    god_map: GodMap
     default_pose = {}
     better_pose = {}
 
@@ -482,6 +486,8 @@ class GiskardTestWrapper(GiskardWrapper):
     def tear_down(self):
         rospy.sleep(1)
         self.heart.shutdown()
+        # TODO it is strange that I need to kill the services... should be investigated. (:
+        self.tree.kill_all_services()
         logging.loginfo(
             'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo('total time spend moving: {}'.format(self.total_time_spend_moving))
@@ -522,11 +528,12 @@ class GiskardTestWrapper(GiskardWrapper):
     # GOAL STUFF #################################################################################################
     #
 
-    def set_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,), check=True):
+    def set_joint_goal(self, goal, weight=None, hard=False, decimal=2, expected_error_codes=(MoveResult.SUCCESS,),
+                       check=True):
         """
         :type goal: dict
         """
-        super(GiskardTestWrapper, self).set_joint_goal(goal, weight=weight)
+        super(GiskardTestWrapper, self).set_joint_goal(goal, weight=weight, hard=hard)
         if check:
             self.add_goal_check(JointGoalChecker(self.god_map, goal, decimal))
 
@@ -628,20 +635,24 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def plan_and_execute(self, expected_error_codes=None, stop_after=None):
-        return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after)
+    def plan_and_execute(self, expected_error_codes=None, stop_after=None, wait=True):
+        return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
 
-    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None):
+    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None,
+                  wait=True):
         try:
             time_spend_giskarding = time()
-            if stop_after is None:
-                r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=True)
-            else:
+            if stop_after is not None:
                 super(GiskardTestWrapper, self).send_goal(goal_type, wait=False)
                 rospy.sleep(stop_after)
                 self.interrupt()
                 rospy.sleep(1)
                 r = self.get_result(rospy.Duration(3))
+            elif not wait:
+                super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
+                return
+            else:
+                r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
             self.wait_heartbeats()
             self.total_time_spend_giskarding += time() - time_spend_giskarding
             for cmd_id in range(len(r.error_codes)):
@@ -667,7 +678,7 @@ class GiskardTestWrapper(GiskardWrapper):
             self.are_joint_limits_violated()
         finally:
             self.goal_checks = defaultdict(list)
-        return r.trajectory
+        return r
 
     def get_result_trajectory_position(self):
         trajectory = self.god_map.unsafe_get_data(identifier.trajectory)
@@ -1033,6 +1044,15 @@ class Donbot(GiskardTestWrapper):
         'ur5_wrist_3_joint': 0.0
     }
 
+    better_pose = {
+        'ur5_shoulder_pan_joint': -np.pi / 2,
+        'ur5_shoulder_lift_joint': -2.44177755311,
+        'ur5_elbow_joint': 2.15026930371,
+        'ur5_wrist_1_joint': 0.291547812391,
+        'ur5_wrist_2_joint': np.pi / 2,
+        'ur5_wrist_3_joint': np.pi / 2
+    }
+
     def __init__(self):
         self.camera_tip = 'camera_link'
         self.gripper_tip = 'gripper_tool_frame'
@@ -1074,6 +1094,22 @@ class Donbot(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
         self.open_gripper()
+
+
+class BaseBot(GiskardTestWrapper):
+    default_pose = {
+        'joint_x': 0.0,
+        'joint_y': 0.0,
+        'rot_z': 0.0,
+    }
+
+    def __init__(self):
+        super().__init__('package://giskardpy/config/base_bot.yaml')
+
+    def reset(self):
+        self.clear_world()
+        # self.set_joint_goal(self.default_pose)
+        # self.plan_and_execute()
 
 
 class Boxy(GiskardTestWrapper):
@@ -1316,3 +1352,32 @@ def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, i
     rospy.sleep(0.3)
 
     pub.publish(m)
+
+
+class SuccessfulActionServer(object):
+    def __init__(self):
+        self.name_space = rospy.get_param('~name_space')
+        self.joint_names = rospy.get_param('~joint_names')
+        self.state = {j:0 for j in self.joint_names}
+        self.pub = rospy.Publisher('{}/state'.format(self.name_space), control_msgs.msg.JointTrajectoryControllerState,
+                                   queue_size=10)
+        self.timer = rospy.Timer(rospy.Duration(0.1), self.state_cb)
+        self._as = actionlib.SimpleActionServer(self.name_space, control_msgs.msg.FollowJointTrajectoryAction,
+                                                execute_cb=self.execute_cb, auto_start=False)
+        self._as.start()
+        self._as.register_preempt_callback(self.preempt_requested)
+
+    def state_cb(self, timer_event):
+        msg = control_msgs.msg.JointTrajectoryControllerState()
+        msg.header.stamp = timer_event.current_real
+        msg.joint_names = self.joint_names
+        self.pub.publish(msg)
+
+    def preempt_requested(self):
+        print('cancel called')
+        self._as.set_preempted()
+
+    def execute_cb(self, goal):
+        rospy.sleep(goal.trajectory.points[-1].time_from_start)
+        if self._as.is_active():
+            self._as.set_succeeded()

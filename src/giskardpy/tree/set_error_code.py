@@ -2,20 +2,17 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveResult
-from giskardpy.exceptions import UnreachableException, MAX_NWSR_REACHEDException, \
-    QPSolverException, UnknownBodyException, ImplementationException, OutOfJointLimitsException, \
-    HardConstraintsViolatedException, PhysicsWorldException, ConstraintException, UnknownConstraintException, \
-    ConstraintInitalizationException, PlanningException, ShakingException, ExecutionException, InvalidGoalException, \
-    PreemptedException
+from giskardpy.exceptions import *
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils import logging
 
 
 class SetErrorCode(GiskardBehavior):
 
-    def __init__(self, name, print=True):
+    def __init__(self, name, context, print=True):
         self.reachability_threshold = 0.001
         self.print = print
+        self.context = context
         super(SetErrorCode, self).__init__(name)
 
     @profile
@@ -36,9 +33,9 @@ class SetErrorCode(GiskardBehavior):
         else:
             if self.print:
                 if error_code == MoveResult.SUCCESS:
-                    logging.loginfo('Planning succeeded.')
+                    logging.loginfo('{} succeeded.'.format(self.context))
                 else:
-                    logging.logwarn('Planning failed: {}.'.format(error_message))
+                    logging.logwarn('{} failed: {}.'.format(self.context, error_message))
         self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
 
@@ -91,6 +88,22 @@ class SetErrorCode(GiskardBehavior):
             error_code = MoveResult.EXECUTION_ERROR
             if isinstance(exception, PreemptedException):
                 error_code = MoveResult.PREEMPTED
+            elif isinstance(exception, ExecutionPreemptedException):
+                error_code = MoveResult.EXECUTION_PREEMPTED
+            elif isinstance(exception, ExecutionTimeoutException):
+                error_code = MoveResult.EXECUTION_TIMEOUT
+            elif isinstance(exception, ExecutionSucceededPrematurely):
+                error_code = MoveResult.EXECUTION_SUCCEEDED_PREMATURELY
+            elif isinstance(exception, FollowJointTrajectory_INVALID_GOAL):
+                error_code = MoveResult.FollowJointTrajectory_INVALID_GOAL
+            elif isinstance(exception, FollowJointTrajectory_INVALID_JOINTS):
+                error_code = MoveResult.FollowJointTrajectory_INVALID_JOINTS
+            elif isinstance(exception, FollowJointTrajectory_OLD_HEADER_TIMESTAMP):
+                error_code = MoveResult.FollowJointTrajectory_OLD_HEADER_TIMESTAMP
+            elif isinstance(exception, FollowJointTrajectory_PATH_TOLERANCE_VIOLATED):
+                error_code = MoveResult.FollowJointTrajectory_PATH_TOLERANCE_VIOLATED
+            elif isinstance(exception, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED):
+                error_code = MoveResult.FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED
 
         elif isinstance(exception, ImplementationException):
             print(exception)

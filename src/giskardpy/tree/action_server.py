@@ -41,9 +41,8 @@ class ActionServerHandler(object):
     def has_goal(self):
         return not self.goal_queue.empty()
 
-    def send_feedback(self):
-        # TODO
-        pass
+    def send_feedback(self, message):
+        self._as.publish_feedback(message)
 
     def send_preempted(self, result=None):
         def call_me_now():
@@ -72,19 +71,16 @@ class ActionServerHandler(object):
 
 
 class ActionServerBehavior(GiskardBehavior):
+    as_handler: ActionServerHandler
+
     def __init__(self, name, as_name, action_type=None):
-        self.as_handler = None
         self.as_name = as_name
         self.action_type = action_type
-        super(ActionServerBehavior, self).__init__(name)
-
-    def setup(self, timeout):
-        # TODO handle timeout
         self.as_handler = Blackboard().get(self.as_name)
         if self.as_handler is None:
             self.as_handler = ActionServerHandler(self.as_name, self.action_type)
             Blackboard().set(self.as_name, self.as_handler)
-        return super(ActionServerBehavior, self).setup(timeout)
+        super(ActionServerBehavior, self).__init__(name)
 
     def get_as(self):
         """

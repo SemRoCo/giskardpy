@@ -1,23 +1,5 @@
 <launch>
 
-  <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
-    <rosparam param="enable_self_collision">False</rosparam>
-    <rosparam param="state_topics">
-      - /whole_body_controller/base/state
-      - /whole_body_controller/torso/state
-      - /scaled_pos_traj_controller/state
-      - /whole_body_controller/left_arm/state
-      - /whole_body_controller/right_arm/state
-    </rosparam>
-    <rosparam param="client_topics">
-      - /whole_body_controller/base/follow_joint_trajectory
-      - /whole_body_controller/torso/follow_joint_trajectory
-      - /scaled_pos_traj_controller/follow_joint_trajectory
-      - /whole_body_controller/left_arm/follow_joint_trajectory
-      - /whole_body_controller/right_arm/follow_joint_trajectory
-    </rosparam>
-  </node>
-
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen" >
     <param name="config" value="$(find giskardpy)/config/boxy.yaml" />
   </node>

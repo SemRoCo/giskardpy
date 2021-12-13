@@ -19,6 +19,17 @@ class WiggleCancel(GiskardBehavior):
         self.max_angular_velocity = 10.5
         self.max_linear_velocity = 10.5
 
+    def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
+        joint_convergence_threshold = self.god_map.get_data(identifier.joint_convergence_threshold)
+        free_variables = self.god_map.get_data(identifier.free_variables)
+        thresholds = []
+        for free_variable in free_variables:  # type: FreeVariable
+            velocity_limit = self.god_map.evaluate_expr(free_variable.get_upper_limit(1))
+            velocity_limit *= joint_convergence_threshold
+            velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
+            thresholds.append(velocity_limit)
+        return np.array(thresholds)
+
     def initialise(self):
         super(WiggleCancel, self).initialise()
         self.js_samples = []
@@ -29,7 +40,7 @@ class WiggleCancel(GiskardBehavior):
         self.thresholds = []
         self.velocity_limits = []
         for joint_name, threshold in zip(self.get_robot().controlled_joints,
-                                         make_velocity_threshold(self.get_god_map())):
+                                         self.make_velocity_threshold()):
             _, velocity_limit = self.world.get_joint_velocity_limits(joint_name)
             if self.world.is_joint_prismatic(joint_name):
                 velocity_limit = min(self.max_linear_velocity, velocity_limit)

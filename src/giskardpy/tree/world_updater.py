@@ -1,32 +1,23 @@
 import traceback
-from multiprocessing import Lock
+from queue import Queue
 from xml.etree.ElementTree import ParseError
 
-from giskardpy.tree.sync_localization import SyncLocalization
-
-try:
-    # Python 2
-    from Queue import Empty, Queue
-except ImportError:
-    # Python 3
-    from queue import Queue, Empty
-
 import rospy
-from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames, \
-    GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse
 from py_trees import Status
-from tf2_py import InvalidArgumentException, ExtrapolationException, TransformException
+from py_trees.meta import running_is_success
+from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.identifier as identifier
-from giskardpy import RobotPrefix, RobotName
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames, \
+    GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.sync_configuration import SyncConfiguration
-from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.tree.sync_localization import SyncLocalization
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose
 
@@ -37,6 +28,7 @@ def exception_to_response(e, req):
         for x in list_of_errors:
             result |= isinstance(error, x)
         return result
+
     if error_in_list(e, [CorruptShapeException, ParseError]):
         traceback.print_exc()
         if req.body.type == req.body.MESH_BODY:
@@ -59,7 +51,7 @@ def exception_to_response(e, req):
         traceback.print_exc()
         return UpdateWorldResponse(UpdateWorldResponse.ERROR,
                                    '{}: {}'.format(e.__class__.__name__,
-                                                    str(e)))
+                                                   str(e)))
 
 
 class WorldUpdater(GiskardBehavior):
@@ -190,8 +182,8 @@ class WorldUpdater(GiskardBehavior):
         logging.loginfo('Added object \'{}\' at \'{}\'.'.format(req.body.name, req.parent_link))
         if world_body.joint_state_topic:
             plugin_name = str(PrefixName(world_body.name, 'js'))
-            plugin = SyncConfiguration(plugin_name, group_name=world_body.name,
-                                       joint_state_topic=world_body.joint_state_topic)
+            plugin = running_is_success(SyncConfiguration)(plugin_name, group_name=world_body.name,
+                                                           joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo('Added configuration plugin for \'{}\' to tree.'.format(req.body.name))

@@ -1,4 +1,5 @@
 general_options:
+  action_server_name: ~command
   path_to_data_folder: !find data # or 'find ros://giskardpy/data'
   enable_gui: False
   sample_period: 0.05 # time[s] between points of generated joint trajectory
@@ -92,7 +93,7 @@ reachability_check:
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
-  collision_checker: disable # one of [bpb, pybullet, disable]
+  collision_checker: bpb # one of [bpb, pybullet, disable]
   external_collision_avoidance:
     default:
       number_of_repeller: 1

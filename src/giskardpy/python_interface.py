@@ -5,12 +5,13 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd
+    MoveCmd, MoveFeedback
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
+from tf.transformations import quaternion_multiply
 
 from giskardpy import RobotName, identifier
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
@@ -24,6 +25,8 @@ DEFAULT_WORLD_TIMEOUT = 500
 
 
 class GiskardWrapper(object):
+    last_feedback: MoveFeedback = None
+
     def __init__(self, node_name='giskard'):
         giskard_topic = '{}/command'.format(node_name)
         if giskard_topic is not None:
@@ -39,11 +42,13 @@ class GiskardWrapper(object):
         self._god_map = GodMap.init_from_paramserver(node_name)
         self._world = WorldTree(self._god_map)
         self._world.delete_all_but_robot()
-
         self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
         rospy.sleep(.3)
+
+    def _feedback_cb(self, msg):
+        self.last_feedback = msg
 
     def get_robot_name(self):
         """
@@ -58,7 +63,8 @@ class GiskardWrapper(object):
         """
         return str(self._world.groups[RobotName].root_link_name)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
+                      weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
@@ -180,7 +186,7 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, goal_state, weight=None, max_velocity=None):
+    def set_joint_goal(self, goal_state, weight=None, max_velocity=None, hard=False):
         """
         This goal will move the robots joint to the desired configuration.
         :param goal_state: Can either be a joint state messages or a dict mapping joint name to position. 
@@ -205,6 +211,7 @@ class GiskardWrapper(object):
             params['weight'] = weight
         if max_velocity is not None:
             params['max_velocity'] = max_velocity
+        params['hard'] = hard
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
@@ -222,6 +229,7 @@ class GiskardWrapper(object):
         :type root_normal: Vector3Stamped
         :param max_angular_velocity: rad/s, default 0.5
         :type max_angular_velocity: float
+        :param weight: default WEIGHT_BELOW_CA
         :type weight: float
         """
         if root_link is None:
@@ -416,6 +424,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def allow_self_collision(self):
+        """
+        Allows the collision with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -424,6 +435,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def avoid_self_collision(self):
+        """
+        Avoid collisions with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -502,7 +516,7 @@ class GiskardWrapper(object):
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()
         else:
-            self._client.send_goal(goal)
+            self._client.send_goal(goal, feedback_cb=self._feedback_cb)
 
     def get_collision_entries(self):
         return self.cmd_seq
@@ -526,7 +540,8 @@ class GiskardWrapper(object):
         :type timeout: rospy.Duration
         :rtype: MoveResult
         """
-        self._client.wait_for_result(timeout)
+        if not self._client.wait_for_result(timeout):
+            raise TimeoutError('Timeout while waiting for goal.')
         return self._client.get_result()
 
     def clear_world(self, timeout=DEFAULT_WORLD_TIMEOUT):
@@ -630,7 +645,7 @@ class GiskardWrapper(object):
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
         object.shape.type = SolidPrimitive.CYLINDER
-        object.shape.dimensions = [0,0]
+        object.shape.dimensions = [0, 0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
         req = UpdateWorldRequest()
@@ -784,7 +799,7 @@ class GiskardWrapper(object):
     def update_rviz_markers(self, object_names):
         """
         republishes visualization markers for rviz
-        :type name: list
+        :type object_names: list
         :rtype: UpdateRvizMarkersResponse
         """
         return self._update_rviz_markers_srv(object_names)

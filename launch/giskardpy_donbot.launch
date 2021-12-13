@@ -1,16 +1,5 @@
 <launch>
 
-    <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
-        <rosparam param="state_topics">
-            - /whole_body_controller/base/state
-            - /scaled_pos_joint_traj_controller/state
-        </rosparam>
-        <rosparam param="client_topics">
-            - /whole_body_controller/base/follow_joint_trajectory
-            - /scaled_pos_joint_traj_controller/follow_joint_trajectory
-        </rosparam>
-    </node>
-
     <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen" >
         <param name="config" value="$(find giskardpy)/config/donbot.yaml" />
     </node>

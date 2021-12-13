@@ -1,4 +1,5 @@
 from rospy import ROSException
+from rostopic import ROSTopicException
 
 from giskardpy.data_types import JointStates
 from giskardpy.model.world import SubWorldTree
@@ -38,12 +39,11 @@ class SyncConfiguration(GiskardBehavior):
 
     def setup(self, timeout=0.0):
         msg = None
-        while not msg:
+        while msg is None and not rospy.is_shutdown():
             try:
-                msg = rospy.wait_for_message(self.joint_state_topic, JointState, timeout=rospy.Duration(1))
+                msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
             except ROSException as e:
-                logging.logwarn('Waiting for topic \'{}\' to appear.'.format(self.joint_state_topic))
-                rospy.sleep(1)
+                logging.logwarn('Waiting for topic \'/{}\' to appear.'.format(self.joint_state_topic))
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
         return super(SyncConfiguration, self).setup(timeout)
 

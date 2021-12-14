@@ -53,9 +53,14 @@ class CollisionChecker(GiskardBehavior):
         self.collision_scene.sync()
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
         max_distances = self.make_max_distances()
-
+        try:
+            added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
+        except KeyError:
+            # no collision checks added
+            added_checks = {}
         self.collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_goals),
-                                                                                         max_distances)
+                                                                                         max_distances,
+                                                                                         added_checks)
         self.collision_list_size = self._cal_max_param('number_of_repeller')
 
         super(CollisionChecker, self).initialise()
@@ -82,16 +87,6 @@ class CollisionChecker(GiskardBehavior):
             else:
                 max_distances[link_name] = distance
 
-        try:
-            added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
-            for link_name, distance in added_checks.items():
-                if link_name in max_distances:
-                    max_distances[link_name] = max(distance, max_distances[link_name])
-                else:
-                    max_distances[link_name] = distance
-        except KeyError:
-            # no collision checks added
-            pass
         return max_distances
 
     @profile

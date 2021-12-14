@@ -37,6 +37,21 @@ class Goal(object):
         self._sub_goals = []
         self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
 
+    def add_collision_check(self, link_a, link_b, distance):
+        if self.world.link_order(link_a, link_b):
+            key = (link_a, link_b)
+        else:
+            key = (link_b, link_a)
+        try:
+            added_checks = self.god_map.get_data(identifier.added_collision_checks)
+        except KeyError:
+            added_checks = {}
+            self.god_map.set_data(identifier.added_collision_checks, added_checks)
+        if key in added_checks:
+            added_checks[key] = max(added_checks[key], distance)
+        else:
+            added_checks[key] = distance
+
     def _save_self_on_god_map(self):
         self.god_map.set_data(self._get_identifier(), self)
 

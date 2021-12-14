@@ -57,7 +57,6 @@ class PluginBehavior(GiskardBehavior):
         self.looped_once = False
         with self.status_lock:
             self.set_status(Status.RUNNING)
-        self.sleeps = []
         self.update_thread = Thread(target=self.loop_over_plugins)
         self.update_thread.start()
         super(PluginBehavior, self).initialise()
@@ -74,9 +73,6 @@ class PluginBehavior(GiskardBehavior):
             self.set_status(Status.FAILURE)
         try:
             self.update_thread.join()
-            data = np.array(self.sleeps)
-            print(np.average(data))
-            print(np.std(data))
         except Exception as e:
             # FIXME sometimes terminate gets called without init being called
             # happens when a previous plugin fails
@@ -116,7 +112,6 @@ class PluginBehavior(GiskardBehavior):
                 if self.sleeper:
                     a = rospy.get_rostime()
                     self.sleeper.sleep()
-                    self.sleeps.append((rospy.get_rostime() - a).to_sec())
         except Exception as e:
             traceback.print_exc()
             # TODO make 'exception' string a parameter somewhere

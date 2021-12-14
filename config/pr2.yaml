@@ -1,6 +1,5 @@
 parent: !include default.yaml
 robot_interface:
-  mode: open_loop # closed_loop or open_loop
   base:
     plugin: SendFollowJointTrajectory
     namespace: /whole_body_controller/base/follow_joint_trajectory

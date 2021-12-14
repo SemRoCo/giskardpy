@@ -208,12 +208,11 @@ class TreeManager(object):
         god_map = GodMap.init_from_paramserver(rospy.get_name())
         blackboard = Blackboard
         blackboard.god_map = god_map
-        mode = god_map.get_data(identifier.robot_interface_mode)
-        del god_map.get_data(identifier.robot_interface)['mode']
-        if mode == 'open_loop':
-            self = OpenLoopTree(god_map)
-        elif mode == 'closed_loop':
-            self = ClosedLoopTree(god_map)
+        mode = god_map.get_data(identifier.control_mode)
+        if mode == 'OpenLoop':
+            self = OpenLoop(god_map)
+        elif mode == 'ClosedLoop':
+            self = ClosedLoop(god_map)
         else:
             raise KeyError('Robot interface mode \'{}\' is not supported.'.format(mode))
 
@@ -463,7 +462,7 @@ def generate_pydot_graph(root, visibility_level):
     return graph
 
 
-class OpenLoopTree(TreeManager):
+class OpenLoop(TreeManager):
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
@@ -597,7 +596,7 @@ class OpenLoopTree(TreeManager):
         return move_robot
 
 
-class ClosedLoopTree(OpenLoopTree):
+class ClosedLoop(OpenLoop):
 
     def grow_giskard(self):
         root = Sequence('Giskard')

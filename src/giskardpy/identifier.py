@@ -43,6 +43,7 @@ rosparam = ['rosparam']
 # config file
 # general options
 general_options = rosparam + ['general_options']
+control_mode = general_options + ['mode']
 action_server_name = general_options + ['action_server_name']
 gui = general_options + ['enable_gui']
 data_folder = general_options + ['path_to_data_folder']
@@ -121,6 +122,5 @@ external_collision_avoidance = collision_avoidance + ['external_collision_avoida
 
 # robot interface
 robot_interface = rosparam + ['robot_interface']
-robot_interface_mode = robot_interface + ['mode']
 
 

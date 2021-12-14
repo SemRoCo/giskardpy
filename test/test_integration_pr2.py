@@ -250,7 +250,6 @@ class TestConstraints(object):
         """
         :type kitchen_setup: PR2
         """
-        # FIXME
         # FIXME bouncy
         tip = 'base_footprint'
         base_pose = PoseStamped()

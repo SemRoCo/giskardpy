@@ -24,8 +24,10 @@ from giskardpy.utils.utils import suppress_stderr, memoize
 
 
 class WorldTree(object):
+    god_map: GodMap
+
     def __init__(self, god_map=None):
-        self.god_map = god_map  # type: GodMap
+        self.god_map = god_map
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'

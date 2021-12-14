@@ -65,7 +65,6 @@ class WorldUpdater(GiskardBehavior):
         super(WorldUpdater, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
-        self.tree_tick_rate = self.god_map.get_data(identifier.tree_tick_rate) / 2
         self.queue = Queue(maxsize=1)
         self.queue2 = Queue(maxsize=1)
         self.timer_state = self.READY

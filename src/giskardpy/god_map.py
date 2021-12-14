@@ -9,6 +9,7 @@ from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, V
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict
+from giskardpy.utils.config_loader import upload_config_file_to_paramserver
 
 
 def set_default_in_override_block(block_identifier, god_map):
@@ -195,10 +196,9 @@ class GodMap(object):
     @classmethod
     def init_from_paramserver(cls, node_name):
         import rospy
-        from control_msgs.msg import JointTrajectoryControllerState
-        from rospy import ROSException
-        from giskardpy.utils import logging
         from giskardpy.data_types import order_map
+
+        upload_config_file_to_paramserver()
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))

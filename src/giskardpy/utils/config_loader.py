@@ -192,5 +192,15 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     return False
 
 
+def upload_config_file_to_paramserver():
+    old_params = rospy.get_param('~')
+    if rospy.has_param('~test'):
+        test = rospy.get_param('~test')
+    else:
+        test = False
+    config_file_name = rospy.get_param('~{}'.format('config'))
+    ros_load_robot_config(config_file_name, old_data=old_params, test=test)
+
+
 yaml.add_constructor('!include', construct_include, Loader)
 yaml.add_constructor('!find', construct_find, Loader)

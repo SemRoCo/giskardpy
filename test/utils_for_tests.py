@@ -28,10 +28,10 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
-from giskardpy.garden import let_there_be_motions
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy.tree.tree_manager import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
@@ -408,8 +408,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
-        self.tree = let_there_be_motions()
-        self.god_map = Blackboard().god_map
+        self.tree = TreeManager.from_param_server()
+        self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
         super(GiskardTestWrapper, self).__init__(node_name='tests')

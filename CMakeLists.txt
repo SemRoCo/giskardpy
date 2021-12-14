@@ -162,7 +162,6 @@ include_directories(
 
 catkin_install_python(PROGRAMS 
 	scripts/giskard_trees.py 
-	scripts/giskard_trees_closed_loop.py
 	scripts/interactive_marker.py
 	scripts/add_box.py
 	scripts/add_cylinder.py

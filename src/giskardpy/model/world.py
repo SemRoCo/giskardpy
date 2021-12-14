@@ -920,6 +920,10 @@ class SubWorldTree(WorldTree):
         self.world = world
 
     @property
+    def controlled_joints(self):
+        return [j for j in self.god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
+
+    @property
     def attachment_joint_name(self):
         return self.world.links[self.root_link_name].parent_joint_name
 

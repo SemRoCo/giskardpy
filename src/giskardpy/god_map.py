@@ -194,11 +194,12 @@ class GodMap(object):
         self.lock = Lock()
 
     @classmethod
-    def init_from_paramserver(cls, node_name):
+    def init_from_paramserver(cls, node_name, upload_config=True):
         import rospy
         from giskardpy.data_types import order_map
 
-        upload_config_file_to_paramserver()
+        if upload_config:
+            upload_config_file_to_paramserver()
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))

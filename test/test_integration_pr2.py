@@ -5097,6 +5097,35 @@ class TestConfigFile(object):
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
+
+class TestInfoServices(object):
+    def test_get_object_info(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        result = zero_pose.get_object_info('robot')
+        expected = {'head_pan_joint',
+                    'head_tilt_joint',
+                    'l_elbow_flex_joint',
+                    'l_forearm_roll_joint',
+                    'l_shoulder_lift_joint',
+                    'l_shoulder_pan_joint',
+                    'l_upper_arm_roll_joint',
+                    'l_wrist_flex_joint',
+                    'l_wrist_roll_joint',
+                    'odom_x_joint',
+                    'odom_y_joint',
+                    'odom_z_joint',
+                    'r_elbow_flex_joint',
+                    'r_forearm_roll_joint',
+                    'r_shoulder_lift_joint',
+                    'r_shoulder_pan_joint',
+                    'r_upper_arm_roll_joint',
+                    'r_wrist_flex_joint',
+                    'r_wrist_roll_joint',
+                    'torso_lift_joint'}
+        assert set(result.controlled_joints) == expected
+
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])

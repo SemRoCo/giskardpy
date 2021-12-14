@@ -39,7 +39,7 @@ class GiskardWrapper(object):
             self._marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service('{}/update_world'.format(node_name))
             self._client.wait_for_server()
-        self._god_map = GodMap.init_from_paramserver(node_name)
+        self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)
         self._world = WorldTree(self._god_map)
         self._world.delete_all_but_robot()
         self.collisions = []
@@ -795,6 +795,9 @@ class GiskardWrapper(object):
         :rtype: GetObjectInfoResponse
         """
         return self._get_object_info_srv(name)
+
+    def get_controlled_joints(self, name='robot'):
+        return self.get_object_info(name).controlled_joints
 
     def update_rviz_markers(self, object_names):
         """

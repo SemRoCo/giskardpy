@@ -441,7 +441,7 @@ class AvoidJointLimitsPrismatic(Goal):
 
 
 class JointPositionList(Goal):
-    def __init__(self, goal_state, weight=None, max_velocity=None, hard=False, **kwargs):
+    def __init__(self, goal_state, weight=None, max_velocity=None, hard: bool = False, **kwargs):
         """
         This goal takes a joint state and adds the other JointPosition goals depending on their type
         :param goal_state: JointState as json

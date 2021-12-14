@@ -8,12 +8,7 @@ from defusedxml import minidom
 
 import rospy
 import random
-if sys.version_info[0] == 3:
-    # for Python3
-    from tkinter import *   ## notice lowercase 't' in tkinter here
-else:
-    # for Python2
-    from Tkinter import *   ## notice capitalized T in Tkinter
+from tkinter import *   ## notice lowercase 't' in tkinter here
 
 from giskardpy.python_interface import GiskardWrapper
 # import xml.dom.minidom
@@ -154,7 +149,7 @@ class JointGoalPublisher(object):
     def __init__(self):
         description = get_param('robot_description')
 
-        self. giskard_wrapper = GiskardWrapper()
+        self.giskard_wrapper = GiskardWrapper()
 
         self.free_joints = {}
         self.joint_list = [] # for maintaining the original order of the joints
@@ -168,9 +163,7 @@ class JointGoalPublisher(object):
         #self.pub_def_vels = get_param("publish_default_velocities", False)
         #self.pub_def_efforts = get_param("publish_default_efforts", False)
 
-        msg = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState)
-        self.giskard_joints = msg.joint_names
-
+        self.giskard_joints = self.giskard_wrapper.get_controlled_joints()
 
         robot = minidom.parseString(description)
         if robot.getElementsByTagName('COLLADA'):

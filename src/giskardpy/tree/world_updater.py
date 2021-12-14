@@ -74,7 +74,7 @@ class WorldUpdater(GiskardBehavior):
         self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.get_object_names = rospy.Service('~get_object_names', GetObjectNames, self.get_object_names)
-        self.get_object_info = rospy.Service('~get_object_info', GetObjectInfo, self.get_object_info)
+        self.get_object_info = rospy.Service('~get_object_info', GetObjectInfo, self.get_object_info_cb)
         self.get_attached_objects = rospy.Service('~get_attached_objects', GetAttachedObjects,
                                                   self.get_attached_objects)
         # self.dump_state_srv = rospy.Service('~dump_state', Trigger, self.dump_state_cb)
@@ -86,12 +86,13 @@ class WorldUpdater(GiskardBehavior):
         res.object_names = object_names
         return res
 
-    def get_object_info(self, req):
+    def get_object_info_cb(self, req):
         res = GetObjectInfoResponse()
         res.error_codes = GetObjectInfoResponse.SUCCESS
         try:
             object = self.world.groups[req.object_name]  # type: SubWorldTree
             res.joint_state_topic = ''
+            res.controlled_joints = self.world.groups[req.object_name].controlled_joints
             tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             node_name = str(PrefixName(req.object_name, 'js'))
             if node_name in tree.tree_nodes:

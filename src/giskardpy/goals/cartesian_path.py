@@ -12,7 +12,7 @@ class CartesianPathCarrot(Goal):
 
     def __init__(self, root_link, tip_link, goals, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, ignore_trajectory_orientation=False, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -33,6 +33,7 @@ class CartesianPathCarrot(Goal):
         self.max_angular_velocity = max_angular_velocity
         self.max_linear_acceleration = max_linear_acceleration
         self.max_angular_acceleration = max_angular_acceleration
+        self.ignore_trajectory_orientation = ignore_trajectory_orientation
 
         self.setup_goal_params(goals)
 
@@ -73,18 +74,22 @@ class CartesianPathCarrot(Goal):
                                                               w.ca.mmin(next_normal_dists))
         next_normal = self.select(next_normals_closer_to_goal, zero_one_mapping_one)
         # Orientation Calculation
-        decimal_of_curr_normal_time = curr_normal_time - w.round_down(curr_normal_time, 0)
-        line_starts = []
-        line_ends = []
-        for i in range(0, self.trajectory_length):
-            line_s_q = w.quaternion_from_matrix(w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[i]])))
-            line_starts.append(line_s_q)
-            line_e_q = w.quaternion_from_matrix(w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.next_goal_strings[i]])))
-            line_ends.append(line_e_q)
-        line_start_q = self.select(w.Matrix(line_starts), zero_one_mapping)
-        line_end_q = self.select(w.Matrix(line_ends), zero_one_mapping)
-        current_rotation = w.quaternion_slerp(line_start_q, line_end_q, decimal_of_curr_normal_time)
-        return next_normal, w.rotation_matrix_from_quaternion(current_rotation[0], current_rotation[1], current_rotation[2], current_rotation[3])
+        if not self.ignore_trajectory_orientation:
+            decimal_of_curr_normal_time = curr_normal_time - w.round_down(curr_normal_time, 0)
+            line_starts = []
+            line_ends = []
+            for i in range(0, self.trajectory_length):
+                line_s_q = w.quaternion_from_matrix(w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[i]])))
+                line_starts.append(line_s_q)
+                line_e_q = w.quaternion_from_matrix(w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.next_goal_strings[i]])))
+                line_ends.append(line_e_q)
+            line_start_q = self.select(w.Matrix(line_starts), zero_one_mapping)
+            line_end_q = self.select(w.Matrix(line_ends), zero_one_mapping)
+            current_rotation = w.quaternion_slerp(line_start_q, line_end_q, decimal_of_curr_normal_time)
+            next_rotation = w.rotation_matrix_from_quaternion(current_rotation[0], current_rotation[1], current_rotation[2], current_rotation[3])
+        else:
+            next_rotation = w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[-1]]))
+        return next_normal, next_rotation
 
     def predict(self):
         v = self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
@@ -186,6 +191,7 @@ class CartesianPathCarrot(Goal):
     def make_constraints(self):
 
         goal_translation, goal_orientation = self.get_goal_expr()
+
         self.add_debug_vector("debugGoal", goal_translation)
         self.add_debug_vector("debugCurrentX", w.position_of(self.get_fk(self.root_link, self.tip_link)))
         self.add_debug_vector("debugNext", self.predict())

@@ -99,10 +99,15 @@ class AABBCollision(CollisionObjects):
         if link_name not in link_names:
             self.collision_objects.append(self.get_collision(link_name))
 
-    def get_points(self, x_b, y_b, z_b, x_e, y_e, z_e, transform_points=None):
+    def get_points(self, x_b, y_b, z_b, x_e, y_e, z_e, collision_objects=None, transform_points=None):
+        if collision_objects is None:
+            collision_objects = self.collision_objects
+        return self._get_points(x_b, y_b, z_b, x_e, y_e, z_e, collision_objects, transform_points=transform_points)
+
+    def _get_points(self, x_b, y_b, z_b, x_e, y_e, z_e, collision_objects, transform_points=None):
         query_b = list()
         query_e = list()
-        for collision_info in self.collision_objects:
+        for collision_info in collision_objects:
             aabbs = self.aabb_to_3d_points(collision_info.d, collision_info.u)
             q_b = [[x_b + aabb[0], y_b + aabb[1], z_b + aabb[2]] for aabb in aabbs]
             q_e = [[x_e + aabb[0], y_e + aabb[1], z_e + aabb[2]] for aabb in aabbs]
@@ -186,9 +191,43 @@ class GiskardPyBulletAABBCollision(AABBCollision, GiskardLinkCollision):
                              map_2_coll_link_pos.z - map_2_tip_link_pos.z]
                     self.transform_points[collision_info.link] = point
 
-    def get_points(self, x_b, y_b, z_b, x_e, y_e, z_e, transform_points=None):
+    def get_points_from_poses(self, x_b, y_b, z_b, x_e, y_e, z_e):
         self.update()
-        return super().get_points(x_b, y_b, z_b, x_e, y_e, z_e, transform_points=self.transform_points)
+        return super().get_points(x_b, y_b, z_b, x_e, y_e, z_e,
+                                  transform_points=self.transform_points)
+
+    def get_points_from_positions(self, x_b, y_b, z_b, x_e, y_e, z_e):
+        self.update()
+        return super().get_points(x_b, y_b, z_b, x_e, y_e, z_e,
+                                  collision_objects=[self.get_cube_collision()],
+                                  transform_points=self.transform_points)
+
+    @profile
+    def get_cube_collision(self, link_names=None, from_link=None):
+        d = np.array([1e10] * 3)
+        u = np.array([-1e10] * 3)
+        if link_names is None:
+            link_names = self.get_links()
+        if from_link is None:
+            from_link = link_names[0]
+        for link_name in link_names:
+            link_id = self.collision_scene.object_name_to_bullet_id[link_name]
+            d_i, u_i = p.getAABB(link_id, physicsClientId=0)
+            if (np.array(d_i) < d).all():
+                d = d_i
+            if (np.array(u_i) > u).all():
+                u = u_i
+        l = max(abs(np.array(d) - np.array(u)))
+        cur_pose = self.collision_scene.fks[from_link]
+        cur_pos = cur_pose[:3]
+        return CollisionAABB(link=from_link, d=tuple(d-cur_pos), u=tuple((d + l)-cur_pos))
+
+    def get_distance(self, link_name):
+        cc = self.get_cube_collision(link_names=[link_name], from_link=link_name)
+        diameter = np.sqrt(sum((np.array(cc.d)-np.array(cc.u))**2))
+        c = self.get_collision(link_name)
+        l = min(abs(np.array(c.d) - np.array(c.u)))
+        return diameter/2. - l/2.
 
     def get_collision(self, link_name):
         if self.object_in_motion.has_link_collisions(link_name):
@@ -208,7 +247,7 @@ class AbstractMotionValidator(ob.MotionValidator):
     by overwriting the function ompl_check_motion.
     """
 
-    def __init__(self, si, is_3D, tip_link, ignore_state_validator=False):
+    def __init__(self, si, is_3D, tip_link, ignore_state_validator=False, ignore_orientation=False):
         ob.MotionValidator.__init__(self, si)
         self.si = si
         self.state_validator = None
@@ -216,6 +255,7 @@ class AbstractMotionValidator(ob.MotionValidator):
         self.is_3D = is_3D
         self.tip_link = tip_link
         self.ignore_state_validator = ignore_state_validator
+        self.ignore_orientation = ignore_orientation
 
     def checkMotion(self, s1, s2):
         if self.state_validator is None:
@@ -262,11 +302,13 @@ class PyBulletRayTester(object):
         if js is not None:
             # Reset Joint State
             for joint_id in range(0, pbw.p.getNumJoints(self.environment_id, physicsClientId=self.client_id)):
-                joint_name = pbw.p.getJointInfo(self.environment_id, joint_id, physicsClientId=self.client_id)[1].decode()
+                joint_name = pbw.p.getJointInfo(self.environment_id, joint_id, physicsClientId=self.client_id)[
+                    1].decode()
                 joint_state = js[joint_name].position
                 pbw.p.resetJointState(self.environment_id, joint_id, joint_state, physicsClientId=self.client_id)
             # Recalculate collision stuff
-            pbw.p.stepSimulation(physicsClientId=self.client_id) #todo: actually only collision stuff needs to be calculated
+            pbw.p.stepSimulation(
+                physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
 
     def pre_ray_test(self):
         bodies_num = p.getNumBodies(physicsClientId=self.client_id)
@@ -315,9 +357,10 @@ class PyBulletRayTester(object):
 
 class RayMotionValidator(AbstractMotionValidator):
 
-    def __init__(self, si, is_3D, collision_scene, tip_link, object_in_motion=None, debug=False, raytester=None, js=None,
-                 ignore_state_validator=False):
-        AbstractMotionValidator.__init__(self, si, is_3D, tip_link, ignore_state_validator=ignore_state_validator)
+    def __init__(self, si, is_3D, collision_scene, tip_link, object_in_motion=None, debug=False, raytester=None,
+                 js=None, ignore_state_validator=False, ignore_orientation=False):
+        AbstractMotionValidator.__init__(self, si, is_3D, tip_link, ignore_state_validator=ignore_state_validator,
+                                         ignore_orientation=ignore_orientation)
         self.hitting = {}
         self.debug = debug
         self.js = js
@@ -345,11 +388,15 @@ class RayMotionValidator(AbstractMotionValidator):
             self.raytester.post_ray_test()
             return res
 
+    @profile
     def _check_motion(self, x_b, y_b, z_b, x_e, y_e, z_e):
         # Shoot ray from start to end pose and check if it intersects with the kitchen,
         # if so return false, else true.
         if self.object_in_motion is not None:
-            query_b, query_e = self.collision_points.get_points(x_b, y_b, z_b, x_e, y_e, z_e)
+            if self.ignore_orientation:
+                query_b, query_e = self.collision_points.get_points_from_positions(x_b, y_b, z_b, x_e, y_e, z_e)
+            else:
+                query_b, query_e = self.collision_points.get_points_from_poses(x_b, y_b, z_b, x_e, y_e, z_e)
         else:
             query_b = [[x_b, y_b, z_b]]
             query_e = [[x_e, y_e, z_e]]
@@ -537,6 +584,7 @@ class RobotBulletCollisionChecker(GiskardBehavior):
             if j[2] != p.JOINT_FIXED:
                 self.pybullet_joints_id[j[1].decode('UTF-8')] = i
 
+    @profile
     def is_collision_free(self, x, y, z, rot):
         with self.pybullet_lock:
             # Get current joint states
@@ -590,7 +638,7 @@ class RobotBulletCollisionChecker(GiskardBehavior):
 
 class GiskardRobotBulletCollisionChecker(GiskardBehavior):
 
-    def __init__(self, is_3D, root_link, tip_link, ik=None, ik_sampling=1, collision_link_names=None):
+    def __init__(self, is_3D, root_link, tip_link, collision_scene, ik=None, ik_sampling=1, ignore_orientation=False):
         GiskardBehavior.__init__(self, str(self))
         self.giskard_lock = threading.Lock()
         if ik is None:
@@ -600,10 +648,8 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
         self.is_3D = is_3D
         self.tip_link = tip_link
         self.ik_sampling = ik_sampling
-        if collision_link_names is None:
-            self.collision_link_names = GiskardLinkCollision(self.robot, tip_link).get_links()
-        else:
-            self.collision_link_names = collision_link_names
+        self.ignore_orientation = ignore_orientation
+        self.collision_objects = GiskardPyBulletAABBCollision(self.robot, collision_scene, tip_link)
 
     def is_collision_free(self, x, y, z, rot):
         if True:  # with self.giskard_lock:
@@ -620,8 +666,14 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                 # override on current joint states.
                 self.robot.state = state_ik
                 # Check if kitchen is colliding with robot
-                results.append(
-                    self.collision_scene.are_robot_links_external_collision_free(self.collision_link_names, dist=0))
+                if self.ignore_orientation:
+                    tmp = list()
+                    for link_name in self.collision_objects.get_links():
+                        dist = self.collision_objects.get_distance(link_name)
+                        tmp.append(self.collision_scene.is_robot_link_external_collision_free(link_name, dist=dist))
+                    results.append(all(tmp))
+                else:
+                    results.append(self.collision_scene.are_robot_links_external_collision_free(self.collision_objects.get_links(), dist=0))
                 # Reset joint state
                 self.get_robot().state = old_js
         return any(results)
@@ -842,7 +894,7 @@ class CompoundBoxSpace:
         pos_d = pos_c + np.array([dx, 0, 0])
         g = np.sqrt(np.sum((np.array(pos_b) - np.array(pos_d)) ** 2))
         a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_d)) ** 2))
-        return -np.arctan2(g, a) if dx > 0 else np.pi-np.arctan2(g, a)
+        return -np.arctan2(g, a)  # if dx > 0 else np.pi-np.arctan2(g, a)
 
     def get_collisions(self, collision_box_name_prefix=u'is_object_pickable_box'):
         collisions = dict()
@@ -1032,14 +1084,14 @@ class OMPLGoalRegionSampler:
         pos_d = pos_c + np.array([dx, 0, 0])
         g = np.sqrt(np.sum((np.array(pos_b) - np.array(pos_d)) ** 2))
         a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_d)) ** 2))
-        return -np.arctan2(g, a) if dx > 0 else np.pi-np.arctan2(g, a)
+        return -np.arctan2(g, a)  # if dx > 0 else np.pi-np.arctan2(g, a)
 
     def valid_sample(self, d=0.5, max_samples=100):
         i = 0
         while i < max_samples:
             valid = False
             while not valid and i < max_samples:
-                s = self._sample(i*d/max_samples)
+                s = self._sample(i * d / max_samples)
                 valid = self.validation_fun(s())
                 i += 1
             self.valid_samples.append([self.h(s()).value(), s])
@@ -1049,7 +1101,7 @@ class OMPLGoalRegionSampler:
     def sample(self, d, samples=100):
         i = 0
         while i < samples:
-            s = self._sample(i*d/samples)
+            s = self._sample(i * d / samples)
             self.samples.append([self.h(s()).value(), s])
             i += 1
         self.samples = sorted(self.samples, key=lambda e: e[0])
@@ -1129,6 +1181,7 @@ class GlobalPlanner(GetGoal):
             raise Exception(u'Did not found link chain of the robot from'
                             u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
 
+    @profile
     def update(self):
 
         global_planner_needed = self.god_map.get_data(identifier.global_planner_needed)
@@ -1190,7 +1243,7 @@ class GlobalPlanner(GetGoal):
         self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
         return Status.SUCCESS
 
-    def get_cartesian_path_constraints(self, poses):
+    def get_cartesian_path_constraints(self, poses, ignore_trajectory_orientation=True):
 
         d = dict()
         d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
@@ -1198,6 +1251,7 @@ class GlobalPlanner(GetGoal):
 
         c_d = deepcopy(d)
         c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
+        c_d[u'parameter_value_pair'][u'ignore_trajectory_orientation'] = ignore_trajectory_orientation
         c = Constraint()
         c.type = u'CartesianPathCarrot'
         c.parameter_value_pair = json.dumps(c_d[u'parameter_value_pair'])
@@ -1267,7 +1321,7 @@ class OMPLPlanner(object):
                                                 max_refine_iterations=5, min_refine_thresh=0.5)
         }
         self._planner_solve_params['RRTConnect'] = {
-            'slow_without_refine': SolveParameters(initial_solve_time=120, refine_solve_time=5,
+            'slow_without_refine': SolveParameters(initial_solve_time=240, refine_solve_time=5,
                                                    max_initial_iterations=1,
                                                    max_refine_iterations=0, min_refine_thresh=0.5),
             'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
@@ -1323,6 +1377,7 @@ class OMPLPlanner(object):
         space.enforceBounds(state())
         return state
 
+    @profile
     def next_goal(self, env_js, goal):
         valid_fun = self.setup.getSpaceInformation().isValid
         h = PathLengthAndGoalOptimizationObjective(self.setup.getSpaceInformation(), goal)
@@ -1330,7 +1385,7 @@ class OMPLPlanner(object):
         simple_motion = RayMotionValidator(self.setup.getSpaceInformation(), self.is_3D, self.collision_scene,
                                            self.tip_link, ignore_state_validator=True, js=env_js)
         # Sample goal points which are e.g. in the aabb of the object to pick up
-        goal_grs.sample(.3) # todo d is max aabb size of object
+        goal_grs.sample(.5)  # todo d is max aabb size of object
         goals = list()
         next_goals = list()
         for s in goal_grs.samples:
@@ -1397,9 +1452,9 @@ class MovementPlanner(OMPLPlanner):
                                               pose_goal, map_frame, config)
 
     def get_planner(self, si):
-        planner = og.ABITstar(si)
-        #planner = og.RRTConnect(si)
-        #planner.setRange(0.2)
+        #planner = og.ABITstar(si)
+        planner = og.RRTConnect(si)
+        planner.setRange(0.1)
         # planner.setIntermediateStates(True)
         # planner.setup()
         return planner
@@ -1407,9 +1462,11 @@ class MovementPlanner(OMPLPlanner):
     def plan(self, js, plot=True):
 
         si = self.setup.getSpaceInformation()
-        collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.root_link, self.tip_link)
+        collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.root_link, self.tip_link, self.collision_scene,
+                                                               ignore_orientation=True)
         si.setStateValidityChecker(ThreeDimStateValidator(si, collision_checker))
-        si.setMotionValidator(RayMotionValidator(si, self.is_3D, self.collision_scene, object_in_motion=self.robot, tip_link=self.tip_link, js=js))
+        si.setMotionValidator(RayMotionValidator(si, self.is_3D, self.collision_scene, object_in_motion=self.robot,
+                                                 ignore_orientation=True, tip_link=self.tip_link, js=js))
         si.setup()
 
         start = self.get_start_state(self.space)
@@ -1477,9 +1534,10 @@ class NavigationPlanner(OMPLPlanner):
     def plan(self, js, plot=True):
 
         si = self.setup.getSpaceInformation()
-        collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.robot.root_link, u'base_footprint')
+        collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.robot.root_link, u'base_footprint', self.collision_scene)
         si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker))
-        si.setMotionValidator(RayMotionValidator(si, self.is_3D, self.collision_scene, object_in_motion=self.robot, tip_link=u'base_footprint', js=js))
+        si.setMotionValidator(RayMotionValidator(si, self.is_3D, self.collision_scene, object_in_motion=self.robot,
+                                                 tip_link=u'base_footprint', js=js))
         si.setup()
         # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(allocGiskardValidStateSample))
 
@@ -1494,7 +1552,7 @@ class NavigationPlanner(OMPLPlanner):
         # self.setup.setOptimizationObjective(optimization_objective)
 
         if not self.setup.getSpaceInformation().isValid(goal()):
-            raise Exception('The given goal pose is not valid.') # todo: make GlobalPlanningException
+            raise Exception('The given goal pose is not valid.')  # todo: make GlobalPlanningException
 
         self.setup.setup()
         planner_status = self.solve()
@@ -1515,7 +1573,8 @@ class NavigationPlanner(OMPLPlanner):
                 ax.plot(data[:, 1], data[:, 0])
                 ax.invert_xaxis()
                 ax.set(xlabel='y (m)', ylabel='x (m)',
-                       title=u'Navigation Path in map - FP: {}'.format(verify_ompl_navigation_solution(self.setup, debug=True)))
+                       title=u'Navigation Path in map - FP: {}'.format(
+                           verify_ompl_navigation_solution(self.setup, debug=True)))
                 # ax = fig.gca(projection='2d')
                 # ax.plot(data[:, 0], data[:, 1], '.-')
                 plt.show()

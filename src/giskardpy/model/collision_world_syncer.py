@@ -345,11 +345,15 @@ class CollisionWorldSynchronizer(object):
         else:
             return -1 * c.map_V_n
 
-    def is_robot_link_external_collision_free(self, link_name):
+    def is_robot_link_external_collision_free(self, link_name, dist=None):
         self.update_collision_checker()
+        if dist is None:
+            distance = self._cal_max_param(u'soft_threshold') * 2
+        else:
+            distance = dist
         cs = self.get_external_collisions(link_name)
         for c in cs:
-            if c.contact_distance < self._cal_max_param(u'soft_threshold') * 2:
+            if c.contact_distance < distance:
                 return False
         return True
 

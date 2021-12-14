@@ -2432,7 +2432,7 @@ class TestCartesianPath(object):
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 0.4
-        base_goal.pose.position.y = -1.0
+        base_goal.pose.position.y = -1.05
         base_goal.pose.orientation.x = 0
         base_goal.pose.orientation.y = 0
         base_goal.pose.orientation.z = 0

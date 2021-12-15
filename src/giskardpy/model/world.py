@@ -2,6 +2,8 @@ import numbers
 import traceback
 from copy import deepcopy
 from functools import cached_property
+from itertools import combinations
+from typing import Dict, Union, List, Tuple, Set
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -24,6 +26,8 @@ from giskardpy.utils.utils import suppress_stderr, memoize
 
 
 class WorldTree(object):
+    joints: Dict[Union[PrefixName, str], Joint]
+    links: Dict[Union[PrefixName, str], Link]
     god_map: GodMap
 
     def __init__(self, god_map=None):
@@ -105,9 +109,9 @@ class WorldTree(object):
 
         :param joint_name:
         :param stop_at_joint_when: If None, 'lambda joint_name: False' is used.
-        :param stop_at_link_when: If None, 'lambda joint_name: False' is used.
+        :param stop_at_link_when: If None, 'lambda link_name: False' is used.
         :param collect_joint_when: If None, 'lambda joint_name: False' is used.
-        :param collect_link_when: If None, 'lambda joint_name: False' is used.
+        :param collect_link_when: If None, 'lambda link_name: False' is used.
         :return: Collected links and joints. DOES NOT INCLUDE joint_name
         """
         if stop_at_joint_when is None:
@@ -332,6 +336,7 @@ class WorldTree(object):
             joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
         return joint
 
+    @profile
     def add_world_body(self, msg, pose, parent_link_name=None):
         """
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
@@ -376,6 +381,7 @@ class WorldTree(object):
         self.joints = {}
         self.groups = {}
 
+    @profile
     def delete_all_but_robot(self):
         self._clear()
         self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
@@ -387,11 +393,13 @@ class WorldTree(object):
             joint = self.joints[joint_name]
             joint.update_limits(linear_limits, angular_limits, order)
 
+    @profile
     def sync_with_paramserver(self):
         new_lin_limits = {}
         new_ang_limits = {}
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits)) + 1):
             diff = order_map[i]
+
             class Linear(object):
                 def __init__(self, god_map, diff):
                     self.god_map = god_map
@@ -454,6 +462,7 @@ class WorldTree(object):
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
 
+    @profile
     def move_branch(self, joint_name, new_parent_link_name):
         if not self.is_joint_fixed(joint_name):
             raise NotImplementedError('Can only change fixed joints')
@@ -468,6 +477,7 @@ class WorldTree(object):
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()
 
+    @profile
     def update_joint_parent_T_child(self, joint_name, new_parent_T_child):
         joint = self.joints[joint_name]
         joint.parent_T_child = new_parent_T_child
@@ -487,6 +497,7 @@ class WorldTree(object):
     def delete_branch(self, link_name):
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
 
+    @profile
     def delete_branch_at_joint(self, joint_name):
         joint = self.joints.pop(joint_name)  # type: Joint
         self.links[joint.parent_link_name].child_joint_names.remove(joint_name)
@@ -522,6 +533,12 @@ class WorldTree(object):
         except KeyError:
             return True
         return link_a < link_b
+
+    def sort_links(self, link_a: Union[PrefixName, str], link_b: Union[PrefixName, str]) \
+            -> Tuple[Union[PrefixName, str], Union[PrefixName, str]]:
+        if self.link_order(link_a, link_b):
+            return link_a, link_b
+        return link_b, link_a
 
     @property
     def controlled_joints(self):
@@ -780,6 +797,7 @@ class WorldTree(object):
         return self._fk_computer.get_fk(root, tip)
 
     @memoize
+    @profile
     def are_linked(self, link_a, link_b, non_controlled=False, fixed=False):
         """
         Return True if all joints between link_a and link_b are fixed.
@@ -853,7 +871,11 @@ class WorldTree(object):
         return result
 
     def compute_joint_limits(self, joint_name, order):
-        lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
+        try:
+            lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
+        except KeyError:
+            # joint has no limits for this derivative
+            return None, None
         if not isinstance(lower_limit, numbers.Number) and lower_limit is not None:
             f = w.speed_up(lower_limit, w.free_symbols(lower_limit))
             lower_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
@@ -861,6 +883,26 @@ class WorldTree(object):
             f = w.speed_up(upper_limit, w.free_symbols(upper_limit))
             upper_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
         return lower_limit, upper_limit
+
+    @profile
+    def possible_collision_combinations(self, group_name: str) -> Set[Tuple[PrefixName, PrefixName]]:
+        link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in
+                             combinations(self.groups['robot'].link_names_with_collisions, 2)}
+        for link_name in self.groups[group_name].link_names_with_collisions:
+            direct_children = set()
+            for child_joint_name in self.links[link_name].child_joint_names:
+                if self.is_joint_controlled(child_joint_name):
+                    continue
+                links, joints = self.search_branch(joint_name=child_joint_name,
+                                                   stop_at_joint_when=self.is_joint_controlled,
+                                                   stop_at_link_when=None,
+                                                   collect_joint_when=None,
+                                                   collect_link_when=self.has_link_collisions)
+
+                direct_children.update(links)
+            direct_children.add(link_name)
+            link_combinations.difference_update(self.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
+        return link_combinations
 
     def get_joint_position_limits(self, joint_name):
         """
@@ -901,7 +943,7 @@ class WorldTree(object):
     def has_joint(self, joint_name):
         return joint_name in self.joints
 
-    def has_link_collisions(self, link_name):
+    def has_link_collisions(self, link_name) -> bool:
         return self.links[link_name].has_collisions()
 
     def has_link_visuals(self, link_name):

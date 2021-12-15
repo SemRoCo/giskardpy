@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 
-from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.tree.garden import TreeManager
 from giskardpy.utils.dependency_checking import check_dependencies
 
 if __name__ == '__main__':

@@ -1,4 +1,3 @@
-import os
 import pickle
 from collections import defaultdict
 from copy import deepcopy
@@ -6,8 +5,8 @@ from itertools import combinations, product
 from time import time
 
 import numpy as np
-from giskard_msgs.msg import CollisionEntry
 
+from giskard_msgs.msg import CollisionEntry
 from giskardpy import RobotName, identifier
 from giskardpy.data_types import Collisions, JointStates
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
@@ -84,12 +83,12 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if group.are_linked(link_a, link_b, non_controlled) \
-                    or link_a == link_b \
+            if link_a == link_b \
                     or link_a in self.ignored_pairs \
                     or link_b in self.ignored_pairs \
                     or (link_a, link_b) in self.ignored_pairs \
-                    or (link_b, link_a) in self.ignored_pairs:
+                    or (link_b, link_a) in self.ignored_pairs \
+                    or group.are_linked(link_a, link_b, non_controlled):
                 always.add((link_a, link_b))
         unknown = link_combinations.difference(always)
         self.set_joint_state_to_zero(group)
@@ -188,7 +187,7 @@ class CollisionWorldSynchronizer(object):
         return js
 
     def init_collision_matrix(self, group_name):
-        added_links = set(combinations(self.world.groups[group_name].link_names_with_collisions, 2))
+        added_links = set(self.world.possible_collision_combinations(group_name))
         self.update_collision_matrix(group_name=group_name,
                                      added_links=added_links)
 

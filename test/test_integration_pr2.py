@@ -5126,9 +5126,12 @@ class TestInfoServices(object):
                     'torso_lift_joint'}
         assert set(result.controlled_joints) == expected
 
-# import pytest
+
+# time: *[1-9].
+import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_attached_collision2'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
+pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])

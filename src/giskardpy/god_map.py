@@ -26,6 +26,7 @@ def set_default_in_override_block(block_identifier, god_map):
     god_map.set_data(block_identifier, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
 
+
 def get_member(identifier, member):
     """
     :param identifier:
@@ -194,6 +195,7 @@ class GodMap(object):
         self.lock = Lock()
 
     @classmethod
+    @profile
     def init_from_paramserver(cls, node_name, upload_config=True):
         import rospy
         from giskardpy.data_types import order_map
@@ -325,6 +327,7 @@ class GodMap(object):
                 else:
                     result.append(f(index))
             return result
+
         return w.Matrix(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
     def list_to_point3(self, identifier):

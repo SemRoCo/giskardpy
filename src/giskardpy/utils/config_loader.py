@@ -188,8 +188,7 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
             old_data = {}
         old_data.update(config)
         rospy.set_param('~', old_data)
-        return True
-    return False
+    return old_data
 
 
 def upload_config_file_to_paramserver():

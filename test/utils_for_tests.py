@@ -31,7 +31,7 @@ from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
@@ -399,12 +399,6 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.set_param('~config', config_file)
         rospy.set_param('~test', True)
 
-        self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
-                                                 FollowJointTrajectoryActionGoal, self.start_motion_cb,
-                                                 queue_size=100)
-        self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
-                                                FollowJointTrajectoryActionResult, self.stop_motion_cb,
-                                                queue_size=100)
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
@@ -466,12 +460,6 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         self.wait_heartbeats()
         return self.collision_scene.collision_matrices[RobotName]
-
-    def start_motion_cb(self, msg):
-        self.time = time()
-
-    def stop_motion_cb(self, msg):
-        self.total_time_spend_moving += time() - self.time
 
     @property
     def robot(self):
@@ -655,6 +643,8 @@ class GiskardTestWrapper(GiskardWrapper):
                 r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
             self.wait_heartbeats()
             self.total_time_spend_giskarding += time() - time_spend_giskarding
+            self.total_time_spend_moving += len(self.god_map.get_data(identifier.trajectory).keys()) * \
+                                            self.god_map.get_data(identifier.sample_period)
             for cmd_id in range(len(r.error_codes)):
                 error_code = r.error_codes[cmd_id]
                 error_message = r.error_messages[cmd_id]

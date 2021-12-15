@@ -83,12 +83,12 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
+            # assuming that group.are_linked(link_a, link_b, non_controlled) is false, because this call is very slow
             if link_a == link_b \
                     or link_a in self.ignored_pairs \
                     or link_b in self.ignored_pairs \
                     or (link_a, link_b) in self.ignored_pairs \
-                    or (link_b, link_a) in self.ignored_pairs \
-                    or group.are_linked(link_a, link_b, non_controlled):
+                    or (link_b, link_a) in self.ignored_pairs:
                 always.add((link_a, link_b))
         unknown = link_combinations.difference(always)
         self.set_joint_state_to_zero(group)

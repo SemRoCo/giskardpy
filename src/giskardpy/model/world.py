@@ -3,7 +3,7 @@ import traceback
 from copy import deepcopy
 from functools import cached_property
 from itertools import combinations
-from typing import Dict, Union, List, Tuple, Set
+from typing import Dict, Union, Tuple, Set
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -11,6 +11,7 @@ from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Sta
 
 import giskardpy.utils.math as mymath
 from giskardpy import casadi_wrapper as w, RobotName, identifier
+from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
@@ -23,6 +24,20 @@ from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize
+
+
+class TravelCompanion(object):
+    def link_call(self, link_name: Union[PrefixName, str]) -> bool:
+        """
+        :return: return True to stop climbing up the branch
+        """
+        return False
+
+    def joint_call(self, joint_name: Union[PrefixName, str]) -> bool:
+        """
+        :return: return True to stop climbing up the branch
+        """
+        return False
 
 
 class WorldTree(object):
@@ -102,7 +117,16 @@ class WorldTree(object):
         self.notify_state_change()
         self._model_version += 1
 
-    def search_branch(self, joint_name,
+    def travel_branch(self, link_name, companion: TravelCompanion):
+        link = self.links[link_name]
+        if not companion.link_call(link_name):
+            for child_joint_name in link.child_joint_names:
+                if companion.joint_call(child_joint_name):
+                    continue
+                child_link_name = self.joints[child_joint_name].child_link_name
+                self.travel_branch(child_link_name, companion)
+
+    def search_branch(self, link_name,
                       stop_at_joint_when=None, stop_at_link_when=None,
                       collect_joint_when=None, collect_link_when=None):
         """
@@ -112,44 +136,54 @@ class WorldTree(object):
         :param stop_at_link_when: If None, 'lambda link_name: False' is used.
         :param collect_joint_when: If None, 'lambda joint_name: False' is used.
         :param collect_link_when: If None, 'lambda link_name: False' is used.
-        :return: Collected links and joints. DOES NOT INCLUDE joint_name
+        :return: Collected links and joints. Might include 'link_name'
         """
-        if stop_at_joint_when is None:
-            def stop_at_joint_when(_):
-                return False
-        if stop_at_link_when is None:
-            def stop_at_link_when(_):
-                return False
-        if collect_joint_when is None:
-            def collect_joint_when(_):
-                return False
-        if collect_link_when is None:
-            def collect_link_when(_):
-                return False
 
-        def helper(joint_name):
-            joint = self.joints[joint_name]
-            collected_link_names = []
-            collected_joint_names = []
-            child_link = self.links[joint.child_link_name]
-            if collect_link_when(child_link.name):
-                collected_link_names.append(child_link.name)
-            if not stop_at_link_when(child_link.name):
-                for child_joint_name in child_link.child_joint_names:
-                    if collect_joint_when(child_joint_name):
-                        collected_joint_names.append(child_joint_name)
-                    if stop_at_joint_when(child_joint_name):
-                        continue
-                    links_to_add, joints_to_add = helper(child_joint_name)
-                    collected_link_names.extend(links_to_add)
-                    collected_joint_names.extend(joints_to_add)
-            return collected_link_names, collected_joint_names
+        class CollectorCompanion(TravelCompanion):
+            def __init__(self, collect_joint_when=None, collect_link_when=None,
+                         stop_at_joint_when=None, stop_at_link_when=None):
+                self.collected_link_names = []
+                self.collected_joint_names = []
 
-        return helper(joint_name)
+                if stop_at_joint_when is None:
+                    def stop_at_joint_when(_):
+                        return False
+                if stop_at_link_when is None:
+                    def stop_at_link_when(_):
+                        return False
+                self.stop_at_joint_when = stop_at_joint_when
+                self.stop_at_link_when = stop_at_link_when
+
+                if collect_joint_when is None:
+                    def collect_joint_when(_):
+                        return False
+                if collect_link_when is None:
+                    def collect_link_when(_):
+                        return False
+                self.collect_joint_when = collect_joint_when
+                self.collect_link_when = collect_link_when
+
+            def link_call(self, link_name):
+                if self.collect_link_when(link_name):
+                    self.collected_link_names.append(link_name)
+                return self.stop_at_link_when(link_name)
+
+            def joint_call(self, joint_name):
+                if self.collect_joint_when(joint_name):
+                    self.collected_joint_names.append(joint_name)
+                return self.stop_at_joint_when(joint_name)
+
+        collector_companion = CollectorCompanion(collect_joint_when=collect_joint_when,
+                                                 collect_link_when=collect_link_when,
+                                                 stop_at_joint_when=stop_at_joint_when,
+                                                 stop_at_link_when=stop_at_link_when)
+        self.travel_branch(link_name, companion=collector_companion)
+        return collector_companion.collected_link_names, collector_companion.collected_joint_names
 
     @memoize
     def get_directly_controlled_child_links_with_collisions(self, joint_name):
-        links, joints = self.search_branch(joint_name,
+        child_link_name = self.joints[joint_name].child_link_name
+        links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=self.is_joint_controlled,
                                            collect_link_when=self.has_link_collisions)
         return links
@@ -169,7 +203,8 @@ class WorldTree(object):
         def stop_at_joint_when(other_joint_name):
             return joint_name == other_joint_name or self.is_joint_controlled(other_joint_name)
 
-        links, joints = self.search_branch(parent_joint,
+        child_link_name = self.joints[parent_joint].child_link_name
+        links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=stop_at_joint_when,
                                            collect_link_when=self.has_link_collisions)
         return links
@@ -303,11 +338,7 @@ class WorldTree(object):
                 mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
                 joint.set_mimed_free_variable(mimed_joint.free_variable)
 
-    def get_parent_link_of_link(self, link_name):
-        """
-        :type link_name: PrefixName
-        :rtype: PrefixName
-        """
+    def get_parent_link_of_link(self, link_name: Union[PrefixName, str]) -> PrefixName:
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
 
     @memoize
@@ -624,6 +655,7 @@ class WorldTree(object):
         return root_chain, [connection] if links else [], tip_chain
 
     @memoize
+    @profile
     def compose_fk_expression(self, root_link, tip_link):
         fk = w.eye(4)
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, joints=True, links=False, fixed=True,
@@ -647,15 +679,10 @@ class WorldTree(object):
 
     @memoize
     def compute_fk_pose(self, root, tip):
-        try:
-            homo_m = self.compute_fk_np(root, tip)
-            p = PoseStamped()
-            p.header.frame_id = str(root)
-            p.pose = homo_matrix_to_pose(homo_m)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            pass
+        homo_m = self.compute_fk_np(root, tip)
+        p = PoseStamped()
+        p.header.frame_id = str(root)
+        p.pose = homo_matrix_to_pose(homo_m)
         return p
 
     @memoize
@@ -678,21 +705,6 @@ class WorldTree(object):
 
     @profile
     def compute_all_fks(self):
-        # TODO speedup possible
-        # def helper(link, root_T_parent):
-        #     if link.parent_joint_name in self.joints:
-        #         root_T_link = root_T_parent * self.joints[link.parent_joint_name].parent_T_child
-        #     else:
-        #         root_T_link = root_T_parent
-        #     if link.has_collisions():
-        #         fks = {link.name: root_T_link}
-        #     else:
-        #         fks = {}
-        #     for child_joint_name in link.child_joint_names:
-        #         child_link = self.joints[child_joint_name].child
-        #         fks.update(helper(child_link, root_T_link))
-        #     return fks
-        # fks_dict = helper(self.root_link, w.eye(4))
         if self.fast_all_fks is None:
             fks = []
             self.fk_idx = {}
@@ -719,74 +731,63 @@ class WorldTree(object):
 
     @profile
     def compute_all_fks_matrix(self):
-        fks = []
-        for link in self.links.values():
-            if link.name == self.root_link_name:
-                continue
-            if link.has_collisions():
-                map_T_o = self.compose_fk_expression(self.root_link_name, link.name)
-                map_T_geo = w.dot(map_T_o, link.collisions[0].link_T_geometry)
-                fks.append(map_T_geo)
-        fks = w.vstack(fks)
-        fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
-
-        class ComputeFKs(object):
-            def __init__(self, f, god_map):
-                self.f = f
-                self.god_map = god_map
-
-            @profile
-            def __call__(self):
-                return fast_all_fks.call2(self.god_map.unsafe_get_values(self.f.str_params))
-
-        return ComputeFKs(fast_all_fks, self.god_map)
+        return self._fk_computer.collision_fk_matrix
 
     @profile
     def init_all_fks(self):
-        fks = []
-        idx_start = {}
-        idx_stop = {}
-        i = 0
-        for link_name in self.link_names:
-            if link_name == self.root_link_name:
-                continue
-            map_T_o = self.compose_fk_expression(self.root_link_name, link_name)
-            fks.append(map_T_o)
-            idx_start[link_name] = i
-            idx_stop[link_name] = i + 4
-            i += 4
-        fks = w.vstack(fks)
-        fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
+        class ExpressionCompanion(TravelCompanion):
+            idx_start: Dict[PrefixName, int]
+            fast_collision_fks: CompiledFunction
+            fast_all_fks: CompiledFunction
 
-        class FKs(object):
-            def __init__(self, f, god_map, idx_start, idx_stop):
-                self.f = f
-                self.god_map = god_map
-                self.idx_start = idx_start
-                self.idx_stop = idx_stop
-                self.map = god_map.unsafe_get_data(identifier.world).root_link_name
+            def __init__(self, world: WorldTree):
+                self.world = world
+                self.god_map = self.world.god_map
+                self.fks = {self.world.root_link_name: w.eye(4)}
+
+            @profile
+            def joint_call(self, joint_name: Union[PrefixName, str]) -> bool:
+                joint = self.world.joints[joint_name]
+                map_T_parent = self.fks[joint.parent_link_name]
+                self.fks[joint.child_link_name] = w.dot(map_T_parent, joint.parent_T_child)
+                return False
+
+            @profile
+            def compile_fks(self):
+                all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names])
+                for link_name in self.world.link_names_with_collisions:
+                    link = self.world.links[link_name]
+                    self.fks[link_name] = w.dot(self.fks[link_name], link.collisions[0].link_T_geometry)
+                collision_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_with_collisions if
+                                          link_name != self.world.root_link_name])
+                self.fast_all_fks = w.speed_up(all_fks, w.free_symbols(all_fks))
+                self.fast_collision_fks = w.speed_up(collision_fks, w.free_symbols(collision_fks))
+                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names)}
 
             @profile
             def recompute(self):
                 self.get_fk.memo.clear()
-                self.fks = self.f.call2(self.god_map.unsafe_get_values(self.f.str_params))
+                self.fks = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+                self.collision_fk_matrix = self.fast_collision_fks.call2(self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
 
             @memoize
             @profile
             def get_fk(self, root, tip):
-                if root == self.map:
+                if root == self.world.root_link_name:
                     map_T_root = np.eye(4)
                 else:
-                    map_T_root = self.fks[self.idx_start[root]:self.idx_stop[root]]
-                if tip == self.map:
+                    map_T_root = self.fks[self.idx_start[root]:self.idx_start[root] + 4]
+                if tip == self.world.root_link_name:
                     map_T_tip = np.eye(4)
                 else:
-                    map_T_tip = self.fks[self.idx_start[tip]:self.idx_stop[tip]]
+                    map_T_tip = self.fks[self.idx_start[tip]:self.idx_start[tip] + 4]
                 root_T_map = mymath.inverse_frame(map_T_root)
                 root_T_tip = np.dot(root_T_map, map_T_tip)
                 return root_T_tip
 
-        self._fk_computer = FKs(fast_all_fks, self.god_map, idx_start, idx_stop)
+        self._fk_computer = ExpressionCompanion(self)
+        self.travel_branch(self.root_link_name, self._fk_computer)
+        self._fk_computer.compile_fks()
 
     @profile
     def _recompute_fks(self):
@@ -893,7 +894,8 @@ class WorldTree(object):
             for child_joint_name in self.links[link_name].child_joint_names:
                 if self.is_joint_controlled(child_joint_name):
                     continue
-                links, joints = self.search_branch(joint_name=child_joint_name,
+                child_link_name = self.joints[child_joint_name].child_link_name
+                links, joints = self.search_branch(link_name=child_link_name,
                                                    stop_at_joint_when=self.is_joint_controlled,
                                                    stop_at_link_when=None,
                                                    collect_joint_when=None,
@@ -901,7 +903,8 @@ class WorldTree(object):
 
                 direct_children.update(links)
             direct_children.add(link_name)
-            link_combinations.difference_update(self.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
+            link_combinations.difference_update(
+                self.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
 
     def get_joint_position_limits(self, joint_name):

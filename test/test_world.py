@@ -361,16 +361,16 @@ class TestWorldTree(object):
 
     def test_search_branch(self):
         world = create_world_with_pr2()
-        result = world.search_branch('odom_x_joint',
+        result = world.search_branch('odom_x_frame',
                                      stop_at_joint_when=lambda _: False,
                                      stop_at_link_when=lambda _: False)
         assert result == ([], [])
-        result = world.search_branch('odom_y_joint',
+        result = world.search_branch('odom_y_frame',
                                      stop_at_joint_when=world.is_joint_controlled,
                                      stop_at_link_when=lambda _: False,
                                      collect_link_when=world.has_link_collisions)
         assert result == ([], [])
-        result = world.search_branch('odom_z_joint',
+        result = world.search_branch('base_footprint',
                                      stop_at_joint_when=world.is_joint_controlled,
                                      collect_link_when=world.has_link_collisions)
         assert set(result[0]) == {'base_bellow_link',
@@ -387,7 +387,7 @@ class TestWorldTree(object):
                                   'br_caster_r_wheel_link',
                                   'br_caster_rotation_link',
                                   'base_link'}
-        result = world.search_branch('l_elbow_flex_joint',
+        result = world.search_branch('l_elbow_flex_link',
                                      collect_joint_when=world.is_joint_fixed)
         assert set(result[0]) == set()
         assert set(result[1]) == {'l_force_torque_adapter_joint',
@@ -399,7 +399,7 @@ class TestWorldTree(object):
                                   'l_gripper_motor_accelerometer_joint',
                                   'l_gripper_palm_joint',
                                   'l_gripper_tool_joint'}
-        links, joints = world.search_branch('r_wrist_roll_joint',
+        links, joints = world.search_branch('r_wrist_roll_link',
                                             stop_at_joint_when=world.is_joint_controlled,
                                             collect_link_when=world.has_link_collisions,
                                             collect_joint_when=lambda _: True)
@@ -420,7 +420,7 @@ class TestWorldTree(object):
                                'r_gripper_r_finger_joint',
                                'r_gripper_r_finger_tip_joint',
                                'r_gripper_joint'}
-        links, joints = world.search_branch('br_caster_l_wheel_joint',
+        links, joints = world.search_branch('br_caster_l_wheel_link',
                                             collect_link_when=lambda _: True,
                                             collect_joint_when=lambda _: True)
         assert links == ['br_caster_l_wheel_link']
@@ -530,8 +530,7 @@ class TestWorldTree(object):
                                                                           'r_gripper_r_finger_joint': (0.0, 0.548),
                                                                           'r_gripper_r_finger_tip_joint': (0.0, 0.548)}
 
-    @profile
-    def test_asdf(self):
+    def test_possible_collision_combinations(self):
         world = create_world_with_pr2()
         result = world.possible_collision_combinations('robot')
         reference = {world.sort_links(link_a, link_b) for link_a, link_b in
@@ -572,5 +571,3 @@ class TestWorldTree(object):
         with pytest.raises(KeyError):
             world.compute_chain_reduced_to_controlled_joints('l_wrist_roll_link', 'l_gripper_r_finger_link')
 
-import pytest
-pytest.main(['-s', __file__ + '::TestWorldTree::test_asdf'])

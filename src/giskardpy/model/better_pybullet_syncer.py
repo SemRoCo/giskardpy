@@ -183,20 +183,13 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 self.kw.remove_collision_object(o)
             self.object_name_to_id = BiDict()
 
-            for link_name, link in self.world.links.items():
-                if link.has_collisions():
-                    self.add_object(link)
-            self.objects_in_order = [self.object_name_to_id[link.name] for link in self.world.links.values() if
-                                     link.has_collisions()]
-            self.fks = self.world.compute_all_fks_matrix()
-            bpb.batch_set_transforms(self.objects_in_order, self.fks())
+            for link_name in self.world.link_names_with_collisions:
+                link = self.world.links[link_name]
+                self.add_object(link)
+            self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
+            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
             self.init_collision_matrix(RobotName)
-        try:
-            bpb.batch_set_transforms(self.objects_in_order, self.fks())
-        except Exception as e:
-            logging.logerr('needed to recompute all matrices')
-            self.fks = self.world.compute_all_fks_matrix()
-            bpb.batch_set_transforms(self.objects_in_order, self.fks())
+        bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
 
     def get_pose(self, link_name):
         collision_object = self.object_name_to_id[link_name]

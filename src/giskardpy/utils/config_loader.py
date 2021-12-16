@@ -9,8 +9,10 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 rospack = rospkg.RosPack()
 
+
 def get_ros_pkg_path(ros_pkg):
     return rospack.get_path(ros_pkg)
+
 
 class Loader(yaml.SafeLoader):
     """YAML Loader with `!include` constructor."""
@@ -43,13 +45,13 @@ def find_parent_of_key(key, value, keys):
     :rtype: tuple(dict, list(str))
     :returns: tuple containing a dict and the key-chain in a list
     """
-    if key in value:
-        yield value, keys
+    if key in value and key not in value[key]:
+        return value, keys
     else:
         for k, v in value.items():
             if type(v) == dict:
                 keys.append(k)
-                yield find_parent_of_key(key, v, keys)
+                return find_parent_of_key(key, v, keys)
 
 
 def nested_update(dic, keys, value):
@@ -87,27 +89,30 @@ def update_nested_dicts(d, u):
             d[k] = v
     return d
 
-def update_parents(d, merge_key='parent'):
+
+def update_parents(d, merge_key):
     """
-    Will merge the dict containing the given key merge_key with the value in d[merge_key].
+    Will recursively merge the dict containing the given key merge_key with the value in d[merge_key].
 
     :type d: dict
     :returns: dict
     """
-    if 'parent' not in d:
+    if merge_key not in d:
         return d
-    root_data = deepcopy(d)
-    gen = find_parent_of_key(merge_key, root_data, [])
-    while True:
-        try:
-            data, keys = next(gen)
-        except (StopIteration, ValueError):
-            break
-        parent_data = data[merge_key]
-        data.pop(merge_key)
-        updated = update_nested_dicts(parent_data, data)
-        nested_update(root_data, keys, updated)
-    return root_data
+    else:
+        root_data = deepcopy(d)
+        while True:
+            data_keys_tuple = find_parent_of_key(merge_key, root_data, [])
+            if data_keys_tuple is not None:
+                data, keys = data_keys_tuple
+            else:
+                break
+            parent_data = data[merge_key]
+            data.pop(merge_key)
+            updated = update_nested_dicts(parent_data, data)
+            nested_update(root_data, keys, updated)
+        return root_data
+
 
 def get_filename(loader, node, root):
     """Returns file name referenced at given node by using the given loader."""
@@ -144,10 +149,10 @@ def construct_find(loader, node):
     return get_filename(loader, node, loader.giskardpy_root)
 
 
-def load_robot_yaml(path):
+def load_robot_yaml(path, merge_key='parent'):
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
-        updated = update_parents(data)
+        updated = update_parents(data, merge_key)
         return cast_values_in_nested_dict(updated, float)
 
 

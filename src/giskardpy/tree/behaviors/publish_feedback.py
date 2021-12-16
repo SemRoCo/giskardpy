@@ -9,6 +9,7 @@ class PublishFeedback(ActionServerBehavior):
         super().__init__(name, as_name)
         self.feedback = feedback
 
+    @profile
     def update(self):
         feedback_msg = MoveFeedback()
         feedback_msg.state = self.feedback

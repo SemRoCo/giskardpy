@@ -43,38 +43,41 @@ class FIFOSet(set):
         self._data_queue.remove(item)
 
 
+class _JointState(object):
+    derivative_to_name = {
+        0: 'position',
+        1: 'velocity',
+        2: 'acceleration',
+        3: 'jerk',
+        4: 'snap',
+        5: 'crackle',
+        6: 'pop',
+    }
+
+    def __init__(self, position=0, velocity=0, acceleration=0, jerk=0, snap=0, crackle=0, pop=0):
+        self.position = position
+        self.velocity = velocity
+        self.acceleration = acceleration
+        self.jerk = jerk
+        self.snap = snap
+        self.crackle = crackle
+        self.pop = pop
+
+    def set_derivative(self, d, item):
+        setattr(self, self.derivative_to_name[d], item)
+
+    def __str__(self):
+        return '{}'.format(self.position)
+
+    def __repr__(self):
+        return str(self)
+
+    def __deepcopy__(self, memodict={}):
+        return _JointState(self.position, self.velocity, self.acceleration, self.jerk, self.snap, self.crackle, self.pop)
+
 class JointStates(defaultdict):
-    class _JointState(object):
-        derivative_to_name = {
-            0: 'position',
-            1: 'velocity',
-            2: 'acceleration',
-            3: 'jerk',
-            4: 'snap',
-            5: 'crackle',
-            6: 'pop',
-        }
-
-        def __init__(self, position=0, velocity=0, acceleration=0, jerk=0, snap=0, crackle=0, pop=0):
-            self.position = position
-            self.velocity = velocity
-            self.acceleration = acceleration
-            self.jerk = jerk
-            self.snap = snap
-            self.crackle = crackle
-            self.pop = pop
-
-        def set_derivative(self, d, item):
-            setattr(self, self.derivative_to_name[d], item)
-
-        def __str__(self):
-            return '{}'.format(self.position)
-
-        def __repr__(self):
-            return str(self)
-
     def __init__(self, *args, **kwargs):
-        super(JointStates, self).__init__(self._JointState, *args, **kwargs)
+        super(JointStates, self).__init__(_JointState, *args, **kwargs)
 
     @classmethod
     def from_msg(cls, msg, prefix=None):
@@ -85,7 +88,7 @@ class JointStates(defaultdict):
         self = cls()
         for i, joint_name in enumerate(msg.name):
             joint_name = PrefixName(joint_name, prefix)
-            sjs = cls._JointState(position=msg.position[i],
+            sjs = _JointState(position=msg.position[i],
                                   velocity=msg.velocity[i] if msg.velocity else 0,
                                   acceleration=0,
                                   jerk=0,

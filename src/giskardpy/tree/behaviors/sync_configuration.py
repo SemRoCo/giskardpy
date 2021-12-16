@@ -36,6 +36,7 @@ class SyncConfiguration(GiskardBehavior):
             self.tf_root_link_name = tf_root_link_name
         self.lock = Queue(maxsize=1)
 
+    @profile
     def setup(self, timeout=0.0):
         msg = None
         while msg is None and not rospy.is_shutdown():
@@ -53,6 +54,7 @@ class SyncConfiguration(GiskardBehavior):
             pass
         self.lock.put(data)
 
+    @profile
     def update(self):
         try:
             if self.mjs is None:

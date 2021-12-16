@@ -18,6 +18,7 @@ class SyncLocalization(GiskardBehavior):
         else:
             self.tf_root_link_name = tf_root_link_name
 
+    @profile
     def update(self):
         try:
             map_T_base = lookup_pose(self.map_frame, self.tf_root_link_name)

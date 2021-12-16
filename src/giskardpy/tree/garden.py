@@ -15,8 +15,6 @@ from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.behaviors.append_zero_velocity import AppendZeroVelocity
-from giskardpy.tree.composites.async_composite import PluginBehavior
-from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.tree.behaviors.cleanup import CleanUp
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.collision_marker import CollisionMarker
@@ -34,6 +32,7 @@ from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.plugin_if import IF
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.send_result import SendResult
@@ -49,6 +48,8 @@ from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.update_constraints import GoalToConstraints
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
+from giskardpy.tree.composites.async_composite import PluginBehavior
+from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.utils import create_path
@@ -339,13 +340,13 @@ class TreeManager(object):
         """
         return self.tree_nodes[node_name].node
 
-    def render(self):
+    def render(self, profile=None):
         path = self.god_map.get_data(identifier.data_folder) + 'tree'
         create_path(path)
-        render_dot_tree(self.tree.root, name=path)
+        render_dot_tree(self.tree.root, name=path, profile=profile)
 
 
-def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
+def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None, profile=None):
     """
     Render the dot tree to .dot, .svg, .png. files in the current
     working directory. These will be named with the root behaviour name.
@@ -377,7 +378,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
         A good practice is to provide a command line argument for optional rendering of a program so users
         can quickly visualise what tree the program will execute.
     """
-    graph = generate_pydot_graph(root, visibility_level)
+    graph = generate_pydot_graph(root, visibility_level, profile)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
     logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
     graph.write(filename_wo_extension + '.dot')
@@ -385,7 +386,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     graph.write_svg(filename_wo_extension + '.svg')
 
 
-def generate_pydot_graph(root, visibility_level):
+def generate_pydot_graph(root, visibility_level, profile=None):
     """
     Generate the pydot graph - this is usually the first step in
     rendering the tree to file. See also :py:func:`render_dot_tree`.
@@ -434,7 +435,7 @@ def generate_pydot_graph(root, visibility_level):
     graph.add_node(node_root)
     names = [root.name]
 
-    def add_edges(root, root_dot_name, visibility_level):
+    def add_edges(root, root_dot_name, visibility_level, profile):
         if visibility_level < root.blackbox_level:
             if isinstance(root, PluginBehavior):
                 childrens = []
@@ -448,6 +449,20 @@ def generate_pydot_graph(root, visibility_level):
             for name, c in zip(names2, childrens):
                 (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
                 proposed_dot_name = name
+                if (isinstance(c, GiskardBehavior) or (hasattr(c,'original')
+                                                       and isinstance(c.original, GiskardBehavior))) \
+                        and not isinstance(c, PluginBehavior) and profile is not None:
+                    if hasattr(c, 'original'):
+                        file_name = str(c.original.__class__).split('.')[-2]
+                    else:
+                        file_name = str(c.__class__).split('.')[-2]
+                    if file_name in profile:
+                        proposed_dot_name = '{}\nsetup= {}\n' \
+                                            'initialise= {}\n' \
+                                            'update= {}'.format(proposed_dot_name,
+                                                                profile[file_name].get('setup', 'n/a'),
+                                                                profile[file_name].get('initialise', 'n/a'),
+                                                                profile[file_name].get('update', 'n/a'))
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
                 names.append(proposed_dot_name)
@@ -458,9 +473,9 @@ def generate_pydot_graph(root, visibility_level):
                 graph.add_edge(edge)
                 if (isinstance(c, PluginBehavior) and c.get_plugins() != []) or \
                         (isinstance(c, Behaviour) and c.children != []):
-                    add_edges(c, proposed_dot_name, visibility_level)
+                    add_edges(c, proposed_dot_name, visibility_level, profile)
 
-    add_edges(root, root.name, visibility_level)
+    add_edges(root, root.name, visibility_level, profile)
     return graph
 
 
@@ -650,7 +665,6 @@ class ClosedLoop(OpenLoop):
         return planning_4
 
 
-
 def sanity_check(god_map):
     check_velocity_limits_reachable(god_map)
 
@@ -703,4 +717,3 @@ def check_velocity_limits_reachable(god_map):
             print_help = True
     if print_help:
         logging.logwarn('Check utils.py/max_velocity_from_horizon_and_jerk for help.')
-

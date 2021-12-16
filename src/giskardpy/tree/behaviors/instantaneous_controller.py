@@ -16,14 +16,9 @@ class ControllerPlugin(GiskardBehavior):
         self.rc_other_velocity = self.get_god_map().get_data(identifier.rc_other_velocity)
         self.controller = None
 
+    @profile
     def initialise(self):
         super(ControllerPlugin, self).initialise()
-        self.init_controller()
-
-    def setup(self, timeout=0.0):
-        return super(ControllerPlugin, self).setup(5.0)
-
-    def init_controller(self):
         constraints = self.get_god_map().get_data(identifier.constraints)
         vel_constraints = self.get_god_map().get_data(identifier.vel_constraints)
         free_variables = self.get_god_map().get_data(identifier.free_variables)

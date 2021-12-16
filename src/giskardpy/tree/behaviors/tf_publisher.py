@@ -33,6 +33,7 @@ class TFPublisher(GiskardBehavior):
         tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
         return tf
 
+    @profile
     def update(self):
         try:
             with self.get_god_map() as god_map:

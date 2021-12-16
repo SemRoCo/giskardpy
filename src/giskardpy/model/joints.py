@@ -121,6 +121,9 @@ class Joint(object):
                                             upper_limits=upper_limits)
         return joint
 
+    def update_state(self, new_cmds, dt):
+        pass
+
 
 class FixedJoint(Joint):
     pass
@@ -168,9 +171,6 @@ class MovableJoint(Joint):
 
     def has_free_variables(self):
         return len(self.free_variables) > 0
-
-    def update_state(self, new_cmds, dt):
-        pass
 
     def update_parent_T_child(self):
         pass
@@ -745,11 +745,11 @@ class DiffDriveWheelsJoint(MovableJoint):
         x_T_y = w.translation3(0, self.y, 0)
         y_T_z = w.rotation_matrix_from_axis_angle(w.vector3(0, 0, 1), self.z)
         z_T_rot = w.rotation_matrix_from_axis_angle(w.vector3(*self.rotation_axis), rot)
-        rot_T_base = w.translation3(w.cos(self.z+0.01) * trans_r,
-                                    w.sin(self.z+0.01) * trans_r,
+        rot_T_base = w.translation3(w.cos(self.z + 0.01) * trans_r,
+                                    w.sin(self.z + 0.01) * trans_r,
                                     0)
-        rot_T_base2 = w.translation3(w.cos(self.z-0.01) * trans_l,
-                                     w.sin(self.z-0.01) * trans_l,
+        rot_T_base2 = w.translation3(w.cos(self.z - 0.01) * trans_l,
+                                     w.sin(self.z - 0.01) * trans_l,
                                      0)
         self.parent_T_child = w.dot(self.parent_T_child, odom_T_x, x_T_y, y_T_z, z_T_rot, rot_T_base, rot_T_base2)
 

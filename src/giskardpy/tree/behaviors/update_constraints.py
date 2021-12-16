@@ -35,6 +35,7 @@ class GoalToConstraints(GetGoal):
         self.rc_revolute_velocity = self.get_god_map().get_data(identifier.rc_revolute_velocity)
         self.rc_other_velocity = self.get_god_map().get_data(identifier.rc_other_velocity)
 
+    @profile
     def initialise(self):
         self.get_god_map().set_data(identifier.collision_goal, None)
         self.clear_blackboard_exception()

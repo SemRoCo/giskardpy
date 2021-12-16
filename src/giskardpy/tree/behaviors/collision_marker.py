@@ -15,9 +15,9 @@ class CollisionMarker(GiskardBehavior):
         super(CollisionMarker, self).setup(timeout)
         self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.name_space = name_space
-        rospy.sleep(.5)
         return True
 
+    @profile
     def update(self):
         """
         Computes closest point info for all robot links and safes it to the god map.

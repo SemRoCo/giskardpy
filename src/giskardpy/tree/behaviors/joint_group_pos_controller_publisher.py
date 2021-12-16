@@ -16,6 +16,7 @@ class JointGroupPosController(CommandPublisher):
         self.joint_names = rospy.get_param('{}/joints'.format(self.namespace))
         super().__init__(name, hz)
 
+    @profile
     def initialise(self):
         def f(joint_symbol):
             return self.god_map.expr_to_key[joint_symbol][-2]

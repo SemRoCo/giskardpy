@@ -11,6 +11,7 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
         self.number_of_joints = len(self.world.controlled_joints)
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
 
+    @profile
     def initialise(self):
         self.trajectory = self.get_god_map().get_data(identifier.debug_trajectory)
 

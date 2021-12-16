@@ -13,6 +13,7 @@ class LoopDetector(GiskardBehavior):
         self.window_size = 21
         super(LoopDetector, self).__init__(name)
 
+    @profile
     def initialise(self):
         super(LoopDetector, self).initialise()
         self.past_joint_states = set()

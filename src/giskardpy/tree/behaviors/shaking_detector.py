@@ -30,6 +30,7 @@ class WiggleCancel(GiskardBehavior):
             thresholds.append(velocity_limit)
         return np.array(thresholds)
 
+    @profile
     def initialise(self):
         super(WiggleCancel, self).initialise()
         self.js_samples = []
@@ -55,6 +56,7 @@ class WiggleCancel(GiskardBehavior):
         self.velocity_limits = np.array(self.velocity_limits)
         self.js_samples = [[] for _ in range(len(self.keys))]
 
+    @profile
     def update(self):
         latest_points = self.get_god_map().get_data(identifier.joint_states)
 

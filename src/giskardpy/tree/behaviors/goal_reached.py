@@ -15,6 +15,7 @@ class GoalReachedPlugin(GiskardBehavior):
         self.window_size = self.get_god_map().get_data(identifier.GoalReached_window_size)
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
 
+    @profile
     def initialise(self):
         self.above_threshold_time = 0
         self.thresholds = self.make_velocity_threshold()

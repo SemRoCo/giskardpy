@@ -18,6 +18,7 @@ class SendFollowJointTrajectoryDiffDrive(GiskardBehavior):
         self.vel_pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=10)
         self.world.register_controlled_joints(['diff_drive'])
 
+    @profile
     def initialise(self):
         super(SendFollowJointTrajectoryDiffDrive, self).initialise()
         self.trajectory = self.get_god_map().get_data(identifier.trajectory)

@@ -20,6 +20,7 @@ class AppendZeroVelocity(GiskardBehavior):
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         super(AppendZeroVelocity, self).initialise()
 
+    @profile
     def update(self):
         # FIXME we do we need this plugin?
         motor_commands = self.get_god_map().get_data(identifier.qp_solver_solution)

@@ -10,6 +10,7 @@ class MaxTrajectoryLength(GiskardBehavior):
         super(MaxTrajectoryLength, self).__init__(name)
         self.length = length
 
+    @profile
     def update(self):
         t = self.get_god_map().get_data(identifier.time)
         sample_period = self.get_god_map().get_data(identifier.sample_period)

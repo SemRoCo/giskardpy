@@ -2,12 +2,9 @@ from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Lock
 
-import rospy
 from py_trees import Status
-from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
 import giskardpy.identifier as identifier
-from giskardpy.model import pybullet_wrapper
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
@@ -18,25 +15,6 @@ class CollisionChecker(GiskardBehavior):
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
-
-    def setup(self, timeout=10.0):
-        super(CollisionChecker, self).setup(timeout)
-        # self.collision_scene.init_collision_matrix(RobotName)
-        self.srv_activate_rendering = rospy.Service('~render', SetBool, self.activate_rendering)
-        rospy.sleep(.5)
-        return True
-
-    def activate_rendering(self, data):
-        """
-        :type data: SetBoolRequest
-        :return:
-        """
-        pybullet_wrapper.render = data.data
-        if data.data:
-            pybullet_wrapper.activate_rendering()
-        else:
-            pybullet_wrapper.deactivate_rendering()
-        return SetBoolResponse()
 
     def _cal_max_param(self, parameter_name):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
@@ -49,6 +27,7 @@ class CollisionChecker(GiskardBehavior):
             default_distance = max(default_distance, value[parameter_name])
         return default_distance
 
+    @profile
     def initialise(self):
         self.collision_scene.sync()
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)

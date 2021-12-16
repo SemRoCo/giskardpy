@@ -62,7 +62,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                                     'Must be one of: {}'.format(action_msg_type, self.supported_action_types))
             except ROSTopicException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(self.action_namespace))
-                rospy.sleep(2)
+                rospy.sleep(1)
 
         ActionClient.__init__(self, name, action_msg_type, None, self.action_namespace)
         loginfo('Successfully connected to \'{}\'.'.format(self.action_namespace))
@@ -85,10 +85,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                     self.controlled_joints = msg.joint_names
             except ROSException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
-                rospy.sleep(2)
+                rospy.sleep(1)
         self.world.register_controlled_joints(self.controlled_joints)
         loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
 
+    @profile
     def initialise(self):
         super(SendFollowJointTrajectory, self).initialise()
         trajectory = self.get_god_map().get_data(identifier.trajectory)
@@ -103,6 +104,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.max_deadline = deadline + self.goal_time_tolerance
         self.cancel_tries = 0
 
+    @profile
     def update(self):
         """
         Check only to see whether the underlying action server has

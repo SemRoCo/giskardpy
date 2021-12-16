@@ -16,6 +16,7 @@ class CommandPublisher(GiskardBehavior):
         self.world.register_controlled_joints(self.joint_names)
         self.stamp = None
 
+    @profile
     def initialise(self):
         self.sample_period = self.god_map.get_data(identifier.sample_period)
         self.stamp = rospy.get_rostime()

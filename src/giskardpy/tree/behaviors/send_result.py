@@ -10,6 +10,7 @@ class SendResult(ActionServerBehavior):
     def __init__(self, name, as_name, action_type=None):
         super(SendResult, self).__init__(name, as_name, action_type)
 
+    @profile
     def update(self):
         skip_failures = self.get_god_map().get_data(identifier.skip_failures)
         Blackboard().set('exception', None)  # FIXME move this to reset?

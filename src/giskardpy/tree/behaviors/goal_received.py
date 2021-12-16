@@ -6,9 +6,9 @@ from giskardpy.utils import logging
 
 
 class GoalReceived(ActionServerBehavior):
+    @profile
     def update(self):
         if self.get_as().has_goal():
-            rospy.sleep(.5)
             logging.loginfo('Received new goal.')
             return Status.SUCCESS
         return Status.FAILURE

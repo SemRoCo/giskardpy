@@ -15,6 +15,7 @@ class VisualizationBehavior(GiskardBehavior):
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         return super(VisualizationBehavior, self).setup(timeout)
 
+    @profile
     def update(self):
         markers = []
         time_stamp = rospy.Time()

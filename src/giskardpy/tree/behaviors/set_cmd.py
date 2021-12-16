@@ -20,6 +20,7 @@ class SetCmd(GetGoal):
         """
         return self.god_map.get_data(identifier.goal_msg)
 
+    @profile
     def initialise(self):
         if self.goal is None:
             self.god_map.set_data(identifier.goal_msg, self.pop_goal())
@@ -80,6 +81,7 @@ class SetCmd(GetGoal):
     def get_set_bits(self, goal_type):
         return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(goal_type))) if int(bit) != 0]
 
+    @profile
     def update(self):
         if self.get_blackboard_exception() is not None:
             return Status.SUCCESS

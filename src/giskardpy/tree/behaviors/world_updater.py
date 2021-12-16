@@ -69,6 +69,7 @@ class WorldUpdater(GiskardBehavior):
         self.queue2 = Queue(maxsize=1)
         self.timer_state = self.READY
 
+    @profile
     def setup(self, timeout=5.0):
         # TODO make service name a parameter
         self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
@@ -118,6 +119,7 @@ class WorldUpdater(GiskardBehavior):
         res.attachment_points = attachment_points
         return res
 
+    @profile
     def update(self):
         if self.timer_state == self.STALL:
             self.timer_state = self.READY

@@ -10,6 +10,7 @@ class GoalCanceled(ActionServerBehavior):
         super().__init__(name, as_name, action_type)
         self.feedback = feedback
 
+    @profile
     def update(self):
         if self.get_as().is_preempt_requested() and self.get_blackboard_exception() is None:
             logging.logerr('preempted')

@@ -44,10 +44,12 @@ class SyncConfiguration2(GiskardBehavior):
             pass
         self.lock.put(data)
 
+    @profile
     def initialise(self):
         self.last_time = rospy.get_rostime()
         super().initialise()
 
+    @profile
     def update(self):
         try:
             if self.mjs is None:

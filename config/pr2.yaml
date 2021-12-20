@@ -101,14 +101,3 @@ collision_avoidance:
       - base_link
     add: [ ] # list pairs of links that should be added to the self collision matrix
     number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it
-action_server:
-  base:
-    plugin: SendFollowJointTrajectory
-    namespace: /whole_body_controller/base/follow_joint_trajectory
-    state_topic: /whole_body_controller/base/state
-    fill_velocity_values: True
-  body:
-    plugin: SendFollowJointTrajectory
-    namespace: /whole_body_controller/body/follow_joint_trajectory
-    state_topic: /whole_body_controller/body/state
-    fill_velocity_values: False

@@ -99,40 +99,14 @@ def resetted_giskard(giskard):
 
 
 @pytest.fixture()
-def resetted_giskard_more_robots(giskard_more_robots):
-    """
-    :type giskard: PR2
-    """
-    logging.loginfo(u'resetting giskard')
-    for r_n in giskard_more_robots.robot_names:
-        giskard_more_robots.open_l_gripper(r_n)
-        giskard_more_robots.open_r_gripper(r_n)
-    #giskard_more_robots.clear_world() # fixme
-    #giskard_more_robots.reset_base()
-    return giskard_more_robots
-
-
-
-@pytest.fixture()
 def zero_pose(resetted_giskard):
     """
     :type resetted_giskard: PR2
     """
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.set_joint_goal(default_pose)
+    resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
     resetted_giskard.plan_and_execute()
     return resetted_giskard
-
-
-@pytest.fixture()
-def zero_pose_more_robots(resetted_giskard_more_robots):
-    """
-    :type resetted_giskard: PR2
-    """
-    resetted_giskard_more_robots.allow_all_collisions()
-    resetted_giskard_more_robots.set_joint_goal(dict_with_prefix(default_pose, resetted_giskard_more_robots.robot_names[0]))
-    resetted_giskard_more_robots.plan_and_execute()
-    return resetted_giskard_more_robots
 
 
 @pytest.fixture()

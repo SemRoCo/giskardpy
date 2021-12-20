@@ -1,15 +1,18 @@
 from __future__ import division
 
+from copy import deepcopy
+
 from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
+from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 
 
 class CartesianPosition(Goal):
-    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2, weight=WEIGHT_ABOVE_CA,
-                 **kwargs):
+    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2, prefix=None,
+                 weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link.
         :param root_link: root link of kinematic chain
@@ -28,9 +31,11 @@ class CartesianPosition(Goal):
         super(CartesianPosition, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = root_link
-        self.tip_link = tip_link
-        self.goal_pose = self.transform_msg(self.root_link, goal)
+        self.goal = deepcopy(goal)
+        self.goal.header.frame_id = str(PrefixName(self.goal.header.frame_id, prefix))
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
+        self.goal_pose = self.transform_msg(self.root_link, self.goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -40,6 +45,7 @@ class CartesianPosition(Goal):
                                                                   weight=weight,
                                                                   max_velocity=max_velocity,
                                                                   hard=False,
+                                                                  prefix=prefix,
                                                                   **kwargs))
 
     def make_constraints(self):
@@ -57,14 +63,16 @@ class CartesianPosition(Goal):
 
 
 class CartesianOrientation(Goal):
-    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
-                 **kwargs):
+    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5, prefix=None,
+                 weight=WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianOrientation, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = root_link
-        self.tip_link = tip_link
-        self.goal_pose = self.transform_msg(self.root_link, goal)
+        self.goal = deepcopy(goal)
+        self.goal.header.frame_id = str(PrefixName(self.goal.header.frame_id, prefix))
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
+        self.goal_pose = self.transform_msg(self.root_link, self.goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -74,6 +82,7 @@ class CartesianOrientation(Goal):
         #                                                        weight=weight,
         #                                                        max_velocity=max_velocity,
         #                                                        hard=False,
+        #                                                        prefix=prefix,
         #                                                        **kwargs))
 
     def make_constraints(self):
@@ -182,7 +191,7 @@ class CartesianPoseStraight(Goal):
 
 
 class TranslationVelocityLimit(Goal):
-    def __init__(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, **kwargs):
+    def __init__(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, prefix=None, **kwargs):
         """
         This goal will limit the cartesian velocity of the tip link relative to root link
         :param root_link: str, root link of the kin chain
@@ -193,8 +202,8 @@ class TranslationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = root_link
-        self.tip_link = tip_link
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity

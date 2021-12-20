@@ -380,10 +380,7 @@ class WorldTree(object):
             self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
         else:
             for prefix in prefix_list:
-                if prefix == prefix_list[0]:
-                    self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=prefix[:-1])
-                else:
-                    self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=prefix, prefix=prefix[:-1])
+                self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=prefix, prefix=prefix)
         self.fast_all_fks = None
         self.notify_model_change()
 

@@ -64,7 +64,7 @@ class WorldUpdater(GiskardBehavior):
         self.added_plugin_names = []
         super(WorldUpdater, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
-        self.original_link_names = self.robot.link_names
+        self.original_link_names = self.world.link_names
         self.tree_tick_rate = self.god_map.get_data(identifier.tree_tick_rate) / 2
         self.queue = Queue(maxsize=1)
         self.queue2 = Queue(maxsize=1)
@@ -236,7 +236,11 @@ class WorldUpdater(GiskardBehavior):
 
     def clear_world(self):
         # assumes that parent has god map lock
-        self.world.delete_all_but_robot()
+        try:
+            namespaces = self.god_map.unsafe_get_data(identifier.rosparam + ['namespaces'])
+        except Exception:
+            namespaces = None
+        self.world.delete_all_but_robot(prefix_list=namespaces)
         for plugin_name in self.added_plugin_names:
             self.tree.remove_node(plugin_name)
         self.added_plugin_names = []

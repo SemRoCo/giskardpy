@@ -206,7 +206,7 @@ class GodMap(object):
             namespace = self.get_data(identifier.rosparam + ['namespaces'])[0]
         except KeyError:
             namespace = ''
-        self.set_data(identifier.robot_description, rospy.get_param('{}robot_description'.format(namespace)))
+        self.set_data(identifier.robot_description, rospy.get_param('/{}/robot_description'.format(namespace)))
         path_to_data_folder = self.get_data(identifier.data_folder)
         # fix path to data folder
         if not path_to_data_folder.endswith('/'):

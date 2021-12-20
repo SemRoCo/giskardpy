@@ -16,7 +16,7 @@ class TFPublisher(GiskardBehavior):
 
     def __init__(self, name, publish_attached_objects, publish_world_objects, tf_topic):
         super(TFPublisher, self).__init__(name)
-        self.original_links = set(self.get_robot().link_names)
+        self.original_links = set(self.world.link_names)
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.publish_attached_objects = publish_attached_objects
         self.publish_world_objects = publish_world_objects

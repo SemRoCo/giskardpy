@@ -73,7 +73,10 @@ def initialize_god_map():
     blackboard.god_map = god_map
 
     world = WorldTree(god_map)
-    namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
+    try:
+        namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
+    except Exception:
+        namespaces = None
     world.delete_all_but_robot(prefix_list=namespaces)
 
     collision_checker = god_map.get_data(identifier.collision_checker)
@@ -164,7 +167,10 @@ def grow_tree():
     action_server_name = '~command'
 
     god_map = initialize_god_map()
-    namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
+    try:
+        namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
+    except Exception:
+        namespaces = None
     # This has to be called first, because it sets the controlled joints.
     execution_action_server = Parallel('execution action servers', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
     action_servers = god_map.get_data(identifier.action_server)
@@ -180,8 +186,12 @@ def grow_tree():
         sync.add_child(SyncConfiguration(u'update robot configuration0', RobotName, '/'))
     else:
         for namespace in namespaces:
-            sync.add_child(SyncConfiguration(u'{}: update robot configuration'.format(namespace), RobotName, namespace))
-    #sync.add_child(SyncLocalization(u'update robot localization', RobotName)) fixme:
+            sync.add_child(SyncConfiguration(u'{}: update robot configuration'.format(namespace), namespace, prefix=namespace))
+    if namespaces is None:
+        sync.add_child(SyncLocalization(u'update robot localization', RobotName))
+    else:
+        for namespace in namespaces:
+            sync.add_child(SyncLocalization(u'{}: update robot localization'.format(namespace), namespace))
     sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
     sync.add_child(CollisionSceneUpdater(u'update collision scene'))
     sync.add_child(running_is_success(VisualizationBehavior)(u'visualize collision scene'))

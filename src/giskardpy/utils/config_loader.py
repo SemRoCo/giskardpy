@@ -114,10 +114,9 @@ def update_parents(d, merge_key):
         return root_data
 
 
-def get_filename(loader, node, root):
+def get_filename(file_or_ros_path_str, loader, node, root):
     """Returns file name referenced at given node by using the given loader."""
 
-    file_or_ros_path_str = loader.construct_scalar(node)
     indices = [i for i, x in enumerate(loader.ros_package_keywords) if x in file_or_ros_path_str]
     if indices:
         if len(indices) != 1:
@@ -134,19 +133,33 @@ def get_filename(loader, node, root):
 def construct_include(loader, node):
     """Load config file referenced at given node by using the given loader."""
 
-    filename = get_filename(loader, node, loader.config_root)
-    extension = os.path.splitext(filename)[1].lstrip('.')
+    file_str_or_list = loader.construct_scalar(node)
+    ret = dict()
 
-    with open(filename, 'r') as f:
-        if extension in ('yaml', 'yml'):
-            return yaml.load(f, Loader)
-        else:
-            return ''.join(f.readlines())
+    if isinstance(file_str_or_list, list):
+        files_to_load = file_str_or_list
+    else:
+        files_to_load = [file_str_or_list]
+
+    for file_or_ros_path_str in files_to_load:
+        filename = get_filename(file_or_ros_path_str, loader, node, loader.config_root)
+        extension = os.path.splitext(filename)[1].lstrip('.')
+
+        with open(filename, 'r') as f:
+            if extension in ('yaml', 'yml'):
+                loaded_dict = yaml.load(f, Loader)
+                update_nested_dicts(ret, loaded_dict)
+            else:
+                loaded_str = ''.join(f.readlines())
+                update_nested_dicts(ret, {file_or_ros_path_str: loaded_str})
+
+    return ret
 
 
 def construct_find(loader, node):
     """Find directory or file referenced at given node by using the given loader."""
-    return get_filename(loader, node, loader.giskardpy_root)
+    file_or_ros_path_str = loader.construct_scalar(node)
+    return get_filename(file_or_ros_path_str, loader, node, loader.giskardpy_root)
 
 
 def load_robot_yaml(path, merge_key='parent'):
@@ -188,6 +201,9 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     if test:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/test.yaml'))
+    if 'action_server' not in config:
+        config = update_nested_dicts(deepcopy(config),
+                                     load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/action_server.yaml'))
     if config and not rospy.is_shutdown():
         if old_data is None:
             old_data = {}

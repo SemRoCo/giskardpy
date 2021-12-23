@@ -6,9 +6,6 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class KinSimPlugin(GiskardBehavior):
-    def __init__(self, name):
-        super(KinSimPlugin, self).__init__(name)
-
     @profile
     def initialise(self):
         self.sample_period = self.god_map.get_data(identifier.sample_period)

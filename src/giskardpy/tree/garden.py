@@ -449,6 +449,7 @@ def generate_pydot_graph(root, visibility_level, profile=None):
             for name, c in zip(names2, childrens):
                 (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
                 proposed_dot_name = name
+                color = 'black'
                 if (isinstance(c, GiskardBehavior) or (hasattr(c,'original')
                                                        and isinstance(c.original, GiskardBehavior))) \
                         and not isinstance(c, PluginBehavior) and profile is not None:
@@ -457,17 +458,16 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                     else:
                         file_name = str(c.__class__).split('.')[-2]
                     if file_name in profile:
-                        proposed_dot_name = '{}\nsetup= {}\n' \
-                                            'initialise= {}\n' \
-                                            'update= {}'.format(proposed_dot_name,
-                                                                profile[file_name].get('setup', 'n/a'),
-                                                                profile[file_name].get('initialise', 'n/a'),
-                                                                profile[file_name].get('update', 'n/a'))
+                        max_time = max(profile[file_name].values(), key=lambda x: 0 if x=='n/a' else x)
+                        if max_time > 1:
+                            color = 'red'
+                        proposed_dot_name += '\n' + '\n'.join(['{}= {}'.format(k, v) for k,v in sorted(profile[file_name].items())])
+
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
                 names.append(proposed_dot_name)
                 node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
-                                  fontsize=fontsize, fontcolor=node_font_colour)
+                                  fontsize=fontsize, fontcolor=node_font_colour, color=color)
                 graph.add_node(node)
                 edge = pydot.Edge(root_dot_name, proposed_dot_name)
                 graph.add_edge(edge)
@@ -565,7 +565,7 @@ class OpenLoop(TreeManager):
         return planning_3
 
     def grow_planning4(self):
-        planning_4 = PluginBehavior('planning IIII', sleep=0)
+        planning_4 = PluginBehavior('planning IIII')
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_plugin(CollisionChecker('collision checker'))
         # planning_4.add_plugin(VisualizationBehavior('visualization'))

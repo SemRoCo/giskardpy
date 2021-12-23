@@ -16,23 +16,23 @@ def search_for(lines, function_name):
 
 
 def extract_data_from_profile(path):
-    data = defaultdict(dict)
+    data = defaultdict(lambda: defaultdict(lambda: 'n/a'))
     with open(path, 'r') as f:
         profile = f.read()
     lines = profile.split('\n')
-    setups = search_for(lines, 'setup')
-    for file_name, function_data in setups.items():
-        data[file_name].update(function_data)
-    updates = search_for(lines, 'update')
-    for file_name, function_data in updates.items():
-        data[file_name].update(function_data)
-    initialise = search_for(lines, 'initialise')
-    for file_name, function_data in initialise.items():
-        data[file_name].update(function_data)
+    keywords = ['__init__', 'setup', 'initialise', 'update']
+    for function_name in keywords:
+        new_data = search_for(lines, function_name)
+        for file_name, function_data in new_data.items():
+            data[file_name].update(function_data)
+    for file_name, function_data in data.items():
+        for function_name in keywords:
+            data[file_name][function_name]
     return data
 
 
-sys.argv.append('../test/test_keep_position3_10.txt')
+sys.argv.append('../test/test_keep_position3_3_no_collision.txt')
+# sys.argv.append('../test/test_keep_position3_10.txt')
 
 rospy.init_node('tests')
 tree = TreeManager.from_param_server()

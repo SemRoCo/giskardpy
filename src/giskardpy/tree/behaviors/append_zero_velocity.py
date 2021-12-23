@@ -6,16 +6,6 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class AppendZeroVelocity(GiskardBehavior):
-    def __init__(self, name):
-        """
-        :type js_identifier: str
-        :type next_cmd_identifier: str
-        :type time_identifier: str
-        :param sample_period: the time difference in s between each step.
-        :type sample_period: float
-        """
-        super(AppendZeroVelocity, self).__init__(name)
-
     def initialise(self):
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         super(AppendZeroVelocity, self).initialise()

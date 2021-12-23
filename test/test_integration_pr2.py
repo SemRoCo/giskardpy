@@ -1478,6 +1478,7 @@ class TestCartGoals(object):
             'r_wrist_roll_joint': 0.190433188769,
         }
         zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
         r_goal = PoseStamped()
@@ -1488,6 +1489,7 @@ class TestCartGoals(object):
                                                                       [0, 0, -1, 0],
                                                                       [0, 0, 0, 1]]))
         zero_pose.set_cart_goal(r_goal, zero_pose.l_tip, 'torso_lift_link')
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
         r_goal = PoseStamped()
@@ -1500,6 +1502,7 @@ class TestCartGoals(object):
         l_goal.pose.position.y = -.1
         l_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(l_goal, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef(self, zero_pose):

@@ -14,6 +14,7 @@ class TFPublisher(GiskardBehavior):
     Published tf for attached and evironment objects.
     """
 
+    @profile
     def __init__(self, name, publish_attached_objects, publish_world_objects, tf_topic):
         super(TFPublisher, self).__init__(name)
         self.original_links = set(self.get_robot().link_names)

@@ -8,6 +8,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 class CommandPublisher(GiskardBehavior):
     joint_names = []
 
+    @profile
     def __init__(self, name, hz=100):
         super().__init__(name)
         self.hz = hz

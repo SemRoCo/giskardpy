@@ -12,12 +12,11 @@ from giskardpy.utils import logging
 
 class PluginBehavior(GiskardBehavior):
 
-    def __init__(self, name, hz=False, sleep=.5):
+    def __init__(self, name, hz=None):
         super(PluginBehavior, self).__init__(name)
         self._plugins = OrderedDict()
         self.set_status(Status.INVALID)
         self.status_lock = RLock()
-        self.sleep = sleep
         self.looped_once = False
         if hz is not None:
             hz = 1/self.god_map.get_data(identifier.sample_period)
@@ -92,6 +91,7 @@ class PluginBehavior(GiskardBehavior):
     def set_status(self, new_state):
         self.my_status = new_state
 
+    @profile
     def loop_over_plugins(self):
         try:
             # self.init_plugins()

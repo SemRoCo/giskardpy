@@ -8,6 +8,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class CleanUp(GiskardBehavior):
+    @profile
     def __init__(self, name):
         super(CleanUp, self).__init__(name)
         # FIXME this is the smallest hack to reverse (some) update godmap changes, constraints need some kind of finalize

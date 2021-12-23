@@ -9,6 +9,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class CollisionChecker(GiskardBehavior):
+    @profile
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)

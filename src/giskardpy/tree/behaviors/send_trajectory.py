@@ -40,6 +40,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction]
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
+    @profile
     def __init__(self, name, namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
         GiskardBehavior.__init__(self, name)
         self.action_namespace = namespace

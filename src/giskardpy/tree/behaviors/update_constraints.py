@@ -21,6 +21,7 @@ from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_cla
 
 class GoalToConstraints(GetGoal):
     # FIXME no error msg when constraint has missing parameter
+    @profile
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.used_joints = set()

@@ -2,6 +2,7 @@ import rospy
 from py_trees import Status
 from tf2_py import LookupException
 
+from giskardpy import identifier
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import lookup_pose, msg_to_homogeneous_matrix
@@ -26,5 +27,5 @@ class SyncLocalization(GiskardBehavior):
             return Status.FAILURE
         map_T_base = msg_to_homogeneous_matrix(map_T_base)
         self.world.update_joint_parent_T_child(self.group.attachment_joint_name, map_T_base)
-
+        self.get_god_map().set_data(identifier.old_map_T_base, map_T_base)
         return Status.SUCCESS

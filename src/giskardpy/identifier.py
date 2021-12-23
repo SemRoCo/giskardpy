@@ -5,6 +5,8 @@ fk_np = world + [u'compute_fk_np']
 joint_states = world + [u'state']
 controlled_joints = ['controlled_joints']
 collision_scene = ['collision_scene']
+old_joint_states = ['old_joint_states']
+old_map_T_base = ['old_map_T_base']
 
 # goal_params = [u'goal_params']
 trajectory = [u'traj']

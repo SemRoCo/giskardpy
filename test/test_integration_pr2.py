@@ -1790,7 +1790,7 @@ class TestCartGoals(object):
 
         kitchen_setup.set_json_goal(u'CartesianPath',
                                     tip_link=tip_link,
-                                    root_link=kitchen_setup.get_root(),
+                                    root_link=kitchen_setup.default_root,
                                     goals=[goal_a, goal_b, goal_c, goal_d]
                                     )
 
@@ -2306,7 +2306,7 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      tip_link=tip_link,
-                                                     root_link=kitchen_setup_avoid_collisions.get_root(),
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=goal_c
                                                      )
 
@@ -2339,7 +2339,7 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_json_goal(u'SetPredictionHorizon', prediction_horizon=1)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      tip_link=tip_link,
-                                                     root_link=kitchen_setup_avoid_collisions.get_root(),
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=goal_c
                                                      )
 
@@ -2371,7 +2371,7 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      tip_link=tip_link,
-                                                     root_link=kitchen_setup_avoid_collisions.get_root(),
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=goal_c
                                                      )
 
@@ -2411,7 +2411,7 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      tip_link=tip_link,
-                                                     root_link=kitchen_setup_avoid_collisions.get_root(),
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=goal_c
                                                      )
         kitchen_setup_avoid_collisions.plan_and_execute()
@@ -2520,28 +2520,28 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.send_and_check_joint_goal(gaya_pose)
 
 
-    def test_ease_cereal_with_planner(self, kitchen_setup):
+    def test_ease_cereal_with_planner(self, kitchen_setup_avoid_collisions):
         # FIXME
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
 
         # take milk out of fridge
-        kitchen_setup.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
+        kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
 
         # spawn milk
 
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = drawer_frame_id
-        cereal_pose.pose.position = Point(0.123, -0.03, 0.11)
+        cereal_pose.pose.position = Point(0.123, 0.0, 0.135)
         cereal_pose.pose.orientation = Quaternion(0.0087786, 0.005395, -0.838767, -0.544393)
-        kitchen_setup.add_box(cereal_name, [0.1528, 0.0634, 0.22894], cereal_pose)
+        kitchen_setup_avoid_collisions.add_box(cereal_name, [0.1528, 0.0634, 0.22894], cereal_pose)
 
         cereal_pose_in_map = tf.msg_to_kdl(tf.transform_pose(u'map', cereal_pose))
 
         drawer_T_box = tf.msg_to_kdl(cereal_pose)
 
         # grasp milk
-        kitchen_setup.open_l_gripper()
+        kitchen_setup_avoid_collisions.open_l_gripper()
         grasp_pose = PoseStamped()
         grasp_pose.header.frame_id = cereal_name
         grasp_pose.pose.position = Point(0.13, 0, 0.05)
@@ -2552,19 +2552,27 @@ class TestCartesianPath(object):
 
         pre_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
 
-        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
-        kitchen_setup.set_json_goal(u'CartesianPose', tip_link=kitchen_setup.r_tip, root_link=kitchen_setup.get_root(), goal=pre_grasp_pose)
-        kitchen_setup.send_and_check_goal()
+        box_T_r_goal_post = deepcopy(box_T_r_goal)
+        box_T_r_goal_post.p[0] += 0.5
+        post_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_post, drawer_frame_id)
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip,
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     goal=pre_grasp_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
 
-        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
-        kitchen_setup.set_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup_avoid_collisions.set_cart_goal(grasp_pose,
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip)
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup_avoid_collisions.attach_object(cereal_name, kitchen_setup_avoid_collisions.r_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
-        kitchen_setup.close_l_gripper()
+        kitchen_setup_avoid_collisions.close_l_gripper()
 
         # x = Vector3Stamped()
         # x.header.frame_id = 'milk'
@@ -2582,8 +2590,12 @@ class TestCartesianPath(object):
         # kitchen_setup.align_planes('milk', z, root_normal=z_map)
         # kitchen_setup.keep_orientation(u'milk')
         # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
-        kitchen_setup.send_and_check_goal()
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip,
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     goal=post_grasp_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+        #kitchen_setup.set_joint_goal(gaya_pose)
 
         # place milk back
 
@@ -2593,15 +2605,15 @@ class TestCartesianPath(object):
         # milk_goal.pose.position = Point(.1, -.2, .13)
         # milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
 
-        kitchen_setup.set_cart_goal(cereal_pose, cereal_name)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup_avoid_collisions.set_cart_goal(cereal_pose, cereal_name)
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
-        kitchen_setup.open_l_gripper()
+        kitchen_setup_avoid_collisions.open_l_gripper()
+        kitchen_setup_avoid_collisions.detach_object(cereal_name)
 
-        kitchen_setup.detach_object(cereal_name)
-
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
 
 
@@ -5625,4 +5637,4 @@ class TestConfigFile(object):
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_attached_collision2'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
-# pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
+# pytest.main(['-s', __file__ + '::TestCartesianPath::test_ease_fridge_with_cart_goals_and_global_planner'])

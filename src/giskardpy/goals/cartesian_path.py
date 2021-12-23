@@ -10,7 +10,7 @@ import giskardpy.casadi_wrapper as w
 
 class CartesianPathCarrot(Goal):
 
-    def __init__(self, root_link, tip_link, goals, max_linear_velocity=0.1,
+    def __init__(self, root_link, tip_link, goal, goals=None, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         """

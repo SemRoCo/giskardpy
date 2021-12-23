@@ -997,6 +997,7 @@ class GlobalPlanner(GetGoal):
 
         self.initialised_planners = False
         self.collisionCheckerInterface = CollisionCheckerInterface()
+        self.once = False
 
     def get_cart_goal(self, cmd):
         try:
@@ -1052,7 +1053,11 @@ class GlobalPlanner(GetGoal):
                                         self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame,
                                         config=self.navigation_config)
             js = self.get_god_map().get_data(identifier.joint_states)
-            trajectory = planner.plan(js)
+            try:
+                trajectory = planner.plan(js)
+            except GlobalPlanningException:
+                self.raise_to_blackboard(GlobalPlanningException())
+                return Status.FAILURE
         elif global_planner_needed:
             self.collision_scene.update_collision_environment()
             map_frame = self.get_god_map().get_data(identifier.map_frame)
@@ -1060,7 +1065,12 @@ class GlobalPlanner(GetGoal):
                                       self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame,
                                       config=self.movement_config)
             js = self.get_god_map().get_data(identifier.joint_states)
-            trajectory = planner.plan(js)
+            try:
+                trajectory = planner.plan(js, once=self.once)
+            except GlobalPlanningException:
+                self.once = True
+                self.raise_to_blackboard(GlobalPlanningException())
+                return Status.FAILURE
         else:
             raise GlobalPlanningException('Global planner was called although it is not needed.')
 
@@ -1085,15 +1095,16 @@ class GlobalPlanner(GetGoal):
         # poses[-1].pose.orientation = self.pose_goal.pose.orientation
         move_cmd.constraints = [self.get_cartesian_path_constraints(poses)]
         self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
+        self.get_god_map().set_data(identifier.global_planner_needed, False)
         return Status.SUCCESS
 
     def get_cartesian_path_constraints(self, poses):
 
         d = dict()
         d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
-        d[u'parameter_value_pair'].pop(u'goal')
 
         c_d = deepcopy(d)
+        c_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(poses[-1])
         c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
         c = Constraint()
         c.type = u'CartesianPathCarrot'
@@ -1256,7 +1267,6 @@ class OMPLPlanner(object):
                 refine_iteration += 1
         return planner_status.getStatus()
 
-
 class MovementPlanner(OMPLPlanner):
 
     def __init__(self, kitchen_space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame,
@@ -1266,12 +1276,12 @@ class MovementPlanner(OMPLPlanner):
 
     def get_planner(self, si):
         planner = og.RRTConnect(si)
-        planner.setRange(0.05)
+        planner.setRange(0.1)
         # planner.setIntermediateStates(True)
         # planner.setup()
         return planner
 
-    def plan(self, js, plot=True):
+    def plan(self, js, plot=True, once=None):
 
         si = self.setup.getSpaceInformation()
         collision_checker = GiskardRobotBulletCollisionChecker(True, self.root_link, self.tip_link)
@@ -1281,6 +1291,10 @@ class MovementPlanner(OMPLPlanner):
 
         start = self.get_start_state(self.space)
         goal = self.get_goal_state(self.space)
+
+        if not once or not si.isValid(start()):
+            raise GlobalPlanningException()
+
         self.setup.setStartAndGoalStates(start, goal)
 
         optimization_objective = PathLengthAndGoalOptimizationObjective(self.setup.getSpaceInformation(), goal)

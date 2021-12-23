@@ -18,6 +18,7 @@ from giskardpy.tree.commands_remaining import CommandsRemaining
 from giskardpy.tree.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.goal_canceled import GoalCanceled
 from giskardpy.tree.goal_received import GoalReceived
+from giskardpy.tree.retry_planning import RetryPlanning
 from giskardpy.tree.send_result import SendResult
 from giskardpy.tree.start_timer import StartTimer
 from giskardpy.tree.sync_localization import SyncLocalization
@@ -194,22 +195,19 @@ def grow_tree():
         kwargs = god_map.get_data(identifier.MaxTrajectoryLength)
         planning_4.add_plugin(MaxTrajectoryLength(u'traj length check', **kwargs))
     # ---------------------------------------------
-    qp_solving = failure_is_running(Sequence)(u'qp solving')
-    qp_solving.add_child(IF_NOT(u'skip to global planner?', identifier.global_planner_needed))
-    qp_solving.add_child(planning_4)
-    global_planning = success_is_failure(Sequence)(u'global planning')
-    global_planning.add_child(IF(u'global planner needed?', identifier.global_planner_needed))
+    global_planning = Sequence(u'global planning')
+    global_planning.add_child(running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded', action_server_name, planning_4))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
     global_planning.add_child(GlobalPlanner(u'global planner', action_server_name))
-    trajectory_planning = PluginBehavior(u'trajectory planning', sleep=0)
-    trajectory_planning.add_plugin(GlobalPlannerNeeded(u'GlobalPlannerNeeded', action_server_name))
-    trajectory_planning.add_plugin(qp_solving)
-    trajectory_planning.add_plugin(global_planning)
+    #global_planning.add_child(success_is_failure(GoalToConstraints)(u'update constraints', action_server_name))
+    #trajectory_planning = Selector(u'trajectory planning', sleep=0)
+    #trajectory_planning.add_child(global_planning)
+    #trajectory_planning.add_child(planning_4)
     # ----------------------------------------------
     # ----------------------------------------------
     planning_3 = Sequence(u'planning III', sleep=0)
-    planning_3.add_child(trajectory_planning)
+    planning_3.add_child(planning_4)
     planning_3.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
     planning_3.add_child(AppendZeroVelocity(u'append zero velocity'))
     planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
@@ -227,7 +225,7 @@ def grow_tree():
     publish_result.add_child(SendTrajectory(u'send traj'))
     # ----------------------------------------------
     # ----------------------------------------------
-    planning_2 = failure_is_success(Selector)(u'planning II')
+    planning_2 = Selector(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         planning_2.add_child(running_is_failure(VisualizationBehavior)(u'visualization'))
@@ -245,8 +243,9 @@ def grow_tree():
     # ----------------------------------------------
     # planning_1 = Sequence(u'planning I')
     # ----------------------------------------------
-    planning = failure_is_success(Sequence)(u'planning')
+    planning = success_is_failure(Sequence)(u'planning')
     planning.add_child(IF(u'command set?', identifier.next_move_goal))
+    planning.add_child(global_planning)
     planning.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning.add_child(planning_2)
     # planning.add_child(planning_1)
@@ -258,9 +257,10 @@ def grow_tree():
         kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
         planning.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
 
-    process_move_cmd = success_is_failure(Sequence)(u'Process move commands')
-    process_move_cmd.add_child(SetCmd(u'set move cmd', action_server_name))
+    process_move_cmd = Selector(u'Process move commands')
+    process_move_cmd.add_child(success_is_failure(SetCmd)(u'set move cmd', action_server_name))
     process_move_cmd.add_child(planning)
+    process_move_cmd.add_child(success_is_failure(RetryPlanning)(u'done planning?'))
     process_move_cmd.add_child(SetErrorCode(u'set error code'))
 
     process_move_goal = failure_is_success(Selector)(u'Process goal')

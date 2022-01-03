@@ -28,7 +28,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
-from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
+from giskardpy.data_types import KeyDefaultDict, JointStates, TFPrefixName, PrefixName
 from giskardpy.garden import grow_tree
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
@@ -323,9 +323,9 @@ class TranslationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected, prefix=None):
         super(TranslationGoalChecker, self).__init__(god_map)
         self.expected = deepcopy(expected)
-        self.expected.header.frame_id = str(PrefixName(self.expected.header.frame_id, prefix))
-        self.tip_link = PrefixName(tip_link, prefix)
-        self.root_link = PrefixName(root_link, prefix)
+        self.expected.header.frame_id = str(TFPrefixName(self.expected.header.frame_id, prefix))
+        self.tip_link = TFPrefixName(tip_link, prefix)
+        self.root_link = TFPrefixName(root_link, prefix)
         self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
@@ -375,9 +375,9 @@ class RotationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected, prefix=None):
         super(RotationGoalChecker, self).__init__(god_map)
         self.expected = deepcopy(expected)
-        self.expected.header.frame_id = str(PrefixName(self.expected.header.frame_id, prefix))
-        self.tip_link = PrefixName(tip_link, prefix)
-        self.root_link = PrefixName(root_link, prefix)
+        self.expected.header.frame_id = str(TFPrefixName(self.expected.header.frame_id, prefix))
+        self.tip_link = TFPrefixName(tip_link, prefix)
+        self.root_link = TFPrefixName(root_link, prefix)
         self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
@@ -985,8 +985,7 @@ class PR22(GiskardTestWrapper):
             self.set_localization_srvs[robot_name] = rospy.ServiceProxy('/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
                                                                         UpdateTransform)
             self.set_bases[robot_name] = rospy.ServiceProxy('/{}/base_simulator/set_joint_states'.format(robot_name), SetJointState)
-            root_link_name = str(self.world.groups[robot_name].root_link_name)
-            self.default_roots[robot_name] = root_link_name[1:] if root_link_name[0] == '/' else root_link_name
+            self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
@@ -1058,7 +1057,7 @@ class PR22(GiskardTestWrapper):
         assert self.original_number_of_links == len(self.world.links)
 
     def teleport_base(self, goal_pose, robot_name):
-        goal_pose = tf.transform_pose(self.default_roots[robot_name], goal_pose)
+        goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,

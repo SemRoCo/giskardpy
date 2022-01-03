@@ -1,10 +1,11 @@
+from giskardpy.data_types import TFPrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 from giskardpy import casadi_wrapper as w
 import giskardpy.utils.tfwrapper as tf
 
 class AlignPlanes(Goal):
     def __init__(self, root_link, tip_link, root_normal, tip_normal,
-                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
+                 max_angular_velocity=0.5, prefix=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
         :param root_link: str, name of the root link for the kinematic chain
@@ -16,8 +17,8 @@ class AlignPlanes(Goal):
         :param goal_constraint: bool, default False
         """
         super(AlignPlanes, self).__init__(**kwargs)
-        self.root = root_link
-        self.tip = tip_link
+        self.root = TFPrefixName(root_link, prefix)
+        self.tip = TFPrefixName(tip_link, prefix)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 

@@ -3,13 +3,14 @@ from __future__ import division
 from geometry_msgs.msg import Vector3Stamped
 
 from giskardpy import casadi_wrapper as w
+from giskardpy.data_types import TFPrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 import giskardpy.utils.tfwrapper as tf
 
 
 class Pointing(Goal):
     def __init__(self, tip_link, goal_point, root_link, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_BELOW_CA, **kwargs):
+                 prefix=None, weight=WEIGHT_BELOW_CA, **kwargs):
         """
         Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
         :param tip_link: str, name of the tip of the kin chain
@@ -21,8 +22,8 @@ class Pointing(Goal):
         super(Pointing, self).__init__(**kwargs)
         self.weight = weight
         self.max_velocity = max_velocity
-        self.root = root_link
-        self.tip = tip_link
+        self.root = TFPrefixName(root_link, prefix)
+        self.tip = TFPrefixName(tip_link, prefix)
         self.root_P_goal_point = tf.transform_point(self.root, goal_point)
 
         if pointing_axis is not None:

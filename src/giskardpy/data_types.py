@@ -8,6 +8,7 @@ from sortedcontainers import SortedKeyList
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy import RobotName
+from giskardpy.utils.tfwrapper import get_full_frame_names
 
 
 class KeyDefaultDict(defaultdict):
@@ -103,6 +104,7 @@ class JointStates(defaultdict):
 
     def to_position_dict(self):
         return {k: v.position for k, v in self.items()}
+
 
 class Trajectory(object):
     def __init__(self):
@@ -455,6 +457,29 @@ class PrefixName(object):
 
     def __contains__(self, item):
         return self.long_name.__contains__(item.__str__())
+
+
+class TFPrefixName(PrefixName):
+
+    def __init__(self, name, prefix):
+        if name == 'map':
+            super().__init__(name, None)
+        else:
+            super().__init__(name, prefix)
+            # Enforce short name if prefix None
+            if prefix is None and self.separator in self.long_name:
+                self.long_name = self.short_name
+                return
+            # Enforce short name if long name not in tf
+            tf_full_names = get_full_frame_names(name)
+            if self.long_name not in tf_full_names:
+                if self.short_name in tf_full_names:
+                    rospy.logwarn('Frame {} does not exist on TF. '
+                                  'Returning existing frame {}.'.format(self.long_name, self.short_name))
+                    self.long_name = self.short_name
+                    self.prefix = None
+                else:
+                    raise Exception('Frame {} does not exit in TF'.format(self.long_name))
 
 order_map = BiDict({
     0: 'position',

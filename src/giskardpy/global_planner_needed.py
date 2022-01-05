@@ -18,7 +18,7 @@ class GlobalPlannerNeeded(GetGoal):
         GetGoal.__init__(self, name, as_name)
 
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
-        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition']
+        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot']
 
         self.pose_goal = None
         self.__goal_dict = None

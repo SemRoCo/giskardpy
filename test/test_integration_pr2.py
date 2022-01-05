@@ -2532,9 +2532,9 @@ class TestCartesianPath(object):
 
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = drawer_frame_id
-        cereal_pose.pose.position = Point(0.123, 0.0, 0.135)
+        cereal_pose.pose.position = Point(0.123, 0.0, 0.13)
         cereal_pose.pose.orientation = Quaternion(0.0087786, 0.005395, -0.838767, -0.544393)
-        kitchen_setup_avoid_collisions.add_box(cereal_name, [0.1528, 0.0634, 0.22894], cereal_pose)
+        kitchen_setup_avoid_collisions.add_box(cereal_name, [0.1028, 0.0634, 0.20894], cereal_pose)
 
         cereal_pose_in_map = tf.msg_to_kdl(tf.transform_pose(u'map', cereal_pose))
 
@@ -2590,7 +2590,7 @@ class TestCartesianPath(object):
         # kitchen_setup.align_planes('milk', z, root_normal=z_map)
         # kitchen_setup.keep_orientation(u'milk')
         # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
-        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      tip_link=kitchen_setup_avoid_collisions.r_tip,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=post_grasp_pose)

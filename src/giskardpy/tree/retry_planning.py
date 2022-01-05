@@ -49,12 +49,15 @@ class RetryPlanning(GiskardBehavior):
             for c in move_cmd.constraints:
                 if c.type == 'CartesianPathCarrot':
                     d = yaml.load(c.parameter_value_pair)
-                    goal_pose = convert_dictionary_to_ros_message(d['goals'][-1]).pose
-                    calculated_goal = tf.homo_matrix_to_pose(self.world.get_fk('map', d['tip_link']))
-                    goal_pose_arr = np.array(msg_to_list(goal_pose))
-                    calculated_goal_arr = np.array(msg_to_list(calculated_goal))
-                    res = abs(goal_pose_arr - calculated_goal_arr)
-                    ret |= (res > self.valid).any()
+                    if 'goals' in d:
+                        goal_pose = convert_dictionary_to_ros_message(d['goals'][-1]).pose
+                        calculated_goal = tf.homo_matrix_to_pose(self.world.get_fk('map', d['tip_link']))
+                        goal_pose_arr = np.array(msg_to_list(goal_pose))
+                        calculated_goal_arr = np.array(msg_to_list(calculated_goal))
+                        res = abs(goal_pose_arr - calculated_goal_arr)
+                        ret |= (res > self.valid).any()
+                    else:
+                        return True
         return ret
 
     def must_replan(self, exception):

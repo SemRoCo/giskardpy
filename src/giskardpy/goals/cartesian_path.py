@@ -25,16 +25,19 @@ class CartesianPathCarrot(Goal):
         super(CartesianPathCarrot, self).__init__(**kwargs)
         self.root_link = root_link
         self.tip_link = tip_link
-        self.trajectory_length = len(goals)
+        self.initialized = False
 
-        self.terminal_goal = tf.transform_pose(self.root_link, goals[-1])
+        self.terminal_goal = tf.transform_pose(self.root_link, goal)
         self.weight = weight
         self.max_linear_velocity = max_linear_velocity
         self.max_angular_velocity = max_angular_velocity
         self.max_linear_acceleration = max_linear_acceleration
         self.max_angular_acceleration = max_angular_acceleration
 
-        self.setup_goal_params(goals)
+        if goals is not None and len(goals) != 0:
+            self.trajectory_length = len(goals)
+            self.setup_goal_params(goals)
+            self.initialized = True
 
     def setup_goal_params(self, goals):
         goal_str = []
@@ -185,13 +188,14 @@ class CartesianPathCarrot(Goal):
 
     def make_constraints(self):
 
-        goal_translation, goal_orientation = self.get_goal_expr()
-        self.add_debug_vector("debugGoal", goal_translation)
-        self.add_debug_vector("debugCurrentX", w.position_of(self.get_fk(self.root_link, self.tip_link)))
-        self.add_debug_vector("debugNext", self.predict())
+        if self.initialized:
+            goal_translation, goal_orientation = self.get_goal_expr()
+            #self.add_debug_vector("debugGoal", goal_translation)
+            #self.add_debug_vector("debugCurrentX", w.position_of(self.get_fk(self.root_link, self.tip_link)))
+            #self.add_debug_vector("debugNext", self.predict())
 
-        self.minimize_position(goal_translation, self.get_dyn_weight())
-        self.minimize_rotation(goal_orientation, self.weight)
+            self.minimize_position(goal_translation, self.get_dyn_weight())
+            self.minimize_rotation(goal_orientation, self.weight)
 
     def get_closest_traj_point(self):
 

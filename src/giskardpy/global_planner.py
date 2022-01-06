@@ -24,9 +24,11 @@ from copy import deepcopy
 
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pw
+from giskardpy.exceptions import GlobalPlanningException
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.get_goal import GetGoal
+from giskardpy.tree.visualization import VisualizationBehavior
 from giskardpy.utils.kdl_parser import KDL
 from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, list_to_kdl, pose_to_np
 
@@ -307,8 +309,7 @@ class PyBulletRayTester(object):
                 joint_state = js[joint_name].position
                 pbw.p.resetJointState(self.environment_id, joint_id, joint_state, physicsClientId=self.client_id)
             # Recalculate collision stuff
-            pbw.p.stepSimulation(
-                physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
+            pbw.p.stepSimulation(physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
 
     def pre_ray_test(self):
         bodies_num = p.getNumBodies(physicsClientId=self.client_id)
@@ -538,6 +539,7 @@ class PyBulletIK(IK):
             self.update_pybullet(js)
             self.once = True
         new_js = deepcopy(js)
+        rospy.logerr(pose[1])
         state_ik = p.calculateInverseKinematics(self.robot_id, self.pybullet_tip_link_id,
                                                 pose[0], pose[1], self.joint_lowers, self.joint_uppers,
                                                 physicsClientId=self.client_id)
@@ -638,7 +640,7 @@ class RobotBulletCollisionChecker(GiskardBehavior):
 
 class GiskardRobotBulletCollisionChecker(GiskardBehavior):
 
-    def __init__(self, is_3D, root_link, tip_link, collision_scene, ik=None, ik_sampling=1, ignore_orientation=False):
+    def __init__(self, is_3D, root_link, tip_link, collision_scene, ik=None, ik_sampling=1, ignore_orientation=False, publish=True):
         GiskardBehavior.__init__(self, str(self))
         self.giskard_lock = threading.Lock()
         if ik is None:
@@ -650,6 +652,10 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
         self.ik_sampling = ik_sampling
         self.ignore_orientation = ignore_orientation
         self.collision_objects = GiskardPyBulletAABBCollision(self.robot, collision_scene, tip_link)
+        self.publisher = None
+        if publish:
+            self.publisher = VisualizationBehavior('motion planning object publisher', ensure_publish=False)
+            self.publisher.setup(10)
 
     def is_collision_free(self, x, y, z, rot):
         if True:  # with self.giskard_lock:
@@ -665,6 +671,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                 state_ik = self.ik.get_ik(old_js, pose)
                 # override on current joint states.
                 self.robot.state = state_ik
+                self.publish_robot_state()
                 # Check if kitchen is colliding with robot
                 if self.ignore_orientation:
                     tmp = list()
@@ -677,6 +684,10 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                 # Reset joint state
                 self.get_robot().state = old_js
         return any(results)
+
+    def publish_robot_state(self):
+        if self.publisher is not None:
+            self.publisher.update()
 
     def get_furthest_normal(self, x, y, z, rot):
         # Get current joint states
@@ -694,6 +705,23 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
         # Reset joint state
         self.get_robot().state = old_js
         return result
+
+    def get_closest_collision_distance(self, x, y, z, rot, link_names):
+        # Get current joint states
+        old_js = self.get_god_map().get_data(identifier.joint_states)
+        # Calc IK for navigating to given state and ...
+        if self.is_3D:
+            pose = [[x, y, z], rot]
+        else:
+            pose = [[x, y, 0], rot]
+        state_ik = self.ik.get_ik(old_js, pose)
+        # override on current joint states.
+        self.get_robot().state = state_ik
+        # Check if kitchen is colliding with robot
+        collision = self.collision_scene.get_furthest_collision(link_names)[0]
+        # Reset joint state
+        self.get_robot().state = old_js
+        return collision.contact_distance
 
     def ompl_state_to_python(self, state):
         x = state.getX()
@@ -719,6 +747,12 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
             raise Exception(u'Please set tip_link for {}.'.format(str(self)))
         x, y, z, rot = self.ompl_state_to_python(state)
         return self.get_furthest_normal(x, y, z, rot)
+
+    def get_closest_collision_distance_ompl(self, state, link_names):
+        if self.tip_link is None:
+            raise Exception(u'Please set tip_link for {}.'.format(str(self)))
+        x, y, z, rot = self.ompl_state_to_python(state)
+        return self.get_closest_collision_distance(x, y, z, rot, link_names)
 
 
 class PyBulletWorldObjectCollisionChecker(GiskardBehavior):
@@ -1135,6 +1169,8 @@ class GlobalPlanner(GetGoal):
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
 
+        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot']
+
         # self.robot = self.robot
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.l_tip = 'l_gripper_tool_frame'
@@ -1155,7 +1191,7 @@ class GlobalPlanner(GetGoal):
 
     def get_cart_goal(self, cmd):
         try:
-            return next(c for c in cmd.constraints if c.type == "CartesianPose")
+            return next(c for c in cmd.constraints if c.type in self.supported_cart_goals)
         except StopIteration:
             return None
 
@@ -1208,7 +1244,11 @@ class GlobalPlanner(GetGoal):
                                         self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame,
                                         config=self.navigation_config)
             js = self.get_god_map().get_data(identifier.joint_states)
-            trajectory = planner.plan(js)
+            try:
+                trajectory = planner.plan(js)
+            except GlobalPlanningException:
+                self.raise_to_blackboard(GlobalPlanningException())
+                return Status.FAILURE
         elif global_planner_needed:
             self.collision_scene.update_collision_environment()
             map_frame = self.get_god_map().get_data(identifier.map_frame)
@@ -1216,12 +1256,17 @@ class GlobalPlanner(GetGoal):
                                       self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame,
                                       config=self.movement_config)
             js = self.get_god_map().get_data(identifier.joint_states)
-            trajectory = planner.plan(js)
+            try:
+                trajectory = planner.plan(js, once=self.once)
+            except GlobalPlanningException:
+                self.once = True
+                self.raise_to_blackboard(GlobalPlanningException())
+                return Status.FAILURE
         else:
-            return Status.SUCCESS
+            raise GlobalPlanningException('Global planner was called although it is not needed.')
 
         if len(trajectory) == 0:
-            return Status.FAILURE
+            raise GlobalPlanningException('Global Planner did not found a solution.')
         poses = []
         for i, point in enumerate(trajectory):
             if i == 0:
@@ -1241,15 +1286,16 @@ class GlobalPlanner(GetGoal):
         # poses[-1].pose.orientation = self.pose_goal.pose.orientation
         move_cmd.constraints = [self.get_cartesian_path_constraints(poses)]
         self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
+        self.get_god_map().set_data(identifier.global_planner_needed, False)
         return Status.SUCCESS
 
-    def get_cartesian_path_constraints(self, poses, ignore_trajectory_orientation=True):
+    def get_cartesian_path_constraints(self, poses, ignore_trajectory_orientation=False):
 
         d = dict()
         d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
-        d[u'parameter_value_pair'].pop(u'goal')
 
         c_d = deepcopy(d)
+        c_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(poses[-1])
         c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
         c_d[u'parameter_value_pair'][u'ignore_trajectory_orientation'] = ignore_trajectory_orientation
         c = Constraint()
@@ -1269,6 +1315,13 @@ class GlobalPlanner(GetGoal):
         bounds.setLow(2, 0)
         bounds.setHigh(2, 2)
         space.setBounds(bounds)
+
+        # lower distance weight for rotation subspaces
+        for i in range(0, len(space.getSubspaces())):
+            if 'SO3Space' in space.getSubspace(i).getName():
+                space.setSubspaceWeight(i, 0.01)
+            else:
+                space.setSubspaceWeight(i, 0.99)
 
         return space
 
@@ -1301,7 +1354,7 @@ class OMPLPlanner(object):
         self.config = config
         self._planner_solve_params = dict()
         self._planner_solve_params['kABITstar'] = {
-            'slow_without_refine': SolveParameters(initial_solve_time=30, refine_solve_time=5, max_initial_iterations=3,
+            'slow_without_refine': SolveParameters(initial_solve_time=480, refine_solve_time=5, max_initial_iterations=3,
                                                    max_refine_iterations=0, min_refine_thresh=0.5),
             'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
                                                 max_refine_iterations=5, min_refine_thresh=0.5),
@@ -1311,7 +1364,7 @@ class OMPLPlanner(object):
                                                 max_refine_iterations=5, min_refine_thresh=0.5)
         }
         self._planner_solve_params['ABITstar'] = {
-            'slow_without_refine': SolveParameters(initial_solve_time=30, refine_solve_time=5, max_initial_iterations=3,
+            'slow_without_refine': SolveParameters(initial_solve_time=480, refine_solve_time=5, max_initial_iterations=3,
                                                    max_refine_iterations=0, min_refine_thresh=0.5),
             'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
                                                 max_refine_iterations=5, min_refine_thresh=0.5),
@@ -1321,7 +1374,40 @@ class OMPLPlanner(object):
                                                 max_refine_iterations=5, min_refine_thresh=0.5)
         }
         self._planner_solve_params['RRTConnect'] = {
-            'slow_without_refine': SolveParameters(initial_solve_time=240, refine_solve_time=5,
+            'slow_without_refine': SolveParameters(initial_solve_time=360, refine_solve_time=5,
+                                                   max_initial_iterations=1,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5),
+            'fast_without_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'fast_with_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5)
+        }
+        self._planner_solve_params['RRTstar'] = {
+            'slow_without_refine': SolveParameters(initial_solve_time=360, refine_solve_time=5,
+                                                   max_initial_iterations=1,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5),
+            'fast_without_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'fast_with_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5)
+        }
+        self._planner_solve_params['SORRTstar'] = {
+            'slow_without_refine': SolveParameters(initial_solve_time=360, refine_solve_time=5,
+                                                   max_initial_iterations=1,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5),
+            'fast_without_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'fast_with_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5)
+        }
+        self._planner_solve_params['InformedRRTstar'] = {
+            'slow_without_refine': SolveParameters(initial_solve_time=360, refine_solve_time=5,
                                                    max_initial_iterations=1,
                                                    max_refine_iterations=0, min_refine_thresh=0.5),
             'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
@@ -1421,8 +1507,7 @@ class OMPLPlanner(object):
         time_solving_intial = 0
         # Find solution
         while num_try < max_initial_iterations and time_solving_intial < max_initial_solve_time and \
-                planner_status.getStatus() not in [ob.PlannerStatus.APPROXIMATE_SOLUTION,
-                                                   ob.PlannerStatus.EXACT_SOLUTION]:
+                planner_status.getStatus() not in [ob.PlannerStatus.EXACT_SOLUTION]:
             planner_status = self.setup.solve(initial_solve_time)
             time_solving_intial += self.setup.getLastPlanComputationTime()
             num_try += 1
@@ -1430,7 +1515,7 @@ class OMPLPlanner(object):
         refine_iteration = 0
         v_min = 1e6
         time_solving_refine = 0
-        if planner_status.getStatus() in [ob.PlannerStatus.APPROXIMATE_SOLUTION, ob.PlannerStatus.EXACT_SOLUTION]:
+        if planner_status.getStatus() in [ob.PlannerStatus.EXACT_SOLUTION]:
             while v_min > min_refine_thresh and refine_iteration < max_refine_iterations and \
                     time_solving_refine < max_refine_solve_time:
                 if 'ABITstar' in self.setup.getPlanner().getName() and min_refine_thresh is not None:
@@ -1443,7 +1528,6 @@ class OMPLPlanner(object):
                 refine_iteration += 1
         return planner_status.getStatus()
 
-
 class MovementPlanner(OMPLPlanner):
 
     def __init__(self, kitchen_space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame,
@@ -1452,9 +1536,13 @@ class MovementPlanner(OMPLPlanner):
                                               pose_goal, map_frame, config)
 
     def get_planner(self, si):
-        #planner = og.ABITstar(si)
-        planner = og.RRTConnect(si)
-        planner.setRange(0.1)
+        planner = og.RRTstar(si)
+        self.range = 0.05
+        planner.setSampleRejection(True)
+        planner.setOrderedSampling(True)
+        planner.setInformedSampling(True)
+        planner.setRange(self.range)
+        # planner = og.ABITstar(si)
         # planner.setIntermediateStates(True)
         # planner.setup()
         return planner
@@ -1463,18 +1551,24 @@ class MovementPlanner(OMPLPlanner):
 
         si = self.setup.getSpaceInformation()
         collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.root_link, self.tip_link, self.collision_scene,
-                                                               ignore_orientation=True)
+                                                               ignore_orientation=False)
         si.setStateValidityChecker(ThreeDimStateValidator(si, collision_checker))
-        si.setMotionValidator(RayMotionValidator(si, self.is_3D, self.collision_scene, object_in_motion=self.robot,
-                                                 ignore_orientation=True, tip_link=self.tip_link, js=js))
+        si.setStateValidityCheckingResolution(1/(self.space.getMaximumExtent()/(self.range)))
+        rospy.loginfo('MovementPlanner: Using DiscreteMotionValidator with max cost of {}.'.format(self.range))
+        #si.setMotionValidator(RayMotionValidator(si, self.is_3D, self.collision_scene, object_in_motion=self.robot,
+        #                                         ignore_orientation=False, tip_link=self.tip_link, js=js))
         si.setup()
 
         start = self.get_start_state(self.space)
         goal = self.get_goal_state(self.space)
+
+        if not si.isValid(start()):
+            raise GlobalPlanningException()
+
         self.setup.setStartAndGoalStates(start, goal)
 
-        optimization_objective = PathLengthAndGoalOptimizationObjective(self.setup.getSpaceInformation(), goal)
-        self.setup.setOptimizationObjective(optimization_objective)
+        #optimization_objective = PathLengthAndGoalOptimizationObjective(self.setup.getSpaceInformation(), goal)
+        #self.setup.setOptimizationObjective(optimization_objective)
 
         if not self.setup.getSpaceInformation().isValid(goal()):
             next_goal = self.next_goal(js, goal)

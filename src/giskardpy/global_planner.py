@@ -59,6 +59,29 @@ class CollisionCheckerInterface(GiskardBehavior):
                 link_collisions.append(c)
         return link_collisions
 
+class ObjectGoalOptimizationObjective(ob.PathLengthOptimizationObjective):
+
+    def __init__(self, si, goal, object_name, collision_scene, env_js):
+        ob.PathLengthOptimizationObjective.__init__(self, si)
+        self.object_motion_validator = RayMotionValidator(self.getSpaceInformation(), True, collision_scene,
+                                                          object_name, ignore_state_validator=True, js=env_js,
+                                                          object_in_motion=collision_scene.robot)
+        self.goal = goal()
+
+    def stateCost(self, state):
+        return ob.Cost(self.getSpaceInformation().distance(state, self.goal))
+
+    def motionCost(self, s1, s2):
+        return self.motionCostHeuristic(s1, s2)
+
+    def motionCostHeuristic(self, s1, s2):
+
+        self.object_motion_validator.raytester.pre_ray_test()
+        _, _, ds = self.object_motion_validator._ompl_check_motion(s1, s2)
+        self.object_motion_validator.raytester.post_ray_test()
+
+        return ob.Cost(self.getSpaceInformation().distance(s1, s2) + sum(ds))
+
 
 class PathLengthAndGoalOptimizationObjective(ob.PathLengthOptimizationObjective):
 
@@ -156,6 +179,10 @@ class GiskardLinkCollision(object):
 
 
 class GiskardPyBulletAABBCollision(AABBCollision, GiskardLinkCollision):
+    # fixme: rework
+    # call for motion validator get_points_from_poses twice with s1 and s2. calculate with
+    # get_collision the map poses and save them. therefore u can remove transform_points.
+    # therefore ros tf is not needed only use pybullet aabb
 
     def __init__(self, object_in_motion, collision_scene, tip_link, map_frame='map'):
         AABBCollision.__init__(self)
@@ -337,11 +364,15 @@ class PyBulletRayTester(object):
         if any(v[0] in self.ignore_object_ids for v in query_res):
             rospy.logerr('fak')
         coll_links = []
+        dists = []
         for i in range(0, len(query_res)):
             obj_id = query_res[i][0]
+            n = query_res[i][-1]
             if obj_id != self.collision_free_id:
                 coll_links.append(p.getBodyInfo(obj_id)[0])
-        return all([v[0] == self.collision_free_id for v in query_res]), coll_links
+                d = np.sqrt(n[0]** 2 + n[1]** 2 + n[2]** 2)
+                dists.append(d)
+        return all([v[0] == self.collision_free_id for v in query_res]), coll_links, dists
 
     def post_ray_test(self):
         bodies_num = p.getNumBodies(physicsClientId=self.client_id)
@@ -378,14 +409,14 @@ class RayMotionValidator(AbstractMotionValidator):
     def ompl_check_motion(self, s1, s2):
         with self.lock:
             self.raytester.pre_ray_test()
-            res = self._ompl_check_motion(s1, s2)
+            res, _, _ = self._ompl_check_motion(s1, s2)
             self.raytester.post_ray_test()
             return res
 
     def check_motion(self, s1, s2):
         with self.lock:
             self.raytester.pre_ray_test()
-            res = self._check_motion(s1[0], s1[1], s1[2], s2[0], s2[1], s2[2])
+            res, _, _ = self._check_motion(s1[0], s1[1], s1[2], s2[0], s2[1], s2[2])
             self.raytester.post_ray_test()
             return res
 
@@ -401,8 +432,8 @@ class RayMotionValidator(AbstractMotionValidator):
         else:
             query_b = [[x_b, y_b, z_b]]
             query_e = [[x_e, y_e, z_e]]
-        collision_free, coll_links = self.raytester.ray_test_batch(self.js, query_b, query_e)
-        return collision_free
+        collision_free, coll_links, dists = self.raytester.ray_test_batch(self.js, query_b, query_e)
+        return collision_free, coll_links, dists
 
     def _ompl_check_motion(self, s1, s2):
         x_b = s1.getX()
@@ -1257,9 +1288,8 @@ class GlobalPlanner(GetGoal):
                                       config=self.movement_config)
             js = self.get_god_map().get_data(identifier.joint_states)
             try:
-                trajectory = planner.plan(js, once=self.once)
+                trajectory = planner.plan(js)
             except GlobalPlanningException:
-                self.once = True
                 self.raise_to_blackboard(GlobalPlanningException())
                 return Status.FAILURE
         else:
@@ -1567,8 +1597,9 @@ class MovementPlanner(OMPLPlanner):
 
         self.setup.setStartAndGoalStates(start, goal)
 
-        #optimization_objective = PathLengthAndGoalOptimizationObjective(self.setup.getSpaceInformation(), goal)
-        #self.setup.setOptimizationObjective(optimization_objective)
+        optimization_objective = ObjectGoalOptimizationObjective(self.setup.getSpaceInformation(), goal, 'cereal',
+                                                                 self.collision_scene, js)
+        self.setup.setOptimizationObjective(optimization_objective)
 
         if not self.setup.getSpaceInformation().isValid(goal()):
             next_goal = self.next_goal(js, goal)

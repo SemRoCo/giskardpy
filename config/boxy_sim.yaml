@@ -1,5 +1,5 @@
 parent: !include default.yaml
-action_server:
+robot_interface:
   base:
     plugin: SendFollowJointTrajectory
     namespace: /whole_body_controller/base/follow_joint_trajectory

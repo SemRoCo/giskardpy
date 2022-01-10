@@ -1,12 +1,12 @@
 parent: !include default.yaml
 robot_interface:
-  mode: closed_loop # closed_loop or open_loop
   body:
 #    plugin: JointGroupPosController
 #    namespace: /joint_group_pos_controller
     plugin: JointStatePublisher
     namespace: /body_controller
 general_options:
+  mode: ClosedLoop # OpenLoop or ClosedLoop
   sample_period: 0.05 # time[s] between points of generated joint trajectory
 plugins:
   GoalReached:

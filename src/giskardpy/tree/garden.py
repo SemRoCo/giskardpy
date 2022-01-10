@@ -639,9 +639,9 @@ class ClosedLoop(OpenLoop):
         return planning_3
 
     def grow_planning4(self):
-        planning_4 = PluginBehavior('planning IIII', hz=True, sleep=0)
+        planning_4 = PluginBehavior('planning IIII', hz=True)
         action_servers = self.god_map.get_data(identifier.robot_interface)
-        behaviors = get_all_classes_in_package(giskardpy.tree)
+        behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
         for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
             C = behaviors[params['plugin']]
             del params['plugin']

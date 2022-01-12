@@ -98,13 +98,12 @@ def zero_pose(resetted_giskard):
     """
     :type resetted_giskard: PR22
     """
-    resetted_giskard.allow_all_collisions() # todo: resetted_giskard.allow_self_collision() is gonna break stuff
+    resetted_giskard.allow_self_collision() # todo: resetted_giskard.allow_self_collision() is gonna break stuff
     p = PoseStamped()
-    p.header.stamp = rospy.get_rostime()
-    p.header.frame_id = str(TFPrefixName('base_footprint', resetted_giskard.robot_names[1]))
-    p.pose.position = Point(-1, 0, 0)
+    p.header.frame_id = 'map'
+    p.pose.position = Point(0, -1, 0)
     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    resetted_giskard.teleport_base(p, resetted_giskard.robot_names[1])
+    resetted_giskard.move_base(p, resetted_giskard.robot_names[1])
     for robot_name in resetted_giskard.robot_names:
         resetted_giskard.set_joint_goal(resetted_giskard.default_pose, prefix=robot_name)
     resetted_giskard.plan_and_execute()
@@ -208,7 +207,21 @@ class TestJointGoals(object):
             zero_pose.set_joint_goal(js, prefix=robot_name)
         zero_pose.plan_and_execute()
 
-    def test_prismatic_joint1(self, zero_pose):
+    def test_continuous_joint2(self, zero_pose):
+        """
+        :type zero_pose: PR22
+        """
+        zero_pose.allow_self_collision()
+        js = dict()
+        js.update({'{}/r_wrist_roll_joint'.format(zero_pose.robot_names[i-1]): -pi * i
+                   for i in range(1, len(zero_pose.robot_names)+1)})
+        js.update({'{}/l_wrist_roll_joint'.format(zero_pose.robot_names[i-1]): -2.1 * pi * i
+                   for i in range(1, len(zero_pose.robot_names)+1)})
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+
+
+    def test_prismatic_joint1_with_prefix(self, zero_pose):
         """
         :type zero_pose: PR22
         """
@@ -216,6 +229,24 @@ class TestJointGoals(object):
         js = {'torso_lift_joint': 0.1}
         for robot_name in zero_pose.robot_names:
             zero_pose.set_joint_goal(js, prefix=robot_name)
+        zero_pose.plan_and_execute()
+
+    def test_prismatic_joint1_without_prefix(self, zero_pose):
+        """
+        :type zero_pose: PR22
+        """
+        zero_pose.allow_self_collision()
+        js = {'{}/torso_lift_joint'.format(robot_name): 0.1 for robot_name in zero_pose.robot_names}
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+
+    def test_prismatic_joint2(self, zero_pose):
+        """
+        :type zero_pose: PR22
+        """
+        zero_pose.allow_self_collision()
+        js = {'{}/torso_lift_joint'.format(zero_pose.robot_names[i-1]): 0.1 * i for i in range(1, len(zero_pose.robot_names)+1)}
+        zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
     def test_hard_joint_limits(self, zero_pose):
@@ -354,8 +385,7 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
-    # todo: write me as test
-    def test_CartesianPositionRobotIndependentLinks(self, zero_pose):
+    def test_CartesianPosition_robot_independent_links(self, zero_pose):
         """
         :type zero_pose: PR22
         """
@@ -1477,7 +1507,7 @@ class TestConstraints(object):
 
 
 class TestCartGoals(object):
-    def test_move_base(self, zero_pose):
+    def test_move_base_with_prefix(self, zero_pose):
         """
         :type zero_pose: PR222
         """
@@ -1493,6 +1523,46 @@ class TestCartGoals(object):
             base_goal.pose.position.x = 1
             base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
             zero_pose.set_cart_goal(base_goal, 'base_footprint', prefix=robot_name)
+        zero_pose.plan_and_execute()
+
+    def test_move_base_without_prefix(self, zero_pose):
+        """
+        :type zero_pose: PR222
+        """
+        for robot_name in zero_pose.robot_names:
+            map_T_odom = PoseStamped()
+            map_T_odom.pose.position.x = 1
+            map_T_odom.pose.position.y = 1
+            map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+            zero_pose.set_localization(map_T_odom, robot_name)
+
+        for robot_name in zero_pose.robot_names:
+            base_goal = PoseStamped()
+            base_goal.header.frame_id = 'map'
+            base_goal.pose.position.x = 1
+            base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+            zero_pose.set_cart_goal(base_goal, '{}/base_footprint'.format(robot_name))
+        zero_pose.plan_and_execute()
+
+    def test_move_base_with_offset(self, zero_pose):
+        """
+        :type zero_pose: PR222
+        """
+        for i in range(0, len(zero_pose.robot_names)):
+            map_T_odom = PoseStamped()
+            map_T_odom.header.frame_id = 'map'
+            map_T_odom.pose.position.x = i + 1
+            map_T_odom.pose.position.y = i + 1
+            map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+            zero_pose.set_localization(map_T_odom, zero_pose.robot_names[i])
+            zero_pose.wait_heartbeats()
+
+        for i in range(0, len(zero_pose.robot_names)):
+            base_goal = PoseStamped()
+            base_goal.header.frame_id = 'map'
+            base_goal.pose.position.x = i + 1
+            base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+            zero_pose.set_cart_goal(base_goal, '{}/base_footprint'.format(zero_pose.robot_names[i]))
         zero_pose.plan_and_execute()
 
     def test_rotate_gripper(self, zero_pose):

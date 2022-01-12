@@ -11,7 +11,7 @@ from py_trees import Status
 import giskardpy.goals
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
-from giskardpy import casadi_wrapper as w, RobotName
+from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
@@ -31,6 +31,7 @@ class GoalToConstraints(GetGoal):
         self.controllable_links = set()
         self.last_urdf = None
         self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals, Goal)
+        self.robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
 
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
@@ -173,20 +174,22 @@ class GoalToConstraints(GetGoal):
         soft_constraints = {}
         vel_constraints = {}
         debug_expr = {}
-        controlled_joints = self.god_map.get_data(identifier.controlled_joints)['pr2_a']
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
         for joint_name in controlled_joints:
-            child_links = self.robot.get_directly_controlled_child_links_with_collisions(joint_name)
+            robot_name = joint_name.prefix
+            child_links = self.world.groups[robot_name].get_directly_controlled_child_links_with_collisions(joint_name)
             if child_links:
                 number_of_repeller = config[joint_name]['number_of_repeller']
                 for i in range(number_of_repeller):
-                    child_link = self.robot.joints[joint_name].child_link_name
+                    child_link = self.world.groups[robot_name].joints[joint_name].child_link_name
                     hard_threshold = config[joint_name]['hard_threshold']
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
                     else:
                         soft_threshold = config[joint_name]['soft_threshold']
                     constraint = ExternalCollisionAvoidance(god_map=self.god_map,
+                                                            robot_name=robot_name,
                                                             link_name=child_link,
                                                             hard_threshold=hard_threshold,
                                                             soft_threshold=soft_threshold,
@@ -210,15 +213,16 @@ class GoalToConstraints(GetGoal):
         vel_constraints = {}
         debug_expr = {}
         config = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        for link_a_o, link_b_o in self.collision_scene.collision_matrices[RobotName]:
-            try:
-                link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
-                if not self.robot.link_order(link_a, link_b):
-                    link_a, link_b = link_b, link_a
-                counter[link_a, link_b] += 1
-            except KeyError as e:
-                # no controlled joint between both links
-                pass
+        for robot_name in self.robot_names:
+            for link_a_o, link_b_o in self.collision_scene.collision_matrices[robot_name]:
+                try:
+                    link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
+                    if not self.world.groups[robot_name].link_order(link_a, link_b):
+                        link_a, link_b = link_b, link_a
+                    counter[link_a, link_b] += 1
+                except KeyError as e:
+                    # no controlled joint between both links
+                    pass
 
         for link_a, link_b in counter:
             num_of_constraints = min(1, counter[link_a, link_b])
@@ -243,9 +247,12 @@ class GoalToConstraints(GetGoal):
                                          config[link_b]['soft_threshold'])
                     number_of_repeller = min(config[link_a]['number_of_repeller'],
                                              config[link_b]['number_of_repeller'])
+                if link_a.prefix == link_b.prefix:
+                    raise Exception('och nö')
                 constraint = SelfCollisionAvoidance(god_map=self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,
+                                                    robot_name=link_a.prefix,
                                                     hard_threshold=hard_threshold,
                                                     soft_threshold=soft_threshold,
                                                     idx=i,

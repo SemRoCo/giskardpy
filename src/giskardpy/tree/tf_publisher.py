@@ -21,6 +21,7 @@ class TFPublisher(GiskardBehavior):
         self.publish_attached_objects = publish_attached_objects
         self.publish_world_objects = publish_world_objects
         self.map_frame = self.god_map.unsafe_get_data(identifier.map_frame)
+        self.robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
 
     def make_transform(self, parent_frame, child_frame, pose):
         tf = TransformStamped()
@@ -38,18 +39,19 @@ class TFPublisher(GiskardBehavior):
             with self.get_god_map() as god_map:
                 tf_msg = TFMessage()
                 if self.publish_attached_objects:
-                    robot_links = set(self.unsafe_get_robot().link_names)
-                    attached_links = robot_links - self.original_links
-                    if attached_links:
-                        get_fk = self.world.compute_fk_pose
-                        for link_name in attached_links:
-                            parent_link_name = self.robot.get_parent_link_of_link(link_name)
-                            fk = get_fk(parent_link_name, link_name)
-                            tf = self.make_transform(fk.header.frame_id, str(link_name), fk.pose)
-                            tf_msg.transforms.append(tf)
+                    for robot_name in self.robot_names:
+                        robot_links = set(self.world.groups[robot_name].link_names)
+                        attached_links = robot_links - self.original_links
+                        if attached_links:
+                            get_fk = self.world.compute_fk_pose
+                            for link_name in attached_links:
+                                parent_link_name = self.world.groups[robot_name].get_parent_link_of_link(link_name)
+                                fk = get_fk(parent_link_name, link_name)
+                                tf = self.make_transform(fk.header.frame_id, str(link_name), fk.pose)
+                                tf_msg.transforms.append(tf)
                 if self.publish_world_objects:
                     for group_name, group in self.world.groups.items():
-                        if group_name == RobotName:
+                        if group_name in self.robot_names:
                             # robot frames will exist for sure
                             continue
                         if len(group.joins) > 0:

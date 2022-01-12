@@ -274,7 +274,8 @@ class CollisionWorldSynchronizer(object):
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if self.is_avoid_all_self_collision(collision_entry):
-                min_allowed_distance.update(self.get_robot_collision_matrix(min_dist))
+                for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+                    min_allowed_distance.update(self.get_robot_collision_matrix(min_dist, robot_name))
                 continue
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
@@ -301,8 +302,7 @@ class CollisionWorldSynchronizer(object):
                     raise Exception('todo')
         return min_allowed_distance
 
-    def get_robot_collision_matrix(self, min_dist):
-        robot_name = self.robot.name
+    def get_robot_collision_matrix(self, min_dist, robot_name):
         collision_matrix = self.collision_matrices[RobotName]
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:

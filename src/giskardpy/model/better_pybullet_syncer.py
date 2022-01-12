@@ -61,7 +61,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return self.query
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
+    def check_collisions(self, cut_off_distances, collision_list_size=15): # fixme: prob broke after two_robots_testing
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.

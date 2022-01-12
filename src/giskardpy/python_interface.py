@@ -13,7 +13,7 @@ from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 from tf.transformations import quaternion_multiply
 
-from giskardpy import RobotName, identifier
+from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder, make_world_body_sphere
@@ -51,18 +51,12 @@ class GiskardWrapper(object):
     def _feedback_cb(self, msg):
         self.last_feedback = msg
 
-    def get_robot_name(self):
-        """
-        :rtype: str
-        """
-        return RobotName
-
-    def get_root(self):
+    def get_root(self, robot_name):
         """
         Returns the name of the robot's root link
         :rtype: str
         """
-        return str(self._world.groups[RobotName].root_link_name)
+        return str(self._world.groups[robot_name].root_link_name)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
                       weight=None, rob_name=None):
@@ -222,7 +216,7 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
+    def set_align_planes_goal(self, tip_link, tip_normal, root_link, root_normal=None, max_angular_velocity=None,
                               weight=WEIGHT_ABOVE_CA):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
@@ -239,11 +233,9 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_BELOW_CA
         :type weight: float
         """
-        if root_link is None:
-            root_link = self.get_root()
         if root_normal is None:
             root_normal = Vector3Stamped()
-            root_normal.header.frame_id = self.get_root()
+            root_normal.header.frame_id = str(root_link)
             root_normal.vector.z = 1
 
         params = {'tip_link': str(tip_link),
@@ -332,7 +324,7 @@ class GiskardWrapper(object):
         """
         self.set_json_goal('UpdateGodMap', updates=updates)
 
-    def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
+    def set_pointing_goal(self, tip_link, goal_point, root_link, pointing_axis=None, weight=None):
         """
         Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
         :param tip_link: name of the tip of the kin chain
@@ -347,11 +339,8 @@ class GiskardWrapper(object):
         :type weight: float
         """
         kwargs = {'tip_link': tip_link,
+                  'root_link': root_link,
                   'goal_point': goal_point}
-        if root_link is not None:
-            kwargs['root_link'] = root_link
-        else:
-            kwargs['root_link'] = self.get_root()
         if pointing_axis is not None:
             kwargs['pointing_axis'] = pointing_axis
         if weight is not None:
@@ -434,23 +423,25 @@ class GiskardWrapper(object):
         """
         Allows the collision with itself for the next goal.
         """
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.robot_links = [CollisionEntry.ALL]
-        collision_entry.body_b = self.get_robot_name()
-        collision_entry.link_bs = [CollisionEntry.ALL]
-        self.set_collision_entries([collision_entry])
+        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+            collision_entry = CollisionEntry()
+            collision_entry.type = CollisionEntry.ALLOW_COLLISION
+            collision_entry.robot_links = [CollisionEntry.ALL]
+            collision_entry.body_b = robot_name
+            collision_entry.link_bs = [CollisionEntry.ALL]
+            self.set_collision_entries([collision_entry])
 
     def avoid_self_collision(self):
         """
         Avoid collisions with itself for the next goal.
         """
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.robot_links = [CollisionEntry.ALL]
-        collision_entry.body_b = self.get_robot_name()
-        collision_entry.link_bs = [CollisionEntry.ALL]
-        self.set_collision_entries([collision_entry])
+        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+            collision_entry = CollisionEntry()
+            collision_entry.type = CollisionEntry.AVOID_COLLISION
+            collision_entry.robot_links = [CollisionEntry.ALL]
+            collision_entry.body_b = robot_name
+            collision_entry.link_bs = [CollisionEntry.ALL]
+            self.set_collision_entries([collision_entry])
 
     def avoid_all_collisions(self, distance=0.05):
         """

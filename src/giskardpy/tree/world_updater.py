@@ -110,7 +110,7 @@ class WorldUpdater(GiskardBehavior):
         return res
 
     def get_attached_objects(self, req):
-        link_names = self.robot.link_names
+        link_names = self.robot.link_names # todo: rmv self.robot and change message since this is called from a service
         attached_links = [str(s) for s in set(link_names).difference(self.original_link_names)]
         attachment_points = []
         res = GetAttachedObjectsResponse()

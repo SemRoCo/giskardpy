@@ -7,7 +7,6 @@ from sensor_msgs.msg import JointState
 from sortedcontainers import SortedKeyList
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from giskardpy import RobotName
 from giskardpy.utils.tfwrapper import get_full_frame_names
 
 
@@ -220,12 +219,12 @@ class Collision(object):
 
 class Collisions(object):
     @profile
-    def __init__(self, world, collision_list_size):
+    def __init__(self, world, collision_list_size, robot_name):
         """
         :type robot: giskardpy.model.world.WorldTree
         """
         self.world = world
-        self.robot = self.world.groups[RobotName]
+        self.robot = self.world.groups[robot_name]
         self.robot_root = self.robot.root_link_name
         self.root_T_map = self.robot.compute_fk_np(self.robot_root, self.world.root_link_name)
         self.collision_list_size = collision_list_size
@@ -466,10 +465,6 @@ class TFPrefixName(PrefixName):
             super().__init__(name, None)
         else:
             super().__init__(name, prefix)
-            # Enforce short name if prefix None
-            if prefix is None and self.separator in self.long_name:
-                self.long_name = self.short_name
-                return
             # Enforce short name if long name not in tf
             tf_full_names = get_full_frame_names(name)
             if self.long_name not in tf_full_names:

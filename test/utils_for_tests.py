@@ -573,8 +573,14 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
                           prefix=None, **kwargs):
         if not root_link:
-            if prefix is not None:
-                root_link = self.world.groups[prefix].root_link_name.short_name
+            if self.robot_names is not None:
+                if prefix is not None:
+                    root_link = self.world.groups[prefix].root_link_name.short_name
+                else:
+                    for robot_name in self.robot_names:
+                        if robot_name in tip_link:
+                            root_link = self.world.groups[robot_name].root_link_name.long_name
+                            break
             else:
                 root_link = self.default_root
         super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
@@ -585,8 +591,14 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
                              prefix=None, **kwargs):
         if not root_link:
-            if prefix is not None:
-                root_link = self.world.groups[prefix].root_link_name.short_name
+            if self.robot_names is not None:
+                if prefix is not None:
+                    root_link = self.world.groups[prefix].root_link_name.short_name
+                else:
+                    for robot_name in self.robot_names:
+                        if robot_name in tip_link:
+                            root_link = self.world.groups[robot_name].root_link_name.long_name
+                            break
             else:
                 root_link = self.default_root
         super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
@@ -987,9 +999,11 @@ class PR22(GiskardTestWrapper):
             self.set_bases[robot_name] = rospy.ServiceProxy('/{}/base_simulator/set_joint_states'.format(robot_name), SetJointState)
             self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
 
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
-        self.plan_and_execute()
+    def move_base(self, goal_pose, robot_name):
+        self.set_localization(goal_pose, robot_name)
+        self.wait_heartbeats()
+        goal_pose.header.stamp = rospy.get_rostime()
+        self.teleport_base(goal_pose, robot_name)
 
     def get_l_gripper_links(self):
         if 'l_gripper' not in self.world.group_names:

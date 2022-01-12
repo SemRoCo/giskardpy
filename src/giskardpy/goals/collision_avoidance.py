@@ -1,11 +1,11 @@
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w, identifier, RobotName
+from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA
 
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_name, robot_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         """
         Don't use me
@@ -18,7 +18,7 @@ class ExternalCollisionAvoidance(Goal):
         self.idx = idx
         super(ExternalCollisionAvoidance, self).__init__(**kwargs)
         self.root = self.world.root_link_name
-        self.robot_name = self.robot.name
+        self.robot_name = robot_name
 
     # def get_contact_normal_on_b_in_root(self):
     #     return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
@@ -27,19 +27,19 @@ class ExternalCollisionAvoidance(Goal):
     #                                                                           'root_V_n'])
 
     def map_V_n_symbol(self):
-        return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
+        return self.god_map.list_to_vector3(identifier.closest_point[self.robot_name] + ['get_external_collisions',
                                                                         (self.link_name,),
                                                                         self.idx,
                                                                         'map_V_n'])
 
     def get_closest_point_on_a_in_a(self):
-        return self.god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point[self.robot_name] + ['get_external_collisions',
                                                                        (self.link_name,),
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
     def map_P_a_symbol(self):
-        return self.god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point[self.robot_name] + ['get_external_collisions',
                                                                        (self.link_name,),
                                                                        self.idx,
                                                                        'new_map_P_pa'])
@@ -51,13 +51,13 @@ class ExternalCollisionAvoidance(Goal):
     #                                                                          'root_P_b'])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
+        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_external_collisions',
                                                                   (self.link_name,),
                                                                   self.idx,
                                                                   'contact_distance'])
 
     def get_number_of_external_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_number_of_external_collisions',
+        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_number_of_external_collisions',
                                                                   (self.link_name,)])
 
     def make_constraints(self):
@@ -114,7 +114,7 @@ class ExternalCollisionAvoidance(Goal):
 
 class SelfCollisionAvoidance(Goal):
 
-    def __init__(self, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_a, link_b, robot_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         self.link_a = link_a
         self.link_b = link_b
@@ -125,34 +125,34 @@ class SelfCollisionAvoidance(Goal):
         self.idx = idx
         super(SelfCollisionAvoidance, self).__init__(**kwargs)
         self.root = self.world.root_link_name
-        self.robot_name = RobotName
+        self.robot_name = robot_name
 
     def get_contact_normal_in_b(self):
-        return self.god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',
+        return self.god_map.list_to_vector3(identifier.closest_point[self.robot_name] + ['get_self_collisions',
                                                                         (self.link_a, self.link_b),
                                                                         self.idx,
                                                                         'new_b_V_n'])
 
     def get_position_on_a_in_a(self):
-        return self.god_map.list_to_point3(identifier.closest_point + ['get_self_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point[self.robot_name] + ['get_self_collisions',
                                                                        (self.link_a, self.link_b),
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
     def get_b_T_pb(self):
-        return self.god_map.list_to_translation3(identifier.closest_point + ['get_self_collisions',
+        return self.god_map.list_to_translation3(identifier.closest_point[self.robot_name] + ['get_self_collisions',
                                                                              (self.link_a, self.link_b),
                                                                              self.idx,
                                                                              'new_b_P_pb'])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_self_collisions',
+        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_self_collisions',
                                                                   (self.link_a, self.link_b),
                                                                   self.idx,
                                                                   'contact_distance'])
 
     def get_number_of_self_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_number_of_self_collisions',
+        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_number_of_self_collisions',
                                                                   (self.link_a, self.link_b)])
 
     def make_constraints(self):
@@ -209,7 +209,7 @@ class SelfCollisionAvoidance(Goal):
         return '{}/{}/{}/{}'.format(s, self.link_a, self.link_b, self.idx)
 
 
-class CollisionAvoidanceHint(Goal):
+class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_testing
     def __init__(self, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """

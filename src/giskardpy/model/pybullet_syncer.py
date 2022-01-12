@@ -60,25 +60,27 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :type self_collision_d: float
         :type enable_self_collision: bool
         :return: (robot_link, body_b, link_b) -> Collision
-        :rtype: Collisions
+        :rtype: dict()
         """
-        collisions = Collisions(self.world, collision_list_size)
-        for (robot_link, body_b, link_b), distance in cut_off_distances.items():
-            link_b_id = self.object_name_to_bullet_id[link_b]
-            robot_link_id = self.object_name_to_bullet_id[robot_link]
-            contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
-                                                                      distance * 1.1)]
-            if len(contacts) > 0:
-                for contact in contacts:  # type: ContactInfo
-                    collision = Collision(link_a=robot_link,
-                                          body_b=body_b,
-                                          link_b=link_b,
-                                          map_P_pa=contact.position_on_a,
-                                          map_P_pb=contact.position_on_b,
-                                          map_V_n=contact.contact_normal_on_b,
-                                          contact_distance=contact.contact_distance)
-                    collisions.add(collision)
-        return collisions
+        all_collisions = dict()
+        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+            collisions = Collisions(self.world, collision_list_size, robot_name)
+            for (robot_link, body_b, link_b), distance in cut_off_distances.items():
+                link_b_id = self.object_name_to_bullet_id[link_b]
+                robot_link_id = self.object_name_to_bullet_id[robot_link]
+                contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
+                                                                          distance * 1.1)]
+                if len(contacts) > 0:
+                    for contact in contacts:  # type: ContactInfo
+                        collision = Collision(link_a=robot_link,
+                                              body_b=body_b,
+                                              link_b=link_b,
+                                              map_P_pa=contact.position_on_a,
+                                              map_P_pb=contact.position_on_b,
+                                              map_V_n=contact.contact_normal_on_b,
+                                              contact_distance=contact.contact_distance)
+                        collisions.add(collision)
+        return all_collisions
 
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.object_name_to_bullet_id[link_a]

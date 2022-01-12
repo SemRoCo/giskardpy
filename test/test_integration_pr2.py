@@ -88,7 +88,7 @@ def giskard_more_robots(request, ros):
 @pytest.fixture()
 def resetted_giskard(giskard):
     """
-    :type giskard: PR2
+    :type giskard: PR22
     """
     logging.loginfo(u'resetting giskard')
     giskard.open_l_gripper()

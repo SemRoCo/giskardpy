@@ -187,10 +187,11 @@ class CollisionWorldSynchronizer(object):
                 js[joint_name].position = 0
         return js
 
-    def init_collision_matrix(self, group_name):
-        added_links = set(combinations(self.world.groups[group_name].link_names_with_collisions, 2))
-        self.update_collision_matrix(group_name=group_name,
-                                     added_links=added_links)
+    def init_collision_matrix(self):
+        robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
+        for group_name in robot_names:
+            added_links = set(combinations(self.world.groups[group_name].link_names_with_collisions, 2))
+            self.update_collision_matrix(group_name=group_name, added_links=added_links)
 
     def update_collision_matrix(self, group_name, added_links=None, removed_links=None):
         # self.collision_matrices[group_name] = self.load_self_collision_matrix()

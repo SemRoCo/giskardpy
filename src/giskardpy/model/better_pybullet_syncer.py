@@ -190,7 +190,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                                      link.has_collisions()]
             self.fks = self.world.compute_all_fks_matrix()
             bpb.batch_set_transforms(self.objects_in_order, self.fks())
-            self.init_collision_matrix(RobotName)
+            self.init_collision_matrix()
         try:
             bpb.batch_set_transforms(self.objects_in_order, self.fks())
         except Exception as e:

@@ -220,7 +220,6 @@ class TestJointGoals(object):
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
-
     def test_prismatic_joint1_with_prefix(self, zero_pose):
         """
         :type zero_pose: PR22

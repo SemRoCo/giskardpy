@@ -103,7 +103,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.add_object(link)
-            self.init_collision_matrix(RobotName)
+            self.init_collision_matrix()
             # logging.logwarn('synced world')
         else:
             # logging.logwarn('updated world')

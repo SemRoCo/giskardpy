@@ -27,19 +27,22 @@ class ExternalCollisionAvoidance(Goal):
     #                                                                           'root_V_n'])
 
     def map_V_n_symbol(self):
-        return self.god_map.list_to_vector3(identifier.closest_point[self.robot_name] + ['get_external_collisions',
+        return self.god_map.list_to_vector3(identifier.closest_point + [self.robot_name,
+                                                                        'get_external_collisions',
                                                                         (self.link_name,),
                                                                         self.idx,
                                                                         'map_V_n'])
 
     def get_closest_point_on_a_in_a(self):
-        return self.god_map.list_to_point3(identifier.closest_point[self.robot_name] + ['get_external_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point + [self.robot_name,
+                                                                       'get_external_collisions',
                                                                        (self.link_name,),
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
     def map_P_a_symbol(self):
-        return self.god_map.list_to_point3(identifier.closest_point[self.robot_name] + ['get_external_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point + [self.robot_name,
+                                                                       'get_external_collisions',
                                                                        (self.link_name,),
                                                                        self.idx,
                                                                        'new_map_P_pa'])
@@ -51,13 +54,15 @@ class ExternalCollisionAvoidance(Goal):
     #                                                                          'root_P_b'])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_external_collisions',
+        return self.god_map.to_symbol(identifier.closest_point + [self.robot_name,
+                                                                  'get_external_collisions',
                                                                   (self.link_name,),
                                                                   self.idx,
                                                                   'contact_distance'])
 
     def get_number_of_external_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_number_of_external_collisions',
+        return self.god_map.to_symbol(identifier.closest_point + [self.robot_name,
+                                                                  'get_number_of_external_collisions',
                                                                   (self.link_name,)])
 
     def make_constraints(self):
@@ -128,31 +133,36 @@ class SelfCollisionAvoidance(Goal):
         self.robot_name = robot_name
 
     def get_contact_normal_in_b(self):
-        return self.god_map.list_to_vector3(identifier.closest_point[self.robot_name] + ['get_self_collisions',
+        return self.god_map.list_to_vector3(identifier.closest_point + [self.robot_name,
+                                                                        'get_self_collisions',
                                                                         (self.link_a, self.link_b),
                                                                         self.idx,
                                                                         'new_b_V_n'])
 
     def get_position_on_a_in_a(self):
-        return self.god_map.list_to_point3(identifier.closest_point[self.robot_name] + ['get_self_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point + [self.robot_name,
+                                                                       'get_self_collisions',
                                                                        (self.link_a, self.link_b),
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
     def get_b_T_pb(self):
-        return self.god_map.list_to_translation3(identifier.closest_point[self.robot_name] + ['get_self_collisions',
+        return self.god_map.list_to_translation3(identifier.closest_point + [self.robot_name,
+                                                                             'get_self_collisions',
                                                                              (self.link_a, self.link_b),
                                                                              self.idx,
                                                                              'new_b_P_pb'])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_self_collisions',
+        return self.god_map.to_symbol(identifier.closest_point + [self.robot_name,
+                                                                  'get_self_collisions',
                                                                   (self.link_a, self.link_b),
                                                                   self.idx,
                                                                   'contact_distance'])
 
     def get_number_of_self_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point[self.robot_name] + ['get_number_of_self_collisions',
+        return self.god_map.to_symbol(identifier.closest_point + [self.robot_name,
+                                                                  'get_number_of_self_collisions',
                                                                   (self.link_a, self.link_b)])
 
     def make_constraints(self):

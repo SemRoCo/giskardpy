@@ -2553,7 +2553,7 @@ class TestCartesianPath(object):
         pre_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
 
         box_T_r_goal_post = deepcopy(box_T_r_goal)
-        box_T_r_goal_post.p[0] += 0.5
+        box_T_r_goal_post.p[0] += 0.3
         post_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_post, drawer_frame_id)
 
         kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)

@@ -243,7 +243,7 @@ class CollisionWorldSynchronizer(object):
         pass
 
     def are_entries_known(self, collision_goals):
-        robot_name = RobotName
+        robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
         robot_links = set(self.robot.link_names)
         for collision_entry in collision_goals:
             if collision_entry.body_b not in self.world.groups and not self.all_body_bs(collision_entry):
@@ -252,7 +252,7 @@ class CollisionWorldSynchronizer(object):
                 for robot_link in collision_entry.robot_links:
                     if robot_link not in robot_links:
                         raise UnknownBodyException('robot link \'{}\' unknown'.format(robot_link))
-            if collision_entry.body_b == robot_name:
+            if collision_entry.body_b in robot_names:
                 for robot_link in collision_entry.link_bs:
                     if robot_link != CollisionEntry.ALL and robot_link not in robot_links:
                         raise UnknownBodyException(

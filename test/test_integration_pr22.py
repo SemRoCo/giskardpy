@@ -98,6 +98,13 @@ def zero_pose(resetted_giskard):
     """
     :type resetted_giskard: PR22
     """
+    #resetted_giskard.wait_heartbeats(10)
+    #while True:
+    #    try:
+    #        resetted_giskard.tree.tick()
+    #    except Exception:
+    #        continue
+    #    break
     resetted_giskard.allow_self_collision() # todo: resetted_giskard.allow_self_collision() is gonna break stuff
     p = PoseStamped()
     p.header.frame_id = 'map'

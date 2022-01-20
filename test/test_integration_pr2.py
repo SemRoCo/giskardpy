@@ -17,7 +17,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
-from giskardpy import identifier
+from giskardpy import identifier, RobotName
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
 from giskardpy.python_interface import DEFAULT_WORLD_TIMEOUT
@@ -112,6 +112,58 @@ pick_up_pose = {
     u'r_wrist_roll_joint': 0.0509923457388,
     u'torso_lift_joint': 0.261791330751,
 }
+
+oven_area_cereal = {
+    'odom_x_joint': 0.5940842695605993,
+    'odom_y_joint': 0.5646523972590731,
+    'odom_z_joint': 1.2424133925817196,
+    'fl_caster_rotation_joint': 0.0,
+    'fr_caster_rotation_joint': 0.0,
+    'bl_caster_rotation_joint': 0.0,
+    'br_caster_rotation_joint': 0.0,
+    'torso_lift_joint': 0.22617875616830663,
+    'torso_lift_motor_screw_joint': 0.0,
+    'fl_caster_l_wheel_joint': 0.0,
+    'fl_caster_r_wheel_joint': 0.0,
+    'fr_caster_l_wheel_joint': 0.0,
+    'fr_caster_r_wheel_joint': 0.0,
+    'bl_caster_l_wheel_joint': 0.0,
+    'bl_caster_r_wheel_joint': 0.0,
+    'br_caster_l_wheel_joint': 0.0,
+    'br_caster_r_wheel_joint': 0.0,
+    'head_pan_joint': 0.0,
+    'laser_tilt_mount_joint': 0.0,
+    'r_shoulder_pan_joint': -0.24293873201958266,
+    'l_shoulder_pan_joint': 1.561020003858116,
+    'head_tilt_joint': 0.0,
+    'r_shoulder_lift_joint': -0.013819636563032563,
+    'r_upper_arm_roll_joint': -1.4108187392665519,
+    'r_elbow_flex_joint': -0.5344932623724951,
+    'r_forearm_roll_joint': -0.29683611261924375,
+    'r_wrist_flex_joint': -0.4680856109600189,
+    'r_wrist_roll_joint': 1.7792377315663064,
+    'r_gripper_motor_slider_joint': 0.0,
+    'r_gripper_l_finger_joint': 0.54,
+    'r_gripper_r_finger_joint': 0.54,
+    'r_gripper_motor_screw_joint': 0.0,
+    'r_gripper_l_finger_tip_joint': 0.54,
+    'r_gripper_r_finger_tip_joint': 0.54,
+    'r_gripper_joint': 2.220446049250313e-16,
+    'l_shoulder_lift_joint': 0.015148469507495575,
+    'l_upper_arm_roll_joint': 1.3837000000005018,
+    'l_elbow_flex_joint': -1.681037408201828,
+    'l_forearm_roll_joint': -1.8595559215384385,
+    'l_wrist_flex_joint': -0.5217665869722147,
+    'l_wrist_roll_joint': 0.0,
+    'l_gripper_motor_slider_joint': 0.0,
+    'l_gripper_l_finger_joint': 0.54,
+    'l_gripper_r_finger_joint': 0.54,
+    'l_gripper_motor_screw_joint': 0.0,
+    'l_gripper_l_finger_tip_joint': 0.54,
+    'l_gripper_r_finger_tip_joint': 0.54,
+    'l_gripper_joint': 2.220446049250313e-16
+}
+
 
 folder_name = u'tmp_data/'
 
@@ -234,7 +286,7 @@ def kitchen_setup_avoid_collisions(resetted_giskard):
     :type resetted_giskard: GiskardTestWrapper
     :return:
     """
-    resetted_giskard.avoid_all_collisions(distance=0.05)
+    resetted_giskard.avoid_all_collisions(distance=0.0)
     resetted_giskard.set_joint_goal(gaya_pose)
     resetted_giskard.plan_and_execute()
     object_name = u'kitchen'
@@ -2519,6 +2571,94 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.send_and_check_joint_goal(gaya_pose)
 
+    def test_faster_ease_cereal_with_planner(self, kitchen_setup_avoid_collisions):
+        """
+        :type kitchen_setup_avoid_collisions: PR2
+        """
+        # FIXME
+        cereal_name = u'cereal'
+        drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
+
+        # take milk out of fridge
+        kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
+
+        # spawn milk
+        cereal_pose = PoseStamped()
+        cereal_pose.header.frame_id = drawer_frame_id
+        cereal_pose.pose.position = Point(0.123, 0.0, 0.13)
+        cereal_pose.pose.orientation = Quaternion(0.0087786, 0.005395, -0.838767, -0.544393)
+        kitchen_setup_avoid_collisions.add_box(cereal_name, [0.1028, 0.0634, 0.20894], cereal_pose)
+
+        cereal_pose_in_map = tf.msg_to_kdl(tf.transform_pose(u'map', cereal_pose))
+
+        drawer_T_box = tf.msg_to_kdl(cereal_pose)
+
+        # grasp milk
+        kitchen_setup_avoid_collisions.open_l_gripper()
+        grasp_pose = PoseStamped()
+        grasp_pose.header.frame_id = cereal_name
+        grasp_pose.pose.position = Point(0.13, 0, 0.05)
+        grasp_pose.pose.orientation = Quaternion(0, 0, 1, 0)
+        box_T_r_goal = tf.msg_to_kdl(grasp_pose)
+        box_T_r_goal_pre = deepcopy(box_T_r_goal)
+        box_T_r_goal_pre.p[0] += 0.1
+
+        pre_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
+
+        box_T_r_goal_post = deepcopy(box_T_r_goal)
+
+        box_T_r_goal_post.p[0] += 0.3
+        box_T_r_goal_post.p[1] += -0.2
+        post_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_post, drawer_frame_id)
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup_avoid_collisions.set_joint_goal(oven_area_cereal, check=False)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        kitchen_setup_avoid_collisions.attach_object(cereal_name, kitchen_setup_avoid_collisions.r_tip)
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup_avoid_collisions.close_l_gripper()
+
+        # x = Vector3Stamped()
+        # x.header.frame_id = 'milk'
+        # x.vector.x = 1
+        # x_map = Vector3Stamped()
+        # x_map.header.frame_id = 'iai_kitchen/iai_fridge_door'
+        # x_map.vector.x = 1
+        # z = Vector3Stamped()
+        # z.header.frame_id = 'milk'
+        # z.vector.z = 1
+        # z_map = Vector3Stamped()
+        # z_map.header.frame_id = 'map'
+        # z_map.vector.z = 1
+        # kitchen_setup.align_planes('milk', x, root_normal=x_map)
+        # kitchen_setup.align_planes('milk', z, root_normal=z_map)
+        # kitchen_setup.keep_orientation(u'milk')
+        # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip,
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     goal=post_grasp_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+        #kitchen_setup.set_joint_goal(gaya_pose)
+
+        # place milk back
+
+        # kitchen_setup.add_json_goal(u'BasePointingForward')
+        # milk_goal = PoseStamped()
+        # milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        # milk_goal.pose.position = Point(.1, -.2, .13)
+        # milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+
+        kitchen_setup_avoid_collisions.set_cart_goal(cereal_pose, cereal_name)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup_avoid_collisions.open_l_gripper()
+        kitchen_setup_avoid_collisions.detach_object(cereal_name)
+
+        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
     def test_ease_cereal_with_planner(self, kitchen_setup_avoid_collisions):
         # FIXME

@@ -43,7 +43,7 @@ general_options:
         default: 30
         override: {}
 qp_solver:
-  name: cplex # one of [qpoases, gurobi, cplex]
+  name: gurobi # one of [qpoases, gurobi, cplex]
   # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
   prediction_horizon: 9
   hard_constraint_handling:
@@ -99,14 +99,14 @@ collision_avoidance:
     default:
       number_of_repeller: 1
       hard_threshold: 0.0
-      soft_threshold: 0.05
+      soft_threshold: 0.0
       max_velocity: 0.2
     override: {}
   self_collision_avoidance:
     default:
       number_of_repeller: 1
       hard_threshold: 0.0
-      soft_threshold: 0.05
+      soft_threshold: 0.0
       max_velocity: 0.2
     override: {}
 #      - base_link # You can override all combinations with a specific link

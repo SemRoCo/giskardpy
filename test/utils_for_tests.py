@@ -470,12 +470,12 @@ class GiskardTestWrapper(GiskardWrapper):
         return self.god_map.unsafe_get_data(identifier.collision_scene)
 
     @property
-    def robot_self_collision_matrix(self):
+    def robot_self_collision_matrices(self):
         """
         :rtype: set
         """
         self.wait_heartbeats()
-        return self.collision_scene.collision_matrices[RobotName]
+        return self.collision_scene.collision_matrices
 
     def start_motion_cb(self, msg):
         self.time = time()
@@ -839,13 +839,19 @@ class GiskardTestWrapper(GiskardWrapper):
         response = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
+    def is_link_in_collision_matrix(self, group_of_link, link):
+        for group_name, group in self.world.groups.items():
+            if group_name != group_of_link and link in group.link_names:
+                assert len([x for x in self.robot_self_collision_matrices[group_name] if link in x]) > 0
+                break
+
     def check_attach_object_result(self, response, expected_error_code, pose, name, parent_link):
         assert response.error_codes == expected_error_code, \
             'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
                                            update_world_error_code(expected_error_code))
         if expected_error_code == UpdateWorldResponse.SUCCESS:
             assert name in [n.short_name for n in self.world.link_names]
-            assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
+            self.is_link_in_collision_matrix(name, parent_link)
             assert self.world.groups[name].parent_link_of_root == parent_link
             current_pose = self.world.compute_fk_pose(self.world.root_link_name, name)
             pose = tf.transform_pose(self.world.root_link_name, pose)
@@ -881,7 +887,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                            update_world_error_code(expected_response))
         assert name in self.get_attached_objects().object_names
         if self.god_map.get_data(identifier.collision_checker) is not None:
-            assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
+            self.is_link_in_collision_matrix(name, parent_link)
             assert self.world.groups[name].parent_link_of_root == parent_link
 
     def get_external_collisions(self, link, distance_threshold):

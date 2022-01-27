@@ -152,6 +152,24 @@ def fake_table_setup(pocky_pose_setup):
     return pocky_pose_setup
 
 
+@pytest.fixture()
+def kitchen_setup(resetted_giskard):
+    """
+    :type resetted_giskard: PR2
+    :return:
+    """
+    resetted_giskard.avoid_all_collisions()
+    resetted_giskard.set_joint_goal(gaya_pose)
+    resetted_giskard.plan_and_execute()
+    object_name = u'kitchen'
+    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                              set_js_topic=u'/kitchen/cram_joint_states')
+    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
+    resetted_giskard.set_kitchen_js(js)
+    return resetted_giskard
+
+
 class TestFk(object):
     def test_fk(self, zero_pose):
         for root, tip in itertools.product(zero_pose.robot.link_names, repeat=2):
@@ -160,7 +178,7 @@ class TestFk(object):
             compare_poses(fk1.pose, fk2.pose)
 
     def test_fk_attached(self, zero_pose):
-        pocky = 'box'
+        pocky = u'box'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
         for root, tip in itertools.product(zero_pose.robot.link_names, [pocky]):
             fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])

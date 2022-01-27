@@ -244,17 +244,16 @@ class CollisionWorldSynchronizer(object):
 
     def are_entries_known(self, collision_goals):
         robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
-        robot_links = set(self.robot.link_names)
         for collision_entry in collision_goals:
             if collision_entry.body_b not in self.world.groups and not self.all_body_bs(collision_entry):
                 raise UnknownBodyException('body b \'{}\' unknown'.format(collision_entry.body_b))
             if not self.all_robot_links(collision_entry):
                 for robot_link in collision_entry.robot_links:
-                    if robot_link not in robot_links:
+                    if robot_link not in self.world.groups[collision_entry.robot_name].link_names:
                         raise UnknownBodyException('robot link \'{}\' unknown'.format(robot_link))
             if collision_entry.body_b in robot_names:
                 for robot_link in collision_entry.link_bs:
-                    if robot_link != CollisionEntry.ALL and robot_link not in robot_links:
+                    if robot_link != CollisionEntry.ALL and robot_link not in self.world.groups[collision_entry.body_b].link_names:
                         raise UnknownBodyException(
                             'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
             elif not self.all_body_bs(collision_entry) and not self.all_link_bs(collision_entry):
@@ -285,8 +284,8 @@ class CollisionWorldSynchronizer(object):
             else:
                 link_bs = collision_entry.link_bs
             for link_b in link_bs:
-                key = (collision_entry.robot_links[0], collision_entry.body_b, link_b)
-                r_key = (link_b, collision_entry.body_b, collision_entry.robot_links[0])
+                key = (collision_entry.robot_name, collision_entry.robot_links[0], collision_entry.body_b, link_b)
+                r_key = (collision_entry.body_b, link_b, collision_entry.robot_name, collision_entry.robot_links[0])
                 if self.is_allow_collision(collision_entry):
                     if self.all_link_bs(collision_entry):
                         for key2 in list(min_allowed_distance.keys()):
@@ -304,14 +303,14 @@ class CollisionWorldSynchronizer(object):
         return min_allowed_distance
 
     def get_robot_collision_matrix(self, min_dist, robot_name):
-        collision_matrix = self.collision_matrices[RobotName]
+        collision_matrix = self.collision_matrices[robot_name]
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
-            if self.robot.link_order(link1, link2):
-                collision_matrix2[link1, robot_name, link2] = min_dist[link1]
+            if self.world.groups[robot_name].link_order(link1, link2):
+                collision_matrix2[robot_name, link1, robot_name, link2] = min_dist[link1]
             else:
-                collision_matrix2[link2, robot_name, link1] = min_dist[link1]
+                collision_matrix2[robot_name, link2, robot_name, link1] = min_dist[link1]
         return collision_matrix2
 
     def verify_collision_entries(self, collision_goals):
@@ -354,6 +353,7 @@ class CollisionWorldSynchronizer(object):
             # put an avoid all at the front
             ce = CollisionEntry()
             ce.type = CollisionEntry.AVOID_COLLISION
+            ce.robot_name = CollisionEntry.ALL
             ce.robot_links = [CollisionEntry.ALL]
             ce.body_b = CollisionEntry.ALL
             ce.link_bs = [CollisionEntry.ALL]
@@ -381,9 +381,12 @@ class CollisionWorldSynchronizer(object):
                 i += 1
                 continue
             if self.all_link_bs(collision_entry):
-                if collision_entry.body_b == RobotName:
+                if collision_entry.body_b in self.god_map.get_data(identifier.rosparam + ['namespaces']):
                     new_ces = []
-                    link_bs = self.get_possible_collisions(list(collision_entry.robot_links)[0])
+                    link_bs = self.get_possible_collisions(collision_entry.body_b, list(collision_entry.robot_links)[0])
+                    if not link_bs:
+                        i += 1
+                        continue
                 elif [x for x in collision_goals[i:] if
                       x.robot_links == collision_entry.robot_links and
                       x.body_b == collision_entry.body_b and not self.all_link_bs(x)]:
@@ -420,10 +423,10 @@ class CollisionWorldSynchronizer(object):
             i += 1
         return collision_goals
 
-    def get_possible_collisions(self, link):
+    def get_possible_collisions(self, robot_name, link):
         # TODO speed up by saving this
         possible_collisions = set()
-        for link1, link2 in self.collision_matrices[RobotName]:
+        for link1, link2 in self.collision_matrices[robot_name]:
             if link == link1:
                 possible_collisions.add(link2)
             elif link == link2:
@@ -434,7 +437,6 @@ class CollisionWorldSynchronizer(object):
         i = 0
         # TODO why did i use controlled links?
         # controlled_robot_links = self.robot.get_controlled_links()
-        controlled_robot_links = self.robot.link_names_with_collisions
         while i < len(collision_goals):
             collision_entry = collision_goals[i]
             if self.is_avoid_all_self_collision(collision_entry):
@@ -444,9 +446,11 @@ class CollisionWorldSynchronizer(object):
                 collision_goals.remove(collision_entry)
 
                 new_ces = []
+                controlled_robot_links = self.world.groups[collision_entry.robot_name].link_names_with_collisions
                 for robot_link in controlled_robot_links:
                     ce = CollisionEntry()
                     ce.type = collision_entry.type
+                    ce.robot_name = collision_entry.robot_name
                     ce.robot_links = [robot_link]
                     ce.body_b = collision_entry.body_b
                     ce.min_dist = collision_entry.min_dist
@@ -474,23 +478,25 @@ class CollisionWorldSynchronizer(object):
 
     def split_body_b(self, collision_goals):
         # always put robot at the front
-        groups = list(self.world.minimal_group_names)
-        groups.remove(RobotName)
-        groups.insert(0, RobotName)
+        # groups = list(self.world.minimal_group_names)
+        # groups.remove(RobotName)
+        # groups.insert(0, RobotName)
         i = 0
         while i < len(collision_goals):
             collision_entry = collision_goals[i]
             if self.all_body_bs(collision_entry):
                 collision_goals.remove(collision_entry)
                 new_ces = []
-                for body_b in self.world.minimal_group_names:
-                    ce = CollisionEntry()
-                    ce.type = collision_entry.type
-                    ce.robot_links = collision_entry.robot_links
-                    ce.min_dist = collision_entry.min_dist
-                    ce.body_b = body_b
-                    ce.link_bs = collision_entry.link_bs
-                    new_ces.append(ce)
+                for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+                    for body_b in self.world.minimal_group_names:
+                        ce = CollisionEntry()
+                        ce.type = collision_entry.type
+                        ce.robot_name = robot_name
+                        ce.robot_links = collision_entry.robot_links
+                        ce.min_dist = collision_entry.min_dist
+                        ce.body_b = body_b
+                        ce.link_bs = collision_entry.link_bs
+                        new_ces.append(ce)
                 for new_ce in reversed(new_ces):
                     collision_goals.insert(i, new_ce)
                 i += len(new_ces)
@@ -521,7 +527,7 @@ class CollisionWorldSynchronizer(object):
         """
         return self.is_avoid_collision(collision_entry) \
                and self.all_robot_links(collision_entry) \
-               and collision_entry.body_b == RobotName \
+               and collision_entry.body_b == collision_entry.robot_name \
                and self.all_link_bs(collision_entry)
 
     def is_allow_all_self_collision(self, collision_entry):
@@ -531,7 +537,7 @@ class CollisionWorldSynchronizer(object):
         """
         return self.is_allow_collision(collision_entry) \
                and self.all_robot_links(collision_entry) \
-               and collision_entry.body_b == RobotName \
+               and collision_entry.body_b == collision_entry.robot_name \
                and self.all_link_bs(collision_entry)
 
     def is_avoid_all_collision(self, collision_entry):
@@ -542,6 +548,7 @@ class CollisionWorldSynchronizer(object):
         return self.is_avoid_collision(collision_entry) \
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
+               and collision_entry.body_b == collision_entry.robot_name \
                and self.all_link_bs(collision_entry)
 
     def is_allow_all_collision(self, collision_entry):
@@ -552,6 +559,7 @@ class CollisionWorldSynchronizer(object):
         return self.is_allow_collision(collision_entry) \
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
+               and collision_entry.body_b == collision_entry.robot_name \
                and self.all_link_bs(collision_entry)
 
     def reset_cache(self):

@@ -105,7 +105,7 @@ def zero_pose(resetted_giskard):
     #    except Exception:
     #        continue
     #    break
-    resetted_giskard.allow_self_collision() # todo: resetted_giskard.allow_self_collision() is gonna break stuff
+    resetted_giskard.avoid_all_collisions() # todo: resetted_giskard.allow_self_collision() is gonna break stuff
     p = PoseStamped()
     p.header.frame_id = 'map'
     p.pose.position = Point(0, -1, 0)
@@ -191,6 +191,7 @@ class TestJointGoals(object):
         zero_pose.allow_all_collisions()
         for robot_name in zero_pose.robot_names:
             zero_pose.set_joint_goal(pocky_pose, prefix=robot_name)
+        zero_pose.avoid_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_partial_joint_state_goal1(self, zero_pose):

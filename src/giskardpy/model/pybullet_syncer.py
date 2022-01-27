@@ -75,7 +75,9 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         all_collisions = dict()
         for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
             collisions = Collisions(self.world, collision_list_size, robot_name)
-            for (robot_link, body_b, link_b), distance in cut_off_distances.items():
+            for (c_robot_name, robot_link, body_b, link_b), distance in cut_off_distances.items():
+                if c_robot_name != robot_name:
+                    continue
                 link_b_id = self.object_name_to_bullet_id[link_b]
                 robot_link_id = self.object_name_to_bullet_id[robot_link]
                 contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
@@ -90,6 +92,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
                                               map_V_n=contact.contact_normal_on_b,
                                               contact_distance=contact.contact_distance)
                         collisions.add(collision)
+            all_collisions[robot_name] = collisions
         return all_collisions
 
     def in_collision(self, link_a, link_b, distance):

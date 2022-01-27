@@ -372,7 +372,7 @@ class GiskardWrapper(object):
         self.cmd_seq[-1].collisions.extend(collisions)
 
     def allow_collision(self, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
-                        link_bs=(CollisionEntry.ALL,)):
+                        link_bs=(CollisionEntry.ALL,), robot_name=CollisionEntry.ALL):
         """
         :param robot_links: list of robot link names as str, None or empty list means all
         :type robot_links: list
@@ -383,13 +383,14 @@ class GiskardWrapper(object):
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.robot_name = robot_name
         collision_entry.robot_links = [str(x) for x in robot_links]
         collision_entry.body_b = str(body_b)
         collision_entry.link_bs = [str(x) for x in link_bs]
         self.set_collision_entries([collision_entry])
 
     def avoid_collision(self, min_dist, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
-                        link_bs=(CollisionEntry.ALL,)):
+                        link_bs=(CollisionEntry.ALL,), robot_name=CollisionEntry.ALL):
         """
         :param min_dist: the distance giskard is trying to keep between specified links
         :type min_dist: float
@@ -402,6 +403,7 @@ class GiskardWrapper(object):
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_name = robot_name
         collision_entry.min_dist = min_dist
         collision_entry.robot_links = [str(x) for x in robot_links]
         collision_entry.body_b = str(body_b)
@@ -414,30 +416,57 @@ class GiskardWrapper(object):
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.robot_name = CollisionEntry.ALL
         collision_entry.robot_links = [CollisionEntry.ALL]
         collision_entry.body_b = CollisionEntry.ALL
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
 
-    def allow_self_collision(self):
+    def allow_self_collision(self, robot_name):
+        """
+        Allows the collision with itself for the next goal.
+        """
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.robot_name = robot_name
+        collision_entry.robot_links = [CollisionEntry.ALL]
+        collision_entry.body_b = robot_name
+        collision_entry.link_bs = [CollisionEntry.ALL]
+        self.set_collision_entries([collision_entry])
+
+    def allow_all_self_collision(self):
         """
         Allows the collision with itself for the next goal.
         """
         for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
             collision_entry = CollisionEntry()
             collision_entry.type = CollisionEntry.ALLOW_COLLISION
+            collision_entry.robot_name = robot_name
             collision_entry.robot_links = [CollisionEntry.ALL]
             collision_entry.body_b = robot_name
             collision_entry.link_bs = [CollisionEntry.ALL]
             self.set_collision_entries([collision_entry])
 
-    def avoid_self_collision(self):
+    def avoid_self_collision(self, robot_name):
+        """
+        Avoid collisions with itself for the next goal.
+        """
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_name = robot_name
+        collision_entry.robot_links = [CollisionEntry.ALL]
+        collision_entry.body_b = robot_name
+        collision_entry.link_bs = [CollisionEntry.ALL]
+        self.set_collision_entries([collision_entry])
+
+    def avoid_all_self_collision(self):
         """
         Avoid collisions with itself for the next goal.
         """
         for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
             collision_entry = CollisionEntry()
             collision_entry.type = CollisionEntry.AVOID_COLLISION
+            collision_entry.robot_name = robot_name
             collision_entry.robot_links = [CollisionEntry.ALL]
             collision_entry.body_b = robot_name
             collision_entry.link_bs = [CollisionEntry.ALL]
@@ -453,6 +482,7 @@ class GiskardWrapper(object):
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_name = CollisionEntry.ALL
         collision_entry.robot_links = [CollisionEntry.ALL]
         collision_entry.body_b = CollisionEntry.ALL
         collision_entry.link_bs = [CollisionEntry.ALL]

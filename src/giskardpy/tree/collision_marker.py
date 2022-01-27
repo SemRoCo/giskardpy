@@ -26,7 +26,7 @@ class CollisionMarker(GiskardBehavior):
         collisions = self.get_god_map().get_data(identifier.closest_point)
         for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
             if len(collisions[robot_name].all_collisions) > 0:
-                self.publish_cpi_markers(collisions)
+                self.publish_cpi_markers(collisions[robot_name])
         return Status.RUNNING
 
     def publish_cpi_markers(self, collisions):

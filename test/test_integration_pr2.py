@@ -159,7 +159,7 @@ def kitchen_setup(resetted_giskard):
     :return:
     """
     resetted_giskard.avoid_all_collisions()
-    resetted_giskard.set_joint_goal(gaya_pose)
+    resetted_giskard.set_joint_goal(resetted_giskard.gaya_pose)
     resetted_giskard.plan_and_execute()
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),

@@ -290,6 +290,27 @@ class TestCartGoals(object):
         better_pose.plan_and_execute()
         pass
 
+    def test_elbow_singularity2(self, zero_pose):
+        """
+        :type better_pose: Donbot
+        """
+        tip = 'ur5_wrist_1_link'
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = tip
+        hand_goal.pose.position.x = 0.5
+        hand_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(hand_goal, tip, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = tip
+        hand_goal.pose.position.x = -0.6
+        hand_goal.pose.orientation.w = 1
+        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.set_cart_goal(hand_goal, tip, 'base_footprint', weight=WEIGHT_BELOW_CA/2)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_base_driving(self, zero_pose):
         p = PoseStamped()
         p.header.frame_id = 'map'

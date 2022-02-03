@@ -1,4 +1,3 @@
-from giskardpy.data_types import TFPrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 from giskardpy import casadi_wrapper as w
 import giskardpy.utils.tfwrapper as tf
@@ -17,8 +16,8 @@ class AlignPlanes(Goal):
         :param goal_constraint: bool, default False
         """
         super(AlignPlanes, self).__init__(**kwargs)
-        self.root = TFPrefixName(root_link, prefix)
-        self.tip = TFPrefixName(tip_link, prefix)
+        self.root = PrefixName(root_link, prefix)
+        self.tip = PrefixName(tip_link, prefix)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 

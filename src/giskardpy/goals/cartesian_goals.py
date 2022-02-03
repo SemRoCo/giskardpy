@@ -6,7 +6,7 @@ from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import TFPrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 
 
@@ -32,9 +32,9 @@ class CartesianPosition(Goal):
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.goal = deepcopy(goal)
-        self.goal.header.frame_id = str(TFPrefixName(self.goal.header.frame_id, prefix))
-        self.root_link = TFPrefixName(root_link, prefix)
-        self.tip_link = TFPrefixName(tip_link, prefix)
+        self.goal.header.frame_id = str(PrefixName(self.goal.header.frame_id, prefix))
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
         self.goal_pose = self.transform_msg(self.root_link, self.goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
@@ -69,8 +69,8 @@ class CartesianOrientation(Goal):
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.goal = deepcopy(goal)
-        self.root_link = TFPrefixName(root_link, prefix)
-        self.tip_link = TFPrefixName(tip_link, prefix)
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
         self.goal_pose = self.transform_msg(self.root_link, self.goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
@@ -110,8 +110,8 @@ class CartesianPositionStraight(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        self.root_link = TFPrefixName(root_link, prefix)
-        self.tip_link = TFPrefixName(tip_link, prefix)
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
         self.goal_pose = self.transform_msg(self.root_link, goal)
 
         self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)
@@ -201,8 +201,8 @@ class TranslationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = TFPrefixName(root_link, prefix)
-        self.tip_link = TFPrefixName(tip_link, prefix)
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
@@ -237,8 +237,8 @@ class RotationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = TFPrefixName(root_link, prefix)
-        self.tip_link = TFPrefixName(tip_link, prefix)
+        self.root_link = PrefixName(root_link, prefix)
+        self.tip_link = PrefixName(tip_link, prefix)
         self.hard = hard
 
         self.weight = weight

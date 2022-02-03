@@ -1,9 +1,8 @@
 from __future__ import division
 
-import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import TFPrefixName
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.data_types import PrefixName
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 import giskardpy.utils.tfwrapper as tf
 
 class GraspBar(Goal):
@@ -23,8 +22,8 @@ class GraspBar(Goal):
         :param weight: float default WEIGHT_ABOVE_CA
         """
         super(GraspBar, self).__init__(**kwargs)
-        self.root = TFPrefixName(root_link, prefix)
-        self.tip = TFPrefixName(tip_link, prefix)
+        self.root = PrefixName(root_link, prefix)
+        self.tip = PrefixName(tip_link, prefix)
 
         bar_center = self.transform_msg(self.root, bar_center)
 

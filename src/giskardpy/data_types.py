@@ -458,24 +458,6 @@ class PrefixName(object):
         return self.long_name.__contains__(item.__str__())
 
 
-class TFPrefixName(PrefixName):
-
-    def __init__(self, name, prefix):
-        if name == 'map':
-            super().__init__(name, None)
-        else:
-            super().__init__(name, prefix)
-            # Enforce short name if long name not in tf
-            tf_full_names = get_full_frame_names(name)
-            if self.long_name not in tf_full_names:
-                if self.short_name in tf_full_names:
-                    rospy.logwarn('Frame {} does not exist on TF. '
-                                  'Returning existing frame {}.'.format(self.long_name, self.short_name))
-                    self.long_name = self.short_name
-                    self.prefix = None
-                else:
-                    raise Exception('Frame {} does not exit in TF'.format(self.long_name))
-
 order_map = BiDict({
     0: 'position',
     1: 'velocity',

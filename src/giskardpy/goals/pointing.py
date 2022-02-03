@@ -3,7 +3,7 @@ from __future__ import division
 from geometry_msgs.msg import Vector3Stamped
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import TFPrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 import giskardpy.utils.tfwrapper as tf
 
@@ -22,8 +22,8 @@ class Pointing(Goal):
         super(Pointing, self).__init__(**kwargs)
         self.weight = weight
         self.max_velocity = max_velocity
-        self.root = TFPrefixName(root_link, prefix)
-        self.tip = TFPrefixName(tip_link, prefix)
+        self.root = PrefixName(root_link, prefix)
+        self.tip = PrefixName(tip_link, prefix)
         self.root_P_goal_point = tf.transform_point(self.root, goal_point)
 
         if pointing_axis is not None:

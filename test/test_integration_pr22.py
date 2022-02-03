@@ -202,11 +202,12 @@ class TestJointGoals(object):
         zero_pose.allow_all_collisions()
         for robot_name in zero_pose.robot_names:
             zero_pose.set_joint_goal(pocky_pose, prefix=robot_name)
-        zero_pose.avoid_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_joint_movement1b(self, zero_pose):
         """
+        Move one robot closer to the other one, such that they collide if both are going naively in the pocky pose.
+
         :type zero_pose: PR22
         """
         zero_pose.avoid_all_collisions()
@@ -214,7 +215,7 @@ class TestJointGoals(object):
         p.header.frame_id = 'map'
         p.pose.position = Point(0, 1, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        giskard.move_base(p, giskard.robot_names[1])
+        zero_pose.move_base(p, zero_pose.robot_names[1])
         for robot_name in zero_pose.robot_names:
             zero_pose.set_joint_goal(pocky_pose, prefix=robot_name)
         zero_pose.plan_and_execute()
@@ -426,21 +427,21 @@ class TestConstraints(object):
         tip = zero_pose.r_tips[zero_pose.robot_names[0]]
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = str(TFPrefixName(tip, zero_pose.robot_names[0]))
+        p.header.frame_id = str(PrefixName(tip, zero_pose.robot_names[0]))
         p.pose.orientation.w = 1
 
         expecteds.append(tf.transform_pose('map', p))
 
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('CartesianPosition',
-                                root_link=str(TFPrefixName(zero_pose.r_tips[zero_pose.robot_names[0]], zero_pose.robot_names[0])),
-                                tip_link=str(TFPrefixName(zero_pose.r_tips[zero_pose.robot_names[1]], zero_pose.robot_names[1])),
+                                root_link=str(PrefixName(zero_pose.r_tips[zero_pose.robot_names[0]], zero_pose.robot_names[0])),
+                                tip_link=str(PrefixName(zero_pose.r_tips[zero_pose.robot_names[1]], zero_pose.robot_names[1])),
                                 goal=p)
 
         zero_pose.plan_and_execute()
         for robot_name in zero_pose.robot_names:
             tip = zero_pose.r_tips[robot_name]
-            new_poses.append(tf.lookup_pose('map', str(TFPrefixName(tip, robot_name))))
+            new_poses.append(tf.lookup_pose('map', str(PrefixName(tip, robot_name))))
         [compare_points(expected.pose.position, new_pose.pose.position) for (expected, new_pose) in zip(expecteds, new_poses)]
 
     def test_CartesianPose(self, zero_pose):
@@ -453,7 +454,7 @@ class TestConstraints(object):
             tip = zero_pose.r_tips[robot_name]
             p = PoseStamped()
             p.header.stamp = rospy.get_rostime()
-            p.header.frame_id = str(TFPrefixName(tip, robot_name))
+            p.header.frame_id = str(PrefixName(tip, robot_name))
             p.pose.position = Point(-0.4, -0.2, -0.3)
             p.pose.orientation = Quaternion(0, 0, 1, 0)
 
@@ -468,7 +469,7 @@ class TestConstraints(object):
         zero_pose.plan_and_execute()
         for robot_name in zero_pose.robot_names:
             tip = zero_pose.r_tips[robot_name]
-            new_poses.append(tf.lookup_pose('map', str(TFPrefixName(tip, robot_name))))
+            new_poses.append(tf.lookup_pose('map', str(PrefixName(tip, robot_name))))
         [compare_points(expected.pose.position, new_pose.pose.position) for (expected, new_pose) in zip(expecteds, new_poses)]
 
     def test_JointPositionRevolute(self, zero_pose):

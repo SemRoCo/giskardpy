@@ -27,8 +27,8 @@ from visualization_msgs.msg import Marker
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
-from giskardpy import identifier, RobotName, RobotPrefix
-from giskardpy.data_types import KeyDefaultDict, JointStates, TFPrefixName, PrefixName
+from giskardpy import identifier
+from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
@@ -293,7 +293,7 @@ class JointGoalChecker(GoalChecker):
         """
         :rtype: JointState
         """
-        return rospy.wait_for_message('{}/joint_states'.format(self.prefix), JointState)
+        return rospy.wait_for_message(str(PrefixName('joint_states', self.prefix)), JointState)
 
     def __call__(self):
         current_joint_state = JointStates.from_msg(self.get_current_joint_state())
@@ -323,9 +323,9 @@ class TranslationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected, prefix=None):
         super(TranslationGoalChecker, self).__init__(god_map)
         self.expected = deepcopy(expected)
-        self.expected.header.frame_id = str(TFPrefixName(self.expected.header.frame_id, prefix))
-        self.tip_link = TFPrefixName(tip_link, prefix)
-        self.root_link = TFPrefixName(root_link, prefix)
+        self.expected.header.frame_id = str(PrefixName(self.expected.header.frame_id, prefix))
+        self.tip_link = PrefixName(tip_link, prefix)
+        self.root_link = PrefixName(root_link, prefix)
         self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
@@ -375,9 +375,9 @@ class RotationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected, prefix=None):
         super(RotationGoalChecker, self).__init__(god_map)
         self.expected = deepcopy(expected)
-        self.expected.header.frame_id = str(TFPrefixName(self.expected.header.frame_id, prefix))
-        self.tip_link = TFPrefixName(tip_link, prefix)
-        self.root_link = TFPrefixName(root_link, prefix)
+        self.expected.header.frame_id = str(PrefixName(self.expected.header.frame_id, prefix))
+        self.tip_link = PrefixName(tip_link, prefix)
+        self.root_link = PrefixName(root_link, prefix)
         self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
@@ -417,15 +417,12 @@ class GiskardTestWrapper(GiskardWrapper):
         self.god_map = Blackboard().god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
-        try:
-            self.robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
-        except Exception:
-            self.robot_names = None
+        self.robot_names = self.god_map.get_data(identifier.collision_scene).robot_names
         super(GiskardTestWrapper, self).__init__(node_name='tests', namespaces=self.robot_names)
         self.results = Queue(100)
         self.map = 'map'
         self.goal_checks = defaultdict(list)
-        if self.robot_names is None:
+        if len(self.robot_names) == 1:
             self.default_root = self.robot.root_link_name.short_name # todo: remove this
             self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
 
@@ -484,7 +481,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_moving += time() - self.time
 
     @property
-    def robot(self, prefix='robot'):
+    def robot(self, prefix=''):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
@@ -577,10 +574,10 @@ class GiskardTestWrapper(GiskardWrapper):
                 if prefix is not None:
                     root_link = self.world.groups[prefix].root_link_name.short_name
                 else:
-                    for robot_name in self.robot_names:
-                        if robot_name in tip_link:
-                            root_link = self.world.groups[robot_name].root_link_name.long_name
-                            break
+                    if len(self.robot_names) == 1:
+                        root_link = self.world.groups[self.robot_names[0]].root_link_name.long_name
+                    else:
+                        raise Exception('Prefix needed to get root_link automatically.')
             else:
                 root_link = self.default_root
         super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
@@ -595,10 +592,10 @@ class GiskardTestWrapper(GiskardWrapper):
                 if prefix is not None:
                     root_link = self.world.groups[prefix].root_link_name.short_name
                 else:
-                    for robot_name in self.robot_names:
-                        if robot_name in tip_link:
-                            root_link = self.world.groups[robot_name].root_link_name.long_name
-                            break
+                    if len(self.robot_names) == 1:
+                        root_link = self.world.groups[self.robot_names[0]].root_link_name.long_name
+                    else:
+                        raise Exception('Prefix needed to get root_link automatically.')
             else:
                 root_link = self.default_root
         super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,

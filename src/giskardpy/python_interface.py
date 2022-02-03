@@ -41,7 +41,7 @@ class GiskardWrapper(object):
             self._client.wait_for_server()
         self._god_map = GodMap.init_from_paramserver(node_name)
         self._world = WorldTree(self._god_map)
-        self._world.delete_all_but_robot(prefix_list=namespaces)
+        self._world.delete_all_but_robot(namespaces)
 
         self.collisions = []
         self.clear_cmds()
@@ -434,19 +434,6 @@ class GiskardWrapper(object):
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
 
-    def allow_all_self_collision(self):
-        """
-        Allows the collision with itself for the next goal.
-        """
-        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
-            collision_entry = CollisionEntry()
-            collision_entry.type = CollisionEntry.ALLOW_COLLISION
-            collision_entry.robot_name = robot_name
-            collision_entry.robot_links = [CollisionEntry.ALL]
-            collision_entry.body_b = robot_name
-            collision_entry.link_bs = [CollisionEntry.ALL]
-            self.set_collision_entries([collision_entry])
-
     def avoid_self_collision(self, robot_name):
         """
         Avoid collisions with itself for the next goal.
@@ -458,19 +445,6 @@ class GiskardWrapper(object):
         collision_entry.body_b = robot_name
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
-
-    def avoid_all_self_collision(self):
-        """
-        Avoid collisions with itself for the next goal.
-        """
-        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
-            collision_entry = CollisionEntry()
-            collision_entry.type = CollisionEntry.AVOID_COLLISION
-            collision_entry.robot_name = robot_name
-            collision_entry.robot_links = [CollisionEntry.ALL]
-            collision_entry.body_b = robot_name
-            collision_entry.link_bs = [CollisionEntry.ALL]
-            self.set_collision_entries([collision_entry])
 
     def avoid_all_collisions(self, distance=0.05):
         """

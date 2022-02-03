@@ -88,7 +88,7 @@ def giskard_more_robots(request, ros):
 @pytest.fixture()
 def resetted_giskard(giskard):
     """
-    :type giskard: PR22
+    :type giskard: PR2
     """
     logging.loginfo(u'resetting giskard')
     giskard.open_l_gripper()
@@ -188,14 +188,6 @@ class TestFk(object):
 
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.allow_all_collisions()
-        zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.plan_and_execute()
-
-    def test_joint_movement11(self, zero_pose_more_robots):
         """
         :type zero_pose: PR2
         """
@@ -1471,13 +1463,10 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-        robot_names = zero_pose_more_robots.robot_names
-        rob_a = robot_names[0]
-        rob_b = robot_names[1]
         r_goal = PoseStamped()
-        r_goal.header.frame_id = zero_pose_more_robots.r_tips[rob_a]
+        r_goal.header.frame_id = zero_pose_more_robots.r_tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1, 0, 0]))
-        zero_pose_more_robots.set_cart_goal(r_goal, zero_pose_more_robots.r_tips[rob_a], rob_name=rob_a)
+        zero_pose_more_robots.set_cart_goal(r_goal, zero_pose_more_robots.r_tip)
         zero_pose_more_robots.plan_and_execute()
 
     def test_keep_position1(self, zero_pose):

@@ -1,6 +1,6 @@
 parent: !include pr2.yaml
 namespaces: ['pr2_a', 'pr2_b']
-action_server:
+action_server: # todo: in einzelne roboter aufteilen und robotor name hinzufügen
   /pr2_a/base:
     plugin: SendFollowJointTrajectory
     namespace: /pr2_a/whole_body_controller/base/follow_joint_trajectory

@@ -169,7 +169,7 @@ def grow_tree():
     action_servers = god_map.get_data(identifier.action_server)
     behaviors = get_all_classes_in_package(giskardpy.tree)
     for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-        C = behaviors[params['plugin']]
+        C = behaviors[params['plugin']] # todo: hieraus die roboternamen ziehen
         del params['plugin']
         execution_action_server.add_child(C(execution_action_server_name, **params))
     # ----------------------------------------------

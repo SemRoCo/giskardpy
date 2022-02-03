@@ -91,26 +91,37 @@ def resetted_giskard(giskard):
     giskard.clear_world()
     for robot_name in giskard.robot_names:
         giskard.reset_base(robot_name)
+    p = PoseStamped()
+    p.header.frame_id = 'map'
+    p.pose.position = Point(0, 2, 0)
+    p.pose.orientation = Quaternion(0, 0, 0, 1)
+    giskard.move_base(p, giskard.robot_names[1])
     return giskard
+
+@pytest.fixture()
+def kitchen_setup(resetted_giskard):
+    """
+    :type resetted_giskard: PR22
+    :return:
+    """
+    resetted_giskard.allow_all_collisions()
+    for robot_name in resetted_giskard.robot_names:
+        resetted_giskard.set_joint_goal(resetted_giskard.better_pose, prefix=robot_name)
+    resetted_giskard.plan_and_execute()
+    object_name = u'kitchen'
+    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                              set_js_topic=u'/kitchen/cram_joint_states')
+    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
+    resetted_giskard.set_kitchen_js(js)
+    return resetted_giskard
 
 @pytest.fixture()
 def zero_pose(resetted_giskard):
     """
     :type resetted_giskard: PR22
     """
-    #resetted_giskard.wait_heartbeats(10)
-    #while True:
-    #    try:
-    #        resetted_giskard.tree.tick()
-    #    except Exception:
-    #        continue
-    #    break
-    resetted_giskard.avoid_all_collisions() # todo: resetted_giskard.allow_self_collision() is gonna break stuff
-    p = PoseStamped()
-    p.header.frame_id = 'map'
-    p.pose.position = Point(0, -1, 0)
-    p.pose.orientation = Quaternion(0, 0, 0, 1)
-    resetted_giskard.move_base(p, resetted_giskard.robot_names[1])
+    resetted_giskard.allow_all_collisions()
     for robot_name in resetted_giskard.robot_names:
         resetted_giskard.set_joint_goal(resetted_giskard.default_pose, prefix=robot_name)
     resetted_giskard.plan_and_execute()
@@ -184,7 +195,7 @@ class TestFk(object):
 
 
 class TestJointGoals(object):
-    def test_joint_movement1(self, zero_pose):
+    def test_joint_movement1a(self, zero_pose):
         """
         :type zero_pose: PR22
         """
@@ -192,6 +203,20 @@ class TestJointGoals(object):
         for robot_name in zero_pose.robot_names:
             zero_pose.set_joint_goal(pocky_pose, prefix=robot_name)
         zero_pose.avoid_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_joint_movement1b(self, zero_pose):
+        """
+        :type zero_pose: PR22
+        """
+        zero_pose.avoid_all_collisions()
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0, 1, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        giskard.move_base(p, giskard.robot_names[1])
+        for robot_name in zero_pose.robot_names:
+            zero_pose.set_joint_goal(pocky_pose, prefix=robot_name)
         zero_pose.plan_and_execute()
 
     def test_partial_joint_state_goal1(self, zero_pose):
@@ -2806,7 +2831,8 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.detach_object(object_name)
         zero_pose.remove_object(object_name)
         zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        assert zero_pose.get_attached_objects().object_names == []
+        robot_name = zero_pose.god_map.get_data(identifier.rosparam + ['namespaces'])[0]
+        assert zero_pose.get_attached_objects(robot_name).object_names == []
 
     def test_attach_existing_box2(self, zero_pose):
         """

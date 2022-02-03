@@ -158,7 +158,7 @@ def kitchen_setup(resetted_giskard):
     :type resetted_giskard: PR2
     :return:
     """
-    resetted_giskard.avoid_all_collisions()
+    resetted_giskard.allow_all_collisions()
     resetted_giskard.set_joint_goal(resetted_giskard.gaya_pose)
     resetted_giskard.plan_and_execute()
     object_name = u'kitchen'
@@ -2703,7 +2703,8 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.detach_object(object_name)
         zero_pose.remove_object(object_name)
         zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        assert zero_pose.get_attached_objects().object_names == []
+        robot_name = zero_pose.god_map.get_data(identifier.rosparam + ['namespaces'])[0]
+        assert zero_pose.get_attached_objects(robot_name).object_names == []
 
     def test_attach_existing_box2(self, zero_pose):
         """

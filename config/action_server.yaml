@@ -1,3 +1,4 @@
+namespaces: [''] # do not touch if you have only one robot specified
 action_server:
   base:
     plugin: SendFollowJointTrajectory

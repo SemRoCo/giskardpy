@@ -110,7 +110,18 @@ class WorldUpdater(GiskardBehavior):
         return res
 
     def get_attached_objects(self, req):
-        link_names = self.robot.link_names # todo: rmv self.robot and change message since this is called from a service
+        robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
+        if req.robot_name == '':
+            if len(robot_names) == 1:
+                robot_name = self.god_map.get_data(identifier.rosparam + ['namespaces'])[0]
+            else:
+                raise Exception('Please specify a robot name in GetAttachedObjectsRequest.')
+        else:
+            if req.robot_name not in robot_names:
+                Exception('Robot with robot_name {} is not known.'.format(req.robot_name))
+            else:
+                robot_name = req.robot_name
+        link_names = self.world.groups[robot_name].link_names # todo: rmv self.robot and change message since this is called from a service
         attached_links = [str(s) for s in set(link_names).difference(self.original_link_names)]
         attachment_points = []
         res = GetAttachedObjectsResponse()

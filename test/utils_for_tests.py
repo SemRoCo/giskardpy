@@ -802,7 +802,8 @@ class GiskardTestWrapper(GiskardWrapper):
             compare_poses(p.pose, o_p)
             assert name in self.get_object_names().object_names
             compare_poses(o_p, self.get_object_info(name).pose.pose)
-            assert name not in self.get_attached_objects().object_names
+            for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+                assert name not in self.get_attached_objects(robot_name).object_names
         else:
             if error_code != UpdateWorldResponse.DUPLICATE_BODY_ERROR:
                 assert name not in self.world.groups
@@ -885,7 +886,8 @@ class GiskardTestWrapper(GiskardWrapper):
         assert r.error_codes == expected_response, \
             'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                            update_world_error_code(expected_response))
-        assert name in self.get_attached_objects().object_names
+        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+            assert name in self.get_attached_objects(robot_name).object_names
         if self.god_map.get_data(identifier.collision_checker) is not None:
             self.is_link_in_collision_matrix(name, parent_link)
             assert self.world.groups[name].parent_link_of_root == parent_link

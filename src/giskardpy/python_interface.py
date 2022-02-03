@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Po
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, MoveFeedback
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
-    UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
+    UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse, GetAttachedObjectsRequest
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
@@ -832,9 +832,11 @@ class GiskardWrapper(object):
         """
         return self._update_rviz_markers_srv(object_names)
 
-    def get_attached_objects(self):
+    def get_attached_objects(self, robot_name):
         """
         returns a list of all objects that are attached to the robot and the respective attachement points
         :rtype: GetAttachedObjectsResponse
         """
-        return self._get_attached_objects_srv()
+        req = GetAttachedObjectsRequest()
+        req.robot_name = robot_name
+        return self._get_attached_objects_srv(req)

@@ -282,7 +282,7 @@ class WorldTree(object):
         rot_lower_limits = {1: -1}
         rot_upper_limits = {1: 1}
         # diff_drive_joint = DiffDriveJoint(name=PrefixName('diff_drive', None),
-        diff_drive_joint = DiffDriveWheelsJoint(name=PrefixName('diff_drive', None),
+        diff_drive_joint = DiffDriveWheelsJoint(name=PrefixName('diff_drive', None), # fixme?
                                                 parent_link_name=odom_link_name,
                                                 child_link_name=base_footprint_name,
                                                 god_map=self.god_map)
@@ -374,13 +374,10 @@ class WorldTree(object):
         self.joints = {}
         self.groups = {}
 
-    def delete_all_but_robot(self, prefix_list=None):
+    def delete_all_but_robot(self, prefix_list):
         self._clear()
-        if prefix_list is None:
-            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
-        else:
-            for prefix in prefix_list:
-                self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=prefix, prefix=prefix)
+        for prefix in prefix_list:
+            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=prefix, prefix=prefix)
         self.fast_all_fks = None
         self.notify_model_change()
 
@@ -535,6 +532,8 @@ class WorldTree(object):
     def register_controlled_joints(self, controlled_joints, prefix=None):
         if prefix is not None:
             controlled_joints = [PrefixName(j, prefix) for j in controlled_joints]
+        else:
+            controlled_joints = [PrefixName(j, '') for j in controlled_joints]
         old_controlled_joints = set(self.controlled_joints)
         new_controlled_joints = set(controlled_joints)
         double_joints = old_controlled_joints.intersection(new_controlled_joints)

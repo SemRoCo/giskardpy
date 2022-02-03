@@ -1,7 +1,7 @@
 from rospy import ROSException
 from rostopic import ROSTopicException
 
-from giskardpy.data_types import JointStates
+from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.model.world import SubWorldTree
 
 from queue import Queue, Empty
@@ -30,8 +30,7 @@ class SyncConfiguration(GiskardBehavior):
         self.prefix = prefix
         self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
         if self.prefix is not None:
-            self.prefix = prefix
-            self.joint_state_topic = u'/{}/{}'.format(prefix, joint_state_topic)
+            self.joint_state_topic = u'/{}'.format(PrefixName(joint_state_topic, self.prefix))
         else:
             self.joint_state_topic = joint_state_topic
         self.group_name = group_name

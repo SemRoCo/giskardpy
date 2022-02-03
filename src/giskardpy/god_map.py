@@ -8,7 +8,7 @@ import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.data_types import KeyDefaultDict
+from giskardpy.data_types import KeyDefaultDict, PrefixName
 
 
 def set_default_in_override_block(block_identifier, god_map):
@@ -202,11 +202,13 @@ class GodMap(object):
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
+        # fixme robot_description: Will only work with more robots if these are from the same urdf
         try:
             namespace = self.get_data(identifier.rosparam + ['namespaces'])[0]
         except KeyError:
             namespace = ''
-        self.set_data(identifier.robot_description, rospy.get_param('/{}/robot_description'.format(namespace)))
+        robot_description_topic = PrefixName('robot_description', namespace)
+        self.set_data(identifier.robot_description, rospy.get_param('/{}'.format(robot_description_topic)))
         path_to_data_folder = self.get_data(identifier.data_folder)
         # fix path to data folder
         if not path_to_data_folder.endswith('/'):

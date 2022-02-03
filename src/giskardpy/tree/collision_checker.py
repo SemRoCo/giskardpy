@@ -15,7 +15,6 @@ class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
-        self.robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -69,11 +68,11 @@ class CollisionChecker(GiskardBehavior):
 
         max_distances = defaultdict(lambda: default_distance)
         # override max distances based on external distances dict
-        for robot_name in self.robot_names:
-            for link_name in self.world.groups[robot_name].link_names_with_collisions:
-                controlled_parent_joint = self.world.groups[robot_name].get_controlled_parent_joint_of_link(link_name)
+        for robot in self.collision_scene.robots:
+            for link_name in robot.link_names_with_collisions:
+                controlled_parent_joint = robot.get_controlled_parent_joint_of_link(link_name)
                 distance = external_distances[controlled_parent_joint]['soft_threshold']
-                for child_link_name in self.world.groups[robot_name].get_directly_controlled_child_links_with_collisions(
+                for child_link_name in robot.get_directly_controlled_child_links_with_collisions(
                         controlled_parent_joint):
                     max_distances[child_link_name] = distance
 

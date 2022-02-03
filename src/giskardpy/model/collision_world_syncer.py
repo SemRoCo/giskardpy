@@ -6,6 +6,8 @@ from itertools import combinations, product
 from time import time
 
 import numpy as np
+import rospy
+
 from giskard_msgs.msg import CollisionEntry
 
 from giskardpy import RobotName, identifier
@@ -38,12 +40,42 @@ class CollisionWorldSynchronizer(object):
             return True
         return False
 
-    @property
-    def robot(self):
+    def robot(self, robot_name=''):
         """
         :rtype: SubWorldTree
         """
-        return self.world.groups[RobotName]
+        return self.world.groups[robot_name]
+
+    @property
+    def robots(self):
+        """
+        :rtype: list of SubWorldTree
+        """
+        return [self.world.groups[robot_name] for robot_name in self.robot_names]
+
+    @property
+    def robot_names(self):
+        """
+        :rtype: list of str
+        """
+        one_robot_names = ['']
+
+        # Set in god_map if not set
+        try:
+            robot_names = self.world.god_map.get_data(identifier.rosparam + ['namespaces'])
+        except KeyError:
+            self.world.god_map.set_data(identifier.rosparam + ['namespaces'], one_robot_names)
+            return one_robot_names
+
+        # Check if it is set appropriately
+        if len(robot_names) == 1 and robot_names[0] != '':
+            rospy.logwarn('Changing robot_names to [''] since only one robot is specified.')
+            self.world.god_map.set_data(identifier.rosparam + ['namespaces'], one_robot_names)
+            return one_robot_names
+        elif len(robot_names) != 1 and '' in robot_names:
+            raise Exception('Empty robot name '' is not allowed if multiply robots specified.')
+        else:
+            return robot_names
 
     @property
     def god_map(self):
@@ -188,10 +220,9 @@ class CollisionWorldSynchronizer(object):
         return js
 
     def init_collision_matrix(self):
-        robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
-        for group_name in robot_names:
-            added_links = set(combinations(self.world.groups[group_name].link_names_with_collisions, 2))
-            self.update_collision_matrix(group_name=group_name, added_links=added_links)
+        for robot_name in self.robot_names:
+            added_links = set(combinations(self.robot(robot_name).link_names_with_collisions, 2))
+            self.update_collision_matrix(group_name=robot_name, added_links=added_links)
 
     def update_collision_matrix(self, group_name, added_links=None, removed_links=None):
         # self.collision_matrices[group_name] = self.load_self_collision_matrix()
@@ -243,7 +274,6 @@ class CollisionWorldSynchronizer(object):
         pass
 
     def are_entries_known(self, collision_goals):
-        robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
         for collision_entry in collision_goals:
             if collision_entry.body_b not in self.world.groups and not self.all_body_bs(collision_entry):
                 raise UnknownBodyException('body b \'{}\' unknown'.format(collision_entry.body_b))
@@ -251,7 +281,7 @@ class CollisionWorldSynchronizer(object):
                 for robot_link in collision_entry.robot_links:
                     if robot_link not in self.world.groups[collision_entry.robot_name].link_names:
                         raise UnknownBodyException('robot link \'{}\' unknown'.format(robot_link))
-            if collision_entry.body_b in robot_names:
+            if collision_entry.body_b in self.robot_names:
                 for robot_link in collision_entry.link_bs:
                     if robot_link != CollisionEntry.ALL and robot_link not in self.world.groups[collision_entry.body_b].link_names:
                         raise UnknownBodyException(
@@ -274,7 +304,7 @@ class CollisionWorldSynchronizer(object):
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if self.is_avoid_all_self_collision(collision_entry):
-                for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+                for robot_name in self.robot_names:
                     min_allowed_distance.update(self.get_robot_collision_matrix(min_dist, robot_name))
                 continue
             assert len(collision_entry.robot_links) == 1
@@ -307,7 +337,7 @@ class CollisionWorldSynchronizer(object):
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
-            if self.world.groups[robot_name].link_order(link1, link2):
+            if self.robot(robot_name).link_order(link1, link2):
                 collision_matrix2[robot_name, link1, robot_name, link2] = min_dist[link1]
             else:
                 collision_matrix2[robot_name, link2, robot_name, link1] = min_dist[link1]
@@ -381,7 +411,7 @@ class CollisionWorldSynchronizer(object):
                 i += 1
                 continue
             if self.all_link_bs(collision_entry):
-                if collision_entry.body_b in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+                if collision_entry.body_b in self.robot_names:
                     new_ces = []
                     link_bs = self.get_possible_collisions(collision_entry.body_b, list(collision_entry.robot_links)[0])
                     if not link_bs:
@@ -487,7 +517,7 @@ class CollisionWorldSynchronizer(object):
             if self.all_body_bs(collision_entry):
                 collision_goals.remove(collision_entry)
                 new_ces = []
-                for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+                for robot_name in self.robot_names:
                     for body_b in self.world.minimal_group_names:
                         ce = CollisionEntry()
                         ce.type = collision_entry.type

@@ -31,7 +31,7 @@ class GoalToConstraints(GetGoal):
         self.controllable_links = set()
         self.last_urdf = None
         self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals, Goal)
-        self.robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
+        self.robot_names = self.collision_scene.robot_names
 
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
@@ -217,7 +217,7 @@ class GoalToConstraints(GetGoal):
             for link_a_o, link_b_o in self.collision_scene.collision_matrices[robot_name]:
                 try:
                     link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
-                    if not self.world.groups[robot_name].link_order(link_a, link_b):
+                    if not self.collision_scene.robot(robot_name).link_order(link_a, link_b):
                         link_a, link_b = link_b, link_a
                     counter[link_a, link_b] += 1
                 except KeyError as e:

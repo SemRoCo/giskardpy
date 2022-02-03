@@ -73,7 +73,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :rtype: dict()
         """
         all_collisions = dict()
-        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
+        for robot_name in self.robot_names:
             collisions = Collisions(self.world, collision_list_size, robot_name)
             for (c_robot_name, robot_link, body_b, link_b), distance in cut_off_distances.items():
                 if c_robot_name != robot_name:

@@ -20,7 +20,7 @@ class TFPublisher(GiskardBehavior):
         self.publish_attached_objects = publish_attached_objects
         self.publish_world_objects = publish_world_objects
         self.map_frame = self.god_map.unsafe_get_data(identifier.map_frame)
-        self.robot_names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
+        self.robot_names = self.collision_scene.robot_names
 
     def make_transform(self, parent_frame, child_frame, pose):
         tf = TransformStamped()

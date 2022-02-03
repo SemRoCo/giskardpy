@@ -18,11 +18,8 @@ class CleanUp(GiskardBehavior):
         self.god_map.set_data(identifier.goal_msg, None)
         self.world.fast_all_fks = None
         self.collision_scene.reset_cache()
-        names = self.god_map.get_data(identifier.rosparam + ['namespaces'])
-        d = dict()
-        for name in names:
-            d[name] = Collisions(self.world, 1, name)
-        self.get_god_map().set_data(identifier.closest_point, d)
+        init_robot_collisions = {n:  Collisions(self.world, 1, n) for n in self.collision_scene.robot_names}
+        self.get_god_map().set_data(identifier.closest_point, init_robot_collisions)
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.get_god_map().set_data(identifier.time, 1)
         current_js = deepcopy(self.get_god_map().get_data(identifier.joint_states))

@@ -331,7 +331,7 @@ class TestCartGoals(object):
         hand_goal = PoseStamped()
         hand_goal.header.frame_id = 'ur5_base_link'
         hand_goal.pose.position.x = 0.05
-        hand_goal.pose.position.y = -0.2
+        hand_goal.pose.position.y = 0.2
         hand_goal.pose.position.z = 0.4
         hand_goal.pose.orientation = Quaternion(*quaternion_from_matrix(
             [
@@ -344,8 +344,9 @@ class TestCartGoals(object):
         better_pose.allow_all_collisions()
         better_pose.set_cart_goal(hand_goal, 'ur5_wrist_2_link', 'base_footprint', weight=WEIGHT_BELOW_CA)
         better_pose.plan_and_execute()
-        hand_goal.pose.position.y = 0.05
+        hand_goal.pose.position.y = -0.05
         # better_pose.allow_all_collisions()
+        # better_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         better_pose.set_cart_goal(hand_goal, 'ur5_wrist_2_link', 'base_footprint', weight=WEIGHT_BELOW_CA)
         better_pose.plan_and_execute()
         pass

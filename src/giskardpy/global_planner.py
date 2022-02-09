@@ -1226,7 +1226,7 @@ class TwoDimStateValidator(ob.StateValidityChecker):
 
 class CompoundBoxSpace:
 
-    def __init__(self, world, robot, map_frame, collision_scene, publish_collision_boxes=True, js=None):
+    def __init__(self, world, robot, map_frame, collision_scene, publish_collision_boxes=False, js=None):
         self.js = js
         self.pybullet_env = PyBulletEnv(init_js=js)
         self.world = world
@@ -1238,7 +1238,7 @@ class CompoundBoxSpace:
         if self.publish_collision_boxes:
             self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
 
-    def _create_collision_box(self, pose, pos_a, pos_b, min_size, collision_sphere_name):
+    def _create_collision_box_with_files(self, pose, pos_a, pos_b, min_size, collision_sphere_name):
         dist = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
         #world_body_box = make_world_body_box(name=collision_sphere_name + 'start',
         #                                     x_length=self.min_size,
@@ -1265,6 +1265,33 @@ class CompoundBoxSpace:
                         pose_to_np(pose)[1],
                         physicsClientId=self.pybullet_env.client_id)
         os.remove(filename)
+        return id
+
+    def _create_collision_box(self, pose, pos_a, pos_b, min_size, collision_sphere_name):
+        dist = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
+        #world_body_box = make_world_body_box(name=collision_sphere_name + 'start',
+        #                                     x_length=self.min_size,
+        #                                     y_length=self.min_size,
+        #                                     z_length=self.min_size)
+        #self.world.add_world_body(world_body_box, Pose(Point(pos_a[0], pos_a[1], pos_a[2]), Quaternion(0, 0, 0, 1)))
+        #world_body_box = make_world_body_box(name=collision_sphere_name + 'end',
+        #                                     x_length=self.min_size,
+        #                                     y_length=self.min_size,
+        #                                     z_length=self.min_size)
+        #self.world.add_world_body(world_body_box, Pose(Point(pos_b[0], pos_b[1], pos_b[2]), Quaternion(0, 0, 0, 1)))
+        # the visual shape and collision shape can be re-used by all createMultiBody instances (instancing)
+        visualShapeId = p.createVisualShape(shapeType=p.GEOM_BOX,
+                                            halfExtents=[dist/2., min_size/2., min_size/2.],
+                                            physicsClientId=self.pybullet_env.client_id)
+        collisionShapeId = p.createCollisionShape(shapeType=p.GEOM_BOX,
+                                                  halfExtents=[dist/2., min_size/2., min_size/2.],
+                                                  physicsClientId=self.pybullet_env.client_id)
+        id = p.createMultiBody(baseMass=1,
+                               baseCollisionShapeIndex=collisionShapeId,
+                               baseVisualShapeIndex=visualShapeId,
+                               basePosition=pose_to_np(pose)[0],
+                               baseOrientation=pose_to_np(pose)[1],
+                               physicsClientId=self.pybullet_env.client_id)
         return id
 
     def _get_pitch(self, pos_b):
@@ -2163,7 +2190,7 @@ class NavigationPlanner(OMPLPlanner):
         collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.robot.root_link, u'base_footprint',
                                                                self.collision_scene, dist=0.1)
         si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker))
-        motion_validator = ObjectRayMotionValidator(self.collision_scene, u'base_footprint', self.robot,
+        motion_validator = CompoundBoxMotionValidator(self.collision_scene, u'base_footprint', self.robot,
                                                     collision_checker, js=js)
         si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, motion_validator))
 

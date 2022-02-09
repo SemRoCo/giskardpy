@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
 import json
+import os
 import random
 import sys
 import threading
 from collections import namedtuple
 from random import uniform
 from time import sleep
+import urdf_parser_py.urdf as up
 
 import numpy as np
 import rospy
@@ -48,7 +50,8 @@ SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve
                                                 'max_refine_iterations min_refine_thresh')
 CollisionAABB = namedtuple('CollisionAABB', 'link d u')
 
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp, \
+    resolve_ros_iris_in_urdf
 
 
 class CollisionCheckerInterface(GiskardBehavior):
@@ -461,9 +464,9 @@ class GiskardPyBulletAABBCollision(AABBCollision, GiskardLinkCollision):
         for link_name in self.get_links():
             self.add_collision(link_name)
 
-    def get_points_from_poses(self):
+    def get_points_from_poses(self, collision_objects=None):
         self.update()
-        return super(GiskardPyBulletAABBCollision, self).get_points()
+        return super(GiskardPyBulletAABBCollision, self).get_points(collision_objects=collision_objects)
 
     def get_points_from_positions(self):
         self.update()
@@ -608,17 +611,13 @@ class AbstractMotionValidator():
         raise Exception('Please overwrite me')
 
 
-class PyBulletRayTester(object):
+class PyBulletEnv(object):
 
-    def __init__(self, environment_description='kitchen_description', init_js=None, ignore_objects_ids=None):
-        self.once = False
-        self.link_id_start = -1
-        self.collision_free_id = -1
-        self.collisionFilterGroup = 0x1
-        self.noCollisionFilterGroup = 0x0
+    def __init__(self, environment_description='kitchen_description', init_js=None, ignore_objects_ids=None, gui=False):
         self.environment_id = None
         self.environment_description = environment_description
         self.init_js = init_js
+        self.gui = gui
         if ignore_objects_ids is None:
             self.ignore_object_ids = list()
         else:
@@ -630,7 +629,7 @@ class PyBulletRayTester(object):
             if not pbw.p.isConnected(physicsClientId=i):
                 self.client_id = i
                 break
-        pbw.start_pybullet(False, client_id=self.client_id)
+        pbw.start_pybullet(self.gui, client_id=self.client_id)
         self.environment_id = pbw.load_urdf_string_into_bullet(rospy.get_param(self.environment_description),
                                                                client_id=self.client_id)
         self.update(self.init_js)
@@ -646,6 +645,17 @@ class PyBulletRayTester(object):
             # Recalculate collision stuff
             pbw.p.stepSimulation(
                 physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
+
+
+class PyBulletRayTester(PyBulletEnv):
+
+    def __init__(self, environment_description='kitchen_description', init_js=None, ignore_objects_ids=None):
+        super(PyBulletRayTester, self).__init__(environment_description=environment_description, init_js=init_js, ignore_objects_ids=ignore_objects_ids, gui=False)
+        self.once = False
+        self.link_id_start = -1
+        self.collision_free_id = -1
+        self.collisionFilterGroup = 0x1
+        self.noCollisionFilterGroup = 0x0
 
     def pre_ray_test(self):
         bodies_num = p.getNumBodies(physicsClientId=self.client_id)
@@ -785,43 +795,40 @@ class TimedObjectRayMotionValidator(ObjectRayMotionValidator):
 
 class CompoundBoxMotionValidator(AbstractMotionValidator):
 
-    def __init__(self, si, is_3D, object_in_motion, tip_link=None):
-        super(CompoundBoxMotionValidator, self).__init__(si, is_3D, object_in_motion, tip_link)
+    def __init__(self, collision_scene, tip_link, object_in_motion, state_validator, js=None, links=None):
+        super(CompoundBoxMotionValidator, self).__init__(tip_link)
+        self.collision_scene = collision_scene
+        self.state_validator = state_validator
+        self.object_in_motion = object_in_motion
+        self.box_space = CompoundBoxSpace(self.collision_scene.world, self.object_in_motion, 'map', self.collision_scene, js=js)
+        self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
 
-    def checkMotion(self, s1, s2):
-        # checkMotion calls checkMotion with Map anc checkMotion with Bullet
-        if self.tip_link is None:
-            raise Exception(u'Please set tip_link for {}.'.format(str(self)))
-        with self.lock:
-            x_b = s1.getX()
-            y_b = s1.getY()
-            x_e = s2.getX()
-            y_e = s2.getY()
-            if self.is_3D:
-                z_b = s1.getZ()
-                z_e = s2.getZ()
-            # Shoot ray from start to end pose and check if it intersects with the kitchen,
-            # if so return false, else true.
-            # TODO: for each loop for every collision info
-            for collision_info in self.collision_infos:
-                if self.is_3D:
-                    start_and_end_positions = [[x_b, y_b, z_b], [x_e, y_e, z_e]]
-                else:
-                    start_and_end_positions = [[x_b, y_b, 0.001], [x_e, y_e, 0.001]]
-                min_size = np.max(np.abs(np.array(collision_info.d) - np.array(collision_info.u)))
-                # If the aabb box is not from the self.tip_link, add the translation from the
-                # self.tip_link to the collision info link.
-                if collision_info.link != self.tip_link:
-                    tip_link_2_coll_link_pose = lookup_pose(self.tip_link, collision_info.link)
-                    point = tip_link_2_coll_link_pose.pose.position
-                    start_and_end_positions = [[point.x + q_b[0], point.y + q_b[1], point.z + q_b[2]] \
-                                               for q_b in deepcopy(start_and_end_positions)]
-                box_space = CompoundBoxSpace(self.get_world(), self.get_robot(),
-                                             self.get_god_map().get_data(identifier.map_frame),
-                                             CollisionCheckerInterface(), min_size, start_and_end_positions)
-                if len(box_space.get_collisions().values()) != 0:
-                    return False
-            return True
+    @profile
+    def check_motion(self, s1, s2):
+        # Shoot ray from start to end pose and check if it intersects with the kitchen,
+        # if so return false, else true.
+        all_js = self.collision_scene.world.state
+        old_js = self.object_in_motion.state
+        for collision_object in self.collision_points.collision_objects:
+            state_ik = self.state_validator.ik.get_ik(old_js, s1)
+            all_js.update(state_ik)
+            self.object_in_motion.state = all_js
+            self.collision_scene.sync()
+            query_b = pose_stamped_to_np(self.collision_scene.get_pose(collision_object.link))
+            state_ik = self.state_validator.ik.get_ik(old_js, s2)
+            all_js.update(state_ik)
+            self.object_in_motion.state = all_js
+            self.collision_scene.sync()
+            query_e = pose_stamped_to_np(self.collision_scene.get_pose(collision_object.link))
+            start_and_end_positions = [query_b[0], query_e[0]]
+            min_size = np.max(np.abs(np.array(collision_object.d) - np.array(collision_object.u)))
+            if self.box_space.is_colliding(min_size, start_and_end_positions):
+                all_js.update(old_js)
+                self.object_in_motion.state = all_js
+                return False
+        all_js.update(old_js)
+        self.object_in_motion.state = all_js
+        return True
 
 
 class IK(object):
@@ -1219,70 +1226,98 @@ class TwoDimStateValidator(ob.StateValidityChecker):
 
 class CompoundBoxSpace:
 
-    def __init__(self, world, robot, map_frame, collision_checker, min_size, start_and_end_positions,
-                 publish_collision_boxes=True):
-
+    def __init__(self, world, robot, map_frame, collision_scene, publish_collision_boxes=True, js=None):
+        self.js = js
+        self.pybullet_env = PyBulletEnv(init_js=js)
         self.world = world
         self.robot = robot
         self.map_frame = map_frame
         self.publish_collision_boxes = publish_collision_boxes
-        self.collisionChecker = collision_checker
-        self.min_size = min_size
-        self.start_and_end_positions = start_and_end_positions
+        self.collision_scene = collision_scene
 
         if self.publish_collision_boxes:
             self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
 
-    def _create_collision_box(self, pose, pos_a, pos_b, collision_sphere_name):
+    def _create_collision_box(self, pose, pos_a, pos_b, min_size, collision_sphere_name):
         dist = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
-        world_body_box = make_world_body_box(name=collision_sphere_name,
-                                             x_length=dist,
-                                             y_length=self.min_size,
-                                             z_length=self.min_size)
-        self.world.add_world_body(world_body_box, pose)
-        world_body_box = make_world_body_box(name=collision_sphere_name + 'start',
-                                             x_length=self.min_size,
-                                             y_length=self.min_size,
-                                             z_length=self.min_size)
-        self.world.add_world_body(world_body_box, Pose(Point(pos_a[0], pos_a[1], pos_a[2]), Quaternion(0, 0, 0, 1)))
-        world_body_box = make_world_body_box(name=collision_sphere_name + 'end',
-                                             x_length=self.min_size,
-                                             y_length=self.min_size,
-                                             z_length=self.min_size)
-        self.world.add_world_body(world_body_box, Pose(Point(pos_b[0], pos_b[1], pos_b[2]), Quaternion(0, 0, 0, 1)))
+        #world_body_box = make_world_body_box(name=collision_sphere_name + 'start',
+        #                                     x_length=self.min_size,
+        #                                     y_length=self.min_size,
+        #                                     z_length=self.min_size)
+        #self.world.add_world_body(world_body_box, Pose(Point(pos_a[0], pos_a[1], pos_a[2]), Quaternion(0, 0, 0, 1)))
+        #world_body_box = make_world_body_box(name=collision_sphere_name + 'end',
+        #                                     x_length=self.min_size,
+        #                                     y_length=self.min_size,
+        #                                     z_length=self.min_size)
+        #self.world.add_world_body(world_body_box, Pose(Point(pos_b[0], pos_b[1], pos_b[2]), Quaternion(0, 0, 0, 1)))
+        box_urdf = up.URDF(name=collision_sphere_name)
+        box_link = up.Link(name=collision_sphere_name)
+        box = up.Box([dist, min_size, min_size])
+        box_link.visual = up.Visual(geometry=box)
+        box_link.collision = up.Collision(geometry=box)
+        box_link.inertial = up.Inertial()
+        box_link.inertial.mass = 0.01
+        box_link.inertial.inertia = up.Inertia(ixx=0.0, ixy=0.0, ixz=0.0, iyy=0.0, iyz=0.0, izz=0.0)
+        box_urdf.add_link(box_link)
+        filename = write_to_tmp(u'{}.urdf'.format(pbw.random_string()),  box_urdf.to_xml_string())
+        id = p.loadURDF(filename,
+                        pose_to_np(pose)[0],
+                        pose_to_np(pose)[1],
+                        physicsClientId=self.pybullet_env.client_id)
+        os.remove(filename)
+        return id
 
-    def _get_pitch(self, pos_a, pos_b):
+    def _get_pitch(self, pos_b):
+        pos_a = np.zeros(3)
         dx = pos_b[0] - pos_a[0]
         dy = pos_b[1] - pos_a[1]
         dz = pos_b[2] - pos_a[2]
         pos_c = pos_a + np.array([dx, dy, 0])
         a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_a)) ** 2))
-        return -np.arctan2(dz, a)
+        return np.arctan2(dz, a)
 
-    def _get_yaw(self, pos_a, pos_b):
+    def get_pitch(self, pos_b):
+        l_a = self._get_pitch(pos_b)
+        if pos_b[0] >= 0:
+            return -l_a
+        else:
+            return np.pi - l_a
+
+    def _get_yaw(self, pos_b):
+        pos_a = np.zeros(3)
         dx = pos_b[0] - pos_a[0]
         dz = pos_b[2] - pos_a[2]
         pos_c = pos_a + np.array([0, 0, dz])
         pos_d = pos_c + np.array([dx, 0, 0])
         g = np.sqrt(np.sum((np.array(pos_b) - np.array(pos_d)) ** 2))
         a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_d)) ** 2))
-        return -np.arctan2(g, a)  # if dx > 0 else np.pi-np.arctan2(g, a)
+        return np.arctan2(g, a)
 
-    def get_collisions(self, collision_box_name_prefix=u'is_object_pickable_box'):
+    def get_yaw(self, pos_b):
+        l_a = self._get_yaw(pos_b)
+        if pos_b[0] >= 0 and pos_b[1] >= 0:
+            return l_a
+        elif pos_b[0] >= 0 and pos_b[1] <= 0:
+            return -l_a
+        elif pos_b[0] <= 0 and pos_b[1] >= 0:
+            return np.pi - l_a
+        else:
+            return np.pi + l_a
+
+    def is_colliding(self, min_size, start_and_end_positions, collision_box_name_prefix=u'is_object_pickable_box'):
         collisions = dict()
         if self.robot:
             collisions_per_pos = dict()
             # Get em
             for i, (pos_a, pos_b) in enumerate(
-                    zip(self.start_and_end_positions[:-1], self.start_and_end_positions[1:])):
-                if pos_a == pos_b:
+                    zip(start_and_end_positions[:-1], start_and_end_positions[1:])):
+                if np.all(pos_a == pos_b):
                     continue
                 b_to_a = np.array(pos_a) - np.array(pos_b)
                 c = np.array(pos_b) + b_to_a / 2.
                 # https://i.stack.imgur.com/f190Q.png, https://stackoverflow.com/questions/58469297/how-do-i-calculate-the-yaw-pitch-and-roll-of-a-point-in-3d/58469298#58469298
-                q = tf.transformations.quaternion_from_euler(0, self._get_pitch(pos_a, pos_b),
-                                                             self._get_yaw(pos_a, pos_b))
-                rospy.logerr(u'pitch: {}, yaw: {}'.format(self._get_pitch(pos_a, pos_b), self._get_yaw(pos_a, pos_b)))
+                q = tf.transformations.quaternion_from_euler(0, self.get_pitch(pos_b-c), self.get_yaw(pos_b-c))
+                #rospy.logerr(u'pitch: {}, yaw: {}'.format(self._get_pitch(pos_a, pos_b), self._get_yaw(pos_a, pos_b)))
                 collision_box_name_i = u'{}_{}'.format(collision_box_name_prefix, str(i))
                 # if self.is_tip_object():
                 #    tip_coll_aabb = p.getAABB(self.robot.get_pybullet_id(),
@@ -1290,40 +1325,47 @@ class CompoundBoxSpace:
                 #    min_size = np.min(np.array(tip_coll_aabb))
                 # else:
                 #    min_size = box_max_size
-                self._create_collision_box(Pose(Point(c[0], c[1], c[2]), Quaternion(q[0], q[1], q[2], q[3]),
-                                                pos_a, pos_b, collision_box_name_i))
+                coll_id = self._create_collision_box(Pose(Point(c[0], c[1], c[2]), Quaternion(q[0], q[1], q[2], q[3])),
+                                                     pos_a, pos_b, min_size, collision_box_name_i)
                 # self.world.set_object_pose(collision_box_name_i, Pose(Point(c[0], c[1], c[2]),
                 #                                                      Quaternion(q[0], q[1], q[2], q[3])))
-                if self.publish_collision_boxes:
-                    self.pub_marker(collision_box_name_i)
-                self.collisionChecker.update_collisions_environment()
-                if not self.collisionChecker.is_object_external_collision_free(collision_box_name_i):
-                    collisions_per_pos[i] = self.collisionChecker.get_collisions(collision_box_name_i)
-                if self.publish_collision_boxes:
-                    self.del_marker(collision_box_name_i)
-                self.world.remove_object(collision_box_name_i)
-                self.world.remove_object(collision_box_name_i + 'start')
-                self.world.remove_object(collision_box_name_i + 'end')
-        return collisions
+                #if self.publish_collision_boxes:
+                #    self.pub_marker(collision_box_name_i)
+                self.pybullet_env.update(self.js)
+                p.stepSimulation(physicsClientId=self.pybullet_env.client_id)
+                contact_points = p.getContactPoints(self.pybullet_env.environment_id, coll_id, physicsClientId=self.pybullet_env.client_id)
+                #if self.publish_collision_boxes:
+                #    self.del_marker(collision_box_name_i)
+                #self.world.remove_object(collision_box_name_i)
+                #self.world.remove_object(collision_box_name_i + 'start')
+                #self.world.remove_object(collision_box_name_i + 'end')
+                p.removeBody(coll_id, physicsClientId=self.pybullet_env.client_id)
+                if contact_points != tuple():
+                    return True
+        return False
 
     def pub_marker(self, name):
         names = [name, name + 'start', name + 'end']
         ma = MarkerArray()
         for n in names:
-            m = self.world.get_object(n).as_marker_msg()
-            m.header.frame_id = self.map_frame
-            m.ns = u'world' + m.ns
-            ma.markers.append(m)
+            for link_name in self.world.groups[n].link_names:
+                markers = self.world.links[link_name].collision_visualization_markers().markers
+                for m in markers:
+                    m.header.frame_id = self.map_frame
+                    m.ns = u'world' + m.ns
+                    ma.markers.append(m)
         self.pub_collision_marker.publish(ma)
 
     def del_marker(self, name):
         names = [name, name + 'start', name + 'end']
         ma = MarkerArray()
         for n in names:
-            m = self.world.get_object(n).as_marker_msg()
-            m.action = m.DELETE
-            m.ns = u'world' + m.ns
-            ma.markers.append(m)
+            for link_name in self.world.groups[n].link_names:
+                markers = self.world.links[link_name].collision_visualization_markers().markers
+                for m in markers:
+                    m.action = m.DELETE
+                    m.ns = u'world' + m.ns
+                    ma.markers.append(m)
         self.pub_collision_marker.publish(ma)
 
 
@@ -2027,7 +2069,8 @@ class MovementPlanner(OMPLPlanner):
                                     self.space.getMaximumExtent(),
                                     self.space.getMaximumExtent() * si.getStateValidityCheckingResolution()))
         else:
-            motion_validator = ObjectRayMotionValidator(self.collision_scene, self.tip_link, self.robot, collision_checker, js=js)
+            #motion_validator = ObjectRayMotionValidator(self.collision_scene, self.tip_link, self.robot, collision_checker, js=js)
+            motion_validator = CompoundBoxMotionValidator(self.collision_scene, self.tip_link, self.robot, collision_checker, js=js)
             si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, motion_validator))
 
         if self.setup.getPlanner().getName() == 'InformedRRTstar':
@@ -2109,7 +2152,7 @@ class NavigationPlanner(OMPLPlanner):
         #    planner.setRange(0.1)
         # else:
         planner = og.RRTConnect(si)
-        planner.setRange(0.1)
+        planner.setRange(1.0)
         # planner.setIntermediateStates(True)
         # planner.setup()
         return planner

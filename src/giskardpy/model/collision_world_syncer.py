@@ -379,15 +379,6 @@ class CollisionWorldSynchronizer(object):
                     return False
         return True
 
-    #def is_object_external_collision_free(self, object_name):
-    #    self.update_collision_checker()
-    #    obj = self.world.links[object_name]
-     #   closest_points = self.god_map.get_data(identifier.closest_point)
-     #   collisions = []
-     #   for link_name in obj.get_link_names():
-     #       collisions.extend(self.get_external_collision_free(closest_points, link_name))
-     #   return len(collisions) == 0
-
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
         """
         :param collision_goals: list of CollisionEntry

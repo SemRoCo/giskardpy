@@ -213,5 +213,86 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     return False
 
 
+def get_namespaces(d, namespace_seperator='/'):
+    """
+    This function tries to find namespaces in the given dictionary by searching its top level keys
+    for the namespace_seperator. Moreover, the prefix entry in the values is checked too (see example below).
+    Therefore, a namespace is registered if it is specified in the top level key name or in the value part
+    with the key word 'prefix'.
+    If no namespaces are found a list is returned holding as many empty strings entries as top level keys
+    exist in the given dictionary.
+
+    Valid dict with namespacing:
+        dict = {
+        namespace1/something:
+            something: 2
+            other: 1
+            prefix: namespace1 (optional)
+        something:
+            ...
+            prefix: namespace2 (optional)
+        /something:
+            ...
+            prefix: namespace3 (optional)
+        /namespace4/something: (also okay)
+            ...
+            prefix: namespace4 (optional)
+        }
+
+    :type d: dict
+    :type namespace_seperator: str
+    :rtype: list of str
+    """
+    single_robot_namespace = ''
+    no_namespaces = list()
+    namespaces = list()
+    for i, (key_name, values) in enumerate(d.items()):
+        prefix_namespace = None
+        name_namespace = None
+
+        # Namespacing by specifying the prefix keyword
+        if 'prefix' in values:
+            prefix_namespace = values['prefix']
+
+        # Namespacing by the action server name
+        # Namespacing: e.g. pr2_a/base
+        if key_name.count(namespace_seperator) > 0:
+            if key_name.count(namespace_seperator) == 1:
+                pass
+            # Namespacing: e.g. /pr2_a/base
+            elif key_name.count(namespace_seperator) == 2 and \
+                    key_name.index(namespace_seperator) == 0:
+                key_name = key_name[1:]
+            else:
+                raise Exception('{} is an invalid combination of a namespace and'
+                                ' the action server name.'.format(key_name))
+            name_namespace = key_name[:key_name.index(namespace_seperator)]
+            if name_namespace == single_robot_namespace:
+                name_namespace = None
+
+        # Check prefix_namespace with the namespace in the action server name
+        if prefix_namespace is None and name_namespace is None:
+            no_namespaces.append(key_name)
+            continue
+        else:
+            if prefix_namespace is not None:
+                if name_namespace is None:
+                    namespaces.append(prefix_namespace)
+                elif prefix_namespace != name_namespace:
+                    raise ('Prefix namespace {} differs from the namespace specified '
+                            'in the action server name {}'.format(prefix_namespace, name_namespace))
+                else:
+                    namespaces.append(prefix_namespace)
+            else:
+                namespaces.append(name_namespace)
+
+    if len(namespaces) == 0:
+        namespaces = [single_robot_namespace] * len(d.items())
+    elif len(namespaces) != len(d.items()):
+        raise Exception('The entries {} have no namespacing but the others do.'.format(str(no_namespaces)))
+
+    return namespaces
+
+
 yaml.add_constructor('!include', construct_include, Loader)
 yaml.add_constructor('!find', construct_find, Loader)

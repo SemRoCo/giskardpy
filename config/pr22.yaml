@@ -1,27 +1,22 @@
 parent: !include pr2.yaml
-namespaces: ['pr2_a', 'pr2_b']
-action_server: # todo: in einzelne roboter aufteilen und robotor name hinzufügen
+action_server:
   /pr2_a/base:
     plugin: SendFollowJointTrajectory
     namespace: /pr2_a/whole_body_controller/base/follow_joint_trajectory
     state_topic: /pr2_a/whole_body_controller/base/state
     fill_velocity_values: True
-    prefix: pr2_a # must be in namespaces
   /pr2_a/body:
     plugin: SendFollowJointTrajectory
     namespace: /pr2_a/whole_body_controller/body/follow_joint_trajectory
     state_topic: /pr2_a/whole_body_controller/body/state
     fill_velocity_values: False
-    prefix: pr2_a # must be in namespaces
   /pr2_b/base:
     plugin: SendFollowJointTrajectory
     namespace: /pr2_b/whole_body_controller/base/follow_joint_trajectory
     state_topic: /pr2_b/whole_body_controller/base/state
     fill_velocity_values: True
-    prefix: pr2_b # must be in namespaces
   /pr2_b/body:
     plugin: SendFollowJointTrajectory
     namespace: /pr2_b/whole_body_controller/body/follow_joint_trajectory
     state_topic: /pr2_b/whole_body_controller/body/state
     fill_velocity_values: False
-    prefix: pr2_b # must be in namespaces

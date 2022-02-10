@@ -249,8 +249,8 @@ class WorldUpdater(GiskardBehavior):
     def clear_world(self):
         # assumes that parent has god map lock
 
-        namespaces = self.god_map.unsafe_get_data(identifier.collision_scene).robot_names
-        self.world.delete_all_but_robot(namespaces)
+        namespaces = self.god_map.unsafe_get_data(identifier.collision_scene).unsafe_robot_names
+        self.world.delete_all_but_robots(namespaces)
         for plugin_name in self.added_plugin_names:
             self.tree.remove_node(plugin_name)
         self.added_plugin_names = []

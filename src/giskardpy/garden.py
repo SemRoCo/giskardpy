@@ -50,7 +50,7 @@ from giskardpy.tree.update_constraints import GoalToConstraints
 from giskardpy.tree.visualization import VisualizationBehavior
 from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
-from giskardpy.utils.config_loader import ros_load_robot_config
+from giskardpy.utils.config_loader import ros_load_robot_config, get_namespaces
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
 
@@ -73,7 +73,7 @@ def initialize_god_map():
 
     world = WorldTree(god_map)
     namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
-    world.delete_all_but_robot(namespaces)
+    world.delete_all_but_robots(namespaces)
 
     collision_checker = god_map.get_data(identifier.collision_checker)
     if collision_checker == 'bpb':
@@ -167,8 +167,11 @@ def grow_tree():
     # This has to be called first, because it sets the controlled joints.
     execution_action_server = Parallel('execution action servers', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
     action_servers = god_map.get_data(identifier.action_server)
+    action_servers_namespaces = get_namespaces(action_servers)
     behaviors = get_all_classes_in_package(giskardpy.tree)
-    for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
+    for namespace, (execution_action_server_name, params) in zip(action_servers_namespaces, action_servers.items()):
+        if 'prefix' not in params:
+            params['prefix'] = namespace
         C = behaviors[params['plugin']] # todo: hieraus die roboternamen ziehen
         del params['plugin']
         execution_action_server.add_child(C(execution_action_server_name, **params))

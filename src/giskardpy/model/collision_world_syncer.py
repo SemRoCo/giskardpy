@@ -58,24 +58,14 @@ class CollisionWorldSynchronizer(object):
         """
         :rtype: list of str
         """
-        one_robot_names = ['']
+        return self.world.god_map.get_data(identifier.rosparam + ['namespaces'])
 
-        # Set in god_map if not set
-        try:
-            robot_names = self.world.god_map.get_data(identifier.rosparam + ['namespaces'])
-        except KeyError:
-            self.world.god_map.set_data(identifier.rosparam + ['namespaces'], one_robot_names)
-            return one_robot_names
-
-        # Check if it is set appropriately
-        if len(robot_names) == 1 and robot_names[0] != '':
-            rospy.logwarn('Changing robot_names to [''] since only one robot is specified.')
-            self.world.god_map.set_data(identifier.rosparam + ['namespaces'], one_robot_names)
-            return one_robot_names
-        elif len(robot_names) != 1 and '' in robot_names:
-            raise Exception('Empty robot name '' is not allowed if multiply robots specified.')
-        else:
-            return robot_names
+    @property
+    def unsafe_robot_names(self):
+        """
+        :rtype: list of str
+        """
+        return self.world.god_map.unsafe_get_data(identifier.rosparam + ['namespaces'])
 
     @property
     def god_map(self):

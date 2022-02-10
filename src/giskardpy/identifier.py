@@ -36,7 +36,7 @@ soft_constraints = post_processing + ['soft_constraints']
 result_message = ['result_message']
 
 # stuff from rosparam
-robot_description = ['robot_description']
+robot_descriptions = ['robot_descriptions']
 
 rosparam = ['rosparam']
 

@@ -247,8 +247,6 @@ class GoalToConstraints(GetGoal):
                                          config[link_b]['soft_threshold'])
                     number_of_repeller = min(config[link_a]['number_of_repeller'],
                                              config[link_b]['number_of_repeller'])
-                if link_a.prefix != link_b.prefix:
-                    raise Exception('och nö')
                 constraint = SelfCollisionAvoidance(god_map=self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,

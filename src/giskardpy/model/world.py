@@ -171,8 +171,8 @@ class WorldTree(object):
     def register_group(self, name, root_link_name):
         if root_link_name not in self.links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
-        #if name in self.groups:
-        #    raise DuplicateNameException('Group with name {} already exists'.format(name)) #fixme
+        if name in self.groups:
+            raise DuplicateNameException('Group with name {} already exists'.format(name))
         self.groups[name] = SubWorldTree(name, root_link_name, self)
 
     @property
@@ -216,12 +216,12 @@ class WorldTree(object):
     def joint_names_as_set(self):
         return set(self.joints.keys())
 
-    def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None): #todo: use prefix
+    def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name in self.groups:
             raise DuplicateNameException(
-                'Failed to add group \'{}\' because one with such a name already exists'.format(group_name)) #fixme
+                'Failed to add group \'{}\' because one with such a name already exists'.format(group_name))
         if parent_link_name is None:
             parent_link = self.root_link
         else:
@@ -282,7 +282,7 @@ class WorldTree(object):
         rot_lower_limits = {1: -1}
         rot_upper_limits = {1: 1}
         # diff_drive_joint = DiffDriveJoint(name=PrefixName('diff_drive', None),
-        diff_drive_joint = DiffDriveWheelsJoint(name=PrefixName('diff_drive', None), # fixme?
+        diff_drive_joint = DiffDriveWheelsJoint(name=PrefixName('diff_drive', prefix),
                                                 parent_link_name=odom_link_name,
                                                 child_link_name=base_footprint_name,
                                                 god_map=self.god_map)
@@ -530,11 +530,8 @@ class WorldTree(object):
         except KeyError:
             return []
 
-    def register_controlled_joints(self, controlled_joints, prefix=None):
-        if prefix is not None:
-            controlled_joints = [PrefixName(j, prefix) for j in controlled_joints]
-        else:
-            controlled_joints = [PrefixName(j, '') for j in controlled_joints]
+    def register_controlled_joints(self, controlled_joints, prefix=''):
+        controlled_joints = [PrefixName(j, prefix) for j in controlled_joints]
         old_controlled_joints = set(self.controlled_joints)
         new_controlled_joints = set(controlled_joints)
         double_joints = old_controlled_joints.intersection(new_controlled_joints)

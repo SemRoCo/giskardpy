@@ -112,17 +112,10 @@ class WorldUpdater(GiskardBehavior):
     def get_attached_objects(self, req):
         robot_names = self.collision_scene.robot_names
         # Check if empty string is allowed, meaning only one robot is specified and...
-        if req.robot_name == '':
-            if len(robot_names) == 1:
-                return req.robot_name
-            else:
-                raise Exception('Please specify a robot name in GetAttachedObjectsRequest.')
-        # if it exits
-        else:
-            if req.robot_name not in robot_names:
-                Exception('Robot with robot_name {} is not known.'.format(req.robot_name))
+        if req.robot_name not in robot_names:
+            Exception('Robot with robot_name {} is not known.'.format(req.robot_name))
         robot_name = req.robot_name
-        link_names = self.world.groups[robot_name].link_names # todo: rmv self.robot and change message since this is called from a service
+        link_names = self.world.groups[robot_name].link_names
         attached_links = [str(s) for s in set(link_names).difference(self.original_link_names)]
         attachment_points = []
         res = GetAttachedObjectsResponse()

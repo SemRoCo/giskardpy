@@ -128,6 +128,8 @@ class SelfCollisionAvoidance(Goal):
         self.soft_threshold = soft_threshold
         self.num_repeller = num_repeller
         self.idx = idx
+        if self.link_a.prefix != self.link_b.prefix:
+            raise Exception('Links {} and {} have different prefix'.format(self.link_a, self.link_b))
         super(SelfCollisionAvoidance, self).__init__(**kwargs)
         self.root = self.world.root_link_name
         self.robot_name = robot_name

@@ -1,3 +1,4 @@
+from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 from giskardpy import casadi_wrapper as w
 import giskardpy.utils.tfwrapper as tf

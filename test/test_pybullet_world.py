@@ -198,7 +198,7 @@ class TestPyBulletSyncer(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.ALLOW_COLLISION
         ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = donbot_world.robot.name
+        ce.body_b = donbot_world.robot().name
         ce.link_bs = [CollisionEntry.ALL]
         ces = [ce]
         new_ces = donbot_world.verify_collision_entries(ces)
@@ -259,7 +259,7 @@ class TestPyBulletSyncer(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = donbot_world.robot.name
+        ce.body_b = donbot_world.robot().name
         ce.link_bs = ['muh']
         ce.min_dist = min_dist
         ces.append(ce)
@@ -346,7 +346,7 @@ class TestPyBulletSyncer(object):
         new_ces = donbot_world.verify_collision_entries(ces)
         assert len(new_ces) == 1
         for ce in new_ces:
-            assert ce.body_b == donbot_world.robot.name
+            assert ce.body_b == donbot_world.robot().name
             assert ce.body_b != CollisionEntry.ALL
             assert donbot_world.all_robot_links(ce)
             assert donbot_world.all_link_bs(ce)
@@ -374,7 +374,7 @@ class TestPyBulletSyncer(object):
         assert donbot_world.all_robot_links(new_ces[0])
         assert donbot_world.all_link_bs(new_ces[0])
         for ce in new_ces[1:]:
-            assert ce.body_b == donbot_world.robot.name
+            assert ce.body_b == donbot_world.robot().name
             assert ce.body_b != CollisionEntry.ALL
             assert CollisionEntry.ALL not in ce.robot_links
         i = 0
@@ -402,21 +402,21 @@ class TestPyBulletSyncer(object):
         ce.link_bs = [CollisionEntry.ALL]
         ces.append(ce)
         new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == 1 + len(donbot_world.robot.link_names_with_collisions) * 2
+        assert len(new_ces) == 1 + len(donbot_world.robot().link_names_with_collisions) * 2
         for ce in new_ces[1:]:
             assert ce.body_b != CollisionEntry.ALL
             assert CollisionEntry.ALL not in ce.robot_links
-            if ce.body_b != donbot_world.robot.name:
+            if ce.body_b != donbot_world.robot().name:
                 assert CollisionEntry.ALL in ce.link_bs
             else:
                 assert CollisionEntry.ALL not in ce.link_bs
             assert len(ce.link_bs) == 1
         i = 0
-        for i in range(len(donbot_world.robot.link_names_with_collisions) + 1):
+        for i in range(len(donbot_world.robot().link_names_with_collisions) + 1):
             ce = new_ces[i]
             assert ce.type == CollisionEntry.AVOID_COLLISION
         i += 1
-        for j in range(len(donbot_world.robot.link_names_with_collisions)):
+        for j in range(len(donbot_world.robot().link_names_with_collisions)):
             ce = new_ces[i + j]
             assert ce.type == CollisionEntry.ALLOW_COLLISION
 
@@ -442,7 +442,7 @@ class TestPyBulletSyncer(object):
         ce.link_bs = [name]
         ces.append(ce)
         new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == len(donbot_world.robot.link_names_with_collisions) * 2 + 1
+        assert len(new_ces) == len(donbot_world.robot().link_names_with_collisions) * 2 + 1
         for ce in new_ces[1:]:
             assert ce.body_b != CollisionEntry.ALL
             assert CollisionEntry.ALL not in ce.robot_links
@@ -450,11 +450,11 @@ class TestPyBulletSyncer(object):
             assert len(ce.link_bs) == 1
         i = 0
         for i in range(1 +
-                       len(donbot_world.robot.link_names_with_collisions)):
+                       len(donbot_world.robot().link_names_with_collisions)):
             ce = new_ces[i]
             assert ce.type == CollisionEntry.AVOID_COLLISION
         i += 1
-        for j in range(len(donbot_world.robot.link_names_with_collisions)):
+        for j in range(len(donbot_world.robot().link_names_with_collisions)):
             ce = new_ces[i + j]
             assert ce.type == CollisionEntry.ALLOW_COLLISION
 
@@ -488,7 +488,7 @@ class TestPyBulletSyncer(object):
         ce.link_bs = [name]
         ces.append(ce)
         new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == len(donbot_world.robot.link_names_with_collisions) * 3 + 1
+        assert len(new_ces) == len(donbot_world.robot().link_names_with_collisions) * 3 + 1
         for ce in new_ces[1:]:
             assert ce.body_b != CollisionEntry.ALL
             assert CollisionEntry.ALL not in ce.robot_links
@@ -498,11 +498,11 @@ class TestPyBulletSyncer(object):
                 assert CollisionEntry.ALL not in ce.link_bs
             assert len(ce.link_bs) == 1
         i = -1
-        for i in range(1 + len(donbot_world.robot.link_names_with_collisions) * 2):
+        for i in range(1 + len(donbot_world.robot().link_names_with_collisions) * 2):
             ce = new_ces[i]
             assert ce.type == CollisionEntry.AVOID_COLLISION
         i += 1
-        for j in range(len(donbot_world.robot.link_names_with_collisions)):
+        for j in range(len(donbot_world.robot().link_names_with_collisions)):
             ce = new_ces[i + j]
             assert ce.type == CollisionEntry.ALLOW_COLLISION
 
@@ -535,7 +535,7 @@ class TestPyBulletSyncer(object):
         ce1 = CollisionEntry()
         ce1.type = CollisionEntry.ALLOW_COLLISION
         ce1.robot_links = ['plate', 'base_link']
-        ce1.body_b = donbot_world.robot.name
+        ce1.body_b = donbot_world.robot().name
         ce1.link_bs = ['gripper_finger_left_link', 'gripper_finger_right_link']
         ce1.min_dist = min_dist
         ces.append(ce1)
@@ -624,7 +624,7 @@ class TestPyBulletSyncer(object):
 
     def test_collision_goals_to_collision_matrix_avoid_only_box(self, donbot_world):
         name = 'muh'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
 
         p = Pose()
         p.orientation.w = 1
@@ -653,7 +653,7 @@ class TestPyBulletSyncer(object):
         allow collision with a specific object
         """
         name = 'muh'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
         min_dist = defaultdict(lambda: 0.1)
 
         p = Pose()
@@ -684,7 +684,7 @@ class TestPyBulletSyncer(object):
         """
         name = 'muh'
         name2 = 'muh2'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
         min_dist = defaultdict(lambda: 0.05)
 
         p = Pose()
@@ -715,7 +715,7 @@ class TestPyBulletSyncer(object):
         """
         name = 'muh'
         name2 = 'muh2'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
         allowed_link = robot_link_names[0]
         min_dist = defaultdict(lambda: 0.05)
 
@@ -738,7 +738,7 @@ class TestPyBulletSyncer(object):
         assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
-            if body_b != donbot_world.robot.name:
+            if body_b != donbot_world.robot().name:
                 assert body_b_link == name or body_b_link == name2
             assert robot_link in robot_link_names
             if body_b == name2:
@@ -755,7 +755,7 @@ class TestPyBulletSyncer(object):
         collision_entry.robot_links = ['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link',
                                        'l_gripper_l_finger_link', 'l_gripper_r_finger_link',
                                        'l_gripper_r_finger_link', 'l_gripper_palm_link']
-        collision_entry.body_b = pr2_world.robot.name
+        collision_entry.body_b = pr2_world.robot().name
         collision_entry.link_bs = ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link',
                                    'r_forearm_link', 'r_forearm_link']
         ces.append(collision_entry)

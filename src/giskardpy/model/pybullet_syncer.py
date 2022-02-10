@@ -31,19 +31,9 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         pose = self.fks[str(link.name)]
         position = pose[:3]
         orientation = pose[4:]
-        n = pbw.p.getNumBodies()
-        added = False
-        for i in range(0, n):
-            link_name = pbw.p.getBodyInfo(i)[1].decode('UTF-8')
-            if str(link.name) == link_name:
-                added = True
-                break
-        if not added:
-            self.object_name_to_bullet_id[str(link.name)] = pbw.load_urdf_string_into_bullet(link.as_urdf(),
-                                                                                             position=position,
-                                                                                             orientation=orientation)
-        else:
-            self.update_pose(link)
+        self.object_name_to_bullet_id[link.name] = pbw.load_urdf_string_into_bullet(link.as_urdf(),
+                                                                                    position=position,
+                                                                                    orientation=orientation)
 
     @profile
     def update_pose(self, link):

@@ -78,36 +78,6 @@ def giskard(request, ros):
     request.addfinalizer(c.tear_down)
     return c
 
-@pytest.fixture(scope=u'module')
-def giskard_more_robots(request, ros):
-    r = PR22()
-    request.addfinalizer(r.tear_down)
-    return r
-
-
-@pytest.fixture()
-def resetted_giskard(giskard):
-    """
-    :type giskard: PR2
-    """
-    logging.loginfo(u'resetting giskard')
-    giskard.open_l_gripper()
-    giskard.open_r_gripper()
-    giskard.clear_world()
-    giskard.reset_base()
-    return giskard
-
-
-@pytest.fixture()
-def zero_pose(resetted_giskard):
-    """
-    :type resetted_giskard: PR2
-    """
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
-    resetted_giskard.plan_and_execute()
-    return resetted_giskard
-
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard):
@@ -152,35 +122,17 @@ def fake_table_setup(pocky_pose_setup):
     return pocky_pose_setup
 
 
-@pytest.fixture()
-def kitchen_setup(resetted_giskard):
-    """
-    :type resetted_giskard: PR2
-    :return:
-    """
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.set_joint_goal(resetted_giskard.gaya_pose)
-    resetted_giskard.plan_and_execute()
-    object_name = u'kitchen'
-    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
-                              set_js_topic=u'/kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
-    resetted_giskard.set_kitchen_js(js)
-    return resetted_giskard
-
-
 class TestFk(object):
     def test_fk(self, zero_pose):
-        for root, tip in itertools.product(zero_pose.robot.link_names, repeat=2):
+        for root, tip in itertools.product(zero_pose.robot().link_names, repeat=2):
             fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
             fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
 
     def test_fk_attached(self, zero_pose):
-        pocky = u'box'
+        pocky = 'box'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
-        for root, tip in itertools.product(zero_pose.robot.link_names, [pocky]):
+        for root, tip in itertools.product(zero_pose.robot().link_names, [pocky]):
             fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
             fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
@@ -1459,15 +1411,15 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.plan_and_execute()
 
-    def test_rotate_gripper(self, zero_pose_more_robots):
+    def test_rotate_gripper(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         r_goal = PoseStamped()
-        r_goal.header.frame_id = zero_pose_more_robots.r_tip
+        r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1, 0, 0]))
-        zero_pose_more_robots.set_cart_goal(r_goal, zero_pose_more_robots.r_tip)
-        zero_pose_more_robots.plan_and_execute()
+        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip)
+        zero_pose.plan_and_execute()
 
     def test_keep_position1(self, zero_pose):
         """

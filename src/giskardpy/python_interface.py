@@ -41,7 +41,7 @@ class GiskardWrapper(object):
             self._client.wait_for_server()
         self._god_map = GodMap.init_from_paramserver(node_name)
         self._world = WorldTree(self._god_map)
-        self._world.delete_all_but_robot(namespaces)
+        self._world.delete_all_but_robots(namespaces)
 
         self.collisions = []
         self.clear_cmds()

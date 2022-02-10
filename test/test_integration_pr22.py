@@ -17,7 +17,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
-from giskardpy.data_types import PrefixName, TFPrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
 from giskardpy.python_interface import DEFAULT_WORLD_TIMEOUT
@@ -82,7 +82,7 @@ def giskard(request, ros):
 @pytest.fixture()
 def resetted_giskard(giskard):
     """
-    :type giskard: PR222
+    :type giskard: PR22
     """
     logging.loginfo(u'resetting giskard')
     for robot_name in giskard.robot_names:

@@ -374,10 +374,11 @@ class WorldTree(object):
         self.joints = {}
         self.groups = {}
 
-    def delete_all_but_robot(self, prefix_list):
+    def delete_all_but_robots(self, robot_names):
         self._clear()
-        for prefix in prefix_list:
-            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=prefix, prefix=prefix)
+        for prefix in robot_names:
+            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_descriptions)[prefix],
+                          group_name=prefix, prefix=prefix)
         self.fast_all_fks = None
         self.notify_model_change()
 

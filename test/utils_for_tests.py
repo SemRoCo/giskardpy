@@ -423,7 +423,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.map = 'map'
         self.goal_checks = defaultdict(list)
         if len(self.robot_names) == 1:
-            self.default_root = self.robot.root_link_name.short_name # todo: remove this
+            self.default_root = self.robot().root_link_name.short_name # todo: remove this
             self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
 
         def create_publisher(topic):
@@ -444,7 +444,7 @@ class GiskardTestWrapper(GiskardWrapper):
         req.transform.rotation = map_T_odom.pose.orientation
         assert self.set_localization_srv(req).success
         self.wait_heartbeats(10)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot.root_link_name)
+        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot().root_link_name)
         compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
@@ -480,7 +480,6 @@ class GiskardTestWrapper(GiskardWrapper):
     def stop_motion_cb(self, msg):
         self.total_time_spend_moving += time() - self.time
 
-    @property
     def robot(self, prefix=''):
         """
         :rtype: giskardpy.model.world.SubWorldTree
@@ -647,7 +646,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
                               weight=None, check=True):
         if root_link is None:
-            root_link = self.robot.root_link_name
+            root_link = self.robot().root_link_name
         super(GiskardTestWrapper, self).set_align_planes_goal(tip_link, tip_normal, root_link, root_normal,
                                                               max_angular_velocity, weight)
         if check:
@@ -785,7 +784,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
-            expected_pose = self.robot.compute_fk_pose(self.robot.root_link_name, name)
+            expected_pose = self.robot().compute_fk_pose(self.robot.root_link_name, name)
             response = super(GiskardTestWrapper, self).detach_object(name)
             self.check_add_object_result(response, expected_response, expected_pose, name)
 
@@ -899,8 +898,8 @@ class GiskardTestWrapper(GiskardWrapper):
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
                                                                                     defaultdict(lambda: 0.3))
         collisions = self.collision_scene.check_collisions(collision_matrix)
-        controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link)
-        controlled_parent_link = self.robot.joints[controlled_parent_joint].child_link_name
+        controlled_parent_joint = self.robot().get_controlled_parent_joint_of_link(link)
+        controlled_parent_link = self.robot().joints[controlled_parent_joint].child_link_name
         collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():
             if controlled_parent_link in key:

@@ -422,7 +422,7 @@ class GiskardWrapper(object):
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
 
-    def allow_self_collision(self, robot_name):
+    def allow_self_collision(self, robot_name=''):
         """
         Allows the collision with itself for the next goal.
         """
@@ -434,7 +434,7 @@ class GiskardWrapper(object):
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
 
-    def avoid_self_collision(self, robot_name):
+    def avoid_self_collision(self, robot_name=''):
         """
         Avoid collisions with itself for the next goal.
         """

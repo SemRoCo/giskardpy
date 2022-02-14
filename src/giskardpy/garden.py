@@ -172,7 +172,7 @@ def grow_tree():
     for namespace, (execution_action_server_name, params) in zip(action_servers_namespaces, action_servers.items()):
         if 'prefix' not in params:
             params['prefix'] = namespace
-        C = behaviors[params['plugin']] # todo: hieraus die roboternamen ziehen
+        C = behaviors[params['plugin']]
         del params['plugin']
         execution_action_server.add_child(C(execution_action_server_name, **params))
     # ----------------------------------------------

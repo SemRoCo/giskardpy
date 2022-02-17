@@ -11,7 +11,7 @@ import rospy
 from giskard_msgs.msg import CollisionEntry
 
 from giskardpy import RobotName, identifier
-from giskardpy.data_types import Collisions, JointStates
+from giskardpy.data_types import Collisions, JointStates, PrefixName
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
@@ -108,10 +108,10 @@ class CollisionWorldSynchronizer(object):
         for link_a, link_b in link_combinations:
             if group.are_linked(link_a, link_b, non_controlled) \
                     or link_a == link_b \
-                    or link_a in self.ignored_pairs \
-                    or link_b in self.ignored_pairs \
-                    or (link_a, link_b) in self.ignored_pairs \
-                    or (link_b, link_a) in self.ignored_pairs:
+                    or link_a.short_name in self.ignored_pairs \
+                    or link_b.short_name in self.ignored_pairs \
+                    or (link_a.short_name, link_b.short_name) in self.ignored_pairs \
+                    or (link_b.short_name, link_a.short_name) in self.ignored_pairs:
                 always.add((link_a, link_b))
         unknown = link_combinations.difference(always)
         self.set_joint_state_to_zero(group)
@@ -151,7 +151,9 @@ class CollisionWorldSynchronizer(object):
 
         logging.logdebug('Calculated self collision matrix in {:.3f}s'.format(time() - t))
         self.world.state = joint_state_tmp
-        unknown.update(self.added_pairs)
+        grouped_added_pairs = [(str(PrefixName(p[0], group_name)), str(PrefixName(p[1], group_name)))
+                               for p in self.added_pairs]
+        unknown.update(set(grouped_added_pairs))
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]
 

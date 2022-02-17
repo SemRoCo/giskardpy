@@ -1,0 +1,22 @@
+parent: !include donbot.yaml
+action_server:
+  /donbot_a/base:
+    plugin: SendFollowJointTrajectory
+    namespace: /donbot_a/whole_body_controller/base/follow_joint_trajectory
+    state_topic: /donbot_a/whole_body_controller/base/state
+    fill_velocity_values: True
+  /donbot_a/body:
+    plugin: SendFollowJointTrajectory
+    namespace: /donbot_a/whole_body_controller/body/follow_joint_trajectory
+    state_topic: /donbot_a/whole_body_controller/body/state
+    fill_velocity_values: False
+  /donbot_b/base:
+    plugin: SendFollowJointTrajectory
+    namespace: /donbot_b/whole_body_controller/base/follow_joint_trajectory
+    state_topic: /donbot_b/whole_body_controller/base/state
+    fill_velocity_values: True
+  /donbot_b/body:
+    plugin: SendFollowJointTrajectory
+    namespace: /donbot_b/whole_body_controller/body/follow_joint_trajectory
+    state_topic: /donbot_b/whole_body_controller/body/state
+    fill_velocity_values: False

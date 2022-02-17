@@ -1285,6 +1285,109 @@ class Donbot(GiskardTestWrapper):
         self.open_gripper()
 
 
+class Donbot2(GiskardTestWrapper):
+    default_pose = {
+        'ur5_elbow_joint': 0.0,
+        'ur5_shoulder_lift_joint': 0.0,
+        'ur5_shoulder_pan_joint': 0.0,
+        'ur5_wrist_1_joint': 0.0,
+        'ur5_wrist_2_joint': 0.0,
+        'ur5_wrist_3_joint': 0.0
+    }
+
+    better_pose = {
+        'ur5_shoulder_pan_joint': -np.pi / 2,
+        'ur5_shoulder_lift_joint': -2.44177755311,
+        'ur5_elbow_joint': 2.15026930371,
+        'ur5_wrist_1_joint': 0.291547812391,
+        'ur5_wrist_2_joint': np.pi / 2,
+        'ur5_wrist_3_joint': np.pi / 2
+    }
+
+    def __init__(self):
+        self.camera_tip = 'camera_link'
+        self.gripper_tip = 'gripper_tool_frame'
+        self.gripper_pub_topic = 'wsg_50_driver/goal_position'
+        self.camera_tips = dict()
+        self.gripper_tips = dict()
+        self.gripper_pubs = dict()
+        self.default_roots = dict()
+        self.set_localization_srvs = dict()
+        super(Donbot2, self).__init__('package://giskardpy/config/donbot2.yaml')
+        for robot_name in self.robot_names:
+            self.camera_tips[robot_name] = self.camera_tip
+            self.gripper_tips[robot_name] = self.gripper_tip
+            self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
+            self.set_localization_srvs[robot_name] = rospy.ServiceProxy('/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+                                                                        UpdateTransform)
+            self.gripper_pubs[robot_name] = rospy.Publisher('/{}'.format(str(PrefixName(self.gripper_pub_topic, robot_name))),
+                                                            PositionCmd, queue_size=10)
+
+    def move_base(self, robot_name, goal_pose):
+        goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
+        js = {'odom_x_joint': goal_pose.pose.position.x,
+              'odom_y_joint': goal_pose.pose.position.y,
+              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
+        self.allow_all_collisions()
+        self.set_joint_goal(js, prefix=robot_name, decimal=1)
+        self.plan_and_execute()
+
+    def set_localization(self, map_T_odom, robot_name):
+        """
+        :type map_T_odom: PoseStamped
+        """
+        req = UpdateTransformRequest()
+        req.transform.translation = map_T_odom.pose.position
+        req.transform.rotation = map_T_odom.pose.orientation
+        assert self.set_localization_srvs[robot_name](req).success
+        self.wait_heartbeats(10)
+        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.world.groups[robot_name].root_link_name)
+        compare_poses(p2.pose, map_T_odom.pose)
+
+    def open_gripper(self, robot_name):
+        self.set_gripper(robot_name, 0.109)
+
+    def close_gripper(self, robot_name):
+        self.set_gripper(robot_name, 0)
+
+    def set_gripper(self, robot_name, width, gripper_joint='gripper_joint'):
+        """
+        :param width: goal width in m
+        :type width: float
+        """
+        width = max(0.0065, min(0.109, width))
+        goal = PositionCmd()
+        goal.pos = width * 1000
+        self.gripper_pubs[robot_name].publish(goal)
+        rospy.sleep(0.5)
+        self.wait_heartbeats()
+        np.testing.assert_almost_equal(self.world.groups[robot_name].state[str(PrefixName(gripper_joint, robot_name))].position, width, decimal=3)
+
+    def reset_base(self, robot_name):
+        p = PoseStamped()
+        p.header.frame_id = self.map
+        p.pose.orientation.w = 1
+        self.set_localization(p, robot_name)
+        self.wait_heartbeats()
+        self.move_base(robot_name, p)
+
+    def clear_world(self):
+        return_val = super(GiskardTestWrapper, self).clear_world()
+        assert return_val.error_codes == UpdateWorldResponse.SUCCESS
+        assert len(self.world.groups) == 2
+        assert len(self.get_object_names().object_names) == 2
+        assert self.original_number_of_links == len(self.world.links)
+
+    def reset(self):
+        self.clear_world()
+        for robot_name in self.robot_names:
+            self.reset_base(robot_name)
+            self.open_gripper(robot_name)
+
+
 class BaseBot(GiskardTestWrapper):
     default_pose = {
         'joint_x': 0.0,

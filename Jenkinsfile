@@ -15,6 +15,7 @@ node {
         
         app.inside {
             echo "Tests passed"
+            sh 'py.test --verbose --junit-xml test-reports/results.xml test/kdl_parser.py'
         }
     }
      stage ('Email Notification'){

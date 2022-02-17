@@ -1,3 +1,8 @@
+global_planner:
+  navigation:
+    motion_validator: 'rays' # ['rays', 'box', 'discrete']
+  movement:
+    motion_validator: 'rays' # ['rays', 'box', 'discrete']
 general_options:
   path_to_data_folder: !find data # or 'find ros://giskardpy/data'
   enable_gui: False

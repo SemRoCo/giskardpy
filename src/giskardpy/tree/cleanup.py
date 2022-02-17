@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 from py_trees import Status
+from threading import Lock
 
 from giskardpy import identifier
 from giskardpy.data_types import Trajectory, Collisions
@@ -31,6 +32,8 @@ class CleanUp(GiskardBehavior):
         self.get_god_map().set_data(identifier.rosparam, deepcopy(self.rosparams))
         self.world.sync_with_paramserver()
         self.get_god_map().set_data(identifier.next_move_goal, None)
+        self.get_god_map().set_data(identifier.rosparam + ['motion_validator_lock'], Lock())
+        self.get_god_map().set_data(identifier.rosparam + ['state_validator_lock'], Lock())
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime
 

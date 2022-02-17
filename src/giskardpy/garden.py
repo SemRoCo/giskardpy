@@ -13,7 +13,7 @@ from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.global_planner_needed import GlobalPlannerNeeded
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.tree.AsyncComposite import PluginBehavior
-from giskardpy.global_planner import GlobalPlanner
+from giskardpy.global_planner import GlobalPlanner, PreGraspSampler
 from giskardpy.tree.commands_remaining import CommandsRemaining
 from giskardpy.tree.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.goal_canceled import GoalCanceled
@@ -274,6 +274,7 @@ def grow_tree():
     root = Sequence(u'Giskard')
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
+    root.add_child(PreGraspSampler())
     root.add_child(process_move_goal)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))

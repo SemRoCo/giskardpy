@@ -29,7 +29,9 @@ from copy import deepcopy
 
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pw
-from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded
+from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded, GetPreGraspRequest, GetPreGrasp, \
+    GetPreGraspOrientation
+from giskardpy import RobotName
 from giskardpy.exceptions import GlobalPlanningException
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.tree.plugin import GiskardBehavior
@@ -550,7 +552,8 @@ class AbstractMotionValidator():
     by overwriting the function ompl_check_motion.
     """
 
-    def __init__(self, tip_link, ignore_state_validator=False, ignore_orientation=False):
+    def __init__(self, tip_link, god_map, ignore_state_validator=False, ignore_orientation=False):
+        self.god_map = god_map
         self.state_validator = None
         self.tip_link = tip_link
         self.ignore_state_validator = ignore_state_validator
@@ -572,37 +575,39 @@ class AbstractMotionValidator():
         return np_to_pose(f_m)
 
     def checkMotion(self, s1, s2):
-        res_a = self.check_motion(s1, s2)
-        res_b = self.check_motion(s2, s1)
-        if self.ignore_state_validator:
-            return res_a and res_b
-        else:
-            return res_a and res_b and \
-                   self.state_validator.is_collision_free(s1) and \
-                   self.state_validator.is_collision_free(s2)
+        with self.god_map.get_data(identifier.rosparam + ['motion_validator_lock']):
+            res_a = self.check_motion(s1, s2)
+            res_b = self.check_motion(s2, s1)
+            if self.ignore_state_validator:
+                return res_a and res_b
+            else:
+                return res_a and res_b and \
+                       self.state_validator.is_collision_free(s1) and \
+                       self.state_validator.is_collision_free(s2)
 
     def checkMotionTimed(self, s1, s2, last_valid):
-        c1, f1 = self.check_motion_timed(s1, s2)
-        if not self.ignore_state_validator:
-            c1 &= self.state_validator.is_collision_free(s1)
-        c2, f2 = self.check_motion_timed(s2, s1)
-        if not self.ignore_state_validator:
-            c2 &= self.state_validator.is_collision_free(s2)
-        if not c1:
-            last_valid = self.get_last_valid(s1, s2, max(0, f1 - 0.01))
-            return False
-        elif not c2:
-            # calc_f = 1.0 - f2
-            # colliding = True
-            # while colliding:
-            #    calc_f -= 0.01
-            #    colliding, new_f = self.just_check_motion(s1, self.get_last_valid(s1, s2, calc_f))
-            # last_valid = self.get_last_valid(s1, s2, max(0, calc_f-0.05))
-            last_valid = s1
-            return False
-        else:
-            last_valid = s2
-            return True
+        with self.god_map.get_data(identifier.rosparam + ['motion_validator_lock']):
+            c1, f1 = self.check_motion_timed(s1, s2)
+            if not self.ignore_state_validator:
+                c1 &= self.state_validator.is_collision_free(s1)
+            c2, f2 = self.check_motion_timed(s2, s1)
+            if not self.ignore_state_validator:
+                c2 &= self.state_validator.is_collision_free(s2)
+            if not c1:
+                last_valid = self.get_last_valid(s1, s2, max(0, f1 - 0.01))
+                return False
+            elif not c2:
+                # calc_f = 1.0 - f2
+                # colliding = True
+                # while colliding:
+                #    calc_f -= 0.01
+                #    colliding, new_f = self.just_check_motion(s1, self.get_last_valid(s1, s2, calc_f))
+                # last_valid = self.get_last_valid(s1, s2, max(0, calc_f-0.05))
+                last_valid = s1
+                return False
+            else:
+                last_valid = s2
+                return True
 
     def check_motion(self, s1, s2):
         raise Exception('Please overwrite me')
@@ -708,9 +713,9 @@ class PyBulletRayTester(PyBulletEnv):
 
 class SimpleRayMotionValidator(AbstractMotionValidator):
 
-    def __init__(self, tip_link, debug=False, raytester=None, js=None,
+    def __init__(self, tip_link, god_map, debug=False, raytester=None, js=None,
                  ignore_state_validator=None, ignore_orientation=False):
-        AbstractMotionValidator.__init__(self, tip_link,
+        AbstractMotionValidator.__init__(self, tip_link, god_map,
                                          ignore_state_validator=ignore_state_validator,
                                          ignore_orientation=ignore_orientation)
         self.hitting = {}
@@ -741,9 +746,9 @@ class SimpleRayMotionValidator(AbstractMotionValidator):
 
 class ObjectRayMotionValidator(SimpleRayMotionValidator):
 
-    def __init__(self, collision_scene, tip_link, object_in_motion, state_validator, debug=False, raytester=None,
+    def __init__(self, collision_scene, tip_link, object_in_motion, state_validator, god_map, debug=False, raytester=None,
                  js=None, ignore_state_validator=False, links=None, ignore_orientation=False):
-        SimpleRayMotionValidator.__init__(self, tip_link, debug=debug, raytester=raytester,
+        SimpleRayMotionValidator.__init__(self, tip_link, god_map, debug=debug, raytester=raytester,
                                           js=js, ignore_state_validator=ignore_state_validator,
                                           ignore_orientation=ignore_orientation)
         self.state_validator = state_validator
@@ -778,10 +783,10 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
 
 class TimedObjectRayMotionValidator(ObjectRayMotionValidator):
 
-    def __init__(self, collision_scene, tip_link, object_in_motion, debug=False, raytester=None,
-                 js=None, state_validator=None, links=None, ignore_state_validator=False, ignore_orientation=False):
-        ObjectRayMotionValidator.__init__(self, collision_scene, tip_link, object_in_motion, debug=debug,
-                                          raytester=raytester, js=js, state_validator=state_validator,
+    def __init__(self, collision_scene, tip_link, object_in_motion, state_validator, god_map, debug=False,
+                 raytester=None, js=None, links=None, ignore_state_validator=False, ignore_orientation=False):
+        ObjectRayMotionValidator.__init__(self, collision_scene, tip_link, object_in_motion, state_validator,
+                                          god_map, debug=debug, raytester=raytester, js=js,
                                           ignore_state_validator=ignore_state_validator,
                                           links=links, ignore_orientation=ignore_orientation)
 
@@ -795,8 +800,8 @@ class TimedObjectRayMotionValidator(ObjectRayMotionValidator):
 
 class CompoundBoxMotionValidator(AbstractMotionValidator):
 
-    def __init__(self, collision_scene, tip_link, object_in_motion, state_validator, js=None, links=None):
-        super(CompoundBoxMotionValidator, self).__init__(tip_link)
+    def __init__(self, collision_scene, tip_link, object_in_motion, state_validator, god_map, js=None, links=None):
+        super(CompoundBoxMotionValidator, self).__init__(tip_link, god_map)
         self.collision_scene = collision_scene
         self.state_validator = state_validator
         self.object_in_motion = object_in_motion
@@ -1015,7 +1020,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
             self.publisher.setup(10)
 
     def is_collision_free(self, pose):
-        if True:  # with self.giskard_lock:
+        with self.get_god_map().get_data(identifier.rosparam + ['state_validator_lock']):
             # Get current joint states
             all_js = self.collision_scene.world.state
             old_js = self.collision_scene.robot.state
@@ -1042,7 +1047,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                     self.publish_robot_state()
                 all_js.update(old_js)
                 self.robot.state = all_js
-        return any(results)
+            return any(results)
 
     def publish_robot_state(self):
         if self.publisher is not None:
@@ -1499,39 +1504,53 @@ class GiskardValidStateSample(ob.ValidStateSampler):
             return self.sample(state)
 
 
-class OMPLGoalRegionSampler:
-    def __init__(self, setup, is_3D, goal, space, validation_fun, heuristic_fun, precision=5):
+class GoalRegionSampler:
+    def __init__(self, is_3D, goal, validation_fun, heuristic_fun, precision=5):
         self.goal = goal
-        self.setup = setup
         self.is_3D = is_3D
-        self.space = space
         self.precision = precision
         self.validation_fun = validation_fun
         self.h = heuristic_fun
         self.valid_samples = list()
         self.samples = list()
-        self.goal_list = [goal().getX(), goal().getY()]
-        if self.is_3D:
-            self.goal_list.append(goal().getZ())
-        else:
-            self.goal_list.append(0.)
+        self.goal_list = pose_to_np(goal)[0]
 
-    def _get_pitch(self, pos_a, pos_b):
+    def _get_pitch(self, pos_b):
+        pos_a = np.zeros(3)
         dx = pos_b[0] - pos_a[0]
         dy = pos_b[1] - pos_a[1]
         dz = pos_b[2] - pos_a[2]
         pos_c = pos_a + np.array([dx, dy, 0])
         a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_a)) ** 2))
-        return -np.arctan2(dz, a)
+        return np.arctan2(dz, a)
 
-    def _get_yaw(self, pos_a, pos_b):
+    def get_pitch(self, pos_b):
+        l_a = self._get_pitch(pos_b)
+        if pos_b[0] >= 0:
+            return -l_a
+        else:
+            return np.pi - l_a
+
+    def _get_yaw(self, pos_b):
+        pos_a = np.zeros(3)
         dx = pos_b[0] - pos_a[0]
         dz = pos_b[2] - pos_a[2]
         pos_c = pos_a + np.array([0, 0, dz])
         pos_d = pos_c + np.array([dx, 0, 0])
         g = np.sqrt(np.sum((np.array(pos_b) - np.array(pos_d)) ** 2))
         a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_d)) ** 2))
-        return -np.arctan2(g, a)  # if dx > 0 else np.pi-np.arctan2(g, a)
+        return np.arctan2(g, a)
+
+    def get_yaw(self, pos_b):
+        l_a = self._get_yaw(pos_b)
+        if pos_b[0] >= 0 and pos_b[1] >= 0:
+            return l_a
+        elif pos_b[0] >= 0 and pos_b[1] <= 0:
+            return -l_a
+        elif pos_b[0] <= 0 and pos_b[1] >= 0:
+            return np.pi - l_a
+        else:
+            return np.pi + l_a # todo: -np.pi + l_a
 
     def valid_sample(self, d=0.5, max_samples=100):
         i = 0
@@ -1539,9 +1558,9 @@ class OMPLGoalRegionSampler:
             valid = False
             while not valid and i < max_samples:
                 s = self._sample(i * d / max_samples)
-                valid = self.validation_fun(s())
+                valid = self.validation_fun(s)
                 i += 1
-            self.valid_samples.append([self.h(s()).value(), s])
+            self.valid_samples.append([self.h(s), s])
         self.valid_samples = sorted(self.valid_samples, key=lambda e: e[0])
         return self.valid_samples[0][1]
 
@@ -1549,32 +1568,132 @@ class OMPLGoalRegionSampler:
         i = 0
         while i < samples:
             s = self._sample(i * d / samples)
-            self.samples.append([self.h(s()).value(), s])
+            self.samples.append([self.h(s), s])
             i += 1
         self.samples = sorted(self.samples, key=lambda e: e[0])
         return self.samples[0][1]
 
-    def _sample(self, d):
-        s = ob.State(self.space)
-
-        x = round(uniform(self.goal().getX() - d, self.goal().getX() + d), self.precision)
-        y = round(uniform(self.goal().getY() - d, self.goal().getY() + d), self.precision)
-        s().setX(x)
-        s().setY(y)
+    def get_orientation(self, p):
         if self.is_3D:
-            z = round(uniform(self.goal().getZ() - d, self.goal().getZ() + d), self.precision)
-            pitch = self._get_pitch([x, y, z], self.goal_list)
-            yaw = self._get_yaw([x, y, z], self.goal_list)
-            q = tf.transformations.quaternion_from_euler(0, pitch, yaw)
-            s().rotation().x = q[0]
-            s().rotation().y = q[1]
-            s().rotation().z = q[2]
-            s().rotation().w = q[3]
-            s().setZ(z)
+            diff = [self.goal.position.x-p.position.x,
+                    self.goal.position.y-p.position.y,
+                    self.goal.position.z-p.position.z]
+            pitch = self.get_pitch(diff) # fixme: pitch is wrong sometimes
+            yaw = self.get_yaw(diff)
+            return tf.transformations.quaternion_from_euler(0, 0, yaw)
         else:
-            yaw = self._get_yaw([x, y, 0], self.goal_list)
-            s().setYaw(yaw)
+            diff = [self.goal.position.x-p.position.x,
+                    self.goal.position.y-p.position.y,
+                    0]
+            yaw = self.get_yaw(diff)
+            return tf.transformations.quaternion_from_euler(0, 0, yaw)
+
+    def _sample(self, d):
+        s = Pose()
+        s.orientation.w = 1
+
+        x = round(uniform(self.goal.position.x - d, self.goal.position.x + d), self.precision)
+        y = round(uniform(self.goal.position.y - d, self.goal.position.y + d), self.precision)
+        s.position.x = x
+        s.position.y = y
+
+        if self.is_3D:
+            z = round(uniform(self.goal.position.z - d, self.goal.position.z + d), self.precision)
+            q = self.get_orientation(s)
+            s.orientation.x = q[0]
+            s.orientation.y = q[1]
+            s.orientation.z = q[2]
+            s.orientation.w = q[3]
+            s.position.z = z
+        else:
+            q = self.get_orientation(s)
+            s.orientation.x = q[0]
+            s.orientation.y = q[1]
+            s.orientation.z = q[2]
+            s.orientation.w = q[3]
+
         return s
+
+
+class PreGraspSampler(GiskardBehavior):
+    def __init__(self, name='PreGraspSampler'):
+        super().__init__(name='PreGraspSampler')
+        self.is_3D = True
+
+    def setup(self, timeout):
+        self.srv_get_pregrasp = rospy.Service(u'~get_pregrasp', GetPreGrasp, self.get_pregrasp_cb)
+        self.srv_get_pregrasp_o = rospy.Service(u'~get_pregrasp_orientation', GetPreGraspOrientation,
+                                                self.get_pregrasp_orientation_cb)
+        return super(PreGraspSampler, self).setup(timeout=timeout)
+
+    def update(self):
+        return Status.SUCCESS
+
+    def get_in_map(self, ps):
+        return transform_pose('map', ps).pose
+
+    def get_pregrasp_cb(self, req):
+        rospy.logerr('0')
+        collision_scene = self.god_map.unsafe_get_data(identifier.collision_scene)
+        robot = collision_scene.world.groups[RobotName]
+        js = self.god_map.unsafe_get_data(identifier.joint_states)
+        rospy.logerr('00')
+        #collision_scene.sync()
+        rospy.logerr('000')
+        #collision_scene.sync()
+        rospy.logerr(collision_scene.client_id)
+        self.state_validator = GiskardRobotBulletCollisionChecker(self.is_3D, req.root_link, req.tip_link,
+                                                                  collision_scene, dist=req.dist)
+        rospy.logerr('11')
+        self.motion_validator = ObjectRayMotionValidator(collision_scene, req.tip_link, robot, self.state_validator,
+                                                         self.god_map, js=js)
+        rospy.logerr('111')
+        p = self.sample(js, req.tip_link, self.get_in_map(req.goal))
+        rospy.logerr('1111')
+        ps = PoseStamped()
+        ps.header.frame_id = 'map'
+        ps.pose = p
+        return ps
+
+    def get_pregrasp_orientation_cb(self, req):
+        q_arr = self.get_orientation(self.get_in_map(req.start), self.get_in_map(req.goal))
+        ps = PoseStamped()
+        ps.header.frame_id = 'map'
+        ps.pose = self.get_in_map(req.start)
+        ps.pose.orientation.x = q_arr[0]
+        ps.pose.orientation.y = q_arr[1]
+        ps.pose.orientation.z = q_arr[2]
+        ps.pose.orientation.w = q_arr[3]
+        return ps
+
+    def get_orientation(self, curr, goal):
+        return GoalRegionSampler(self.is_3D, goal, lambda _: True, lambda _: 0).get_orientation(curr)
+
+    def sample(self, js, tip_link, goal):
+        valid_fun = self.state_validator.is_collision_free
+        goal_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
+        s_m = SimpleRayMotionValidator(tip_link, self.god_map, ignore_state_validator=True, js=js)
+        # Sample goal points which are e.g. in the aabb of the object to pick up
+        goal_grs.sample(.5)  # todo d is max aabb size of object
+        goals = list()
+        next_goals = list()
+        for s in goal_grs.samples:
+            o_g = s[1]
+            if s_m.checkMotion(o_g, goal):
+                goals.append(o_g)
+        # Find valid goal poses which allow motion towards the sampled goal points above
+        tip_link_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
+        motion_cost = lambda a, b: np.sqrt(np.sum((pose_to_np(a)[0] - pose_to_np(b)[0])**2))
+        for sampled_goal in goals:
+            if len(next_goals) > 0:
+                break
+            tip_link_grs.valid_sample(d=.5, max_samples=10)
+            for s in tip_link_grs.valid_samples:
+                n_g = s[1]
+                if self.motion_validator.checkMotion(n_g, sampled_goal):
+                    next_goals.append([motion_cost(n_g, sampled_goal), n_g, sampled_goal])
+            tip_link_grs.valid_samples = list()
+        return sorted(next_goals, key=lambda e: e[0])[0][1], sorted(next_goals, key=lambda e: e[0])[0][2]
 
 
 class GlobalPlanner(GetGoal):
@@ -1601,6 +1720,19 @@ class GlobalPlanner(GetGoal):
 
         self.initialised_planners = False
         self.collisionCheckerInterface = CollisionCheckerInterface()
+
+    def _get_motion_validator_class(self, motion_validator_type, default=None):
+        if default is None:
+            default = ObjectRayMotionValidator
+        if motion_validator_type is not None:
+            if motion_validator_type == 'rays':
+                return ObjectRayMotionValidator
+            elif motion_validator_type == 'box':
+                return CompoundBoxMotionValidator
+            elif motion_validator_type == 'discrete':
+                return None
+            else:
+                return default
 
     def get_cart_goal(self, cmd):
         try:
@@ -1672,9 +1804,10 @@ class GlobalPlanner(GetGoal):
                                   ' nevertheless continuing with planning...')
                 self.collision_scene.update_collision_environment()
                 map_frame = self.get_god_map().get_data(identifier.map_frame)
+                motion_validator_class = self._get_motion_validator_class(self.get_god_map().get_data(identifier.rosparam + ['global_planner', 'navigation', 'motion_validator']))
                 planner = NavigationPlanner(self.kitchen_floor_space, self.collision_scene,
-                                            self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame,
-                                            config=self.navigation_config)
+                                            self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame, self.god_map,
+                                            config=self.navigation_config, motion_validator_class=motion_validator_class)
                 js = self.get_god_map().get_data(identifier.joint_states)
                 try:
                     trajectory = planner.plan(js)
@@ -1700,10 +1833,13 @@ class GlobalPlanner(GetGoal):
                     continue
                 self.collision_scene.update_collision_environment()
                 map_frame = self.get_god_map().get_data(identifier.map_frame)
+                motion_validator_class = None
+                if not discrete_checking:
+                    motion_validator_class = self._get_motion_validator_class(self.get_god_map().get_data(identifier.rosparam + ['global_planner', 'movement', 'motion_validator']))
                 planner = MovementPlanner(self.kitchen_space, self.collision_scene,
-                                          self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame,
+                                          self.robot, self.root_link, self.tip_link, self.pose_goal, map_frame, self.god_map,
                                           config=self.movement_config, planner_name=planner_name,
-                                          discrete_checking=discrete_checking)
+                                          discrete_checking=discrete_checking, motion_validator_class=motion_validator_class)
                 js = self.get_god_map().get_data(identifier.joint_states)
                 try:
                     trajectory = planner.plan(js)
@@ -1794,8 +1930,8 @@ class GlobalPlanner(GetGoal):
 
 class OMPLPlanner(object):
 
-    def __init__(self, is_3D, space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame, config,
-                 planner_name=None, discrete_checking=False):
+    def __init__(self, is_3D, space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame, config, god_map,
+                 planner_name=None, discrete_checking=False, motion_validator_class=None):
         self.setup = None
         self.is_3D = is_3D
         self.space = space
@@ -1806,8 +1942,10 @@ class OMPLPlanner(object):
         self.pose_goal = pose_goal
         self.map_frame = map_frame
         self.config = config
+        self.god_map = god_map
         self.planner_name = planner_name
         self.discrete_checking = discrete_checking
+        self.motion_validator_class = motion_validator_class
         self._planner_solve_params = dict()
         self._planner_solve_params['kABITstar'] = {
             'slow_without_refine': SolveParameters(initial_solve_time=480, refine_solve_time=5,
@@ -1933,32 +2071,14 @@ class OMPLPlanner(object):
         return state
 
     @profile
-    def next_goal(self, env_js, goal):
-        valid_fun = self.setup.getSpaceInformation().isValid
-        h = PathLengthAndGoalOptimizationObjective(self.setup.getSpaceInformation(), goal)
-        goal_grs = OMPLGoalRegionSampler(self.setup, self.is_3D, goal, self.space, valid_fun, h.stateCost)
-        s_m = SimpleRayMotionValidator(self.tip_link, ignore_state_validator=True, js=env_js)
-        simple_motion = OMPLMotionValidator(self.setup.getSpaceInformation(), self.is_3D, s_m)
-        # Sample goal points which are e.g. in the aabb of the object to pick up
-        goal_grs.sample(.5)  # todo d is max aabb size of object
-        goals = list()
-        next_goals = list()
-        for s in goal_grs.samples:
-            o_g = s[1]
-            if simple_motion.checkMotion(o_g(), goal()):
-                goals.append(o_g)
-        # Find valid goal poses which allow motion towards the sampled goal points above
-        tip_link_grs = OMPLGoalRegionSampler(self.setup, self.is_3D, goal, self.space, valid_fun, h.stateCost)
-        for sampled_goal in goals:
-            if len(next_goals) > 0:
-                break
-            tip_link_grs.valid_sample(d=.5, max_samples=10)
-            for s in tip_link_grs.valid_samples:
-                n_g = s[1]
-                if self.setup.getSpaceInformation().checkMotion(n_g(), sampled_goal()):
-                    next_goals.append([h.motionCost(n_g(), sampled_goal()).value(), n_g])
-            tip_link_grs.valid_samples = list()
-        return sorted(next_goals, key=lambda e: e[0])[0][1]
+    def next_goal(self, js, goal):
+        p = self.god_map.get_data(identifier.tree_manager).get_node('PreGraspSampler')
+        collision_scene = self.god_map.get_data(identifier.collision_scene)
+        robot = self.god_map.get_data(identifier.robot)
+        p.state_validator = GiskardRobotBulletCollisionChecker(self.is_3D, self.root_link, self.tip_link, collision_scene, dist=0.0)
+        p.motion_validator = ObjectRayMotionValidator(collision_scene, self.tip_link, robot, p.state_validator, self.god_map, js=js)
+        pose, debug_pose = p.sample(js, self.tip_link, ompl_se3_state_to_pose(goal()))
+        return pose_to_ompl_se3(self.space, pose)
 
     #def get_shorten_path(self, poses):
     #    for i in reversed(range(0, len(poses))):
@@ -2013,11 +2133,11 @@ class OMPLPlanner(object):
 
 class MovementPlanner(OMPLPlanner):
 
-    def __init__(self, kitchen_space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame,
-                 config='slow_without_refine', planner_name=None, discrete_checking=False):
+    def __init__(self, kitchen_space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame, god_map,
+                 config='slow_without_refine', planner_name=None, discrete_checking=False, motion_validator_class=None):
         super(MovementPlanner, self).__init__(True, kitchen_space, collision_scene, robot, root_link, tip_link,
-                                              pose_goal, map_frame, config, planner_name=planner_name,
-                                              discrete_checking=discrete_checking)
+                                              pose_goal, map_frame, config, god_map, planner_name=planner_name,
+                                              discrete_checking=discrete_checking, motion_validator_class=motion_validator_class)
 
     def get_planner(self, si):
         # rays do not hit the object:
@@ -2083,8 +2203,8 @@ class MovementPlanner(OMPLPlanner):
         si = self.setup.getSpaceInformation()
 
         # si.getStateSpace().setStateSamplerAllocator()
-        collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.root_link, self.tip_link, self.collision_scene)
-        si.setStateValidityChecker(ThreeDimStateValidator(si, collision_checker))
+        self.collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.root_link, self.tip_link, self.collision_scene)
+        si.setStateValidityChecker(ThreeDimStateValidator(si, self.collision_checker))
 
         if self.discrete_checking:
             si.setStateValidityCheckingResolution(1. / ((self.space.getMaximumExtent() * 3) / self.range))
@@ -2097,8 +2217,8 @@ class MovementPlanner(OMPLPlanner):
                                     self.space.getMaximumExtent() * si.getStateValidityCheckingResolution()))
         else:
             #motion_validator = ObjectRayMotionValidator(self.collision_scene, self.tip_link, self.robot, collision_checker, js=js)
-            motion_validator = CompoundBoxMotionValidator(self.collision_scene, self.tip_link, self.robot, collision_checker, js=js)
-            si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, motion_validator))
+            self.motion_validator = self.motion_validator_class(self.collision_scene, self.tip_link, self.robot, self.collision_checker, self.god_map, js=js)
+            si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, self.motion_validator))
 
         if self.setup.getPlanner().getName() == 'InformedRRTstar':
             self.create_goal_specific_space()
@@ -2163,10 +2283,10 @@ class MovementPlanner(OMPLPlanner):
 
 class NavigationPlanner(OMPLPlanner):
 
-    def __init__(self, kitchen_floor_space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame,
-                 config='fast_without_refine'):
+    def __init__(self, kitchen_floor_space, collision_scene, robot, root_link, tip_link, pose_goal, map_frame, god_map,
+                 config='fast_without_refine', motion_validator_class=None):
         super(NavigationPlanner, self).__init__(False, kitchen_floor_space, collision_scene, robot, root_link, tip_link,
-                                                pose_goal, map_frame, config)
+                                                pose_goal, map_frame, config, god_map, motion_validator_class=motion_validator_class)
 
     def get_planner(self, si):
         # Navigation:
@@ -2187,12 +2307,11 @@ class NavigationPlanner(OMPLPlanner):
     def plan(self, js, plot=True):
 
         si = self.setup.getSpaceInformation()
-        collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.robot.root_link, u'base_footprint',
-                                                               self.collision_scene, dist=0.1)
-        si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker))
-        motion_validator = CompoundBoxMotionValidator(self.collision_scene, u'base_footprint', self.robot,
-                                                    collision_checker, js=js)
-        si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, motion_validator))
+        self.collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.robot.root_link, u'base_footprint',
+                                                                    self.collision_scene, dist=0.1)
+        si.setStateValidityChecker(TwoDimStateValidator(si, self.collision_checker))
+        self.motion_validator = self.motion_validator_class(self.collision_scene, u'base_footprint', self.robot, self.collision_checker, self.god_map, js=js)
+        si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, self.motion_validator))
 
         si.setup()
         # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(allocGiskardValidStateSample))
@@ -2273,6 +2392,16 @@ def ompl_se3_state_to_pose(state):
 
 def pose_to_ompl_se3(space, pose):
     state = ob.State(space)
+    state().setX(pose.position.x)
+    state().setY(pose.position.y)
+    state().setZ(pose.position.z)
+    state().rotation().x = pose.orientation.x
+    state().rotation().y = pose.orientation.y
+    state().rotation().z = pose.orientation.z
+    state().rotation().w = pose.orientation.w
+    return state
+
+def copy_pose_to_ompl_se3(state, pose):
     state().setX(pose.position.x)
     state().setY(pose.position.y)
     state().setZ(pose.position.z)

@@ -67,7 +67,7 @@ class GlobalPlannerNeeded(GetGoal):
             else:
                 collision_checker = GiskardRobotBulletCollisionChecker(tip_link!='base_footprint', root_link,
                                                                        tip_link, self.collision_scene)
-                m = ObjectRayMotionValidator(self.collision_scene, tip_link, self.robot, collision_checker,
+                m = ObjectRayMotionValidator(self.collision_scene, tip_link, self.robot, collision_checker, self.god_map,
                                              js=self.get_god_map().get_data(identifier.joint_states))
                 start = np_to_pose(self.get_robot().get_fk(root_link, tip_link))
                 return not m.check_motion(start, pose_goal)

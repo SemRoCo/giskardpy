@@ -1525,11 +1525,9 @@ class GoalRegionSampler:
         return np.arctan2(dz, a)
 
     def get_pitch(self, pos_b):
+        """ :returns: value in [-np.pi, np.pi] """
         l_a = self._get_pitch(pos_b)
-        if pos_b[0] >= 0:
-            return -l_a
-        else:
-            return np.pi - l_a
+        return -l_a
 
     def _get_yaw(self, pos_b):
         pos_a = np.zeros(3)
@@ -1542,6 +1540,7 @@ class GoalRegionSampler:
         return np.arctan2(g, a)
 
     def get_yaw(self, pos_b):
+        """ :returns: value in [-2.*np.pi, 2.*np.pi] """
         l_a = self._get_yaw(pos_b)
         if pos_b[0] >= 0 and pos_b[1] >= 0:
             return l_a
@@ -1550,7 +1549,7 @@ class GoalRegionSampler:
         elif pos_b[0] <= 0 and pos_b[1] >= 0:
             return np.pi - l_a
         else:
-            return np.pi + l_a # todo: -np.pi + l_a
+            return -np.pi + l_a # todo: -np.pi + l_a
 
     def valid_sample(self, d=0.5, max_samples=100):
         i = 0
@@ -1578,9 +1577,9 @@ class GoalRegionSampler:
             diff = [self.goal.position.x-p.position.x,
                     self.goal.position.y-p.position.y,
                     self.goal.position.z-p.position.z]
-            pitch = self.get_pitch(diff) # fixme: pitch is wrong sometimes
+            pitch = self.get_pitch(diff)
             yaw = self.get_yaw(diff)
-            return tf.transformations.quaternion_from_euler(0, 0, yaw)
+            return tf.transformations.quaternion_from_euler(0, pitch, yaw)
         else:
             diff = [self.goal.position.x-p.position.x,
                     self.goal.position.y-p.position.y,
@@ -1599,12 +1598,12 @@ class GoalRegionSampler:
 
         if self.is_3D:
             z = round(uniform(self.goal.position.z - d, self.goal.position.z + d), self.precision)
+            s.position.z = z
             q = self.get_orientation(s)
             s.orientation.x = q[0]
             s.orientation.y = q[1]
             s.orientation.z = q[2]
             s.orientation.w = q[3]
-            s.position.z = z
         else:
             q = self.get_orientation(s)
             s.orientation.x = q[0]
@@ -2162,7 +2161,7 @@ class MovementPlanner(OMPLPlanner):
                 raise Exception('Planner name {} is not known.'.format(self.planner_name))
         else:
             planner = og.RRTConnect(si)
-            self.range = 0.05
+            self.range = 0.1
             planner.setRange(self.range)
         # planner.setSampleRejection(True)
         # planner.setOrderedSampling(True)

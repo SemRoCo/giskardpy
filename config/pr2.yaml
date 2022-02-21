@@ -21,6 +21,9 @@ general_options:
       odom_y_joint: 0.05
       odom_z_joint: 0.05
       torso_lift_joint: 0.05
+plugins:
+  LoopDetector:
+    precision: 4 # decimal places
 collision_avoidance:
   external_collision_avoidance:
     distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links

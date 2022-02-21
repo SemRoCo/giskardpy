@@ -28,8 +28,11 @@ class GoalReachedPlugin(GiskardBehavior):
             velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution)[0].values()))
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
+                run_time = self.get_runtime()
                 logging.loginfo('Found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * self.sample_period,
-                                                                                       self.get_runtime()))
+                                                                                       run_time))
+                self.time_collector.lengths.append(planning_time * self.sample_period)
+                self.time_collector.times.append(run_time)
                 return Status.SUCCESS
         return Status.RUNNING
 

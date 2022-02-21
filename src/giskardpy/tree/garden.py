@@ -52,6 +52,7 @@ from giskardpy.tree.composites.async_composite import PluginBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
+from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
 
@@ -209,6 +210,7 @@ class TreeManager(object):
     @profile
     def from_param_server(cls):
         god_map = GodMap.init_from_paramserver(rospy.get_name())
+        god_map.set_data(identifier.timer_collector, TimeCollector(god_map))
         blackboard = Blackboard
         blackboard.god_map = god_map
         mode = god_map.get_data(identifier.control_mode)

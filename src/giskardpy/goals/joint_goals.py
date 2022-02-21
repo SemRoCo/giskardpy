@@ -440,6 +440,8 @@ class JointPositionList(Goal):
         :param max_velocity: float, default is the default of the added joint goals
         """
         super(JointPositionList, self).__init__(**kwargs)
+        if len(goal_state.name) == 0:
+            raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for i, joint_name in enumerate(goal_state.name):
             if not self.world.has_joint(joint_name):
                 raise KeyError(f'unknown joint \'{joint_name}\'')

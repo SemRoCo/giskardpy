@@ -472,6 +472,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.tree.tick()
 
     def tear_down(self):
+        self.god_map.unsafe_get_data(identifier.timer_collector).print()
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
@@ -845,7 +846,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.collision_scene.reset_cache()
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
-                                                                                    defaultdict(lambda: 0.3))
+                                                                                    defaultdict(lambda: 0.3), {})
         collisions = self.collision_scene.check_collisions(collision_matrix)
         controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link)
         controlled_parent_link = self.robot.joints[controlled_parent_joint].child_link_name
@@ -1248,6 +1249,7 @@ class HSR(GiskardTestWrapper):
         'hand_l_spring_proximal_joint': 0,
         'hand_r_spring_proximal_joint': 0
     }
+    better_pose = default_pose
 
     def __init__(self):
         self.tip = 'hand_palm_link'

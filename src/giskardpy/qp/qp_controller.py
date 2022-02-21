@@ -14,6 +14,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
+from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import memoize, create_path
 
 
@@ -34,7 +35,10 @@ def save_pandas(dfs, names, path):
 
 
 class Parent(object):
-    def __init__(self, sample_period, prediction_horizon, order):
+    time_collector: TimeCollector
+
+    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
+        self.time_collector = time_collector
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.order = order
@@ -280,8 +284,8 @@ class BA(Parent):
 
 
 class A(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order):
-        super(A, self).__init__(sample_period, prediction_horizon, order)
+    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order, time_collector):
+        super(A, self).__init__(sample_period, prediction_horizon, order, time_collector)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
@@ -396,9 +400,11 @@ class A(Parent):
         J_err = w.jacobian(w.Matrix(self.get_constraint_expressions()), self.get_free_variable_symbols(), order=1)
         J_vel *= self.sample_period
         J_err *= self.sample_period
-        logging.loginfo('computed Jacobian in {:.5f}s'.format(time() - t))
+        jac_time = time() - t
+        logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
+        self.time_collector.jacobians.append(jac_time)
 
         # position limits
         vertical_offset = number_of_joints * self.prediction_horizon
@@ -488,10 +494,12 @@ class QPController(object):
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
+    time_collector: TimeCollector
 
     def __init__(self, sample_period, prediction_horizon, solver_name,
                  free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
-                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100):
+                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None):
+        self.time_collector = time_collector
         self.free_variables = []  # type: list[FreeVariable]
         self.constraints = []  # type: list[Constraint]
         self.velocity_constraints = []  # type: list[VelocityConstraint]
@@ -604,8 +612,9 @@ class QPController(object):
         free_symbols = list(free_symbols)
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              free_symbols)
-
-        logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(time() - t))
+        compilation_time = time() - t
+        logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(compilation_time))
+        self.time_collector.compilations.append(compilation_time)
         # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
@@ -713,10 +722,12 @@ class QPController(object):
         self.bA = BA(self.free_variables, self.constraints, self.velocity_constraints, self.sample_period,
                      self.prediction_horizon, self.order)
         self.A = A(self.free_variables, self.constraints, self.velocity_constraints, self.sample_period,
-                   self.prediction_horizon, self.order)
+                   self.prediction_horizon, self.order, self.time_collector)
 
         logging.loginfo('Constructing new controller with {} constraints and {} free variables...'.format(
             self.A.height, self.A.width))
+        self.time_collector.constraints.append(self.A.height)
+        self.time_collector.variables.append(self.A.width)
 
         self._init_big_ass_M()
 

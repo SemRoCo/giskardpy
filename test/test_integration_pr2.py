@@ -161,6 +161,7 @@ class TestJointGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         js = {'r_wrist_roll_joint': -pi,
               'l_wrist_roll_joint': -2.1 * pi, }
         zero_pose.set_joint_goal(js)
@@ -1522,6 +1523,7 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = 'base_footprint'

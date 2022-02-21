@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
@@ -184,6 +184,72 @@ class TestConstraints(object):
         goal_point = tf.lookup_point('map', tip)
         better_pose.set_pointing_goal(tip, goal_point, root_link=tip)
 
+    def test_open_fridge(self, kitchen_setup):
+        """
+        :type kitchen_setup: Donbot
+        """
+        handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        handle_name = 'iai_fridge_door_handle'
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position = Point(0.3, -0.5, 0)
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        kitchen_setup.teleport_base(base_goal)
+
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.gripper_tip
+        tip_grasp_axis.vector.y = 1
+
+        kitchen_setup.set_json_goal('GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.gripper_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.4)
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.gripper_tip
+        x_gripper.vector.z = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        kitchen_setup.set_align_planes_goal(kitchen_setup.gripper_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
+        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.set_json_goal('Open',
+                                    tip_link=kitchen_setup.gripper_tip,
+                                    environment_link=handle_name,
+                                    goal_joint_state=1.5)
+        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.add_json_goal('AvoidJointLimits')
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 1.5})
+
+        kitchen_setup.set_json_goal('Open',
+                                    tip_link=kitchen_setup.gripper_tip,
+                                    environment_link=handle_name,
+                                    goal_joint_state=0)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 0})
+
+        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.plan_and_execute()
 
 class TestCartGoals(object):
     def test_cart_goal_1eef(self, zero_pose):

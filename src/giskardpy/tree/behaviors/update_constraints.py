@@ -161,7 +161,7 @@ class GoalToConstraints(GetGoal):
             if collision_cmd.type == CollisionEntry.AVOID_ALL_COLLISIONS or \
                     self.collision_scene.is_avoid_all_collision(collision_cmd):
                 soft_threshold = collision_cmd.min_dist
-
+        self.time_collector.collision_avoidance.append(0)
         if not collision_cmds or not self.collision_scene.is_allow_all_collision(collision_cmds[-1]):
             self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
         if not collision_cmds or (not self.collision_scene.is_allow_all_collision(collision_cmds[-1]) and
@@ -199,6 +199,7 @@ class GoalToConstraints(GetGoal):
 
         num_external = len(soft_constraints)
         loginfo('adding {} external collision avoidance constraints'.format(num_external))
+        self.time_collector.collision_avoidance[-1] += num_external
         self.soft_constraints.update(soft_constraints)
         self.vel_constraints.update(vel_constraints)
         self.debug_expr.update(debug_expr)
@@ -255,6 +256,7 @@ class GoalToConstraints(GetGoal):
                 vel_constraints.update(c_vel)
                 debug_expr.update(debug_expressions)
         loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
+        self.time_collector.collision_avoidance[-1] += len(soft_constraints)
         self.soft_constraints.update(soft_constraints)
         self.vel_constraints.update(vel_constraints)
         self.debug_expr.update(debug_expr)

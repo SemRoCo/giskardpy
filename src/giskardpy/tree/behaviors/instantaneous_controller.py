@@ -1,3 +1,5 @@
+from time import time
+
 from py_trees import Status
 
 import giskardpy.identifier as identifier
@@ -18,6 +20,7 @@ class ControllerPlugin(GiskardBehavior):
 
     @profile
     def initialise(self):
+        t = time()
         super(ControllerPlugin, self).initialise()
         constraints = self.get_god_map().get_data(identifier.constraints)
         vel_constraints = self.get_god_map().get_data(identifier.vel_constraints)
@@ -39,6 +42,8 @@ class ControllerPlugin(GiskardBehavior):
         )
 
         self.controller.compile()
+        t2 = time() - t
+        self.get_blackboard().runtime += t2
 
     @profile
     def update(self):

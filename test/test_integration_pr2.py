@@ -1530,7 +1530,7 @@ class TestCartGoals(object):
         p.pose.position = Point(0.599, -0.009, 0.983)
         p.pose.orientation = Quaternion(0.524, -0.495, 0.487, -0.494)
         zero_pose.allow_all_collisions()
-        zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, 'torso_lift_link')
         zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef3(self, zero_pose):
@@ -3624,9 +3624,14 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
+        # FIXME
         attached_link_name = 'pocky'
-        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
-        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 0.01
+        p.pose.orientation.w = 1
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, p)
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, p,
                              expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)

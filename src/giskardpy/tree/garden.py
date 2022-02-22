@@ -549,7 +549,7 @@ class OpenLoop(TreeManager):
         if self.god_map.get_data(identifier.enable_CPIMarker) and self.god_map.get_data(
                 identifier.collision_checker) is not None:
             planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
-        planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
+        # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         planning_2.add_child(self.grow_planning3())
         return planning_2
 

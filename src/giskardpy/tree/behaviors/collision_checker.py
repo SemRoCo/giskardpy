@@ -1,6 +1,7 @@
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Lock
+from time import time
 
 from py_trees import Status
 
@@ -30,6 +31,7 @@ class CollisionChecker(GiskardBehavior):
 
     @profile
     def initialise(self):
+        t = time()
         self.collision_scene.sync()
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
         max_distances = self.make_max_distances()
@@ -44,6 +46,8 @@ class CollisionChecker(GiskardBehavior):
         self.collision_list_size = self._cal_max_param('number_of_repeller')
 
         super(CollisionChecker, self).initialise()
+        t2 = time() - t
+        self.get_blackboard().runtime += t2
 
     def make_max_distances(self):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)

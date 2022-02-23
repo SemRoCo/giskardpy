@@ -360,7 +360,10 @@ class GiskardWrapper(object):
             if isinstance(v, list):
                 kwargs[k] = []
                 for i in v:
-                    kwargs[k].append(convert_ros_message_to_dictionary(i))
+                    try:
+                        kwargs[k].append(convert_ros_message_to_dictionary(i))
+                    except AttributeError:
+                        kwargs[k].append(i)
             if isinstance(v, Message):
                 kwargs[k] = convert_ros_message_to_dictionary(v)
             if isinstance(v, PrefixName):

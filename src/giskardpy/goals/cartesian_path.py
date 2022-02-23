@@ -12,7 +12,7 @@ class CartesianPathCarrot(Goal):
 
     def __init__(self, root_link, tip_link, goal, goals=None, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, ignore_trajectory_orientation=False, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, ignore_trajectory_orientation=False, predict_f = 1.0, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -34,6 +34,7 @@ class CartesianPathCarrot(Goal):
         self.max_linear_acceleration = max_linear_acceleration
         self.max_angular_acceleration = max_angular_acceleration
         self.ignore_trajectory_orientation = ignore_trajectory_orientation
+        self.predict_f = predict_f
 
         if goals is not None and len(goals) != 0:
             self.trajectory_length = len(goals)
@@ -96,7 +97,7 @@ class CartesianPathCarrot(Goal):
 
     def predict(self):
         v = self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
-        v_p = w.save_division(v, w.norm(v), 0) * self.max_linear_velocity * 10 #todo: make parameter for num
+        v_p = w.save_division(v, w.norm(v), 0) * self.max_linear_velocity * self.predict_f
         p = w.position_of(self.get_fk(self.root_link, self.tip_link))
         s = self.get_sampling_period_symbol()
         n_p = p[0:3] + v_p * s

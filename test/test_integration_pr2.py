@@ -2876,7 +2876,7 @@ class TestCartesianPath(object):
         """
         :type kitchen_setup_avoid_collisions: PR2
         """
-        # FIXME
+        # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
 
@@ -2937,7 +2937,8 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      tip_link=kitchen_setup_avoid_collisions.r_tip,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
-                                                     goal=post_grasp_pose)
+                                                     goal=post_grasp_pose,
+                                                     goal_sampling_axis=[True,False,False])
         kitchen_setup_avoid_collisions.plan_and_execute()
         #kitchen_setup.set_joint_goal(gaya_pose)
 
@@ -2963,7 +2964,7 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.plan_and_execute()
 
     def test_ease_cereal_with_planner(self, kitchen_setup_avoid_collisions):
-        # FIXME
+        # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
 
@@ -3058,7 +3059,7 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.plan_and_execute()
 
     def test_ease_cereal_different_drawers(self, kitchen_setup_avoid_collisions):
-        # FIXME
+        # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_3_link'
 
@@ -5987,6 +5988,7 @@ class TestEASE():
         :return:
         """
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
+        tip = kitchen_setup.l_tip
         cup_name = u'cup'
         percentage = 50
         drawer_handle = u'kitchen_island_left_upper_drawer_handle'
@@ -5995,7 +5997,8 @@ class TestEASE():
         # teleport to cup drawer
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
-        base_goal.pose.position.y = 0.1
+        base_goal.pose.position.x = 0.5
+        base_goal.pose.position.y = 1.0
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
         kitchen_setup.teleport_base(base_goal)
 
@@ -6008,25 +6011,25 @@ class TestEASE():
         bar_center.header.frame_id = drawer_handle
 
         tip_grasp_axis = Vector3Stamped()
-        tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
+        tip_grasp_axis.header.frame_id = tip
         tip_grasp_axis.vector.z = 1
 
         kitchen_setup.set_json_goal(u'GraspBar',
                                     root_link=kitchen_setup.default_root,
-                                    tip_link=kitchen_setup.r_tip,
+                                    tip_link=tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
-                                    bar_length=0.4)  # TODO: check for real length
+                                    bar_length=0.1)
         x_gripper = Vector3Stamped()
-        x_gripper.header.frame_id = kitchen_setup.r_tip
+        x_gripper.header.frame_id = tip
         x_gripper.vector.x = 1
 
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = drawer_handle
         x_goal.vector.x = -1
 
-        kitchen_setup.set_align_planes_goal(kitchen_setup.r_tip,
+        kitchen_setup.set_align_planes_goal(tip,
                                             x_gripper,
                                             root_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
@@ -6034,7 +6037,7 @@ class TestEASE():
 
         # open drawer
         kitchen_setup.set_json_goal(u'Open',
-                                    tip_link=kitchen_setup.r_tip,
+                                    tip_link=tip,
                                     environment_link=drawer_handle)
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
@@ -6058,30 +6061,41 @@ class TestEASE():
         kitchen_setup.plan_and_execute()
 
         # grasp cup
-        r_goal = deepcopy(cup_pose)
-        r_goal.pose.position.z += .2
+        # pregrasp
+        pregrasp_r_goal = deepcopy(cup_pose)
+        pregrasp_r_goal.pose.position.z += .2
         req = GetPreGraspOrientationRequest()
         req.root_link = kitchen_setup.default_root
-        req.tip_link = kitchen_setup.r_tip
+        req.tip_link = tip
         req.dist = 0.0
-        req.start = r_goal
+        req.start = pregrasp_r_goal
         req.goal = deepcopy(cup_pose)
         get_pregrasp = rospy.ServiceProxy('~get_pregrasp_orientation', GetPreGraspOrientation)
-        r_goal = get_pregrasp(req).pregrasp
+        pregrasp_r_goal = get_pregrasp(req).pregrasp
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(pregrasp_r_goal, tip, kitchen_setup.default_root)
         kitchen_setup.plan_and_execute()
 
+        # grasp
+        r_goal = deepcopy(pregrasp_r_goal)
         r_goal.pose.position.z -= .2
         kitchen_setup.allow_collision([CollisionEntry.ALL], cup_name, [CollisionEntry.ALL])
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(r_goal, tip, kitchen_setup.default_root)
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cup_name, kitchen_setup.r_tip)
+        # attach cup
+        kitchen_setup.attach_object(cup_name, tip)
 
+        # pregrasp
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_cart_goal(pregrasp_r_goal, tip, kitchen_setup.default_root)
+        kitchen_setup.plan_and_execute()
+
+        # gaya pose
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.plan_and_execute()
+
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
         base_goal.pose.position.x = -.1

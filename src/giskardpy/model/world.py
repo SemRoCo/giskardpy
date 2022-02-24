@@ -293,11 +293,11 @@ class WorldTree(object):
 
         helper(parsed_urdf, base_footprint)
 
-        self._set_free_variables_on_mimic_joints()
         if group_name is not None:
             self.register_group(group_name, odom.name)
         if self.god_map is not None:
             self.sync_with_paramserver()
+        self._set_free_variables_on_mimic_joints(group_name)
 
     def _add_fixed_joint(self, parent_link, child_link, joint_name=None):
         if joint_name is None:
@@ -332,8 +332,9 @@ class WorldTree(object):
         self._link_joint_to_links(diff_drive_joint, base_footprint)
         return base_footprint, odom
 
-    def _set_free_variables_on_mimic_joints(self):
-        for joint_name, joint in self.joints.items():  # type: (PrefixName, MimicJoint)
+    def _set_free_variables_on_mimic_joints(self, group_name):
+        # TODO prevent this from happening twice
+        for joint_name, joint in self.groups[group_name].joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
                 mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
                 joint.set_mimed_free_variable(mimed_joint.free_variable)

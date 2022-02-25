@@ -100,12 +100,13 @@ def sanity_check(god_map):
 
 
 def sanity_check_derivatives(god_map):
-    weights = god_map.get_data(identifier.joint_weights)
-    limits = god_map.get_data(identifier.joint_limits)
-    check_derivatives(weights, 'Weights')
-    check_derivatives(limits, 'Limits')
-    if len(weights) != len(limits):
-        raise AttributeError('Weights and limits are not defined for the same number of derivatives')
+    for robot_name in god_map.get_data(identifier.rosparam + ['namespaces']):
+        weights = god_map.get_data(identifier.joint_weights[robot_name])
+        limits = god_map.get_data(identifier.joint_limits[robot_name])
+        check_derivatives(weights, 'Weights')
+        check_derivatives(limits, 'Limits')
+        if len(weights) != len(limits):
+            raise AttributeError('Weights and limits are not defined for the same number of derivatives')
 
 
 def check_derivatives(entries, name):

@@ -319,7 +319,7 @@ class CollisionWorldSynchronizer(object):
                         del min_allowed_distance[r_key]
 
                 elif self.is_avoid_collision(collision_entry):
-                    min_allowed_distance[key] = min_dist[key[0]]
+                    min_allowed_distance[key] = min_dist[collision_entry.robot_name][key[0]]
                 else:
                     raise Exception('todo')
         return min_allowed_distance

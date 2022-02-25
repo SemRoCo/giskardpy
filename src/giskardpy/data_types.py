@@ -15,12 +15,15 @@ class KeyDefaultDict(defaultdict):
     A default dict where the key is passed as parameter to the factory function.
     """
 
-    def __missing__(self, key):
+    def __missing__(self, key, cache=True):
         if self.default_factory is None:
             raise KeyError(key)
         else:
-            ret = self[key] = self.default_factory(key)
-            return ret
+            if cache:
+                ret = self[key] = self.default_factory(key)
+                return ret
+            else:
+                return self.default_factory(key)
 
 
 class FIFOSet(set):
@@ -415,6 +418,15 @@ class BiDict(dict):
         if self[key] in self.inverse and not self.inverse[self[key]]:
             del self.inverse[self[key]]
         super(BiDict, self).__delitem__(key)
+
+
+class PrefixDefaultDict(KeyDefaultDict):
+
+    def __missing__(self, key):
+        """
+        :type key: PrefixName
+        """
+        return super(PrefixDefaultDict, self).__missing__(key.prefix, cache=False)
 
 
 class PrefixName(object):

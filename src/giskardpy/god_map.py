@@ -8,23 +8,80 @@ import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.data_types import KeyDefaultDict, PrefixName
+from giskardpy.data_types import KeyDefaultDict, PrefixName, PrefixDefaultDict
 from giskardpy.utils.config_loader import get_namespaces
 
 
-def set_default_in_override_block(block_identifier, god_map):
-    default_value = god_map.get_data(block_identifier[:-1] + ['default'])
-    override = god_map.get_data(block_identifier)
-    d = defaultdict(lambda: default_value)
+def get_default_in_override_block(block_identifier, god_map, prefix=None):
+    if prefix is not None:
+        if identifier.rosparam[0] in block_identifier:
+            full_block_identifier = identifier.rosparam + prefix + block_identifier[block_identifier.index(identifier.rosparam[0])+1:]
+        else:
+            full_block_identifier = prefix + block_identifier
+    else:
+        full_block_identifier = block_identifier
+    try:
+        default_value = god_map.get_data(full_block_identifier[:-1] + ['default'])
+    except KeyError:
+        default_value = god_map.get_data(block_identifier[:-1] + ['default'])
+    override = god_map.get_data(full_block_identifier)
+    new_override = dict()
+    new_default_value = None
+    d = dict()
     if isinstance(override, dict):
         if isinstance(default_value, dict):
-            for key, value in override.items():
-                o = deepcopy(default_value)
+            new_default_value = dict()
+            for key, value in default_value.items():
+                if prefix is not None:
+                    new_key = PrefixName(key, prefix[0])
+                    if type(value) == dict():
+                        new_value = dict()
+                        for k, v in value.items():
+                            new_value[PrefixName(k, prefix[0])] = v
+                    else:
+                        new_value = value
+                    new_default_value[new_key] = new_value
+        else:
+            new_default_value = default_value
+        o = deepcopy(new_default_value)
+        for key, value in override.items():
+            if type(default_value) == dict():
                 o.update(value)
-                override[key] = o
-        d.update(override)
-    god_map.set_data(block_identifier, d)
+            if prefix is not None:
+                new_o = dict()
+                if type(o) == dict():
+                    for k, v in o.items():
+                        if type(k) == PrefixName:
+                            new_o[k] = v
+                        else:
+                            new_o[PrefixName(k, prefix[0])] = v
+                else:
+                    new_o[PrefixName(key, prefix[0])] = o
+                new_override = new_o
+            else:
+                new_override = override
+        d.update(new_override)
+    if d:
+        ret_d = defaultdict(lambda: new_default_value)
+        ret_d.update(d)
+    else:
+        ret_d = defaultdict(lambda: default_value)
+    return ret_d
+
+
+def set_default_in_override_block(block_identifier, god_map, namespaces):
+    d = dict()
+    for prefix in namespaces:
+        d[prefix] = get_default_in_override_block(block_identifier, god_map, [prefix])
+    defaults = dict()
+    for prefix in namespaces:
+        defaults[PrefixName('default', prefix)] = d[prefix].default_factory()
+    new_d = PrefixDefaultDict(lambda p: [v for k, v in defaults.items() if p == k.prefix][0])
+    for prefix in namespaces:
+        new_d.update(d[prefix])
+    god_map.set_data(block_identifier, new_d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
+
 
 def get_member(identifier, member):
     """
@@ -228,17 +285,16 @@ class GodMap(object):
         #     else:
         #         break
         #     rospy.sleep(0.5)
-
-        set_default_in_override_block(identifier.external_collision_avoidance, self)
-        set_default_in_override_block(identifier.self_collision_avoidance, self)
+        set_default_in_override_block(identifier.external_collision_avoidance, self, namespaces)
+        set_default_in_override_block(identifier.self_collision_avoidance, self, namespaces)
         # weights
         for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
-            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self)
+            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self, namespaces)
 
         # limits
         for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self)
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self, namespaces)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self, namespaces)
 
         return self
 

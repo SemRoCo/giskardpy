@@ -631,16 +631,20 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_translation_goal(**kwargs)
         self.set_rotation_goal(**kwargs)
 
-    def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, prefix=None, pointing_axis=None, weight=None):
+        if len(self.robot_names) == 1:
+            prefix = self.robot_names[0]
+        if root_link is None and prefix is None:
+            raise Exception('set_pointing_goal: Either root_link or prefix must be not None.')
         super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
                                                           goal_point=goal_point,
-                                                          root_link=root_link,
+                                                          root_link=root_link if root_link is not None else self.get_root(prefix),
                                                           pointing_axis=pointing_axis,
                                                           weight=weight)
         self.add_goal_check(PointingGoalChecker(self.god_map,
                                                 tip_link=tip_link,
                                                 goal_point=goal_point,
-                                                root_link=root_link if root_link else self.get_root(),
+                                                root_link=root_link if root_link is not None else self.get_root(prefix),
                                                 pointing_axis=pointing_axis))
 
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
@@ -1315,8 +1319,8 @@ class Donbot2(GiskardTestWrapper):
         self.set_localization_srvs = dict()
         super(Donbot2, self).__init__('package://giskardpy/config/donbot2.yaml')
         for robot_name in self.robot_names:
-            self.camera_tips[robot_name] = self.camera_tip
-            self.gripper_tips[robot_name] = self.gripper_tip
+            self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
+            self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)
             self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
             self.set_localization_srvs[robot_name] = rospy.ServiceProxy('/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
                                                                         UpdateTransform)

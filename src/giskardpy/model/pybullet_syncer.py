@@ -51,7 +51,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         return in_collision
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
+    def check_collisions(self, cut_off_distances, collision_list_sizes):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
@@ -64,7 +64,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         """
         all_collisions = dict()
         for robot_name in self.robot_names:
-            collisions = Collisions(self.world, collision_list_size, robot_name)
+            collisions = Collisions(self.world, collision_list_sizes[robot_name], robot_name)
             for (c_robot_name, robot_link, body_b, link_b), distance in cut_off_distances.items():
                 if c_robot_name != robot_name:
                     continue

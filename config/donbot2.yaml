@@ -1,4 +1,8 @@
-parent: !include donbot.yaml
+parent: !include default.yaml
+donbot_a:
+  parent: !include donbot.yaml # create in garden robot specific dicts for joint_limits, joint_weights, external_collision_avoidance and self_collision_avoidance with donbot_a as kw
+donbot_b:
+  parent: !include donbot.yaml
 action_server:
   /donbot_a/base:
     plugin: SendFollowJointTrajectory

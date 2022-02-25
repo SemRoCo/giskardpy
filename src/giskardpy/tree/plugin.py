@@ -46,6 +46,9 @@ class GiskardBehavior(Behaviour):
         """
         return self.world.groups[robot_name]
 
+    def robot_names(self):
+        return self.world.god_map.get_data(identifier.rosparam + ['namespaces'])
+
     def get_world(self):
         """
         :rtype: giskardpy.model.world.WorldTree

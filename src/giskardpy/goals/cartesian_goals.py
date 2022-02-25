@@ -69,6 +69,7 @@ class CartesianOrientation(Goal):
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.goal = deepcopy(goal)
+        self.goal.header.frame_id = str(PrefixName(self.goal.header.frame_id, prefix))
         self.root_link = PrefixName(root_link, prefix)
         self.tip_link = PrefixName(tip_link, prefix)
         self.goal_pose = self.transform_msg(self.root_link, self.goal)

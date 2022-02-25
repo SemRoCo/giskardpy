@@ -50,8 +50,11 @@ def find_parent_of_key(key, value, keys):
     else:
         for k, v in value.items():
             if type(v) == dict:
-                keys.append(k)
-                return find_parent_of_key(key, v, keys)
+                new_keys = deepcopy(keys)
+                new_keys.append(k)
+                ret = find_parent_of_key(key, v, new_keys)
+                if ret is not None:
+                    return ret
 
 
 def nested_update(dic, keys, value):

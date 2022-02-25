@@ -7,6 +7,7 @@ from py_trees import Status
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
 import giskardpy.identifier as identifier
+from giskardpy.data_types import PrefixName
 from giskardpy.model import pybullet_wrapper
 from giskardpy.tree.plugin import GiskardBehavior
 
@@ -41,12 +42,14 @@ class CollisionChecker(GiskardBehavior):
     def _cal_max_param(self, parameter_name):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        default_distance = max(external_distances.default_factory()[parameter_name],
-                               self_distances.default_factory()[parameter_name])
-        for value in external_distances.values():
-            default_distance = max(default_distance, value[parameter_name])
-        for value in self_distances.values():
-            default_distance = max(default_distance, value[parameter_name])
+        default_distance = max(external_distances.default_factory(parameter_name.prefix)[parameter_name],
+                               self_distances.default_factory(parameter_name.prefix)[parameter_name])
+        for key, value in external_distances.items():
+            if key.prefix == parameter_name.prefix:
+                default_distance = max(default_distance, value[parameter_name])
+        for key, value in self_distances.items():
+            if key.prefix == parameter_name.prefix:
+                default_distance = max(default_distance, value[parameter_name])
         return default_distance
 
     def initialise(self):
@@ -56,7 +59,8 @@ class CollisionChecker(GiskardBehavior):
 
         self.collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_goals),
                                                                                          max_distances)
-        self.collision_list_size = self._cal_max_param('number_of_repeller')
+        self.collision_list_sizes = {r_n: self._cal_max_param(PrefixName('number_of_repeller', r_n))
+                                     for r_n in self.robot_names()}
 
         super(CollisionChecker, self).initialise()
 
@@ -64,20 +68,20 @@ class CollisionChecker(GiskardBehavior):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
         # FIXME check all dict entries
-        default_distance = self._cal_max_param('soft_threshold')
+        default_distance = {r_n: self._cal_max_param(PrefixName('soft_threshold', r_n)) for r_n in self.robot_names()}
 
         max_distances = defaultdict(lambda: default_distance)
         # override max distances based on external distances dict
         for robot in self.collision_scene.robots:
             for link_name in robot.link_names_with_collisions:
                 controlled_parent_joint = robot.get_controlled_parent_joint_of_link(link_name)
-                distance = external_distances[controlled_parent_joint]['soft_threshold']
+                distance = external_distances[controlled_parent_joint][PrefixName('soft_threshold', robot.name)]
                 for child_link_name in robot.get_directly_controlled_child_links_with_collisions(
                         controlled_parent_joint):
                     max_distances[child_link_name] = distance
 
         for link_name in self_distances:
-            distance = self_distances[link_name]['soft_threshold']
+            distance = self_distances[link_name][PrefixName('soft_threshold', link_name.prefix)]
             if link_name in max_distances:
                 max_distances[link_name] = max(distance, max_distances[link_name])
             else:
@@ -101,6 +105,6 @@ class CollisionChecker(GiskardBehavior):
         Computes closest point info for all robot links and safes it to the god map.
         """
         self.collision_scene.sync()
-        collisions = self.collision_scene.check_collisions(self.collision_matrix, self.collision_list_size)
+        collisions = self.collision_scene.check_collisions(self.collision_matrix, self.collision_list_sizes)
         self.god_map.set_data(identifier.closest_point, collisions)
         return Status.RUNNING

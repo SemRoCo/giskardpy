@@ -12,6 +12,7 @@ import giskardpy.goals
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
 from giskardpy import casadi_wrapper as w
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
@@ -180,14 +181,14 @@ class GoalToConstraints(GetGoal):
             robot_name = joint_name.prefix
             child_links = self.world.groups[robot_name].get_directly_controlled_child_links_with_collisions(joint_name)
             if child_links:
-                number_of_repeller = config[joint_name]['number_of_repeller']
+                number_of_repeller = config[joint_name][PrefixName('number_of_repeller', robot_name)]
                 for i in range(number_of_repeller):
                     child_link = self.world.groups[robot_name].joints[joint_name].child_link_name
-                    hard_threshold = config[joint_name]['hard_threshold']
+                    hard_threshold = config[joint_name][PrefixName('hard_threshold', robot_name)]
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
                     else:
-                        soft_threshold = config[joint_name]['soft_threshold']
+                        soft_threshold = config[joint_name][PrefixName('soft_threshold', robot_name)]
                     constraint = ExternalCollisionAvoidance(god_map=self.god_map,
                                                             robot_name=robot_name,
                                                             link_name=child_link,
@@ -231,22 +232,22 @@ class GoalToConstraints(GetGoal):
                 key_r = '{}, {}'.format(link_b, link_a)
                 # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
                 if key in config:
-                    hard_threshold = config[key]['hard_threshold']
-                    soft_threshold = config[key]['soft_threshold']
-                    number_of_repeller = config[key]['number_of_repeller']
+                    hard_threshold = config[key][PrefixName('hard_threshold', link_a.prefix)]
+                    soft_threshold = config[key][PrefixName('soft_threshold', link_a.prefix)]
+                    number_of_repeller = config[key][PrefixName('number_of_repeller', link_a.prefix)]
                 elif key_r in config:
-                    hard_threshold = config[key_r]['hard_threshold']
-                    soft_threshold = config[key_r]['soft_threshold']
-                    number_of_repeller = config[key_r]['number_of_repeller']
+                    hard_threshold = config[key_r][PrefixName('hard_threshold', link_a.prefix)]
+                    soft_threshold = config[key_r][PrefixName('soft_threshold', link_a.prefix)]
+                    number_of_repeller = config[key_r][PrefixName('number_of_repeller', link_a.prefix)]
                 else:
                     # TODO minimum is not the best if i reduce to the links next to the controlled chains
                     #   should probably add symbols that retrieve the values for the current pair
-                    hard_threshold = min(config[link_a]['hard_threshold'],
-                                         config[link_b]['hard_threshold'])
-                    soft_threshold = min(config[link_a]['soft_threshold'],
-                                         config[link_b]['soft_threshold'])
-                    number_of_repeller = min(config[link_a]['number_of_repeller'],
-                                             config[link_b]['number_of_repeller'])
+                    hard_threshold = min(config[link_a][PrefixName('hard_threshold', link_a.prefix)],
+                                         config[link_b][PrefixName('hard_threshold', link_a.prefix)])
+                    soft_threshold = min(config[link_a][PrefixName('soft_threshold', link_a.prefix)],
+                                         config[link_b][PrefixName('soft_threshold', link_a.prefix)])
+                    number_of_repeller = min(config[link_a][PrefixName('number_of_repeller', link_a.prefix)],
+                                             config[link_b][PrefixName('number_of_repeller', link_a.prefix)])
                 constraint = SelfCollisionAvoidance(god_map=self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,

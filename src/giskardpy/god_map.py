@@ -13,6 +13,7 @@ from giskardpy.utils.config_loader import get_namespaces
 
 
 def get_default_in_override_block(block_identifier, god_map, prefix=None):
+
     if prefix is not None:
         if identifier.rosparam[0] in block_identifier:
             full_block_identifier = identifier.rosparam + prefix + block_identifier[block_identifier.index(identifier.rosparam[0])+1:]
@@ -20,29 +21,34 @@ def get_default_in_override_block(block_identifier, god_map, prefix=None):
             full_block_identifier = prefix + block_identifier
     else:
         full_block_identifier = block_identifier
+
     try:
         default_value = god_map.get_data(full_block_identifier[:-1] + ['default'])
     except KeyError:
         default_value = god_map.get_data(block_identifier[:-1] + ['default'])
-    override = god_map.get_data(full_block_identifier)
-    new_override = dict()
     new_default_value = None
+    if isinstance(default_value, dict):
+        new_default_value = dict()
+        for key, value in default_value.items():
+            if prefix is not None:
+                new_key = PrefixName(key, prefix[0])
+                if type(value) == dict():
+                    new_value = dict()
+                    for k, v in value.items():
+                        new_value[PrefixName(k, prefix[0])] = v
+                else:
+                    new_value = value
+                new_default_value[new_key] = new_value
+    else:
+        new_default_value = default_value
+
+    try:
+        override = god_map.get_data(full_block_identifier)
+    except KeyError:
+        override = None
+    new_override = dict()
     d = dict()
     if isinstance(override, dict):
-        if isinstance(default_value, dict):
-            new_default_value = dict()
-            for key, value in default_value.items():
-                if prefix is not None:
-                    new_key = PrefixName(key, prefix[0])
-                    if type(value) == dict():
-                        new_value = dict()
-                        for k, v in value.items():
-                            new_value[PrefixName(k, prefix[0])] = v
-                    else:
-                        new_value = value
-                    new_default_value[new_key] = new_value
-        else:
-            new_default_value = default_value
         o = deepcopy(new_default_value)
         for key, value in override.items():
             if type(default_value) == dict():
@@ -61,11 +67,14 @@ def get_default_in_override_block(block_identifier, god_map, prefix=None):
             else:
                 new_override = override
         d.update(new_override)
-    if d:
+
+    if new_default_value is not None:
         ret_d = defaultdict(lambda: new_default_value)
-        ret_d.update(d)
+        if d:
+            ret_d.update(d)
     else:
         ret_d = defaultdict(lambda: default_value)
+
     return ret_d
 
 

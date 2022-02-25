@@ -1,4 +1,3 @@
-parent: !include default.yaml
 general_options:
   joint_weights:
     # the planner prefers low weight joints to achieve solutions

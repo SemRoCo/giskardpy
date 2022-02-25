@@ -42,8 +42,11 @@ class CollisionChecker(GiskardBehavior):
     def _cal_max_param(self, parameter_name):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        default_distance = max(external_distances.default_factory(parameter_name.prefix)[parameter_name],
-                               self_distances.default_factory(parameter_name.prefix)[parameter_name])
+        try:
+            default_distance = max(external_distances.default_factory(parameter_name.prefix)[parameter_name],
+                                   self_distances.default_factory(parameter_name.prefix)[parameter_name])
+        except KeyError:
+            pass
         for key, value in external_distances.items():
             if key.prefix == parameter_name.prefix:
                 default_distance = max(default_distance, value[parameter_name])

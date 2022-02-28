@@ -293,8 +293,6 @@ class Goal(object):
                                    name_suffixes=['{}/x'.format(name_suffix),
                                                   '{}/y'.format(name_suffix),
                                                   '{}/z'.format(name_suffix)])
-        if self._test_mode:
-            self.add_debug_expr('{}/error'.format(name_suffix), w.norm(error))
 
     def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4,
                                          name_suffix=''):
@@ -305,8 +303,9 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix='{}/vel'.format(name_suffix))
-        # if self._test_mode:
-        #     self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
+        if self._test_mode:
+            # self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
+            self.add_debug_expr('trans_error', trans_error)
 
     def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
                                     weight=WEIGHT_BELOW_CA, name_suffix=''):
@@ -349,6 +348,8 @@ class Goal(object):
                                    name_suffixes=['{}/rot/x'.format(name_suffix),
                                                   '{}/rot/y'.format(name_suffix),
                                                   '{}/rot/z'.format(name_suffix)])
+        # if self._test_mode:
+        #     self.add_debug_expr('rot', w.axis_angle_from_quaternion(tip_Q_goal[0], tip_Q_goal[1], tip_Q_goal[2], tip_Q_goal[3])[1])
 
     def add_rotational_velocity_limit(self, frame_R_current, max_velocity, weight, max_violation=1e4, name_suffix=''):
         root_Q_tipCurrent = w.quaternion_from_matrix(frame_R_current)

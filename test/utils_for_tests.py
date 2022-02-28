@@ -1,5 +1,6 @@
 import keyword
 from collections import defaultdict
+from copy import copy
 from multiprocessing import Queue
 from time import time
 
@@ -577,12 +578,14 @@ class GiskardTestWrapper(GiskardWrapper):
             kwargs['root_link'] = root_link
         if weight:
             kwargs['weight'] = weight
+        linear_kwargs = copy(kwargs)
         if linear_velocity:
-            kwargs['max_linear_velocity'] = linear_velocity
+            linear_kwargs['max_velocity'] = linear_velocity
+        self.set_translation_goal(**linear_kwargs)
+        angular_kwargs = copy(kwargs)
         if angular_velocity:
-            kwargs['max_angular_velocity'] = angular_velocity
-        self.set_translation_goal(**kwargs)
-        self.set_rotation_goal(**kwargs)
+            angular_kwargs['max_velocity'] = angular_velocity
+        self.set_rotation_goal(**angular_kwargs)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
         super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
@@ -1252,7 +1255,7 @@ class HSR(GiskardTestWrapper):
     better_pose = default_pose
 
     def __init__(self):
-        self.tip = 'hand_palm_link'
+        self.tip = 'hand_gripper_tool_frame'
         super(HSR, self).__init__('package://giskardpy/config/hsr.yaml')
 
     def move_base(self, goal_pose):

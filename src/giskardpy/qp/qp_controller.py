@@ -536,6 +536,7 @@ class QPController(object):
         """
         :type free_variables: list
         """
+        # TODO check for empty goals
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.name)))
         l = [x.name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
@@ -880,10 +881,10 @@ class QPController(object):
         return split
 
     def b_names(self):
-        return self.b.names()
+        return self.b.names
 
     def bA_names(self):
-        return self.bA.names()
+        return self.bA.names
 
     def _viz_mpc(self, joint_name):
         def pad(a, desired_length):

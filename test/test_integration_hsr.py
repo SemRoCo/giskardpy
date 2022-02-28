@@ -58,6 +58,50 @@ class TestJointGoals(object):
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
+    def test_mimic_joints2(self, zero_pose):
+        """
+        :type zero_pose: HSR
+        """
+        zero_pose.open_gripper()
+        hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
+        compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
+
+        tip = 'hand_gripper_tool_frame'
+        p = PoseStamped()
+        p.header.frame_id = tip
+        p.pose.position.z = 0.2
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
+                                root_link='base_footprint')
+        zero_pose.plan_and_execute()
+        np.testing.assert_almost_equal(zero_pose.world.state['arm_lift_joint'].position, 0.2, decimal=2)
+        base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        compare_poses(base_T_torso2.pose, base_T_torso.pose)
+
+    def test_mimic_joints3(self, zero_pose):
+        """
+        :type zero_pose: HSR
+        """
+        zero_pose.open_gripper()
+        hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
+        compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
+
+        tip = 'head_pan_link'
+        p = PoseStamped()
+        p.header.frame_id = tip
+        p.pose.position.z = 0.15
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
+                                root_link='base_footprint')
+        zero_pose.plan_and_execute()
+        np.testing.assert_almost_equal(zero_pose.world.state['arm_lift_joint'].position, 0.3, decimal=2)
+        base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        compare_poses(base_T_torso2.pose, base_T_torso.pose)
+
 
 class TestCartGoals(object):
 
@@ -81,7 +125,7 @@ class TestConstraints:
         """
         handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'
-
+        kitchen_setup.open_gripper()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
         base_goal.pose.position = Point(0.3, -0.5, 0)
@@ -194,7 +238,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.open_gripper()
 
         grasp_pose = deepcopy(box_pose)
-        grasp_pose.pose.position.x -= 0.05
+        # grasp_pose.pose.position.x -= 0.05
         grasp_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],

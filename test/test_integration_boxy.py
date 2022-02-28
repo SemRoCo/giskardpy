@@ -1,3 +1,5 @@
+from copy import copy
+
 import numpy as np
 import pytest
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
@@ -24,7 +26,9 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(zero_pose.better_pose)
+        js = copy(zero_pose.better_pose)
+        js['triangle_base_joint'] = zero_pose.default_pose['triangle_base_joint']
+        zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
 

@@ -206,7 +206,7 @@ class TestConstraints(object):
 
         tip_grasp_axis = Vector3Stamped()
         tip_grasp_axis.header.frame_id = kitchen_setup.gripper_tip
-        tip_grasp_axis.vector.y = 1
+        tip_grasp_axis.vector.y = -1
 
         kitchen_setup.set_json_goal('GraspBar',
                                     root_link=kitchen_setup.default_root,
@@ -421,9 +421,37 @@ class TestCartGoals(object):
 class TestCollisionAvoidanceGoals(object):
     # kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
 
+    def test_open_gripper(self, kitchen_setup):
+        """
+        :type kitchen_setup: Donbot
+        """
+        kitchen_setup.open_gripper()
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 0.1
+        p.pose.orientation.w = 1
+        kitchen_setup.move_base(p)
+
+    def test_open_gripper2(self, better_pose):
+        """
+        :type better_pose: Donbot
+        """
+        better_pose.open_gripper()
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        better_pose.add_box(name='box',
+                            size=[1,1,1],
+                            pose=p)
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 0.1
+        p.pose.orientation.w = 1
+        better_pose.move_base(p)
+
     def test_attach_box(self, better_pose):
         """
-        :type zero_pose: PR2
+        :type zero_pose: Donbot
         """
         pocky = 'http://muh#pocky'
         p = PoseStamped()

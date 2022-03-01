@@ -2719,7 +2719,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = 'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], '', [0.05, 0, 0],
+        p = PoseStamped()
+        zero_pose.attach_box(name=pocky,
+                             size=[0.1, 0.02, 0.02],
+                             parent_link='muh',
+                             pose=p,
                              expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
 
     def test_detach_unknown_object(self, zero_pose):
@@ -2746,7 +2750,12 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
-        req = UpdateWorldRequest(42, DEFAULT_WORLD_TIMEOUT, WorldBody(), True, PoseStamped())
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = WorldBody()
+        req.pose = PoseStamped()
+        req.parent_link = zero_pose.r_tip
+        req.operation = 42
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_missing_body_error(self, zero_pose):
@@ -2761,18 +2770,27 @@ class TestCollisionAvoidanceGoals(object):
         """
         p = PoseStamped()
         p.header.frame_id = 'base_link'
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
-                                 WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                                           shape=SolidPrimitive(type=42)), True, p)
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                             shape=SolidPrimitive(type=42))
+        req.pose = PoseStamped()
+        req.pose.header.frame_id = 'map'
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ATTACH
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
 
     def test_tf_error(self, zero_pose):
         """
         :type zero_pose: PR2
         """
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
-                                 WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                                           shape=SolidPrimitive(type=42)), False, PoseStamped())
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                             shape=SolidPrimitive(type=1))
+        req.pose = PoseStamped()
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ADD
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
@@ -2787,7 +2805,12 @@ class TestCollisionAvoidanceGoals(object):
         pose.pose.orientation = Quaternion(w=1)
         wb.type = WorldBody.URDF_BODY
 
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT, wb, True, pose)
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = wb
+        req.pose = pose
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ATTACH
         assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
 
     def test_infeasible(self, kitchen_setup):

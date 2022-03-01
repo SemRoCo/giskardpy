@@ -214,7 +214,12 @@ class WorldTree(object):
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         if name in self.groups:
             raise DuplicateNameException('Group with name {} already exists'.format(name))
-        self.groups[name] = SubWorldTree(name, root_link_name, self)
+        new_group = SubWorldTree(name, root_link_name, self)
+        # if the group is a subtree of a subtree, register it for the subtree as well
+        for group in self.groups.values():
+            if root_link_name in group.links:
+                group.groups[name] = new_group
+        self.groups[name] = new_group
 
     @property
     def group_names(self):

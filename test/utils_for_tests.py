@@ -784,11 +784,10 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                 pose=pose)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
-    def add_mesh(self, name='meshy', mesh='', frame_id='map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                 pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=mesh, frame_id=frame_id, position=position,
-                                                            orientation=orientation, pose=pose)
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+    def add_mesh(self, name='meshy', mesh='', pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=mesh, pose=pose)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
+                                          position=pose.pose.position, orientation=pose.pose.orientation)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
     def add_urdf(self, name, urdf, pose, js_topic='', set_js_topic=None,

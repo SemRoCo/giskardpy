@@ -45,7 +45,7 @@ class CartesianPosition(Goal):
     def make_constraints(self):
         r_P_g = w.position_of(self.get_parameter_as_symbolic_expression('goal_pose'))
         r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
-        # self.add_debug_vector('trans', r_P_c)
+        # self.add_debug_expr('trans', w.norm(r_P_c))
         self.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.reference_velocity,

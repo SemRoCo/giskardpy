@@ -204,7 +204,8 @@ plot_lock = Lock()
 @profile
 def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0,
                     cm_per_second=0.2, normalize_position=False, tick_stride=1.0, file_name='trajectory.pdf', history=5,
-                    height_per_derivative=3.5, print_last_tick=False, legend=True, hspace=1, diff_after=2):
+                    height_per_derivative=3.5, print_last_tick=False, legend=True, hspace=1, diff_after=2,
+                    y_limits=None):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
@@ -278,11 +279,13 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
             for i in range(order):
                 axs[i].set_title(titles[i])
                 axs[i].xaxis.set_ticks(ticks)
-                # axs[i].set_ylim([-0.5, 0.5])
+                if y_limits is not None:
+                    axs[i].set_ylim([-y_limits, y_limits])
         else:
             for i in range(order):
                 axs[i].set_title(titles[i])
-                # axs[i].set_ylim([-0.5, 0.5])
+                if y_limits is not None:
+                    axs[i].set_ylim([-y_limits, y_limits])
         color_counter = 0
         for i in range(len(controlled_joints)):
             if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):

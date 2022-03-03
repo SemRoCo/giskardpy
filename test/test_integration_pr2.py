@@ -3111,14 +3111,16 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type fake_table_setup: PR2
         """
+        # FIXME goes inside ?!
         r_goal = PoseStamped()
         r_goal.header.frame_id = 'map'
         r_goal.pose.position.x = 0.8
         r_goal.pose.position.y = -0.38
         r_goal.pose.position.z = 0.84
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        # fake_table_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         fake_table_setup.avoid_all_collisions(0.1)
-        fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip)
+        fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip, weight=WEIGHT_BELOW_CA)
         fake_table_setup.plan_and_execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)

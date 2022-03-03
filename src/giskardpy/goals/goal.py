@@ -285,6 +285,7 @@ class Goal(object):
 
     def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
         error = frame_P_goal[:3] - frame_P_current[:3]
+        # self.add_debug_expr('error', w.norm(error))
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
@@ -303,9 +304,9 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix='{}/vel'.format(name_suffix))
-        if self._test_mode:
-            # self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
-            self.add_debug_expr('trans_error', trans_error)
+        # if self._test_mode:
+        #     # self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
+        #     self.add_debug_expr('trans_error', trans_error)
 
     def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
                                     weight=WEIGHT_BELOW_CA, name_suffix=''):

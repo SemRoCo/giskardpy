@@ -53,11 +53,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 pass
 
     @profile
-    def cut_off_distances_to_query(self, cut_off_distances):
+    def cut_off_distances_to_query(self, cut_off_distances, buffer=0.05):
         if self.query is None:
             self.query = defaultdict(set)
             for (link_a, _, link_b), dist in cut_off_distances.items():
-                self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist))
+                self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist+buffer))
         return self.query
 
     @profile

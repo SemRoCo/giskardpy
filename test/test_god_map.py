@@ -1,6 +1,7 @@
 import numpy as np
 
 import giskardpy
+from giskardpy.data_types import PrefixName
 
 giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
@@ -10,7 +11,7 @@ from geometry_msgs.msg import PoseStamped
 from hypothesis import given, assume
 import hypothesis.strategies as st
 from giskardpy import casadi_wrapper as w
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import GodMap, get_default, override_default
 from utils_for_tests import variable_name, keys_values, lists_of_same_length
 
 PKG = 'giskardpy'
@@ -340,6 +341,41 @@ class TestGodMap(unittest.TestCase):
         data[0]
         data[1]
         data[2]
+
+    def test_get_default1(self):
+        gm = GodMap()
+        gm.set_data(['bla'], {'default': 1, 'override': 2})
+        block_id_over = ['bla', 'override']
+        assert get_default([block_id_over], gm) == 1
+
+    def test_get_default2(self):
+        gm = GodMap()
+        gm.set_data(['bla'], {'default': {'a': 0, 'b': 1}, 'override': {'b': 2}})
+        block_id_over = ['bla', 'override']
+        assert get_default([block_id_over], gm) == {'a': 0, 'b': 1}
+
+    def test_get_default3(self):
+        gm = GodMap()
+        gm.set_data(['default'], {'a': 0, 'b': 1})
+        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'b': 3}})
+        block_id_over = ['bla', 'override']
+        assert get_default([[], block_id_over], gm) == {'a': 0, 'b': 2}
+
+    def test_get_default4(self):
+        gm = GodMap()
+        gm.set_data(['default'], {'a': 0, 'b': 1})
+        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'b': 3}})
+        block_id_over = ['bla', 'override']
+        assert get_default([[], block_id_over], gm, prefix='p') == {PrefixName('a', 'p'): 0, PrefixName('b', 'p'): 2}
+
+    def test_override_default(self):
+        gm = GodMap()
+        gm.set_data(['default'], {'a': 0, 'b': 1})
+        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'b': 3}})
+        block_id_over = ['bla', 'override']
+        default = get_default([[], block_id_over], gm, prefix='p')
+        assert default == {PrefixName('a', 'p'): 0, PrefixName('b', 'p'): 2}
+        override_default(default, block_id_over, gm, prefix='p')
 
 
 if __name__ == '__main__':

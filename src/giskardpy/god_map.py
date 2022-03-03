@@ -20,8 +20,8 @@ def get_default(block_identifiers, god_map, prefix=None):
         except KeyError:
             continue
         if isinstance(default_value, dict):
-            for key, value in default_value.items():
-                if prefix is not None:
+            if prefix is not None:
+                for key, value in default_value.items():
                     new_key = PrefixName(key, prefix[0])
                     if type(value) == dict():
                         new_value = dict()
@@ -30,6 +30,8 @@ def get_default(block_identifiers, god_map, prefix=None):
                     else:
                         new_value = value
                     new_default_value[new_key] = new_value
+            else:
+                new_default_value.update(default_value)
         else:
             new_default_value = default_value
     return new_default_value
@@ -45,14 +47,17 @@ def override_default(default, block_identifier, god_map, prefix=None):
     if isinstance(override, dict):
         if prefix is not None:
             for key, value in override.items():
-                new_override[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda a: default[a])
                 if isinstance(value, dict):
+                    if isinstance(default, dict):
+                        new_override[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda a: default[a])
+                        if any([isinstance(x, dict) for _, x in value.items()]):
+                            raise Exception('Nested dictionaries are not supported for overrides.')
+                    else:
+                        new_override[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda _: default)
                     keys = {PrefixName(n, prefix[0]): None for n, _ in value.items()}
                     new_override[PrefixName(key, prefix[0])].update(keys)
                     for k, v in value.items():
                         new_override[PrefixName(key, prefix[0])][PrefixName(k, prefix[0])] = v
-                #else:
-                #    new_override[PrefixName(key, prefix[0])] = value
         else:
             new_override = defaultdict(lambda: default)
             new_override.update(override)

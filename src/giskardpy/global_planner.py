@@ -30,7 +30,7 @@ from copy import deepcopy
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pw
 from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded, GetPreGraspRequest, GetPreGrasp, \
-    GetPreGraspOrientation
+    GetPreGraspOrientation, GetAttachedObjects, GetAttachedObjectsRequest
 from giskardpy import RobotName
 from giskardpy.exceptions import GlobalPlanningException
 from giskardpy.model.utils import make_world_body_box
@@ -272,9 +272,16 @@ class GrowingGoalStates(ob.GoalStates):
         self.robot = robot
         self.root_link = root_link
         self.tip_link = tip_link
+        self.max_consecutive_sampling = 5
+        self.max_n_samples = 50
         self.addState(self.goal)
 
-    def sampleGoal(self, st):
+    def maxSampleCount(self):
+        return self.getStateCount() \
+            if self.getStateCount() < self.max_consecutive_sampling\
+            else self.max_consecutive_sampling
+
+    def _sampleGoal(self, st):
         for i in range(0, 1):
             # Calc vector from start to goal and roll random rotation around it.
             w_T_gr = self.robot.get_fk(self.root_link, self.tip_link)
@@ -308,11 +315,77 @@ class GrowingGoalStates(ob.GoalStates):
             if self.getSpaceInformation().isValid(st):
                 self.addState(st)
 
+    def sampleGoal(self, st):
+        if self.max_n_samples < self.getStateCount():
+            super(GrowingGoalStates, self).sampleGoal(st)
+        else:
+            self._sampleGoal(st)
+
     def distanceGoal(self, state):
         if self.getSpaceInformation().checkMotion(state, self.getState(0)):
             self.addState(state)
         return super(GrowingGoalStates, self).distanceGoal(state)
 
+
+class GrowingGoalStatesS(ob.GoalStates):
+
+    def __init__(self, si, robot, root_link, tip_link, start, goal, sampling_axis=None):
+        super(GrowingGoalStatesS, self).__init__(si)
+        self.sampling_axis = np.array(sampling_axis, dtype=bool) if sampling_axis is not None else None
+        self.start = start
+        self.goal = goal
+        self.robot = robot
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.addState(self.goal)
+
+    def getGoal(self):
+        return self.getState(0)
+
+    def sampleGoal(self, st):
+        for i in range(0, 1):
+            # Calc vector from start to goal and roll random rotation around it.
+            w_T_gr = self.robot.get_fk(self.root_link, self.tip_link)
+            if self.sampling_axis is not None:
+                s_arr = np.array([np.random.uniform(low=0.0, high=np.pi)] * 3) * self.sampling_axis
+                q_sample = tuple(s_arr.tolist())
+            else:
+                q_sample = tuple([np.random.uniform(low=0.0, high=np.pi)] * 3)
+            gr_q_gr = tf.transformations.quaternion_from_euler(*q_sample)
+            w_T_g = tf.transformations.concatenate_matrices(
+                tf.transformations.translation_matrix([self.getGoal().getX(), self.getGoal().getY(), self.getGoal().getZ()]),
+                tf.transformations.quaternion_matrix([self.getGoal().rotation().x, self.getGoal().rotation().y,
+                                                      self.getGoal().rotation().z, self.getGoal().rotation().w])
+            )
+            gr_T_goal = tf.transformations.concatenate_matrices(tf.transformations.inverse_matrix(w_T_gr), w_T_g)
+            gr_t_goal = tf.transformations.translation_matrix(tf.transformations.translation_from_matrix(gr_T_goal))
+            w_T_calc_g = tf.transformations.concatenate_matrices(
+                w_T_gr, tf.transformations.quaternion_matrix(gr_q_gr), gr_t_goal
+            )
+            q = tf.transformations.quaternion_from_matrix(w_T_calc_g)
+            # Apply random rotation around the axis on the goal position and ...
+            # state = ob.State(self.getSpaceInformation().getStateSpace())
+            st.setX(self.getGoal().getX())
+            st.setY(self.getGoal().getY())
+            st.setZ(self.getGoal().getZ())
+            st.rotation().x = q[0]
+            st.rotation().y = q[1]
+            st.rotation().z = q[2]
+            st.rotation().w = q[3]
+            # ... add it to the other goal states, if it is valid.
+            if self.getSpaceInformation().isValid(st):
+                self.addState(st)
+
+    def distanceGoal(self, state):
+        if self.getSpaceInformation().checkMotion(state, self.getGoal()):
+            self.addState(state)
+        return super(GrowingGoalStatesS, self).distanceGoal(state)
+
+    def isSatisfied(self, *args):
+        if len(args) == 1 or len(args) == 2:
+            return self.getSpaceInformation().checkMotion(args[0], self.getGoal())
+        else:
+            raise Exception('Unknown signature.')
 
 class CheckerGoalState(ob.GoalState):
 
@@ -1756,7 +1829,11 @@ class GlobalPlanner(GetGoal):
         self.goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose) # type: PoseStamped
 
         self.root_link = self.__goal_dict[u'root_link']
-        self.tip_link = self.__goal_dict[u'tip_link']
+        tip_link = self.__goal_dict[u'tip_link']
+        get_attached_objects = rospy.ServiceProxy('~get_attached_objects', GetAttachedObjects)
+        if tip_link in get_attached_objects(GetAttachedObjectsRequest()).object_names:
+            tip_link = self.get_robot().get_parent_link_of_link(tip_link)
+        self.tip_link = tip_link
         link_names = self.robot.link_names
 
         if self.root_link not in link_names:
@@ -1803,6 +1880,8 @@ class GlobalPlanner(GetGoal):
         discrete_checking = False
 
         while len(trajectory) == 0:
+            if counter != 0:
+                rospy.loginfo('Global Planner did not found a solution. Retrying...')
             if global_planner_needed and self.is_global_navigation_needed():
                 if self.seem_trivial():
                     rospy.loginfo('The provided goal might be reached by using CartesianPose,'
@@ -1852,14 +1931,16 @@ class GlobalPlanner(GetGoal):
                 js = self.get_god_map().get_data(identifier.joint_states)
                 try:
                     trajectory = planner.plan(js)
-                    predict_f = 1.0
+                    if planner.setup.getPlanner().getName() == 'InformedRRTstar':
+                        predict_f = 1.0
+                    else:
+                        predict_f = 3.0
                 except GlobalPlanningException:
                     self.raise_to_blackboard(GlobalPlanningException())
                     return Status.FAILURE
             else:
                 raise GlobalPlanningException('Global planner was called although it is not needed.')
             counter += 1
-            rospy.loginfo('Global Planner did not found a solution. Retrying...')
 
         poses = []
         for i, point in enumerate(trajectory):
@@ -1889,11 +1970,15 @@ class GlobalPlanner(GetGoal):
         d = dict()
         d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
 
+        goal = self.goal
+        goal.header.stamp = rospy.Time(0)
+
         c_d = deepcopy(d)
-        c_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(self.goal)
+        c_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(goal)
         c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
         c_d[u'parameter_value_pair'][u'predict_f'] = predict_f
         c_d[u'parameter_value_pair'][u'ignore_trajectory_orientation'] = ignore_trajectory_orientation
+
         c = Constraint()
         c.type = u'CartesianPathCarrot'
         c.parameter_value_pair = json.dumps(c_d[u'parameter_value_pair'])
@@ -2014,7 +2099,7 @@ class OMPLPlanner(object):
                                                 max_refine_iterations=5, min_refine_thresh=0.5)
         }
         self._planner_solve_params['InformedRRTstar'] = {
-            'slow_without_refine': SolveParameters(initial_solve_time=30, refine_solve_time=5,
+            'slow_without_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5,
                                                    max_initial_iterations=1,
                                                    max_refine_iterations=0, min_refine_thresh=0.5),
             'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
@@ -2091,13 +2176,15 @@ class OMPLPlanner(object):
         pose, debug_pose = p.sample(js, self.tip_link, ompl_se3_state_to_pose(goal()))
         return pose_to_ompl_se3(self.space, pose)
 
-    #def get_shorten_path(self, poses):
-    #    for i in reversed(range(0, len(poses))):
-    #        if not self.motion_validator.check_motion(poses[i].pose, self.pose_goal):
-    #            return poses[:i + 2 if i + 2 <= len(poses) else len(poses)]
-    #    return poses
+    def shorten_path(self, path, goal):
+        if type(goal) == ob.State:
+            goal = goal()
+        for i in reversed(range(0, path.getStateCount())):
+            if not self.setup.getSpaceInformation().checkMotion(path.getState(i), goal):
+                including_last_i = i + 2 if i + 2 <= path.getStateCount() else path.getStateCount()-1
+                path.keepBefore(path.getState(including_last_i))
 
-    def solve(self, debug_factor=2., discrete_factor=2.):
+    def solve(self, debug_factor=2., discrete_factor=1.):
         # Get solve parameters
         planner_name = self.setup.getPlanner().getName()
         if planner_name not in self._planner_solve_params:
@@ -2168,8 +2255,9 @@ class MovementPlanner(OMPLPlanner):
                 planner.setRange(self.range)
             elif self.planner_name == 'InformedRRTstar':
                 planner = og.InformedRRTstar(si)
-                self.range = 0.05
+                self.range = 0.1
                 planner.setRange(self.range)
+                self.discrete_checking = True
             else:
                 raise Exception('Planner name {} is not known.'.format(self.planner_name))
         else:
@@ -2247,10 +2335,9 @@ class MovementPlanner(OMPLPlanner):
 
         self.setup.setStartAndGoalStates(start, goal)
 
-        if not self.setup.getSpaceInformation().isValid(goal()):
+        if not si.isValid(goal()):
             rospy.logwarn('Goal is not valid, searching new one...')
-            next_goal = self.next_goal(js, goal)
-            si.copyState(goal, next_goal)
+            goal = self.next_goal(js, goal)
             self.setup.setStartAndGoalStates(start, goal)
 
         if self.setup.getPlanner().getName() == 'InformedRRTstar':
@@ -2295,9 +2382,12 @@ class MovementPlanner(OMPLPlanner):
             # try to shorten the path
             # self.movement_setup.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # Make sure enough subpaths are available for Path Following
-            self.setup.getSolutionPath().interpolate(20)
+            path = self.setup.getSolutionPath()
+            #self.shorten_path(path, goal)
+            if self.discrete_checking:
+                path.interpolate(int(path.cost(optimization_objective).value()/0.01))
 
-            data = ompl_states_matrix_to_np(self.setup.getSolutionPath().printAsMatrix())  # [x y z xw yw zw w]
+            data = ompl_states_matrix_to_np(path.printAsMatrix())  # [x y z xw yw zw w]
             # print the simplified path
             if plot:
                 plt.close()

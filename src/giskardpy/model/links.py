@@ -215,11 +215,11 @@ class Link(object):
 
     def as_urdf(self):
         r = up.Robot(self.name)
-        r.version = u'1.0'
+        r.version = '1.0'
         link = up.Link(self.name)
         # if self.visuals:
-        #     link.add_aggregate(u'visual', up.Visual(self.visuals[0].as_urdf()))
-        link.add_aggregate(u'collision', up.Collision(self.collisions[0].as_urdf()))
+        #     link.add_aggregate('visual', up.Visual(self.visuals[0].as_urdf()))
+        link.add_aggregate('collision', up.Collision(self.collisions[0].as_urdf()))
         r.add_link(link)
         return r.to_xml_string()
 

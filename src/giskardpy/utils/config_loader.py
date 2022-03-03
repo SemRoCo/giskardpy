@@ -25,8 +25,8 @@ class Loader(yaml.SafeLoader):
 
         try:
             self.config_root = os.path.split(stream.name)[0]
-            self.ros_package_keywords = [u'ros://', u'package://']
-            self.giskardpy_root = get_ros_pkg_path(u'giskardpy')
+            self.ros_package_keywords = ['ros://', 'package://']
+            self.giskardpy_root = get_ros_pkg_path('giskardpy')
         except AttributeError:
             self.config_root = os.path.curdir
 
@@ -121,7 +121,7 @@ def get_filename(loader, node, root):
     indices = [i for i, x in enumerate(loader.ros_package_keywords) if x in file_or_ros_path_str]
     if indices:
         if len(indices) != 1:
-            raise SyntaxError(u'Invalid ros package path: please use ros:// or package:// as path prefix.')
+            raise SyntaxError('Invalid ros package path: please use ros:// or package:// as path prefix.')
         removed_key_word = file_or_ros_path_str.replace(loader.ros_package_keywords[indices[0]], '')
         path_split = removed_key_word.split('/')
         package_path = get_ros_pkg_path(path_split[0])
@@ -189,14 +189,23 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     config = load_robot_yaml(resolve_ros_iris(config_file))
     if test:
         config = update_nested_dicts(deepcopy(config),
-                                     load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/test.yaml'))
+                                     load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/test.yaml'))
     if config and not rospy.is_shutdown():
         if old_data is None:
             old_data = {}
         old_data.update(config)
         rospy.set_param('~', old_data)
-        return True
-    return False
+    return old_data
+
+
+def upload_config_file_to_paramserver():
+    old_params = rospy.get_param('~')
+    if rospy.has_param('~test'):
+        test = rospy.get_param('~test')
+    else:
+        test = False
+    config_file_name = rospy.get_param('~{}'.format('config'))
+    ros_load_robot_config(config_file_name, old_data=old_params, test=test)
 
 
 yaml.add_constructor('!include', construct_include, Loader)

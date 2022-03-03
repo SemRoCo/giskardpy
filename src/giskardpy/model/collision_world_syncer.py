@@ -1,4 +1,3 @@
-import os
 import pickle
 from collections import defaultdict
 from copy import deepcopy
@@ -6,8 +5,8 @@ from itertools import combinations, product
 from time import time
 
 import numpy as np
-from giskard_msgs.msg import CollisionEntry
 
+from giskard_msgs.msg import CollisionEntry
 from giskardpy import RobotName, identifier
 from giskardpy.data_types import Collisions, JointStates
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
@@ -26,6 +25,7 @@ class CollisionWorldSynchronizer(object):
             self.ignored_pairs = set()
         try:
             self.added_pairs = self.god_map.get_data(identifier.added_self_collisions)
+            self.added_pairs = set(x if self.world.link_order(*x) else tuple(reversed(x)) for x in self.added_pairs)
         except KeyError as e:
             self.added_pairs = set()
 
@@ -75,7 +75,7 @@ class CollisionWorldSynchronizer(object):
         group = self.world.groups[group_name]  # type: SubWorldTree
         if link_combinations is None:
             link_combinations = set(combinations(group.link_names_with_collisions, 2))
-        # logging.loginfo(u'calculating self collision matrix')
+        # logging.loginfo('calculating self collision matrix')
         joint_state_tmp = self.world.state
         t = time()
         np.random.seed(1337)
@@ -83,8 +83,8 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if group.are_linked(link_a, link_b, non_controlled) \
-                    or link_a == link_b \
+            # assuming that group.are_linked(link_a, link_b, non_controlled) is false, because this call is very slow
+            if link_a == link_b \
                     or link_a in self.ignored_pairs \
                     or link_b in self.ignored_pairs \
                     or (link_a, link_b) in self.ignored_pairs \
@@ -126,16 +126,16 @@ class CollisionWorldSynchronizer(object):
             never = set(subset_of_unknown).difference(sometimes)
             unknown = unknown.difference(never)
 
-        logging.logdebug(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
+        logging.logdebug('Calculated self collision matrix in {:.3f}s'.format(time() - t))
         self.world.state = joint_state_tmp
-
+        unknown.update(self.added_pairs)
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]
 
     def load_self_collision_matrix(self):
         path = '/home/stelter/workspace20/giskard_ws/src/giskardpy/tmp_data/collision_matrix//pr2/ecde0c3a330b5e4a094b7ca46100a7e5'
         with open(path, 'rb') as f:
-            logging.loginfo(u'loaded self collision matrix {}'.format(path))
+            logging.loginfo('loaded self collision matrix {}'.format(path))
             return pickle.load(f)
 
     def get_pose(self, link_name):
@@ -187,7 +187,7 @@ class CollisionWorldSynchronizer(object):
         return js
 
     def init_collision_matrix(self, group_name):
-        added_links = set(combinations(self.world.groups[group_name].link_names_with_collisions, 2))
+        added_links = set(self.world.possible_collision_combinations(group_name))
         self.update_collision_matrix(group_name=group_name,
                                      added_links=added_links)
 
@@ -245,24 +245,24 @@ class CollisionWorldSynchronizer(object):
         robot_links = set(self.robot.link_names)
         for collision_entry in collision_goals:
             if collision_entry.body_b not in self.world.groups and not self.all_body_bs(collision_entry):
-                raise UnknownBodyException(u'body b \'{}\' unknown'.format(collision_entry.body_b))
+                raise UnknownBodyException('body b \'{}\' unknown'.format(collision_entry.body_b))
             if not self.all_robot_links(collision_entry):
                 for robot_link in collision_entry.robot_links:
                     if robot_link not in robot_links:
-                        raise UnknownBodyException(u'robot link \'{}\' unknown'.format(robot_link))
+                        raise UnknownBodyException('robot link \'{}\' unknown'.format(robot_link))
             if collision_entry.body_b == robot_name:
                 for robot_link in collision_entry.link_bs:
                     if robot_link != CollisionEntry.ALL and robot_link not in robot_links:
                         raise UnknownBodyException(
-                            u'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
+                            'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
             elif not self.all_body_bs(collision_entry) and not self.all_link_bs(collision_entry):
                 object_links = self.world.groups[collision_entry.body_b].link_names
                 for link_b in collision_entry.link_bs:
                     if link_b not in object_links:
                         raise UnknownBodyException(
-                            u'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
+                            'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
 
-    def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
+    def collision_goals_to_collision_matrix(self, collision_goals, min_dist, added_checks):
         """
         :param collision_goals: list of CollisionEntry
         :type collision_goals: list
@@ -282,7 +282,7 @@ class CollisionWorldSynchronizer(object):
             else:
                 link_bs = collision_entry.link_bs
             for link_b in link_bs:
-                key = (collision_entry.robot_links[0], collision_entry.body_b, link_b)
+                key = (collision_entry.robot_links[0], None, link_b)
                 r_key = (link_b, collision_entry.body_b, collision_entry.robot_links[0])
                 if self.is_allow_collision(collision_entry):
                     if self.all_link_bs(collision_entry):
@@ -298,6 +298,12 @@ class CollisionWorldSynchronizer(object):
                     min_allowed_distance[key] = min_dist[key[0]]
                 else:
                     raise Exception('todo')
+        for (link_a, link_b), distance in added_checks.items():
+            key = (link_a, None, link_b)
+            if key in min_allowed_distance:
+                min_allowed_distance[key] = max(distance, min_allowed_distance[key])
+            else:
+                min_allowed_distance[key] = distance
         return min_allowed_distance
 
     def get_robot_collision_matrix(self, min_dist):
@@ -307,17 +313,17 @@ class CollisionWorldSynchronizer(object):
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
             if self.robot.link_order(link1, link2):
-                collision_matrix2[link1, robot_name, link2] = min_dist[link1]
+                collision_matrix2[link1, None, link2] = min_dist[link1]
             else:
-                collision_matrix2[link2, robot_name, link1] = min_dist[link1]
+                collision_matrix2[link2, None, link1] = min_dist[link1]
         return collision_matrix2
 
     def verify_collision_entries(self, collision_goals):
         for ce in collision_goals:  # type: CollisionEntry
             if ce.type in [CollisionEntry.ALLOW_ALL_COLLISIONS,
                            CollisionEntry.AVOID_ALL_COLLISIONS]:
-                # logging.logwarn(u'ALLOW_ALL_COLLISIONS and AVOID_ALL_COLLISIONS deprecated, use AVOID_COLLISIONS and'
-                #               u'ALLOW_COLLISIONS instead with ALL constant instead.')
+                # logging.logwarn('ALLOW_ALL_COLLISIONS and AVOID_ALL_COLLISIONS deprecated, use AVOID_COLLISIONS and'
+                #               'ALLOW_COLLISIONS instead with ALL constant instead.')
                 if ce.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
                     ce.type = CollisionEntry.ALLOW_COLLISION
                 else:
@@ -325,11 +331,11 @@ class CollisionWorldSynchronizer(object):
 
         for ce in collision_goals:  # type: CollisionEntry
             if CollisionEntry.ALL in ce.robot_links and len(ce.robot_links) != 1:
-                raise PhysicsWorldException(u'ALL used in robot_links, but it\'s not the only entry')
+                raise PhysicsWorldException('ALL used in robot_links, but it\'s not the only entry')
             if CollisionEntry.ALL in ce.link_bs and len(ce.link_bs) != 1:
-                raise PhysicsWorldException(u'ALL used in link_bs, but it\'s not the only entry')
+                raise PhysicsWorldException('ALL used in link_bs, but it\'s not the only entry')
             if ce.body_b == CollisionEntry.ALL and not self.all_link_bs(ce):
-                raise PhysicsWorldException(u'if body_b == ALL, link_bs has to be ALL as well')
+                raise PhysicsWorldException('if body_b == ALL, link_bs has to be ALL as well')
 
         self.are_entries_known(collision_goals)
 

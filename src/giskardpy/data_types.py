@@ -43,38 +43,41 @@ class FIFOSet(set):
         self._data_queue.remove(item)
 
 
+class _JointState(object):
+    derivative_to_name = {
+        0: 'position',
+        1: 'velocity',
+        2: 'acceleration',
+        3: 'jerk',
+        4: 'snap',
+        5: 'crackle',
+        6: 'pop',
+    }
+
+    def __init__(self, position=0, velocity=0, acceleration=0, jerk=0, snap=0, crackle=0, pop=0):
+        self.position = position
+        self.velocity = velocity
+        self.acceleration = acceleration
+        self.jerk = jerk
+        self.snap = snap
+        self.crackle = crackle
+        self.pop = pop
+
+    def set_derivative(self, d, item):
+        setattr(self, self.derivative_to_name[d], item)
+
+    def __str__(self):
+        return '{}'.format(self.position)
+
+    def __repr__(self):
+        return str(self)
+
+    def __deepcopy__(self, memodict={}):
+        return _JointState(self.position, self.velocity, self.acceleration, self.jerk, self.snap, self.crackle, self.pop)
+
 class JointStates(defaultdict):
-    class _JointState(object):
-        derivative_to_name = {
-            0: 'position',
-            1: 'velocity',
-            2: 'acceleration',
-            3: 'jerk',
-            4: 'snap',
-            5: 'crackle',
-            6: 'pop',
-        }
-
-        def __init__(self, position=0, velocity=0, acceleration=0, jerk=0, snap=0, crackle=0, pop=0):
-            self.position = position
-            self.velocity = velocity
-            self.acceleration = acceleration
-            self.jerk = jerk
-            self.snap = snap
-            self.crackle = crackle
-            self.pop = pop
-
-        def set_derivative(self, d, item):
-            setattr(self, self.derivative_to_name[d], item)
-
-        def __str__(self):
-            return '{}'.format(self.position)
-
-        def __repr__(self):
-            return str(self)
-
     def __init__(self, *args, **kwargs):
-        super(JointStates, self).__init__(self._JointState, *args, **kwargs)
+        super(JointStates, self).__init__(_JointState, *args, **kwargs)
 
     @classmethod
     def from_msg(cls, msg, prefix=None):
@@ -85,7 +88,7 @@ class JointStates(defaultdict):
         self = cls()
         for i, joint_name in enumerate(msg.name):
             joint_name = PrefixName(joint_name, prefix)
-            sjs = cls._JointState(position=msg.position[i],
+            sjs = _JointState(position=msg.position[i],
                                   velocity=msg.velocity[i] if msg.velocity else 0,
                                   acceleration=0,
                                   jerk=0,
@@ -116,7 +119,7 @@ class Trajectory(object):
 
     def set(self, time, point):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:
-            raise KeyError(u'Cannot append a trajectory point that is before the current end time of the trajectory.')
+            raise KeyError('Cannot append a trajectory point that is before the current end time of the trajectory.')
         self._points[time] = point
 
     def delete(self, time):
@@ -154,7 +157,7 @@ class Trajectory(object):
                     if fill_velocity_values:
                         p.velocities.append(traj_point[joint_name].velocity)
                 else:
-                    raise NotImplementedError(u'generated traj does not contain all joints')
+                    raise NotImplementedError('generated traj does not contain all joints')
             trajectory_msg.points.append(p)
         return trajectory_msg
 
@@ -264,7 +267,7 @@ class Collisions(object):
             self.external_collision[key].add(collision)
             self.number_of_external_collisions[key] = min(self.collision_list_size,
                                                           self.number_of_external_collisions[key] + 1)
-            key_long = (collision.original_link_a, collision.body_b, collision.original_link_b)
+            key_long = (collision.original_link_a, None, collision.original_link_b)
             if key_long not in self.external_collision_long_key:
                 self.external_collision_long_key[key_long] = collision
             else:
@@ -456,11 +459,11 @@ class PrefixName(object):
         return self.long_name.__contains__(item.__str__())
 
 order_map = BiDict({
-    0: u'position',
-    1: u'velocity',
-    2: u'acceleration',
-    3: u'jerk',
-    4: u'snap',
-    5: u'crackle',
-    6: u'pop'
+    0: 'position',
+    1: 'velocity',
+    2: 'acceleration',
+    3: 'jerk',
+    4: 'snap',
+    5: 'crackle',
+    6: 'pop'
 })

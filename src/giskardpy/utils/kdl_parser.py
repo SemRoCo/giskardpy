@@ -117,8 +117,8 @@ class KDL(object):
             return np.array(r)
 
     def __init__(self, urdf):
-        if urdf.endswith(u'.urdfs'):
-            with open(urdf, u'r') as file:
+        if urdf.endswith('.urdfs'):
+            with open(urdf, 'r') as file:
                 urdf = file.read()
         r = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
         self.tree = kdl_tree_from_urdf_model(r)

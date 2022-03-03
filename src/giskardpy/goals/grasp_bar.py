@@ -43,12 +43,12 @@ class GraspBar(Goal):
 
     def __str__(self):
         s = super(GraspBar, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root, self.tip)
+        return '{}/{}/{}'.format(s, self.root, self.tip)
 
     def make_constraints(self):
-        root_V_bar_axis = self.get_parameter_as_symbolic_expression(u'bar_axis')
-        tip_V_tip_grasp_axis = self.get_parameter_as_symbolic_expression(u'tip_grasp_axis')
-        root_P_bar_center = self.get_parameter_as_symbolic_expression(u'bar_center')
+        root_V_bar_axis = self.get_parameter_as_symbolic_expression('bar_axis')
+        tip_V_tip_grasp_axis = self.get_parameter_as_symbolic_expression('tip_grasp_axis')
+        root_P_bar_center = self.get_parameter_as_symbolic_expression('bar_center')
 
         root_T_tip = self.get_fk(self.root, self.tip)
         root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)

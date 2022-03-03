@@ -5,12 +5,13 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd
+    MoveCmd, MoveFeedback
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
+from tf.transformations import quaternion_multiply
 
 from giskardpy import RobotName, identifier
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
@@ -24,26 +25,30 @@ DEFAULT_WORLD_TIMEOUT = 500
 
 
 class GiskardWrapper(object):
-    def __init__(self, node_name=u'giskard'):
-        giskard_topic = u'{}/command'.format(node_name)
+    last_feedback: MoveFeedback = None
+
+    def __init__(self, node_name='giskard'):
+        giskard_topic = '{}/command'.format(node_name)
         if giskard_topic is not None:
             self._client = SimpleActionClient(giskard_topic, MoveAction)
-            self._update_world_srv = rospy.ServiceProxy(u'{}/update_world'.format(node_name), UpdateWorld)
-            self._get_object_names_srv = rospy.ServiceProxy(u'{}/get_object_names'.format(node_name), GetObjectNames)
-            self._get_object_info_srv = rospy.ServiceProxy(u'{}/get_object_info'.format(node_name), GetObjectInfo)
-            self._update_rviz_markers_srv = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(node_name), UpdateRvizMarkers)
-            self._get_attached_objects_srv = rospy.ServiceProxy(u'{}/get_attached_objects'.format(node_name), GetAttachedObjects)
-            self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
-            rospy.wait_for_service(u'{}/update_world'.format(node_name))
+            self._update_world_srv = rospy.ServiceProxy('{}/update_world'.format(node_name), UpdateWorld)
+            self._get_object_names_srv = rospy.ServiceProxy('{}/get_object_names'.format(node_name), GetObjectNames)
+            self._get_object_info_srv = rospy.ServiceProxy('{}/get_object_info'.format(node_name), GetObjectInfo)
+            self._update_rviz_markers_srv = rospy.ServiceProxy('{}/update_rviz_markers'.format(node_name), UpdateRvizMarkers)
+            self._get_attached_objects_srv = rospy.ServiceProxy('{}/get_attached_objects'.format(node_name), GetAttachedObjects)
+            self._marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+            rospy.wait_for_service('{}/update_world'.format(node_name))
             self._client.wait_for_server()
-        self._god_map = GodMap.init_from_paramserver(node_name)
+        self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)
         self._world = WorldTree(self._god_map)
         self._world.delete_all_but_robot()
-
         self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
         rospy.sleep(.3)
+
+    def _feedback_cb(self, msg):
+        self.last_feedback = msg
 
     def get_robot_name(self):
         """
@@ -58,7 +63,8 @@ class GiskardWrapper(object):
         """
         return str(self._world.groups[RobotName].root_link_name)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
+                      weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
@@ -113,14 +119,14 @@ class GiskardWrapper(object):
         :type weight: float
         """
         constraint = Constraint()
-        constraint.type = u'CartesianPosition'
-        params = {u'root_link': root_link,
-                  u'tip_link': tip_link,
-                  u'goal': convert_ros_message_to_dictionary(goal_pose)}
+        constraint.type = 'CartesianPosition'
+        params = {'root_link': root_link,
+                  'tip_link': tip_link,
+                  'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
-            params[u'max_velocity'] = max_velocity
+            params['max_velocity'] = max_velocity
         if weight:
-            params[u'weight'] = weight
+            params['weight'] = weight
         params.update(kwargs)
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
@@ -141,14 +147,14 @@ class GiskardWrapper(object):
         :type weight: float
         """
         constraint = Constraint()
-        constraint.type = u'CartesianPositionStraight'
-        params = {u'root_link': root_link,
-                  u'tip_link': tip_link,
-                  u'goal': convert_ros_message_to_dictionary(goal_pose)}
+        constraint.type = 'CartesianPositionStraight'
+        params = {'root_link': root_link,
+                  'tip_link': tip_link,
+                  'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
-            params[u'max_velocity'] = max_velocity
+            params['max_velocity'] = max_velocity
         if weight:
-            params[u'weight'] = weight
+            params['weight'] = weight
         params.update(kwargs)
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
@@ -168,19 +174,19 @@ class GiskardWrapper(object):
         :type weight: float
         """
         constraint = Constraint()
-        constraint.type = u'CartesianOrientation'
-        params = {u'root_link': root_link,
-                  u'tip_link': tip_link,
-                  u'goal': convert_ros_message_to_dictionary(goal_pose)}
+        constraint.type = 'CartesianOrientation'
+        params = {'root_link': root_link,
+                  'tip_link': tip_link,
+                  'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
-            params[u'max_velocity'] = max_velocity
+            params['max_velocity'] = max_velocity
         if weight:
-            params[u'weight'] = weight
+            params['weight'] = weight
         params.update(kwargs)
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, goal_state, weight=None, max_velocity=None):
+    def set_joint_goal(self, goal_state, weight=None, max_velocity=None, hard=False):
         """
         This goal will move the robots joint to the desired configuration.
         :param goal_state: Can either be a joint state messages or a dict mapping joint name to position. 
@@ -200,11 +206,12 @@ class GiskardWrapper(object):
                 goal_state2.name.append(joint_name)
                 goal_state2.position.append(joint_position)
             goal_state = goal_state2
-        params = {u'goal_state': convert_ros_message_to_dictionary(goal_state)}
+        params = {'goal_state': convert_ros_message_to_dictionary(goal_state)}
         if weight is not None:
-            params[u'weight'] = weight
+            params['weight'] = weight
         if max_velocity is not None:
-            params[u'max_velocity'] = max_velocity
+            params['max_velocity'] = max_velocity
+        params['hard'] = hard
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
@@ -222,6 +229,7 @@ class GiskardWrapper(object):
         :type root_normal: Vector3Stamped
         :param max_angular_velocity: rad/s, default 0.5
         :type max_angular_velocity: float
+        :param weight: default WEIGHT_BELOW_CA
         :type weight: float
         """
         if root_link is None:
@@ -231,15 +239,15 @@ class GiskardWrapper(object):
             root_normal.header.frame_id = self.get_root()
             root_normal.vector.z = 1
 
-        params = {u'tip_link': str(tip_link),
-                  u'tip_normal': tip_normal,
-                  u'root_link': str(root_link),
-                  u'root_normal': root_normal}
+        params = {'tip_link': str(tip_link),
+                  'tip_normal': tip_normal,
+                  'root_link': str(root_link),
+                  'root_normal': root_normal}
         if weight is not None:
-            params[u'weight'] = weight
+            params['weight'] = weight
         if max_angular_velocity is not None:
-            params[u'max_angular_velocity'] = max_angular_velocity
-        self.set_json_goal(u'AlignPlanes', **params)
+            params['max_angular_velocity'] = max_angular_velocity
+        self.set_json_goal('AlignPlanes', **params)
 
     def avoid_joint_limits(self, percentage=15, weight=WEIGHT_BELOW_CA):
         """
@@ -249,7 +257,7 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_BELOW_CA
         :type weight: float
         """
-        self.set_json_goal(u'AvoidJointLimits', percentage=percentage, weight=weight)
+        self.set_json_goal('AvoidJointLimits', percentage=percentage, weight=weight)
 
     def limit_cartesian_velocity(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
                                  max_angular_velocity=0.5, hard=True):
@@ -269,7 +277,7 @@ class GiskardWrapper(object):
                                 make some goal combination infeasible
         :type hard: bool
         """
-        self.set_json_goal(u'CartesianVelocityLimit',
+        self.set_json_goal('CartesianVelocityLimit',
                            root_link=root_link,
                            tip_link=tip_link,
                            weight=weight,
@@ -300,7 +308,7 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        self.set_json_goal(u'GraspBar',
+        self.set_json_goal('GraspBar',
                            root_link=root_link,
                            tip_link=tip_link,
                            tip_grasp_axis=tip_grasp_axis,
@@ -315,9 +323,9 @@ class GiskardWrapper(object):
         """
         don't use, it's only for hacks :)
         """
-        self.set_json_goal(u'UpdateGodMap', updates=updates)
+        self.set_json_goal('UpdateGodMap', updates=updates)
 
-    def pointing(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
         """
         Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
         :param tip_link: name of the tip of the kin chain
@@ -331,18 +339,18 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_BELOW_CA
         :type weight: float
         """
-        kwargs = {u'tip_link': tip_link,
-                  u'goal_point': goal_point}
+        kwargs = {'tip_link': tip_link,
+                  'goal_point': goal_point}
         if root_link is not None:
-            kwargs[u'root_link'] = root_link
+            kwargs['root_link'] = root_link
         else:
-            kwargs[u'root_link'] = self.get_root()
+            kwargs['root_link'] = self.get_root()
         if pointing_axis is not None:
-            kwargs[u'pointing_axis'] = pointing_axis
+            kwargs['pointing_axis'] = pointing_axis
         if weight is not None:
-            kwargs[u'weight'] = weight
-        kwargs[u'goal_point'] = goal_point
-        self.set_json_goal(u'Pointing', **kwargs)
+            kwargs['weight'] = weight
+        kwargs['goal_point'] = goal_point
+        self.set_json_goal('Pointing', **kwargs)
 
     def set_json_goal(self, constraint_type, **kwargs):
         """
@@ -416,6 +424,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def allow_self_collision(self):
+        """
+        Allows the collision with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -424,6 +435,9 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def avoid_self_collision(self):
+        """
+        Avoid collisions with itself for the next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
@@ -502,7 +516,7 @@ class GiskardWrapper(object):
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()
         else:
-            self._client.send_goal(goal)
+            self._client.send_goal(goal, feedback_cb=self._feedback_cb)
 
     def get_collision_entries(self):
         return self.cmd_seq
@@ -526,7 +540,8 @@ class GiskardWrapper(object):
         :type timeout: rospy.Duration
         :rtype: MoveResult
         """
-        self._client.wait_for_result(timeout)
+        if not self._client.wait_for_result(timeout):
+            raise TimeoutError('Timeout while waiting for goal.')
         return self._client.get_result()
 
     def clear_world(self, timeout=DEFAULT_WORLD_TIMEOUT):
@@ -630,7 +645,7 @@ class GiskardWrapper(object):
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
         object.shape.type = SolidPrimitive.CYLINDER
-        object.shape.dimensions = [0,0]
+        object.shape.dimensions = [0, 0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
         req = UpdateWorldRequest()
@@ -721,7 +736,7 @@ class GiskardWrapper(object):
         req.operation = req.DETACH
         return self._update_world_srv.call(req)
 
-    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None, timeout=DEFAULT_WORLD_TIMEOUT):
+    def add_urdf(self, name, urdf, pose, js_topic='', set_js_topic=None, timeout=DEFAULT_WORLD_TIMEOUT):
         """
         Adds a urdf to the world
         :param name: name it will have in the world
@@ -781,10 +796,13 @@ class GiskardWrapper(object):
         """
         return self._get_object_info_srv(name)
 
+    def get_controlled_joints(self, name='robot'):
+        return self.get_object_info(name).controlled_joints
+
     def update_rviz_markers(self, object_names):
         """
         republishes visualization markers for rviz
-        :type name: list
+        :type object_names: list
         :rtype: UpdateRvizMarkersResponse
         """
         return self._update_rviz_markers_srv(object_names)

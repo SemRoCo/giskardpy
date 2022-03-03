@@ -2,6 +2,7 @@ import betterpybullet as pb
 
 from giskardpy.utils.utils import resolve_ros_iris
 
+
 class MyCollisionObject(pb.CollisionObject):
     def __init__(self, name):
         super(MyCollisionObject, self).__init__()
@@ -12,6 +13,30 @@ class MyCollisionObject(pb.CollisionObject):
 
     def __str__(self):
         return str(self.name)
+
+    def __hash__(self):
+        return self.name.__hash__()
+
+    def __eq__(self, other):
+        return self.name.__eq__(other.__str__())
+
+    def __ne__(self, other):
+        return self.name.__ne__(other.__str__())
+
+    def __le__(self, other):
+        return self.name.__le__(other.__str__())
+
+    def __ge__(self, other):
+        return self.name.__ge__(other.__str__())
+
+    def __gt__(self, other):
+        return self.name.__gt__(other.__str__())
+
+    def __lt__(self, other):
+        return self.name.__lt__(other.__str__())
+
+    def __contains__(self, item):
+        return self.name.__contains__(item.__str__())
 
 
 def create_cube_shape(extents):

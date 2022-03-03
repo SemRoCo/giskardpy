@@ -3,11 +3,24 @@ general_options:
   enable_gui: False
   test_mode: True
 plugins:
-  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-    enabled: True
+#  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+#    enabled: True
+#  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+#    enabled: True
+#    order: 4
+#    hspace: 0.5
+    # for paper
+#    legend: False
+#    height_per_derivative: 5.3
+#    cm_per_second: 3.301
+#  PlotDebugTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+#    enabled: True
+#    legend: False
+#    order: 4
+#    height_per_derivative: 5.3
+#    cm_per_second: 3.365
+#    hspace: 0.5
   CPIMarker: # contact visualization, slows planning down a little bit
-    enabled: True
-  PlotDebugTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
   MaxTrajectoryLength:
     enabled: True

@@ -17,7 +17,7 @@ class UpdateGodMap(Goal):
 
     def update_god_map(self, identifier, updates):
         if not isinstance(updates, dict):
-            raise GiskardException(u'{} used incorrectly, {} not a dict or number'.format(str(self), updates))
+            raise GiskardException('{} used incorrectly, {} not a dict or number'.format(str(self), updates))
         for member, value in updates.items():
             next_identifier = identifier + [member]
             if isinstance(value, numbers.Number) and \

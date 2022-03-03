@@ -12,7 +12,7 @@ def call_back(pose_stamped):
     """
     :type pose_stamped: PoseStamped
     """
-    rospy.loginfo(u'received simple move base goal')
+    rospy.loginfo('received simple move base goal')
     goal = transform_pose(root, pose_stamped)
     js = {x_joint: goal.pose.position.x,
           y_joint: goal.pose.position.y,
@@ -26,15 +26,15 @@ def call_back(pose_stamped):
 
 if __name__ == '__main__':
     try:
-        rospy.init_node(u'move_base_simple_goal')
+        rospy.init_node('move_base_simple_goal')
         init()
-        x_joint = u'odom_x_joint'
-        y_joint = u'odom_y_joint'
-        z_joint = u'odom_z_joint'
-        root = u'odom_combined'
+        x_joint = 'odom_x_joint'
+        y_joint = 'odom_y_joint'
+        z_joint = 'odom_z_joint'
+        root = 'odom_combined'
 
         giskard = GiskardWrapper()
-        sub = rospy.Subscriber(u'/move_base_simple/goal', PoseStamped, call_back, queue_size=10)
+        sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, call_back, queue_size=10)
 
         rospy.spin()
 

@@ -2,6 +2,8 @@ import numbers
 import traceback
 from copy import deepcopy
 from functools import cached_property
+from itertools import combinations
+from typing import Dict, Union, Tuple, Set
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -9,24 +11,42 @@ from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Sta
 
 import giskardpy.utils.math as mymath
 from giskardpy import casadi_wrapper as w, RobotName, identifier
+from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
-from giskardpy.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
-    FixedJoint, MimicJoint
+    FixedJoint, MimicJoint, DiffDriveWheelsJoint
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
-    kdl_to_np, msg_to_homogeneous_matrix, np_point, np_vector
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize
 
 
+class TravelCompanion(object):
+    def link_call(self, link_name: Union[PrefixName, str]) -> bool:
+        """
+        :return: return True to stop climbing up the branch
+        """
+        return False
+
+    def joint_call(self, joint_name: Union[PrefixName, str]) -> bool:
+        """
+        :return: return True to stop climbing up the branch
+        """
+        return False
+
+
 class WorldTree(object):
+    joints: Dict[Union[PrefixName, str], Joint]
+    links: Dict[Union[PrefixName, str], Link]
+    god_map: GodMap
+
     def __init__(self, god_map=None):
-        self.god_map = god_map  # type: GodMap
+        self.god_map = god_map
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
@@ -97,54 +117,73 @@ class WorldTree(object):
         self.notify_state_change()
         self._model_version += 1
 
-    def search_branch(self, joint_name,
+    def travel_branch(self, link_name, companion: TravelCompanion):
+        link = self.links[link_name]
+        if not companion.link_call(link_name):
+            for child_joint_name in link.child_joint_names:
+                if companion.joint_call(child_joint_name):
+                    continue
+                child_link_name = self.joints[child_joint_name].child_link_name
+                self.travel_branch(child_link_name, companion)
+
+    def search_branch(self, link_name,
                       stop_at_joint_when=None, stop_at_link_when=None,
                       collect_joint_when=None, collect_link_when=None):
         """
 
         :param joint_name:
         :param stop_at_joint_when: If None, 'lambda joint_name: False' is used.
-        :param stop_at_link_when: If None, 'lambda joint_name: False' is used.
+        :param stop_at_link_when: If None, 'lambda link_name: False' is used.
         :param collect_joint_when: If None, 'lambda joint_name: False' is used.
-        :param collect_link_when: If None, 'lambda joint_name: False' is used.
-        :return: Collected links and joints. DOES NOT INCLUDE joint_name
+        :param collect_link_when: If None, 'lambda link_name: False' is used.
+        :return: Collected links and joints. Might include 'link_name'
         """
-        if stop_at_joint_when is None:
-            def stop_at_joint_when(_):
-                return False
-        if stop_at_link_when is None:
-            def stop_at_link_when(_):
-                return False
-        if collect_joint_when is None:
-            def collect_joint_when(_):
-                return False
-        if collect_link_when is None:
-            def collect_link_when(_):
-                return False
 
-        def helper(joint_name):
-            joint = self.joints[joint_name]
-            collected_link_names = []
-            collected_joint_names = []
-            child_link = self.links[joint.child_link_name]
-            if collect_link_when(child_link.name):
-                collected_link_names.append(child_link.name)
-            if not stop_at_link_when(child_link.name):
-                for child_joint_name in child_link.child_joint_names:
-                    if collect_joint_when(child_joint_name):
-                        collected_joint_names.append(child_joint_name)
-                    if stop_at_joint_when(child_joint_name):
-                        continue
-                    links_to_add, joints_to_add = helper(child_joint_name)
-                    collected_link_names.extend(links_to_add)
-                    collected_joint_names.extend(joints_to_add)
-            return collected_link_names, collected_joint_names
+        class CollectorCompanion(TravelCompanion):
+            def __init__(self, collect_joint_when=None, collect_link_when=None,
+                         stop_at_joint_when=None, stop_at_link_when=None):
+                self.collected_link_names = []
+                self.collected_joint_names = []
 
-        return helper(joint_name)
+                if stop_at_joint_when is None:
+                    def stop_at_joint_when(_):
+                        return False
+                if stop_at_link_when is None:
+                    def stop_at_link_when(_):
+                        return False
+                self.stop_at_joint_when = stop_at_joint_when
+                self.stop_at_link_when = stop_at_link_when
+
+                if collect_joint_when is None:
+                    def collect_joint_when(_):
+                        return False
+                if collect_link_when is None:
+                    def collect_link_when(_):
+                        return False
+                self.collect_joint_when = collect_joint_when
+                self.collect_link_when = collect_link_when
+
+            def link_call(self, link_name):
+                if self.collect_link_when(link_name):
+                    self.collected_link_names.append(link_name)
+                return self.stop_at_link_when(link_name)
+
+            def joint_call(self, joint_name):
+                if self.collect_joint_when(joint_name):
+                    self.collected_joint_names.append(joint_name)
+                return self.stop_at_joint_when(joint_name)
+
+        collector_companion = CollectorCompanion(collect_joint_when=collect_joint_when,
+                                                 collect_link_when=collect_link_when,
+                                                 stop_at_joint_when=stop_at_joint_when,
+                                                 stop_at_link_when=stop_at_link_when)
+        self.travel_branch(link_name, companion=collector_companion)
+        return collector_companion.collected_link_names, collector_companion.collected_joint_names
 
     @memoize
     def get_directly_controlled_child_links_with_collisions(self, joint_name):
-        links, joints = self.search_branch(joint_name,
+        child_link_name = self.joints[joint_name].child_link_name
+        links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=self.is_joint_controlled,
                                            collect_link_when=self.has_link_collisions)
         return links
@@ -164,7 +203,8 @@ class WorldTree(object):
         def stop_at_joint_when(other_joint_name):
             return joint_name == other_joint_name or self.is_joint_controlled(other_joint_name)
 
-        links, joints = self.search_branch(parent_joint,
+        child_link_name = self.joints[parent_joint].child_link_name
+        links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=stop_at_joint_when,
                                            collect_link_when=self.has_link_collisions)
         return links
@@ -174,7 +214,12 @@ class WorldTree(object):
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         if name in self.groups:
             raise DuplicateNameException('Group with name {} already exists'.format(name))
-        self.groups[name] = SubWorldTree(name, root_link_name, self)
+        new_group = SubWorldTree(name, root_link_name, self)
+        # if the group is a subtree of a subtree, register it for the subtree as well
+        for group in self.groups.values():
+            if root_link_name in group.links:
+                group.groups[name] = new_group
+        self.groups[name] = new_group
 
     @property
     def group_names(self):
@@ -227,11 +272,15 @@ class WorldTree(object):
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
-        child_link = Link(name=PrefixName(parsed_urdf.get_root(), prefix))
-        connecting_joint = FixedJoint(name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix),
-                                      parent_link_name=parent_link.name,
-                                      child_link_name=child_link.name)
-        self._link_joint_to_links(connecting_joint, child_link)
+        if False:
+            base_footprint, odom = self._add_diff_drive_joint(urdf=parsed_urdf,
+                                                              map_link=parent_link,
+                                                              prefix=prefix)
+        else:
+            odom = Link.from_urdf(parsed_urdf.link_map[parsed_urdf.get_root()], None)
+            base_footprint = odom
+            self._add_fixed_joint(parent_link, odom,
+                                  joint_name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix))
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
@@ -247,17 +296,55 @@ class WorldTree(object):
                 self._link_joint_to_links(joint, child_link)
                 helper(urdf, child_link)
 
-        helper(parsed_urdf, child_link)
+        helper(parsed_urdf, base_footprint)
+
         if group_name is not None:
-            self.register_group(group_name, child_link.name)
+            self.register_group(group_name, odom.name)
         if self.god_map is not None:
             self.sync_with_paramserver()
+        self._set_free_variables_on_mimic_joints(group_name)
 
-    def get_parent_link_of_link(self, link_name):
-        """
-        :type link_name: PrefixName
-        :rtype: PrefixName
-        """
+    def _add_fixed_joint(self, parent_link, child_link, joint_name=None):
+        if joint_name is None:
+            joint_name = '{}_{}_fixed_joint'.format(parent_link.name, child_link.name)
+        connecting_joint = FixedJoint(name=joint_name,
+                                      parent_link_name=parent_link.name,
+                                      child_link_name=child_link.name)
+        self._link_joint_to_links(connecting_joint, child_link)
+
+    def _add_diff_drive_joint(self, urdf, map_link, odom_link_name='odom', prefix=None):
+        # create odom and link to map with fixed joint
+        odom = Link(name=PrefixName(odom_link_name, prefix))
+        self._add_fixed_joint(parent_link=map_link,
+                              child_link=odom,
+                              joint_name=PrefixName(PrefixName(urdf.name, prefix), self.connection_prefix))
+
+        # create urdf root link and fix to odom with diff drive
+        base_footprint_name = urdf.get_root()
+        base_footprint = Link.from_urdf(urdf.link_map[base_footprint_name], None)
+
+        trans_lower_limits = {1: -1}
+        trans_upper_limits = {1: 1}
+        rot_lower_limits = {1: -1}
+        rot_upper_limits = {1: 1}
+        # diff_drive_joint = DiffDriveJoint(name=PrefixName('diff_drive', None),
+        diff_drive_joint = DiffDriveWheelsJoint(name=PrefixName('diff_drive', None),
+                                                parent_link_name=odom_link_name,
+                                                child_link_name=base_footprint_name,
+                                                god_map=self.god_map)
+        diff_drive_joint.create_free_variables(identifier.joint_states, trans_lower_limits, trans_upper_limits,
+                                               rot_lower_limits, rot_upper_limits)
+        self._link_joint_to_links(diff_drive_joint, base_footprint)
+        return base_footprint, odom
+
+    def _set_free_variables_on_mimic_joints(self, group_name):
+        # TODO prevent this from happening twice
+        for joint_name, joint in self.groups[group_name].joints.items():  # type: (PrefixName, MimicJoint)
+            if self.is_joint_mimic(joint_name):
+                mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
+                joint.set_mimed_free_variable(mimed_joint.free_variable)
+
+    def get_parent_link_of_link(self, link_name: Union[PrefixName, str]) -> PrefixName:
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
 
     @memoize
@@ -270,13 +357,13 @@ class WorldTree(object):
                 new_link_b = chain[i - 1]
                 break
         else:
-            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+            raise KeyError('no controlled joint in chain between {} and {}'.format(link_a, link_b))
         for i, thing in enumerate(reversed(chain)):
             if i % 2 == 1 and thing in self.controlled_joints:
                 new_link_a = chain[len(chain) - i]
                 break
         else:
-            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+            raise KeyError('no controlled joint in chain between {} and {}'.format(link_a, link_b))
         return new_link_a, new_link_b
 
     @memoize
@@ -286,6 +373,7 @@ class WorldTree(object):
             joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
         return joint
 
+    @profile
     def add_world_body(self, msg, pose, parent_link_name=None):
         """
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
@@ -307,18 +395,18 @@ class WorldTree(object):
         else:
             link = Link.from_world_body(msg)
             joint = FixedJoint(PrefixName(msg.name, self.connection_prefix), parent_link.name, link.name,
-                               parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
+                               parent_T_child=w.Matrix(msg_to_homogeneous_matrix(pose)))
             self._link_joint_to_links(joint, link)
             self.register_group(msg.name, link.name)
             self.notify_model_change()
 
     @cached_property
     def movable_joints(self):
-        return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
+        return [j.name for j in self.joints.values() if isinstance(j, MovableJoint) and not isinstance(j, MimicJoint)]
 
     @cached_property
     def movable_joints_as_set(self):
-        return set(j.name for j in self.joints.values() if isinstance(j, MovableJoint))
+        return set(self.movable_joints)
 
     def _clear(self):
         self.state = JointStates()
@@ -330,32 +418,70 @@ class WorldTree(object):
         self.joints = {}
         self.groups = {}
 
+    @profile
     def delete_all_but_robot(self):
         self._clear()
         self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
         self.fast_all_fks = None
         self.notify_model_change()
 
+    def _set_joint_limits(self, linear_limits, angular_limits, order):
+        for joint_name in self.movable_joints:  # type: OneDofJoint
+            joint = self.joints[joint_name]
+            joint.update_limits(linear_limits, angular_limits, order)
+
+    @profile
     def sync_with_paramserver(self):
-        self._delete_joint_limits()
-        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits))+1):
-            order_identifier = identifier.joint_limits + [order_map[i]]
-            d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                         [u'linear', u'override', key]))
-            d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                          [u'angular', u'override', key]))
-            self._set_joint_limits(d_linear, d_angular, i)
-        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights))+1):
+        new_lin_limits = {}
+        new_ang_limits = {}
+        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits)) + 1):
+            diff = order_map[i]
+
+            class Linear(object):
+                def __init__(self, god_map, diff):
+                    self.god_map = god_map
+                    self.diff = diff
+
+                def __call__(self, key):
+                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['linear', 'override', key])
+
+            class Angular(object):
+                def __init__(self, god_map, diff):
+                    self.god_map = god_map
+                    self.diff = diff
+
+                def __call__(self, key):
+                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['linear', 'override', key])
+
+            d_linear = KeyDefaultDict(Linear(self.god_map, diff))
+            d_angular = KeyDefaultDict(Angular(self.god_map, diff))
+            new_lin_limits[i] = d_linear
+            new_ang_limits[i] = d_angular
+        for joint_name in self.movable_joints:  # type: OneDofJoint
+            joint = self.joints[joint_name]
+            joint.update_limits(new_lin_limits, new_ang_limits)
+
+        new_weights = {}
+        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights)) + 1):
             def default(joint_name):
                 return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
 
             d = KeyDefaultDict(default)
-            self._set_joint_weights(i, d)
+            new_weights[i] = d
+            # self._set_joint_weights(i, d)
+        for joint_name in self.movable_joints:
+            joint = self.joints[joint_name]
+            if not self.is_joint_mimic(joint_name):
+                joint.update_weights(new_weights)
         self.notify_model_change()
 
     @property
     def joint_constraints(self):
-        return {j.name: j.free_variable for j in self.joints.values() if j.has_free_variables()}
+        joint_constraints = []
+        for joint_name, joint in self.joints.items():
+            if joint.has_free_variables():  # FIXME check name clashes
+                joint_constraints.extend(joint.free_variable_list)
+        return joint_constraints
 
     def _link_joint_to_links(self, joint, child_link):
         """
@@ -373,6 +499,7 @@ class WorldTree(object):
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
 
+    @profile
     def move_branch(self, joint_name, new_parent_link_name):
         if not self.is_joint_fixed(joint_name):
             raise NotImplementedError('Can only change fixed joints')
@@ -387,6 +514,7 @@ class WorldTree(object):
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()
 
+    @profile
     def update_joint_parent_T_child(self, joint_name, new_parent_T_child):
         joint = self.joints[joint_name]
         joint.parent_T_child = new_parent_T_child
@@ -406,6 +534,7 @@ class WorldTree(object):
     def delete_branch(self, link_name):
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
 
+    @profile
     def delete_branch_at_joint(self, joint_name):
         joint = self.joints.pop(joint_name)  # type: Joint
         self.links[joint.parent_link_name].child_joint_names.remove(joint_name)
@@ -442,9 +571,30 @@ class WorldTree(object):
             return True
         return link_a < link_b
 
+    def sort_links(self, link_a: Union[PrefixName, str], link_b: Union[PrefixName, str]) \
+            -> Tuple[Union[PrefixName, str], Union[PrefixName, str]]:
+        if self.link_order(link_a, link_b):
+            return link_a, link_b
+        return link_b, link_a
+
     @property
     def controlled_joints(self):
-        return self.god_map.unsafe_get_data(identifier.controlled_joints)
+        try:
+            return self.god_map.unsafe_get_data(identifier.controlled_joints)
+        except KeyError:
+            return []
+
+    def register_controlled_joints(self, controlled_joints):
+        old_controlled_joints = set(self.controlled_joints)
+        new_controlled_joints = set(controlled_joints)
+        double_joints = old_controlled_joints.intersection(new_controlled_joints)
+        if double_joints:
+            raise DuplicateNameException('Controlled joints \'{}\' are already registered!'.format(double_joints))
+        unknown_joints = new_controlled_joints.difference(self.joint_names_as_set)
+        if unknown_joints:
+            raise UnknownBodyException('Trying to register unknown joints: \'{}\''.format(unknown_joints))
+        old_controlled_joints.update(new_controlled_joints)
+        self.god_map.set_data(identifier.controlled_joints, list(sorted(old_controlled_joints)))
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name):
@@ -511,6 +661,7 @@ class WorldTree(object):
         return root_chain, [connection] if links else [], tip_chain
 
     @memoize
+    @profile
     def compose_fk_expression(self, root_link, tip_link):
         fk = w.eye(4)
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, joints=True, links=False, fixed=True,
@@ -534,15 +685,10 @@ class WorldTree(object):
 
     @memoize
     def compute_fk_pose(self, root, tip):
-        try:
-            homo_m = self.compute_fk_np(root, tip)
-            p = PoseStamped()
-            p.header.frame_id = str(root)
-            p.pose = homo_matrix_to_pose(homo_m)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            pass
+        homo_m = self.compute_fk_np(root, tip)
+        p = PoseStamped()
+        p.header.frame_id = str(root)
+        p.pose = homo_matrix_to_pose(homo_m)
         return p
 
     @memoize
@@ -565,21 +711,6 @@ class WorldTree(object):
 
     @profile
     def compute_all_fks(self):
-        # TODO speedup possible
-        # def helper(link, root_T_parent):
-        #     if link.parent_joint_name in self.joints:
-        #         root_T_link = root_T_parent * self.joints[link.parent_joint_name].parent_T_child
-        #     else:
-        #         root_T_link = root_T_parent
-        #     if link.has_collisions():
-        #         fks = {link.name: root_T_link}
-        #     else:
-        #         fks = {}
-        #     for child_joint_name in link.child_joint_names:
-        #         child_link = self.joints[child_joint_name].child
-        #         fks.update(helper(child_link, root_T_link))
-        #     return fks
-        # fks_dict = helper(self.root_link, w.eye(4))
         if self.fast_all_fks is None:
             fks = []
             self.fk_idx = {}
@@ -606,74 +737,63 @@ class WorldTree(object):
 
     @profile
     def compute_all_fks_matrix(self):
-        fks = []
-        for link in self.links.values():
-            if link.name == self.root_link_name:
-                continue
-            if link.has_collisions():
-                map_T_o = self.compose_fk_expression(self.root_link_name, link.name)
-                map_T_geo = w.dot(map_T_o, link.collisions[0].link_T_geometry)
-                fks.append(map_T_geo)
-        fks = w.vstack(fks)
-        fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
-
-        class ComputeFKs(object):
-            def __init__(self, f, god_map):
-                self.f = f
-                self.god_map = god_map
-
-            @profile
-            def __call__(self):
-                return fast_all_fks.call2(self.god_map.unsafe_get_values(self.f.str_params))
-
-        return ComputeFKs(fast_all_fks, self.god_map)
+        return self._fk_computer.collision_fk_matrix
 
     @profile
     def init_all_fks(self):
-        fks = []
-        idx_start = {}
-        idx_stop = {}
-        i = 0
-        for link_name in self.link_names:
-            if link_name == self.root_link_name:
-                continue
-            map_T_o = self.compose_fk_expression(self.root_link_name, link_name)
-            fks.append(map_T_o)
-            idx_start[link_name] = i
-            idx_stop[link_name] = i + 4
-            i += 4
-        fks = w.vstack(fks)
-        fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
+        class ExpressionCompanion(TravelCompanion):
+            idx_start: Dict[PrefixName, int]
+            fast_collision_fks: CompiledFunction
+            fast_all_fks: CompiledFunction
 
-        class FKs(object):
-            def __init__(self, f, god_map, idx_start, idx_stop):
-                self.f = f
-                self.god_map = god_map
-                self.idx_start = idx_start
-                self.idx_stop = idx_stop
-                self.map = god_map.unsafe_get_data(identifier.world).root_link_name
+            def __init__(self, world: WorldTree):
+                self.world = world
+                self.god_map = self.world.god_map
+                self.fks = {self.world.root_link_name: w.eye(4)}
+
+            @profile
+            def joint_call(self, joint_name: Union[PrefixName, str]) -> bool:
+                joint = self.world.joints[joint_name]
+                map_T_parent = self.fks[joint.parent_link_name]
+                self.fks[joint.child_link_name] = w.dot(map_T_parent, joint.parent_T_child)
+                return False
+
+            @profile
+            def compile_fks(self):
+                all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names])
+                for link_name in self.world.link_names_with_collisions:
+                    link = self.world.links[link_name]
+                    self.fks[link_name] = w.dot(self.fks[link_name], link.collisions[0].link_T_geometry)
+                collision_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_with_collisions if
+                                          link_name != self.world.root_link_name])
+                self.fast_all_fks = w.speed_up(all_fks, w.free_symbols(all_fks))
+                self.fast_collision_fks = w.speed_up(collision_fks, w.free_symbols(collision_fks))
+                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names)}
 
             @profile
             def recompute(self):
                 self.get_fk.memo.clear()
-                self.fks = self.f.call2(self.god_map.unsafe_get_values(self.f.str_params))
+                self.fks = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+                self.collision_fk_matrix = self.fast_collision_fks.call2(self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
 
             @memoize
             @profile
             def get_fk(self, root, tip):
-                if root == self.map:
+                if root == self.world.root_link_name:
                     map_T_root = np.eye(4)
                 else:
-                    map_T_root = self.fks[self.idx_start[root]:self.idx_stop[root]]
-                if tip == self.map:
+                    map_T_root = self.fks[self.idx_start[root]:self.idx_start[root] + 4]
+                if tip == self.world.root_link_name:
                     map_T_tip = np.eye(4)
                 else:
-                    map_T_tip = self.fks[self.idx_start[tip]:self.idx_stop[tip]]
+                    map_T_tip = self.fks[self.idx_start[tip]:self.idx_start[tip] + 4]
                 root_T_map = mymath.inverse_frame(map_T_root)
                 root_T_tip = np.dot(root_T_map, map_T_tip)
                 return root_T_tip
 
-        self._fk_computer = FKs(fast_all_fks, self.god_map, idx_start, idx_stop)
+        self._fk_computer = ExpressionCompanion(self)
+        self.travel_branch(self.root_link_name, self._fk_computer)
+        self._fk_computer.compile_fks()
 
     @profile
     def _recompute_fks(self):
@@ -684,6 +804,7 @@ class WorldTree(object):
         return self._fk_computer.get_fk(root, tip)
 
     @memoize
+    @profile
     def are_linked(self, link_a, link_b, non_controlled=False, fixed=False):
         """
         Return True if all joints between link_a and link_b are fixed.
@@ -701,26 +822,8 @@ class WorldTree(object):
             joint.delete_limits()
             joint.delete_weights()
 
-    def _set_joint_limits(self, linear_limits, angular_limits, order):
-        for joint in self.joints.values():  # type: OneDofJoint
-            if self.is_joint_fixed(joint.name) or self.is_joint_mimic(joint.name):
-                continue
-            if self.is_joint_rotational(joint.name):
-                new_limits = angular_limits
-            else:
-                new_limits = linear_limits
-            joint.free_variable.set_upper_limit(order, new_limits[joint.name])
-            joint.free_variable.set_lower_limit(order, -new_limits[joint.name])
-
-    def _set_joint_weights(self, order, weights):
-        for joint_name, joint in self.joints.items():
-            if self.is_joint_movable(joint_name) and not self.is_joint_mimic(joint_name):
-                joint.free_variable.quadratic_weights[order] = weights[joint_name]
-
     def joint_limit_expr(self, joint_name, order):
-        upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)
-        lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
-        return lower_limit, upper_limit
+        return self.joints[joint_name].get_limit_expressions(order)
 
     def transform_msg(self, target_frame, msg):
         if isinstance(msg, PoseStamped):
@@ -752,7 +855,7 @@ class WorldTree(object):
         :type point: PointStamped
         :rtype: PointStamped
         """
-        f_P_p = np_point(point.point.x, point.point.y, point.point.z)
+        f_P_p = msg_to_homogeneous_matrix(point)
         t_T_f = self.compute_fk_np(target_frame, point.header.frame_id)
         t_P_p = np.dot(t_T_f, f_P_p)
         result = PointStamped()
@@ -766,7 +869,7 @@ class WorldTree(object):
         :type vector: Vector3Stamped
         :rtype: Vector3Stamped
         """
-        f_V_p = np_vector(vector.vector.x, vector.vector.y, vector.vector.z)
+        f_V_p = msg_to_homogeneous_matrix(vector)
         t_T_f = self.compute_fk_np(target_frame, vector.header.frame_id)
         t_V_p = np.dot(t_T_f, f_V_p)
         result = Vector3Stamped()
@@ -775,7 +878,11 @@ class WorldTree(object):
         return result
 
     def compute_joint_limits(self, joint_name, order):
-        lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
+        try:
+            lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
+        except KeyError:
+            # joint has no limits for this derivative
+            return None, None
         if not isinstance(lower_limit, numbers.Number) and lower_limit is not None:
             f = w.speed_up(lower_limit, w.free_symbols(lower_limit))
             lower_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
@@ -783,6 +890,28 @@ class WorldTree(object):
             f = w.speed_up(upper_limit, w.free_symbols(upper_limit))
             upper_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
         return lower_limit, upper_limit
+
+    @profile
+    def possible_collision_combinations(self, group_name: str) -> Set[Tuple[PrefixName, PrefixName]]:
+        link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in
+                             combinations(self.groups['robot'].link_names_with_collisions, 2)}
+        for link_name in self.groups[group_name].link_names_with_collisions:
+            direct_children = set()
+            for child_joint_name in self.links[link_name].child_joint_names:
+                if self.is_joint_controlled(child_joint_name):
+                    continue
+                child_link_name = self.joints[child_joint_name].child_link_name
+                links, joints = self.search_branch(link_name=child_link_name,
+                                                   stop_at_joint_when=self.is_joint_controlled,
+                                                   stop_at_link_when=None,
+                                                   collect_joint_when=None,
+                                                   collect_link_when=self.has_link_collisions)
+
+                direct_children.update(links)
+            direct_children.add(link_name)
+            link_combinations.difference_update(
+                self.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
+        return link_combinations
 
     def get_joint_position_limits(self, joint_name):
         """
@@ -823,7 +952,7 @@ class WorldTree(object):
     def has_joint(self, joint_name):
         return joint_name in self.joints
 
-    def has_link_collisions(self, link_name):
+    def has_link_collisions(self, link_name) -> bool:
         return self.links[link_name].has_collisions()
 
     def has_link_visuals(self, link_name):
@@ -840,6 +969,10 @@ class SubWorldTree(WorldTree):
         self.name = name
         self.root_link_name = root_link_name
         self.world = world
+
+    @property
+    def controlled_joints(self):
+        return [j for j in self.god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
 
     @property
     def attachment_joint_name(self):

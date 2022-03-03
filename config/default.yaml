@@ -1,3 +1,4 @@
+reset_god_map: True # will reset god_map in cleanup.py by loading rosparam values if true
 global_planner:
   navigation:
     motion_validator: 'rays' # ['rays', 'box', 'discrete']

@@ -280,12 +280,12 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
                 axs[i].set_title(titles[i])
                 axs[i].xaxis.set_ticks(ticks)
                 if y_limits is not None:
-                    axs[i].set_ylim([-y_limits, y_limits])
+                    axs[i].set_ylim(y_limits)
         else:
             for i in range(order):
                 axs[i].set_title(titles[i])
                 if y_limits is not None:
-                    axs[i].set_ylim([-y_limits, y_limits])
+                    axs[i].set_ylim(y_limits)
         color_counter = 0
         for i in range(len(controlled_joints)):
             if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):

@@ -1,0 +1,33 @@
+parent: !include default.yaml
+general_options:
+  joint_vel_limit: # giskard will use the min of this number and limits from the urdf
+    linear: # m/s
+      default: 1
+    angular: # rad/s
+      default: 1
+  joint_weights:
+    # the planner prefers low weight joints to achieve solutions
+    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
+    default: 0.01
+plugins:
+  WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
+    amplitude_threshold: 0.15 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
+    window_size: 21 # size of the moving window of sample points
+    frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
+collision_avoidance:
+  external_collision_avoidance:
+    distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links
+      default:
+        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
+        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
+    # each controlled joint gets pushed away from its X nearest objects
+    # to reduce the runtime, you can set different values for joints that control end effectors
+    number_of_repeller:
+      default: 1
+      end_effector_joints: 4
+  self_collision_avoidance:
+    distance_thresholds: # thresholds for self collision avoidance are set for each link pair
+      default: &default # you can set variables and reuse them
+        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
+        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
+    number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it

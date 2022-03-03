@@ -1,0 +1,25 @@
+<launch>
+    
+    <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
+        <rosparam param="state_topics">
+            - /panda_arm/joint_trajectory_controller/state 
+        </rosparam>
+        <rosparam param="client_topics">
+            - /panda_arm/joint_trajectory_controller/follow_joint_trajectory
+        </rosparam>
+    </node>
+
+    <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen" >
+        <remap from="robot_description" to="panda_arm/robot_description"/>
+        <param name="config" value="$(find giskardpy)/config/panda_arm.yaml" />
+    </node>
+
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+        <remap from="robot_description" to="panda_arm/robot_description"/>
+        <rosparam param="enable_self_collision">False</rosparam>
+        <rosparam param="interactive_marker_chains">
+            - [panda_link0, panda_link8]
+        </rosparam>
+    </node>
+
+</launch>

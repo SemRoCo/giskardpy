@@ -56,7 +56,7 @@ class ControllerPlugin(GiskardBehavior):
             next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
             self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
             self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
-        except (HardConstraintsViolatedException, PlanningException):
+        except (HardConstraintsViolatedException, PlanningException, ValueError):
             self.raise_to_blackboard(PlanningException())
             return Status.FAILURE
 

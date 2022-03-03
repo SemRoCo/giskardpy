@@ -463,8 +463,8 @@ class GiskardTestWrapper(GiskardWrapper):
         i = 0.0
         while not rospy.is_shutdown():
             current_js = self.world.groups[object_name].state
-            joint_names_without_prefix = set(j.short_name for j in current_js)
-            assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()
+            #joint_names_without_prefix = set(j.short_name for j in current_js)
+            #assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()
             for joint_name, state in current_js.items():
                 if joint_name.short_name in joint_state:
                     assert i < waiting_time
@@ -528,7 +528,7 @@ class GiskardTestWrapper(GiskardWrapper):
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         self.set_base.call(goal)
-        #self.wait_heartbeats()
+        self.wait_heartbeats()
         rospy.sleep(0.5)
 
     def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,

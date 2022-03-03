@@ -29,7 +29,8 @@ class CleanUp(GiskardBehavior):
         trajectory = Trajectory()
         self.get_god_map().set_data(identifier.debug_trajectory, trajectory)
         # to reverse update godmap changes
-        self.get_god_map().set_data(identifier.rosparam, deepcopy(self.rosparams))
+        if self.god_map.get_data(identifier.rosparam + ['reset_god_map']):
+            self.get_god_map().set_data(identifier.rosparam, deepcopy(self.rosparams))
         self.world.sync_with_paramserver()
         self.get_god_map().set_data(identifier.next_move_goal, None)
         self.get_god_map().set_data(identifier.rosparam + ['motion_validator_lock'], Lock())

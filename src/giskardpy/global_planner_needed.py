@@ -9,7 +9,7 @@ import pybullet as p
 from py_trees import Status
 
 from giskardpy import identifier, RobotName
-from giskard_msgs.srv import GlobalPathNeeded, GlobalPathNeededResponse
+from giskard_msgs.srv import GlobalPathNeeded, GlobalPathNeededResponse, GetAttachedObjects, GetAttachedObjectsRequest
 from giskardpy.data_types import Trajectory, Collisions
 from giskardpy.global_planner import ObjectRayMotionValidator, GiskardRobotBulletCollisionChecker
 from giskardpy.tree.get_goal import GetGoal
@@ -65,6 +65,9 @@ class GlobalPlannerNeeded(GetGoal):
                 ids = self.get_collision_ids(env_group)
                 return self.__is_global_path_needed(root_link, tip_link, pose_goal, ids)
             else:
+                get_attached_objects = rospy.ServiceProxy('~get_attached_objects', GetAttachedObjects)
+                if tip_link in get_attached_objects(GetAttachedObjectsRequest()).object_names:
+                    tip_link = self.get_robot().get_parent_link_of_link(tip_link)
                 collision_checker = GiskardRobotBulletCollisionChecker(tip_link!='base_footprint', root_link,
                                                                        tip_link, self.collision_scene)
                 m = ObjectRayMotionValidator(self.collision_scene, tip_link, self.robot, collision_checker, self.god_map,

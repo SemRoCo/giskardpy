@@ -50,8 +50,11 @@ def find_parent_of_key(key, value, keys):
     else:
         for k, v in value.items():
             if type(v) == dict:
-                keys.append(k)
-                return find_parent_of_key(key, v, keys)
+                new_keys = deepcopy(keys)
+                new_keys.append(k)
+                ret = find_parent_of_key(key, v, new_keys)
+                if ret is not None:
+                    return ret
 
 
 def nested_update(dic, keys, value):
@@ -97,21 +100,18 @@ def update_parents(d, merge_key):
     :type d: dict
     :returns: dict
     """
-    if merge_key not in d:
-        return d
-    else:
-        root_data = deepcopy(d)
-        while True:
-            data_keys_tuple = find_parent_of_key(merge_key, root_data, [])
-            if data_keys_tuple is not None:
-                data, keys = data_keys_tuple
-            else:
-                break
-            parent_data = data[merge_key]
-            data.pop(merge_key)
-            updated = update_nested_dicts(parent_data, data)
-            nested_update(root_data, keys, updated)
-        return root_data
+    root_data = deepcopy(d)
+    while True:
+        data_keys_tuple = find_parent_of_key(merge_key, root_data, [])
+        if data_keys_tuple is not None:
+            data, keys = data_keys_tuple
+        else:
+            break
+        parent_data = data[merge_key]
+        data.pop(merge_key)
+        updated = update_nested_dicts(parent_data, data)
+        nested_update(root_data, keys, updated)
+    return root_data
 
 
 def get_filename(loader, node, root):
@@ -169,10 +169,12 @@ def cast_values_in_nested_dict(d, constructor):
         elif isinstance(v, list):
             v_new = []
             for w in v:
-                if isinstance(w, str) or isinstance(w, list):
+                if isinstance(w, (list, str, int, float)):
                     tmp = {None: w}
                     cast_values_in_nested_dict(tmp, constructor)
                     v_new.append(tmp[None])
+                else:
+                    raise Exception('Unknown type {} for value {}'.format(type(v), v))
             d.update({k: v_new})
         else:
             if isinstance(d[k], str):

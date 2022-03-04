@@ -125,7 +125,6 @@ class ShakyCartesianPosition(Goal):
         return u'{}/{}'.format(s, self.tip_link)
 
 
-
 class CartesianOrientation(Goal):
     def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
                  **kwargs):
@@ -245,6 +244,30 @@ class CartesianPoseStraight(Goal):
                                                           tip_link=tip_link,
                                                           goal=goal,
                                                           max_velocity=rotation_max_velocity,
+                                                          weight=weight,
+                                                          **kwargs))
+
+
+class CartesianPreGrasp(Goal):
+    def __init__(self, root_link, tip_link, grasping_goal, goal, goal_position=None, dist=0, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
+        super(CartesianPreGrasp, self).__init__(**kwargs)
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.goal = goal
+        self.grasping_goal = grasping_goal
+        self.goal_position = goal_position
+        self.dist = dist
+        self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
+                                                       tip_link=tip_link,
+                                                       goal=goal,
+                                                       max_velocity=max_linear_velocity,
+                                                       weight=weight,
+                                                       **kwargs))
+        self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          goal=goal,
+                                                          max_velocity=max_angular_velocity,
                                                           weight=weight,
                                                           **kwargs))
 

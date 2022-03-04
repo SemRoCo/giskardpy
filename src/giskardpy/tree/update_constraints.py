@@ -48,7 +48,6 @@ class GoalToConstraints(GetGoal):
         self.rc_other_velocity = self.get_god_map().get_data(identifier.rc_other_velocity)
 
     def initialise(self):
-        self.get_god_map().set_data(identifier.collision_goal, None)
         self.clear_blackboard_exception()
 
     @profile
@@ -81,7 +80,6 @@ class GoalToConstraints(GetGoal):
                 self.god_map.get_data(identifier.collision_checker) is not None:
             self.add_collision_avoidance_constraints(move_cmd.collisions)
 
-        self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
         self.get_god_map().set_data(identifier.constraints, self.soft_constraints)
         self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)

@@ -43,7 +43,7 @@ from giskardpy.tree.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plot_trajectory import PlotTrajectory
 from giskardpy.tree.set_error_code import SetErrorCode
 from giskardpy.tree.send_trajectory import SendTrajectory
-from giskardpy.tree.set_cmd import SetCmd
+from giskardpy.tree.set_cmd import SetCmd, SetCollisionGoal
 from giskardpy.tree.tf_publisher import TFPublisher
 from giskardpy.tree.time import TimePlugin
 from giskardpy.tree.update_constraints import GoalToConstraints
@@ -196,6 +196,7 @@ def grow_tree():
         planning_4.add_plugin(MaxTrajectoryLength(u'traj length check', **kwargs))
     # ---------------------------------------------
     global_planning = Sequence(u'global planning')
+    global_planning.add_child(PreGraspSampler())
     global_planning.add_child(running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded', action_server_name, planning_4))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
@@ -245,6 +246,7 @@ def grow_tree():
     # ----------------------------------------------
     planning = success_is_failure(Sequence)(u'planning')
     planning.add_child(IF(u'command set?', identifier.next_move_goal))
+    planning.add_child(SetCollisionGoal(u'set collision goal', action_server_name))
     planning.add_child(global_planning)
     planning.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning.add_child(planning_2)
@@ -274,7 +276,6 @@ def grow_tree():
     root = Sequence(u'Giskard')
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
-    root.add_child(PreGraspSampler())
     root.add_child(process_move_goal)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))

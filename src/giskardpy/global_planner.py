@@ -730,6 +730,9 @@ class PyBulletEnv(object):
             pbw.p.stepSimulation(
                 physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
 
+    def close_pybullet(self):
+        pbw.stop_pybullet(client_id=self.client_id)
+
 
 class PyBulletRayTester(PyBulletEnv):
 
@@ -740,6 +743,9 @@ class PyBulletRayTester(PyBulletEnv):
         self.collision_free_id = -1
         self.collisionFilterGroup = 0x1
         self.noCollisionFilterGroup = 0x0
+
+    def __del__(self):
+        self.close_pybullet()
 
     def pre_ray_test(self):
         bodies_num = p.getNumBodies(physicsClientId=self.client_id)
@@ -786,9 +792,6 @@ class PyBulletRayTester(PyBulletEnv):
                     p.setCollisionFilterGroupMask(id, link_id, self.collisionFilterGroup, self.collisionFilterGroup,
                                                   physicsClientId=self.client_id)
 
-    def close_pybullet(self):
-        pbw.stop_pybullet(client_id=self.client_id)
-
 
 class SimpleRayMotionValidator(AbstractMotionValidator):
 
@@ -805,6 +808,9 @@ class SimpleRayMotionValidator(AbstractMotionValidator):
             self.raytester = PyBulletRayTester()
         else:
             self.raytester = raytester
+
+    def __del__(self):
+        del self.raytester
 
     def check_motion(self, s1, s2):
         with self.raytester_lock:
@@ -887,6 +893,9 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
         self.box_space = CompoundBoxSpace(self.collision_scene.world, self.object_in_motion, 'map', self.collision_scene, js=js)
         self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
 
+    def __del__(self):
+        del self.box_space
+
     @profile
     def check_motion(self, s1, s2):
         # Shoot ray from start to end pose and check if it intersects with the kitchen,
@@ -966,6 +975,9 @@ class PyBulletIK(IK):
         self.joint_lowers = list()
         self.joint_uppers = list()
         self.setup()
+
+    def __del__(self):
+        pbw.p.disconnect(physicsClientId=self.client_id)
 
     def setup(self):
         for i in range(0, 100):
@@ -1321,6 +1333,9 @@ class CompoundBoxSpace:
 
         if self.publish_collision_boxes:
             self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
+
+    def __del__(self):
+        del self.pybullet_env
 
     def _create_collision_box_with_files(self, pose, pos_a, pos_b, min_size, collision_sphere_name):
         dist = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
@@ -1695,49 +1710,115 @@ class GoalRegionSampler:
 
 class PreGraspSampler(GiskardBehavior):
     def __init__(self, name='PreGraspSampler'):
-        super().__init__(name='PreGraspSampler')
+        super().__init__(name=name)
         self.is_3D = True
 
-    def setup(self, timeout):
-        self.srv_get_pregrasp = rospy.Service(u'~get_pregrasp', GetPreGrasp, self.get_pregrasp_cb)
-        self.srv_get_pregrasp_o = rospy.Service(u'~get_pregrasp_orientation', GetPreGraspOrientation,
-                                                self.get_pregrasp_orientation_cb)
-        return super(PreGraspSampler, self).setup(timeout=timeout)
+    def get_pregrasp_goal(self, cmd):
+        try:
+            return next(c for c in cmd.constraints if c.type in ['CartesianPreGrasp'])
+        except StopIteration:
+            return None
+
+    def get_cart_goal(self, cart_c):
+
+        pregrasp_pos = None
+        self.__goal_dict = yaml.load(cart_c.parameter_value_pair)
+        if 'goal_position' in self.__goal_dict:
+            pregrasp_pos = convert_dictionary_to_ros_message(self.__goal_dict[u'goal_position'])
+        dist = 0.0
+        if 'dist' in self.__goal_dict:
+            dist = self.__goal_dict['dist']
+        ros_pose = convert_dictionary_to_ros_message(self.__goal_dict[u'grasping_goal'])
+        goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose) # type: PoseStamped
+
+        self.root_link = self.__goal_dict[u'root_link']
+        tip_link = self.__goal_dict[u'tip_link']
+        get_attached_objects = rospy.ServiceProxy('~get_attached_objects', GetAttachedObjects)
+        if tip_link in get_attached_objects(GetAttachedObjectsRequest()).object_names:
+            tip_link = self.get_robot().get_parent_link_of_link(tip_link)
+        self.tip_link = tip_link
+        link_names = self.robot.link_names
+
+        if self.root_link not in link_names:
+            raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
+        if self.tip_link not in link_names:
+            raise Exception(u'Tip_link {} is no known link of the robot.'.format(self.tip_link))
+        if not self.robot.are_linked(self.root_link, self.tip_link):
+            raise Exception(u'Did not found link chain of the robot from'
+                            u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
+
+        return goal, pregrasp_pos, dist
+
+    def get_cartesian_pose_constraints(self, goal):
+
+        d = dict()
+        d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
+
+        goal.header.stamp = rospy.Time(0)
+
+        c_d = deepcopy(d)
+        c_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(goal)
+
+        c = Constraint()
+        c.type = u'CartesianPreGrasp'
+        c.parameter_value_pair = json.dumps(c_d[u'parameter_value_pair'])
+
+        return c
 
     def update(self):
+
+        # Check if move_cmd exists
+        move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
+        if not move_cmd:
+            return Status.SUCCESS
+
+        # Check if move_cmd contains a Cartesian Goal
+        cart_c = self.get_pregrasp_goal(move_cmd)
+        if not cart_c:
+            return Status.SUCCESS
+
+        goal, pregrasp_pos, dist = self.get_cart_goal(cart_c)
+        self.collision_scene.update_collision_environment()
+        if not self.collision_scene.collision_matrix:
+            raise Exception('PreGrasp Sampling is not possible, since the collision matrix is empty')
+        if pregrasp_pos is None:
+            pregrasp_goal = self.get_pregrasp_cb(goal, self.root_link, self.tip_link, dist=dist)
+        else:
+            # TODO: check if given position is collision free
+            pregrasp_goal = self.get_pregrasp_orientation_cb(pregrasp_pos, goal)
+
+        move_cmd.constraints.remove(cart_c)
+        move_cmd.constraints.append(self.get_cartesian_pose_constraints(pregrasp_goal))
+
         return Status.SUCCESS
 
     def get_in_map(self, ps):
         return transform_pose('map', ps).pose
 
-    def get_pregrasp_cb(self, req):
-        rospy.logerr('0')
+    def get_pregrasp_cb(self, goal, root_link, tip_link, dist=0.00):
         collision_scene = self.god_map.unsafe_get_data(identifier.collision_scene)
         robot = collision_scene.world.groups[RobotName]
         js = self.god_map.unsafe_get_data(identifier.joint_states)
-        rospy.logerr('00')
-        #collision_scene.sync()
-        rospy.logerr('000')
-        #collision_scene.sync()
-        rospy.logerr(collision_scene.client_id)
-        self.state_validator = GiskardRobotBulletCollisionChecker(self.is_3D, req.root_link, req.tip_link,
-                                                                  collision_scene, dist=req.dist)
-        rospy.logerr('11')
-        self.motion_validator = ObjectRayMotionValidator(collision_scene, req.tip_link, robot, self.state_validator,
+        self.state_validator = GiskardRobotBulletCollisionChecker(self.is_3D, root_link, tip_link,
+                                                                  collision_scene, dist=dist)
+        self.motion_validator = ObjectRayMotionValidator(collision_scene, tip_link, robot, self.state_validator,
                                                          self.god_map, js=js)
-        rospy.logerr('111')
-        p = self.sample(js, req.tip_link, self.get_in_map(req.goal))
-        rospy.logerr('1111')
+
+        p, _ = self.sample(js, tip_link, self.get_in_map(goal))
         ps = PoseStamped()
         ps.header.frame_id = 'map'
         ps.pose = p
+
+        del self.state_validator
+        del self.motion_validator
+
         return ps
 
-    def get_pregrasp_orientation_cb(self, req):
-        q_arr = self.get_orientation(self.get_in_map(req.start), self.get_in_map(req.goal))
+    def get_pregrasp_orientation_cb(self, start, goal):
+        q_arr = self.get_orientation(self.get_in_map(start), self.get_in_map(goal))
         ps = PoseStamped()
         ps.header.frame_id = 'map'
-        ps.pose = self.get_in_map(req.start)
+        ps.pose = self.get_in_map(start)
         ps.pose.orientation.x = q_arr[0]
         ps.pose.orientation.y = q_arr[1]
         ps.pose.orientation.z = q_arr[2]
@@ -1747,31 +1828,39 @@ class PreGraspSampler(GiskardBehavior):
     def get_orientation(self, curr, goal):
         return GoalRegionSampler(self.is_3D, goal, lambda _: True, lambda _: 0).get_orientation(curr)
 
-    def sample(self, js, tip_link, goal):
+    def sample(self, js, tip_link, goal, tries=10):
         valid_fun = self.state_validator.is_collision_free
-        goal_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
-        s_m = SimpleRayMotionValidator(tip_link, self.god_map, ignore_state_validator=True, js=js)
-        # Sample goal points which are e.g. in the aabb of the object to pick up
-        goal_grs.sample(.5)  # todo d is max aabb size of object
-        goals = list()
+        try_i = 0
         next_goals = list()
-        for s in goal_grs.samples:
-            o_g = s[1]
-            if s_m.checkMotion(o_g, goal):
-                goals.append(o_g)
-        # Find valid goal poses which allow motion towards the sampled goal points above
-        tip_link_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
-        motion_cost = lambda a, b: np.sqrt(np.sum((pose_to_np(a)[0] - pose_to_np(b)[0])**2))
-        for sampled_goal in goals:
-            if len(next_goals) > 0:
-                break
-            tip_link_grs.valid_sample(d=.5, max_samples=10)
-            for s in tip_link_grs.valid_samples:
-                n_g = s[1]
-                if self.motion_validator.checkMotion(n_g, sampled_goal):
-                    next_goals.append([motion_cost(n_g, sampled_goal), n_g, sampled_goal])
-            tip_link_grs.valid_samples = list()
-        return sorted(next_goals, key=lambda e: e[0])[0][1], sorted(next_goals, key=lambda e: e[0])[0][2]
+        while try_i < tries and len(next_goals) == 0:
+            goal_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
+            s_m = SimpleRayMotionValidator(tip_link, self.god_map, ignore_state_validator=True, js=js)
+            # Sample goal points which are e.g. in the aabb of the object to pick up
+            goal_grs.sample(.5)  # todo d is max aabb size of object
+            goals = list()
+            next_goals = list()
+            for s in goal_grs.samples:
+                o_g = s[1]
+                if s_m.checkMotion(o_g, goal):
+                    goals.append(o_g)
+            # Find valid goal poses which allow motion towards the sampled goal points above
+            tip_link_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
+            motion_cost = lambda a, b: np.sqrt(np.sum((pose_to_np(a)[0] - pose_to_np(b)[0])**2))
+            for sampled_goal in goals:
+                if len(next_goals) > 0:
+                    break
+                tip_link_grs.valid_sample(d=.5, max_samples=10)
+                for s in tip_link_grs.valid_samples:
+                    n_g = s[1]
+                    if self.motion_validator.checkMotion(n_g, sampled_goal):
+                        next_goals.append([motion_cost(n_g, sampled_goal), n_g, sampled_goal])
+                tip_link_grs.valid_samples = list()
+            del s_m
+            try_i += 1
+        if len(next_goals) != 0:
+            return sorted(next_goals, key=lambda e: e[0])[0][1], sorted(next_goals, key=lambda e: e[0])[0][2]
+        else:
+            raise Exception('Could not find PreGrasp samples.')
 
 
 class GlobalPlanner(GetGoal):
@@ -1941,7 +2030,7 @@ class GlobalPlanner(GetGoal):
             else:
                 raise GlobalPlanningException('Global planner was called although it is not needed.')
             counter += 1
-
+        del planner
         poses = []
         for i, point in enumerate(trajectory):
             if i == 0:
@@ -2121,6 +2210,9 @@ class OMPLPlanner(object):
                                                 max_refine_iterations=5, min_refine_thresh=0.5)
         }
         self.init_setup()
+
+    def __del__(self):
+        del self.motion_validator
 
     def get_planner(self, si):
         raise Exception('Not overwritten.')

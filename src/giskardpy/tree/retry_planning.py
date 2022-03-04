@@ -29,7 +29,6 @@ class RetryPlanning(GiskardBehavior):
         e = self.get_blackboard_exception()
         if e and self.must_replan(e):
             self.clear_blackboard_exception()
-            logging.loginfo(u'Replanning a new path.')
             self.get_god_map().set_data(identifier.global_planner_needed, True)
             return Status.RUNNING
         elif self.is_reaching_goal_pose_trivial():
@@ -126,24 +125,34 @@ class RetryPlanning(GiskardBehavior):
         """
 
         if isinstance(exception, PlanningException):
-            supported_global_cart_goals = ['CartesianPose', 'CartesianPosition']
+            supported_global_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPreGrasp']
             failed_move_cmd = self.god_map.get_data(identifier.next_move_goal) # type: MoveCmd
             if any([c.type in supported_global_cart_goals for c in failed_move_cmd.constraints]):
                 global_move_cmd = deepcopy(failed_move_cmd)
                 global_move_cmd.constraints = list()
                 for c in failed_move_cmd.constraints:
                     if c.type in supported_global_cart_goals:
+                        logging.loginfo(u'Replanning a new path for CartesianPose.')
                         n_c = Constraint()
                         n_c.type = 'CartesianPose'
                         n_c.parameter_value_pair = c.parameter_value_pair
                         global_move_cmd.constraints.append(n_c)
                     elif c.type == 'CartesianPathCarrot':
+                        logging.loginfo(u'Replanning a new path for CartesianPathCarrot.')
                         n_c = Constraint()
                         n_c.type = 'CartesianPathCarrot'
                         d = yaml.load(c.parameter_value_pair)
                         goal = d['goals'][-1]
                         d.pop('goals')
                         d['goal'] = goal
+                        n_c.parameter_value_pair = yaml.dump(d)
+                        global_move_cmd.constraints.append(n_c)
+                    elif c.type == 'CartesianPreGrasp':
+                        logging.loginfo(u'Resampling a new PreGrasp pose.')
+                        n_c = Constraint()
+                        n_c.type = 'CartesianPreGrasp'
+                        d = yaml.load(c.parameter_value_pair)
+                        d.pop('goal')
                         n_c.parameter_value_pair = yaml.dump(d)
                         global_move_cmd.constraints.append(n_c)
                     else:

@@ -16,8 +16,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis, qu
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest, GetPreGrasp, GetPreGraspOrientation, \
-    GetPreGraspOrientationRequest, GetPreGraspRequest
+from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier, RobotName
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
@@ -2832,11 +2831,17 @@ class TestCartesianPath(object):
         else:
             raise Exception('Wrong tip link')
 
+        kitchen_setup_avoid_collisions.set_json_goal('CartesianPreGrasp',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     grasping_goal=milk_pose)
+        rospy.logerr('Pregrasping')
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      tip_link=tip_link,
                                                      goal=milk_pose)
-
         kitchen_setup_avoid_collisions.plan_and_execute()
 
         # grasp milk
@@ -2849,10 +2854,23 @@ class TestCartesianPath(object):
         else:
             raise Exception('Wrong tip link')
 
+        kitchen_setup_avoid_collisions.set_json_goal('CartesianPreGrasp',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     grasping_goal=milk_pose)
+        rospy.logerr('Pregrasping')
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
         kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
 
         # place milk back
+        kitchen_setup_avoid_collisions.set_json_goal('CartesianPreGrasp',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     grasping_goal=milk_pose)
+        rospy.logerr('Pregrasping')
+        kitchen_setup_avoid_collisions.plan_and_execute()
         kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)
         kitchen_setup_avoid_collisions.set_cart_goal(milk_pose, milk_name, kitchen_setup_avoid_collisions.default_root)
         kitchen_setup_avoid_collisions.plan_and_execute()
@@ -6231,12 +6249,12 @@ class TestEASE():
         kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
 
         # move a bit away from the drawer
+        kitchen_setup.allow_collision()
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
         base_goal.pose.position.x = -0.2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_goal)
-        kitchen_setup.wait_heartbeats(10)
+        kitchen_setup.move_base(base_goal)
 
         # spawn cup
         cup_pose = PoseStamped()
@@ -6253,20 +6271,17 @@ class TestEASE():
         # pregrasp
         pregrasp_r_goal = deepcopy(cup_pose)
         pregrasp_r_goal.pose.position.z += .2
-        req = GetPreGraspOrientationRequest()
-        req.root_link = kitchen_setup.default_root
-        req.tip_link = tip
-        req.dist = 0.0
-        req.start = pregrasp_r_goal
-        req.goal = deepcopy(cup_pose)
-        get_pregrasp = rospy.ServiceProxy('~get_pregrasp_orientation', GetPreGraspOrientation)
-        pregrasp_r_goal = get_pregrasp(req).pregrasp
+        kitchen_setup.set_json_goal('CartesianPreGrasp',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=tip,
+                                    grasping_goal=cup_pose,
+                                    goal_position=pregrasp_r_goal)
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
-        kitchen_setup.set_cart_goal(pregrasp_r_goal, tip, kitchen_setup.default_root)
         kitchen_setup.plan_and_execute()
 
         # grasp
-        r_goal = deepcopy(pregrasp_r_goal)
+        r_goal = deepcopy(tf.np_to_pose_stamped(kitchen_setup.robot.get_fk(kitchen_setup.default_root, tip),
+                                                kitchen_setup.default_root))
         r_goal.pose.position.z -= .2
         kitchen_setup.allow_collision([CollisionEntry.ALL], cup_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(r_goal, tip, kitchen_setup.default_root)
@@ -6278,7 +6293,11 @@ class TestEASE():
 
         # pregrasp
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
-        kitchen_setup.set_cart_goal(pregrasp_r_goal, tip, kitchen_setup.default_root)
+        kitchen_setup.set_json_goal('CartesianPreGrasp',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=tip,
+                                    grasping_goal=cup_pose,
+                                    goal_position=pregrasp_r_goal)
         kitchen_setup.plan_and_execute()
 
         # gaya pose
@@ -6307,8 +6326,60 @@ class TestEASE():
         #kitchen_setup.set_joint_goal(gaya_pose)
         #kitchen_setup.plan_and_execute()
 
-    def test_grasp_milk(self, kitchen_setup):
-        pass
+    def test_grasp_milk(self, kitchen_setup_avoid_collisions):
+        tip_link = kitchen_setup_avoid_collisions.l_tip
+        milk_name = u'milk'
+
+        # take milk out of fridge
+        kitchen_setup_avoid_collisions.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
+
+        # spawn milk
+        milk_pose = PoseStamped()
+        milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_pose.pose.position = Point(0, 0, 0.13)
+        milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup_avoid_collisions.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
+
+        # move arm towards milk
+        if tip_link == kitchen_setup_avoid_collisions.l_tip:
+            kitchen_setup_avoid_collisions.open_l_gripper()
+        elif tip_link == kitchen_setup_avoid_collisions.r_tip:
+            kitchen_setup_avoid_collisions.open_r_gripper()
+        else:
+            raise Exception('Wrong tip link')
+
+        kitchen_setup_avoid_collisions.set_json_goal('CartesianPreGrasp',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     grasping_goal=milk_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     goal=milk_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        # grasp milk
+        kitchen_setup_avoid_collisions.attach_object(milk_name, tip_link)
+
+        if tip_link == kitchen_setup_avoid_collisions.l_tip:
+            kitchen_setup_avoid_collisions.close_l_gripper()
+        elif tip_link == kitchen_setup_avoid_collisions.r_tip:
+            kitchen_setup_avoid_collisions.close_r_gripper()
+        else:
+            raise Exception('Wrong tip link')
+
+        kitchen_setup_avoid_collisions.set_json_goal('CartesianPreGrasp',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     grasping_goal=milk_pose,
+                                                     dist=0.1)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
 
     def test_move_to_cup(self, kitchen_setup):
         # teleport to cup drawer
@@ -6320,6 +6391,87 @@ class TestEASE():
         kitchen_setup.set_cart_goal(base_goal, tip_link='base_footprint')
         kitchen_setup.plan_and_execute()
 
+    def test_move_to_fridge(self, kitchen_setup):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.3
+        base_goal.pose.position.y = -0.7
+        base_goal.pose.orientation.z = -0.51152562713
+        base_goal.pose.orientation.w = 0.85926802151
+        kitchen_setup.set_cart_goal(base_goal, tip_link='base_footprint')
+        kitchen_setup.plan_and_execute()
+
+    def test_open_fridge(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        handle_frame_id = u'iai_kitchen/iai_fridge_door_handle'
+        handle_name = u'iai_fridge_door_handle'
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = u'map'
+        base_goal.pose.position = Point(0.3, -0.5, 0)
+        base_goal.pose.orientation.w = 1
+        kitchen_setup.teleport_base(base_goal)
+
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.r_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.4)
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.r_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        kitchen_setup.set_align_planes_goal(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=10)
+        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=kitchen_setup.r_tip,
+                                    environment_link=handle_name,
+                                    goal_joint_state=1.5)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.add_json_goal(u'AvoidJointLimits')
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.5})
+
+        kitchen_setup.avoid_all_collisions()
+        r_goal = deepcopy(tf.lookup_pose(kitchen_setup.default_root, handle_frame_id))
+        kitchen_setup.set_json_goal('CartesianPreGrasp',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.r_tip,
+                                    grasping_goal=r_goal,
+                                    dist=0.025)
+        kitchen_setup.plan_and_execute()
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = u'base_footprint'
+        base_goal.pose.position.x = -0.2
+        base_goal.pose.orientation.w = 1
+        kitchen_setup.set_cart_goal(base_goal, tip_link='base_footprint')
+        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
 
     def test_move_to_dining_area(self, kitchen_setup):
         table_navigation_link = 'iai_kitchen/dining_area_footprint'
@@ -6339,16 +6491,25 @@ class TestEASE():
 
         kitchen_setup.plan_and_execute()
 
-    def test_cup_deliver(self, kitchen_setup):
+    def test_milk_fetch(self, kitchen_setup):
+        self.test_open_fridge(kitchen_setup)
+        self.test_move_to_fridge(kitchen_setup)
+        self.test_grasp_milk(kitchen_setup)
+
+    def test_deliver_milk(self, kitchen_setup):
+        self.test_milk_fetch(kitchen_setup)
+        self.test_move_to_dining_area(kitchen_setup)
+
+    def test_deliver_cup(self, kitchen_setup):
         self.test_move_to_cup(kitchen_setup)
         self.test_grasp_cup(kitchen_setup)
         self.test_move_to_dining_area(kitchen_setup)
 
-    def test_cereal_deliver(self, kitchen_setup):
+    def test_deliver_cereal(self, kitchen_setup):
         self.test_grasp_cereal(kitchen_setup)
         self.test_move_to_dining_area(kitchen_setup)
 
-    def test_cereal_cup_deliver(self, kitchen_setup):
+    def test_deliver_cereal_cup(self, kitchen_setup):
         self.test_grasp_cereal(kitchen_setup)
         kitchen_setup.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.0})
         self.test_move_to_cup(kitchen_setup)

@@ -42,26 +42,30 @@ def override_default(default, block_identifier, god_map, prefix=None):
         override = god_map.get_data(block_identifier)
     except KeyError:
         override = None
-    new_override = dict()
+    new_override_dicts = dict()
+    new_override_values = dict()
     d = dict()
     if isinstance(override, dict):
         if prefix is not None:
             for key, value in override.items():
                 if isinstance(value, dict):
                     if isinstance(default, dict):
-                        new_override[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda a: default[a])
+                        new_override_dicts[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda a: default[a])
                         if any([isinstance(x, dict) for _, x in value.items()]):
                             raise Exception('Nested dictionaries are not supported for overrides.')
                     else:
-                        new_override[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda _: default)
+                        new_override_dicts[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda _: default)
                     keys = {PrefixName(n, prefix[0]): None for n, _ in value.items()}
-                    new_override[PrefixName(key, prefix[0])].update(keys)
+                    new_override_dicts[PrefixName(key, prefix[0])].update(keys)
                     for k, v in value.items():
-                        new_override[PrefixName(key, prefix[0])][PrefixName(k, prefix[0])] = v
+                        new_override_dicts[PrefixName(key, prefix[0])][PrefixName(k, prefix[0])] = v
+                else:
+                    new_override_values.update({PrefixName(key, prefix[0]): value})
         else:
             new_override = defaultdict(lambda: default)
             new_override.update(override)
-        d.update(new_override)
+        d.update(new_override_dicts)
+        d.update(new_override_values)
     return d
 
 

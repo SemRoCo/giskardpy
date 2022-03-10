@@ -133,13 +133,18 @@ def get_filename(file_or_ros_path_str, loader, node, root):
 def construct_include(loader, node):
     """Load config file referenced at given node by using the given loader."""
 
-    file_str_or_list = loader.construct_scalar(node)
-    ret = dict()
+    try:
+        file_str_or_list = loader.construct_scalar(node)
+    except Exception:
+        file_str_or_list = loader.construct_sequence(node)
 
     if isinstance(file_str_or_list, list):
-        files_to_load = file_str_or_list
+        splitt = [f.split(' ') for f in file_str_or_list]
     else:
-        files_to_load = [file_str_or_list]
+        splitt = [file_str_or_list.split(' ')]
+
+    files_to_load = [file for e in splitt for file in e]
+    ret = dict()
 
     for file_or_ros_path_str in files_to_load:
         filename = get_filename(file_or_ros_path_str, loader, node, loader.config_root)

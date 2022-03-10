@@ -1,0 +1,102 @@
+general_options:
+  joint_weights:
+    # the planner prefers low weight joints to achieve solutions
+    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
+    velocity:
+      default: 0.001
+      override: {}
+    acceleration:
+      default: 0
+      override: { }
+    jerk:
+      default: 0.001
+      override: { }
+#    snap:
+#      default: 0
+#      override: { }
+  joint_limits: # giskard will use the min of this number and limits from the urdf
+    velocity:
+      linear: # m/s
+        default: 1
+        override:
+          odom_x_joint: 0.5
+          odom_y_joint: 0.5
+      angular: # rad/s
+        default: 1
+        override:
+          odom_z_joint: 0.6
+          head_pan_joint: 0.5
+          head_tilt_joint: 0.5
+    acceleration:
+      linear: # m/s**2
+        default: 1e3
+        override: { }
+      angular: # rad/s**2
+        default: 1e3
+        override: { }
+    jerk:
+      linear: # m/s**3
+        default: 30
+        override:
+          torso_lift_joint: 5
+          odom_x_joint: 5
+          odom_y_joint: 5
+      angular: # rad/s**3
+        default: 30
+        override:
+          odom_z_joint: 10
+#    snap:
+#      linear: # m/s**4
+#        default: 250
+#        override: { }
+#      angular: # rad/s**3
+#        default: 250
+#        override: { }
+collision_avoidance:
+  external_collision_avoidance:
+    default:
+      hard_threshold: 0.0
+      soft_threshold: 0.1
+    override:
+      4eef: &4eef
+        number_of_repeller: 4
+        hard_threshold: 0.00
+        soft_threshold: 0.05
+      2eef: &2eef
+        number_of_repeller: 2
+        hard_threshold: 0.00
+        soft_threshold: 0.05
+      50mm: &50mm
+        hard_threshold: 0.00
+        soft_threshold: 0.05
+      25mm: &25mm
+        number_of_repeller: 2
+        hard_threshold: 0.00
+        soft_threshold: 0.025
+      r_wrist_roll_joint: *4eef
+      l_wrist_roll_joint: *4eef
+      r_forearm_roll_joint: *25mm
+      l_forearm_roll_joint: *25mm
+      r_elbow_flex_joint: *50mm
+      l_elbow_flex_joint: *50mm
+      r_wrist_flex_joint: *2eef
+      l_wrist_flex_joint: *2eef
+  self_collision_avoidance:
+    ignore: # list pairs of links that should be removed from the self collision avoidance
+      - bl_caster_l_wheel_link
+      - bl_caster_r_wheel_link
+      - bl_caster_rotation_link
+      - br_caster_l_wheel_link
+      - br_caster_r_wheel_link
+      - br_caster_rotation_link
+      - fl_caster_l_wheel_link
+      - fl_caster_r_wheel_link
+      - fl_caster_rotation_link
+      - fr_caster_l_wheel_link
+      - fr_caster_r_wheel_link
+      - fr_caster_rotation_link
+      - l_shoulder_lift_link
+      - r_shoulder_lift_link
+      - base_link
+    add: [ ] # list pairs of links that should be added to the self collision matrix
+    number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it

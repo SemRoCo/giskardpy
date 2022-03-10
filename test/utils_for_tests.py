@@ -995,7 +995,7 @@ class PR22(GiskardTestWrapper):
         self.set_bases = dict()
         self.default_roots = dict()
         self.tf_prefix = dict()
-        super(PR22, self).__init__(u'package://giskardpy/config/pr22.yaml')
+        super(PR22, self).__init__(u'package://giskardpy/config/pr2_twice.yaml')
         for robot_name in self.robot_names:
             self.r_tips[robot_name] = u'r_gripper_tool_frame'
             self.l_tips[robot_name] = u'l_gripper_tool_frame'
@@ -1561,7 +1561,7 @@ class Donbot2(GiskardTestWrapper):
         self.gripper_pubs = dict()
         self.default_roots = dict()
         self.set_localization_srvs = dict()
-        super(Donbot2, self).__init__('package://giskardpy/config/donbot2.yaml')
+        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml')
         for robot_name in self.robot_names:
             self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
             self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)

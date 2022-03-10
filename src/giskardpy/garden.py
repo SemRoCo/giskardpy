@@ -9,7 +9,6 @@ from py_trees_ros.trees import BehaviourTree
 import giskardpy
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveAction, MoveFeedback
-from giskardpy import RobotName
 from giskardpy.data_types import order_map, KeyDefaultDict
 from giskardpy.god_map import GodMap
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer

@@ -2,7 +2,7 @@ from time import time
 
 from py_trees import Behaviour, Blackboard
 
-from giskardpy import identifier, RobotName
+from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 

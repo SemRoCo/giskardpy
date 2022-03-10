@@ -10,7 +10,7 @@ import rospy
 
 from giskard_msgs.msg import CollisionEntry
 
-from giskardpy import RobotName, identifier
+from giskardpy import identifier
 from giskardpy.data_types import Collisions, JointStates, PrefixName
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
 from giskardpy.model.world import SubWorldTree

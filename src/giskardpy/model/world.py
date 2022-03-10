@@ -8,7 +8,7 @@ import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3
 
 import giskardpy.utils.math as mymath
-from giskardpy import casadi_wrapper as w, RobotName, identifier
+from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException

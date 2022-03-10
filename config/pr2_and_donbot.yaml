@@ -1,0 +1,26 @@
+parent: !include default.yaml
+pr2:
+  parent: !include robots/pr2.yaml
+donbot:
+  parent: !include robots/donbot.yaml
+action_server:
+  /pr2/base:
+    plugin: SendFollowJointTrajectory
+    namespace: /pr2/whole_body_controller/base/follow_joint_trajectory
+    state_topic: /pr2/whole_body_controller/base/state
+    fill_velocity_values: True
+  /pr2/body:
+    plugin: SendFollowJointTrajectory
+    namespace: /pr2/whole_body_controller/body/follow_joint_trajectory
+    state_topic: /pr2/whole_body_controller/body/state
+    fill_velocity_values: False
+  /donbot/base:
+    plugin: SendFollowJointTrajectory
+    namespace: /donbot/whole_body_controller/base/follow_joint_trajectory
+    state_topic: /donbot/whole_body_controller/base/state
+    fill_velocity_values: True
+  /donbot/body:
+    plugin: SendFollowJointTrajectory
+    namespace: /donbot/whole_body_controller/body/follow_joint_trajectory
+    state_topic: /donbot/whole_body_controller/body/state
+    fill_velocity_values: False

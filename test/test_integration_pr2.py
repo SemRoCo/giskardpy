@@ -895,38 +895,6 @@ class TestConstraints(object):
         """
         :type kitchen_setup: PR2
         """
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = u'base_footprint'
-        base_goal.pose.position.y = -1
-        base_goal.pose.orientation.w = 1
-        kitchen_setup.teleport_base(base_goal)
-
-        tip = u'head_mount_kinect_rgb_link'
-        goal_point = tf.lookup_point(u'map', u'iai_kitchen/iai_fridge_door_handle')
-        pointing_axis = Vector3Stamped()
-        pointing_axis.header.frame_id = tip
-        pointing_axis.vector.x = 1
-        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
-        kitchen_setup.plan_and_execute()
-
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = u'base_footprint'
-        base_goal.pose.position.y = 2
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
-        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
-        gaya_pose2 = deepcopy(gaya_pose)
-        del gaya_pose2['head_pan_joint']
-        del gaya_pose2['head_tilt_joint']
-        kitchen_setup.set_joint_goal(gaya_pose2)
-        kitchen_setup.move_base(base_goal)
-
-        current_x = Vector3Stamped()
-        current_x.header.frame_id = tip
-        current_x.vector.x = 1
-
-        expected_x = tf.transform_point(tip, goal_point)
-        np.testing.assert_almost_equal(expected_x.point.y, 0, 1)
-        np.testing.assert_almost_equal(expected_x.point.z, 0, 1)
 
         rospy.loginfo("Starting looking")
         tip = u'head_mount_kinect_rgb_link'
@@ -935,6 +903,12 @@ class TestConstraints(object):
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
         kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
+        dgaya_pose = deepcopy(gaya_pose)
+        del dgaya_pose[u'head_pan_joint']
+        del dgaya_pose[u'head_tilt_joint']
+        kitchen_setup.set_joint_goal(dgaya_pose)
+        kitchen_setup.plan_and_execute()
+
 
         rospy.loginfo("Starting pointing")
         r_goal = PoseStamped()
@@ -1531,19 +1505,19 @@ class TestConstraints(object):
         """
         handle_name = [
             # u'oven_area_area_middle_upper_drawer_handle',
-            u'oven_area_area_middle_lower_drawer_handle',
-            u'sink_area_left_upper_drawer_handle',
+            # u'oven_area_area_middle_lower_drawer_handle',
+            #u'sink_area_left_upper_drawer_handle',
             # u'sink_area_left_middle_drawer_handle',
             # u'sink_area_left_bottom_drawer_handle',
-            u'sink_area_trash_drawer_handle',
-            u'fridge_area_lower_drawer_handle',
+            #u'sink_area_trash_drawer_handle',
+            #u'fridge_area_lower_drawer_handle',
             # u'kitchen_island_left_upper_drawer_handle',
             # u'kitchen_island_left_lower_drawer_handle',
             # u'kitchen_island_middle_upper_drawer_handle',
             # u'kitchen_island_middle_lower_drawer_handle',
             # u'kitchen_island_right_upper_drawer_handle',
-            u'kitchen_island_right_lower_drawer_handle',
-            u'oven_area_area_left_drawer_handle',
+            #u'kitchen_island_right_lower_drawer_handle',
+            u'oven_area_area_right_drawer_handle',
             # u'oven_area_area_right_drawer_handle'
         ]
 
@@ -1587,7 +1561,7 @@ class TestConstraints(object):
 
             kitchen_setup.set_json_goal(u'Open',
                                         tip_link=kitchen_setup.l_tip,
-                                        evironment_link=i_handle_name)
+                                        environment_link=i_handle_name)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
             kitchen_setup.plan_and_execute()  # send goal to Giskard
@@ -1597,7 +1571,7 @@ class TestConstraints(object):
             # Close drawer partially
             kitchen_setup.set_json_goal(u'Open',
                                         tip_link=kitchen_setup.l_tip,
-                                        evironment_link=i_handle_name,
+                                        environment_link=i_handle_name,
                                         goal_joint_state=0.2)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
@@ -6116,6 +6090,27 @@ class TestEASE():
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.plan_and_execute()
 
+    def look_at(self, kitchen_setup, tip_link=None, goal_point=None):
+        tip = u'head_mount_kinect_rgb_link'
+        if goal_point is None:
+            goal_point = tf.lookup_point(u'map', tip_link)
+        pointing_axis = Vector3Stamped()
+        pointing_axis.header.frame_id = tip
+        pointing_axis.vector.x = 1
+        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
+
+    def look_at_while_driving(self, kitchen_setup, tip_link):
+        tip = u'head_mount_kinect_rgb_link'
+        goal_point = tf.lookup_point(u'map', tip_link)
+        pointing_axis = Vector3Stamped()
+        pointing_axis.header.frame_id = tip
+        pointing_axis.vector.x = 1
+        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis, root_link=tip_link)
+        dgaya_pose = deepcopy(gaya_pose)
+        del dgaya_pose[u'head_pan_joint']
+        del dgaya_pose[u'head_tilt_joint']
+        kitchen_setup.set_joint_goal(dgaya_pose)
+
     def test_grasp_cereal(self, kitchen_setup):
         # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
@@ -6150,6 +6145,12 @@ class TestEASE():
         box_T_r_goal_post.p[0] += 0.4
         post_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_post, drawer_frame_id)
 
+        point = tf.np_to_pose(kitchen_setup.world.get_fk('map', cereal_name)).position
+        point_s = PointStamped()
+        point_s.header.frame_id = 'map'
+        point_s.point = point
+        self.look_at(kitchen_setup, goal_point=point_s)
+
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         kitchen_setup.set_json_goal(u'CartesianPose',
                                                      tip_link=kitchen_setup.r_tip,
@@ -6165,7 +6166,7 @@ class TestEASE():
 
         kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
-        kitchen_setup.close_l_gripper()
+        kitchen_setup.close_r_gripper()
 
         # x = Vector3Stamped()
         # x.header.frame_id = 'milk'
@@ -6183,6 +6184,13 @@ class TestEASE():
         # kitchen_setup.align_planes('milk', z, root_normal=z_map)
         # kitchen_setup.keep_orientation(u'milk')
         # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
+
+        point = tf.np_to_pose(kitchen_setup.world.get_fk('map', cereal_name)).position
+        point_s = PointStamped()
+        point_s.header.frame_id = 'map'
+        point_s.point = point
+        self.look_at(kitchen_setup, goal_point=point_s)
+
         kitchen_setup.god_map.set_data(identifier.rosparam + ['reset_god_map'], False)
         decrease_external_collision_avoidance(kitchen_setup)
         kitchen_setup.set_json_goal(u'CartesianPathCarrot',
@@ -6191,6 +6199,7 @@ class TestEASE():
                                     goal=post_grasp_pose,
                                     goal_sampling_axis=[True, False, False])
         kitchen_setup.plan_and_execute()
+        kitchen_setup.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
 
         # gaya pose
         kitchen_setup.set_joint_goal(gaya_pose)
@@ -6267,6 +6276,13 @@ class TestEASE():
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.plan_and_execute()
 
+        point = tf.np_to_pose(kitchen_setup.world.get_fk('map', cup_name)).position
+        point_s = PointStamped()
+        point_s.header.frame_id = 'map'
+        point_s.point = point
+        self.look_at(kitchen_setup, goal_point=point_s)
+        kitchen_setup.plan_and_execute()
+
         # grasp cup
         # pregrasp
         pregrasp_r_goal = deepcopy(cup_pose)
@@ -6290,6 +6306,7 @@ class TestEASE():
 
         # attach cup
         kitchen_setup.attach_object(cup_name, tip)
+        kitchen_setup.close_l_gripper()
 
         # pregrasp
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
@@ -6340,6 +6357,13 @@ class TestEASE():
         milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         kitchen_setup_avoid_collisions.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
+
+        point = tf.np_to_pose(kitchen_setup_avoid_collisions.world.get_fk('map', milk_name)).position
+        point_s = PointStamped()
+        point_s.header.frame_id = 'map'
+        point_s.point = point
+        self.look_at(kitchen_setup_avoid_collisions, goal_point=point_s)
+        kitchen_setup.plan_and_execute()
 
         # move arm towards milk
         if tip_link == kitchen_setup_avoid_collisions.l_tip:
@@ -6401,6 +6425,153 @@ class TestEASE():
         kitchen_setup.set_cart_goal(base_goal, tip_link='base_footprint')
         kitchen_setup.plan_and_execute()
 
+    def test_open_cereal_drawer(self, kitchen_setup):
+        handle_name = [
+            # u'oven_area_area_middle_upper_drawer_handle',
+            # u'oven_area_area_middle_lower_drawer_handle',
+            #u'sink_area_left_upper_drawer_handle',
+            # u'sink_area_left_middle_drawer_handle',
+            # u'sink_area_left_bottom_drawer_handle',
+            #u'sink_area_trash_drawer_handle',
+            #u'fridge_area_lower_drawer_handle',
+            # u'kitchen_island_left_upper_drawer_handle',
+            # u'kitchen_island_left_lower_drawer_handle',
+            # u'kitchen_island_middle_upper_drawer_handle',
+            # u'kitchen_island_middle_lower_drawer_handle',
+            # u'kitchen_island_right_upper_drawer_handle',
+            #u'kitchen_island_right_lower_drawer_handle',
+            u'oven_area_area_right_drawer_handle',
+            # u'oven_area_area_right_drawer_handle'
+        ]
+
+        handle_frame_id = [u'iai_kitchen/' + item for item in handle_name]
+        joint_name = [item.replace(u'handle', u'main_joint') for item in handle_name]
+
+        for i_handle_id, i_handle_name, i_joint_name in zip(handle_frame_id, handle_name, joint_name):
+            bar_axis = Vector3Stamped()
+            bar_axis.header.frame_id = i_handle_id
+            bar_axis.vector.y = 1
+
+            bar_center = PointStamped()
+            bar_center.header.frame_id = i_handle_id
+
+            tip_grasp_axis = Vector3Stamped()
+            tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+            tip_grasp_axis.vector.z = 1
+
+            self.look_at(kitchen_setup, tip_link=i_handle_id)
+
+            kitchen_setup.set_json_goal(u'GraspBar',
+                                        root_link=kitchen_setup.default_root,
+                                        tip_link=kitchen_setup.l_tip,
+                                        tip_grasp_axis=tip_grasp_axis,
+                                        bar_center=bar_center,
+                                        bar_axis=bar_axis,
+                                        bar_length=0.4)  # TODO: check for real length
+            x_gripper = Vector3Stamped()
+            x_gripper.header.frame_id = kitchen_setup.l_tip
+            x_gripper.vector.x = 1
+
+            x_goal = Vector3Stamped()
+            x_goal.header.frame_id = i_handle_id
+            x_goal.vector.x = -1
+
+            kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip,
+                                                x_gripper,
+                                                root_normal=x_goal)
+            kitchen_setup.allow_all_collisions()
+            kitchen_setup.avoid_self_collision()
+            kitchen_setup.plan_and_execute()
+
+            kitchen_setup.set_json_goal(u'Open',
+                                        tip_link=kitchen_setup.l_tip,
+                                        environment_link=i_handle_name)
+            kitchen_setup.allow_all_collisions()  # makes execution faster
+            kitchen_setup.avoid_self_collision()
+            kitchen_setup.plan_and_execute()  # send goal to Giskard
+            # Update kitchen object
+            kitchen_setup.set_kitchen_js({i_joint_name: 0.48})  # TODO: get real value from URDF
+            kitchen_setup.allow_collision()
+            r_goal = deepcopy(tf.lookup_pose(kitchen_setup.default_root, 'base_footprint'))
+            r_goal.pose.position.x -= 0.2
+            kitchen_setup.move_base(r_goal)
+            kitchen_setup.set_joint_goal(gaya_pose)
+            kitchen_setup.plan_and_execute()
+
+    def test_close_cereal_drawer(self, kitchen_setup):
+        handle_name = [
+            # u'oven_area_area_middle_upper_drawer_handle',
+            # u'oven_area_area_middle_lower_drawer_handle',
+            #u'sink_area_left_upper_drawer_handle',
+            # u'sink_area_left_middle_drawer_handle',
+            # u'sink_area_left_bottom_drawer_handle',
+            #u'sink_area_trash_drawer_handle',
+            #u'fridge_area_lower_drawer_handle',
+            # u'kitchen_island_left_upper_drawer_handle',
+            # u'kitchen_island_left_lower_drawer_handle',
+            # u'kitchen_island_middle_upper_drawer_handle',
+            # u'kitchen_island_middle_lower_drawer_handle',
+            # u'kitchen_island_right_upper_drawer_handle',
+            #u'kitchen_island_right_lower_drawer_handle',
+            u'oven_area_area_right_drawer_handle',
+            # u'oven_area_area_right_drawer_handle'
+        ]
+
+        handle_frame_id = [u'iai_kitchen/' + item for item in handle_name]
+        joint_name = [item.replace(u'handle', u'main_joint') for item in handle_name]
+
+        for i_handle_id, i_handle_name, i_joint_name in zip(handle_frame_id, handle_name, joint_name):
+            bar_axis = Vector3Stamped()
+            bar_axis.header.frame_id = i_handle_id
+            bar_axis.vector.y = 1
+
+            bar_center = PointStamped()
+            bar_center.header.frame_id = i_handle_id
+
+            tip_grasp_axis = Vector3Stamped()
+            tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+            tip_grasp_axis.vector.z = 1
+
+            self.look_at(kitchen_setup, tip_link=i_handle_id)
+
+            kitchen_setup.set_json_goal(u'GraspBar',
+                                        root_link=kitchen_setup.default_root,
+                                        tip_link=kitchen_setup.l_tip,
+                                        tip_grasp_axis=tip_grasp_axis,
+                                        bar_center=bar_center,
+                                        bar_axis=bar_axis,
+                                        bar_length=0.4)  # TODO: check for real length
+            x_gripper = Vector3Stamped()
+            x_gripper.header.frame_id = kitchen_setup.l_tip
+            x_gripper.vector.x = 1
+
+            x_goal = Vector3Stamped()
+            x_goal.header.frame_id = i_handle_id
+            x_goal.vector.x = -1
+
+            kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip,
+                                                x_gripper,
+                                                root_normal=x_goal)
+            kitchen_setup.allow_all_collisions()
+            kitchen_setup.avoid_self_collision()
+            kitchen_setup.plan_and_execute()
+
+            kitchen_setup.set_json_goal(u'Close',
+                                        tip_link=kitchen_setup.l_tip,
+                                        object_name=u'kitchen',
+                                        environment_link=i_handle_name)
+            kitchen_setup.allow_all_collisions()  # makes execution faster
+            kitchen_setup.avoid_self_collision()
+            kitchen_setup.plan_and_execute()  # send goal to Giskard
+            # Update kitchen object
+            kitchen_setup.set_kitchen_js({i_joint_name: 0.0})  # TODO: get real value from URDF
+            kitchen_setup.allow_collision()
+            r_goal = deepcopy(tf.lookup_pose(kitchen_setup.default_root, 'base_footprint'))
+            r_goal.pose.position.x -= 0.2
+            kitchen_setup.move_base(r_goal)
+            kitchen_setup.set_joint_goal(gaya_pose)
+            kitchen_setup.plan_and_execute()
+
     def test_open_fridge(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
@@ -6424,6 +6595,8 @@ class TestEASE():
         tip_grasp_axis = Vector3Stamped()
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
         tip_grasp_axis.vector.z = 1
+
+        self.look_at(kitchen_setup, tip_link=handle_frame_id)
 
         kitchen_setup.set_json_goal(u'GraspBar',
                                     root_link=kitchen_setup.default_root,
@@ -6473,14 +6646,17 @@ class TestEASE():
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.plan_and_execute()
 
-    def test_move_to_dining_area(self, kitchen_setup):
+    def test_move_to_dining_area(self, kitchen_setup, left):
         table_navigation_link = 'iai_kitchen/dining_area_footprint'
         tip_link = u'base_footprint'
 
         # spawn milk
         table_navigation_goal = PoseStamped()
         table_navigation_goal.header.frame_id = table_navigation_link
-        table_navigation_goal.pose.position = Point(-0.24, -0.80, 0.0)
+        if left:
+            table_navigation_goal.pose.position = Point(0.15, -0.95, 0.0)
+        else:
+            table_navigation_goal.pose.position = Point(-0.15, -0.95, 0.0)
         table_navigation_goal.pose.orientation = Quaternion(*quaternion_from_euler(0, 0, np.pi/2.))
 
         kitchen_setup.set_json_goal(u'CartesianPose',
@@ -6491,30 +6667,80 @@ class TestEASE():
 
         kitchen_setup.plan_and_execute()
 
-    def test_milk_fetch(self, kitchen_setup):
+    def test_place_on_dining_area_table(self, kitchen_setup, z_offset, left=False, detach_object_name=None):
+        # move to dining table
+        self.test_move_to_dining_area(kitchen_setup, left)
+        # go in gaya pose
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
+        # place
+        # preplacing
+        if left:
+            tip = kitchen_setup.l_tip
+        else:
+            tip = kitchen_setup.r_tip
+        g = PoseStamped()
+        g.header.frame_id = 'iai_kitchen/dining_area_jokkmokk_table_main'
+        g.pose.position.y = -0.3
+        if left:
+            g.pose.position.x = -0.2
+        else:
+            g.pose.position.x = 0.2
+        g.pose.position.z = 0.35 + z_offset
+        pregrasp_r_goal = deepcopy(g)
+        pregrasp_r_goal.pose.position.z += .2
+        kitchen_setup.set_json_goal('CartesianPreGrasp',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=tip,
+                                    grasping_goal=g,
+                                    goal_position=pregrasp_r_goal)
+        #kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.plan_and_execute()
+
+        # placing
+        r_goal = deepcopy(tf.np_to_pose_stamped(kitchen_setup.robot.get_fk(kitchen_setup.default_root, tip),
+                                                kitchen_setup.default_root))
+        r_goal.pose.position.z -= 0.2
+        kitchen_setup.set_cart_goal(r_goal, tip)
+        kitchen_setup.plan_and_execute()
+        if detach_object_name:
+            kitchen_setup.detach_object(detach_object_name)
+        if left:
+            kitchen_setup.open_l_gripper()
+        else:
+            kitchen_setup.open_r_gripper()
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
+
+    def test_fetch_milk(self, kitchen_setup):
         self.test_open_fridge(kitchen_setup)
         self.test_move_to_fridge(kitchen_setup)
         self.test_grasp_milk(kitchen_setup)
 
+    def test_fetch_cereal(self, kitchen_setup):
+        self.test_open_cereal_drawer(kitchen_setup)
+        self.test_grasp_cereal(kitchen_setup)
+        self.test_close_cereal_drawer(kitchen_setup)
+
     def test_deliver_milk(self, kitchen_setup):
-        self.test_milk_fetch(kitchen_setup)
+        self.test_fetch_milk(kitchen_setup)
         self.test_move_to_dining_area(kitchen_setup)
 
     def test_deliver_cup(self, kitchen_setup):
+        left = True
+        tip_link = 'l_gripper_tool_frame'
         self.test_move_to_cup(kitchen_setup)
         self.test_grasp_cup(kitchen_setup)
-        self.test_move_to_dining_area(kitchen_setup)
-
-    def test_deliver_cereal(self, kitchen_setup):
-        self.test_grasp_cereal(kitchen_setup)
-        self.test_move_to_dining_area(kitchen_setup)
+        self.look_at_while_driving(kitchen_setup, tip_link)
+        self.test_place_on_dining_area_table(kitchen_setup, 0.1, left=left)
 
     def test_deliver_cereal_cup(self, kitchen_setup):
-        self.test_grasp_cereal(kitchen_setup)
-        kitchen_setup.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.0})
+        self.test_fetch_cereal(kitchen_setup)
         self.test_move_to_cup(kitchen_setup)
         self.test_grasp_cup(kitchen_setup)
-        self.test_move_to_dining_area(kitchen_setup)
+        self.look_at_while_driving(kitchen_setup, 'l_gripper_tool_frame')
+        self.test_place_on_dining_area_table(kitchen_setup, 0.1, left=True, detach_object_name='cup')
+        self.test_place_on_dining_area_table(kitchen_setup, 0.2, left=False, detach_object_name='cereal')
 
 class TestReachability():
     def test_unreachable_goal_0(self, zero_pose):

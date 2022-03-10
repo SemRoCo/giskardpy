@@ -469,11 +469,14 @@ class WorldTree(object):
             d = KeyDefaultDict(default)
             new_weights[i] = d
             # self._set_joint_weights(i, d)
+        self.overwrite_joint_weights(new_weights)
+        self.notify_model_change()
+
+    def overwrite_joint_weights(self, new_weights):
         for joint_name in self.movable_joints:
             joint = self.joints[joint_name]
             if not self.is_joint_mimic(joint_name):
                 joint.update_weights(new_weights)
-        self.notify_model_change()
 
     @property
     def joint_constraints(self):

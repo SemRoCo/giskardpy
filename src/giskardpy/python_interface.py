@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 
 import rospy
 from actionlib import SimpleActionClient
@@ -319,11 +320,15 @@ class GiskardWrapper(object):
                            max_angular_velocity=max_angular_velocity,
                            weight=weight)
 
-    def update_god_map(self, updates):
+    def overwrite_joint_weights(self, updates: Dict[int, Dict[str, float]]):
         """
-        don't use, it's only for hacks :)
+        {
+            1: {
+                'joint1: 0.001,
+            }
+        }
         """
-        self.set_json_goal('UpdateGodMap', updates=updates)
+        self.set_json_goal('OverwriteWeights', updates=updates)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
         """

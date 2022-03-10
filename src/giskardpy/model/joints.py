@@ -1,3 +1,5 @@
+from typing import Dict, Union
+
 import numpy as np
 
 from giskardpy import casadi_wrapper as w, identifier
@@ -178,7 +180,11 @@ class MovableJoint(Joint):
     def update_limits(self, linear_limits, angular_limits):
         raise NotImplementedError()
 
-    def update_weights(self, weights):
+    def update_weights(self, weights: Dict[int, float]):
+        """
+        :param weights: maps derivative to weight. e.g. {1:0.001, 2:0, 3:0.001}
+        :return:
+        """
         raise NotImplementedError()
 
     def get_limit_expressions(self, order):
@@ -244,10 +250,14 @@ class OneDofJoint(MovableJoint):
     def delete_weights(self):
         self.free_variable.quadratic_weights = {}
 
-    def update_weights(self, weights):
-        self.delete_weights()
+    def update_weights(self, weights: Dict[int, Dict[Union[str, PrefixName], float]]):
+        # self.delete_weights()
         for order, weight in weights.items():
-            self.free_variable.quadratic_weights[order] = weight[self.name]
+            try:
+                self.free_variable.quadratic_weights[order] = weight[self.name]
+            except KeyError:
+                # can't do if in, because the dict may be a defaultdict
+                pass
 
 
 class RevoluteJoint(OneDofJoint):

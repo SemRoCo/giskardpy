@@ -10,6 +10,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException
+from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
@@ -21,12 +22,7 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
 class Goal(object):
-    def __init__(self, god_map, control_horizon=None, **kwargs):
-        """
-        :type god_map: giskardpy.god_map.GodMap
-        :type control_horizon: int
-        :type kwargs: dict
-        """
+    def __init__(self, god_map: GodMap, control_horizon: int = None, **kwargs):
         self.god_map = god_map
         self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
         self._test_mode = self.god_map.get_data(identifier.test_mode)

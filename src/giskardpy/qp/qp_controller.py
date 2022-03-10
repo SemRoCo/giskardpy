@@ -94,7 +94,7 @@ class H(Parent):
     def number_of_free_variables_with_horizon(self):
         h = 0
         for v in self.free_variables:
-            h += (v.order - 1) * self.prediction_horizon
+            h += (min(v.order, self.order) - 1) * self.prediction_horizon
         return h
 
     def number_of_constraint_vel_variables(self):
@@ -111,7 +111,7 @@ class H(Parent):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, v.order):
+                for o in range(1, min(v.order, self.order)):
                     weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o,
                                                                                            self.prediction_horizon)
         slack_weights = {}
@@ -180,8 +180,8 @@ class B(Parent):
         ub = defaultdict(dict)
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < v.order - 1 and self.prediction_horizon > 2:  # and False:
+                for o in range(1, min(v.order, self.order)):  # start with velocity
+                    if t == self.prediction_horizon - 1 and o < min(v.order, self.order) - 1 and self.prediction_horizon > 2:  # and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:
@@ -257,14 +257,14 @@ class BA(Parent):
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
-            for o in range(1, v.order - 1):
+            for o in range(1, min(v.order, self.order) - 1):
                 l_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_up(v.get_symbol(o), self.round_to)
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
-                for o in range(1, v.order - 1):
+                for o in range(1, min(v.order, self.order) - 1):
                     derivative_link[o]['t{:03d}/{}/{}/link'.format(t, o, v.name)] = 0
 
         lb_params = [lb]
@@ -415,8 +415,8 @@ class A(Parent):
             A_soft[start:vertical_offset, :matrix_size] += I
 
         # derivative links
-        I = w.eye(number_of_joints * (self.order - 2) * self.prediction_horizon)
         block_size = number_of_joints * (self.order - 2) * self.prediction_horizon
+        I = w.eye(block_size)
         A_soft[vertical_offset:vertical_offset + block_size, :block_size] += I
         h_offset = number_of_joints * self.prediction_horizon
         A_soft[vertical_offset:vertical_offset + block_size, h_offset:h_offset + block_size] += -I * self.sample_period
@@ -540,7 +540,7 @@ class QPController(object):
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.name)))
         l = [x.name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = max(v.order for v in self.free_variables)
+        self.order = min(self.prediction_horizon + 1, max(v.order for v in self.free_variables))
         assert duplicates == set(), 'there are free variables with the same name: {}'.format(duplicates)
 
     def get_free_variable(self, name):

@@ -203,6 +203,18 @@ class TestJointGoals(object):
 
 class TestConstraints(object):
     # TODO write buggy constraints that test sanity checks
+
+    def test_SetPredictionHorizon(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan_and_execute()
+
+
     def test_JointPositionRange(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -529,68 +541,48 @@ class TestConstraints(object):
             lower_limit2 = center - joint_range / 2. * (1 - percentage / 100.)
             assert upper_limit2 >= position >= lower_limit2
 
-    def test_UpdateGodMap(self, pocky_pose_setup):
+    def test_OverwriteWeights1(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
         """
-        # FIXME
-        joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
-        old_torso_value = pocky_pose_setup.god_map.get_data(
-            joint_velocity_weight + ['torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + ['odom_x_joint'])
+        # joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
+        # old_torso_value = pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights
+        # old_odom_x_value = pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
         r_goal.pose.orientation.w = 1
         r_goal.pose.position.x += 0.1
         updates = {
-            'rosparam': {
-                'general_options': {
-                    'joint_weights': {
-                        'velocity': {
-                            'override': {
-                                'odom_x_joint': 1000000,
-                                'odom_y_joint': 1000000,
-                                'odom_z_joint': 1000000
-                            }
-                        }
-                    }
-                }
-            }
+            1: {
+                'odom_x_joint': 1000000,
+                'odom_y_joint': 1000000,
+                'odom_z_joint': 1000000
+            },
         }
 
         old_pose = tf.lookup_pose('map', 'base_footprint')
 
-        pocky_pose_setup.update_god_map(updates)
+        pocky_pose_setup.overwrite_joint_weights(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip, check=False)
         pocky_pose_setup.plan_and_execute()
 
         new_pose = tf.lookup_pose('map', 'base_footprint')
         compare_poses(new_pose.pose, old_pose.pose)
 
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == 1000000
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1] == 1000000
+        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1], int)
 
         updates = {
-            'rosparam': {
-                'general_options': {
-                    'joint_weights': {
-                        'velocity': {
-                            'override': {
-                                'odom_x_joint': 0.0001,
-                                'odom_y_joint': 0.0001,
-                                'odom_z_joint': 0.0001
-                            }
-                        }
-                    }
-                }
-            }
+            1: {
+                'odom_x_joint': 0.0001,
+                'odom_y_joint': 0.0001,
+                'odom_z_joint': 0.0001,
+            },
         }
         # old_pose = tf.lookup_pose('map', 'base_footprint')
         # old_pose.pose.position.x += 0.1
-        pocky_pose_setup.update_god_map(updates)
+        pocky_pose_setup.overwrite_joint_weights(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.plan_and_execute()
 
@@ -598,15 +590,14 @@ class TestConstraints(object):
 
         # compare_poses(old_pose.pose, new_pose.pose)
         assert new_pose.pose.position.x >= 0.03
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == 0.0001
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1] == 0.0001
+        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+                              float)
         pocky_pose_setup.plan_and_execute()
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
+        assert not isinstance(pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1],
+                              float)
+        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+                              float)
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """
@@ -4979,16 +4970,6 @@ class TestReachability(object):
 
 
 class TestConfigFile(object):
-    def test_prediction_horizon1(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute()
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan_and_execute()
-
     def test_bowl_and_cup_prediction_horizon1(self, kitchen_setup):
         """
         :type kitchen_setup: PR2

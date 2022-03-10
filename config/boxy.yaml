@@ -1,4 +1,5 @@
 parent: !include default.yaml
+# parent: !include robots/boxy.yaml
 action_server:
   base:
     plugin: SendFollowJointTrajectory

@@ -1,4 +1,7 @@
-parent: !include pr2.yaml
+pr2_a:
+  parent: !include robots/pr2.yaml
+pr2_b:
+  parent: !include robots/pr2.yaml
 action_server:
   /pr2_a/base:
     plugin: SendFollowJointTrajectory

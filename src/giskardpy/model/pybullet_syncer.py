@@ -65,24 +65,23 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         all_collisions = dict()
         for robot_name in self.robot_names:
             collisions = Collisions(self.world, collision_list_sizes[robot_name], robot_name)
-            for (c_robot_name, robot_link, body_b, link_b), distance in cut_off_distances.items():
-                if c_robot_name != robot_name:
-                    continue
-                link_b_id = self.object_name_to_bullet_id[link_b]
-                robot_link_id = self.object_name_to_bullet_id[robot_link]
-                contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
-                                                                          distance * 1.1)]
-                if len(contacts) > 0:
-                    for contact in contacts:  # type: ContactInfo
-                        collision = Collision(link_a=robot_link,
-                                              body_b=body_b,
-                                              link_b=link_b,
-                                              map_P_pa=contact.position_on_a,
-                                              map_P_pb=contact.position_on_b,
-                                              map_V_n=contact.contact_normal_on_b,
-                                              contact_distance=contact.contact_distance)
-                        collisions.add(collision)
             all_collisions[robot_name] = collisions
+
+        for (c_robot_name, robot_link, body_b, link_b), distance in cut_off_distances.items():
+            link_b_id = self.object_name_to_bullet_id[link_b]
+            robot_link_id = self.object_name_to_bullet_id[robot_link]
+            contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
+                                                                      distance * 1.1)]
+            if len(contacts) > 0:
+                for contact in contacts:  # type: ContactInfo
+                    collision = Collision(link_a=robot_link,
+                                          body_b=body_b,
+                                          link_b=link_b,
+                                          map_P_pa=contact.position_on_a,
+                                          map_P_pb=contact.position_on_b,
+                                          map_V_n=contact.contact_normal_on_b,
+                                          contact_distance=contact.contact_distance)
+                    all_collisions[c_robot_name].add(collision)
         return all_collisions
 
     def in_collision(self, link_a, link_b, distance):

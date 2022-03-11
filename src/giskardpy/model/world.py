@@ -1014,6 +1014,18 @@ class SubWorldTree(WorldTree):
     def notify_model_change(self):
         raise NotImplementedError()
 
+    def get_link_short_name_match(self, link_name):
+        matches = []
+        for link_name2 in self.link_names:
+            if link_name == link_name2 or link_name == link_name2.short_name:
+                matches.append(link_name2)
+        if len(matches) > 1:
+            raise ValueError(f'Found multiple link matches {matches}.')
+        if len(matches) == 0:
+            raise KeyError('Found no link match.')
+        return matches[0]
+
+
     def reset_cache(self):
         try:
             del self.joints

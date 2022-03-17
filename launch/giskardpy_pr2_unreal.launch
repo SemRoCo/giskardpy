@@ -42,14 +42,10 @@
     </rosparam>
   </node>
 
-  <arg name="gui" default="false" />
-
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
-    <param name="path_to_data_folder" value="$(find giskardpy)/data" />
-    <param name="enable_gui" value="$(arg gui)"/>
-    <rosparam command="load" file="$(find giskardpy)/config/pr2.yaml"/>
     <remap from="/joint_states" to="/giskard/joint_states"/>
     <remap from="robot_description" to="giskard/robot_description"/>
+    <param name="config" value="$(find giskardpy)/config/pr2.yaml" />
     <!-- <remap from="/whole_body_controller/follow_joint_trajectory/" to="/whole_body_controller/follow_joint_trajectory/base/"/> -->
     <!-- <remap from="~state" to="/whole_body_controller/base/state"/> -->
   </node>

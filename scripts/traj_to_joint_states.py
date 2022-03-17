@@ -2,9 +2,9 @@
 import rospy
 from control_msgs.msg import FollowJointTrajectoryActionGoal
 from sensor_msgs.msg import JointState
-import giskardpy.tfwrapper as tf
-from giskardpy import logging
-from giskardpy.tfwrapper import msg_to_kdl
+import giskardpy.utils.tfwrapper as tf
+from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import msg_to_kdl
 import PyKDL as kdl
 
 class TrajToJS(object):
@@ -55,15 +55,15 @@ class TrajToJS(object):
         js.velocity = [0 for _ in js.velocity]
         self.joint_state_pub.publish(js)
 
-if __name__ == u'__main__':
-    rospy.init_node(u'traj_to_js_publisher')
+if __name__ == '__main__':
+    rospy.init_node('traj_to_js_publisher')
     try:
         traj2js = TrajToJS(odom_x_joint=rospy.get_param('~odom_x_joint'),
                            odom_y_joint=rospy.get_param('~odom_y_joint'),
                            odom_z_joint=rospy.get_param('~odom_z_joint'),
                            odom_frame=rospy.get_param('~odom_frame'))
         rospy.sleep(0.5)
-        logging.loginfo(u'running')
+        logging.loginfo('running')
         rospy.spin()
     except KeyError:
         logging.loginfo(

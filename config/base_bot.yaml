@@ -1,0 +1,10 @@
+parent: !include default.yaml
+action_server:
+  base:
+    plugin: SendFollowJointTrajectory
+    namespace: /xy
+    state_topic: /xy/state
+  body:
+    plugin: SendFollowJointTrajectory
+    namespace: /z
+    state_topic: /z/state

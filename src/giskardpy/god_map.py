@@ -9,7 +9,7 @@ from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, V
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict, PrefixName, PrefixDefaultDict
-from giskardpy.utils.config_loader import get_namespaces
+from giskardpy.utils.config_loader import upload_config_file_to_paramserver, get_namespaces
 
 
 def get_default(block_identifiers, god_map, prefix=None):
@@ -271,16 +271,17 @@ class GodMap(object):
         self.lock = Lock()
 
     @classmethod
-    def init_from_paramserver(cls, node_name):
+    @profile
+    def init_from_paramserver(cls, node_name, upload_config=True):
         import rospy
-        from control_msgs.msg import JointTrajectoryControllerState
-        from rospy import ROSException
-        from giskardpy.utils import logging
         from giskardpy.data_types import order_map
+
+        if upload_config:
+            upload_config_file_to_paramserver()
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        namespaces = list(set(get_namespaces(self.get_data(identifier.action_server))))
+        namespaces = list(set(get_namespaces(self.get_data(identifier.robot_interface))))
         self.set_data(identifier.rosparam + ['namespaces'], namespaces)
         robot_descriptions = dict()
         for robot_name in namespaces:
@@ -293,18 +294,6 @@ class GodMap(object):
             path_to_data_folder += '/'
         self.set_data(identifier.data_folder, path_to_data_folder)
 
-        # while not rospy.is_shutdown():
-        #     try:
-        #         controlled_joints = rospy.wait_for_message('/whole_body_controller/state',
-        #                                                    JointTrajectoryControllerState,
-        #                                                    timeout=5.0).joint_names
-        #         self.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
-        #     except ROSException as e:
-        #         logging.logerr('state topic not available')
-        #         logging.logerr(str(e))
-        #     else:
-        #         break
-        #     rospy.sleep(0.5)
         set_default_in_override_block(identifier.external_collision_avoidance, self, namespaces)
         set_default_in_override_block(identifier.self_collision_avoidance, self, namespaces)
         # weights
@@ -420,6 +409,7 @@ class GodMap(object):
                 else:
                     result.append(f(index))
             return result
+
         return w.Matrix(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
     def list_to_point3(self, identifier):

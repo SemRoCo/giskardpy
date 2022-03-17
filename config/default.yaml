@@ -1,4 +1,6 @@
 general_options:
+  mode: OpenLoop # OpenLoop or ClosedLoop
+  action_server_name: ~command
   path_to_data_folder: !find data # or 'find ros://giskardpy/data'
   enable_gui: False
   sample_period: 0.05 # time[s] between points of generated joint trajectory
@@ -81,7 +83,7 @@ plugins:
     publish_world_objects: False
     tf_topic: /tf
   MaxTrajectoryLength:
-    enabled: False
+    enabled: True
     length: 30 # will abort planning if the trajectory becomes longer than this many seconds
 reachability_check:
   sample_period: 0.5

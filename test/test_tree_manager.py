@@ -1,22 +1,21 @@
 import pytest
 from py_trees.composites import Sequence, Selector
-from giskardpy.tree.plugin import PluginBehavior
+from giskardpy.tree.behaviors.plugin import PluginBehavior
 from py_trees.meta import failure_is_success, success_is_failure
 from py_trees import display, Blackboard
 from py_trees_ros.trees import BehaviourTree
 from py_trees.behaviour import Behaviour
 from py_trees.common import Status
-from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.tree.garden import TreeManager
 from giskardpy.god_map import GodMap
 from giskardpy.utils import logging
 from giskardpy import identifier
 
-import roslaunch
 import rospy
 from giskardpy.utils.tfwrapper import init as tf_init
 from utils_for_tests import PR2
 from giskardpy.model.pybullet_wrapper import stop_pybullet
-from giskardpy.tree.plugin import GiskardBehavior
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 default_pose = {'r_elbow_flex_joint': -0.15,
@@ -87,7 +86,7 @@ def giskard(ros):
     tree_manager = c.god_map.get_data(identifier.tree_manager)
     tree_manager.get_node('pybullet updater').srv_update_world.shutdown()
     tree_manager.get_node('pybullet updater').get_object_names.shutdown()
-    tree_manager.get_node('pybullet updater').get_object_info.shutdown()
+    tree_manager.get_node('pybullet updater').get_object_info_cb.shutdown()
     tree_manager.get_node('pybullet updater').get_attached_objects.shutdown()
     tree_manager.get_node('pybullet updater').update_rviz_markers.shutdown()
     tree_manager.get_node('coll').srv_activate_rendering.shutdown()

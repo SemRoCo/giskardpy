@@ -29,10 +29,10 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
-from giskardpy.garden import grow_tree
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
@@ -404,17 +404,11 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.set_param('~config', config_file)
         rospy.set_param('~test', True)
 
-        self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
-                                                 FollowJointTrajectoryActionGoal, self.start_motion_cb,
-                                                 queue_size=100)
-        self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
-                                                FollowJointTrajectoryActionResult, self.stop_motion_cb,
-                                                queue_size=100)
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
-        self.tree = grow_tree()
-        self.god_map = Blackboard().god_map
+        self.tree = TreeManager.from_param_server()
+        self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
         self.robot_names = self.god_map.get_data(identifier.collision_scene).robot_names
@@ -474,12 +468,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.wait_heartbeats()
         return self.collision_scene.collision_matrices
 
-    def start_motion_cb(self, msg):
-        self.time = time()
-
-    def stop_motion_cb(self, msg):
-        self.total_time_spend_moving += time() - self.time
-
+    @property
     def robot(self, prefix=''):
         """
         :rtype: giskardpy.model.world.SubWorldTree
@@ -493,21 +482,11 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
-        self.tree.blackboard_exchange.get_blackboard_variables_srv.shutdown()
-        self.tree.blackboard_exchange.open_blackboard_watcher_srv.shutdown()
-        self.tree.blackboard_exchange.close_blackboard_watcher_srv.shutdown()
-        self.kill_all_services()
+        self.tree.kill_all_services()
         logging.loginfo(
             'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo('total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo('stopping tree')
-
-    def kill_all_services(self):
-        for value in self.god_map.get_data(identifier.tree_manager).tree_nodes.values():
-            node = value.node
-            for attribute_name, attribute in vars(node).items():
-                if isinstance(attribute, rospy.Service):
-                    attribute.shutdown(reason='life is pain')
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
@@ -694,7 +673,11 @@ class GiskardTestWrapper(GiskardWrapper):
             else:
                 r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
             self.wait_heartbeats()
-            self.total_time_spend_giskarding += time() - time_spend_giskarding
+            diff = time() - time_spend_giskarding
+            self.total_time_spend_giskarding += diff
+            self.total_time_spend_moving += len(self.god_map.get_data(identifier.trajectory).keys()) * \
+                                            self.god_map.get_data(identifier.sample_period)
+            logging.logwarn('Goal processing took {}'.format(diff))
             for cmd_id in range(len(r.error_codes)):
                 error_code = r.error_codes[cmd_id]
                 error_message = r.error_messages[cmd_id]
@@ -743,8 +726,9 @@ class GiskardTestWrapper(GiskardWrapper):
                 if not self.world.is_joint_continuous(joint_name):
                     joint_limits = self.world.get_joint_position_limits(joint_name)
                     error_msg = '{} has violated joint position limit'.format(joint_name)
-                    np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1], error_msg)
-                    np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0], error_msg)
+                    eps = 0.0001
+                    np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1]+eps, error_msg)
+                    np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0]+eps, error_msg)
                 vel_limit = self.world.joint_limit_expr(joint_name, 1)[1]
                 vel_limit = self.god_map.evaluate_expr(vel_limit) * 1.001
                 vel = trajectory_vel[joint_name]
@@ -1008,9 +992,6 @@ class PR22(GiskardTestWrapper):
             self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
 
     def move_base(self, goal_pose, robot_name):
-        self.set_localization(goal_pose, robot_name)
-        self.wait_heartbeats()
-        goal_pose.header.stamp = rospy.get_rostime()
         self.teleport_base(goal_pose, robot_name)
 
     def get_l_gripper_links(self):
@@ -1269,9 +1250,6 @@ class PR2AndDonbot(GiskardTestWrapper):
 
     def move_base(self, goal_pose, robot_name):
         if robot_name == self.pr2:
-            self.set_localization(goal_pose, robot_name)
-            self.wait_heartbeats()
-            goal_pose.header.stamp = rospy.get_rostime()
             self.teleport_base(goal_pose, robot_name)
         else:
             goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
@@ -1470,6 +1448,24 @@ class PR2(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
 
+class PR2CloseLoop(PR2):
+
+    def __init__(self):
+        self.r_tip = 'r_gripper_tool_frame'
+        self.l_tip = 'l_gripper_tool_frame'
+        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
+        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
+        GiskardTestWrapper.__init__(self, 'package://giskardpy/config/pr2_closed_loop.yaml')
+
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        self.move_base(p)
+
+    def reset(self):
+        self.clear_world()
+        self.reset_base()
 
 class Donbot(GiskardTestWrapper):
     default_pose = {
@@ -1701,11 +1697,14 @@ class Boxy(GiskardTestWrapper):
         'right_arm_6_joint': 0.01,
     }
 
-    def __init__(self):
+    def __init__(self, config=None):
         self.camera_tip = 'camera_link'
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
-        super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml')
+        if config is None:
+            super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml')
+        else:
+            super(Boxy, self).__init__(config)
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -1723,6 +1722,20 @@ class Boxy(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
 
+class BoxyCloseLoop(Boxy):
+
+    def __init__(self, config=None):
+        super().__init__('package://giskardpy/config/boxy_closed_loop.yaml')
+
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        self.move_base(p)
+
+    def reset(self):
+        self.clear_world()
+        self.reset_base()
 
 class TiagoDual(GiskardTestWrapper):
     default_pose = {

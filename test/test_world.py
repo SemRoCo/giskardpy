@@ -1,5 +1,5 @@
 import shutil
-from collections import defaultdict
+from itertools import combinations
 
 import pytest
 import urdf_parser_py.urdf as up
@@ -13,6 +13,7 @@ from giskardpy.exceptions import DuplicateNameException
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.utils.utils import suppress_stderr
 from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, rnd_joint_state, hsr_urdf
 
@@ -88,36 +89,7 @@ def avoid_all_entry(min_dist):
 
 def world_with_robot(urdf, prefix):
     god_map = GodMap()
-    default_limits = {
-        'linear':
-            {
-                'override': defaultdict(lambda: 1000)
-            },
-        'angular':
-            {
-                'override': defaultdict(lambda: 1000)
-            }
-    }
-    god_map.set_data(identifier.rosparam,
-                     {
-                         'general_options':
-                             {
-                                 'joint_limits':
-                                     {
-                                         'velocity': default_limits,
-                                         'acceleration': default_limits,
-                                         'jerk': default_limits,
-                                     },
-                                 'joint_weights':
-                                     {
-                                         'velocity': {'override': defaultdict(float)},
-                                         'acceleration': {'override': defaultdict(float)},
-                                         'jerk': {'override': defaultdict(float)},
-                                     }
-                             }
-                     })
-    god_map.set_data(identifier.map_frame, 'map')
-    god_map.set_data(identifier.order, 3)
+    god_map.set_data(identifier.rosparam, ros_load_robot_config('package://giskardpy/config/default.yaml'))
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.add_urdf(urdf, prefix=prefix, group_name=RobotName)
@@ -389,16 +361,16 @@ class TestWorldTree(object):
 
     def test_search_branch(self):
         world = create_world_with_pr2()
-        result = world.search_branch('odom_x_joint',
+        result = world.search_branch('odom_x_frame',
                                      stop_at_joint_when=lambda _: False,
                                      stop_at_link_when=lambda _: False)
         assert result == ([], [])
-        result = world.search_branch('odom_y_joint',
+        result = world.search_branch('odom_y_frame',
                                      stop_at_joint_when=world.is_joint_controlled,
                                      stop_at_link_when=lambda _: False,
                                      collect_link_when=world.has_link_collisions)
         assert result == ([], [])
-        result = world.search_branch('odom_z_joint',
+        result = world.search_branch('base_footprint',
                                      stop_at_joint_when=world.is_joint_controlled,
                                      collect_link_when=world.has_link_collisions)
         assert set(result[0]) == {'base_bellow_link',
@@ -415,7 +387,7 @@ class TestWorldTree(object):
                                   'br_caster_r_wheel_link',
                                   'br_caster_rotation_link',
                                   'base_link'}
-        result = world.search_branch('l_elbow_flex_joint',
+        result = world.search_branch('l_elbow_flex_link',
                                      collect_joint_when=world.is_joint_fixed)
         assert set(result[0]) == set()
         assert set(result[1]) == {'l_force_torque_adapter_joint',
@@ -427,7 +399,7 @@ class TestWorldTree(object):
                                   'l_gripper_motor_accelerometer_joint',
                                   'l_gripper_palm_joint',
                                   'l_gripper_tool_joint'}
-        links, joints = world.search_branch('r_wrist_roll_joint',
+        links, joints = world.search_branch('r_wrist_roll_link',
                                             stop_at_joint_when=world.is_joint_controlled,
                                             collect_link_when=world.has_link_collisions,
                                             collect_joint_when=lambda _: True)
@@ -448,7 +420,7 @@ class TestWorldTree(object):
                                'r_gripper_r_finger_joint',
                                'r_gripper_r_finger_tip_joint',
                                'r_gripper_joint'}
-        links, joints = world.search_branch('br_caster_l_wheel_joint',
+        links, joints = world.search_branch('br_caster_l_wheel_link',
                                             collect_link_when=lambda _: True,
                                             collect_joint_when=lambda _: True)
         assert links == ['br_caster_l_wheel_link']
@@ -558,6 +530,14 @@ class TestWorldTree(object):
                                                                           'r_gripper_r_finger_joint': (0.0, 0.548),
                                                                           'r_gripper_r_finger_tip_joint': (0.0, 0.548)}
 
+    def test_possible_collision_combinations(self):
+        world = create_world_with_pr2()
+        result = world.possible_collision_combinations('robot')
+        reference = {world.sort_links(link_a, link_b) for link_a, link_b in
+                     combinations(world.groups['robot'].link_names_with_collisions, 2) if
+                     not world.groups['robot'].are_linked(link_a, link_b)}
+        assert result == reference
+
     @given(rnd_joint_state(pr2_joint_limits))
     def test_pr2_fk1(self, js):
         """
@@ -590,3 +570,4 @@ class TestWorldTree(object):
         world = create_world_with_pr2()
         with pytest.raises(KeyError):
             world.compute_chain_reduced_to_controlled_joints('l_wrist_roll_link', 'l_gripper_r_finger_link')
+

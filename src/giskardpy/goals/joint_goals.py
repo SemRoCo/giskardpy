@@ -1,10 +1,9 @@
 from __future__ import division
 
-from giskardpy import casadi_wrapper as w, identifier, RobotPrefix
+from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
-from giskardpy.utils import logging
 
 
 class JointPositionContinuous(Goal):
@@ -25,8 +24,7 @@ class JointPositionContinuous(Goal):
         super(JointPositionContinuous, self).__init__(**kwargs)
 
         if not self.world.is_joint_continuous(joint_name):
-            raise ConstraintException('{} called with non continuous joint {}'.format(self.__class__.__name__,
-                                                                                       joint_name))
+            raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
     def make_constraints(self):
         """
@@ -63,7 +61,7 @@ class JointPositionContinuous(Goal):
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'
 
 
 class JointPositionPrismatic(Goal):
@@ -82,8 +80,7 @@ class JointPositionPrismatic(Goal):
         self.hard = hard
         super(JointPositionPrismatic, self).__init__(**kwargs)
         if not self.world.is_joint_prismatic(joint_name):
-            raise ConstraintException('{} called with non prismatic joint {}'.format(self.__class__.__name__,
-                                                                                      joint_name))
+            raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
     def make_constraints(self):
         """
@@ -135,7 +132,7 @@ class JointPositionPrismatic(Goal):
 
     def __str__(self):
         s = super(JointPositionPrismatic, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'
 
 
 class JointPositionRevolute(Goal):
@@ -155,8 +152,7 @@ class JointPositionRevolute(Goal):
         self.hard = hard
         super(JointPositionRevolute, self).__init__(**kwargs)
         if not self.world.is_joint_revolute(joint_name):
-            raise ConstraintException('{} called with non revolute joint {}'.format(self.__class__.__name__,
-                                                                                     joint_name))
+            raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
     def make_constraints(self):
         """
@@ -180,6 +176,7 @@ class JointPositionRevolute(Goal):
                              self.world.joint_limit_expr(self.joint_name, 1)[1])
 
         error = joint_goal - current_joint
+        self.add_debug_expr('error', error)
         if self.hard:
             self.add_constraint(reference_velocity=max_velocity,
                                 lower_error=error,
@@ -197,7 +194,7 @@ class JointPositionRevolute(Goal):
 
     def __str__(self):
         s = super(JointPositionRevolute, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'
 
 
 class ShakyJointPositionRevoluteOrPrismatic(Goal):
@@ -215,8 +212,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         self.joint_name = PrefixName(joint_name, prefix)
         super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(**kwargs)
         if not self.world.is_joint_revolute(joint_name) and not self.world.is_joint_prismatic(joint_name):
-            raise ConstraintException('{} called with non revolute/prismatic joint {}'.format(self.__class__.__name__,
-                                                                                               joint_name))
+            raise ConstraintException(f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
 
         self.goal = goal
         self.frequency = frequency
@@ -261,7 +257,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
 
     def __str__(self):
         s = super(ShakyJointPositionRevoluteOrPrismatic, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'
 
 
 class ShakyJointPositionContinuous(Goal):
@@ -284,8 +280,7 @@ class ShakyJointPositionContinuous(Goal):
         self.max_velocity = max_velocity
         super(ShakyJointPositionContinuous, self).__init__(**kwargs)
         if not self.world.is_joint_continuous(joint_name):
-            raise ConstraintException('{} called with non continuous joint {}'.format(self.__class__.__name__,
-                                                                                       joint_name))
+            raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
     def make_constraints(self):
         """
@@ -326,7 +321,7 @@ class ShakyJointPositionContinuous(Goal):
 
     def __str__(self):
         s = super(ShakyJointPositionContinuous, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'
 
 
 class AvoidJointLimitsRevolute(Goal):
@@ -344,8 +339,7 @@ class AvoidJointLimitsRevolute(Goal):
         self.percentage = percentage
         super(AvoidJointLimitsRevolute, self).__init__(**kwargs)
         if not self.world.is_joint_revolute(joint_name):
-            raise ConstraintException('{} called with non prismatic joint {}'.format(self.__class__.__name__,
-                                                                                      joint_name))
+            raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
     def make_constraints(self):
         weight = self.get_parameter_as_symbolic_expression('weight')
@@ -381,7 +375,7 @@ class AvoidJointLimitsRevolute(Goal):
 
     def __str__(self):
         s = super(AvoidJointLimitsRevolute, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'
 
 
 class AvoidJointLimitsPrismatic(Goal):
@@ -399,8 +393,7 @@ class AvoidJointLimitsPrismatic(Goal):
         self.percentage = percentage
         super(AvoidJointLimitsPrismatic, self).__init__(**kwargs)
         if not self.world.is_joint_prismatic(joint_name):
-            raise ConstraintException('{} called with non prismatic joint {}'.format(self.__class__.__name__,
-                                                                                      joint_name))
+            raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
     def make_constraints(self):
         weight = self.get_parameter_as_symbolic_expression('weight')
@@ -436,11 +429,11 @@ class AvoidJointLimitsPrismatic(Goal):
 
     def __str__(self):
         s = super(AvoidJointLimitsPrismatic, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'
 
 
 class JointPositionList(Goal):
-    def __init__(self, goal_state, weight=None, max_velocity=None, hard=False, prefix=None, **kwargs):
+    def __init__(self, goal_state, weight=None, max_velocity=None, hard: bool = False, prefix=None, **kwargs):
         """
         This goal takes a joint state and adds the other JointPosition goals depending on their type
         :param goal_state: JointState as json
@@ -450,7 +443,7 @@ class JointPositionList(Goal):
         super(JointPositionList, self).__init__(**kwargs)
         for i, joint_name in enumerate(goal_state.name):
             if not self.world.has_joint(PrefixName(joint_name, prefix)):
-                raise KeyError('unknown joint "{}"'.format(joint_name))
+                raise KeyError(f'unknown joint \'{joint_name}\'')
             goal_position = goal_state.position[i]
             params = kwargs
             params.update({'joint_name': joint_name,
@@ -475,7 +468,7 @@ class JointPosition(Goal):
         elif self.world.is_joint_prismatic(joint_name):
             C = JointPositionPrismatic
         else:
-            raise ConstraintInitalizationException('\'{}\' has to be continuous, revolute or prismatic'.format(joint_name))
+            raise ConstraintInitalizationException(f'\'{joint_name}\' has to be continuous, revolute or prismatic')
         self.add_constraints_of_goal(C(joint_name=joint_name,
                                        goal=goal,
                                        weight=weight,
@@ -507,18 +500,16 @@ class JointPositionRange(Goal):
         super(JointPositionRange, self).__init__(**kwargs)
         self.joint_name = PrefixName(joint_name, prefix)
         if self.world.is_joint_continuous(joint_name):
-            raise NotImplementedError('Can\'t limit range of continues joint \'{}\'.'.format(self.joint_name))
+            raise NotImplementedError(f'Can\'t limit range of continues joint \'{self.joint_name}\'.')
         self.upper_limit = upper_limit
         self.lower_limit = lower_limit
         self.hard = hard
         if self.hard:
             current_position = self.world.state[self.joint_name].position
             if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
-                raise ConstraintInitalizationException('{} out of set limits. '
-                                                       '{} <= {} <= {} is not true.'.format(self.joint_name,
-                                                                                             self.lower_limit,
-                                                                                             current_position,
-                                                                                             self.upper_limit))
+                raise ConstraintInitalizationException(f'{self.joint_name} out of set limits. '
+                                                       '{self.lower_limit} <= {current_position} <= {self.upper_limit} '
+                                                       'is not true.')
 
     def make_constraints(self):
         joint_position = self.get_joint_position_symbol(self.joint_name)
@@ -539,4 +530,4 @@ class JointPositionRange(Goal):
 
     def __str__(self):
         s = super(JointPositionRange, self).__str__()
-        return '{}/{}'.format(s, self.joint_name)
+        return f'{s}/{self.joint_name}'

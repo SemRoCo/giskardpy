@@ -5,7 +5,7 @@ collision_avoidance:
       odom_z_joint: # this affects all links between this and the next controlled joint
         hard_threshold: 0.02 # at this distance in [cm] that can not be surpassed
         soft_threshold: 0.7 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-action_server:
+robot_interface:
   base:
     plugin: SendFollowJointTrajectoryDiffDrive
     namespace: /mobile_base_controller

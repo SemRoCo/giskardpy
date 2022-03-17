@@ -1,4 +1,3 @@
-import os
 import pickle
 from collections import defaultdict
 from copy import deepcopy
@@ -6,10 +5,8 @@ from itertools import combinations, product
 from time import time
 
 import numpy as np
-import rospy
 
 from giskard_msgs.msg import CollisionEntry
-
 from giskardpy import identifier
 from giskardpy.data_types import Collisions, JointStates, PrefixName
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
@@ -106,8 +103,8 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if group.are_linked(link_a, link_b, non_controlled) \
-                    or link_a == link_b \
+            # assuming that group.are_linked(link_a, link_b, non_controlled) is false, because this call is very slow
+            if link_a == link_b \
                     or link_a.short_name in self.ignored_pairs \
                     or link_b.short_name in self.ignored_pairs \
                     or (link_a.short_name, link_b.short_name) in self.ignored_pairs \
@@ -213,7 +210,7 @@ class CollisionWorldSynchronizer(object):
 
     def init_collision_matrix(self):
         for robot_name in self.robot_names:
-            added_links = set(combinations(self.robot(robot_name).link_names_with_collisions, 2))
+            added_links = set(self.world.possible_collision_combinations(robot_name))
             self.update_collision_matrix(group_name=robot_name, added_links=added_links)
 
     def update_collision_matrix(self, group_name, added_links=None, removed_links=None):
@@ -285,7 +282,7 @@ class CollisionWorldSynchronizer(object):
                         raise UnknownBodyException(
                             'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
 
-    def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
+    def collision_goals_to_collision_matrix(self, collision_goals, min_dist, added_checks):
         """
         :param collision_goals: list of CollisionEntry
         :type collision_goals: list
@@ -322,6 +319,12 @@ class CollisionWorldSynchronizer(object):
                     min_allowed_distance[key] = min_dist[collision_entry.robot_name][key[0]]
                 else:
                     raise Exception('todo')
+        for (link_a, link_b), distance in added_checks.items():
+            key = (link_a.prefix, link_a, link_b.prefix, link_b)
+            if key in min_allowed_distance:
+                min_allowed_distance[key] = max(distance, min_allowed_distance[key])
+            else:
+                min_allowed_distance[key] = distance
         return min_allowed_distance
 
     def get_robot_collision_matrix(self, min_dist, robot_name):

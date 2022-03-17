@@ -5,6 +5,7 @@ import rospkg
 import rospy
 import yaml
 
+from giskardpy import identifier
 from giskardpy.utils.utils import resolve_ros_iris
 
 rospack = rospkg.RosPack()
@@ -208,7 +209,7 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     if test:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/test.yaml'))
-    if 'action_server' not in config:
+    if identifier.robot_interface[-1] not in config:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/action_server.yaml'))
     if config and not rospy.is_shutdown():
@@ -216,8 +217,17 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
             old_data = {}
         old_data.update(config)
         rospy.set_param('~', old_data)
-        return True
-    return False
+    return old_data
+
+
+def upload_config_file_to_paramserver():
+    old_params = rospy.get_param('~')
+    if rospy.has_param('~test'):
+        test = rospy.get_param('~test')
+    else:
+        test = False
+    config_file_name = rospy.get_param('~{}'.format('config'))
+    ros_load_robot_config(config_file_name, old_data=old_params, test=test)
 
 
 def get_namespaces(d, namespace_seperator='/'):

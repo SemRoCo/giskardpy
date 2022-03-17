@@ -102,6 +102,7 @@ class H(Parent):
     def number_of_contraint_error_variables(self):
         return len(self.constraints)
 
+    @profile
     def weights(self):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
@@ -109,7 +110,6 @@ class H(Parent):
                 for o in range(1, v.order):
                     weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o,
                                                                                            self.prediction_horizon)
-
         slack_weights = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:  # type: VelocityConstraint
@@ -195,10 +195,8 @@ class B(Parent):
         ub_params.append(self.get_upper_slack_limits())
         ub_params.append(self.get_upper_error_slack_limits())
 
-        return self._sorter(*lb_params)[0], self._sorter(*ub_params)[0], self._sorter(*lb_params)[1]
-
-    def names(self):
-        return self()[2]
+        lb, self.names = self._sorter(*lb_params)
+        return lb, self._sorter(*ub_params)[0]
 
 
 class BA(Parent):
@@ -240,7 +238,7 @@ class BA(Parent):
                                                c.velocity_limit * self.sample_period * c.control_horizon)
                 for c in self.constraints}
 
-    def __call__(self):
+    def __call__(self) -> tuple:
         lb = {}
         ub = {}
         # position limits
@@ -277,10 +275,8 @@ class BA(Parent):
         ub_params.append(self.get_upper_constraint_velocities())
         ub_params.append(self.get_upper_constraint_error())
 
-        return self._sorter(*lb_params)[0], self._sorter(*ub_params)[0], self._sorter(*lb_params)[1]
-
-    def names(self):
-        return self()[2]
+        lbA, self.names = self._sorter(*lb_params)
+        return lbA, self._sorter(*ub_params)[0]
 
 
 class A(Parent):
@@ -384,7 +380,7 @@ class A(Parent):
         #         |   sp   |   sp   |   sp   |   sp   |
         #         |      sp|      sp|      sp|      sp|
         #         |===================================|
-        # TODO possible speed improvement by creating blocks and stiching them together
+        # TODO possible speed improvement by creating blocks and stitching them together
         number_of_joints = self.number_of_joints
         A_soft = w.zeros(
             self.prediction_horizon * number_of_joints +  # joint position constraints
@@ -580,8 +576,8 @@ class QPController(object):
         elif constraint.control_horizon > self.prediction_horizon:
             logging.logwarn('Specified control horizon of {} is bigger than prediction horizon.'
                             'Reducing control horizon of {} to prediction horizon of {}'.format(constraint.name,
-                                                                                                 constraint.control_horizon,
-                                                                                                 self.prediction_horizon))
+                                                                                                constraint.control_horizon,
+                                                                                                self.prediction_horizon))
 
     def add_debug_expressions(self, debug_expressions):
         """
@@ -590,6 +586,7 @@ class QPController(object):
         # TODO check duplicates
         self.debug_expressions.update(debug_expressions)
 
+    @profile
     def compile(self):
         self._construct_big_ass_M()
         self._compile_big_ass_M()
@@ -634,12 +631,14 @@ class QPController(object):
         if len(lbA_danger) > 0:
             logging.logwarn(
                 'The following joints ended up closer than {}% to their lower position limits {}'.format(percentage,
-                                                                                                          list(lbA_danger.index)))
+                                                                                                         list(
+                                                                                                             lbA_danger.index)))
             result = True
         if len(ubA_danger) > 0:
             logging.logwarn(
                 'The following joints ended up closer than {}% to their upper position limits {}'.format(percentage,
-                                                                                                          list(ubA_danger.index)))
+                                                                                                         list(
+                                                                                                             ubA_danger.index)))
             result = True
         return result
 
@@ -723,10 +722,12 @@ class QPController(object):
 
         self._set_weights(w.Matrix(self.H.weights()))
         self._set_A_soft(self.A.A())
-        self._set_lbA(w.Matrix(self.bA()[0]))
-        self._set_ubA(w.Matrix(self.bA()[1]))
-        self._set_lb(w.Matrix(self.b()[0]))
-        self._set_ub(w.Matrix(self.b()[1]))
+        lbA, ubA = self.bA()
+        self._set_lbA(w.Matrix(lbA))
+        self._set_ubA(w.Matrix(ubA))
+        lb, ub = self.b()
+        self._set_lb(w.Matrix(lb))
+        self._set_ub(w.Matrix(ub))
         self.np_g = np.zeros(self.H.width)
         self.debug_names = list(sorted(self.debug_expressions.keys()))
         self.debug_v = w.Matrix([self.debug_expressions[name] for name in self.debug_names])
@@ -819,7 +820,7 @@ class QPController(object):
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order-1)
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
         num_of_slack = len(lb) - num_non_slack
         lb[-num_of_slack:] = -100
         ub[-num_of_slack:] = 100
@@ -844,7 +845,7 @@ class QPController(object):
         return False
 
     def get_cmd_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order-1)
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
         num_of_slack = len(lb) - num_non_slack
         lb_relaxed = lb.copy()
         ub_relaxed = ub.copy()
@@ -961,7 +962,7 @@ class QPController(object):
             self.p_pure_xdot[num_non_slack:] = 0
             self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
             self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
-                                                   dtype=float)
+                                                       dtype=float)
             self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
             self.p_Ax_without_slack[-num_of_slack:] /= sample_period
 

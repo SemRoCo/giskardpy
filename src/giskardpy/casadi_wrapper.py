@@ -304,7 +304,7 @@ class CompiledFunction(object):
         return self.out
 
 
-def speed_up(function, parameters, backend='clang'):
+def speed_up(function, parameters, backend='clang') -> CompiledFunction:
     str_params = [str(x) for x in parameters]
     try:
         f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])

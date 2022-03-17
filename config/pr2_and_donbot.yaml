@@ -3,7 +3,7 @@ pr2:
   parent: !include robots/pr2.yaml
 donbot:
   parent: !include robots/donbot.yaml
-action_server:
+robot_interface:
   /pr2/base:
     plugin: SendFollowJointTrajectory
     namespace: /pr2/whole_body_controller/base/follow_joint_trajectory

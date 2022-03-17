@@ -1,6 +1,6 @@
 parent: !include default.yaml
 # parent: robots/base_bot.yaml
-action_server:
+robot_interface:
   base:
     plugin: SendFollowJointTrajectory
     namespace: /xy

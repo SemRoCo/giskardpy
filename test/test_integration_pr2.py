@@ -250,7 +250,6 @@ class TestConstraints(object):
         """
         :type kitchen_setup: PR2
         """
-        # FIXME
         # FIXME bouncy
         tip = 'base_footprint'
         base_pose = PoseStamped()
@@ -1479,6 +1478,7 @@ class TestCartGoals(object):
             'r_wrist_roll_joint': 0.190433188769,
         }
         zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
         r_goal = PoseStamped()
@@ -1489,6 +1489,7 @@ class TestCartGoals(object):
                                                                       [0, 0, -1, 0],
                                                                       [0, 0, 0, 1]]))
         zero_pose.set_cart_goal(r_goal, zero_pose.l_tip, 'torso_lift_link')
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
         r_goal = PoseStamped()
@@ -1501,6 +1502,7 @@ class TestCartGoals(object):
         l_goal.pose.position.y = -.1
         l_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(l_goal, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef(self, zero_pose):
@@ -5099,9 +5101,41 @@ class TestConfigFile(object):
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
+
+class TestInfoServices(object):
+    def test_get_object_info(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        result = zero_pose.get_object_info('robot')
+        expected = {'head_pan_joint',
+                    'head_tilt_joint',
+                    'l_elbow_flex_joint',
+                    'l_forearm_roll_joint',
+                    'l_shoulder_lift_joint',
+                    'l_shoulder_pan_joint',
+                    'l_upper_arm_roll_joint',
+                    'l_wrist_flex_joint',
+                    'l_wrist_roll_joint',
+                    'odom_x_joint',
+                    'odom_y_joint',
+                    'odom_z_joint',
+                    'r_elbow_flex_joint',
+                    'r_forearm_roll_joint',
+                    'r_shoulder_lift_joint',
+                    'r_shoulder_pan_joint',
+                    'r_upper_arm_roll_joint',
+                    'r_wrist_flex_joint',
+                    'r_wrist_roll_joint',
+                    'torso_lift_joint'}
+        assert set(result.controlled_joints) == expected
+
+
+# time: *[1-9].
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_attached_collision2'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
+# pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])

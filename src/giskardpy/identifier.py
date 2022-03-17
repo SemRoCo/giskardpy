@@ -43,6 +43,8 @@ rosparam = ['rosparam']
 # config file
 # general options
 general_options = rosparam + ['general_options']
+control_mode = general_options + ['mode']
+action_server_name = general_options + ['action_server_name']
 gui = general_options + ['enable_gui']
 data_folder = general_options + ['path_to_data_folder']
 sample_period = general_options + ['sample_period']
@@ -118,5 +120,7 @@ added_self_collisions = self_collision_avoidance[:-1] + ['add']
 
 external_collision_avoidance = collision_avoidance + ['external_collision_avoidance', 'override']
 
-# action server
-action_server = rosparam + ['action_server']
+# robot interface
+robot_interface = rosparam + ['robot_interface']
+
+

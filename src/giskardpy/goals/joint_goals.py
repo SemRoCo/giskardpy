@@ -1,5 +1,9 @@
 from __future__ import division
 
+from typing import Union, Dict
+
+from sensor_msgs.msg import JointState
+
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
@@ -8,7 +12,8 @@ from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 
 class JointPositionContinuous(Goal):
 
-    def __init__(self, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1, hard=False, prefix=None, **kwargs):
+    def __init__(self, joint_name: str, goal: float, weight: float =WEIGHT_BELOW_CA, max_velocity: float = 1,
+                 hard: bool = False, prefix=None, **kwargs):
         """
         This goal will move a continuous joint to the goal position
         :param joint_name: str
@@ -65,13 +70,12 @@ class JointPositionContinuous(Goal):
 
 
 class JointPositionPrismatic(Goal):
-    def __init__(self, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1, hard=False, prefix=None, **kwargs):
+    def __init__(self, joint_name: str, goal: float, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 1,
+                 hard: bool = False, prefix=None, **kwargs):
         """
         This goal will move a prismatic joint to the goal position
-        :param joint_name: str
-        :param goal: float
-        :param weight: float, default WEIGHT_BELOW_CA
-        :param max_velocity: float, m/s, default 4535, meaning the urdf/config limits are active
+        :param weight: default WEIGHT_BELOW_CA
+        :param max_velocity: m/s, default 4535, meaning the urdf/config limits are active
         """
         self.joint_name = PrefixName(joint_name, prefix)
         self.goal = goal
@@ -137,7 +141,8 @@ class JointPositionPrismatic(Goal):
 
 class JointPositionRevolute(Goal):
 
-    def __init__(self, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1, hard=False, prefix=None, **kwargs):
+    def __init__(self, joint_name: str, goal: float, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 1,
+                 hard: bool = False, prefix=None, **kwargs):
         """
         This goal will move a revolute joint to the goal position
         :param joint_name: str
@@ -433,14 +438,16 @@ class AvoidJointLimitsPrismatic(Goal):
 
 
 class JointPositionList(Goal):
-    def __init__(self, goal_state, weight=None, max_velocity=None, hard: bool = False, prefix=None, **kwargs):
+    def __init__(self, goal_state: Union[Dict[str, float], JointState], weight: float = None,
+                 max_velocity: float = None, hard: bool = False, prefix=None, **kwargs):
         """
         This goal takes a joint state and adds the other JointPosition goals depending on their type
-        :param goal_state: JointState as json
-        :param weight: float, default is the default of the added joint goals
-        :param max_velocity: float, default is the default of the added joint goals
+        :param weight: default is the default of the added joint goals
+        :param max_velocity: default is the default of the added joint goals
         """
         super(JointPositionList, self).__init__(**kwargs)
+        if len(goal_state.name) == 0:
+            raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for i, joint_name in enumerate(goal_state.name):
             if not self.world.has_joint(PrefixName(joint_name, prefix)):
                 raise KeyError(f'unknown joint \'{joint_name}\'')
@@ -458,7 +465,8 @@ class JointPositionList(Goal):
 
 
 class JointPosition(Goal):
-    def __init__(self, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=100, prefix=None, **kwargs):
+    def __init__(self, joint_name: str, goal: float, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 100,
+                 prefix=None, **kwargs):
         super(JointPosition, self).__init__(**kwargs)
         joint_name = PrefixName(joint_name, prefix)
         if self.world.is_joint_continuous(joint_name):

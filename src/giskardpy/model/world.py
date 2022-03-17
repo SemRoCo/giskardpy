@@ -214,7 +214,12 @@ class WorldTree(object):
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         if name in self.groups:
             raise DuplicateNameException('Group with name {} already exists'.format(name))
-        self.groups[name] = SubWorldTree(name, root_link_name, self)
+        new_group = SubWorldTree(name, root_link_name, self)
+        # if the group is a subtree of a subtree, register it for the subtree as well
+        for group in self.groups.values():
+            if root_link_name in group.links:
+                group.groups[name] = new_group
+        self.groups[name] = new_group
 
     @property
     def group_names(self):
@@ -293,11 +298,11 @@ class WorldTree(object):
 
         helper(parsed_urdf, base_footprint)
 
-        self._set_free_variables_on_mimic_joints()
         if group_name is not None:
             self.register_group(group_name, odom.name)
         if self.god_map is not None:
             self.sync_with_paramserver()
+        self._set_free_variables_on_mimic_joints(group_name)
 
     def _add_fixed_joint(self, parent_link, child_link, joint_name=None):
         if joint_name is None:
@@ -332,8 +337,9 @@ class WorldTree(object):
         self._link_joint_to_links(diff_drive_joint, base_footprint)
         return base_footprint, odom
 
-    def _set_free_variables_on_mimic_joints(self):
-        for joint_name, joint in self.joints.items():  # type: (PrefixName, MimicJoint)
+    def _set_free_variables_on_mimic_joints(self, group_name):
+        # TODO prevent this from happening twice
+        for joint_name, joint in self.groups[group_name].joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
                 mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
                 joint.set_mimed_free_variable(mimed_joint.free_variable)
@@ -464,11 +470,14 @@ class WorldTree(object):
             d = KeyDefaultDict(default)
             new_weights[i] = d
             # self._set_joint_weights(i, d)
+        self.overwrite_joint_weights(new_weights)
+        self.notify_model_change()
+
+    def overwrite_joint_weights(self, new_weights):
         for joint_name in self.movable_joints:
             joint = self.joints[joint_name]
             if not self.is_joint_mimic(joint_name):
                 joint.update_weights(new_weights)
-        self.notify_model_change()
 
     @property
     def joint_constraints(self):
@@ -1006,6 +1015,18 @@ class SubWorldTree(WorldTree):
 
     def notify_model_change(self):
         raise NotImplementedError()
+
+    def get_link_short_name_match(self, link_name):
+        matches = []
+        for link_name2 in self.link_names:
+            if link_name == link_name2 or link_name == link_name2.short_name:
+                matches.append(link_name2)
+        if len(matches) > 1:
+            raise ValueError(f'Found multiple link matches {matches}.')
+        if len(matches) == 0:
+            raise KeyError('Found no link match.')
+        return matches[0]
+
 
     def reset_cache(self):
         try:

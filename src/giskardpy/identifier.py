@@ -123,4 +123,6 @@ external_collision_avoidance = collision_avoidance + ['external_collision_avoida
 # robot interface
 robot_interface = rosparam + ['robot_interface']
 
+# rnd stuff
+timer_collector = ['timer_collector']
 

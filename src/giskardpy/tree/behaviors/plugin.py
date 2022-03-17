@@ -5,13 +5,21 @@ from py_trees import Behaviour, Blackboard
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
+from giskardpy.utils.time_collector import TimeCollector
 
 
 class GiskardBehavior(Behaviour):
+    time_collector: TimeCollector
+
     def __init__(self, name):
         self.god_map = Blackboard().god_map  # type: GodMap
+        self.time_collector = self.god_map.unsafe_get_data(identifier.timer_collector)
         self.world = self.get_god_map().unsafe_get_data(identifier.world)  # type: WorldTree
         super(GiskardBehavior, self).__init__(name)
+
+    @property
+    def traj_time_in_sec(self):
+        return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     def get_god_map(self):
         """

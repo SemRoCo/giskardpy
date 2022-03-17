@@ -1,3 +1,5 @@
+from time import time
+
 from py_trees import Status
 
 import giskardpy.identifier as identifier
@@ -18,6 +20,7 @@ class ControllerPlugin(GiskardBehavior):
 
     @profile
     def initialise(self):
+        t = time()
         super(ControllerPlugin, self).initialise()
         constraints = self.get_god_map().get_data(identifier.constraints)
         vel_constraints = self.get_god_map().get_data(identifier.vel_constraints)
@@ -34,10 +37,13 @@ class ControllerPlugin(GiskardBehavior):
             solver_name=self.get_god_map().unsafe_get_data(identifier.qp_solver_name),
             retries_with_relaxed_constraints=self.get_god_map().unsafe_get_data(identifier.retries_with_relaxed_constraints),
             retry_added_slack=self.get_god_map().unsafe_get_data(identifier.retry_added_slack),
-            retry_weight_factor=self.get_god_map().unsafe_get_data(identifier.retry_weight_factor)
+            retry_weight_factor=self.get_god_map().unsafe_get_data(identifier.retry_weight_factor),
+            time_collector=self.time_collector
         )
 
         self.controller.compile()
+        t2 = time() - t
+        self.get_blackboard().runtime += t2
 
     @profile
     def update(self):

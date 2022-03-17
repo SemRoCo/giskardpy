@@ -1,6 +1,6 @@
 import keyword
 from collections import defaultdict
-from copy import deepcopy
+from copy import deepcopy, copy
 from multiprocessing import Queue
 from time import time
 
@@ -479,6 +479,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.tree.tick()
 
     def tear_down(self):
+        self.god_map.unsafe_get_data(identifier.timer_collector).print()
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
@@ -601,14 +602,16 @@ class GiskardTestWrapper(GiskardWrapper):
             kwargs['root_link'] = root_link
         if weight:
             kwargs['weight'] = weight
-        if linear_velocity:
-            kwargs['max_linear_velocity'] = linear_velocity
-        if angular_velocity:
-            kwargs['max_angular_velocity'] = angular_velocity
         if prefix:
             kwargs['prefix'] = prefix
-        self.set_translation_goal(**kwargs)
-        self.set_rotation_goal(**kwargs)
+        linear_kwargs = copy(kwargs)
+        if linear_velocity:
+            linear_kwargs['max_velocity'] = linear_velocity
+        self.set_translation_goal(**linear_kwargs)
+        angular_kwargs = copy(kwargs)
+        if angular_velocity:
+            angular_kwargs['max_velocity'] = angular_velocity
+        self.set_rotation_goal(**angular_kwargs)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, prefix=None, pointing_axis=None, weight=None):
         if len(self.robot_names) == 1:
@@ -812,11 +815,10 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                 pose=pose)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
-    def add_mesh(self, name='meshy', mesh='', frame_id='map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                 pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=mesh, frame_id=frame_id, position=position,
-                                                            orientation=orientation, pose=pose)
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
+    def add_mesh(self, name='meshy', mesh='', pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
+        response = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=mesh, pose=pose)
+        pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
+                                          position=pose.pose.position, orientation=pose.pose.orientation)
         self.check_add_object_result(response, expected_error_code, pose, name)
 
     def add_urdf(self, name, urdf, pose, js_topic='', set_js_topic=None,
@@ -884,7 +886,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.collision_scene.reset_cache()
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
-                                                                                    defaultdict(lambda: 0.3))
+                                                                                    defaultdict(lambda: 0.3), {})
         collisions = self.collision_scene.check_collisions(collision_matrix)
         controlled_parent_joint = self.robot().get_controlled_parent_joint_of_link(link)
         controlled_parent_link = self.robot().joints[controlled_parent_joint].child_link_name
@@ -1792,9 +1794,10 @@ class HSR(GiskardTestWrapper):
         'hand_l_spring_proximal_joint': 0,
         'hand_r_spring_proximal_joint': 0
     }
+    better_pose = default_pose
 
     def __init__(self):
-        self.tip = 'hand_palm_link'
+        self.tip = 'hand_gripper_tool_frame'
         super(HSR, self).__init__('package://giskardpy/config/hsr.yaml')
 
     def move_base(self, goal_pose):

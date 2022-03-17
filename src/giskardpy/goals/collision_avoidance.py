@@ -76,6 +76,7 @@ class ExternalCollisionAvoidance(Goal):
 
         map_P_pa = w.dot(map_T_a, a_P_pa)
 
+        # the position distance is not accurate, but the derivative is still correct
         dist = w.dot(map_V_n.T, map_P_pa)[0]
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
@@ -103,7 +104,10 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, self.num_repeller))
-
+        # if self.link_name == 'r_wrist_roll_link' and self.idx <= 1:
+        #     self.add_debug_expr('weight', weight)
+        #     self.add_debug_expr('dist', dist)
+        #     self.add_debug_expr('actual_distance', actual_distance)
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
                             upper_error=100,

@@ -14,6 +14,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
+from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import memoize, create_path
 
 
@@ -34,7 +35,10 @@ def save_pandas(dfs, names, path):
 
 
 class Parent(object):
-    def __init__(self, sample_period, prediction_horizon, order):
+    time_collector: TimeCollector
+
+    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
+        self.time_collector = time_collector
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.order = order
@@ -90,7 +94,7 @@ class H(Parent):
     def number_of_free_variables_with_horizon(self):
         h = 0
         for v in self.free_variables:
-            h += (v.order - 1) * self.prediction_horizon
+            h += (min(v.order, self.order) - 1) * self.prediction_horizon
         return h
 
     def number_of_constraint_vel_variables(self):
@@ -107,7 +111,7 @@ class H(Parent):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, v.order):
+                for o in range(1, min(v.order, self.order)):
                     weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o,
                                                                                            self.prediction_horizon)
         slack_weights = {}
@@ -176,8 +180,8 @@ class B(Parent):
         ub = defaultdict(dict)
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < v.order - 1 and self.prediction_horizon > 2:  # and False:
+                for o in range(1, min(v.order, self.order)):  # start with velocity
+                    if t == self.prediction_horizon - 1 and o < min(v.order, self.order) - 1 and self.prediction_horizon > 2:  # and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:
@@ -253,14 +257,14 @@ class BA(Parent):
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
-            for o in range(1, v.order - 1):
+            for o in range(1, min(v.order, self.order) - 1):
                 l_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_up(v.get_symbol(o), self.round_to)
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
-                for o in range(1, v.order - 1):
+                for o in range(1, min(v.order, self.order) - 1):
                     derivative_link[o]['t{:03d}/{}/{}/link'.format(t, o, v.name)] = 0
 
         lb_params = [lb]
@@ -280,8 +284,8 @@ class BA(Parent):
 
 
 class A(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order):
-        super(A, self).__init__(sample_period, prediction_horizon, order)
+    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order, time_collector):
+        super(A, self).__init__(sample_period, prediction_horizon, order, time_collector)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
@@ -396,9 +400,11 @@ class A(Parent):
         J_err = w.jacobian(w.Matrix(self.get_constraint_expressions()), self.get_free_variable_symbols(), order=1)
         J_vel *= self.sample_period
         J_err *= self.sample_period
-        logging.loginfo('computed Jacobian in {:.5f}s'.format(time() - t))
+        jac_time = time() - t
+        logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
+        self.time_collector.jacobians.append(jac_time)
 
         # position limits
         vertical_offset = number_of_joints * self.prediction_horizon
@@ -409,8 +415,8 @@ class A(Parent):
             A_soft[start:vertical_offset, :matrix_size] += I
 
         # derivative links
-        I = w.eye(number_of_joints * (self.order - 2) * self.prediction_horizon)
         block_size = number_of_joints * (self.order - 2) * self.prediction_horizon
+        I = w.eye(block_size)
         A_soft[vertical_offset:vertical_offset + block_size, :block_size] += I
         h_offset = number_of_joints * self.prediction_horizon
         A_soft[vertical_offset:vertical_offset + block_size, h_offset:h_offset + block_size] += -I * self.sample_period
@@ -488,10 +494,12 @@ class QPController(object):
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
+    time_collector: TimeCollector
 
     def __init__(self, sample_period, prediction_horizon, solver_name,
                  free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
-                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100):
+                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None):
+        self.time_collector = time_collector
         self.free_variables = []  # type: list[FreeVariable]
         self.constraints = []  # type: list[Constraint]
         self.velocity_constraints = []  # type: list[VelocityConstraint]
@@ -528,10 +536,11 @@ class QPController(object):
         """
         :type free_variables: list
         """
+        # TODO check for empty goals
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.name)))
         l = [x.name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = max(v.order for v in self.free_variables)
+        self.order = min(self.prediction_horizon + 1, max(v.order for v in self.free_variables))
         assert duplicates == set(), 'there are free variables with the same name: {}'.format(duplicates)
 
     def get_free_variable(self, name):
@@ -604,8 +613,9 @@ class QPController(object):
         free_symbols = list(free_symbols)
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              free_symbols)
-
-        logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(time() - t))
+        compilation_time = time() - t
+        logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(compilation_time))
+        self.time_collector.compilations.append(compilation_time)
         # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
@@ -713,10 +723,12 @@ class QPController(object):
         self.bA = BA(self.free_variables, self.constraints, self.velocity_constraints, self.sample_period,
                      self.prediction_horizon, self.order)
         self.A = A(self.free_variables, self.constraints, self.velocity_constraints, self.sample_period,
-                   self.prediction_horizon, self.order)
+                   self.prediction_horizon, self.order, self.time_collector)
 
         logging.loginfo('Constructing new controller with {} constraints and {} free variables...'.format(
             self.A.height, self.A.width))
+        self.time_collector.constraints.append(self.A.height)
+        self.time_collector.variables.append(self.A.width)
 
         self._init_big_ass_M()
 
@@ -869,10 +881,10 @@ class QPController(object):
         return split
 
     def b_names(self):
-        return self.b.names()
+        return self.b.names
 
     def bA_names(self):
-        return self.bA.names()
+        return self.bA.names
 
     def _viz_mpc(self, joint_name):
         def pad(a, desired_length):

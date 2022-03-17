@@ -11,16 +11,10 @@ from giskardpy.utils.utils import plot_trajectory
 class PlotTrajectory(GiskardBehavior):
     plot_thread: Thread
 
-    def __init__(self, name, enabled, history, velocity_threshold, scaling, normalize_position, tick_stride, wait=False,
-                 order=4):
+    def __init__(self, name, enabled, wait=False, **kwargs):
         super(PlotTrajectory, self).__init__(name)
-        self.order = order
-        self.history = history
-        self.velocity_threshold = velocity_threshold
-        self.scaling = scaling
-        self.normalize_position = normalize_position
-        self.tick_stride = tick_stride
         self.wait = wait
+        self.kwargs = kwargs
         self.path_to_data_folder = self.get_god_map().get_data(identifier.data_folder)
 
     @profile
@@ -38,13 +32,10 @@ class PlotTrajectory(GiskardBehavior):
                                 controlled_joints=controlled_joints,
                                 path_to_data_folder=self.path_to_data_folder,
                                 sample_period=sample_period,
-                                order=self.order,
-                                velocity_threshold=self.velocity_threshold,
-                                scaling=self.scaling,
-                                normalize_position=self.normalize_position,
-                                tick_stride=self.tick_stride,
-                                history=self.history)
+                                diff_after=2,
+                                **self.kwargs)
             except Exception as e:
+                logwarn(e)
                 logwarn('failed to save trajectory.pdf')
 
     @profile

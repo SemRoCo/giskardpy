@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
@@ -184,6 +184,72 @@ class TestConstraints(object):
         goal_point = tf.lookup_point('map', tip)
         better_pose.set_pointing_goal(tip, goal_point, root_link=tip)
 
+    def test_open_fridge(self, kitchen_setup):
+        """
+        :type kitchen_setup: Donbot
+        """
+        handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        handle_name = 'iai_fridge_door_handle'
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position = Point(0.3, -0.5, 0)
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        kitchen_setup.teleport_base(base_goal)
+
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.gripper_tip
+        tip_grasp_axis.vector.y = -1
+
+        kitchen_setup.set_json_goal('GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.gripper_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.4)
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.gripper_tip
+        x_gripper.vector.z = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        kitchen_setup.set_align_planes_goal(kitchen_setup.gripper_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
+        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.set_json_goal('Open',
+                                    tip_link=kitchen_setup.gripper_tip,
+                                    environment_link=handle_name,
+                                    goal_joint_state=1.5)
+        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.add_json_goal('AvoidJointLimits')
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 1.5})
+
+        kitchen_setup.set_json_goal('Open',
+                                    tip_link=kitchen_setup.gripper_tip,
+                                    environment_link=handle_name,
+                                    goal_joint_state=0)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 0})
+
+        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.plan_and_execute()
 
 class TestCartGoals(object):
     def test_cart_goal_1eef(self, zero_pose):
@@ -290,6 +356,27 @@ class TestCartGoals(object):
         better_pose.plan_and_execute()
         pass
 
+    def test_elbow_singularity2(self, zero_pose):
+        """
+        :type better_pose: Donbot
+        """
+        tip = 'ur5_wrist_1_link'
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = tip
+        hand_goal.pose.position.x = 0.5
+        hand_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(hand_goal, tip, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = tip
+        hand_goal.pose.position.x = -0.6
+        hand_goal.pose.orientation.w = 1
+        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.set_cart_goal(hand_goal, tip, 'base_footprint', weight=WEIGHT_BELOW_CA/2)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_base_driving(self, zero_pose):
         p = PoseStamped()
         p.header.frame_id = 'map'
@@ -310,7 +397,7 @@ class TestCartGoals(object):
         hand_goal = PoseStamped()
         hand_goal.header.frame_id = 'ur5_base_link'
         hand_goal.pose.position.x = 0.05
-        hand_goal.pose.position.y = -0.2
+        hand_goal.pose.position.y = 0.2
         hand_goal.pose.position.z = 0.4
         hand_goal.pose.orientation = Quaternion(*quaternion_from_matrix(
             [
@@ -323,8 +410,9 @@ class TestCartGoals(object):
         better_pose.allow_all_collisions()
         better_pose.set_cart_goal(hand_goal, 'ur5_wrist_2_link', 'base_footprint', weight=WEIGHT_BELOW_CA)
         better_pose.plan_and_execute()
-        hand_goal.pose.position.y = 0.05
+        hand_goal.pose.position.y = -0.05
         # better_pose.allow_all_collisions()
+        # better_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         better_pose.set_cart_goal(hand_goal, 'ur5_wrist_2_link', 'base_footprint', weight=WEIGHT_BELOW_CA)
         better_pose.plan_and_execute()
         pass
@@ -333,9 +421,37 @@ class TestCartGoals(object):
 class TestCollisionAvoidanceGoals(object):
     # kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
 
+    def test_open_gripper(self, kitchen_setup):
+        """
+        :type kitchen_setup: Donbot
+        """
+        kitchen_setup.open_gripper()
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 0.1
+        p.pose.orientation.w = 1
+        kitchen_setup.move_base(p)
+
+    def test_open_gripper2(self, better_pose):
+        """
+        :type better_pose: Donbot
+        """
+        better_pose.open_gripper()
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        better_pose.add_box(name='box',
+                            size=[1,1,1],
+                            pose=p)
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 0.1
+        p.pose.orientation.w = 1
+        better_pose.move_base(p)
+
     def test_attach_box(self, better_pose):
         """
-        :type zero_pose: PR2
+        :type zero_pose: Donbot
         """
         pocky = 'http://muh#pocky'
         p = PoseStamped()

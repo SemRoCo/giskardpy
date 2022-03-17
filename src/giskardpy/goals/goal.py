@@ -10,6 +10,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException
+from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
@@ -21,12 +22,7 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
 class Goal(object):
-    def __init__(self, god_map, control_horizon=None, **kwargs):
-        """
-        :type god_map: giskardpy.god_map.GodMap
-        :type control_horizon: int
-        :type kwargs: dict
-        """
+    def __init__(self, god_map: GodMap, control_horizon: int = None, **kwargs):
         self.god_map = god_map
         self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
         self._test_mode = self.god_map.get_data(identifier.test_mode)
@@ -285,6 +281,7 @@ class Goal(object):
 
     def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
         error = frame_P_goal[:3] - frame_P_current[:3]
+        # self.add_debug_expr('error', w.norm(error))
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
@@ -293,8 +290,6 @@ class Goal(object):
                                    name_suffixes=['{}/x'.format(name_suffix),
                                                   '{}/y'.format(name_suffix),
                                                   '{}/z'.format(name_suffix)])
-        if self._test_mode:
-            self.add_debug_expr('{}/error'.format(name_suffix), w.norm(error))
 
     def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4,
                                          name_suffix=''):
@@ -306,7 +301,8 @@ class Goal(object):
                                      upper_slack_limit=max_violation,
                                      name_suffix='{}/vel'.format(name_suffix))
         # if self._test_mode:
-        #     self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
+        #     # self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
+        #     self.add_debug_expr('trans_error', trans_error)
 
     def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
                                     weight=WEIGHT_BELOW_CA, name_suffix=''):
@@ -349,6 +345,8 @@ class Goal(object):
                                    name_suffixes=['{}/rot/x'.format(name_suffix),
                                                   '{}/rot/y'.format(name_suffix),
                                                   '{}/rot/z'.format(name_suffix)])
+        # if self._test_mode:
+        #     self.add_debug_expr('rot', w.axis_angle_from_quaternion(tip_Q_goal[0], tip_Q_goal[1], tip_Q_goal[2], tip_Q_goal[3])[1])
 
     def add_rotational_velocity_limit(self, frame_R_current, max_velocity, weight, max_violation=1e4, name_suffix=''):
         root_Q_tipCurrent = w.quaternion_from_matrix(frame_R_current)

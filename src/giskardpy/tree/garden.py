@@ -53,6 +53,7 @@ from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
 from giskardpy.utils.config_loader import get_namespaces
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
+from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
 
@@ -211,6 +212,7 @@ class TreeManager(object):
     @profile
     def from_param_server(cls):
         god_map = GodMap.init_from_paramserver(rospy.get_name())
+        god_map.set_data(identifier.timer_collector, TimeCollector(god_map))
         blackboard = Blackboard
         blackboard.god_map = god_map
         mode = god_map.get_data(identifier.control_mode)
@@ -550,7 +552,7 @@ class OpenLoop(TreeManager):
         if self.god_map.get_data(identifier.enable_CPIMarker) and self.god_map.get_data(
                 identifier.collision_checker) is not None:
             planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
-        planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
+        # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         planning_2.add_child(self.grow_planning3())
         return planning_2
 
@@ -645,7 +647,7 @@ class ClosedLoop(OpenLoop):
         return planning_3
 
     def grow_planning4(self):
-        planning_4 = PluginBehavior('planning IIII', hz=True)
+        planning_4 = PluginBehavior('planning IIII')
         action_servers = self.god_map.get_data(identifier.robot_interface)
         behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
         for i, (execution_action_server_name, params) in enumerate(action_servers.items()):

@@ -197,20 +197,27 @@ def create_path(path):
                 raise
 
 
+def cm_to_inch(cm):
+    return cm * 0.393701
 
 plot_lock = Lock()
 @profile
 def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0,
-                    scaling=0.2, normalize_position=False, tick_stride=1.0, file_name='trajectory.pdf', history=5):
+                    cm_per_second=0.2, normalize_position=False, tick_stride=1.0, file_name='trajectory.pdf', history=5,
+                    height_per_derivative=3.5, print_last_tick=False, legend=True, hspace=1, diff_after=2,
+                    y_limits=None):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     :param velocity_threshold: only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
-    :param scaling: determines how much the x axis is scaled with the length(time) of the trajectory
+    :param cm_per_second: determines how much the x axis is scaled with the length(time) of the trajectory
     :param normalize_position: centers the joint positions around 0 on the y axis
     :param tick_stride: the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
     """
+    cm_per_second = cm_to_inch(cm_per_second)
+    height_per_derivative = cm_to_inch(height_per_derivative)
+    hspace = cm_to_inch(hspace)
     with plot_lock:
         def ceil(val, base=0.0, stride=1.0):
             base = base % stride
@@ -232,23 +239,32 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         data = [[] for i in range(order)]
         times = []
         names = list(sorted([i for i in tj._points[0.0].keys() if i in controlled_joints]))
+        if diff_after > 3:
+            tj.delete_last()
         for time, point in tj.items():
             for i in range(order):
                 if i == 0:
                     data[0].append([point[joint_name].position for joint_name in names])
                 elif i == 1:
                     data[1].append([point[joint_name].velocity for joint_name in names])
+                elif i < diff_after and i == 2:
+                    data[2].append([point[joint_name].acceleration for joint_name in names])
+                elif i < diff_after and i == 3:
+                    data[3].append([point[joint_name].jerk for joint_name in names])
             times.append(time)
-        data[0] = np.array(data[0])
-        data[1] = np.array(data[1])
+
+
+        for i in range(0, order):
+            if i < diff_after:
+                data[i] = np.array(data[i])
+            else:
+                data[i] = np.diff(data[i - 1], axis=0, prepend=0) / sample_period
         if (normalize_position):
             data[0] = data[0] - (data[0].max(0) + data[0].min(0)) / 2
-        for i in range(2, order):
-            data[i] = np.diff(data[i - 1], axis=0, prepend=0) / sample_period
         times = np.array(times) * sample_period
 
-        f, axs = plt.subplots(order, sharex=True, gridspec_kw={'hspace': 0.2})
-        f.set_size_inches(w=(times[-1] - times[0]) * scaling, h=order * 3.5)
+        f, axs = plt.subplots(order, sharex=True, gridspec_kw={'hspace': hspace})
+        f.set_size_inches(w=(times[-1] - times[0]) * cm_per_second, h=order * height_per_derivative)
 
         plt.xlim(times[0], times[-1])
 
@@ -258,15 +274,18 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
             ticks = np.arange(first, last, tick_stride)
             ticks = np.insert(ticks, 0, times[0])
             ticks = np.append(ticks, last)
-            ticks = np.append(ticks, times[-1])
+            if print_last_tick:
+                ticks = np.append(ticks, times[-1])
             for i in range(order):
                 axs[i].set_title(titles[i])
                 axs[i].xaxis.set_ticks(ticks)
-                # axs[i].set_ylim([-0.5, 0.5])
+                if y_limits is not None:
+                    axs[i].set_ylim(y_limits)
         else:
             for i in range(order):
                 axs[i].set_title(titles[i])
-                # axs[i].set_ylim([-0.5, 0.5])
+                if y_limits is not None:
+                    axs[i].set_ylim(y_limits)
         color_counter = 0
         for i in range(len(controlled_joints)):
             if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
@@ -280,7 +299,8 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
                         pass
                 color_counter += 1
 
-        axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+        if legend:
+            axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
 
         axs[-1].set_xlabel('time [s]')
         for i in range(order):

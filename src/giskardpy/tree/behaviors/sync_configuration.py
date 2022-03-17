@@ -47,6 +47,7 @@ class SyncConfiguration(GiskardBehavior):
         while msg is None and not rospy.is_shutdown():
             try:
                 msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
+                self.lock.put(msg)
             except ROSException as e:
                 logging.logwarn('Waiting for topic \'/{}\' to appear.'.format(self.joint_state_topic))
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
@@ -71,4 +72,5 @@ class SyncConfiguration(GiskardBehavior):
             pass
 
         self.get_world().state.update(self.mjs)
+        # self.world.notify_state_change()
         return Status.RUNNING

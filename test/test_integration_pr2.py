@@ -161,6 +161,7 @@ class TestJointGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         js = {'r_wrist_roll_joint': -pi,
               'l_wrist_roll_joint': -2.1 * pi, }
         zero_pose.set_joint_goal(js)
@@ -202,22 +203,36 @@ class TestJointGoals(object):
 
 class TestConstraints(object):
     # TODO write buggy constraints that test sanity checks
+
+    def test_SetPredictionHorizon(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan_and_execute()
+
+
     def test_JointPositionRange(self, zero_pose):
         """
         :type zero_pose: PR2
         """
-        #FIXME
+        #FIXME needs to be implemented like other position limits, or override limits
         joint_name = 'head_pan_joint'
         lower_limit, upper_limit = zero_pose.robot.joints[joint_name].position_limits
         lower_limit *= 0.5
         upper_limit *= 0.5
+        zero_pose.set_joint_goal({
+            joint_name: 2
+        }, check=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
         zero_pose.set_json_goal('JointPositionRange',
                                 joint_name=joint_name,
                                 upper_limit=upper_limit,
                                 lower_limit=lower_limit)
-        zero_pose.set_joint_goal({
-            joint_name: 2
-        }, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         assert zero_pose.robot.state[joint_name].position <= upper_limit + 3e-3
@@ -235,16 +250,16 @@ class TestConstraints(object):
         assert zero_pose.robot.state[joint_name].position <= upper_limit
         assert zero_pose.robot.state[joint_name].position >= lower_limit
 
-        zero_pose.set_json_goal('JointPositionRange',
-                                joint_name=joint_name,
-                                upper_limit=10,
-                                lower_limit=9,
-                                hard=True)
-        zero_pose.set_joint_goal({
-            joint_name: 0
-        }, check=False)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
+        # zero_pose.set_json_goal('JointPositionRange',
+        #                         joint_name=joint_name,
+        #                         upper_limit=10,
+        #                         lower_limit=9,
+        #                         hard=True)
+        # zero_pose.set_joint_goal({
+        #     joint_name: 0
+        # }, check=False)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_CollisionAvoidanceHint(self, kitchen_setup):
         """
@@ -435,7 +450,6 @@ class TestConstraints(object):
         """
         :type zero_pose: PR2
         """
-        # FIXME
         base_linear_velocity = 0.1
         base_angular_velocity = 0.2
         zero_pose.limit_cartesian_velocity(
@@ -527,68 +541,48 @@ class TestConstraints(object):
             lower_limit2 = center - joint_range / 2. * (1 - percentage / 100.)
             assert upper_limit2 >= position >= lower_limit2
 
-    def test_UpdateGodMap(self, pocky_pose_setup):
+    def test_OverwriteWeights1(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
         """
-        # FIXME
-        joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
-        old_torso_value = pocky_pose_setup.god_map.get_data(
-            joint_velocity_weight + ['torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + ['odom_x_joint'])
+        # joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
+        # old_torso_value = pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights
+        # old_odom_x_value = pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
         r_goal.pose.orientation.w = 1
         r_goal.pose.position.x += 0.1
         updates = {
-            'rosparam': {
-                'general_options': {
-                    'joint_weights': {
-                        'velocity': {
-                            'override': {
-                                'odom_x_joint': 1000000,
-                                'odom_y_joint': 1000000,
-                                'odom_z_joint': 1000000
-                            }
-                        }
-                    }
-                }
-            }
+            1: {
+                'odom_x_joint': 1000000,
+                'odom_y_joint': 1000000,
+                'odom_z_joint': 1000000
+            },
         }
 
         old_pose = tf.lookup_pose('map', 'base_footprint')
 
-        pocky_pose_setup.update_god_map(updates)
+        pocky_pose_setup.overwrite_joint_weights(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip, check=False)
         pocky_pose_setup.plan_and_execute()
 
         new_pose = tf.lookup_pose('map', 'base_footprint')
         compare_poses(new_pose.pose, old_pose.pose)
 
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == 1000000
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1] == 1000000
+        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1], int)
 
         updates = {
-            'rosparam': {
-                'general_options': {
-                    'joint_weights': {
-                        'velocity': {
-                            'override': {
-                                'odom_x_joint': 0.0001,
-                                'odom_y_joint': 0.0001,
-                                'odom_z_joint': 0.0001
-                            }
-                        }
-                    }
-                }
-            }
+            1: {
+                'odom_x_joint': 0.0001,
+                'odom_y_joint': 0.0001,
+                'odom_z_joint': 0.0001,
+            },
         }
         # old_pose = tf.lookup_pose('map', 'base_footprint')
         # old_pose.pose.position.x += 0.1
-        pocky_pose_setup.update_god_map(updates)
+        pocky_pose_setup.overwrite_joint_weights(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.plan_and_execute()
 
@@ -596,15 +590,14 @@ class TestConstraints(object):
 
         # compare_poses(old_pose.pose, new_pose.pose)
         assert new_pose.pose.position.x >= 0.03
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == 0.0001
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1] == 0.0001
+        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+                              float)
         pocky_pose_setup.plan_and_execute()
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
+        assert not isinstance(pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1],
+                              float)
+        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+                              float)
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """
@@ -935,95 +928,95 @@ class TestConstraints(object):
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0})
 
-    def test_open_close_dishwasher_palm(self, kitchen_setup):
-        """
-        :type kitchen_setup: PR2
-        """
-        # FIXME
-        handle_frame_id = 'iai_kitchen/sink_area_dish_washer_door_handle'
-        handle_name = 'sink_area_dish_washer_door_handle'
-        hand = kitchen_setup.r_tip
-        goal_angle = np.pi / 3.5
-
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        p.pose.position.x = 0.5
-        p.pose.position.y = 0.2
-        kitchen_setup.teleport_base(p)
-
-        kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0.})
-
-        hand_goal = PoseStamped()
-        hand_goal.header.frame_id = handle_frame_id
-        hand_goal.pose.position.x -= 0.03
-        hand_goal.pose.position.z = 0.03
-        hand_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [1, 0, 0, 0],
-                                                                         [0, 0, 0, 1]]))
-        # kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_json_goal('CartesianVelocityLimit',
-                                    root_link='odom_combined',
-                                    tip_link='base_footprint',
-                                    max_linear_velocity=0.05,
-                                    max_angular_velocity=0.08,
-                                    )
-        kitchen_setup.set_cart_goal(hand_goal, hand)
-        kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING)
-
-        kitchen_setup.set_json_goal('Open',
-                                    tip_link=hand,
-                                    object_name='kitchen',
-                                    handle_link=handle_name,
-                                    goal_joint_state=goal_angle,
-                                    )
-
-        kitchen_setup.set_json_goal('CartesianVelocityLimit',
-                                    root_link='odom_combined',
-                                    tip_link='base_footprint',
-                                    max_linear_velocity=0.05,
-                                    max_angular_velocity=0.1,
-                                    )
-
-        kitchen_setup.set_json_goal('CartesianVelocityLimit',
-                                    root_link='odom_combined',
-                                    tip_link='r_forearm_link',
-                                    max_linear_velocity=0.1,
-                                    max_angular_velocity=0.5,
-                                    )
-
-        # kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': goal_angle})
-
-        kitchen_setup.set_json_goal('Open',
-                                    tip_link=hand,
-                                    object_name='kitchen',
-                                    handle_link=handle_name,
-                                    goal_joint_state=0,
-                                    )
-
-        kitchen_setup.set_json_goal('CartesianVelocityLimit',
-                                    root_link='odom_combined',
-                                    tip_link='base_footprint',
-                                    max_linear_velocity=0.05,
-                                    max_angular_velocity=0.1,
-                                    )
-
-        kitchen_setup.set_json_goal('CartesianVelocityLimit',
-                                    root_link='odom_combined',
-                                    tip_link='r_forearm_link',
-                                    max_linear_velocity=0.05,
-                                    max_angular_velocity=0.1,
-                                    )
-
-        # kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0})
-
-        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+    # def test_open_close_dishwasher_palm(self, kitchen_setup):
+    #     """
+    #     :type kitchen_setup: PR2
+    #     """
+    #     # FIXME
+    #     handle_frame_id = 'iai_kitchen/sink_area_dish_washer_door_handle'
+    #     handle_name = 'sink_area_dish_washer_door_handle'
+    #     hand = kitchen_setup.r_tip
+    #     goal_angle = np.pi / 3.5
+    #
+    #     p = PoseStamped()
+    #     p.header.frame_id = 'map'
+    #     p.pose.orientation.w = 1
+    #     p.pose.position.x = 0.5
+    #     p.pose.position.y = 0.2
+    #     kitchen_setup.teleport_base(p)
+    #
+    #     kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0.})
+    #
+    #     hand_goal = PoseStamped()
+    #     hand_goal.header.frame_id = handle_frame_id
+    #     hand_goal.pose.position.x -= 0.03
+    #     hand_goal.pose.position.z = 0.03
+    #     hand_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+    #                                                                      [0, -1, 0, 0],
+    #                                                                      [1, 0, 0, 0],
+    #                                                                      [0, 0, 0, 1]]))
+    #     # kitchen_setup.allow_all_collisions()
+    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
+    #                                 root_link='odom_combined',
+    #                                 tip_link='base_footprint',
+    #                                 max_linear_velocity=0.05,
+    #                                 max_angular_velocity=0.08,
+    #                                 )
+    #     kitchen_setup.set_cart_goal(hand_goal, hand)
+    #     kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING)
+    #
+    #     kitchen_setup.set_json_goal('Open',
+    #                                 tip_link=hand,
+    #                                 object_name='kitchen',
+    #                                 handle_link=handle_name,
+    #                                 goal_joint_state=goal_angle,
+    #                                 )
+    #
+    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
+    #                                 root_link='odom_combined',
+    #                                 tip_link='base_footprint',
+    #                                 max_linear_velocity=0.05,
+    #                                 max_angular_velocity=0.1,
+    #                                 )
+    #
+    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
+    #                                 root_link='odom_combined',
+    #                                 tip_link='r_forearm_link',
+    #                                 max_linear_velocity=0.1,
+    #                                 max_angular_velocity=0.5,
+    #                                 )
+    #
+    #     # kitchen_setup.allow_all_collisions()
+    #     kitchen_setup.plan_and_execute()
+    #     kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': goal_angle})
+    #
+    #     kitchen_setup.set_json_goal('Open',
+    #                                 tip_link=hand,
+    #                                 object_name='kitchen',
+    #                                 handle_link=handle_name,
+    #                                 goal_joint_state=0,
+    #                                 )
+    #
+    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
+    #                                 root_link='odom_combined',
+    #                                 tip_link='base_footprint',
+    #                                 max_linear_velocity=0.05,
+    #                                 max_angular_velocity=0.1,
+    #                                 )
+    #
+    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
+    #                                 root_link='odom_combined',
+    #                                 tip_link='r_forearm_link',
+    #                                 max_linear_velocity=0.05,
+    #                                 max_angular_velocity=0.1,
+    #                                 )
+    #
+    #     # kitchen_setup.allow_all_collisions()
+    #     kitchen_setup.plan_and_execute()
+    #     kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0})
+    #
+    #     kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+    #     kitchen_setup.plan_and_execute()
 
     def test_align_planes1(self, zero_pose):
         """
@@ -1304,7 +1297,6 @@ class TestConstraints(object):
         """"
         :type kitchen_setup: PR2
         """
-        # FIXME
         handle_name = [
             # 'oven_area_area_middle_upper_drawer_handle',
             'oven_area_area_middle_lower_drawer_handle',
@@ -1363,7 +1355,7 @@ class TestConstraints(object):
 
             kitchen_setup.set_json_goal('Open',
                                         tip_link=kitchen_setup.l_tip,
-                                        evironment_link=i_handle_name)
+                                        environment_link=i_handle_name)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
             kitchen_setup.plan_and_execute()  # send goal to Giskard
@@ -1373,7 +1365,7 @@ class TestConstraints(object):
             # Close drawer partially
             kitchen_setup.set_json_goal('Open',
                                         tip_link=kitchen_setup.l_tip,
-                                        evironment_link=i_handle_name,
+                                        environment_link=i_handle_name,
                                         goal_joint_state=0.2)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
@@ -1383,8 +1375,7 @@ class TestConstraints(object):
 
             kitchen_setup.set_json_goal('Close',
                                         tip_link=kitchen_setup.l_tip,
-                                        object_name='kitchen',
-                                        object_link_name=i_handle_name)
+                                        environment_link=i_handle_name)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
             kitchen_setup.plan_and_execute()  # send goal to Giskard
@@ -1522,13 +1513,14 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(0.599, -0.009, 0.983)
         p.pose.orientation = Quaternion(0.524, -0.495, 0.487, -0.494)
         zero_pose.allow_all_collisions()
-        zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, 'torso_lift_link')
         zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef3(self, zero_pose):
@@ -2719,7 +2711,11 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = 'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], '', [0.05, 0, 0],
+        p = PoseStamped()
+        zero_pose.attach_box(name=pocky,
+                             size=[0.1, 0.02, 0.02],
+                             parent_link='muh',
+                             pose=p,
                              expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
 
     def test_detach_unknown_object(self, zero_pose):
@@ -2746,7 +2742,12 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
-        req = UpdateWorldRequest(42, DEFAULT_WORLD_TIMEOUT, WorldBody(), True, PoseStamped())
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = WorldBody()
+        req.pose = PoseStamped()
+        req.parent_link = zero_pose.r_tip
+        req.operation = 42
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_missing_body_error(self, zero_pose):
@@ -2761,18 +2762,27 @@ class TestCollisionAvoidanceGoals(object):
         """
         p = PoseStamped()
         p.header.frame_id = 'base_link'
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
-                                 WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                                           shape=SolidPrimitive(type=42)), True, p)
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                             shape=SolidPrimitive(type=42))
+        req.pose = PoseStamped()
+        req.pose.header.frame_id = 'map'
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ATTACH
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
 
     def test_tf_error(self, zero_pose):
         """
         :type zero_pose: PR2
         """
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
-                                 WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                                           shape=SolidPrimitive(type=42)), False, PoseStamped())
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                             shape=SolidPrimitive(type=1))
+        req.pose = PoseStamped()
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ADD
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
@@ -2787,7 +2797,12 @@ class TestCollisionAvoidanceGoals(object):
         pose.pose.orientation = Quaternion(w=1)
         wb.type = WorldBody.URDF_BODY
 
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT, wb, True, pose)
+        req = UpdateWorldRequest()
+        req.timeout = DEFAULT_WORLD_TIMEOUT
+        req.body = wb
+        req.pose = pose
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ATTACH
         assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
 
     def test_infeasible(self, kitchen_setup):
@@ -3088,14 +3103,16 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type fake_table_setup: PR2
         """
+        # FIXME goes inside ?!
         r_goal = PoseStamped()
         r_goal.header.frame_id = 'map'
         r_goal.pose.position.x = 0.8
         r_goal.pose.position.y = -0.38
         r_goal.pose.position.z = 0.84
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        # fake_table_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         fake_table_setup.avoid_all_collisions(0.1)
-        fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip)
+        fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip, weight=WEIGHT_BELOW_CA)
         fake_table_setup.plan_and_execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
@@ -3623,9 +3640,14 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
+        # FIXME
         attached_link_name = 'pocky'
-        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
-        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 0.01
+        p.pose.orientation.w = 1
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, p)
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, p,
                              expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
@@ -4949,16 +4971,6 @@ class TestReachability(object):
 
 
 class TestConfigFile(object):
-    def test_prediction_horizon1(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute()
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan_and_execute()
-
     def test_bowl_and_cup_prediction_horizon1(self, kitchen_setup):
         """
         :type kitchen_setup: PR2

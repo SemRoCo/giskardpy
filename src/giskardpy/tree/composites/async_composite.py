@@ -1,6 +1,7 @@
 import traceback
 from collections import OrderedDict
 from threading import RLock, Thread
+from time import time
 
 import rospy
 from py_trees import Status, Blackboard
@@ -62,6 +63,7 @@ class PluginBehavior(GiskardBehavior):
     def init_plugins(self):
         for plugin in self._plugins.values():
             plugin.initialise()
+            # plugin.status = Status.RUNNING
 
     def is_running(self):
         return self.my_status == Status.RUNNING
@@ -95,6 +97,7 @@ class PluginBehavior(GiskardBehavior):
     def loop_over_plugins(self):
         try:
             # self.init_plugins()
+            self.get_blackboard().runtime = time()
             while self.is_running() and not rospy.is_shutdown():
                 for plugin_name, plugin in self._plugins.items():
                     with self.status_lock:

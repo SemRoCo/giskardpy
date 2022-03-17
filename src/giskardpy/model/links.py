@@ -1,8 +1,10 @@
 import os
+from collections import namedtuple
 
 import numpy as np
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose
+from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -15,6 +17,7 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 class LinkGeometry(object):
     def __init__(self, link_T_geometry):
+        self.color = ColorRGBA(1.0, 1.0, 1.0, 0.5)
         self.link_T_geometry = link_T_geometry
 
     @classmethod
@@ -69,10 +72,7 @@ class LinkGeometry(object):
 
     def as_visualization_marker(self):
         marker = Marker()
-        marker.color.a = 0.5
-        marker.color.r = 1.0
-        marker.color.g = 1.0
-        marker.color.b = 1.0
+        marker.color = self.color
 
         marker.pose = Pose()
         marker.pose = np_to_pose(self.link_T_geometry)
@@ -205,6 +205,11 @@ class Link(object):
         link.collisions.append(geometry)
         link.visuals.append(geometry)
         return link
+
+    def dye_collisions(self, color: ColorRGBA):
+        if self.has_collisions():
+            for collision in self.collisions:
+                collision.color = color
 
     def collision_visualization_markers(self):
         markers = MarkerArray()

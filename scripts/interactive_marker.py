@@ -1,19 +1,14 @@
 #!/usr/bin/env python
 import numpy as np
-from collections import defaultdict
 from copy import deepcopy
 
 import rospy
 from actionlib.simple_action_client import SimpleActionClient
 from geometry_msgs.msg import Pose, PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
-from giskard_msgs.msg._Controller import Controller
-from giskard_msgs.msg._MoveAction import MoveAction
-from giskard_msgs.msg._MoveCmd import MoveCmd
-from giskard_msgs.msg._MoveGoal import MoveGoal
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from interactive_markers.menu_handler import MenuHandler
-from tf.transformations import quaternion_multiply, quaternion_about_axis, quaternion_conjugate
+from tf.transformations import quaternion_multiply, quaternion_about_axis
 from visualization_msgs.msg import MarkerArray
 from visualization_msgs.msg._InteractiveMarker import InteractiveMarker
 from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerControl
@@ -21,8 +16,8 @@ from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerF
 from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.utils import qv_mult
-from giskardpy import logging
+from giskardpy.utils import logging
+from giskardpy.utils.math import qv_mult
 
 MARKER_SCALE = 0.15
 
@@ -33,14 +28,14 @@ class IMServer(object):
     Spawns interactive Marker which send cart goals to action server.
     Does not interact with god map.
     """
-    def __init__(self, root_tips, suffix=u''):
+    def __init__(self, root_tips, suffix=''):
         """
         :param root_tips: list containing root->tip tuple for each interactive marker.
         :type root_tips: list
         :param suffix: the marker will be called 'eef_control{}'.format(suffix)
         :type suffix: str
         """
-        self.enable_self_collision = rospy.get_param(u'~enable_self_collision', True)
+        self.enable_self_collision = rospy.get_param('~enable_self_collision', True)
         self.giskard = GiskardWrapper()
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
@@ -51,7 +46,7 @@ class IMServer(object):
         self.markers = {}
 
         # marker server
-        self.server = InteractiveMarkerServer(u'eef_control{}'.format(self.suffix))
+        self.server = InteractiveMarkerServer('eef_control{}'.format(self.suffix))
         self.menu_handler = MenuHandler()
 
 
@@ -104,7 +99,7 @@ class IMServer(object):
         int_marker.pose.orientation.w = 1
         int_marker.scale = MARKER_SCALE
 
-        int_marker.name = u'eef_{}_to_{}'.format(root_link, tip_link)
+        int_marker.name = 'eef_{}_to_{}'.format(root_link, tip_link)
 
         # insert a box
         self.make_sphere_control(int_marker)
@@ -112,44 +107,44 @@ class IMServer(object):
 
         if interaction_mode != InteractiveMarkerControl.NONE:
             control_modes_dict = {
-                InteractiveMarkerControl.MOVE_3D: u'MOVE_3D',
-                InteractiveMarkerControl.ROTATE_3D: u'ROTATE_3D',
-                InteractiveMarkerControl.MOVE_ROTATE_3D: u'MOVE_ROTATE_3D'}
-            int_marker.name += u'_' + control_modes_dict[interaction_mode]
+                InteractiveMarkerControl.MOVE_3D: 'MOVE_3D',
+                InteractiveMarkerControl.ROTATE_3D: 'ROTATE_3D',
+                InteractiveMarkerControl.MOVE_ROTATE_3D: 'MOVE_ROTATE_3D'}
+            int_marker.name += '_' + control_modes_dict[interaction_mode]
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(0, 0, 0, 1)
-        control.name = u'rotate_x'
+        control.name = 'rotate_x'
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(0, 0, 0, 1)
-        control.name = u'move_x'
+        control.name = 'move_x'
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
-        control.name = u'rotate_z'
+        control.name = 'rotate_z'
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
-        control.name = u'move_z'
+        control.name = 'move_z'
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 0, 1, 1))
-        control.name = u'rotate_y'
+        control.name = 'rotate_y'
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 0, 1, 1))
-        control.name = u'move_y'
+        control.name = 'move_y'
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
         self.markers[int_marker.name] = int_marker
@@ -179,24 +174,23 @@ class IMServer(object):
             self.root_link = root_link
             self.giskard = giskard
             self.enable_self_collision = enable_self_collision
-            self.marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
+            self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
 
 
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-                logging.loginfo(u'got interactive goal update')
+                logging.loginfo('got interactive goal update')
 
                 p = PoseStamped()
                 p.header.frame_id = feedback.header.frame_id
                 p.pose = feedback.pose
-
+                # self.giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
                 self.giskard.set_cart_goal(root_link=self.root_link,
                                            tip_link=self.tip_link,
                                            goal_pose=p)
 
                 if not self.enable_self_collision:
                     self.giskard.allow_self_collision()
-
                 self.giskard.plan_and_execute(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)
                 self.i_server.setPose(self.marker_name, Pose())
@@ -232,7 +226,7 @@ class IMServer(object):
             m.color.g = 0
             m.color.b = 0
             m.color.a = 1
-            m.ns = u'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
+            m.ns = 'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
             m.id = 0
             ma.markers.append(m)
             # y
@@ -247,7 +241,7 @@ class IMServer(object):
             m.color.g = 1
             m.color.b = 0
             m.color.a = 1
-            m.ns = u'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
+            m.ns = 'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
             m.id = 1
             ma.markers.append(m)
             # z
@@ -261,16 +255,16 @@ class IMServer(object):
             m.color.g = 0
             m.color.b = 1
             m.color.a = 1
-            m.ns = u'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
+            m.ns = 'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
             m.id = 2
             ma.markers.append(m)
             self.marker_pub.publish(ma)
 
 
 
-if __name__ == u'__main__':
-    rospy.init_node(u'giskard_interactive_marker')
-    root_tips = rospy.get_param(u'~interactive_marker_chains')
+if __name__ == '__main__':
+    rospy.init_node('giskard_interactive_marker')
+    root_tips = rospy.get_param('~interactive_marker_chains')
     im = IMServer(root_tips)
     while not rospy.is_shutdown():
         rospy.sleep(1)

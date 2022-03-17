@@ -2,17 +2,20 @@
 
 from __future__ import division
 
+import sys
+
 from defusedxml import minidom
 
 import rospy
 import random
-from Tkinter import *
+from tkinter import *   ## notice lowercase 't' in tkinter here
+
 from giskardpy.python_interface import GiskardWrapper
 # import xml.dom.minidom
 from sensor_msgs.msg import JointState
 from math import pi
 from control_msgs.msg import JointTrajectoryControllerState
-from giskardpy import logging
+from giskardpy.utils import logging
 
 
 def get_param(name, value=None):
@@ -146,7 +149,7 @@ class JointGoalPublisher(object):
     def __init__(self):
         description = get_param('robot_description')
 
-        self. giskard_wrapper = GiskardWrapper()
+        self.giskard_wrapper = GiskardWrapper()
 
         self.free_joints = {}
         self.joint_list = [] # for maintaining the original order of the joints
@@ -160,9 +163,7 @@ class JointGoalPublisher(object):
         #self.pub_def_vels = get_param("publish_default_velocities", False)
         #self.pub_def_efforts = get_param("publish_default_efforts", False)
 
-        msg = rospy.wait_for_message(u'/whole_body_controller/state', JointTrajectoryControllerState)
-        self.giskard_joints = msg.joint_names
-
+        self.giskard_joints = self.giskard_wrapper.get_controlled_joints()
 
         robot = minidom.parseString(description)
         if robot.getElementsByTagName('COLLADA'):
@@ -287,7 +288,7 @@ class JointGoalPublisherGui(Frame):
         """
         sets the value of every slider to its corresponding current joint state
         """
-        msg = rospy.wait_for_message(u'joint_states', JointState)
+        msg = rospy.wait_for_message('joint_states', JointState)
         for i in range(len(msg.name)):
             if msg.name[i] in self.sliders:
                 self.sliders[msg.name[i]].set(msg.position[i])

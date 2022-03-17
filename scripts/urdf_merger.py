@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 import rospy
-from giskardpy.urdf_object import URDFObject
+from giskardpy.model.urdf_object import URDFObject
 from geometry_msgs.msg import Pose, Point, Quaternion
-from giskardpy import logging
-
+from giskardpy.utils import logging
 
 while not rospy.has_param('/urdf_merger/urdf_sources'):
     logging.loginfo('waiting for rosparam /urdf_merger/urdf_sources')

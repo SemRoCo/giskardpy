@@ -1,19 +1,30 @@
+import errno
 import os
 import pickle
 
 import casadi as ca
-import errno
 import numpy as np
-from casadi import sign, cos, acos, sin, sqrt, atan2
+from casadi import sign, cos, sin, sqrt, atan2, acos, substitute
 from numpy import pi
 
-from giskardpy import logging
+from giskardpy.utils import logging
 
 pathSeparator = '_'
 
 # VERY_SMALL_NUMBER = 2.22507385851e-308
 VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
+
+
+def var(variables_names):
+    """
+    :type variables_names: str
+    :return:
+    """
+    symbols = []
+    for v in variables_names.split(' '):
+        symbols.append(Symbol(v))
+    return symbols
 
 
 def diag(*args):
@@ -26,8 +37,16 @@ def Symbol(data):
     return ca.SX(data)
 
 
-def jacobian(expressions, symbols):
-    return ca.jacobian(expressions, Matrix(symbols))
+def jacobian(expressions, symbols, order=1):
+    if order == 1:
+        return ca.jacobian(expressions, Matrix(symbols))
+    elif order == 2:
+        j = jacobian(expressions, symbols, order=1)
+        for i, symbol in enumerate(symbols):
+            j[:, i] = jacobian(j[:, i], symbol)
+        return j
+    else:
+        raise NotImplementedError('jacobian only supports order 1 and 2')
 
 
 def equivalent(expression1, expression2):
@@ -44,6 +63,10 @@ def is_matrix(expression):
 
 def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
+
+
+def create_symbols(names):
+    return [Symbol(x) for x in names]
 
 
 def compile_and_execute(f, params):
@@ -87,7 +110,7 @@ def Matrix(data):
     try:
         return ca.SX(data)
     except NotImplementedError:
-        if hasattr(data, u'shape'):
+        if hasattr(data, 'shape'):
             m = ca.SX(*data.shape)
         else:
             x = len(data)
@@ -108,11 +131,24 @@ def Matrix(data):
         return m
 
 
+def matrix_to_list(m):
+    try:
+        len(m)
+        return m
+    except:
+        return [m[i] for i in range(m.shape[0])]
+
+
+
 def zeros(x, y):
     return ca.SX.zeros(x, y)
 
 
-def Abs(x):
+def ones(x, y):
+    return ca.SX.ones(x, y)
+
+
+def abs(x):
     """
     :type x: Union[float, Symbol]
     :return: abs(x)
@@ -121,11 +157,11 @@ def Abs(x):
     return ca.fabs(x)
 
 
-def Max(x, y):
+def max(x, y):
     return ca.fmax(x, y)
 
 
-def Min(x, y):
+def min(x, y):
     """
     !gets very imprecise if inputs outside of [-1e7,1e7]!
     :type x: Union[float, Symbol]
@@ -136,9 +172,13 @@ def Min(x, y):
     return ca.fmin(x, y)
 
 
+def limit(x, lower_limit, upper_limit):
+    return max(lower_limit, min(upper_limit, x))
+
 
 def if_greater(a, b, if_result, else_result):
     return ca.if_else(ca.gt(a, b), if_result, else_result)
+
 
 def if_less(a, b, if_result, else_result):
     return ca.if_else(ca.lt(a, b), if_result, else_result)
@@ -153,9 +193,9 @@ def if_greater_zero(condition, if_result, else_result):
     :rtype: Union[float, Symbol]
     """
     _condition = sign(condition)  # 1 or -1
-    _if = Max(0, _condition) * if_result  # 0 or if_result
-    _else = -Min(0, _condition) * else_result  # 0 or else_result
-    return _if + _else + (1 - Abs(_condition)) * else_result  # if_result or else_result
+    _if = max(0, _condition) * if_result  # 0 or if_result
+    _else = -min(0, _condition) * else_result  # 0 or else_result
+    return _if + _else + (1 - abs(_condition)) * else_result  # if_result or else_result
 
 
 def if_greater_eq_zero(condition, if_result, else_result):
@@ -224,18 +264,18 @@ def safe_compiled_function(f, file_name):
                 raise
     with open(file_name, 'w') as file:
         pickle.dump(f, file)
-        logging.loginfo(u'saved {}'.format(file_name))
+        logging.loginfo('saved {}'.format(file_name))
 
 
 def load_compiled_function(file_name):
     if os.path.isfile(file_name):
         try:
-            with open(file_name, u'r') as file:
+            with open(file_name, 'r') as file:
                 fast_f = pickle.load(file)
                 return fast_f
         except EOFError as e:
             os.remove(file_name)
-            logging.logerr(u'{} deleted because it was corrupted'.format(file_name))
+            logging.logerr('{} deleted because it was corrupted'.format(file_name))
 
 
 class CompiledFunction(object):
@@ -264,7 +304,7 @@ class CompiledFunction(object):
         return self.out
 
 
-def speed_up(function, parameters, backend=u'clang'):
+def speed_up(function, parameters, backend='clang') -> CompiledFunction:
     str_params = [str(x) for x in parameters]
     try:
         f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])
@@ -477,6 +517,10 @@ def eye(size):
     return ca.SX.eye(size)
 
 
+def kron(m1, m2):
+    return ca.kron(m1, m2)
+
+
 def inverse_frame(frame):
     """
     :param frame: 4x4 Matrix
@@ -533,7 +577,10 @@ def trace(matrix):
     :type matrix: Matrix
     :rtype: Union[float, Symbol]
     """
-    return sum(matrix[i, i] for i in range(matrix.shape[0]))
+    s = 0
+    for i in range(matrix.shape[0]):
+        s += matrix[i, i]
+    return s
 
 
 def rotation_distance(a_R_b, a_R_c):
@@ -548,9 +595,18 @@ def rotation_distance(a_R_b, a_R_c):
     difference = dot(a_R_b.T, a_R_c)
     # return axis_angle_from_matrix(difference)[1]
     angle = (trace(difference[:3, :3]) - 1) / 2
-    angle = Min(angle, 1)
-    angle = Max(angle, -1)
+    angle = min(angle, 1)
+    angle = max(angle, -1)
     return acos(angle)
+
+
+def vstack(list_of_matrices):
+    return ca.vertcat(*list_of_matrices)
+
+
+def hstack(list_of_matrices):
+    return ca.horzcat(*list_of_matrices)
+
 
 def asdf(a_R_b, a_R_c):
     """
@@ -578,17 +634,17 @@ def axis_angle_from_matrix(rotation_matrix):
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
     cos_angle = (trace(rm[:3, :3]) - 1) / 2
-    cos_angle = Min(cos_angle, 1)
-    cos_angle = Max(cos_angle, -1)
+    cos_angle = min(cos_angle, 1)
+    cos_angle = max(cos_angle, -1)
     angle = acos(cos_angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
     n = sqrt(x * x + y * y + z * z)
 
-    axis = Matrix([if_eq(Abs(cos_angle), 1, 0, x / n),
-                   if_eq(Abs(cos_angle), 1, 0, y / n),
-                   if_eq(Abs(cos_angle), 1, 1, z / n)])
+    axis = Matrix([if_eq(abs(cos_angle), 1, 0, x / n),
+                   if_eq(abs(cos_angle), 1, 0, y / n),
+                   if_eq(abs(cos_angle), 1, 1, z / n)])
     return axis, angle
 
 
@@ -604,12 +660,18 @@ def axis_angle_from_quaternion(x, y, z, w):
     l = norm(Matrix([x, y, z, w]))
     x, y, z, w = x / l, y / l, z / l, w / l
     w2 = sqrt(1 - w ** 2)
-    angle = (2 * acos(Min(Max(-1, w), 1)))
     m = if_eq_zero(w2, 1, w2)  # avoid /0
+    angle = if_eq_zero(w2, 0, (2 * acos(min(max(-1, w), 1))))
     x = if_eq_zero(w2, 0, x / m)
     y = if_eq_zero(w2, 0, y / m)
     z = if_eq_zero(w2, 1, z / m)
     return Matrix([x, y, z]), angle
+
+
+def normalize_axis_angle(axis, angle):
+    axis = if_less(angle, 0, -axis, axis)
+    angle = abs(angle)
+    return axis, angle
 
 
 def quaternion_from_axis_angle(axis, angle):
@@ -657,14 +719,14 @@ def rpy_from_matrix(rotation_matrix):
     cy = sqrt(rotation_matrix[i, i] * rotation_matrix[i, i] + rotation_matrix[j, i] * rotation_matrix[j, i])
     if0 = cy - _EPS
     ax = if_greater_zero(if0,
-                                  atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
-                                  atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
+                         atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
+                         atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
     ay = if_greater_zero(if0,
-                                  atan2(-rotation_matrix[k, i], cy),
-                                  atan2(-rotation_matrix[k, i], cy))
+                         atan2(-rotation_matrix[k, i], cy),
+                         atan2(-rotation_matrix[k, i], cy))
     az = if_greater_zero(if0,
-                                  atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
-                                  0)
+                         atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
+                         0)
     return ax, ay, az
 
 
@@ -747,14 +809,14 @@ def quaternion_from_matrix(matrix):
 
     t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
     q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
-                                    if_greater_zero(if2, m_i_j + m_j_i,
-                                                             if_greater_zero(if1, m_k_i + m_i_k, t)))
+                           if_greater_zero(if2, m_i_j + m_j_i,
+                                           if_greater_zero(if1, m_k_i + m_i_k, t)))
     q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
-                                    if_greater_zero(if2, m_k_i + m_i_k,
-                                                             if_greater_zero(if1, t, m_i_j + m_j_i)))
+                           if_greater_zero(if2, m_k_i + m_i_k,
+                                           if_greater_zero(if1, t, m_i_j + m_j_i)))
     q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
-                                    if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i,
-                                                                                              m_k_i + m_i_k)))
+                           if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i,
+                                                                   m_k_i + m_i_k)))
     q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
 
     q *= 0.5 / sqrt(t * M[3, 3])
@@ -815,7 +877,7 @@ def cosine_distance(v0, v1):
     :type v1: Matrix
     :rtype: Union[float, Symbol]
     """
-    return 1 - ((dot(v0.T, v1))[0] / (norm(v0)*norm(v1)))
+    return 1 - ((dot(v0.T, v1))[0] / (norm(v0) * norm(v1)))
 
 
 def euclidean_distance(v1, v2):
@@ -885,16 +947,16 @@ def quaternion_slerp(q1, q2, t):
     q2 = if_greater_zero(if0, -q2, q2)
     cos_half_theta = if_greater_zero(if0, -cos_half_theta, cos_half_theta)
 
-    if1 = Abs(cos_half_theta) - 1.0
+    if1 = abs(cos_half_theta) - 1.0
 
     # enforce acos(x) with -1 < x < 1
-    cos_half_theta = Min(1, cos_half_theta)
-    cos_half_theta = Max(-1, cos_half_theta)
+    cos_half_theta = min(1, cos_half_theta)
+    cos_half_theta = max(-1, cos_half_theta)
 
     half_theta = acos(cos_half_theta)
 
     sin_half_theta = sqrt(1.0 - cos_half_theta * cos_half_theta)
-    if2 = 0.001 - Abs(sin_half_theta)
+    if2 = 0.001 - abs(sin_half_theta)
 
     ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
     ratio_b = save_division(sin(t * half_theta), sin_half_theta)
@@ -904,6 +966,16 @@ def quaternion_slerp(q1, q2, t):
                                               0.5 * q1 + 0.5 * q2,
                                               ratio_a * q1 + ratio_b * q2))
 
+
+def scale_quaternion(q, angle):
+    axis, _ = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
+    return quaternion_from_axis_angle(axis, angle)
+
+
+def quaternion_angle(q):
+    return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])[1]
+
+
 def slerp(v1, v2, t):
     """
     spherical linear interpolation
@@ -912,9 +984,11 @@ def slerp(v1, v2, t):
     :param t: value between 0 and 1. 0 is v1 and 1 is v2
     :return:
     """
-    angle = acos(dot(v1.T, v2)[0])
-    return (sin((1-t)*angle)/sin(angle))*v1 + (sin(t*angle)/sin(angle))*v2
-
+    angle = save_acos(dot(v1.T, v2)[0])
+    angle2 = if_eq(angle, 0, 1, angle)
+    return if_eq(angle, 0,
+                 v1,
+                 (sin((1 - t) * angle2) / sin(angle2)) * v1 + (sin(t * angle2) / sin(angle2)) * v2)
 
 
 def to_numpy(matrix):
@@ -924,6 +998,11 @@ def to_numpy(matrix):
 def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
+
+
+def save_acos(angle):
+    angle = limit(angle, -1, 1)
+    return acos(angle)
 
 
 def entrywise_product(matrix1, matrix2):
@@ -948,7 +1027,17 @@ def ceil(x):
     return ca.ceil(x)
 
 
-def Sum(matrix):
+def round_up(x, decimal_places):
+    f = 10 ** (decimal_places)
+    return ceil(x * f) / f
+
+
+def round_down(x, decimal_places):
+    f = 10 ** (decimal_places)
+    return floor(x * f) / f
+
+
+def sum(matrix):
     """
     the equivalent to np.sum(matrix)
     """
@@ -985,7 +1074,7 @@ def distance_point_to_line_segment(point, line_start, line_end):
     line_unitvec = line_vec / line_len
     pnt_vec_scaled = pnt_vec / line_len
     t = dot(line_unitvec.T, pnt_vec_scaled)[0]
-    t = Min(Max(t, 0.0), 1.0)
+    t = min(max(t, 0.0), 1.0)
     nearest = line_vec * t
     dist = norm(nearest - pnt_vec)
     nearest = nearest + line_start
@@ -996,3 +1085,140 @@ def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+
+
+def velocity_limit_from_position_limit(acceleration_limit, position_limit, current_position, step_size, eps=1e-5):
+    """
+    Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
+    :param acceleration_limit:
+    :param distance_to_position_limit: 
+    :param step_size: 
+    :param eps: 
+    :return: 
+    """
+    distance_to_position_limit = position_limit - current_position
+    acceleration_limit *= step_size
+    distance_to_position_limit /= step_size
+    m = 1 / acceleration_limit
+    acceleration_limit *= m
+    distance_to_position_limit *= m
+    sign_ = sign(distance_to_position_limit)
+    error = abs(distance_to_position_limit)
+    # reverse gausssche summenformel to compute n from sum
+    n = sqrt(2 * error + (1 / 4)) - 1 / 2
+    # round up if very close to the ceiling to avoid precision errors
+    n = if_less(1 - (n - floor(n)), eps, np.ceil(n), np.floor(n))
+    error_rounded = (n ** 2 + n) / 2
+    rest = error - error_rounded
+    rest = rest / (n + 1)
+    velocity_limit = n + rest
+    velocity_limit *= sign_
+    velocity_limit /= m
+    return velocity_limit
+
+
+def position_with_max_velocity(velocity_limit, jerk_limit):
+    t = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    return -t * velocity_limit
+
+
+def t_til_pos2(position_error, jerk_limit):
+    return (position_error / (2 * jerk_limit)) ** (1 / 3)
+
+
+def position_till_b(jerk_limit, t):
+    return (1 / 6) * jerk_limit * t ** 3
+
+
+def position_till_a(jerk_limit, t, t_offset, velocity_limit):
+    return (
+                   1 / 6) * jerk_limit * t ** 3 - 0.5 * jerk_limit * t_offset * t ** 2 + 0.5 * jerk_limit * t_offset ** 2 * t + velocity_limit * t
+
+
+def velocity(velocity_limit, jerk_limit, t):
+    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    t_a = t_b * 2
+    if t < t_b:
+        return velocity_limit + 0.5 * jerk_limit * t ** 2
+    if t < t_a:
+        t -= t_a
+        return -0.5 * jerk_limit * t ** 2
+    return velocity_limit
+
+
+def position(jerk_limit, t, velocity_limit):
+    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    t_a = t_b * 2
+    if t < t_b:
+        return (1 / 6) * jerk_limit * t ** 3 + velocity_limit * t - velocity_limit * t_b
+    if t < t_a:
+        t -= t_a
+        return -(1 / 6) * jerk_limit * t ** 3
+    return velocity_limit * t
+
+
+def compute_t_from_position(jerk_limit, position_error, velocity_limit):
+    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    a = position_with_max_velocity(velocity_limit, jerk_limit)
+    b = -(1 / 6) * jerk_limit * (-t_b) ** 3
+    t_a = t_b * 2
+    if position_error < b:
+        asdf = (-(6 * position_error) / jerk_limit)
+        return np.sign(asdf) * np.abs(asdf) ** (1 / 3) + t_a
+    if position_error < a:
+        return np.real(-1.44224957030741 * (-0.5 - 0.866025403784439j) * \
+                       (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
+                               8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j) + (1 / 6) *
+                        (-6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (1 / 3) \
+                       + 1.38672254870127 * velocity_limit * (-0.5 + 0.866025403784439j) / \
+                       (jerk_limit * (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
+                               8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j)
+                                      + (1 / 6) * (
+                                              -6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (
+                                1 / 3)))
+    return 0
+
+
+def jerk_limits_from_everything(position_limit, velocity_limit, jerk_limit, current_position, current_velocity,
+                                current_acceleration, t, step_size, eps=1e-5):
+    """
+    Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
+    :param acceleration_limit:
+    :param distance_to_position_limit:
+    :param step_size:
+    :param eps:
+    :return:
+    """
+    # p(t) describes slowdown with max vel/jerk down to 0
+    # 1. get t from p(t)=position_limit - current_position
+    # 2. plug t into v(t) to get vel limit
+
+    a = position_with_max_velocity(velocity_limit, jerk_limit)
+    t_b = t_til_pos2(a, jerk_limit)
+    t_a = t_b * 2
+
+
+def to_str(expression):
+    """
+    Turns expression into a more or less readable string.
+    """
+    s = str(expression)
+    parts = s.split(', ')
+    result = parts[-1]
+    for x in reversed(parts[:-1]):
+        index, sub = x.split('=')
+        if index not in result:
+            raise Exception('fuck')
+        result = result.replace(index, sub)
+    return result
+    pass
+
+
+def total_derivative(expr, symbols, symbols_dot):
+    expr_jacobian = jacobian(expr, symbols)
+    last_velocities = Matrix(symbols_dot)
+    velocity = dot(expr_jacobian, last_velocities)
+    if velocity.shape[0] * velocity.shape[0] == 1:
+        return velocity[0]
+    else:
+        return velocity

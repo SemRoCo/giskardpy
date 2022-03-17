@@ -1,33 +1,30 @@
 import shutil
-from collections import defaultdict
+from itertools import combinations
 
-import giskardpy
-
-giskardpy.WORLD_IMPLEMENTATION = None
-
-from giskardpy.robot import Robot
 import pytest
-from geometry_msgs.msg import Pose, Point, Quaternion
+import urdf_parser_py.urdf as up
+from geometry_msgs.msg import Pose
+from hypothesis import given
+
 from giskard_msgs.msg import CollisionEntry
-import test_urdf_object
-from giskardpy.exceptions import DuplicateNameException, PhysicsWorldException, UnknownBodyException
-from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, pr2_without_base_urdf
-from giskardpy.utils import make_world_body_box
-from giskardpy.world import World
-from giskardpy.world_object import WorldObject
-import numpy as np
+from giskardpy import identifier, RobotName, RobotPrefix
+from giskardpy.data_types import JointStates, PrefixName
+from giskardpy.exceptions import DuplicateNameException
+from giskardpy.god_map import GodMap
+from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
+from giskardpy.model.world import WorldTree
+from giskardpy.utils.config_loader import ros_load_robot_config
+from giskardpy.utils.utils import suppress_stderr
+from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, rnd_joint_state, hsr_urdf
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def module_setup(request):
     pass
 
 
 @pytest.fixture()
 def function_setup(request, module_setup):
-    """
-    :rtype: WorldObject
-    """
     pass
 
 
@@ -36,13 +33,13 @@ def test_folder(request):
     """
     :rtype: str
     """
-    folder_name = u'tmp_data/'
+    folder_name = 'tmp_data/'
 
     def delete_test_folder():
         try:
             shutil.rmtree(folder_name)
         except OSError:
-            print(u'couldn\'t delete test folder')
+            print('couldn\'t delete test folder')
 
     request.addfinalizer(delete_test_folder)
     return folder_name
@@ -53,7 +50,7 @@ def delete_test_folder(request):
     """
     :rtype: World
     """
-    folder_name = u'tmp_data/'
+    folder_name = 'tmp_data/'
     try:
         shutil.rmtree(folder_name)
     except:
@@ -63,7 +60,7 @@ def delete_test_folder(request):
         try:
             shutil.rmtree(folder_name)
         except OSError:
-            print(u'couldn\'t delete test folder')
+            print('couldn\'t delete test folder')
 
     request.addfinalizer(delete_test_folder)
 
@@ -90,998 +87,487 @@ def avoid_all_entry(min_dist):
     return ce
 
 
-class TestWorldObj(test_urdf_object.TestUrdfObject):
-    cls = WorldObject
-
-    def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.init_self_collision_matrix()
-        scm = r.get_self_collision_matrix()
-        r.safe_self_collision_matrix(test_folder)
-        r.load_self_collision_matrix(test_folder)
-        assert scm == r.get_self_collision_matrix()
-
-    def test_safe_load_collision_matrix2(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.init_self_collision_matrix()
-        scm = r.get_self_collision_matrix()
-
-        box = self.cls.from_world_body(make_world_body_box())
-        p = Pose()
-        p.position = Point(0, 0, 0)
-        p.orientation = Quaternion(0, 0, 0, 1)
-        r.attach_urdf_object(box, u'gripper_tool_frame', p)
-        r.update_self_collision_matrix()
-        scm_with_obj = r.get_self_collision_matrix()
-
-        r.detach_sub_tree(box.get_name())
-        r.load_self_collision_matrix(test_folder)
-        assert scm == r.get_self_collision_matrix()
-
-        r.attach_urdf_object(box, u'gripper_tool_frame', p)
-        r.load_self_collision_matrix(test_folder)
-        assert scm_with_obj == r.get_self_collision_matrix()
-
-    def test_base_pose1(self, function_setup):
-        parsed_pr2 = self.cls(pr2_urdf())
-        p = Pose()
-        p.orientation.w = 1
-        parsed_pr2.base_pose = p
-        assert parsed_pr2.base_pose == p
-
-    def test_base_pose2(self, function_setup):
-        parsed_pr2 = self.cls(pr2_urdf())
-        p = Pose()
-        p.orientation.w = 10
-        parsed_pr2.base_pose = p
-        orientation = parsed_pr2.base_pose.orientation
-        orientation_vector = [orientation.x,
-                              orientation.y,
-                              orientation.z,
-                              orientation.w]
-        assert np.linalg.norm(orientation_vector) == 1
-
-    def test_joint_state(self, function_setup):
-        parsed_pr2 = self.cls(pr2_urdf())
-        js = parsed_pr2.get_zero_joint_state()
-        parsed_pr2.joint_state = js
-        assert parsed_pr2.joint_state == js
-
-    def test_controlled_joints(self, function_setup):
-        controlled_joints = [u'torso_lift_joint']
-        wo = self.cls(pr2_urdf(), controlled_joints=controlled_joints)
-        assert wo.controlled_joints == controlled_joints
+def world_with_robot(urdf, prefix):
+    god_map = GodMap()
+    god_map.set_data(identifier.rosparam, ros_load_robot_config('package://giskardpy/config/default.yaml'))
+    world = WorldTree(god_map)
+    god_map.set_data(identifier.world, world)
+    world.add_urdf(urdf, prefix=prefix, group_name=RobotName)
+    return world
 
 
-class TestRobot(TestWorldObj):
-    cls = Robot
-
-    def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        scm = r.get_self_collision_matrix()
-        assert len(scm) == 0
-
-    def test_get_controlled_leaf_joints(self, test_folder, delete_test_folder):
-        r = self.cls(pr2_urdf(), path_to_data_folder=test_folder)
-        r.controlled_joints = [u'torso_lift_joint',
-                               u'r_upper_arm_roll_joint',
-                               u'r_shoulder_pan_joint',
-                               u'r_shoulder_lift_joint',
-                               u'r_forearm_roll_joint',
-                               u'r_elbow_flex_joint',
-                               u'r_wrist_flex_joint',
-                               u'r_wrist_roll_joint',
-                               u'l_upper_arm_roll_joint',
-                               u'l_shoulder_pan_joint',
-                               u'l_shoulder_lift_joint',
-                               u'l_forearm_roll_joint',
-                               u'l_elbow_flex_joint',
-                               u'l_wrist_flex_joint',
-                               u'l_wrist_roll_joint',
-                               u'head_pan_joint',
-                               u'head_tilt_joint',
-                               u'odom_x_joint',
-                               u'odom_y_joint',
-                               u'odom_z_joint']
-
-        r = r.get_controlled_leaf_joints()
-        assert r == {
-            'l_wrist_roll_joint', 'r_wrist_roll_joint', 'odom_z_joint', 'l_forearm_roll_joint', 'torso_lift_joint',
-            'head_tilt_joint', 'r_forearm_roll_joint'
-        }
-
-    def test_get_controlled_leaf_joints2(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.controlled_joints = [u'ur5_shoulder_pan_joint',
-                               u'ur5_shoulder_lift_joint',
-                               u'ur5_elbow_joint',
-                               u'ur5_wrist_1_joint',
-                               u'ur5_wrist_2_joint',
-                               u'ur5_wrist_3_joint',
-                               u'odom_x_joint',
-                               u'odom_y_joint',
-                               u'odom_z_joint']
-
-        r = r.get_controlled_leaf_joints()
-        assert r == {
-            'odom_z_joint', 'ur5_wrist_3_joint'
-        }
-
-    def test_get_directly_controllable_collision_links(self, test_folder, delete_test_folder):
-        r = self.cls(pr2_urdf(), path_to_data_folder=test_folder)
-        r.controlled_joints = [u'torso_lift_joint',
-                               u'r_upper_arm_roll_joint',
-                               u'r_shoulder_pan_joint',
-                               u'r_shoulder_lift_joint',
-                               u'r_forearm_roll_joint',
-                               u'r_elbow_flex_joint',
-                               u'r_wrist_flex_joint',
-                               u'r_wrist_roll_joint',
-                               u'l_upper_arm_roll_joint',
-                               u'l_shoulder_pan_joint',
-                               u'l_shoulder_lift_joint',
-                               u'l_forearm_roll_joint',
-                               u'l_elbow_flex_joint',
-                               u'l_wrist_flex_joint',
-                               u'l_wrist_roll_joint',
-                               u'head_pan_joint',
-                               u'head_tilt_joint',
-                               u'odom_x_joint',
-                               u'odom_y_joint',
-                               u'odom_z_joint']
-
-        result = r.get_directly_controllable_collision_links(u'odom_x_joint')
-        assert result == []
-        result = r.get_directly_controllable_collision_links(u'odom_y_joint')
-        assert result == []
-        result = r.get_directly_controllable_collision_links(u'odom_z_joint')
-        assert result == [u'base_link']
-        result = r.get_directly_controllable_collision_links(u'l_elbow_flex_joint')
-        assert result == [u'l_elbow_flex_link']
-        result = r.get_directly_controllable_collision_links(u'r_wrist_roll_joint')
-        assert result == [u'r_wrist_roll_link']
-        result = r.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint')
-        assert result == []
+def create_world_with_pr2(prefix=None):
+    """
+    :rtype: WorldTree
+    """
+    world = world_with_robot(pr2_urdf(), prefix=prefix)
+    world.god_map.set_data(identifier.controlled_joints, ['torso_lift_joint',
+                                                          'r_upper_arm_roll_joint',
+                                                          'r_shoulder_pan_joint',
+                                                          'r_shoulder_lift_joint',
+                                                          'r_forearm_roll_joint',
+                                                          'r_elbow_flex_joint',
+                                                          'r_wrist_flex_joint',
+                                                          'r_wrist_roll_joint',
+                                                          'l_upper_arm_roll_joint',
+                                                          'l_shoulder_pan_joint',
+                                                          'l_shoulder_lift_joint',
+                                                          'l_forearm_roll_joint',
+                                                          'l_elbow_flex_joint',
+                                                          'l_wrist_flex_joint',
+                                                          'l_wrist_roll_joint',
+                                                          'head_pan_joint',
+                                                          'head_tilt_joint',
+                                                          'odom_x_joint',
+                                                          'odom_y_joint',
+                                                          'odom_z_joint'])
+    return world
 
 
+def create_world_with_donbot(prefix=None):
+    world = world_with_robot(donbot_urdf(), prefix=prefix)
+    world.god_map.set_data(identifier.controlled_joints, ['ur5_elbow_joint',
+                                                          'ur5_shoulder_lift_joint',
+                                                          'ur5_shoulder_pan_joint',
+                                                          'ur5_wrist_1_joint',
+                                                          'ur5_wrist_2_joint',
+                                                          'ur5_wrist_3_joint',
+                                                          'odom_x_joint',
+                                                          'odom_y_joint',
+                                                          'odom_z_joint'])
+    return world
 
 
-class TestWorld(object):
-    cls = WorldObject
-    world_cls = World
+def create_world_with_hsr(prefix=None):
+    return world_with_robot(hsr_urdf(), prefix=prefix)
 
-    def make_world_with_robot(self, urdf, path_to_data_folder):
-        w = self.world_cls(path_to_data_folder=path_to_data_folder)
-        r = self.cls(urdf)
-        w.add_robot(robot=r,
-                    base_pose=None,
-                    controlled_joints=r.controlled_joints,
-                    ignored_pairs=[],
-                    added_pairs=[])
-        if path_to_data_folder is not None:
-            w.robot.init_self_collision_matrix()
-        return w
 
-    def make_world_with_pr2(self, path_to_data_folder=None):
+def all_joint_limits(urdf):
+    world = world_with_robot(urdf, None)
+    return world.get_all_joint_position_limits()
+
+
+pr2_joint_limits = all_joint_limits(pr2_urdf())
+
+
+class TestWorldTree(object):
+    def parsed_pr2_urdf(self):
         """
-        :rtype: World
+        :rtype: urdf_parser_py.urdf.Robot
         """
-        return self.make_world_with_robot(pr2_urdf(), path_to_data_folder)
+        urdf = pr2_urdf()
+        with suppress_stderr():
+            return up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
 
-    def make_world_with_pr2_without_base(self, path_to_data_folder=None):
-        """
-        :rtype: World
-        """
-        return self.make_world_with_robot(pr2_without_base_urdf(), path_to_data_folder)
+    def parsed_hsr_urdf(self):
+        urdf = hsr_urdf()
+        with suppress_stderr():
+            return up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
 
-    def make_world_with_donbot(self, path_to_data_folder=None):
-        """
-        :rtype: World
-        """
-        return self.make_world_with_robot(donbot_urdf(), path_to_data_folder)
+    def test_link_urdf_str(self):
+        world = create_world_with_pr2()
+        world.links['base_footprint'].as_urdf()
 
-    def test_add_robot(self, function_setup):
-        empty_world = self.world_cls()
-        assert len(empty_world.get_objects()) == 0
-        assert not empty_world.has_robot()
-        # extracting the urdf turns integers into floats
-        pr2 = self.cls(self.cls(pr2_urdf()).get_urdf_str())
-        empty_world.add_robot(robot=pr2,
-                              base_pose=None,
-                              controlled_joints=pr2.controlled_joints,
-                              ignored_pairs=[],
-                              added_pairs=[])
-        assert empty_world.has_robot()
-        assert pr2.get_urdf_str() == empty_world.robot.get_urdf_str()
-        return empty_world
+    def test_load_pr2(self):
+        world = create_world_with_pr2()
+        parsed_urdf = self.parsed_pr2_urdf()
+        assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
+        assert set(world.joint_names) == set(
+            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.name, world.connection_prefix)])
 
-    def test_add_object(self, function_setup):
-        empty_world = self.world_cls()
-        name = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        empty_world.add_object(box)
-        assert empty_world.has_object(name)
-        assert len(empty_world.get_objects()) == 1
-        assert len(empty_world.get_object_names()) == 1
-        assert empty_world.get_object(box.get_name()) == box
-        return empty_world
-
-    def test_add_object_twice(self, function_setup):
-        empty_world = self.world_cls()
-        name = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        empty_world.add_object(box)
+    def test_load_pr2_twice(self):
+        world = create_world_with_pr2()
+        pr22_name = 'pr22'
         try:
-            empty_world.add_object(box)
-            assert False, u'expected exception'
-        except DuplicateNameException:
-            assert True
-        assert empty_world.has_object(name)
-        assert len(empty_world.get_objects()) == 1
-        assert empty_world.get_object(box.get_name()) == box
-        return empty_world
-
-    def test_add_object_with_robot_name(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        name = u'pr2'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        try:
-            world_with_pr2.add_object(box)
-            assert False, u'expected exception'
-        except DuplicateNameException:
-            assert True
-        assert world_with_pr2.has_robot()
-        assert len(world_with_pr2.get_objects()) == 0
-        return world_with_pr2
-
-    def test_attach_existing_obj_to_robot1(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        box = self.cls.from_world_body(make_world_body_box())
-        world_with_pr2.add_object(box)
-        links_before = set(world_with_pr2.robot.get_link_names())
-        joints_before = set(world_with_pr2.robot.get_joint_names())
-        p = Pose()
-        p.orientation.w = 1
-        world_with_pr2.attach_existing_obj_to_robot(u'box', u'l_gripper_tool_frame', p)
-        assert u'box' not in world_with_pr2.get_object_names()
-        assert set(world_with_pr2.robot.get_link_names()).difference(links_before) == {u'box'}
-        assert set(world_with_pr2.robot.get_joint_names()).difference(joints_before) == {u'box'}
-        return world_with_pr2
-
-    def test_attach_existing_obj_to_robot2(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        box = self.cls.from_world_body(make_world_body_box())
-        world_with_pr2.add_object(box)
-        p = Pose()
-        p.orientation.w = 1
-        try:
-            world_with_pr2.attach_existing_obj_to_robot(u'box2', u'l_gripper_tool_frame', p)
+            world.add_urdf(pr2_urdf(), group_name=RobotName)
             assert False
-        except KeyError:
-            assert True
-        return world_with_pr2
-
-    def test_attach_detach_existing_obj_to_robot1(self, function_setup):
-        obj_name = u'box'
-        world_with_pr2 = self.make_world_with_pr2()
-        box = self.cls.from_world_body(make_world_body_box(name=obj_name))
-        world_with_pr2.add_object(box)
-        links_before = set(world_with_pr2.robot.get_link_names())
-        joints_before = set(world_with_pr2.robot.get_joint_names())
-        p = Pose()
-        p.orientation.w = 1
-        world_with_pr2.attach_existing_obj_to_robot(obj_name, u'l_gripper_tool_frame', p)
-        assert obj_name not in world_with_pr2.get_object_names()
-        assert set(world_with_pr2.robot.get_link_names()).difference(links_before) == {obj_name}
-        assert set(world_with_pr2.robot.get_joint_names()).difference(joints_before) == {obj_name}
-
-        world_with_pr2.detach(obj_name)
-        assert set(world_with_pr2.robot.get_link_names()).symmetric_difference(links_before) == set()
-        assert set(world_with_pr2.robot.get_joint_names()).symmetric_difference(joints_before) == set()
-        assert obj_name in world_with_pr2.get_object_names()
-        compare_poses(world_with_pr2.robot.get_fk_pose(world_with_pr2.robot.get_root(), u'l_gripper_tool_frame').pose,
-                      world_with_pr2.get_object(obj_name).base_pose)
-        return world_with_pr2
-
-    def test_hard_reset1(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        world_with_pr2.hard_reset()
-        assert not world_with_pr2.has_robot()
-        return world_with_pr2
-
-    def test_hard_reset2(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        name = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_pr2.add_object(box)
-        world_with_pr2.hard_reset()
-        assert not world_with_pr2.has_robot()
-        assert len(world_with_pr2.get_objects()) == 0
-        return world_with_pr2
-
-    def test_soft_reset1(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        world_with_pr2.soft_reset()
-        assert world_with_pr2.has_robot()
-        return world_with_pr2
-
-    def test_soft_reset2(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        name = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_pr2.add_object(box)
-        world_with_pr2.soft_reset()
-        assert world_with_pr2.has_robot()
-        assert len(world_with_pr2.get_objects()) == 0
-        return world_with_pr2
-
-    def test_remove_object1(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        name = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_pr2.add_object(box)
-        world_with_pr2.remove_object(name)
-        assert not world_with_pr2.has_object(name)
-        assert len(world_with_pr2.get_objects()) == 0
-        assert world_with_pr2.has_robot()
-        return world_with_pr2
-
-    def test_remove_object2(self, function_setup):
-        world_with_pr2 = self.make_world_with_pr2()
-        name1 = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name1))
-        world_with_pr2.add_object(box)
-        name2 = u'muh2'
-        box = self.cls.from_world_body(make_world_body_box(name2))
-        world_with_pr2.add_object(box)
-        world_with_pr2.remove_object(name1)
-        assert not world_with_pr2.has_object(name1)
-        assert world_with_pr2.has_object(name2)
-        assert len(world_with_pr2.get_objects()) == 1
-        assert world_with_pr2.has_robot()
-        return world_with_pr2
-
-    def test_verify_collision_entries_empty(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        ces = []
-        new_ces = world_with_donbot.verify_collision_entries(ces, 0.05)
-        assert len(new_ces) == 1
-
-    def test_verify_collision_entries_allow_all(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        ces = [allow_all_entry()]
-        new_ces = world_with_donbot.verify_collision_entries(ces, 0.05)
-        assert len(new_ces) == 0
-
-    def test_verify_collision_entries_allow_all_self(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = world_with_donbot.robot.get_name()
-        ce.link_bs = [CollisionEntry.ALL]
-        ces = [ce]
-        new_ces = world_with_donbot.verify_collision_entries(ces, 0.05)
-        assert len(new_ces) == 1 + len(world_with_donbot.robot.get_self_collision_matrix()) * 2
-
-    def test_verify_collision_entries_unknown_robot_link(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [u'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
+        except DuplicateNameException:
+            pass
         try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except UnknownBodyException:
-            assert True
-        else:
-            assert False, u'expected exception'
+            world.add_urdf(pr2_urdf(), group_name=RobotName, prefix=pr22_name)
+            assert False
+        except DuplicateNameException:
+            pass
+        world.add_urdf(pr2_urdf(), group_name='pr22', prefix=pr22_name)
+        pr21 = world.groups[RobotName]
+        pr22 = world.groups[pr22_name]
+        for link_name in pr22.link_names:
+            assert link_name.short_name in pr21.link_names
+        for joint_name in pr22.joint_names:
+            assert joint_name.short_name in pr21.joint_names
+        assert len(world.links) == len(pr21.links) + len(pr22.links) + 1
 
-    def test_verify_collision_entries_unknown_body_b(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = u'muh'
-        ce.link_bs = [CollisionEntry.ALL]
-        ce.min_dist = min_dist
-        ces.append(ce)
+    def test_add_box(self):
+        world = create_world_with_pr2()
+        box = make_world_body_box()
+        box_name = box.name
+        pose = Pose()
+        pose.orientation.w = 1
+        world.add_world_body(box, pose)
+        assert box.name in world.groups
+        assert box_name in world.links
+        assert PrefixName(box_name, world.connection_prefix) in world.joints
+
+    def test_attach_box(self):
+        world = create_world_with_pr2()
+        box = make_world_body_box()
+        box_name = PrefixName(box.name, None)
+        pose = Pose()
+        pose.orientation.w = 1
+        world.add_world_body(box, pose)
+        new_parent_link_name = PrefixName('r_gripper_tool_frame', RobotPrefix)
+        old_fk = world.compute_fk_pose(world.root_link_name, box_name)
+
+        world.move_group(box.name, new_parent_link_name)
+
+        new_fk = world.compute_fk_pose(world.root_link_name, box_name)
+        assert box_name in world.groups[RobotName].link_names
+        assert world.joints[world.links[box_name].parent_joint_name].parent_link_name == new_parent_link_name
+        compare_poses(old_fk.pose, new_fk.pose)
+
+        assert box_name in world.groups[RobotName].groups
+        assert RobotName not in world.groups[RobotName].groups
+        assert box_name not in world.minimal_group_names
+
+    def test_load_hsr(self):
+        world = create_world_with_hsr()
+        parsed_urdf = self.parsed_hsr_urdf()
+        assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
+        assert set(world.joint_names) == set(
+            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.name, world.connection_prefix)])
+
+    def test_group_pr2_hand(self):
+        world = create_world_with_pr2()
+        world.register_group('r_hand', 'r_wrist_roll_link')
+        assert set(world.groups['r_hand'].joint_names) == {'r_gripper_palm_joint',
+                                                           'r_gripper_led_joint',
+                                                           'r_gripper_motor_accelerometer_joint',
+                                                           'r_gripper_tool_joint',
+                                                           'r_gripper_motor_slider_joint',
+                                                           'r_gripper_l_finger_joint',
+                                                           'r_gripper_r_finger_joint',
+                                                           'r_gripper_motor_screw_joint',
+                                                           'r_gripper_l_finger_tip_joint',
+                                                           'r_gripper_r_finger_tip_joint',
+                                                           'r_gripper_joint'}
+        assert set(world.groups['r_hand'].link_names) == {'r_wrist_roll_link',
+                                                          'r_gripper_palm_link',
+                                                          'r_gripper_led_frame',
+                                                          'r_gripper_motor_accelerometer_link',
+                                                          'r_gripper_tool_frame',
+                                                          'r_gripper_motor_slider_link',
+                                                          'r_gripper_motor_screw_link',
+                                                          'r_gripper_l_finger_link',
+                                                          'r_gripper_l_finger_tip_link',
+                                                          'r_gripper_r_finger_link',
+                                                          'r_gripper_r_finger_tip_link',
+                                                          'r_gripper_l_finger_tip_frame'}
+
+    def test_get_chain(self):
+        world = create_world_with_pr2()
+        parsed_urdf = self.parsed_pr2_urdf()
+        root_link = parsed_urdf.get_root()
+        tip_link = 'r_gripper_tool_frame'
+        real = world.compute_chain(root_link, tip_link, True, True, True, True)
+        expected = parsed_urdf.get_chain(root_link, tip_link, True, True, True)
+        assert set(real) == set(expected)
+
+    def test_get_chain2(self):
+        world = create_world_with_pr2()
+        root_link = 'l_gripper_tool_frame'
+        tip_link = 'r_gripper_tool_frame'
         try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except UnknownBodyException:
-            assert True
-        else:
-            assert False, u'expected exception'
+            world.compute_chain(root_link, tip_link, True, True, True, True)
+            assert False
+        except ValueError:
+            pass
 
-    def test_verify_collision_entries_unknown_link_b(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = u'muh'
-        ce.link_bs = [u'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
+    def test_get_chain_group(self):
+        root_link = 'r_wrist_roll_link'
+        tip_link = 'r_gripper_r_finger_tip_link'
+        world = create_world_with_pr2()
+        world.register_group('r_hand', root_link)
+        real = world.groups['r_hand'].compute_chain(root_link, tip_link, True, True, True, True)
+        assert real == ['r_wrist_roll_link',
+                        'r_gripper_palm_joint',
+                        'r_gripper_palm_link',
+                        'r_gripper_r_finger_joint',
+                        'r_gripper_r_finger_link',
+                        'r_gripper_r_finger_tip_joint',
+                        'r_gripper_r_finger_tip_link']
+
+    def test_get_chain_group2(self):
+        root_link = 'r_gripper_l_finger_tip_link'
+        tip_link = 'r_gripper_r_finger_tip_link'
+        world = create_world_with_pr2()
+        world.register_group('r_hand', 'r_wrist_roll_link')
         try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except UnknownBodyException:
-            assert True
-        else:
-            assert False, u'expected exception'
+            real = world.groups['r_hand'].compute_chain(root_link, tip_link, True, True, True, True)
+            assert False
+        except ValueError:
+            pass
 
-    def test_verify_collision_entries_unknown_link_b2(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = world_with_donbot.robot.get_name()
-        ce.link_bs = [u'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except UnknownBodyException:
-            assert True
-        else:
-            assert False, u'expected exception'
+    def test_get_split_chain(self):
+        world = create_world_with_pr2()
+        root_link = PrefixName('l_gripper_r_finger_tip_link', None)
+        tip_link = PrefixName('l_gripper_l_finger_tip_link', None)
+        chain1, connection, chain2 = world.compute_split_chain(root_link, tip_link, True, True, True, True)
+        chain1 = [n.short_name for n in chain1]
+        connection = [n.short_name for n in connection]
+        chain2 = [n.short_name for n in chain2]
+        assert chain1 == ['l_gripper_r_finger_tip_link', 'l_gripper_r_finger_tip_joint', 'l_gripper_r_finger_link',
+                          'l_gripper_r_finger_joint']
+        assert connection == ['l_gripper_palm_link']
+        assert chain2 == ['l_gripper_l_finger_joint', 'l_gripper_l_finger_link', 'l_gripper_l_finger_tip_joint',
+                          'l_gripper_l_finger_tip_link']
 
-    def test_verify_collision_entries1(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL, u'plate']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except PhysicsWorldException:
-            assert True
-        else:
-            assert False, u'expected exception'
+    def test_get_split_chain_group(self):
+        root_link = 'r_gripper_l_finger_tip_link'
+        tip_link = 'r_gripper_r_finger_tip_link'
+        world = create_world_with_pr2()
+        world.register_group('r_hand', 'r_wrist_roll_link')
+        chain1, connection, chain2 = world.groups['r_hand'].compute_split_chain(root_link, tip_link,
+                                                                                True, True, True, True)
+        assert chain1 == ['r_gripper_l_finger_tip_link',
+                          'r_gripper_l_finger_tip_joint',
+                          'r_gripper_l_finger_link',
+                          'r_gripper_l_finger_joint']
+        assert connection == ['r_gripper_palm_link']
+        assert chain2 == ['r_gripper_r_finger_joint',
+                          'r_gripper_r_finger_link',
+                          'r_gripper_r_finger_tip_joint',
+                          'r_gripper_r_finger_tip_link']
 
-    def test_verify_collision_entries2(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.link_bs = [CollisionEntry.ALL, u'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except PhysicsWorldException:
-            assert True
-        else:
-            assert False, u'expected exception'
+    def test_get_split_chain_hsr(self):
+        world = create_world_with_hsr(prefix=RobotName)
+        root_link = PrefixName('base_link', RobotName)
+        tip_link = PrefixName('hand_gripper_tool_frame', RobotName)
+        chain1, connection, chain2 = world.compute_split_chain(root_link, tip_link, True, True, True, True)
+        chain1 = [n.short_name for n in chain1]
+        connection = [n.short_name for n in connection]
+        chain2 = [n.short_name for n in chain2]
+        assert chain1 == []
+        assert connection == ['base_link']
+        assert chain2 == ['arm_lift_joint', 'arm_lift_link', 'arm_flex_joint', 'arm_flex_link', 'arm_roll_joint',
+                          'arm_roll_link', 'wrist_flex_joint', 'wrist_flex_link', 'wrist_roll_joint', 'wrist_roll_link',
+                          'hand_palm_joint', 'hand_palm_link', 'hand_gripper_tool_frame_joint',
+                          'hand_gripper_tool_frame']
 
-    def test_verify_collision_entries3(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.link_bs = [CollisionEntry.ALL, u'muh']
-        ce.robot_links = [CollisionEntry.ALL, u'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except PhysicsWorldException:
-            assert True
-        else:
-            assert False, u'expected exception'
+    def test_get_joint_limits2(self):
+        world = create_world_with_pr2()
+        lower_limit, upper_limit = world.get_joint_position_limits('l_shoulder_pan_joint')
+        assert lower_limit == -0.564601836603
+        assert upper_limit == 2.1353981634
 
-    def test_verify_collision_entries3_1(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.body_b = CollisionEntry.ALL
-        ce.link_bs = [u'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        except PhysicsWorldException:
-            assert True
-        else:
-            assert False, u'expected exception'
+    def test_search_branch(self):
+        world = create_world_with_pr2()
+        result = world.search_branch('odom_x_frame',
+                                     stop_at_joint_when=lambda _: False,
+                                     stop_at_link_when=lambda _: False)
+        assert result == ([], [])
+        result = world.search_branch('odom_y_frame',
+                                     stop_at_joint_when=world.is_joint_controlled,
+                                     stop_at_link_when=lambda _: False,
+                                     collect_link_when=world.has_link_collisions)
+        assert result == ([], [])
+        result = world.search_branch('base_footprint',
+                                     stop_at_joint_when=world.is_joint_controlled,
+                                     collect_link_when=world.has_link_collisions)
+        assert set(result[0]) == {'base_bellow_link',
+                                  'fl_caster_l_wheel_link',
+                                  'fl_caster_r_wheel_link',
+                                  'fl_caster_rotation_link',
+                                  'fr_caster_l_wheel_link',
+                                  'fr_caster_r_wheel_link',
+                                  'fr_caster_rotation_link',
+                                  'bl_caster_l_wheel_link',
+                                  'bl_caster_r_wheel_link',
+                                  'bl_caster_rotation_link',
+                                  'br_caster_l_wheel_link',
+                                  'br_caster_r_wheel_link',
+                                  'br_caster_rotation_link',
+                                  'base_link'}
+        result = world.search_branch('l_elbow_flex_link',
+                                     collect_joint_when=world.is_joint_fixed)
+        assert set(result[0]) == set()
+        assert set(result[1]) == {'l_force_torque_adapter_joint',
+                                  'l_force_torque_joint',
+                                  'l_forearm_cam_frame_joint',
+                                  'l_forearm_cam_optical_frame_joint',
+                                  'l_forearm_joint',
+                                  'l_gripper_led_joint',
+                                  'l_gripper_motor_accelerometer_joint',
+                                  'l_gripper_palm_joint',
+                                  'l_gripper_tool_joint'}
+        links, joints = world.search_branch('r_wrist_roll_link',
+                                            stop_at_joint_when=world.is_joint_controlled,
+                                            collect_link_when=world.has_link_collisions,
+                                            collect_joint_when=lambda _: True)
+        assert set(links) == {'r_gripper_l_finger_tip_link',
+                              'r_gripper_l_finger_link',
+                              'r_gripper_r_finger_tip_link',
+                              'r_gripper_r_finger_link',
+                              'r_gripper_palm_link',
+                              'r_wrist_roll_link'}
+        assert set(joints) == {'r_gripper_palm_joint',
+                               'r_gripper_led_joint',
+                               'r_gripper_motor_accelerometer_joint',
+                               'r_gripper_tool_joint',
+                               'r_gripper_motor_slider_joint',
+                               'r_gripper_motor_screw_joint',
+                               'r_gripper_l_finger_joint',
+                               'r_gripper_l_finger_tip_joint',
+                               'r_gripper_r_finger_joint',
+                               'r_gripper_r_finger_tip_joint',
+                               'r_gripper_joint'}
+        links, joints = world.search_branch('br_caster_l_wheel_link',
+                                            collect_link_when=lambda _: True,
+                                            collect_joint_when=lambda _: True)
+        assert links == ['br_caster_l_wheel_link']
+        assert joints == []
 
-    def test_verify_collision_entries_cut_off1(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = []
-        ces.append(avoid_all_entry(min_dist))
-        ces.append(allow_all_entry())
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == 0
+    def test_get_siblings_with_collisions(self):
+        world = create_world_with_pr2()
+        result = world.get_siblings_with_collisions('odom_x_joint')
+        assert result == []
+        result = world.get_siblings_with_collisions('odom_y_joint')
+        assert result == []
+        result = world.get_siblings_with_collisions('odom_z_joint')
+        assert result == []
+        result = world.get_siblings_with_collisions('l_elbow_flex_joint')
+        assert set(result) == {'l_upper_arm_roll_link', 'l_upper_arm_link'}
+        result = world.get_siblings_with_collisions('r_wrist_roll_joint')
+        assert result == ['r_wrist_flex_link']
+        result = world.get_siblings_with_collisions('br_caster_l_wheel_joint')
+        assert set(result) == {'base_bellow_link',
+                               'fl_caster_l_wheel_link',
+                               'fl_caster_r_wheel_link',
+                               'fl_caster_rotation_link',
+                               'fr_caster_l_wheel_link',
+                               'fr_caster_r_wheel_link',
+                               'fr_caster_rotation_link',
+                               'bl_caster_l_wheel_link',
+                               'bl_caster_r_wheel_link',
+                               'bl_caster_rotation_link',
+                               'br_caster_r_wheel_link',
+                               'br_caster_rotation_link',
+                               'base_link'}
 
-    def test_verify_collision_entries_split0(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.1
-        ces = [avoid_all_entry(min_dist)]
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == 1
-        for ce in new_ces:
-            assert ce.body_b == world_with_donbot.robot.get_name()
-            assert ce.body_b != CollisionEntry.ALL
-            assert world_with_donbot.all_robot_links(ce)
-            assert world_with_donbot.all_link_bs(ce)
-            assert ce.type == CollisionEntry. \
-                AVOID_COLLISION
+    def test_get_controlled_parent_joint_of_link(self):
+        world = create_world_with_pr2()
+        with pytest.raises(KeyError) as e_info:
+            world.get_controlled_parent_joint_of_link('odom_combined')
+        assert world.get_controlled_parent_joint_of_link('odom_x_frame') == 'odom_x_joint'
 
-    def test_verify_collision_entries_split1(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.05
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = [CollisionEntry.ALL]
-        ce1.body_b = CollisionEntry.ALL
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = 0.1
-        ces.append(ce1)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [u'plate']
-        ce.body_b = CollisionEntry.ALL
-        ce.link_bs = [CollisionEntry.ALL]
-        ces.append(ce)
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == 1 + \
-               len(world_with_donbot.robot.get_possible_collisions(u'plate'))
-        assert world_with_donbot.all_robot_links(new_ces[0])
-        assert world_with_donbot.all_link_bs(new_ces[0])
-        for ce in new_ces[1:]:
-            assert ce.body_b == world_with_donbot.robot.get_name()
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-        i = 0
-        for i in range(1):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(world_with_donbot.robot.get_possible_collisions(u'plate'))):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
+    def test_get_parent_joint_of_joint(self):
+        world = create_world_with_pr2()
+        with pytest.raises(KeyError) as e_info:
+            world.get_controlled_parent_joint_of_joint('odom_x_joint')
+        with pytest.raises(KeyError) as e_info:
+            world.search_for_parent_joint('r_wrist_roll_joint', stop_when=lambda x: False)
+        assert world.get_controlled_parent_joint_of_joint('r_torso_lift_side_plate_joint') == 'torso_lift_joint'
+        assert world.get_controlled_parent_joint_of_joint('odom_y_joint') == 'odom_x_joint'
 
-    def test_verify_collision_entries_split2(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        min_dist = 0.05
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
+    def test_get_all_joint_limits(self):
+        world = create_world_with_pr2()
+        assert world.get_all_joint_position_limits() == {'bl_caster_l_wheel_joint': (None, None),
+                                                         'bl_caster_r_wheel_joint': (None, None),
+                                                         'bl_caster_rotation_joint': (None, None),
+                                                         'br_caster_l_wheel_joint': (None, None),
+                                                         'br_caster_r_wheel_joint': (None, None),
+                                                         'br_caster_rotation_joint': (None, None),
+                                                         'fl_caster_l_wheel_joint': (None, None),
+                                                         'fl_caster_r_wheel_joint': (None, None),
+                                                         'fl_caster_rotation_joint': (None, None),
+                                                         'fr_caster_l_wheel_joint': (None, None),
+                                                         'fr_caster_r_wheel_joint': (None, None),
+                                                         'fr_caster_rotation_joint': (None, None),
+                                                         'head_pan_joint': (-2.857, 2.857),
+                                                         'head_tilt_joint': (-0.3712, 1.29626),
+                                                         'l_elbow_flex_joint': (-2.1213, -0.15),
+                                                         'l_forearm_roll_joint': (None, None),
+                                                         'l_gripper_joint': (0.0, 0.088),
+                                                         'l_gripper_l_finger_joint': (0.0, 0.548),
+                                                         'l_gripper_l_finger_tip_joint': (0.0, 0.548),
+                                                         'l_gripper_motor_screw_joint': (None, None),
+                                                         'l_gripper_motor_slider_joint': (-0.1, 0.1),
+                                                         'l_gripper_r_finger_joint': (0.0, 0.548),
+                                                         'l_gripper_r_finger_tip_joint': (0.0, 0.548),
+                                                         'l_shoulder_lift_joint': (-0.3536, 1.2963),
+                                                         'l_shoulder_pan_joint': (-0.564601836603, 2.1353981634),
+                                                         'l_upper_arm_roll_joint': (-0.65, 3.75),
+                                                         'l_wrist_flex_joint': (-2.0, -0.1),
+                                                         'l_wrist_roll_joint': (None, None),
+                                                         'laser_tilt_mount_joint': (-0.7354, 1.43353),
+                                                         'odom_x_joint': (-1000.0, 1000.0),
+                                                         'odom_y_joint': (-1000.0, 1000.0),
+                                                         'odom_z_joint': (None, None),
+                                                         'r_elbow_flex_joint': (-2.1213, -0.15),
+                                                         'r_forearm_roll_joint': (None, None),
+                                                         'r_gripper_joint': (0.0, 0.088),
+                                                         'r_gripper_l_finger_joint': (0.0, 0.548),
+                                                         'r_gripper_l_finger_tip_joint': (0.0, 0.548),
+                                                         'r_gripper_motor_screw_joint': (None, None),
+                                                         'r_gripper_motor_slider_joint': (-0.1, 0.1),
+                                                         'r_gripper_r_finger_joint': (0.0, 0.548),
+                                                         'r_gripper_r_finger_tip_joint': (0.0, 0.548),
+                                                         'r_shoulder_lift_joint': (-0.3536, 1.2963),
+                                                         'r_shoulder_pan_joint': (-2.1353981634, 0.564601836603),
+                                                         'r_upper_arm_roll_joint': (-3.75, 0.65),
+                                                         'r_wrist_flex_joint': (-2.0, -0.1),
+                                                         'r_wrist_roll_joint': (None, None),
+                                                         'torso_lift_joint': (0.0115, 0.325),
+                                                         'torso_lift_motor_screw_joint': (None, None)}
 
-        ces = [avoid_all_entry(min_dist)]
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = name
-        ce.link_bs = [CollisionEntry.ALL]
-        ces.append(ce)
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == 1 + len(world_with_donbot.robot.get_controlled_links()) * 2
-        for ce in new_ces[1:]:
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-            if ce.body_b != world_with_donbot.robot.get_name():
-                assert CollisionEntry.ALL in ce.link_bs
-            else:
-                assert CollisionEntry.ALL not in ce.link_bs
-            assert len(ce.link_bs) == 1
-        i = 0
-        for i in range(len(world_with_donbot.robot.get_controlled_links()) + 1):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(world_with_donbot.robot.get_controlled_links())):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
+    def test_get_all_joint_limits_group(self):
+        world = create_world_with_pr2()
+        world.register_group('r_hand', 'r_wrist_roll_link')
+        assert world.groups['r_hand'].get_all_joint_position_limits() == {'r_gripper_joint': (0.0, 0.088),
+                                                                          'r_gripper_l_finger_joint': (0.0, 0.548),
+                                                                          'r_gripper_l_finger_tip_joint': (0.0, 0.548),
+                                                                          'r_gripper_motor_screw_joint': (None, None),
+                                                                          'r_gripper_motor_slider_joint': (-0.1, 0.1),
+                                                                          'r_gripper_r_finger_joint': (0.0, 0.548),
+                                                                          'r_gripper_r_finger_tip_joint': (0.0, 0.548)}
 
-    def test_verify_collision_entries_split3(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        min_dist = 0.05
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
+    def test_possible_collision_combinations(self):
+        world = create_world_with_pr2()
+        result = world.possible_collision_combinations('robot')
+        reference = {world.sort_links(link_a, link_b) for link_a, link_b in
+                     combinations(world.groups['robot'].link_names_with_collisions, 2) if
+                     not world.groups['robot'].are_linked(link_a, link_b)}
+        assert result == reference
 
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = [CollisionEntry.ALL]
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = name
-        ce.link_bs = [name]
-        ces.append(ce)
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == len(world_with_donbot.robot.get_controlled_links()) * 2 + 1
-        for ce in new_ces[1:]:
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-            assert CollisionEntry.ALL not in ce.link_bs
-            assert len(ce.link_bs) == 1
-        i = 0
-        for i in range(1 +
-                       len(world_with_donbot.robot.get_controlled_links())):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(world_with_donbot.robot.get_controlled_links())):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_verify_collision_entries_split4(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        min_dist = 0.05
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
-        name2 = u'box2'
-        box2 = self.cls.from_world_body(make_world_body_box(name2))
-        world_with_donbot.add_object(box2)
-
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = [CollisionEntry.ALL]
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = name
-        ce.link_bs = [name]
-        ces.append(ce)
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == len(world_with_donbot.robot.get_controlled_links()) * 3 + 1
-        for ce in new_ces[1:]:
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-            if ce.body_b == name2:
-                assert CollisionEntry.ALL in ce.link_bs
-            else:
-                assert CollisionEntry.ALL not in ce.link_bs
-            assert len(ce.link_bs) == 1
-        i = -1
-        for i in range(1 + len(world_with_donbot.robot.get_controlled_links()) * 2):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(world_with_donbot.robot.get_controlled_links())):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_verify_collision_entries_split5(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        min_dist = 0.05
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
-
-        ces = [allow_all_entry()]
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = [u'plate', u'base_link']
-        ce1.body_b = name
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == 2
-
-        for j in range(2):
-            ce = new_ces[j]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-
-    def test_verify_collision_entries_split6(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = 0.05
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.ALLOW_COLLISION
-        ce1.robot_links = [u'plate', u'base_link']
-        ce1.body_b = world_with_donbot.robot.get_name()
-        ce1.link_bs = [u'gripper_finger_left_link', u'gripper_finger_right_link']
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        new_ces = world_with_donbot.verify_collision_entries(ces, min_dist)
-        assert len(new_ces) == 4 + 1
-        i = -1
-        for i in range(1):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(4):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_collision_goals_to_collision_matrix1(self, delete_test_folder):
+    @given(rnd_joint_state(pr2_joint_limits))
+    def test_pr2_fk1(self, js):
         """
-        test with no collision entries which is equal to avoid all collisions
-        collision matrix should be empty, because world has no collision checker
-        :param test_folder:
-        :return:
+        :type js:
         """
-        world_with_donbot = self.make_world_with_donbot(delete_test_folder)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
-        assert len(collision_matrix) == 0
-        return world_with_donbot
+        world = create_world_with_pr2()
+        root = 'odom_combined'
+        tips = ['l_gripper_tool_frame', 'r_gripper_tool_frame']
+        for tip in tips:
+            mjs = JointStates()
+            for joint_name, position in js.items():
+                mjs[joint_name].position = position
+            world.joint_state = mjs
+            fk = world.compute_fk_pose(root, tip).pose
 
-    def test_collision_goals_to_collision_matrix2(self, test_folder):
-        """
-        avoid all with an added object should enlarge the collision matrix
-        :param test_folder:
-        :return:
-        """
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        base_collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
-        name = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
-        assert len(collision_matrix) == len(base_collision_matrix) + len(world_with_donbot.robot.get_controlled_links())
-        robot_link_names = world_with_donbot.robot.get_link_names()
-        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert dist == min_dist[robot_link][u'zero_weight_distance']
-            if body_b == name:
-                assert body_b_link == u''
-            assert robot_link in robot_link_names
-        return world_with_donbot
+    def test_compute_chain_reduced_to_controlled_joints(self):
+        world = create_world_with_pr2()
+        link_a, link_b = world.compute_chain_reduced_to_controlled_joints('r_gripper_tool_frame',
+                                                                          'l_gripper_tool_frame')
+        assert link_a == 'r_wrist_roll_link'
+        assert link_b == 'l_wrist_roll_link'
 
-    def test_collision_goals_to_collision_matrix3(self, test_folder):
-        """
-        empty list should have the same effect than avoid all entry
-        :param test_folder:
-        :return:
-        """
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        base_collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
-        name = u'muh'
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
-        ces = []
-        ces.append(avoid_all_entry(min_dist))
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix(ces, min_dist)
-        assert len(collision_matrix) == len(base_collision_matrix) + len(world_with_donbot.robot.get_controlled_links())
-        robot_link_names = world_with_donbot.robot.get_link_names()
-        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert dist == min_dist[robot_link][u'zero_weight_distance']
-            if body_b == name:
-                assert body_b_link == u''
-            assert robot_link in robot_link_names
-        return world_with_donbot
+    def test_compute_chain_reduced_to_controlled_joints2(self):
+        world = create_world_with_pr2()
+        link_a, link_b = world.compute_chain_reduced_to_controlled_joints('l_upper_arm_link', 'r_upper_arm_link')
+        assert link_a == 'l_upper_arm_roll_link'
+        assert link_b == 'r_upper_arm_roll_link'
 
-    def test_collision_goals_to_collision_matrix4(self, test_folder):
-        """
-        allow all should lead to an empty collision matrix
-        :param test_folder:
-        :return:
-        """
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
+    def test_compute_chain_reduced_to_controlled_joints3(self):
+        world = create_world_with_pr2()
+        with pytest.raises(KeyError):
+            world.compute_chain_reduced_to_controlled_joints('l_wrist_roll_link', 'l_gripper_r_finger_link')
 
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
-
-        ces = []
-        ces.append(allow_all_entry())
-        ces.append(allow_all_entry())
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix(ces, min_dist)
-
-        assert len(collision_matrix) == 0
-        return world_with_donbot
-
-    def test_collision_goals_to_collision_matrix5(self, test_folder):
-        """
-
-        :param test_folder:
-        :return:
-        """
-        # FIXME min dist is kinda outdated so this test is hacked to succeed
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
-
-        ces = []
-        ces.append(allow_all_entry())
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [robot_link_names[0]]
-        ce.body_b = name
-        ce.min_dist = 0.1
-        ces.append(ce)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix(ces, min_dist)
-
-        assert len(collision_matrix) == 1
-        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert dist == ce.min_dist
-            assert body_b == name
-            assert body_b_link == u''
-            assert robot_link in robot_link_names
-        return world_with_donbot
-
-    def test_collision_goals_to_collision_matrix6(self, test_folder):
-        """
-        allow collision with a specific object
-        :param test_folder:
-        :return:
-        """
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
-
-        box = self.cls.from_world_body(make_world_body_box(name))
-        world_with_donbot.add_object(box)
-
-        allowed_link = robot_link_names[0]
-
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [allowed_link]
-        ce.link_bs = [CollisionEntry.ALL]
-        ce.min_dist = 0.1
-        ces.append(ce)
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix(ces, min_dist)
-
-        assert len([x for x in collision_matrix if x[0] == allowed_link]) == 0
-        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert dist == min_dist[robot_link][u'zero_weight_distance']
-            if body_b == name:
-                assert body_b_link == u''
-            assert robot_link in robot_link_names
-        return world_with_donbot
-
-    def test_collision_goals_to_collision_matrix7(self, test_folder):
-        """
-        allow collision with specific object
-        :param test_folder:
-        :return:
-        """
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        name2 = u'muh2'
-        robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-
-        box = self.cls.from_world_body(make_world_body_box(name))
-        box2 = self.cls.from_world_body(make_world_body_box(name2))
-        world_with_donbot.add_object(box)
-        world_with_donbot.add_object(box2)
-
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.body_b = name2
-        ce.min_dist = 0.1
-        ces.append(ce)
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix(ces, min_dist)
-
-        assert len([x for x in collision_matrix if x[2] == name2]) == 0
-        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert dist == min_dist[robot_link][u'zero_weight_distance']
-            if body_b == name:
-                assert body_b_link == u''
-            assert robot_link in robot_link_names
-        return world_with_donbot
-
-    def test_collision_goals_to_collision_matrix8(self, test_folder):
-        """
-        allow collision between specific object and link
-        :param test_folder:
-        :return:
-        """
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        name = u'muh'
-        name2 = u'muh2'
-        robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-        allowed_link = robot_link_names[0]
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-
-        box = self.cls.from_world_body(make_world_body_box(name))
-        box2 = self.cls.from_world_body(make_world_body_box(name2))
-        world_with_donbot.add_object(box)
-        world_with_donbot.add_object(box2)
-
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [allowed_link]
-        ce.body_b = name2
-        ce.min_dist = 0.1
-        ces.append(ce)
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix(ces, min_dist)
-
-        assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
-        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert dist == min_dist[robot_link][u'zero_weight_distance']
-            if body_b != world_with_donbot.robot.get_name():
-                assert body_b_link == u''
-            assert robot_link in robot_link_names
-            if body_b == name2:
-                assert robot_link != robot_link_names[0]
-        return world_with_donbot
-
-    def test_collision_goals_to_collision_matrix9(self, test_folder):
-        """
-        allow self collision
-        :param test_folder:
-        :return:
-        """
-        world_with_pr2 = self.make_world_with_pr2(test_folder)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-        ces = []
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.robot_links = [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link',
-                                       u'l_gripper_l_finger_link', u'l_gripper_r_finger_link',
-                                       u'l_gripper_r_finger_link', u'l_gripper_palm_link']
-        collision_entry.body_b = world_with_pr2.robot.get_name()
-        collision_entry.link_bs = [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link',
-                                   u'r_forearm_link', u'r_forearm_link']
-        ces.append(collision_entry)
-
-        collision_matrix = world_with_pr2.collision_goals_to_collision_matrix(ces, min_dist)
-
-        # assert len(collision_matrix) == 0
-        # assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
-        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert not (robot_link in collision_entry.robot_links and body_b_link in collision_entry.link_bs)
-            assert not (body_b_link in collision_entry.robot_links and robot_link in collision_entry.link_bs)
-        #     assert dist == min_dist
-        #     if body_b != world_with_donbot.robot.get_name():
-        #         assert body_b_link == u''
-        #     assert robot_link in robot_link_names
-        #     if body_b == name2:
-        #         assert robot_link != robot_link_names[0]
-        return world_with_pr2
-
-    def test_collision_goals_to_collision_matrix10(self, test_folder):
-        """
-        avoid self collision with only specific links
-        :param test_folder:
-        :return:
-        """
-        world_with_pr2 = self.make_world_with_pr2_without_base(test_folder)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-        ces = [allow_all_entry()]
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.robot_links = [u'base_link']
-        collision_entry.body_b = world_with_pr2.robot.get_name()
-        collision_entry.link_bs = [u'r_wrist_flex_link']
-        ces.append(collision_entry)
-
-        collision_matrix = world_with_pr2.collision_goals_to_collision_matrix(ces, min_dist)
-
-        assert collision_matrix == {(u'base_link', u'pr2', u'r_wrist_flex_link'): 0.05}
-
-        return world_with_pr2

@@ -10,7 +10,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.identifier as identifier
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames, \
-    GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse
+    GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse, \
+    DyeGroup, DyeGroupResponse
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
@@ -78,8 +79,19 @@ class WorldUpdater(GiskardBehavior):
         self.get_object_info = rospy.Service('~get_object_info', GetObjectInfo, self.get_object_info_cb)
         self.get_attached_objects = rospy.Service('~get_attached_objects', GetAttachedObjects,
                                                   self.get_attached_objects)
+        self.dye_group = rospy.Service('~dye_group', DyeGroup, self.dye_group)
         # self.dump_state_srv = rospy.Service('~dump_state', Trigger, self.dump_state_cb)
         return super(WorldUpdater, self).setup(timeout)
+
+    def dye_group(self, req):
+        group_name = req.group_name
+        res = DyeGroupResponse()
+        if group_name in self.world.groups:
+            for _, link in self.world.groups[req.group_name].links.items():
+                link.dye_collisions(req.color)
+            return res.SUCCESS
+        else:
+            return res.GROUP_NOT_FOUND_ERROR
 
     def get_object_names(self, req):
         object_names = self.world.group_names

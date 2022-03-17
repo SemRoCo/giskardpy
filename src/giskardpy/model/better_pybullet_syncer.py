@@ -11,6 +11,7 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.utils import logging
 
+
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world):
         super(BetterPyBulletSyncer, self).__init__(world)
@@ -60,7 +61,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return self.query
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_sizes): # fixme: prob broke after two_robots_testing
+    def check_collisions(self, cut_off_distances, collision_list_sizes):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.

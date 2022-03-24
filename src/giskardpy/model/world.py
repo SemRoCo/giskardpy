@@ -1027,7 +1027,6 @@ class SubWorldTree(WorldTree):
             raise KeyError('Found no link match.')
         return matches[0]
 
-
     def reset_cache(self):
         try:
             del self.joints

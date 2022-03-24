@@ -829,7 +829,10 @@ class GiskardTestWrapper(GiskardWrapper):
     def is_link_in_collision_matrix(self, group_of_link, link):
         for group_name, group in self.world.groups.items():
             if group_name != group_of_link and link in group.link_names:
-                assert len([x for x in self.robot_self_collision_matrices[group_name] if link in x]) > 0
+                link_with_collision = link
+                while not self.world.has_link_collisions(link_with_collision):
+                    link_with_collision = self.world.get_parent_link_of_link(link)
+                assert len([x for x in self.robot_self_collision_matrices[group_name] if link_with_collision in x]) > 0
                 break
 
     def check_attach_object_result(self, response, expected_error_code, pose, name, parent_link):
@@ -1224,10 +1227,11 @@ class PR2AndDonbot(GiskardTestWrapper):
         width = max(0.0065, min(0.109, width))
         goal = PositionCmd()
         goal.pos = width * 1000
+        rospy.sleep(0.5)
         self.gripper_pubs[robot_name].publish(goal)
         rospy.sleep(0.5)
         self.wait_heartbeats()
-        np.testing.assert_almost_equal(self.world.groups[robot_name].state[str(PrefixName(gripper_joint, robot_name))].position, width, decimal=3)
+        np.testing.assert_almost_equal(self.world.state[PrefixName(gripper_joint, robot_name)].position, width, decimal=3)
 
     def reset_base(self, robot_name):
         p = PoseStamped()

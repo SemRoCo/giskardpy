@@ -60,11 +60,11 @@ class LinkGeometry(object):
                 geometry = SphereGeometry(np.eye(4),
                                           radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS])
             else:
-                raise CorruptShapeException('World body type {} not supported'.format(msg.type))
+                raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
         elif msg.type == msg.MESH_BODY:
             geometry = MeshGeometry(np.eye(4), msg.mesh)
         else:
-            raise CorruptShapeException('World body type {} not supported'.format(msg.type))
+            raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
     def as_visualization_marker(self):
@@ -194,12 +194,12 @@ class Link(object):
         return link
 
     @classmethod
-    def from_world_body(cls, msg):
+    def from_world_body(cls, prefix, msg):
         """
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
         :type pose: Pose
         """
-        link_name = PrefixName(msg.name, None)
+        link_name = PrefixName(prefix, None)
         link = cls(link_name)
         geometry = LinkGeometry.from_world_body(msg)
         link.collisions.append(geometry)

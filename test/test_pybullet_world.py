@@ -1,20 +1,17 @@
 import shutil
 from collections import defaultdict
 
-import pybullet as p
 import pytest
 from geometry_msgs.msg import Pose
 from giskard_msgs.msg import CollisionEntry
 
-import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy import RobotName
-from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
+from giskardpy.exceptions import PhysicsWorldException, UnknownGroupException
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.utils import logging
 from test_world import create_world_with_pr2, create_world_with_donbot, allow_all_entry, avoid_all_entry
-
-# this import has to come last
 
 folder_name = 'tmp_data/'
 
@@ -32,7 +29,7 @@ def module_setup(request):
 
     def kill_pybullet():
         logging.loginfo('shutdown pybullet')
-        pbw.stop_pybullet()
+        # pbw.stop_pybullet()
 
     request.addfinalizer(kill_pybullet)
 
@@ -43,7 +40,7 @@ def function_setup(request, module_setup):
 
     def kill_pybullet():
         logging.loginfo('resetting pybullet')
-        pbw.clear_pybullet()
+        # pbw.clear_pybullet()
 
     request.addfinalizer(kill_pybullet)
 
@@ -55,7 +52,7 @@ def pr2_world(request, function_setup):
     """
 
     world = create_world_with_pr2()
-    pbs = PyBulletSyncer(world, False)
+    pbs = CollisionWorldSynchronizer(world)
     pbs.sync()
     return pbs
 
@@ -67,7 +64,7 @@ def donbot_world(request, function_setup):
     """
 
     world = create_world_with_donbot()
-    pbs = PyBulletSyncer(world, False)
+    pbs = CollisionWorldSynchronizer(world)
     pbs.sync()
     return pbs
 
@@ -85,29 +82,23 @@ def delete_test_folder(request):
     return folder_name
 
 
-def assert_num_pybullet_objects(num):
-    assert p.getNumBodies() == num, pbw.print_body_names()
+# def assert_num_pybullet_objects(num):
+#     assert p.getNumBodies() == num, pbw.print_body_names()
 
 
 class TestPyBulletSyncer(object):
     def test_load_pr2(self, pr2_world):
-        assert len(pbw.get_body_names()) == 46
+        pass
+        # assert len(pbw.get_body_names()) == 46
 
     def test_set_pr2_js(self, pr2_world):
         pr2_world.world.state['torso_lift_link'] = 1
         pr2_world.sync()
-        assert len(pbw.get_body_names()) == 46
+        # assert len(pbw.get_body_names()) == 46
 
-    def test_compute_collision_matrix(self, pr2_world):
-        """
-        :type pr2_world: PyBulletSyncer
-        """
-        pr2_world.init_collision_matrix(RobotName)
-        collision_matrix = pr2_world.collision_matrices[RobotName]
-        for entry in collision_matrix:
-            assert entry[0] != entry[-1]
-
-        assert len(collision_matrix) == 125
+    def test_update_blacklist(self, pr2_world: CollisionWorldSynchronizer):
+        pr2_world.update_collision_blacklist()
+        pass
 
     def test_compute_collision_matrix_donbot(self, donbot_world):
         """
@@ -127,34 +118,38 @@ class TestPyBulletSyncer(object):
         o = make_world_body_box()
         p = Pose()
         p.orientation.w = 1
-        pr2_world.world.add_world_body(o, p)
+        pr2_world.world.add_world_body(group_name='box',
+                                       msg=o,
+                                       pose=p)
         pr2_world.sync()
-        assert len(pbw.get_body_names()) == 47
+        # assert len(pbw.get_body_names()) == 47
 
     def test_delete_object(self, pr2_world):
         """
         :type pr2_world: PyBulletSyncer
         """
+        o_name = 'box'
         o = make_world_body_box()
         p = Pose()
         p.orientation.w = 1
-        pr2_world.world.add_world_body(o, p)
+        pr2_world.world.add_world_body(group_name=o_name, msg=o, pose=p)
         pr2_world.sync()
-        pr2_world.world.delete_branch(o.name)
+        pr2_world.world.delete_branch(o_name)
         pr2_world.sync()
-        assert len(pbw.get_body_names()) == 46
+        # assert len(pbw.get_body_names()) == 46
 
     def test_attach_object(self, pr2_world):
         """
         :type pr2_world: PyBulletSyncer
         """
+        o_name = 'box'
         o = make_world_body_box()
         p = Pose()
         p.orientation.w = 1
-        pr2_world.world.add_world_body(o, p)
-        pr2_world.world.move_group(o.name, 'r_gripper_tool_frame')
+        pr2_world.world.add_world_body(group_name=o_name, msg=o, pose=p)
+        pr2_world.world.move_group(o_name, 'r_gripper_tool_frame')
         pr2_world.sync()
-        assert len(pbw.get_body_names()) == 47
+        # assert len(pbw.get_body_names()) == 47
 
     def test_compute_collision_matrix_attached(self, pr2_world):
         """
@@ -197,137 +192,38 @@ class TestPyBulletSyncer(object):
     def test_verify_collision_entries_allow_all_self(self, donbot_world):
         ce = CollisionEntry()
         ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = donbot_world.robot.name
-        ce.link_bs = [CollisionEntry.ALL]
+        ce.group1 = CollisionEntry.ALL
+        ce.group2 = CollisionEntry.ALL
         ces = [ce]
         new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == 1 + len(donbot_world.collision_matrices[RobotName]) * 2
+        assert len(new_ces) == 0
 
-    def test_verify_collision_entries_unknown_robot_link(self, donbot_world):
+    def test_verify_collision_entries_unknown_group(self, donbot_world):
         min_dist = 0.1
         ces = []
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = ['muh']
-        ce.min_dist = min_dist
+        ce.group1 = 'muh'
+        ce.distance = min_dist
         ces.append(ce)
         try:
             new_ces = donbot_world.verify_collision_entries(ces)
-        except UnknownBodyException:
+        except UnknownGroupException:
             assert True
         else:
             assert False, 'expected exception'
 
-    def test_verify_collision_entries_unknown_body_b(self, donbot_world):
+    def test_verify_collision_entries_unknown_group2(self, donbot_world):
         min_dist = 0.1
         ces = []
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = 'muh'
-        ce.link_bs = [CollisionEntry.ALL]
-        ce.min_dist = min_dist
+        ce.group2 = 'asdf'
+        ce.distance = min_dist
         ces.append(ce)
         try:
             new_ces = donbot_world.verify_collision_entries(ces)
-        except UnknownBodyException:
-            assert True
-        else:
-            assert False, 'expected exception'
-
-    def test_verify_collision_entries_unknown_link_b(self, donbot_world):
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = 'muh'
-        ce.link_bs = ['muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = donbot_world.verify_collision_entries(ces)
-        except UnknownBodyException:
-            assert True
-        else:
-            assert False, 'expected exception'
-
-    def test_verify_collision_entries_unknown_link_b2(self, donbot_world):
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = donbot_world.robot.name
-        ce.link_bs = ['muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = donbot_world.verify_collision_entries(ces)
-        except UnknownBodyException:
-            assert True
-        else:
-            assert False, 'expected exception'
-
-    def test_verify_collision_entries1(self, donbot_world):
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.robot_links = [CollisionEntry.ALL, 'plate']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = donbot_world.verify_collision_entries(ces)
-        except PhysicsWorldException:
-            assert True
-        else:
-            assert False, 'expected exception'
-
-    def test_verify_collision_entries2(self, donbot_world):
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.link_bs = [CollisionEntry.ALL, 'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = donbot_world.verify_collision_entries(ces)
-        except PhysicsWorldException:
-            assert True
-        else:
-            assert False, 'expected exception'
-
-    def test_verify_collision_entries3(self, donbot_world):
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.link_bs = [CollisionEntry.ALL, 'muh']
-        ce.robot_links = [CollisionEntry.ALL, 'muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = donbot_world.verify_collision_entries(ces)
-        except PhysicsWorldException:
-            assert True
-        else:
-            assert False, 'expected exception'
-
-    def test_verify_collision_entries3_1(self, donbot_world):
-        min_dist = 0.1
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.body_b = CollisionEntry.ALL
-        ce.link_bs = ['muh']
-        ce.min_dist = min_dist
-        ces.append(ce)
-        try:
-            new_ces = donbot_world.verify_collision_entries(ces)
-        except PhysicsWorldException:
+        except UnknownGroupException:
             assert True
         else:
             assert False, 'expected exception'
@@ -340,217 +236,7 @@ class TestPyBulletSyncer(object):
         new_ces = donbot_world.verify_collision_entries(ces)
         assert len(new_ces) == 0
 
-    def test_verify_collision_entries_split0(self, donbot_world):
-        min_dist = 0.1
-        ces = [avoid_all_entry(min_dist)]
-        new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == 1
-        for ce in new_ces:
-            assert ce.body_b == donbot_world.robot.name
-            assert ce.body_b != CollisionEntry.ALL
-            assert donbot_world.all_robot_links(ce)
-            assert donbot_world.all_link_bs(ce)
-            assert ce.type == CollisionEntry. \
-                AVOID_COLLISION
-
-    def test_verify_collision_entries_split1(self, donbot_world):
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = [CollisionEntry.ALL]
-        ce1.body_b = CollisionEntry.ALL
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = 0.1
-        ces.append(ce1)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = ['plate']
-        ce.body_b = CollisionEntry.ALL
-        ce.link_bs = [CollisionEntry.ALL]
-        ces.append(ce)
-        new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == 1 + \
-               len(donbot_world.get_possible_collisions('plate'))
-        assert donbot_world.all_robot_links(new_ces[0])
-        assert donbot_world.all_link_bs(new_ces[0])
-        for ce in new_ces[1:]:
-            assert ce.body_b == donbot_world.robot.name
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-        i = 0
-        for i in range(1):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(donbot_world.get_possible_collisions('plate'))):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_verify_collision_entries_split2(self, donbot_world):
-        name = 'muh'
-        min_dist = 0.05
-        box = make_world_body_box(name)
-        p = Pose()
-        p.orientation.w = 1
-        donbot_world.world.add_world_body(box, p)
-
-        ces = [avoid_all_entry(min_dist)]
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = name
-        ce.link_bs = [CollisionEntry.ALL]
-        ces.append(ce)
-        new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == 1 + len(donbot_world.robot.link_names_with_collisions) * 2
-        for ce in new_ces[1:]:
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-            if ce.body_b != donbot_world.robot.name:
-                assert CollisionEntry.ALL in ce.link_bs
-            else:
-                assert CollisionEntry.ALL not in ce.link_bs
-            assert len(ce.link_bs) == 1
-        i = 0
-        for i in range(len(donbot_world.robot.link_names_with_collisions) + 1):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(donbot_world.robot.link_names_with_collisions)):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_verify_collision_entries_split3(self, donbot_world):
-        name = 'muh'
-        min_dist = 0.05
-        box = make_world_body_box(name)
-        p = Pose()
-        p.orientation.w = 1
-        donbot_world.world.add_world_body(box, p)
-
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = [CollisionEntry.ALL]
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = name
-        ce.link_bs = [name]
-        ces.append(ce)
-        new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == len(donbot_world.robot.link_names_with_collisions) * 2 + 1
-        for ce in new_ces[1:]:
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-            assert CollisionEntry.ALL not in ce.link_bs
-            assert len(ce.link_bs) == 1
-        i = 0
-        for i in range(1 +
-                       len(donbot_world.robot.link_names_with_collisions)):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(donbot_world.robot.link_names_with_collisions)):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_verify_collision_entries_split4(self, donbot_world):
-        """
-        :type giskardpy.model.pybullet_syncer.PyBulletSyncer:
-        """
-        name = 'muh'
-        min_dist = 0.05
-        box = make_world_body_box(name)
-        p = Pose()
-        p.orientation.w = 1
-        donbot_world.world.add_world_body(box, p)
-        name2 = 'box2'
-        box = make_world_body_box(name2)
-        p = Pose()
-        p.orientation.w = 1
-        donbot_world.world.add_world_body(box, p)
-
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = [CollisionEntry.ALL]
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_links = [CollisionEntry.ALL]
-        ce.body_b = name
-        ce.link_bs = [name]
-        ces.append(ce)
-        new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == len(donbot_world.robot.link_names_with_collisions) * 3 + 1
-        for ce in new_ces[1:]:
-            assert ce.body_b != CollisionEntry.ALL
-            assert CollisionEntry.ALL not in ce.robot_links
-            if ce.body_b == name2:
-                assert CollisionEntry.ALL in ce.link_bs
-            else:
-                assert CollisionEntry.ALL not in ce.link_bs
-            assert len(ce.link_bs) == 1
-        i = -1
-        for i in range(1 + len(donbot_world.robot.link_names_with_collisions) * 2):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(len(donbot_world.robot.link_names_with_collisions)):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_verify_collision_entries_split5(self, donbot_world):
-        name = 'muh'
-        min_dist = 0.05
-        box = make_world_body_box(name)
-        p = Pose()
-        p.orientation.w = 1
-        donbot_world.world.add_world_body(box, p)
-
-        ces = [allow_all_entry()]
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.AVOID_COLLISION
-        ce1.robot_links = ['plate', 'base_link']
-        ce1.body_b = name
-        ce1.link_bs = [CollisionEntry.ALL]
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == 2
-
-        for j in range(2):
-            ce = new_ces[j]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-
-    def test_verify_collision_entries_split6(self, donbot_world):
-        min_dist = 0.05
-        ces = []
-        ce1 = CollisionEntry()
-        ce1.type = CollisionEntry.ALLOW_COLLISION
-        ce1.robot_links = ['plate', 'base_link']
-        ce1.body_b = donbot_world.robot.name
-        ce1.link_bs = ['gripper_finger_left_link', 'gripper_finger_right_link']
-        ce1.min_dist = min_dist
-        ces.append(ce1)
-        new_ces = donbot_world.verify_collision_entries(ces)
-        assert len(new_ces) == 4 + 1
-        i = -1
-        for i in range(1):
-            ce = new_ces[i]
-            assert ce.type == CollisionEntry.AVOID_COLLISION
-        i += 1
-        for j in range(4):
-            ce = new_ces[i + j]
-            assert ce.type == CollisionEntry.ALLOW_COLLISION
-
-    def test_collision_goals_to_collision_matrix1(self, donbot_world):
+    def test_collision_goals_to_collision_matrix1(self, donbot_world: CollisionWorldSynchronizer):
         """
         test with no collision entries which is equal to avoid all collisions
         collision matrix should be empty, because world has no collision checker
@@ -558,7 +244,7 @@ class TestPyBulletSyncer(object):
         :return:
         """
         min_dist = defaultdict(lambda: 0.05)
-        collision_matrix = donbot_world.collision_goals_to_collision_matrix([], min_dist)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix([], min_dist, {})
         assert len(collision_matrix) == 0
 
     def test_collision_goals_to_collision_matrix2(self, donbot_world):

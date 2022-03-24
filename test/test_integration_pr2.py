@@ -19,7 +19,6 @@ from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
-from giskardpy.python_interface import DEFAULT_WORLD_TIMEOUT
 from giskardpy.utils import logging
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
     JointGoalChecker
@@ -214,12 +213,11 @@ class TestConstraints(object):
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute()
 
-
     def test_JointPositionRange(self, zero_pose):
         """
         :type zero_pose: PR2
         """
-        #FIXME needs to be implemented like other position limits, or override limits
+        # FIXME needs to be implemented like other position limits, or override limits
         joint_name = 'head_pan_joint'
         lower_limit, upper_limit = zero_pose.robot.joints[joint_name].position_limits
         lower_limit *= 0.5
@@ -2051,7 +2049,7 @@ class TestWayPoints(object):
 
 class TestShaking(object):
     def test_wiggle_prismatic_joint_neglectable_shaking(self, kitchen_setup):
-        #FIXME
+        # FIXME
         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
@@ -2315,6 +2313,279 @@ class TestShaking(object):
                     assert True
 
 
+class TestWorldManipulation(object):
+
+    def test_clear_world(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+        zero_pose.clear_world()
+        object_name = 'muh2'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+        zero_pose.clear_world()
+        zero_pose.plan_and_execute()
+
+    def test_attach_remove_box(self, better_pose: PR2):
+        pocky = 'http://muh#pocky'
+        p = PoseStamped()
+        p.header.frame_id = better_pose.r_tip
+        p.pose.orientation.w = 1
+        better_pose.add_box(pocky, size=(1, 1, 1), pose=p)
+        for i in range(3):
+            better_pose.reattach_object(name=pocky, parent_link=better_pose.r_tip)
+            better_pose.detach_object(pocky)
+        better_pose.remove_object(pocky)
+
+    def test_reattach_box(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = 'http://muh#pocky'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
+        zero_pose.add_box(pocky, (0.1, 0.02, 0.02), pose=p)
+        zero_pose.reattach_object(pocky, parent_link=zero_pose.r_tip)
+        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
+        compare_poses(p.pose, relative_pose)
+
+    def test_add_box_twice(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p,
+                          expected_error_code=UpdateWorldResponse.DUPLICATE_GROUP_ERROR)
+
+    def test_add_remove_sphere(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 1.2
+        p.pose.position.y = 0
+        p.pose.position.z = 1.6
+        p.pose.orientation.w = 1
+        zero_pose.add_sphere(object_name, radius=1, pose=p)
+        zero_pose.remove_object(object_name)
+
+    def test_add_remove_cylinder(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 0.5
+        p.pose.position.y = 0
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        zero_pose.add_cylinder(object_name, height=1, radius=1, pose=p)
+        zero_pose.remove_object(object_name)
+
+    def test_add_urdf_body(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        object_name = 'kitchen'
+        kitchen_setup.clear_world()
+        kitchen_setup.add_urdf(name=object_name,
+                               urdf=rospy.get_param('kitchen_description'),
+                               pose=tf.lookup_pose('map', 'iai_kitchen/world'),
+                               js_topic='/kitchen/joint_states',
+                               set_js_topic='/kitchen/cram_joint_states')
+        kitchen_setup.remove_object(object_name)
+        kitchen_setup.add_urdf(name=object_name,
+                               urdf=rospy.get_param('kitchen_description'),
+                               pose=tf.lookup_pose('map', 'iai_kitchen/world'),
+                               js_topic='/kitchen/joint_states',
+                               set_js_topic='/kitchen/cram_joint_states')
+
+    def test_add_mesh(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.add_mesh(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
+
+    def test_add_non_existing_mesh(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.add_mesh(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
+                           expected_error_code=UpdateWorldResponse.CORRUPT_MESH_ERROR)
+
+    def test_add_attach_detach_remove_add(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+        zero_pose.reattach_object(object_name, parent_link=zero_pose.r_tip)
+        zero_pose.detach_object(object_name)
+        zero_pose.remove_object(object_name)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+        assert zero_pose.get_attached_objects().object_names == []
+
+    def test_attach_existing_box2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = 'http://muh#pocky'
+        old_p = PoseStamped()
+        old_p.header.frame_id = zero_pose.r_tip
+        old_p.pose.position = Point(0.05, 0, 0)
+        old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
+        zero_pose.add_box(pocky, (0.1, 0.02, 0.02), pose=old_p)
+        zero_pose.reattach_object(pocky, parent_link=zero_pose.r_tip)
+        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
+        compare_poses(old_p.pose, relative_pose)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position.x = -0.1
+        p.pose.orientation.w = 1.0
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
+        p.header.frame_id = 'map'
+        p.pose.position.y = -1
+        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
+        zero_pose.move_base(p)
+        rospy.sleep(.5)
+
+        zero_pose.detach_object(pocky)
+
+    def test_attach_to_nonexistant_robot_link(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = 'http://muh#pocky'
+        p = PoseStamped()
+        zero_pose.add_box(name=pocky,
+                          size=(0.1, 0.02, 0.02),
+                          pose=p,
+                          parent_link='muh',
+                          expected_error_code=UpdateWorldResponse.UNKNOWN_LINK_ERROR)
+
+    def test_reattach_unknown_object(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.reattach_object('muh',
+                                  parent_link='',
+                                  parent_link_group='',
+                                  expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+
+    def test_add_remove_box(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 1.2
+        p.pose.position.y = 0
+        p.pose.position.z = 1.6
+        p.pose.orientation.w = 1
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+        zero_pose.remove_object(object_name)
+
+    def test_invalid_update_world(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        req = UpdateWorldRequest()
+        req.timeout = 500
+        req.body = WorldBody()
+        req.pose = PoseStamped()
+        req.parent_link = zero_pose.r_tip
+        req.operation = 42
+        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
+
+    def test_remove_unkown_group(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.remove_object('muh', expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+
+    def test_corrupt_shape_error(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        p = PoseStamped()
+        p.header.frame_id = 'base_link'
+        req = UpdateWorldRequest()
+        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                             shape=SolidPrimitive(type=42))
+        req.pose = PoseStamped()
+        req.pose.header.frame_id = 'map'
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ADD
+        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+
+    def test_tf_error(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        req = UpdateWorldRequest()
+        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                             shape=SolidPrimitive(type=1))
+        req.pose = PoseStamped()
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ADD
+        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
+
+    def test_unsupported_options(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        wb = WorldBody()
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = str('base_link')
+        pose.pose.position = Point()
+        pose.pose.orientation = Quaternion(w=1)
+        wb.type = WorldBody.URDF_BODY
+
+        req = UpdateWorldRequest()
+        req.body = wb
+        req.pose = pose
+        req.parent_link = 'base_link'
+        req.operation = UpdateWorldRequest.ADD
+        assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
+
+
 class TestCollisionAvoidanceGoals(object):
 
     # def test_wiggle4(self, pocky_pose_setup):
@@ -2388,7 +2659,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.detach_object('box')
-        kitchen_setup.attach_object('box', kitchen_setup.r_tip)
+        kitchen_setup.reattach_object('box', kitchen_setup.r_tip)
 
         r_goal2 = PoseStamped()
         r_goal2.header.frame_id = 'box'
@@ -2400,54 +2671,11 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.plan_and_execute()
         # kitchen_setup.check_cart_goal('box', r_goal2)
 
-    def test_clear_world(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position = Point(1.2, 0, 1.6)
-        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        zero_pose.clear_world()
-        object_name = 'muh2'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position = Point(1.2, 0, 1.6)
-        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        zero_pose.clear_world()
-        zero_pose.plan_and_execute()
-
     def test_only_collision_avoidance(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         zero_pose.plan_and_execute()
-
-    def test_add_mesh(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
-
-    def test_add_non_existing_mesh(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
-                           expected_error_code=UpdateWorldResponse.CORRUPT_MESH_ERROR)
 
     def test_mesh_collision_avoidance(self, zero_pose):
         """
@@ -2461,61 +2689,6 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 2, [0, 1, 0]))
         zero_pose.add_mesh(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
         zero_pose.plan_and_execute()
-
-    def test_add_box_twice(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position = Point(1.2, 0, 1.6)
-        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p,
-                          expected_error_code=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
-
-    def test_add_remove_sphere(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.x = 1.2
-        p.pose.position.y = 0
-        p.pose.position.z = 1.6
-        p.pose.orientation.w = 1
-        zero_pose.add_sphere(object_name, radius=1, pose=p)
-        zero_pose.remove_object(object_name)
-
-    def test_add_remove_cylinder(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.x = 0.5
-        p.pose.position.y = 0
-        p.pose.position.z = 0
-        p.pose.orientation.w = 1
-        zero_pose.add_cylinder(object_name, height=1, radius=1, pose=p)
-        zero_pose.remove_object(object_name)
-
-    def test_add_urdf_body(self, kitchen_setup):
-        """
-        :type kitchen_setup: PR2
-        """
-        object_name = 'kitchen'
-        kitchen_setup.clear_world()
-        kitchen_setup.add_urdf(object_name, rospy.get_param('kitchen_description'),
-                               tf.lookup_pose('map', 'iai_kitchen/world'), '/kitchen/joint_states',
-                               set_js_topic='/kitchen/cram_joint_states')
-        kitchen_setup.remove_object(object_name)
-        kitchen_setup.add_urdf(object_name, rospy.get_param('kitchen_description'),
-                               tf.lookup_pose('map', 'iai_kitchen/world'), '/kitchen/joint_states',
-                               set_js_topic='/kitchen/cram_joint_states')
 
     def test_attach_box_as_eef(self, zero_pose):
         """
@@ -2542,267 +2715,6 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.x = -.1
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
-
-    def test_attach_remove_box(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.05, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
-        zero_pose.detach_object(pocky)
-        zero_pose.remove_object(pocky)
-
-    def test_attach_remove_sphere(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.05, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.attach_sphere(pocky, 1, zero_pose.r_tip, p)
-        zero_pose.detach_object(pocky)
-        zero_pose.remove_object(pocky)
-
-    def test_attach_remove_cylinder(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.05, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.attach_cylinder(pocky, 1, 1, zero_pose.r_tip, p)
-        zero_pose.detach_object(pocky)
-        zero_pose.remove_object(pocky)
-
-    def test_attach_remove_box2(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute()
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.orientation.w = 1
-        zero_pose.add_box(pocky, size=[1, 1, 1], pose=p)
-        for i in range(3):
-            zero_pose.attach_object(pocky, zero_pose.r_tip)
-            zero_pose.detach_object(pocky)
-        zero_pose.remove_object(pocky)
-
-    def test_remove_attached_box(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.05, 0, 0)
-        p.pose.orientation.w = 1
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
-        zero_pose.remove_object(pocky)
-
-    def test_attach_existing_box(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.05, 0, 0)
-        p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
-        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=p)
-        zero_pose.attach_object(pocky, parent_link=zero_pose.r_tip)
-        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
-        compare_poses(p.pose, relative_pose)
-
-    def test_add_attach_detach_remove_add(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position = Point(1.2, 0, 1.6)
-        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        zero_pose.attach_object(object_name, parent_link=zero_pose.r_tip)
-        zero_pose.detach_object(object_name)
-        zero_pose.remove_object(object_name)
-        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        assert zero_pose.get_attached_objects().object_names == []
-
-    def test_attach_existing_box2(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        old_p = PoseStamped()
-        old_p.header.frame_id = zero_pose.r_tip
-        old_p.pose.position = Point(0.05, 0, 0)
-        old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
-        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
-        zero_pose.attach_object(pocky, parent_link=zero_pose.r_tip)
-        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
-        compare_poses(old_p.pose, relative_pose)
-
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position.x = -0.1
-        p.pose.orientation.w = 1.0
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
-        p.header.frame_id = 'map'
-        p.pose.position.y = -1
-        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
-        zero_pose.move_base(p)
-        rospy.sleep(.5)
-
-        zero_pose.detach_object(pocky)
-
-    def test_attach_detach_twice(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.05, 0, 0)
-        p.pose.orientation = Quaternion(1, 0, 0, 0)
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, p)
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.orientation.w = 1
-        zero_pose.set_cart_goal(p, pocky)
-        p = tf.transform_pose(zero_pose.default_root, p)
-        zero_pose.plan_and_execute()
-        p2 = zero_pose.robot.compute_fk_pose(zero_pose.default_root, pocky)
-        compare_poses(p2.pose, p.pose)
-
-        zero_pose.clear_world()
-
-        old_p = PoseStamped()
-        old_p.header.frame_id = zero_pose.r_tip
-        old_p.pose.position = Point(0.05, 0, 0)
-        old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
-        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
-        zero_pose.attach_object(pocky, parent_link=zero_pose.r_tip)
-        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
-        compare_poses(actual_pose=relative_pose, desired_pose=old_p.pose)
-
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position.x = -0.1
-        p.pose.orientation.w = 1.0
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
-
-    def test_attach_to_nonexistant_robot_link(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        zero_pose.attach_box(name=pocky,
-                             size=[0.1, 0.02, 0.02],
-                             parent_link='muh',
-                             pose=p,
-                             expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
-
-    def test_detach_unknown_object(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.detach_object('nil', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
-
-    def test_add_remove_box(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        object_name = 'muh'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.x = 1.2
-        p.pose.position.y = 0
-        p.pose.position.z = 1.6
-        p.pose.orientation.w = 1
-        zero_pose.add_box(object_name, size=[1, 1, 1], pose=p)
-        zero_pose.remove_object(object_name)
-
-    def test_invalid_update_world(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        req = UpdateWorldRequest()
-        req.timeout = DEFAULT_WORLD_TIMEOUT
-        req.body = WorldBody()
-        req.pose = PoseStamped()
-        req.parent_link = zero_pose.r_tip
-        req.operation = 42
-        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
-
-    def test_missing_body_error(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.remove_object('muh', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
-
-    def test_corrupt_shape_error(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        p = PoseStamped()
-        p.header.frame_id = 'base_link'
-        req = UpdateWorldRequest()
-        req.timeout = DEFAULT_WORLD_TIMEOUT
-        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                             shape=SolidPrimitive(type=42))
-        req.pose = PoseStamped()
-        req.pose.header.frame_id = 'map'
-        req.parent_link = 'base_link'
-        req.operation = UpdateWorldRequest.ATTACH
-        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
-
-    def test_tf_error(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        req = UpdateWorldRequest()
-        req.timeout = DEFAULT_WORLD_TIMEOUT
-        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                             shape=SolidPrimitive(type=1))
-        req.pose = PoseStamped()
-        req.parent_link = 'base_link'
-        req.operation = UpdateWorldRequest.ADD
-        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
-
-    def test_unsupported_options(self, kitchen_setup):
-        """
-        :type kitchen_setup: PR2
-        """
-        wb = WorldBody()
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str('base_link')
-        pose.pose.position = Point()
-        pose.pose.orientation = Quaternion(w=1)
-        wb.type = WorldBody.URDF_BODY
-
-        req = UpdateWorldRequest()
-        req.timeout = DEFAULT_WORLD_TIMEOUT
-        req.body = wb
-        req.pose = pose
-        req.parent_link = 'base_link'
-        req.operation = UpdateWorldRequest.ATTACH
-        assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
 
     def test_infeasible(self, kitchen_setup):
         """
@@ -4087,7 +3999,7 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(milk_name, kitchen_setup.l_tip)
+        kitchen_setup.reattach_object(milk_name, kitchen_setup.l_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -4175,7 +4087,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.reattach_object(cereal_name, kitchen_setup.r_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -4319,8 +4231,8 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(bowl_name, kitchen_setup.l_tip)
-        kitchen_setup.attach_object(cup_name, kitchen_setup.r_tip)
+        kitchen_setup.reattach_object(bowl_name, kitchen_setup.l_tip)
+        kitchen_setup.reattach_object(cup_name, kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
@@ -4461,7 +4373,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.attach_object(spoon_name, kitchen_setup.l_tip)
+        kitchen_setup.reattach_object(spoon_name, kitchen_setup.l_tip)
 
         l_goal.pose.position.z += .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
@@ -4586,7 +4498,7 @@ class TestCollisionAvoidanceGoals(object):
         # grasp tray
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(tray_name, kitchen_setup.r_tip)
+        kitchen_setup.reattach_object(tray_name, kitchen_setup.r_tip)
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = kitchen_setup.l_tip
@@ -5076,8 +4988,8 @@ class TestConfigFile(object):
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
 
-        kitchen_setup.attach_object(bowl_name, kitchen_setup.l_tip)
-        kitchen_setup.attach_object(cup_name, kitchen_setup.r_tip)
+        kitchen_setup.reattach_object(bowl_name, kitchen_setup.l_tip)
+        kitchen_setup.reattach_object(cup_name, kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
@@ -5140,7 +5052,6 @@ class TestInfoServices(object):
                     'r_wrist_roll_joint',
                     'torso_lift_joint'}
         assert set(result.controlled_joints) == expected
-
 
 # time: *[1-9].
 # import pytest

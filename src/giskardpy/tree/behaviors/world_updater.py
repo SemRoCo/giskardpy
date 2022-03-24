@@ -9,11 +9,13 @@ from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.identifier as identifier
+from giskard_msgs.msg import WorldBody
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames, \
     GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse
+from giskardpy import RobotName
 from giskardpy.data_types import PrefixName
-from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
-    UnsupportedOptionException, DuplicateNameException
+from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
+    UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
@@ -36,12 +38,15 @@ def exception_to_response(e, req):
         elif req.body.type == req.body.URDF_BODY:
             return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_URDF_ERROR, str(e))
         return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
-    elif error_in_list(e, [UnknownBodyException, KeyError]):
+    elif error_in_list(e, [UnknownGroupException]):
         traceback.print_exc()
-        return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
+        return UpdateWorldResponse(UpdateWorldResponse.UNKNOWN_GROUP_ERROR, str(e))
+    elif error_in_list(e, [UnknownLinkException]):
+        traceback.print_exc()
+        return UpdateWorldResponse(UpdateWorldResponse.UNKNOWN_LINK_ERROR, str(e))
     elif error_in_list(e, [DuplicateNameException]):
         traceback.print_exc()
-        return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
+        return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_GROUP_ERROR, str(e))
     elif error_in_list(e, [UnsupportedOptionException]):
         traceback.print_exc()
         return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
@@ -65,8 +70,9 @@ class WorldUpdater(GiskardBehavior):
         super(WorldUpdater, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
-        self.queue = Queue(maxsize=1)
-        self.queue2 = Queue(maxsize=1)
+        self.service_in_use = Queue(maxsize=1)
+        self.work_permit = Queue(maxsize=1)
+        self.update_ticked = Queue(maxsize=1)
         self.timer_state = self.READY
 
     @profile
@@ -121,16 +127,20 @@ class WorldUpdater(GiskardBehavior):
 
     @profile
     def update(self):
-        if self.timer_state == self.STALL:
-            self.timer_state = self.READY
-            return Status.SUCCESS
-        if self.queue.empty():
-            return Status.SUCCESS
-        else:
-            if self.timer_state == self.READY:
-                self.timer_state = self.BUSY
-                self.queue2.put(1)
-        return Status.RUNNING
+        try:
+            if self.timer_state == self.STALL:
+                self.timer_state = self.READY
+                return Status.SUCCESS
+            if self.service_in_use.empty():
+                return Status.SUCCESS
+            else:
+                if self.timer_state == self.READY:
+                    self.timer_state = self.BUSY
+                    self.work_permit.put(1)
+            return Status.RUNNING
+        finally:
+            if self.update_ticked.empty():
+                self.update_ticked.put(1)
 
     def update_world_cb(self, req):
         """
@@ -140,25 +150,29 @@ class WorldUpdater(GiskardBehavior):
         :return: Service response, reporting back any runtime errors that occurred.
         :rtype UpdateWorldResponse
         """
-        self.queue.put('busy')
+        self.service_in_use.put('muh')
         try:
-            self.queue2.get(timeout=req.timeout)
+            # make sure update had a chance to add a work permit
+            self.update_ticked.get()
+            # calling this twice, because it may still have a tick from the prev update call
+            self.update_ticked.get()
+            self.work_permit.get(timeout=req.timeout)
             with self.get_god_map():
                 self.clear_markers()
                 try:
                     if req.operation == UpdateWorldRequest.ADD:
                         self.add_object(req)
-                    elif req.operation == UpdateWorldRequest.ATTACH:
-                        self.attach_object(req)
+                    elif req.operation == UpdateWorldRequest.REATTACH:
+                        self.reattach_object(req)
                     elif req.operation == UpdateWorldRequest.REMOVE:
-                        self.remove_object(req.body.name)
+                        self.remove_object(req.group_name)
                     elif req.operation == UpdateWorldRequest.REMOVE_ALL:
                         self.clear_world()
                     elif req.operation == UpdateWorldRequest.DETACH:
                         self.detach_object(req)
                     else:
                         return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                                   'Received invalid operation code: {}'.format(req.operation))
+                                                   f'Received invalid operation code: {req.operation}')
                     return UpdateWorldResponse()
                 except Exception as e:
                     return exception_to_response(e, req)
@@ -169,59 +183,67 @@ class WorldUpdater(GiskardBehavior):
             return response
         finally:
             self.timer_state = self.STALL
-            self.queue.get_nowait()
+            self.service_in_use.get_nowait()
 
-    def add_object(self, req):
-        """
-        :type req: UpdateWorldRequest
-        """
+    def handle_convention(self, req: UpdateWorldRequest):
+        # default to world root if all is empty
+        if req.parent_link_group == '' and req.parent_link == '':
+            req.parent_link = self.world.root_link_name
+        # default to robot group, if parent link name is not empty
+        else:
+            if req.parent_link_group == '':
+                req.parent_link_group = RobotName
+            req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
+        return req
+
+    def add_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
+        req = self.handle_convention(req)
         world_body = req.body
         global_pose = transform_pose(req.parent_link, req.pose).pose
-        self.world.add_world_body(world_body, global_pose, req.parent_link)
+        self.world.add_world_body(group_name=req.group_name,
+                                  msg=world_body,
+                                  pose=global_pose,
+                                  parent_link_name=req.parent_link)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
-        logging.loginfo('Added object \'{}\' at \'{}\'.'.format(req.body.name, req.parent_link))
+        logging.loginfo(f'Added object \'{req.group_name}\' at \'{req.parent_link_group}/{req.parent_link}\'.')
         if world_body.joint_state_topic:
-            plugin_name = str(PrefixName(world_body.name, 'js'))
-            plugin = running_is_success(SyncConfiguration)(plugin_name, group_name=world_body.name,
+            plugin_name = str(PrefixName(req.group_name, 'js'))
+            plugin = running_is_success(SyncConfiguration)(plugin_name,
+                                                           group_name=req.group_name,
                                                            joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
-            logging.loginfo('Added configuration plugin for \'{}\' to tree.'.format(req.body.name))
+            logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
             plugin_name = str(PrefixName(world_body.name, 'localization'))
-            plugin = SyncLocalization(plugin_name, group_name=world_body.name,
+            plugin = SyncLocalization(plugin_name,
+                                      group_name=req.group_name,
                                       tf_root_link_name=world_body.tf_root_link_name)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
-            logging.loginfo('Added localization plugin for \'{}\' to tree.'.format(req.body.name))
+            logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
 
     def detach_object(self, req):
         # assumes that parent has god map lock
-        if req.body.name not in self.world.groups:
-            raise UnknownBodyException('Can\'t detach \'{}\' because it doesn\'t exist.'.format(req.body.name))
-        req.parent_link = self.world.root_link_name
-        self.attach_object(req)
+        if req.group_name not in self.world.groups:
+            raise UnknownGroupException(f'Can\'t detach \'{req.group_name}\' because it doesn\'t exist.')
+        req.parent_link_group = ''
+        req.parent_link = ''
+        self.reattach_object(req)
 
-    def attach_object(self, req):
-        """
-        :type req: UpdateWorldRequest
-        """
+    def reattach_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        if req.parent_link not in self.world.link_names:
-            raise UnknownBodyException('There is no link named \'{}\'.'.format(req.parent_link))
-        if req.body.name not in self.world.groups:
-            self.add_object(req)
-        elif self.world.groups[req.body.name].root_link_name != req.parent_link:
-            old_parent_link = self.world.groups[req.body.name].parent_link_of_root
-            self.world.move_group(req.body.name, req.parent_link)
-            logging.loginfo('Attached \'{}\' from \'{}\' to \'{}\'.'.format(req.body.name,
-                                                                            old_parent_link,
-                                                                            req.parent_link))
+        req = self.handle_convention(req)
+        if req.group_name not in self.world.groups:
+            raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
+        if self.world.groups[req.group_name].root_link_name != req.parent_link:
+            old_parent_link = self.world.groups[req.group_name].parent_link_of_root
+            self.world.move_group(req.group_name, req.parent_link)
+            logging.loginfo(f'Reattached \'{req.group_name}\' from \'{old_parent_link}\' to \'{req.parent_link}\'.')
         else:
-            logging.logwarn('Didn\'t update world because \'{}\' is already attached to \'{}\'.'.format(req.body.name,
-                                                                                                        req.parent_link))
+            logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
 
     def remove_object(self, name):
         # assumes that parent has god map lock

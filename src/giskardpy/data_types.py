@@ -292,7 +292,10 @@ class Collisions(object):
         """
         link_a = collision.original_link_a
         link_b = collision.original_link_b
-        new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b)
+        try:
+            new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b)
+        except Exception as e:
+            pass
         if new_link_a > new_link_b:
             collision = collision.reverse()
             new_link_a, new_link_b = new_link_b, new_link_a

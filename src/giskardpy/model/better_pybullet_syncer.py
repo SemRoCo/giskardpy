@@ -56,8 +56,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def cut_off_distances_to_query(self, cut_off_distances, buffer=0.05):
         if self.query is None:
             self.query = defaultdict(set)
-            for (link_a, _, link_b), dist in cut_off_distances.items():
-                self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist+buffer))
+            for (link_a, link_b), dist in cut_off_distances.items():
+                try:
+                    self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist+buffer))
+                except:
+                    pass
         return self.query
 
     @profile
@@ -188,7 +191,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 self.add_object(link)
             self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
             bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
-            self.init_collision_matrix(RobotName)
+            self.update_collision_blacklist()
         bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
 
     def get_pose(self, link_name):

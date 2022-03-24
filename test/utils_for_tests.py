@@ -3,6 +3,7 @@ from collections import defaultdict
 from copy import copy
 from multiprocessing import Queue
 from time import time
+from typing import Tuple, Optional
 
 import actionlib
 import control_msgs
@@ -10,17 +11,16 @@ import hypothesis.strategies as st
 import numpy as np
 import rospy
 from angles import shortest_angular_distance
-from control_msgs.msg import FollowJointTrajectoryActionGoal, FollowJointTrajectoryActionResult
+from control_msgs.msg import FollowJointTrajectoryActionGoal
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3Stamped
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
-from py_trees import Blackboard
 from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from std_srvs.srv import Trigger, TriggerRequest
-from tf.transformations import rotation_from_matrix, quaternion_matrix, quaternion_about_axis
+from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
 from visualization_msgs.msg import Marker
 
@@ -700,8 +700,8 @@ class GiskardTestWrapper(GiskardWrapper):
                     joint_limits = self.robot.get_joint_position_limits(joint_name)
                     error_msg = '{} has violated joint position limit'.format(joint_name)
                     eps = 0.0001
-                    np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1]+eps, error_msg)
-                    np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0]+eps, error_msg)
+                    np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1] + eps, error_msg)
+                    np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0] + eps, error_msg)
                 vel_limit = self.world.joint_limit_expr(joint_name, 1)[1]
                 vel_limit = self.god_map.evaluate_expr(vel_limit) * 1.001
                 vel = trajectory_vel[joint_name]
@@ -713,6 +713,8 @@ class GiskardTestWrapper(GiskardWrapper):
     # BULLET WORLD #####################################################################################################
     #
 
+    TimeOut = 5000
+
     @property
     def world(self):
         """
@@ -720,21 +722,25 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         return self.god_map.get_data(identifier.world)
 
-    def clear_world(self):
-        return_val = super(GiskardTestWrapper, self).clear_world()
-        assert return_val.error_codes == UpdateWorldResponse.SUCCESS
+    def clear_world(self, timeout: float = TimeOut) -> UpdateWorldResponse:
+        respone = super().clear_world(timeout=timeout)
+        assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 1
         assert len(self.get_object_names().object_names) == 1
         assert self.original_number_of_links == len(self.world.links)
+        return respone
 
-    def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+    def remove_object(self,
+                      name: str,
+                      timeout: float = TimeOut,
+                      expected_response: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
         if expected_response == UpdateWorldResponse.SUCCESS:
             old_link_names = self.world.groups[name].link_names
             old_joint_names = self.world.groups[name].joint_names
         r = super(GiskardTestWrapper, self).remove_object(name)
         assert r.error_codes == expected_response, \
-            'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                           update_world_error_code(expected_response))
+            f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
+            f'expected: \'{update_world_error_code(expected_response)}.\''
         assert not name in self.world.groups
         assert name not in self.get_object_names().object_names
         if expected_response == UpdateWorldResponse.SUCCESS:
@@ -742,17 +748,18 @@ class GiskardTestWrapper(GiskardWrapper):
                 assert old_link_name not in self.world.link_names
             for old_joint_name in old_joint_names:
                 assert old_joint_name not in self.world.joint_names
+        return r
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
             expected_pose = self.robot.compute_fk_pose(self.robot.root_link_name, name)
-            response = super(GiskardTestWrapper, self).detach_object(name)
+            response = super().detach_object(name)
             self.check_add_object_result(response, expected_response, expected_pose, name)
 
     def check_add_object_result(self, response, error_code, pose, name):
         assert response.error_codes == error_code, \
-            'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
-                                           update_world_error_code(error_code))
+            f'Got: \'{update_world_error_code(response.error_codes)}\', ' \
+            f'expected: \'{update_world_error_code(error_code)}.\''
         if error_code == UpdateWorldResponse.SUCCESS:
             p = tf.transform_pose(self.world.root_link_name, pose)
             o_p = self.world.groups[name].base_pose
@@ -761,84 +768,123 @@ class GiskardTestWrapper(GiskardWrapper):
             compare_poses(o_p, self.get_object_info(name).pose.pose)
             assert name not in self.get_attached_objects().object_names
         else:
-            if error_code != UpdateWorldResponse.DUPLICATE_BODY_ERROR:
+            if error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
                 assert name not in self.world.groups
                 assert name not in self.get_object_names().object_names
 
-    def add_box(self, name, size, pose, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_box(name=name,
-                                                           size=size,
-                                                           pose=pose)
+    def add_box(self,
+                name: str,
+                size: Tuple[float, float, float],
+                pose: PoseStamped,
+                parent_link: str = '',
+                parent_link_group: str = '',
+                timeout: float = TimeOut,
+                expected_error_code: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        response = super().add_box(name=name,
+                                   size=size,
+                                   pose=pose,
+                                   parent_link=parent_link,
+                                   parent_link_group=parent_link_group,
+                                   timeout=timeout)
         self.check_add_object_result(response, expected_error_code, pose, name)
+        return response
 
-    def add_sphere(self, name, radius=1, pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_sphere(name=name,
-                                                              radius=radius,
-                                                              pose=pose)
+    def add_sphere(self,
+                   name: str,
+                   radius: float = 1,
+                   pose: Optional[PoseStamped] = None,
+                   parent_link: str = '',
+                   parent_link_group: str = '',
+                   timeout: float = TimeOut,
+                   expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        response = super().add_sphere(name=name,
+                                      radius=radius,
+                                      pose=pose,
+                                      parent_link=parent_link,
+                                      parent_link_group=parent_link_group,
+                                      timeout=timeout)
         self.check_add_object_result(response, expected_error_code, pose, name)
+        return response
 
-    def add_cylinder(self, name, height, radius, pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_cylinder(name=name,
-                                                                height=height,
-                                                                radius=radius,
-                                                                pose=pose)
+    def add_cylinder(self,
+                     name: str,
+                     height: float,
+                     radius: float,
+                     pose: Optional[PoseStamped] = None,
+                     parent_link: str = '',
+                     parent_link_group: str = '',
+                     timeout: float = TimeOut,
+                     expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        response = super().add_cylinder(name=name,
+                                        height=height,
+                                        radius=radius,
+                                        pose=pose,
+                                        parent_link=parent_link,
+                                        parent_link_group=parent_link_group,
+                                        timeout=timeout)
         self.check_add_object_result(response, expected_error_code, pose, name)
+        return response
 
-    def add_mesh(self, name='meshy', mesh='', pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=mesh, pose=pose)
+    def add_mesh(self,
+                 name: str = 'meshy',
+                 mesh: str = '',
+                 pose: Optional[PoseStamped] = None,
+                 parent_link: str = '',
+                 parent_link_group: str = '',
+                 timeout: float = TimeOut,
+                 expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        response = super().add_mesh(name=name,
+                                    mesh=mesh,
+                                    pose=pose,
+                                    parent_link=parent_link,
+                                    parent_link_group=parent_link_group,
+                                    timeout=timeout)
         pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
                                           position=pose.pose.position, orientation=pose.pose.orientation)
         self.check_add_object_result(response, expected_error_code, pose, name)
+        return response
 
-    def add_urdf(self, name, urdf, pose, js_topic='', set_js_topic=None,
-                 expected_error_code=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
+    def add_urdf(self,
+                 name: str,
+                 urdf: str,
+                 pose: PoseStamped,
+                 parent_link: str = '',
+                 parent_link_group: str = '',
+                 js_topic: str = '',
+                 set_js_topic: Optional[str] = None,
+                 timeout: float = TimeOut,
+                 expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        response = super().add_urdf(name=name,
+                                    urdf=urdf,
+                                    pose=pose,
+                                    parent_link=parent_link,
+                                    parent_link_group=parent_link_group,
+                                    js_topic=js_topic,
+                                    set_js_topic=set_js_topic,
+                                    timeout=timeout)
         self.check_add_object_result(response, expected_error_code, pose, name)
+        return response
 
-    def check_attach_object_result(self, response, expected_error_code, pose, name, parent_link):
-        assert response.error_codes == expected_error_code, \
-            'got: {}, expected: {}'.format(update_world_error_code(response.error_codes),
-                                           update_world_error_code(expected_error_code))
-        if expected_error_code == UpdateWorldResponse.SUCCESS:
-            assert name in [n.short_name for n in self.world.link_names]
-            assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
-            assert self.world.groups[name].parent_link_of_root == parent_link
-            current_pose = self.world.compute_fk_pose(self.world.root_link_name, name)
-            pose = tf.transform_pose(self.world.root_link_name, pose)
-            compare_poses(pose.pose, current_pose.pose)
-
-    def attach_box(self, name, size, parent_link, pose, expected_response=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).attach_box(name=name,
-                                                              size=size,
-                                                              parent_link=parent_link,
-                                                              pose=pose)
-        self.check_attach_object_result(response, expected_response, pose, name, parent_link)
-
-    def attach_cylinder(self, name, height, radius, parent_link, pose, expected_response=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).attach_cylinder(name=name,
-                                                                   height=height,
-                                                                   radius=radius,
-                                                                   parent_link=parent_link,
-                                                                   pose=pose)
-        self.check_attach_object_result(response, expected_response, pose, name, parent_link)
-
-    def attach_sphere(self, name, radius, parent_link, pose, expected_response=UpdateWorldResponse.SUCCESS):
-        response = super(GiskardTestWrapper, self).attach_sphere(name=name,
-                                                                 radius=radius,
-                                                                 parent_link=parent_link,
-                                                                 pose=pose)
-        self.check_attach_object_result(response, expected_response, pose, name, parent_link)
-
-    def attach_object(self, name, parent_link, expected_response=UpdateWorldResponse.SUCCESS):
-        r = super(GiskardTestWrapper, self).attach_object(name, parent_link)
+    def reattach_object(self,
+                        name: str,
+                        parent_link: str = '',
+                        parent_link_group: str = '',
+                        timeout: float = TimeOut,
+                        expected_response: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        r = super(GiskardTestWrapper, self).reattach_object(name=name,
+                                                            parent_link=parent_link,
+                                                            parent_link_group=parent_link_group,
+                                                            timeout=timeout)
         self.wait_heartbeats()
         assert r.error_codes == expected_response, \
-            'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                           update_world_error_code(expected_response))
-        assert name in self.get_attached_objects().object_names
-        if self.god_map.get_data(identifier.collision_checker) is not None:
-            assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
-            assert self.world.groups[name].parent_link_of_root == parent_link
+            f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
+            f'expected: \'{update_world_error_code(expected_response)}.\''
+        if r.error_codes == r.SUCCESS:
+            assert name in self.get_attached_objects().object_names
+            if self.god_map.get_data(identifier.collision_checker) is not None:
+                assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
+                assert self.world.groups[name].parent_link_of_root == parent_link
+        return r
 
     def get_external_collisions(self, link, distance_threshold):
         """
@@ -846,7 +892,7 @@ class GiskardTestWrapper(GiskardWrapper):
         :rtype: list
         """
         self.collision_scene.reset_cache()
-        collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
+        collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_COLLISION, distance=distance_threshold)]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
                                                                                     defaultdict(lambda: 0.3), {})
         collisions = self.collision_scene.check_collisions(collision_matrix)
@@ -1010,6 +1056,7 @@ class PR2(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
 
+
 class PR2CloseLoop(PR2):
 
     def __init__(self):
@@ -1028,6 +1075,7 @@ class PR2CloseLoop(PR2):
     def reset(self):
         self.clear_world()
         self.reset_base()
+
 
 class Donbot(GiskardTestWrapper):
     default_pose = {
@@ -1181,6 +1229,7 @@ class Boxy(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
 
+
 class BoxyCloseLoop(Boxy):
 
     def __init__(self, config=None):
@@ -1195,6 +1244,7 @@ class BoxyCloseLoop(Boxy):
     def reset(self):
         self.clear_world()
         self.reset_base()
+
 
 class TiagoDual(GiskardTestWrapper):
     default_pose = {
@@ -1354,7 +1404,7 @@ class SuccessfulActionServer(object):
     def __init__(self):
         self.name_space = rospy.get_param('~name_space')
         self.joint_names = rospy.get_param('~joint_names')
-        self.state = {j:0 for j in self.joint_names}
+        self.state = {j: 0 for j in self.joint_names}
         self.pub = rospy.Publisher('{}/state'.format(self.name_space), control_msgs.msg.JointTrajectoryControllerState,
                                    queue_size=10)
         self.timer = rospy.Timer(rospy.Duration(0.1), self.state_cb)

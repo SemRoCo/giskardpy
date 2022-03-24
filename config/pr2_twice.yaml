@@ -1,3 +1,4 @@
+parent: !include default.yaml
 pr2_a:
   parent: !include robots/pr2.yaml
 pr2_b:

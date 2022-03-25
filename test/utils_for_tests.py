@@ -455,14 +455,6 @@ class GiskardTestWrapper(GiskardWrapper):
         return self.god_map.unsafe_get_data(identifier.collision_scene)
 
     @property
-    def robot_self_collision_matrix(self):
-        """
-        :rtype: set
-        """
-        self.wait_heartbeats()
-        return self.collision_scene.collision_matrices[RobotName]
-
-    @property
     def robot(self):
         """
         :rtype: giskardpy.model.world.SubWorldTree
@@ -882,7 +874,6 @@ class GiskardTestWrapper(GiskardWrapper):
         if r.error_codes == r.SUCCESS:
             assert name in self.get_attached_objects().object_names
             if self.god_map.get_data(identifier.collision_checker) is not None:
-                assert len([x for x in self.robot_self_collision_matrix if name in x]) > 0
                 assert self.world.groups[name].parent_link_of_root == parent_link
         return r
 

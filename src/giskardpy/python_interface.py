@@ -381,43 +381,19 @@ class GiskardWrapper(object):
         """
         self.cmd_seq[-1].collisions.extend(collisions)
 
-    def allow_collision(self, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
-                        link_bs=(CollisionEntry.ALL,)):
-        """
-        :param robot_links: list of robot link names as str, None or empty list means all
-        :type robot_links: list
-        :param body_b: name of the other body, use the robots name to modify self collision behavior, empty string means all bodies
-        :type body_b: str
-        :param link_bs: list of link name of body_b, None or empty list means all
-        :type link_bs: list
-        """
+    def allow_collision(self, group1: str = CollisionEntry.ALL, group2: str = CollisionEntry.ALL):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        # todo
-        # collision_entry.robot_links = [str(x) for x in robot_links]
-        # collision_entry.body_b = str(body_b)
-        # collision_entry.link_bs = [str(x) for x in link_bs]
+        collision_entry.group1 = str(group1)
+        collision_entry.group2 = str(group2)
         self.set_collision_entries([collision_entry])
 
-    def avoid_collision(self, min_dist, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
-                        link_bs=(CollisionEntry.ALL,)):
-        """
-        :param min_dist: the distance giskard is trying to keep between specified links
-        :type min_dist: float
-        :param robot_links: list of robot link names as str, None or empty list means all
-        :type robot_links: list
-        :param body_b: name of the other body, use the robots name to modify self collision behavior, empty string means all bodies
-        :type body_b: str
-        :param link_bs: list of link name of body_b, None or empty list means all
-        :type link_bs: list
-        """
+    def avoid_collision(self, min_distance: float, group1: str = CollisionEntry.ALL, group2: str = CollisionEntry.ALL):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
-        # todo
-        # collision_entry.min_dist = min_dist
-        # collision_entry.robot_links = [str(x) for x in robot_links]
-        # collision_entry.body_b = str(body_b)
-        # collision_entry.link_bs = [str(x) for x in link_bs]
+        collision_entry.distance = min_distance
+        collision_entry.group1 = group1
+        collision_entry.group2 = group2
         self.set_collision_entries([collision_entry])
 
     def allow_all_collisions(self):
@@ -434,39 +410,31 @@ class GiskardWrapper(object):
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        # todo
-        # collision_entry.robot_links = [CollisionEntry.ALL]
-        # collision_entry.body_b = self.get_robot_name()
-        # collision_entry.link_bs = [CollisionEntry.ALL]
+        collision_entry.group1 = self.get_robot_name()
+        collision_entry.group2 = self.get_robot_name()
         self.set_collision_entries([collision_entry])
 
-    def avoid_self_collision(self):
+    def avoid_self_collision(self, min_distance: float = -1):
         """
         Avoid collisions with itself for the next goal.
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
-        # todo
-        # collision_entry.robot_links = [CollisionEntry.ALL]
-        # collision_entry.body_b = self.get_robot_name()
-        # collision_entry.link_bs = [CollisionEntry.ALL]
+        collision_entry.group1 = self.get_robot_name()
+        collision_entry.group2 = self.get_robot_name()
+        collision_entry.distance = min_distance
         self.set_collision_entries([collision_entry])
 
-    def avoid_all_collisions(self, distance=0.05):
+    def avoid_all_collisions(self, min_distance:float = -1):
         """
         Avoids all collisions for next goal. The distance will override anything from the config file.
         If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
         add any collision entries.
         :param distance: the distance that giskard is trying to keep from all objects
-        :type distance: float
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
-        # todo
-        # collision_entry.robot_links = [CollisionEntry.ALL]
-        # collision_entry.body_b = CollisionEntry.ALL
-        # collision_entry.link_bs = [CollisionEntry.ALL]
-        # collision_entry.min_dist = distance
+        collision_entry.distance = min_distance
         self.set_collision_entries([collision_entry])
 
     def add_cmd(self):

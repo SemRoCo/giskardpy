@@ -3029,10 +3029,7 @@ class TestCollisionAvoidanceGoals(object):
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
 
-    def test_allow_collision(self, box_setup):
-        """
-        :type box_setup: PR2
-        """
+    def test_allow_collision(self, box_setup: PR2):
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
@@ -3041,8 +3038,7 @@ class TestCollisionAvoidanceGoals(object):
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.body_b = 'box'
-        collision_entry.link_bs = ['box']
+        collision_entry.group2 = 'box'
         box_setup.set_collision_entries([collision_entry])
 
         box_setup.allow_self_collision()

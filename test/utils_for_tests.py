@@ -899,21 +899,15 @@ class GiskardTestWrapper(GiskardWrapper):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance >= distance_threshold, \
-                'distance for {}: {} >= {} ({} with {})'.format(link,
-                                                                collisions[0].contact_distance,
-                                                                distance_threshold,
-                                                                collisions[0].original_link_a,
-                                                                collisions[0].original_link_b)
+                f'distance for {link}: {collisions[0].contact_distance} >= {distance_threshold} ' \
+                f'({collisions[0].original_link_a} with {collisions[0].original_link_b})'
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance <= distance_threshold, \
-                'distance for {}: {} <= {} ({} with {})'.format(link,
-                                                                collisions[0].contact_distance,
-                                                                distance_threshold,
-                                                                collisions[0].original_link_a,
-                                                                collisions[0].original_link_b)
+                f'distance for {link}: {collisions[0].contact_distance} <= {distance_threshold} ' \
+                f'({collisions[0].original_link_a} with {collisions[0].original_link_b})'
 
     def move_base(self, goal_pose):
         """

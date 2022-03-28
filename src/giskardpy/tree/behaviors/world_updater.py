@@ -9,9 +9,9 @@ from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.identifier as identifier
-from giskard_msgs.msg import WorldBody
-from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames, \
-    GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNames, GetGroupInfo, \
+    GetGroupNamesResponse, GetGroupNamesRequest, RegisterGroup, RegisterGroupRequest, RegisterGroupResponse, \
+    GetGroupInfoResponse, GetGroupInfoRequest
 from giskardpy import RobotName
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
@@ -65,7 +65,7 @@ class WorldUpdater(GiskardBehavior):
     STALL = 2
 
     # TODO reject changes if plugin not active or something
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.added_plugin_names = []
         super(WorldUpdater, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
@@ -76,53 +76,49 @@ class WorldUpdater(GiskardBehavior):
         self.timer_state = self.READY
 
     @profile
-    def setup(self, timeout=5.0):
-        # TODO make service name a parameter
+    def setup(self, timeout: float = 5.0):
         self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
-        self.get_object_names = rospy.Service('~get_object_names', GetObjectNames, self.get_object_names)
-        self.get_object_info = rospy.Service('~get_object_info', GetObjectInfo, self.get_object_info_cb)
-        self.get_attached_objects = rospy.Service('~get_attached_objects', GetAttachedObjects,
-                                                  self.get_attached_objects)
-        # self.dump_state_srv = rospy.Service('~dump_state', Trigger, self.dump_state_cb)
+        self.get_group_names = rospy.Service('~get_group_names', GetGroupNames, self.get_group_names_cb)
+        self.get_group_info = rospy.Service('~get_group_info', GetGroupInfo, self.get_group_info_cb)
+        self.register_groups = rospy.Service('~register_groups', RegisterGroup, self.register_groups_cb)
         return super(WorldUpdater, self).setup(timeout)
 
-    def get_object_names(self, req):
-        object_names = self.world.group_names
-        res = GetObjectNamesResponse()
-        res.object_names = object_names
+    def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
+        link_name = self.world.groups[req.parent_group_name].get_link_short_name_match(req.root_link_name)
+        self.world.register_group(req.group_name, link_name)
+        res = RegisterGroupResponse()
+        res.error_codes = res.SUCCESS
         return res
 
-    def get_object_info_cb(self, req):
-        res = GetObjectInfoResponse()
-        res.error_codes = GetObjectInfoResponse.SUCCESS
+    def get_group_names_cb(self, req: GetGroupNamesRequest) -> GetGroupNamesResponse:
+        group_names = self.world.group_names
+        res = GetGroupNamesResponse()
+        res.group_names = group_names
+        return res
+
+    def get_group_info_cb(self, req: GetGroupInfoRequest) -> GetGroupInfoResponse:
+        res = GetGroupInfoResponse()
+        res.error_codes = GetGroupInfoResponse.SUCCESS
         try:
-            object = self.world.groups[req.object_name]  # type: SubWorldTree
-            res.joint_state_topic = ''
-            res.controlled_joints = self.world.groups[req.object_name].controlled_joints
-            tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
-            node_name = str(PrefixName(req.object_name, 'js'))
-            if node_name in tree.tree_nodes:
-                res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
-            res.pose.pose = object.base_pose
-            res.pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
-            for key, value in object.state.items():
+            group = self.world.groups[req.group_name]  # type: SubWorldTree
+            res.controlled_joints = group.controlled_joints
+            res.links = list(sorted(str(x) for x in group.link_names))
+            res.child_groups = list(group.groups.keys())
+            # tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
+            # node_name = str(PrefixName(req.group_name, 'js'))
+            # if node_name in tree.tree_nodes:
+            #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
+            res.root_link_pose.pose = group.base_pose
+            res.root_link_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
+            for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
                 res.joint_state.velocity.append(value.velocity)
         except KeyError as e:
-            logging.logerr('no object with the name {} was found'.format(req.object_name))
-            res.error_codes = GetObjectInfoResponse.NAME_NOT_FOUND_ERROR
+            logging.logerr('no object with the name {} was found'.format(req.group_name))
+            res.error_codes = GetGroupInfoResponse.GROUP_NOT_FOUND_ERROR
 
-        return res
-
-    def get_attached_objects(self, req):
-        link_names = self.robot.link_names
-        attached_links = [str(s) for s in set(link_names).difference(self.original_link_names)]
-        attachment_points = []
-        res = GetAttachedObjectsResponse()
-        res.object_names = attached_links
-        res.attachment_points = attachment_points
         return res
 
     @profile

@@ -2690,16 +2690,14 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.add_mesh(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
         zero_pose.plan_and_execute()
 
-    def test_attach_box_as_eef(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
+    def test_attach_box_as_eef(self, zero_pose: PR2):
         pocky = 'http://muh#pocky'
         box_pose = PoseStamped()
         box_pose.header.frame_id = zero_pose.r_tip
         box_pose.pose.position = Point(0.05, 0, 0, )
         box_pose.pose.orientation = Quaternion(1, 0, 0, 0)
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, box_pose)
+        zero_pose.add_box(name=pocky, size=(0.1, 0.02, 0.02), pose=box_pose, parent_link=zero_pose.r_tip,
+                          parent_link_group=zero_pose.get_robot_name())
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
@@ -3031,7 +3029,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_allow_collision(self, box_setup: PR2):
         p = PoseStamped()
-        p.header.frame_id = box_setup.r_tip
+        p.header.frame_id = 'base_footprint'
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(0.15, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
@@ -3042,7 +3040,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.set_collision_entries([collision_entry])
 
         box_setup.allow_self_collision()
-        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
+        box_setup.set_cart_goal(p, 'base_footprint', box_setup.default_root)
         box_setup.plan_and_execute()
 
         box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
@@ -5026,7 +5024,7 @@ class TestInfoServices(object):
         """
         :type zero_pose: PR2
         """
-        result = zero_pose.get_object_info('robot')
+        result = zero_pose.get_group_info('robot')
         expected = {'head_pan_joint',
                     'head_tilt_joint',
                     'l_elbow_flex_joint',

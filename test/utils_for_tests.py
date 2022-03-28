@@ -27,7 +27,7 @@ from visualization_msgs.msg import Marker
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
-from giskardpy import identifier, RobotName, RobotPrefix
+from giskardpy import identifier, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
@@ -718,7 +718,7 @@ class GiskardTestWrapper(GiskardWrapper):
         respone = super().clear_world(timeout=timeout)
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 1
-        assert len(self.get_object_names().object_names) == 1
+        assert len(self.get_group_names()) == 1
         assert self.original_number_of_links == len(self.world.links)
         return respone
 
@@ -746,23 +746,44 @@ class GiskardTestWrapper(GiskardWrapper):
         if expected_response == UpdateWorldResponse.SUCCESS:
             expected_pose = self.robot.compute_fk_pose(self.robot.root_link_name, name)
             response = super().detach_object(name)
-            self.check_add_object_result(response, expected_response, expected_pose, name)
+            self.check_add_object_result(response=response,
+                                         name=name,
+                                         size=None,
+                                         pose=None,
+                                         parent_link=self.world.root_link_name,
+                                         parent_link_group='',
+                                         expected_error_code=expected_response)
 
-    def check_add_object_result(self, response, error_code, pose, name):
-        assert response.error_codes == error_code, \
+    def check_add_object_result(self,
+                                response: UpdateWorldResponse,
+                                name: str,
+                                size: Optional,
+                                pose: Optional[PoseStamped],
+                                parent_link: str,
+                                parent_link_group: str,
+                                expected_error_code: int):
+        assert response.error_codes == expected_error_code, \
             f'Got: \'{update_world_error_code(response.error_codes)}\', ' \
-            f'expected: \'{update_world_error_code(error_code)}.\''
-        if error_code == UpdateWorldResponse.SUCCESS:
-            p = tf.transform_pose(self.world.root_link_name, pose)
-            o_p = self.world.groups[name].base_pose
-            compare_poses(p.pose, o_p)
-            assert name in self.get_object_names().object_names
-            compare_poses(o_p, self.get_object_info(name).pose.pose)
-            assert name not in self.get_attached_objects().object_names
+            f'expected: \'{update_world_error_code(expected_error_code)}.\''
+        if expected_error_code == UpdateWorldResponse.SUCCESS:
+            assert name in self.get_group_names()
+            response2 = self.get_group_info(name)
+            if pose is not None:
+                p = tf.transform_pose(self.world.root_link_name, pose)
+                o_p = self.world.groups[name].base_pose
+                compare_poses(p.pose, o_p)
+                compare_poses(o_p, response2.root_link_pose.pose)
+            if parent_link_group != '':
+                robot = self.get_group_info(parent_link_group)
+                assert name in robot.child_groups
+                short_parent_link = self.world.groups[parent_link_group].get_link_short_name_match(parent_link)
+                assert short_parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
+            else:
+                assert parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
         else:
-            if error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
+            if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
                 assert name not in self.world.groups
-                assert name not in self.get_object_names().object_names
+                assert name not in self.get_group_names()
 
     def add_box(self,
                 name: str,
@@ -778,7 +799,13 @@ class GiskardTestWrapper(GiskardWrapper):
                                    parent_link=parent_link,
                                    parent_link_group=parent_link_group,
                                    timeout=timeout)
-        self.check_add_object_result(response, expected_error_code, pose, name)
+        self.check_add_object_result(response=response,
+                                     name=name,
+                                     size=size,
+                                     pose=pose,
+                                     parent_link=parent_link,
+                                     parent_link_group=parent_link_group,
+                                     expected_error_code=expected_error_code)
         return response
 
     def add_sphere(self,

@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Tuple, Optional, Union
+from typing import Dict, Tuple, Optional, Union, List
 
 import rospy
 from actionlib import SimpleActionClient
@@ -11,8 +11,9 @@ from visualization_msgs.msg import MarkerArray
 
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, MoveFeedback
-from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
-    UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
+from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
+from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, DyeGroup, GetGroupInfo, \
+    GetGroupNames, RegisterGroup
 from giskardpy import RobotName
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
@@ -24,19 +25,17 @@ from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_mes
 class GiskardWrapper(object):
     last_feedback: MoveFeedback = None
 
-    def __init__(self, node_name='giskard'):
-        giskard_topic = '{}/command'.format(node_name)
+    def __init__(self, node_name: str = 'giskard'):
+        giskard_topic = f'{node_name}/command'
         if giskard_topic is not None:
             self._client = SimpleActionClient(giskard_topic, MoveAction)
-            self._update_world_srv = rospy.ServiceProxy('{}/update_world'.format(node_name), UpdateWorld)
-            self._get_object_names_srv = rospy.ServiceProxy('{}/get_object_names'.format(node_name), GetObjectNames)
-            self._get_object_info_srv = rospy.ServiceProxy('{}/get_object_info'.format(node_name), GetObjectInfo)
-            self._update_rviz_markers_srv = rospy.ServiceProxy('{}/update_rviz_markers'.format(node_name),
-                                                               UpdateRvizMarkers)
-            self._get_attached_objects_srv = rospy.ServiceProxy('{}/get_attached_objects'.format(node_name),
-                                                                GetAttachedObjects)
+            self._update_world_srv = rospy.ServiceProxy(f'{node_name}/update_world', UpdateWorld)
+            # self._dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup) todo
+            self._get_group_info_srv = rospy.ServiceProxy(f'{node_name}/get_group_info', GetGroupInfo)
+            self._get_group_names_srv = rospy.ServiceProxy(f'{node_name}/get_group_names', GetGroupNames)
+            self._register_groups_srv = rospy.ServiceProxy(f'{node_name}/register_groups', RegisterGroup)
             self._marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-            rospy.wait_for_service('{}/update_world'.format(node_name))
+            rospy.wait_for_service(f'{node_name}/update_world')
             self._client.wait_for_server()
         self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)
         self._world = WorldTree(self._god_map)
@@ -46,38 +45,33 @@ class GiskardWrapper(object):
         self._object_js_topics = {}
         rospy.sleep(.3)
 
-    def _feedback_cb(self, msg):
+    def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
 
-    def get_robot_name(self):
-        """
-        :rtype: str
-        """
+    def get_robot_name(self) -> str:
         return RobotName
 
-    def get_root(self):
+    def get_root(self) -> str:
         """
         Returns the name of the robot's root link
-        :rtype: str
         """
         return str(self._world.groups[RobotName].root_link_name)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
-                      weight=None):
+    def set_cart_goal(self,
+                      goal_pose: PoseStamped,
+                      tip_link: str,
+                      root_link: str,
+                      max_linear_velocity: Optional[float] = None,
+                      max_angular_velocity: Optional[float] = None,
+                      weight: Optional[float] = None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
-        :type root_link: str
         :param tip_link: name of the tip link of the kin chain
-        :type tip_link: str
         :param goal_pose: the goal pose
-        :type goal_pose: PoseStamped
         :param max_linear_velocity: m/s, default 0.1
-        :type max_linear_velocity: float
         :param max_angular_velocity: rad/s, default 0.5
-        :type max_angular_velocity: float
         :param weight: default WEIGHT_ABOVE_CA
-        :type weight: float
         """
         self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
         self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
@@ -425,12 +419,12 @@ class GiskardWrapper(object):
         collision_entry.distance = min_distance
         self.set_collision_entries([collision_entry])
 
-    def avoid_all_collisions(self, min_distance:float = -1):
+    def avoid_all_collisions(self, min_distance: float = -1):
         """
         Avoids all collisions for next goal. The distance will override anything from the config file.
         If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
         add any collision entries.
-        :param distance: the distance that giskard is trying to keep from all objects
+        :param min_distance: the distance that giskard is trying to keep from all objects
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
@@ -721,35 +715,18 @@ class GiskardWrapper(object):
             joint_states = position_dict_to_joint_states(joint_states)
         self._object_js_topics[object_name].publish(joint_states)
 
-    def get_object_names(self):
+    def get_group_names(self) -> List[str]:
         """
         returns the names of every object in the world
-        :rtype: GetObjectNamesResponse
         """
-        return self._get_object_names_srv()
+        resp = self._get_group_names_srv() # type: GetGroupNamesResponse
+        return resp.group_names
 
-    def get_object_info(self, name):
+    def get_group_info(self, group_name: str) -> GetGroupInfoResponse:
         """
         returns the joint state, joint state topic and pose of the object with the given name
-        :type name: str
-        :rtype: GetObjectInfoResponse
         """
-        return self._get_object_info_srv(name)
+        return self._get_group_info_srv(group_name)
 
-    def get_controlled_joints(self, name='robot'):
-        return self.get_object_info(name).controlled_joints
-
-    def update_rviz_markers(self, object_names):
-        """
-        republishes visualization markers for rviz
-        :type object_names: list
-        :rtype: UpdateRvizMarkersResponse
-        """
-        return self._update_rviz_markers_srv(object_names)
-
-    def get_attached_objects(self):
-        """
-        returns a list of all objects that are attached to the robot and the respective attachement points
-        :rtype: GetAttachedObjectsResponse
-        """
-        return self._get_attached_objects_srv()
+    def get_controlled_joints(self, name: str = 'robot'):
+        return self.get_group_info(name).controlled_joints

@@ -729,12 +729,12 @@ class GiskardTestWrapper(GiskardWrapper):
         if expected_response == UpdateWorldResponse.SUCCESS:
             old_link_names = self.world.groups[name].link_names
             old_joint_names = self.world.groups[name].joint_names
-        r = super(GiskardTestWrapper, self).remove_object(name)
+        r = super(GiskardTestWrapper, self).remove_object(name, timeout=timeout)
         assert r.error_codes == expected_response, \
             f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
             f'expected: \'{update_world_error_code(expected_response)}.\''
-        assert not name in self.world.groups
-        assert name not in self.get_object_names().object_names
+        assert name not in self.world.groups
+        assert name not in self.get_group_names()
         if expected_response == UpdateWorldResponse.SUCCESS:
             for old_link_name in old_link_names:
                 assert old_link_name not in self.world.link_names
@@ -779,6 +779,8 @@ class GiskardTestWrapper(GiskardWrapper):
                 short_parent_link = self.world.groups[parent_link_group].get_link_short_name_match(parent_link)
                 assert short_parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
             else:
+                if parent_link == '':
+                    parent_link = self.world.root_link_name
                 assert parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
@@ -811,7 +813,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def add_sphere(self,
                    name: str,
                    radius: float = 1,
-                   pose: Optional[PoseStamped] = None,
+                   pose: PoseStamped = None,
                    parent_link: str = '',
                    parent_link_group: str = '',
                    timeout: float = TimeOut,
@@ -822,14 +824,20 @@ class GiskardTestWrapper(GiskardWrapper):
                                       parent_link=parent_link,
                                       parent_link_group=parent_link_group,
                                       timeout=timeout)
-        self.check_add_object_result(response, expected_error_code, pose, name)
+        self.check_add_object_result(response=response,
+                                     name=name,
+                                     size=None,
+                                     pose=pose,
+                                     parent_link=parent_link,
+                                     parent_link_group=parent_link_group,
+                                     expected_error_code=expected_error_code)
         return response
 
     def add_cylinder(self,
                      name: str,
                      height: float,
                      radius: float,
-                     pose: Optional[PoseStamped] = None,
+                     pose: PoseStamped = None,
                      parent_link: str = '',
                      parent_link_group: str = '',
                      timeout: float = TimeOut,
@@ -841,13 +849,19 @@ class GiskardTestWrapper(GiskardWrapper):
                                         parent_link=parent_link,
                                         parent_link_group=parent_link_group,
                                         timeout=timeout)
-        self.check_add_object_result(response, expected_error_code, pose, name)
+        self.check_add_object_result(response=response,
+                                     name=name,
+                                     size=None,
+                                     pose=pose,
+                                     parent_link=parent_link,
+                                     parent_link_group=parent_link_group,
+                                     expected_error_code=expected_error_code)
         return response
 
     def add_mesh(self,
                  name: str = 'meshy',
                  mesh: str = '',
-                 pose: Optional[PoseStamped] = None,
+                 pose: PoseStamped = None,
                  parent_link: str = '',
                  parent_link_group: str = '',
                  timeout: float = TimeOut,
@@ -860,7 +874,13 @@ class GiskardTestWrapper(GiskardWrapper):
                                     timeout=timeout)
         pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
                                           position=pose.pose.position, orientation=pose.pose.orientation)
-        self.check_add_object_result(response, expected_error_code, pose, name)
+        self.check_add_object_result(response=response,
+                                     name=name,
+                                     size=None,
+                                     pose=pose,
+                                     parent_link=parent_link,
+                                     parent_link_group=parent_link_group,
+                                     expected_error_code=expected_error_code)
         return response
 
     def add_urdf(self,
@@ -881,7 +901,13 @@ class GiskardTestWrapper(GiskardWrapper):
                                     js_topic=js_topic,
                                     set_js_topic=set_js_topic,
                                     timeout=timeout)
-        self.check_add_object_result(response, expected_error_code, pose, name)
+        self.check_add_object_result(response=response,
+                                     name=name,
+                                     size=None,
+                                     pose=pose,
+                                     parent_link=parent_link,
+                                     parent_link_group=parent_link_group,
+                                     expected_error_code=expected_error_code)
         return response
 
     def reattach_object(self,
@@ -899,9 +925,13 @@ class GiskardTestWrapper(GiskardWrapper):
             f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
             f'expected: \'{update_world_error_code(expected_response)}.\''
         if r.error_codes == r.SUCCESS:
-            assert name in self.get_attached_objects().object_names
-            if self.god_map.get_data(identifier.collision_checker) is not None:
-                assert self.world.groups[name].parent_link_of_root == parent_link
+            self.check_add_object_result(response=r,
+                                         name=name,
+                                         size=None,
+                                         pose=None,
+                                         parent_link=parent_link,
+                                         parent_link_group=parent_link_group,
+                                         expected_error_code=expected_response)
         return r
 
     def get_external_collisions(self, link, distance_threshold):

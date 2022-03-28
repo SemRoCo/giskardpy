@@ -2456,7 +2456,6 @@ class TestWorldManipulation(object):
         zero_pose.detach_object(object_name)
         zero_pose.remove_object(object_name)
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
-        assert zero_pose.get_attached_objects().object_names == []
 
     def test_attach_existing_box2(self, zero_pose):
         """

@@ -1,17 +1,251 @@
+from collections import defaultdict
 from itertools import product, combinations_with_replacement
 from time import time
 from typing import List, Dict, Tuple, Union
 
 import numpy as np
+from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import RobotName, identifier
-from giskardpy.data_types import Collisions, JointStates, PrefixName
+from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
 
+
+
+class Collision(object):
+    def __init__(self, link_a, body_b, link_b, contact_distance,
+                 map_P_pa=None, map_P_pb=None, map_V_n=None,
+                 a_P_pa=None, b_P_pb=None):
+        self.contact_distance = contact_distance
+        self.body_b = body_b
+        self.link_a = link_a
+        self.original_link_a = link_a
+        self.link_b = link_b
+        self.original_link_b = link_b
+
+        self.map_P_pa = self.__point_to_4d(map_P_pa)
+        self.map_P_pb = self.__point_to_4d(map_P_pb)
+        self.map_V_n = self.__vector_to_4d(map_V_n)
+        self.old_key = (link_a, body_b, link_a)
+        self.a_P_pa = self.__point_to_4d(a_P_pa)
+        self.b_P_pb = self.__point_to_4d(b_P_pb)
+
+        self.new_a_P_pa = None
+        self.new_b_P_pb = None
+        self.new_b_V_n = None
+
+    def __point_to_4d(self, point):
+        if point is None:
+            return point
+        point = np.array(point)
+        if len(point) == 3:
+            return np.append(point, 1)
+        return point
+
+    def __vector_to_4d(self, vector):
+        if vector is None:
+            return vector
+        vector = np.array(vector)
+        if len(vector) == 3:
+            return np.append(vector, 0)
+        return vector
+
+    def get_link_b_hash(self):
+        return self.link_b.__hash__()
+
+    def get_body_b_hash(self):
+        return self.body_b.__hash__()
+
+    def reverse(self):
+        return Collision(link_a=self.original_link_b,
+                         body_b=self.body_b,
+                         link_b=self.original_link_a,
+                         map_P_pa=self.map_P_pb,
+                         map_P_pb=self.map_P_pa,
+                         map_V_n=-self.map_V_n,
+                         a_P_pa=self.b_P_pb,
+                         b_P_pb=self.a_P_pa,
+                         contact_distance=self.contact_distance)
+
+
+class Collisions(object):
+    @profile
+    def __init__(self, world: WorldTree, collision_list_size):
+        self.world = world
+        self.robot = self.world.groups[RobotName]
+        self.robot_root = self.robot.root_link_name
+        self.root_T_map = self.robot.compute_fk_np(self.robot_root, self.world.root_link_name)
+        self.collision_list_size = collision_list_size
+
+        # @profile
+        def sort(x):
+            return x.contact_distance
+
+        # @profile
+        def default_f():
+            return SortedKeyList([self._default_collision('', '', '')] * collision_list_size,
+                                 key=sort)
+
+        self.default_result = default_f()
+
+        self.self_collisions = defaultdict(default_f)
+        self.external_collision = defaultdict(default_f)
+        self.external_collision_long_key = defaultdict(lambda: self._default_collision('', '', ''))
+        self.all_collisions = set()
+        self.number_of_self_collisions = defaultdict(int)
+        self.number_of_external_collisions = defaultdict(int)
+
+    @profile
+    def add(self, collision):
+        """
+        :type collision: Collision
+        :return:
+        """
+        collision = self.transform_closest_point(collision)
+        self.all_collisions.add(collision)
+
+        if collision.body_b == self.robot.name:
+            key = collision.link_a, collision.link_b
+            self.self_collisions[key].add(collision)
+            self.number_of_self_collisions[key] = min(self.collision_list_size,
+                                                      self.number_of_self_collisions[key] + 1)
+        else:
+            key = collision.link_a
+            self.external_collision[key].add(collision)
+            self.number_of_external_collisions[key] = min(self.collision_list_size,
+                                                          self.number_of_external_collisions[key] + 1)
+            key_long = (collision.original_link_a, None, collision.original_link_b)
+            if key_long not in self.external_collision_long_key:
+                self.external_collision_long_key[key_long] = collision
+            else:
+                self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
+                                                                 key=lambda x: x.contact_distance)
+
+    def transform_closest_point(self, collision):
+        """
+        :type collision: Collision
+        :rtype: Collision
+        """
+        if collision.body_b == self.robot.name:
+            return self.transform_self_collision(collision)
+        else:
+            return self.transform_external_collision(collision)
+
+    @profile
+    def transform_self_collision(self, collision):
+        """
+        :type collision: Collision
+        :rtype: Collision
+        """
+        link_a = collision.original_link_a
+        link_b = collision.original_link_b
+        new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b)
+        if not self.world.link_order(new_link_a, new_link_b):
+            collision = collision.reverse()
+            new_link_a, new_link_b = new_link_b, new_link_a
+        collision.link_a = new_link_a
+        collision.link_b = new_link_b
+
+        new_b_T_r = self.world.compute_fk_np(new_link_b, self.world.root_link_name)
+        new_b_T_map = np.dot(new_b_T_r, self.root_T_map)
+        collision.new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
+
+        if collision.map_P_pa is not None:
+            new_a_T_r = self.world.compute_fk_np(new_link_a, self.world.root_link_name)
+            new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_pa)
+            new_b_P_pb = np.dot(new_b_T_map, collision.map_P_pb)
+        else:
+            new_a_T_a = self.world.compute_fk_np(new_link_a, collision.original_link_a)
+            new_a_P_pa = np.dot(new_a_T_a, collision.a_P_pa)
+            new_b_T_b = self.world.compute_fk_np(new_link_b, collision.original_link_b)
+            new_b_P_pb = np.dot(new_b_T_b, collision.b_P_pb)
+        collision.new_a_P_pa = new_a_P_pa
+        collision.new_b_P_pb = new_b_P_pb
+        return collision
+
+    @profile
+    def transform_external_collision(self, collision):
+        """
+        :type collision: Collision
+        :rtype: Collision
+        """
+        movable_joint = self.world.get_controlled_parent_joint_of_link(collision.original_link_a)
+        new_a = self.world.joints[movable_joint].child_link_name
+        collision.link_a = new_a
+        if collision.map_P_pa is not None:
+            new_a_T_map = self.world.compute_fk_np(new_a, self.world.root_link_name)
+            new_a_P_a = np.dot(new_a_T_map, collision.map_P_pa)
+        else:
+            new_a_T_a = self.world.compute_fk_np(new_a, collision.original_link_a)
+            new_a_P_a = np.dot(new_a_T_a, collision.a_P_pa)
+
+        collision.new_a_P_pa = new_a_P_a
+        return collision
+
+    def _default_collision(self, link_a, body_b, link_b):
+        c = Collision(link_a=link_a,
+                      body_b=body_b,
+                      link_b=link_b,
+                      contact_distance=100,
+                      map_P_pa=[0, 0, 0, 1],
+                      map_P_pb=[0, 0, 0, 1],
+                      map_V_n=[0, 0, 1, 0],
+                      a_P_pa=[0, 0, 0, 1],
+                      b_P_pb=[0, 0, 0, 1])
+        c.new_a_P_pa = [0, 0, 0, 1]
+        c.new_b_P_pb = [0, 0, 0, 1]
+        c.new_b_V_n = [0, 0, 1, 0]
+        return c
+
+    @profile
+    def get_external_collisions(self, joint_name):
+        """
+        Collisions are saved as a list for each movable robot joint, sorted by contact distance
+        :type joint_name: str
+        :rtype: SortedKeyList
+        """
+        if joint_name in self.external_collision:
+            return self.external_collision[joint_name]
+        return self.default_result
+
+    def get_external_collisions_long_key(self, link_a, body_b, link_b):
+        """
+        Collisions are saved as a list for each movable robot joint, sorted by contact distance
+        :type joint_name: str
+        :rtype: SortedKeyList
+        """
+        return self.external_collision_long_key[link_a, body_b, link_b]
+
+    @profile
+    def get_number_of_external_collisions(self, joint_name):
+        return self.number_of_external_collisions[joint_name]
+
+    # @profile
+    def get_self_collisions(self, link_a, link_b):
+        """
+        Make sure that link_a < link_b, the reverse collision is not saved.
+        :type link_a: str
+        :type link_b: str
+        :return:
+        :rtype: SortedKeyList
+        """
+        # FIXME maybe check for reverse key?
+        if (link_a, link_b) in self.self_collisions:
+            return self.self_collisions[link_a, link_b]
+        return self.default_result
+
+    def get_number_of_self_collisions(self, link_a, link_b):
+        return self.number_of_self_collisions[link_a, link_b]
+
+    def __contains__(self, item):
+        return item in self.self_collisions or item in self.external_collision
+
+    def items(self):
+        return self.all_collisions
 
 class CollisionWorldSynchronizer(object):
     def __init__(self, world):

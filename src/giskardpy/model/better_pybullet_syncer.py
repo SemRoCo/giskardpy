@@ -1,14 +1,16 @@
 from collections import defaultdict
 
 import betterpybullet as bpb
+from betterpybullet import ClosestPair
+from betterpybullet import ContactPoint
 from geometry_msgs.msg import PoseStamped, Quaternion
 from sortedcontainers import SortedDict
 
 from giskardpy import RobotName
-from giskardpy.data_types import BiDict, Collisions, Collision
+from giskardpy.data_types import BiDict
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.utils import logging
 

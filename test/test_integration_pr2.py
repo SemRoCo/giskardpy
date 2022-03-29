@@ -2617,10 +2617,7 @@ class TestCollisionAvoidanceGoals(object):
     #
     # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
-    def test_handover(self, kitchen_setup):
-        """
-        :type kitchen_setup: PR2
-        """
+    def test_handover(self, kitchen_setup: PR2):
         js = {
             "l_shoulder_pan_joint": 1.0252138037286773,
             "l_shoulder_lift_joint": - 0.06966848987919201,
@@ -2631,17 +2628,18 @@ class TestCollisionAvoidanceGoals(object):
             "l_wrist_roll_joint": 2.907373693068033,
         }
         kitchen_setup.set_joint_goal(js)
-        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
         p = PoseStamped()
         p.header.frame_id = kitchen_setup.l_tip
         p.pose.position.y = -0.08
         p.pose.orientation.w = 1
-        kitchen_setup.attach_box(name='box',
-                                 size=[0.08, 0.16, 0.16],
-                                 parent_link=kitchen_setup.l_tip,
-                                 pose=p)
+        kitchen_setup.add_box(name='box',
+                              size=(0.08, 0.16, 0.16),
+                              parent_link=kitchen_setup.l_tip,
+                              parent_link_group=kitchen_setup.get_robot_name(),
+                              pose=p)
         kitchen_setup.close_l_gripper()
         r_goal = PoseStamped()
         r_goal.header.frame_id = kitchen_setup.l_tip

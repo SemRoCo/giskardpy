@@ -561,14 +561,10 @@ class WorldTree(object):
         :type link_b: str
         :rtype: bool
         """
-        try:
-            self.get_controlled_parent_joint_of_link(link_a)
-        except KeyError:
-            return False
-        try:
-            self.get_controlled_parent_joint_of_link(link_b)
-        except KeyError:
+        if self.is_link_controlled(link_a) and not self.is_link_controlled(link_b):
             return True
+        elif not self.is_link_controlled(link_a) and self.is_link_controlled(link_b):
+            return False
         return link_a < link_b
 
     def sort_links(self, link_a: Union[PrefixName, str], link_b: Union[PrefixName, str]) \
@@ -936,6 +932,13 @@ class WorldTree(object):
 
     def is_joint_controlled(self, joint_name):
         return joint_name in self.controlled_joints
+
+    def is_link_controlled(self, link_name):
+        try:
+            self.get_controlled_parent_joint_of_link(link_name)
+            return True
+        except KeyError as e:
+            return False
 
     def is_joint_revolute(self, joint_name):
         return isinstance(self.joints[joint_name], RevoluteJoint)

@@ -85,6 +85,8 @@ class CollisionWorldSynchronizer(object):
                     or (link_b, link_a) in self.ignored_pairs \
                     or self.world.are_linked(link_a, link_b, non_controlled=non_controlled):
                 self.black_list.add(link_combination)
+            if not self.world.is_link_controlled(link_a) and not self.world.is_link_controlled(link_b):
+                self.black_list.add(link_combination)
         unknown = link_combinations.difference(self.black_list)
         self.set_joint_state_to_zero()
         for link_a, link_b in self.check_collisions2(unknown, distance_threshold_zero):
@@ -248,7 +250,8 @@ class CollisionWorldSynchronizer(object):
                         elif r_key in min_allowed_distance:
                             del min_allowed_distance[r_key]
                     elif self.is_avoid_collision(collision_entry):
-                        min_allowed_distance[key] = min_dist[key[0]]
+                        if key not in self.black_list:
+                            min_allowed_distance[key] = min_dist[key[0]]
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
         for (link1, link2), distance in added_checks.items():

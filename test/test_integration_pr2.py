@@ -2653,9 +2653,9 @@ class TestCollisionAvoidanceGoals(object):
                                     linear_velocity=0.2,
                                     angular_velocity=1
                                     )
+        kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2='box')
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.detach_object('box')
         kitchen_setup.reattach_object('box', kitchen_setup.r_tip)
 
         r_goal2 = PoseStamped()

@@ -1,5 +1,4 @@
 from itertools import product, combinations_with_replacement
-from itertools import product, combinations_with_replacement
 from time import time
 from typing import List, Dict, Tuple, Union
 
@@ -72,9 +71,8 @@ class CollisionWorldSynchronizer(object):
         joint_state_tmp = self.world.state
         t = time()
 
-        # find meaningless self-collisions
+        # find meaningless collisions
         for link_a, link_b in link_combinations:
-            # assuming that group.are_linked(link_a, link_b, non_controlled) is false, because this call is very slow
             link_combination = self.world.sort_links(link_a, link_b)
             if link_combination in self.black_list:
                 continue
@@ -83,10 +81,10 @@ class CollisionWorldSynchronizer(object):
                     or link_b in self.ignored_pairs \
                     or (link_a, link_b) in self.ignored_pairs \
                     or (link_b, link_a) in self.ignored_pairs \
-                    or self.world.are_linked(link_a, link_b, non_controlled=non_controlled):
+                    or self.world.are_linked(link_a, link_b, non_controlled=non_controlled) \
+                    or (not self.world.is_link_controlled(link_a) and not self.world.is_link_controlled(link_b)):
                 self.black_list.add(link_combination)
-            if not self.world.is_link_controlled(link_a) and not self.world.is_link_controlled(link_b):
-                self.black_list.add(link_combination)
+
         unknown = link_combinations.difference(self.black_list)
         self.set_joint_state_to_zero()
         for link_a, link_b in self.check_collisions2(unknown, distance_threshold_zero):

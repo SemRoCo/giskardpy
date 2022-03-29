@@ -74,8 +74,10 @@ retry_weight_factor = qp_solver + ['hard_constraint_handling', 'weight_factor']
 # tree
 plugins = rosparam + ['plugins']
 enable_VisualizationBehavior = plugins + ['VisualizationBehavior', 'enabled']
+VisualizationBehavior_in_planning_loop = plugins + ['VisualizationBehavior', 'in_planning_loop']
 enable_WorldVisualizationBehavior = plugins + ['WorldVisualizationBehavior', 'enabled']
 enable_CPIMarker = plugins + ['CPIMarker', 'enabled']
+CPIMarker_in_planning_loop = plugins + ['CPIMarker', 'in_planning_loop']
 
 PlotTrajectory = plugins + ['PlotTrajectory']
 PlotTrajectory_enabled = PlotTrajectory + ['enabled']

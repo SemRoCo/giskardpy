@@ -544,10 +544,12 @@ class OpenLoop(TreeManager):
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                  self.action_server_name,
                                                                  MoveFeedback.PLANNING))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_2.add_child(running_is_failure(VisualizationBehavior)('visualization'))
-        if self.god_map.get_data(identifier.enable_CPIMarker) and self.god_map.get_data(
-                identifier.collision_checker) is not None:
+        if self.god_map.get_data(identifier.enable_CPIMarker) \
+                and self.god_map.get_data(identifier.collision_checker) is not None \
+                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
             planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         planning_2.add_child(self.grow_planning3())
@@ -559,10 +561,12 @@ class OpenLoop(TreeManager):
         planning_3.add_child(running_is_success(TimePlugin)('time for zero velocity'))
         planning_3.add_child(AppendZeroVelocity('append zero velocity'))
         planning_3.add_child(running_is_success(LogTrajPlugin)('log zero velocity'))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_3.add_child(running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
-        if self.god_map.get_data(identifier.enable_CPIMarker) and self.god_map.get_data(
-                identifier.collision_checker) is not None:
+        if self.god_map.get_data(identifier.enable_CPIMarker) \
+                and self.god_map.get_data(identifier.collision_checker) is not None \
+                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
             planning_3.add_child(running_is_success(CollisionMarker)('collision marker'))
         return planning_3
 
@@ -570,8 +574,10 @@ class OpenLoop(TreeManager):
         planning_4 = PluginBehavior('planning IIII')
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_plugin(CollisionChecker('collision checker'))
-        # planning_4.add_plugin(VisualizationBehavior('visualization'))
-        # planning_4.add_plugin(CollisionMarker('cpi marker'))
+        if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+            planning_4.add_plugin(VisualizationBehavior('visualization'))
+        if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+            planning_4.add_plugin(CollisionMarker('cpi marker'))
         planning_4.add_plugin(ControllerPlugin('controller'))
         planning_4.add_plugin(KinSimPlugin('kin sim'))
         planning_4.add_plugin(LogTrajPlugin('log'))

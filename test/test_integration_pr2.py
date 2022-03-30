@@ -2788,9 +2788,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
 
     def test_allow_self_collision3(self, zero_pose: PR2):
-        """
-        :type zero_pose: PR2
-        """
+        #fixme
         goal_js = {
             'l_elbow_flex_joint': -1.43286344265,
             'l_forearm_roll_joint': 1.26465060073,
@@ -2811,10 +2809,12 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.z = 0.02
         p.pose.orientation.w = 1
 
-        ces = [CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-                              robot_links=zero_pose.get_l_gripper_links(),
-                              body_b='robot',
-                              link_bs=zero_pose.get_r_forearm_links())]
+        ces = [CollisionEntry()]
+        ces[0].type = CollisionEntry.ALLOW_COLLISION
+        ces[0].group1 = zero_pose.get_robot_name()
+        ces[0].group1 = zero_pose.get_robot_name()
+
+
         zero_pose.set_collision_entries(ces)
 
         zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
@@ -4170,8 +4170,8 @@ class TestCollisionAvoidanceGoals(object):
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
-        kitchen_setup.allow_collision([CollisionEntry.ALL], bowl_name, [CollisionEntry.ALL])
-        kitchen_setup.allow_collision([CollisionEntry.ALL], cup_name, [CollisionEntry.ALL])
+        kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2=bowl_name)
+        kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2=cup_name)
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
         kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
@@ -4206,8 +4206,8 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.detach_object(bowl_name)
         kitchen_setup.detach_object(cup_name)
-        kitchen_setup.allow_collision([], cup_name, [])
-        kitchen_setup.allow_collision([], bowl_name, [])
+        kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2=cup_name)
+        kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2=bowl_name)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 

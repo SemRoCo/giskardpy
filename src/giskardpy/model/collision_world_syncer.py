@@ -1,7 +1,7 @@
 from collections import defaultdict
 from itertools import product, combinations_with_replacement
 from time import time
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Optional
 
 import numpy as np
 from sortedcontainers import SortedKeyList
@@ -292,12 +292,25 @@ class CollisionWorldSynchronizer(object):
 
     def reset_collision_blacklist(self):
         self.black_list = set()
+        link_combinations = set(combinations_with_replacement(self.robot.link_names_with_collisions, 2))
+        for link_a, link_b in link_combinations:
+            link_combination = self.world.sort_links(link_a, link_b)
+            if link_a == link_b \
+                    or link_a in self.ignored_pairs \
+                    or link_b in self.ignored_pairs \
+                    or (link_a, link_b) in self.ignored_pairs \
+                    or (link_b, link_a) in self.ignored_pairs:
+                self.black_list.add(link_combination)
         self.update_collision_blacklist(white_list_combinations=self.white_list_pairs)
 
     @profile
-    def update_collision_blacklist(self, link_combinations: set = None, white_list_combinations: set = None,
-                                   distance_threshold_zero: float = 0.05, distance_threshold_rnd: float = 0.0,
-                                   non_controlled: bool = False, steps: int = 10):
+    def update_collision_blacklist(self,
+                                   link_combinations: Optional[set] = None,
+                                   white_list_combinations: Optional[set] = None,
+                                   distance_threshold_zero: float = 0.05,
+                                   distance_threshold_rnd: float = 0.0,
+                                   non_controlled: bool = False,
+                                   steps: int = 10):
         np.random.seed(1337)
         if link_combinations is None:
             link_combinations = set(combinations_with_replacement(self.world.link_names_with_collisions, 2))
@@ -311,10 +324,6 @@ class CollisionWorldSynchronizer(object):
             if link_combination in self.black_list:
                 continue
             if link_a == link_b \
-                    or link_a in self.ignored_pairs \
-                    or link_b in self.ignored_pairs \
-                    or (link_a, link_b) in self.ignored_pairs \
-                    or (link_b, link_a) in self.ignored_pairs \
                     or self.world.are_linked(link_a, link_b, non_controlled=non_controlled) \
                     or (not self.world.is_link_controlled(link_a) and not self.world.is_link_controlled(link_b)):
                 self.black_list.add(link_combination)
@@ -492,9 +501,6 @@ class CollisionWorldSynchronizer(object):
                 min_allowed_distance[key] = max(distance, min_allowed_distance[key])
             else:
                 min_allowed_distance[key] = distance
-        for key in self.black_list:
-            if key in min_allowed_distance:
-                del min_allowed_distance[key]
         return min_allowed_distance
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:

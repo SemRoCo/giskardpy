@@ -529,67 +529,6 @@ class TestConstraints(object):
         assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1],
                               float)
 
-    def test_UpdateGodMap2(self, pocky_pose_setup: PR2):
-        joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
-        old_torso_value = pocky_pose_setup.god_map.get_data(
-            joint_velocity_weight + ['torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + ['odom_x_joint'])
-        old_odom_y_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + ['odom_y_joint'])
-
-        r_goal = PoseStamped()
-        r_goal.header.frame_id = pocky_pose_setup.r_tip
-        r_goal.pose.orientation.w = 1
-        r_goal.pose.position.x += 0.1
-        updates = {
-            'rosparam': {
-                'general_options': {
-                    'joint_weights': {
-                        'velocity': {
-                            'override': {
-                                'odom_x_joint': 'asdf',
-                                'odom_y_joint': 0.0001,
-                                'odom_z_joint': 0.0001
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        pocky_pose_setup.update_god_map(updates)
-        pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        pocky_pose_setup.plan_and_execute(expected_error_codes=[MoveResult.ERROR])
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_y_joint']) == old_odom_y_value
-        assert pocky_pose_setup.god_map.get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
-
-    def test_UpdateGodMap3(self, pocky_pose_setup: PR2):
-        joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
-        old_torso_value = pocky_pose_setup.god_map.get_data(
-            joint_velocity_weight + ['torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + ['odom_x_joint'])
-
-        r_goal = PoseStamped()
-        r_goal.header.frame_id = pocky_pose_setup.r_tip
-        r_goal.pose.orientation.w = 1
-        r_goal.pose.position.x += 0.1
-        updates = {
-            'rosparam': {
-                'general_options': {
-                    'joint_weights': 'asdf'
-                }
-            }
-        }
-        pocky_pose_setup.update_god_map(updates)
-        pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        pocky_pose_setup.plan_and_execute(expected_error_codes=[MoveResult.ERROR])
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.god_map.unsafe_get_data(
-            joint_velocity_weight + ['torso_lift_joint']) == old_torso_value
-
     def test_pointing(self, kitchen_setup: PR2):
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'

@@ -707,6 +707,12 @@ class GiskardTestWrapper(GiskardWrapper):
 
     TimeOut = 5000
 
+    def register_group(self, group_name: str, parent_group_name: str, root_link_name: str):
+        super().register_group(group_name=group_name,
+                               parent_group_name=parent_group_name,
+                               root_link_name=root_link_name)
+        assert group_name in self.get_group_names()
+
     @property
     def world(self):
         """

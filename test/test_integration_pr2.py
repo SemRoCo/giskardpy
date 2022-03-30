@@ -1101,8 +1101,8 @@ class TestConstraints(object):
                                 bar_center=bar_center,
                                 bar_axis=bar_axis,
                                 bar_length=.3)
-        kitchen_setup.allow_collision([], 'kitchen', ['sink_area_dish_washer_door_handle'])
-        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.register_group('handle', 'kitchen', 'sink_area_dish_washer_door_handle')
+        kitchen_setup.allow_collision('robot', 'handle')
         kitchen_setup.plan_and_execute()
 
     def test_open_all_drawers(self, kitchen_setup: PR2):

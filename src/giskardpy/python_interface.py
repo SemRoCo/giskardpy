@@ -5,16 +5,19 @@ import rospy
 from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped
+from rospy import ServiceException
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, MoveFeedback
-from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
+from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
+from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, DyeGroup, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy import RobotName
+from giskardpy.exceptions import DuplicateNameException
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box
@@ -44,6 +47,17 @@ class GiskardWrapper(object):
         self.clear_cmds()
         self._object_js_topics = {}
         rospy.sleep(.3)
+
+    def register_group(self, group_name: str, parent_group_name: str, root_link_name: str):
+        req = RegisterGroupRequest()
+        req.group_name = group_name
+        req.parent_group_name = parent_group_name
+        req.root_link_name = root_link_name
+        res = self._register_groups_srv.call(req) # type: RegisterGroupResponse
+        if res.error_codes == res.DUPLICATE_GROUP_ERROR:
+            raise DuplicateNameException(f'Group with name {group_name} already exists.')
+        if res.error_codes == res.BUSY:
+            raise ServiceException('Giskard is busy and can\'t process service call.')
 
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg

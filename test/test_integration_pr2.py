@@ -2045,8 +2045,8 @@ class TestWorldManipulation(object):
         p.pose.orientation.w = 1
         better_pose.add_box(pocky, size=(1, 1, 1), pose=p)
         for i in range(3):
-            better_pose.reattach_object(name=pocky, parent_link=better_pose.r_tip)
-            better_pose.detach_object(pocky)
+            better_pose.update_parent_link_of_group(name=pocky, parent_link=better_pose.r_tip)
+            better_pose.detach_group(pocky)
         better_pose.remove_group(pocky)
 
     def test_reattach_box(self, zero_pose: PR2):
@@ -2056,7 +2056,7 @@ class TestWorldManipulation(object):
         p.pose.position = Point(0.05, 0, 0)
         p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, (0.1, 0.02, 0.02), pose=p)
-        zero_pose.reattach_object(pocky, parent_link=zero_pose.r_tip)
+        zero_pose.update_parent_link_of_group(pocky, parent_link=zero_pose.r_tip)
         relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
@@ -2131,8 +2131,8 @@ class TestWorldManipulation(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
-        zero_pose.reattach_object(object_name, parent_link=zero_pose.r_tip)
-        zero_pose.detach_object(object_name)
+        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip)
+        zero_pose.detach_group(object_name)
         zero_pose.remove_group(object_name)
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
 
@@ -2143,7 +2143,7 @@ class TestWorldManipulation(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(group_name, size=(1, 1, 1), pose=p)
-        p.pose.position = Point(1,0,0)
+        p.pose.position = Point(1, 0, 0)
         zero_pose.update_group_pose('asdf', p, expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
         zero_pose.update_group_pose(group_name, p)
 
@@ -2154,7 +2154,7 @@ class TestWorldManipulation(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(group_name, size=(1, 1, 1), pose=p, parent_link='r_gripper_tool_frame')
-        p.pose.position = Point(1,0,0)
+        p.pose.position = Point(1, 0, 0)
         zero_pose.update_group_pose('asdf', p, expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
         zero_pose.update_group_pose(group_name, p)
         zero_pose.set_joint_goal(zero_pose.better_pose)
@@ -2169,7 +2169,7 @@ class TestWorldManipulation(object):
         old_p.pose.position = Point(0.05, 0, 0)
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, (0.1, 0.02, 0.02), pose=old_p)
-        zero_pose.reattach_object(pocky, parent_link=zero_pose.r_tip)
+        zero_pose.update_parent_link_of_group(pocky, parent_link=zero_pose.r_tip)
         relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
@@ -2185,7 +2185,7 @@ class TestWorldManipulation(object):
         zero_pose.move_base(p)
         rospy.sleep(.5)
 
-        zero_pose.detach_object(pocky)
+        zero_pose.detach_group(pocky)
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose: PR2):
         pocky = 'http://muh#pocky'
@@ -2197,10 +2197,10 @@ class TestWorldManipulation(object):
                           expected_error_code=UpdateWorldResponse.UNKNOWN_LINK_ERROR)
 
     def test_reattach_unknown_object(self, zero_pose: PR2):
-        zero_pose.reattach_object('muh',
-                                  parent_link='',
-                                  parent_link_group='',
-                                  expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+        zero_pose.update_parent_link_of_group('muh',
+                                              parent_link='',
+                                              parent_link_group='',
+                                              expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
 
     def test_add_remove_box(self, zero_pose: PR2):
         object_name = 'muh'
@@ -2304,7 +2304,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2='box')
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.reattach_object('box', kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group('box', kitchen_setup.r_tip)
 
         r_goal2 = PoseStamped()
         r_goal2.header.frame_id = 'box'
@@ -2345,7 +2345,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.plan_and_execute()
         p2 = zero_pose.robot.compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
-        zero_pose.detach_object(pocky)
+        zero_pose.detach_group(pocky)
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
@@ -2418,7 +2418,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
 
     def test_allow_self_collision3(self, zero_pose: PR2):
-        #fixme
+        # fixme
         goal_js = {
             'l_elbow_flex_joint': -1.43286344265,
             'l_forearm_roll_joint': 1.26465060073,
@@ -2443,7 +2443,6 @@ class TestCollisionAvoidanceGoals(object):
         ces[0].type = CollisionEntry.ALLOW_COLLISION
         ces[0].group1 = zero_pose.get_robot_name()
         ces[0].group1 = zero_pose.get_robot_name()
-
 
         zero_pose.set_collision_entries(ces)
 
@@ -2560,6 +2559,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
 
     def test_collision_override(self, box_setup: PR2):
+        # FIXME
         p = PoseStamped()
         p.header.frame_id = box_setup.default_root
         p.pose.position.x += 0.5
@@ -2574,7 +2574,6 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq(['base_link'], 0.099)
 
     def test_avoid_collision2(self, fake_table_setup: PR2):
-        # FIXME goes inside ?!
         r_goal = PoseStamped()
         r_goal.header.frame_id = 'map'
         r_goal.pose.position.x = 0.8
@@ -2583,7 +2582,7 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         # fake_table_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         fake_table_setup.avoid_all_collisions(0.1)
-        fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip, weight=WEIGHT_BELOW_CA)
+        fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip)
         fake_table_setup.plan_and_execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
@@ -2613,24 +2612,24 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
         p.pose.orientation.w = 1
-        pocky_pose_setup.attach_box(name='box',
-                                    size=[0.2, 0.05, 0.05],
-                                    parent_link=pocky_pose_setup.r_tip,
-                                    pose=p)
+        pocky_pose_setup.add_box(name='box',
+                                 size=(0.2, 0.05, 0.05),
+                                 parent_link=pocky_pose_setup.r_tip,
+                                 pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = 0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('bl', [0.1, 0.01, 0.2], pose=p)
+        pocky_pose_setup.add_box('bl', (0.1, 0.01, 0.2), pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = -0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('br', [0.1, 0.01, 0.2], pose=p)
+        pocky_pose_setup.add_box('br', (0.1, 0.01, 0.2), pose=p)
 
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
@@ -2649,31 +2648,31 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
         p.pose.orientation.w = 1
-        pocky_pose_setup.attach_box(name='box',
-                                    size=[0.2, 0.05, 0.05],
-                                    parent_link=pocky_pose_setup.r_tip,
-                                    pose=p)
+        pocky_pose_setup.add_box(name='box',
+                                 size=(0.2, 0.05, 0.05),
+                                 parent_link=pocky_pose_setup.r_tip,
+                                 pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.2
         p.pose.position.y = 0
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('b1', [0.01, 0.2, 0.2], pose=p)
+        pocky_pose_setup.add_box('b1', (0.01, 0.2, 0.2), pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = 0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('bl', [0.1, 0.01, 0.2], pose=p)
+        pocky_pose_setup.add_box('bl', (0.1, 0.01, 0.2), pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = -0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('br', [0.1, 0.01, 0.2], pose=p)
+        pocky_pose_setup.add_box('br', (0.1, 0.01, 0.2), pose=p)
 
         # p = PoseStamped()
         # p.header.frame_id = pocky_pose_setup.r_tip
@@ -2696,7 +2695,9 @@ class TestCollisionAvoidanceGoals(object):
         pocky_pose_setup.set_align_planes_goal('box', y, root_normal=y_map)
         pocky_pose_setup.allow_self_collision()
         # pocky_pose_setup.allow_all_collisions()
+
         pocky_pose_setup.plan_and_execute()
+        pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_group_info('r_gripper').links, 0.04)
 
     def test_avoid_collision_two_sticks(self, pocky_pose_setup: PR2):
         p = PoseStamped()
@@ -2968,7 +2969,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq([attached_link_name], -0.008)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
-        box_setup.detach_object(attached_link_name)
+        box_setup.detach_group(attached_link_name)
 
     def test_attached_get_out_of_collision_below(self, box_setup: PR2):
         attached_link_name = 'pocky'
@@ -2994,7 +2995,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
-        box_setup.detach_object(attached_link_name)
+        box_setup.detach_group(attached_link_name)
 
     def test_attached_get_out_of_collision_and_stay_in_hard_threshold(self, box_setup: PR2):
         # fixme
@@ -3020,7 +3021,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq([attached_link_name], -0.002)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
-        box_setup.detach_object(attached_link_name)
+        box_setup.detach_group(attached_link_name)
 
     def test_attached_get_out_of_collision_stay_in(self, box_setup: PR2):
         attached_link_name = 'pocky'
@@ -3035,7 +3036,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq([attached_link_name], -0.082)
-        box_setup.detach_object(attached_link_name)
+        box_setup.detach_group(attached_link_name)
 
     def test_attached_get_out_of_collision_passive(self, box_setup: PR2):
         attached_link_name = 'pocky'
@@ -3044,7 +3045,7 @@ class TestCollisionAvoidanceGoals(object):
                              expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq([attached_link_name], 0.049)
-        box_setup.detach_object(attached_link_name)
+        box_setup.detach_group(attached_link_name)
 
     def test_attached_collision2(self, box_setup: PR2):
         # FIXME
@@ -3059,10 +3060,9 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
-        box_setup.detach_object(attached_link_name)
+        box_setup.detach_group(attached_link_name)
 
     def test_attached_self_collision(self, zero_pose: PR2):
-
         collision_pose = {
             'l_elbow_flex_joint': - 1.1343683863086362,
             'l_forearm_roll_joint': 7.517553513504836,
@@ -3098,10 +3098,9 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
-        zero_pose.detach_object(attached_link_name)
+        zero_pose.detach_group(attached_link_name)
 
     def test_attached_self_collision2(self, zero_pose: PR2):
-
         collision_pose = {
             'r_elbow_flex_joint': - 1.1343683863086362,
             'r_forearm_roll_joint': -7.517553513504836,
@@ -3142,10 +3141,9 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
-        zero_pose.detach_object(attached_link_name)
+        zero_pose.detach_group(attached_link_name)
 
     def test_attached_self_collision3(self, zero_pose: PR2):
-
         collision_pose = {
             'l_elbow_flex_joint': - 1.1343683863086362,
             'l_forearm_roll_joint': 7.517553513504836,
@@ -3186,7 +3184,7 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
-        zero_pose.detach_object(attached_link_name)
+        zero_pose.detach_group(attached_link_name)
 
     def test_attached_collision_allow(self, box_setup: PR2):
         pocky = 'http://muh#pocky'
@@ -3268,8 +3266,8 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.check_cpi_geq([box1_name, box2_name], 0.049)
 
-        zero_pose.detach_object(box1_name)
-        zero_pose.detach_object(box2_name)
+        zero_pose.detach_group(box1_name)
+        zero_pose.detach_group(box2_name)
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.position.x = -.1
@@ -3454,7 +3452,7 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.reattach_object(milk_name, kitchen_setup.l_tip)
+        kitchen_setup.update_parent_link_of_group(milk_name, kitchen_setup.l_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -3494,7 +3492,7 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.open_l_gripper()
 
-        kitchen_setup.detach_object(milk_name)
+        kitchen_setup.detach_group(milk_name)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
@@ -3539,7 +3537,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.reattach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -3579,7 +3577,7 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.open_l_gripper()
 
-        kitchen_setup.detach_object(cereal_name)
+        kitchen_setup.detach_group(cereal_name)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
@@ -3679,8 +3677,8 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.reattach_object(bowl_name, kitchen_setup.l_tip)
-        kitchen_setup.reattach_object(cup_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(bowl_name, kitchen_setup.l_tip)
+        kitchen_setup.update_parent_link_of_group(cup_name, kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
@@ -3706,8 +3704,8 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.detach_object(bowl_name)
-        kitchen_setup.detach_object(cup_name)
+        kitchen_setup.detach_group(bowl_name)
+        kitchen_setup.detach_group(cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2=bowl_name)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
@@ -3815,7 +3813,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.reattach_object(spoon_name, kitchen_setup.l_tip)
+        kitchen_setup.update_parent_link_of_group(spoon_name, kitchen_setup.l_tip)
 
         l_goal.pose.position.z += .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
@@ -3934,7 +3932,7 @@ class TestCollisionAvoidanceGoals(object):
         # grasp tray
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.reattach_object(tray_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(tray_name, kitchen_setup.r_tip)
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = kitchen_setup.l_tip
@@ -4414,8 +4412,8 @@ class TestConfigFile(object):
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
 
-        kitchen_setup.reattach_object(bowl_name, kitchen_setup.l_tip)
-        kitchen_setup.reattach_object(cup_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(bowl_name, kitchen_setup.l_tip)
+        kitchen_setup.update_parent_link_of_group(cup_name, kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
@@ -4443,8 +4441,8 @@ class TestConfigFile(object):
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
 
-        kitchen_setup.detach_object(bowl_name)
-        kitchen_setup.detach_object(cup_name)
+        kitchen_setup.detach_group(bowl_name)
+        kitchen_setup.detach_group(cup_name)
         kitchen_setup.allow_collision([], cup_name, [])
         kitchen_setup.allow_collision([], bowl_name, [])
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)

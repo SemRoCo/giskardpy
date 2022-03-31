@@ -655,20 +655,20 @@ class GiskardWrapper(object):
         req.parent_link_group = parent_link_group
         return self._update_world_srv.call(req)
 
-    def reattach_object(self,
-                        name: str,
-                        parent_link: str,
-                        parent_link_group: str,
-                        timeout: float = 0) -> UpdateWorldResponse:
+    def update_parent_link_of_group(self,
+                                    name: str,
+                                    parent_link: str,
+                                    parent_link_group: str,
+                                    timeout: float = 0) -> UpdateWorldResponse:
         req = UpdateWorldRequest()
-        req.operation = UpdateWorldRequest.REATTACH
+        req.operation = UpdateWorldRequest.UPDATE_PARENT_LINK
         req.group_name = str(name)
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
         req.timeout = timeout
         return self._update_world_srv.call(req)
 
-    def detach_object(self, object_name: str, timeout: float = 0):
+    def detach_group(self, object_name: str, timeout: float = 0):
         """
         Detach an object from the robot and add it back to the world.
         Careful though, you could amputate an arm be accident!
@@ -678,7 +678,7 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest()
         req.timeout = timeout
         req.group_name = str(object_name)
-        req.operation = req.DETACH
+        req.operation = req.UPDATE_PARENT_LINK
         return self._update_world_srv.call(req)
 
     def add_urdf(self,

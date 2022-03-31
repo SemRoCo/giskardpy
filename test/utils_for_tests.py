@@ -27,7 +27,7 @@ from visualization_msgs.msg import Marker
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
-from giskardpy import identifier, RobotPrefix
+from giskardpy import identifier, RobotPrefix, RobotName
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -749,10 +749,10 @@ class GiskardTestWrapper(GiskardWrapper):
                 assert old_joint_name not in self.world.joint_names
         return r
 
-    def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+    def detach_group(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
             expected_pose = self.robot.compute_fk_pose(self.robot.root_link_name, name)
-            response = super().detach_object(name)
+            response = super().detach_group(name)
             self.check_add_object_result(response=response,
                                          name=name,
                                          size=None,
@@ -928,16 +928,16 @@ class GiskardTestWrapper(GiskardWrapper):
                                      expected_error_code=expected_error_code)
         return response
 
-    def reattach_object(self,
-                        name: str,
-                        parent_link: str = '',
-                        parent_link_group: str = '',
-                        timeout: float = TimeOut,
-                        expected_response: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
-        r = super(GiskardTestWrapper, self).reattach_object(name=name,
-                                                            parent_link=parent_link,
-                                                            parent_link_group=parent_link_group,
-                                                            timeout=timeout)
+    def update_parent_link_of_group(self,
+                                    name: str,
+                                    parent_link: str = '',
+                                    parent_link_group: str = '',
+                                    timeout: float = TimeOut,
+                                    expected_response: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        r = super(GiskardTestWrapper, self).update_parent_link_of_group(name=name,
+                                                                        parent_link=parent_link,
+                                                                        parent_link_group=parent_link_group,
+                                                                        timeout=timeout)
         self.wait_heartbeats()
         assert r.error_codes == expected_response, \
             f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
@@ -974,14 +974,14 @@ class GiskardTestWrapper(GiskardWrapper):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance >= distance_threshold, \
-                f'distance for {link}: {collisions[0].contact_distance} >= {distance_threshold} ' \
+                f'distance for {link}: {collisions[0].contact_distance} < {distance_threshold} ' \
                 f'({collisions[0].original_link_a} with {collisions[0].original_link_b})'
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance <= distance_threshold, \
-                f'distance for {link}: {collisions[0].contact_distance} <= {distance_threshold} ' \
+                f'distance for {link}: {collisions[0].contact_distance} > {distance_threshold} ' \
                 f'({collisions[0].original_link_a} with {collisions[0].original_link_b})'
 
     def move_base(self, goal_pose):
@@ -1053,13 +1053,9 @@ class PR2(GiskardTestWrapper):
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
-        if 'l_gripper' not in self.world.group_names:
-            self.world.register_group('l_gripper', 'l_wrist_roll_link')
         return [str(x) for x in self.world.groups['l_gripper'].link_names_with_collisions]
 
     def get_r_gripper_links(self):
-        if 'r_gripper' not in self.world.group_names:
-            self.world.register_group('r_gripper', 'r_wrist_roll_link')
         return [str(x) for x in self.world.groups['r_gripper'].link_names_with_collisions]
 
     def get_r_forearm_links(self):
@@ -1115,6 +1111,8 @@ class PR2(GiskardTestWrapper):
         self.open_r_gripper()
         self.clear_world()
         self.reset_base()
+        self.register_group('l_gripper', parent_group_name=RobotName, root_link_name='l_wrist_roll_link')
+        self.register_group('r_gripper', parent_group_name=RobotName, root_link_name='r_wrist_roll_link')
 
 
 class PR2CloseLoop(PR2):

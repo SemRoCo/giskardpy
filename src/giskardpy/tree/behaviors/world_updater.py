@@ -159,7 +159,7 @@ class WorldUpdater(GiskardBehavior):
                 try:
                     if req.operation == UpdateWorldRequest.ADD:
                         self.add_object(req)
-                    elif req.operation == UpdateWorldRequest.REATTACH:
+                    elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
                         self.reattach_object(req)
                     elif req.operation == UpdateWorldRequest.UPDATE_POSE:
                         self.update_group_pose(req)
@@ -167,8 +167,6 @@ class WorldUpdater(GiskardBehavior):
                         self.remove_object(req.group_name)
                     elif req.operation == UpdateWorldRequest.REMOVE_ALL:
                         self.clear_world()
-                    elif req.operation == UpdateWorldRequest.DETACH:
-                        self.detach_object(req)
                     else:
                         return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                    f'Received invalid operation code: {req.operation}')
@@ -228,14 +226,6 @@ class WorldUpdater(GiskardBehavior):
         self.collision_scene.update_collision_blacklist(
             link_combinations=set(product(self.world.groups[req.group_name].link_names_with_collisions,
                                           self.world.link_names_with_collisions)))
-
-    def detach_object(self, req):
-        # assumes that parent has god map lock
-        if req.group_name not in self.world.groups:
-            raise UnknownGroupException(f'Can\'t detach unknown group: \'{req.group_name}\'')
-        req.parent_link_group = ''
-        req.parent_link = ''
-        self.reattach_object(req)
 
     def update_group_pose(self, req: UpdateWorldRequest):
         if req.group_name not in self.world.groups:

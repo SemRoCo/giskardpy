@@ -29,6 +29,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
+from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.python_interface import GiskardWrapper
@@ -728,14 +729,14 @@ class GiskardTestWrapper(GiskardWrapper):
         assert self.original_number_of_links == len(self.world.links)
         return respone
 
-    def remove_object(self,
-                      name: str,
-                      timeout: float = TimeOut,
-                      expected_response: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+    def remove_group(self,
+                     name: str,
+                     timeout: float = TimeOut,
+                     expected_response: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
         if expected_response == UpdateWorldResponse.SUCCESS:
             old_link_names = self.world.groups[name].link_names
             old_joint_names = self.world.groups[name].joint_names
-        r = super(GiskardTestWrapper, self).remove_object(name, timeout=timeout)
+        r = super(GiskardTestWrapper, self).remove_group(name, timeout=timeout)
         assert r.error_codes == expected_response, \
             f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
             f'expected: \'{update_world_error_code(expected_response)}.\''
@@ -815,6 +816,17 @@ class GiskardTestWrapper(GiskardWrapper):
                                      parent_link_group=parent_link_group,
                                      expected_error_code=expected_error_code)
         return response
+
+    def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = TimeOut,
+                          expected_error_code=UpdateWorldResponse.SUCCESS):
+        try:
+            res = super().update_group_pose(group_name, new_pose, timeout)
+        except UnknownGroupException as e:
+            assert expected_error_code == UpdateWorldResponse.UNKNOWN_GROUP_ERROR
+        if expected_error_code == UpdateWorldResponse.SUCCESS:
+            info = self.get_group_info(group_name)
+            map_T_group = tf.transform_pose(self.world.root_link_name, new_pose)
+            compare_poses(info.root_link_pose.pose, map_T_group.pose)
 
     def add_sphere(self,
                    name: str,

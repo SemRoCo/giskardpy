@@ -247,10 +247,12 @@ class Collisions(object):
     def items(self):
         return self.all_collisions
 
+
 class CollisionWorldSynchronizer(object):
+    black_list: set
+
     def __init__(self, world):
         self.world = world  # type: WorldTree
-        self.black_list = set()
         try:
             self.ignored_pairs = self.god_map.get_data(identifier.ignored_self_collisions)
         except KeyError as e:
@@ -263,6 +265,8 @@ class CollisionWorldSynchronizer(object):
             self.white_list_pairs = set()
 
         self.world_version = -1
+
+        self.reset_collision_blacklist()
 
     def has_world_changed(self):
         if self.world_version != self.world.model_version:
@@ -302,6 +306,9 @@ class CollisionWorldSynchronizer(object):
                     or (link_b, link_a) in self.ignored_pairs:
                 self.black_list.add(link_combination)
         self.update_collision_blacklist(white_list_combinations=self.white_list_pairs)
+
+    def remove_black_list_entries(self, part_list: set):
+        self.black_list = {x for x in self.black_list if x[0] not in part_list and x[1] not in part_list}
 
     @profile
     def update_collision_blacklist(self,

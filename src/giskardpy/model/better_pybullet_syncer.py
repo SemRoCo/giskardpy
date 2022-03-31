@@ -14,12 +14,13 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, C
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.utils import logging
 
+
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world):
-        super(BetterPyBulletSyncer, self).__init__(world)
         self.kw = bpb.KineverseWorld()
         self.object_name_to_id = BiDict()
         self.query = None
+        super(BetterPyBulletSyncer, self).__init__(world)
 
     @profile
     def add_object(self, link):
@@ -178,9 +179,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def sync(self):
-        """
-        :type world: giskardpy.model.world.WorldTree
-        """
         if self.has_world_changed():
             self.reset_cache()
             logging.logdebug('hard sync')
@@ -193,7 +191,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 self.add_object(link)
             self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
             bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
-            self.update_collision_blacklist()
+            # self.update_collision_blacklist()
         bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
 
     def get_pose(self, link_name):

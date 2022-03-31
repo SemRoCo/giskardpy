@@ -2047,7 +2047,7 @@ class TestWorldManipulation(object):
         for i in range(3):
             better_pose.reattach_object(name=pocky, parent_link=better_pose.r_tip)
             better_pose.detach_object(pocky)
-        better_pose.remove_object(pocky)
+        better_pose.remove_group(pocky)
 
     def test_reattach_box(self, zero_pose: PR2):
         pocky = 'http://muh#pocky'
@@ -2079,7 +2079,7 @@ class TestWorldManipulation(object):
         p.pose.position.z = 1.6
         p.pose.orientation.w = 1
         zero_pose.add_sphere(object_name, radius=1, pose=p)
-        zero_pose.remove_object(object_name)
+        zero_pose.remove_group(object_name)
 
     def test_add_remove_cylinder(self, zero_pose: PR2):
         object_name = 'muh'
@@ -2090,7 +2090,7 @@ class TestWorldManipulation(object):
         p.pose.position.z = 0
         p.pose.orientation.w = 1
         zero_pose.add_cylinder(object_name, height=1, radius=1, pose=p)
-        zero_pose.remove_object(object_name)
+        zero_pose.remove_group(object_name)
 
     def test_add_urdf_body(self, kitchen_setup: PR2):
         object_name = 'kitchen'
@@ -2100,7 +2100,7 @@ class TestWorldManipulation(object):
                                pose=tf.lookup_pose('map', 'iai_kitchen/world'),
                                js_topic='/kitchen/joint_states',
                                set_js_topic='/kitchen/cram_joint_states')
-        kitchen_setup.remove_object(object_name)
+        kitchen_setup.remove_group(object_name)
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
                                pose=tf.lookup_pose('map', 'iai_kitchen/world'),
@@ -2133,8 +2133,34 @@ class TestWorldManipulation(object):
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
         zero_pose.reattach_object(object_name, parent_link=zero_pose.r_tip)
         zero_pose.detach_object(object_name)
-        zero_pose.remove_object(object_name)
+        zero_pose.remove_group(object_name)
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+
+    def test_update_group_pose1(self, zero_pose: PR2):
+        group_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(group_name, size=(1, 1, 1), pose=p)
+        p.pose.position = Point(1,0,0)
+        zero_pose.update_group_pose('asdf', p, expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+        zero_pose.update_group_pose(group_name, p)
+
+    def test_update_group_pose2(self, zero_pose: PR2):
+        group_name = 'muh'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(group_name, size=(1, 1, 1), pose=p, parent_link='r_gripper_tool_frame')
+        p.pose.position = Point(1,0,0)
+        zero_pose.update_group_pose('asdf', p, expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+        zero_pose.update_group_pose(group_name, p)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        # TODO test that attached object moved?
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
     def test_attach_existing_box2(self, zero_pose: PR2):
         pocky = 'http://muh#pocky'
@@ -2185,7 +2211,7 @@ class TestWorldManipulation(object):
         p.pose.position.z = 1.6
         p.pose.orientation.w = 1
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
-        zero_pose.remove_object(object_name)
+        zero_pose.remove_group(object_name)
 
     def test_invalid_update_world(self, zero_pose: PR2):
         req = UpdateWorldRequest()
@@ -2197,7 +2223,7 @@ class TestWorldManipulation(object):
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_remove_unkown_group(self, zero_pose: PR2):
-        zero_pose.remove_object('muh', expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+        zero_pose.remove_group('muh', expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
 
     def test_corrupt_shape_error(self, zero_pose: PR2):
         p = PoseStamped()
@@ -2238,33 +2264,6 @@ class TestWorldManipulation(object):
 
 
 class TestCollisionAvoidanceGoals(object):
-
-    # def test_wiggle4(self, pocky_pose_setup: PR2):
-    #     # FIXME
-    #     p = PoseStamped()
-    #     p.header.frame_id = 'map'
-    #     p.pose.position.x = 1.1
-    #     p.pose.position.y = 0
-    #     p.pose.position.z = 0.6
-    #     p.pose.orientation.w = 1
-    #     pocky_pose_setup.add_box(size=[1, 1, 0.01], pose=p)
-    #
-    #     p = PoseStamped()
-    #     p.header.frame_id = pocky_pose_setup.r_tip
-    #     p.pose.position = Point(0.1, 0, 0)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root,
-    #                                              expected_error_codes=[MoveResult.SHAKING])
-
-    # box_setup.avoid_collision()
-
-    # collision_entry = CollisionEntry()
-    # collision_entry.type = CollisionEntry.AVOID_COLLISION
-    # collision_entry.min_dist = 0.05
-    # collision_entry.body_b = 'box'
-    # pocky_pose_setup.add_collision_entries([collision_entry])
-    #
-    # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_handover(self, kitchen_setup: PR2):
         js = {
@@ -2384,7 +2383,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = 0
         p.pose.position.z = -0.2
         p.pose.orientation.w = 1
-        zero_pose.add_box(name='box', size=[1, 1, 1], pose=p)
+        zero_pose.add_box(name='box', size=(1, 1, 1), pose=p)
         zero_pose.set_joint_goal(pocky_pose)
         zero_pose.plan_and_execute()
 
@@ -2551,7 +2550,8 @@ class TestCollisionAvoidanceGoals(object):
     def test_avoid_collision(self, box_setup: PR2):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
-        ce.body_b = 'box'
+        ce.group1 = box_setup.get_robot_name()
+        ce.group2 = 'box'
         # ce.min_dist = 0.05
         box_setup.set_collision_entries([ce])
         box_setup.allow_self_collision()
@@ -4482,5 +4482,6 @@ class TestInfoServices(object):
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_attached_collision2'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
 # pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])

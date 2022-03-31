@@ -1,7 +1,8 @@
 import traceback
+from itertools import product
 from queue import Queue
 from xml.etree.ElementTree import ParseError
-
+import giskardpy.casadi_wrapper as w
 import rospy
 from py_trees import Status
 from py_trees.meta import running_is_success
@@ -21,7 +22,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_localization import SyncLocalization
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import transform_pose
+from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
 
 
 def exception_to_response(e, req):
@@ -160,6 +161,8 @@ class WorldUpdater(GiskardBehavior):
                         self.add_object(req)
                     elif req.operation == UpdateWorldRequest.REATTACH:
                         self.reattach_object(req)
+                    elif req.operation == UpdateWorldRequest.UPDATE_POSE:
+                        self.update_group_pose(req)
                     elif req.operation == UpdateWorldRequest.REMOVE:
                         self.remove_object(req.group_name)
                     elif req.operation == UpdateWorldRequest.REMOVE_ALL:
@@ -189,6 +192,8 @@ class WorldUpdater(GiskardBehavior):
         else:
             if req.parent_link_group == '':
                 req.parent_link_group = RobotName
+            elif req.parent_link == '':
+                req.parent_link = self.world.groups[req.parent_link_group].root_link_name
             req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
         return req
 
@@ -220,29 +225,52 @@ class WorldUpdater(GiskardBehavior):
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
+        self.collision_scene.update_collision_blacklist(
+            link_combinations=set(product(self.world.groups[req.group_name].link_names_with_collisions,
+                                          self.world.link_names_with_collisions)))
 
     def detach_object(self, req):
         # assumes that parent has god map lock
         if req.group_name not in self.world.groups:
-            raise UnknownGroupException(f'Can\'t detach \'{req.group_name}\' because it doesn\'t exist.')
+            raise UnknownGroupException(f'Can\'t detach unknown group: \'{req.group_name}\'')
         req.parent_link_group = ''
         req.parent_link = ''
         self.reattach_object(req)
+
+    def update_group_pose(self, req: UpdateWorldRequest):
+        if req.group_name not in self.world.groups:
+            raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
+        group = self.world.groups[req.group_name]
+        joint_name = group.root_link.parent_joint_name
+        pose = self.world.transform_pose(self.world.joints[joint_name].parent_link_name, req.pose).pose
+        pose = w.Matrix(msg_to_homogeneous_matrix(pose))
+        self.world.update_joint_parent_T_child(joint_name, pose)
+        self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
+        self.collision_scene.update_collision_blacklist(
+            link_combinations=set(product(group.link_names_with_collisions,
+                                          self.world.link_names_with_collisions)))
+
 
     def reattach_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
         req = self.handle_convention(req)
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
-        if self.world.groups[req.group_name].root_link_name != req.parent_link:
-            old_parent_link = self.world.groups[req.group_name].parent_link_of_root
+        group = self.world.groups[req.group_name]
+        if group.root_link_name != req.parent_link:
+            old_parent_link = group.parent_link_of_root
             self.world.move_group(req.group_name, req.parent_link)
             logging.loginfo(f'Reattached \'{req.group_name}\' from \'{old_parent_link}\' to \'{req.parent_link}\'.')
+            self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
+            self.collision_scene.update_collision_blacklist(
+                link_combinations=set(product(group.link_names_with_collisions,
+                                              self.world.link_names_with_collisions)))
         else:
             logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
 
     def remove_object(self, name):
         # assumes that parent has god map lock
+        self.collision_scene.remove_black_list_entries(set(self.world.groups[name].link_names_with_collisions))
         self.world.delete_group(name)
         self._remove_plugin(str(PrefixName(name, 'js')))
         self._remove_plugin(str(PrefixName(name, 'localization')))
@@ -256,6 +284,7 @@ class WorldUpdater(GiskardBehavior):
 
     def clear_world(self):
         # assumes that parent has god map lock
+        self.collision_scene.reset_collision_blacklist()
         self.world.delete_all_but_robot()
         for plugin_name in self.added_plugin_names:
             self.tree.remove_node(plugin_name)

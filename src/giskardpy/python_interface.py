@@ -17,7 +17,7 @@ from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, DyeGroup, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy import RobotName
-from giskardpy.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box
@@ -538,9 +538,9 @@ class GiskardWrapper(object):
         req.timeout = timeout
         return self._update_world_srv.call(req)
 
-    def remove_object(self,
-                      name: str,
-                      timeout: float = 0) -> UpdateWorldResponse:
+    def remove_group(self,
+                     name: str,
+                     timeout: float = 0) -> UpdateWorldResponse:
         object = WorldBody()
         req = UpdateWorldRequest()
         req.group_name = str(name)
@@ -744,3 +744,16 @@ class GiskardWrapper(object):
 
     def get_controlled_joints(self, name: str = 'robot'):
         return self.get_group_info(name).controlled_joints
+
+    def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 0) -> UpdateWorldResponse:
+        req = UpdateWorldRequest()
+        req.operation = req.UPDATE_POSE
+        req.group_name = group_name
+        req.pose = new_pose
+        req.timeout = timeout
+        res = self._update_world_srv.call(req)
+        if res.error_codes == UpdateWorldResponse.SUCCESS:
+            return res
+        if res.error_codes == UpdateWorldResponse.UNKNOWN_GROUP_ERROR:
+            raise UnknownGroupException(res.error_msg)
+        raise ServiceException(res.error_msg)

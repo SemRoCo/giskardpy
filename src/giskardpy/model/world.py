@@ -114,6 +114,7 @@ class WorldTree(object):
         self._clear_memo(self.are_linked)
         self._clear_memo(self.compose_fk_expression)
         self._clear_memo(self.compute_chain)
+        self._clear_memo(self.is_link_controlled)
         self.init_all_fks()
         self.notify_state_change()
         self._model_version += 1
@@ -933,6 +934,7 @@ class WorldTree(object):
     def is_joint_controlled(self, joint_name):
         return joint_name in self.controlled_joints
 
+    @memoize
     def is_link_controlled(self, link_name):
         try:
             self.get_controlled_parent_joint_of_link(link_name)

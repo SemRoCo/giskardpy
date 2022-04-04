@@ -202,6 +202,7 @@ class TreeManager(object):
         else:
             self.tree = tree
         self.tree_nodes = {}
+        collision_scene.reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
         self.render()

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import product, combinations_with_replacement
+from itertools import product, combinations_with_replacement, combinations
 from time import time
 from typing import List, Dict, Tuple, Union, Optional
 
@@ -14,7 +14,7 @@ from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
 
-
+np.random.seed(1337)
 
 class Collision(object):
     def __init__(self, link_a, body_b, link_b, contact_distance,
@@ -266,8 +266,6 @@ class CollisionWorldSynchronizer(object):
 
         self.world_version = -1
 
-        self.reset_collision_blacklist()
-
     def has_world_changed(self):
         if self.world_version != self.world.model_version:
             self.world_version = self.world.model_version
@@ -296,64 +294,62 @@ class CollisionWorldSynchronizer(object):
 
     def reset_collision_blacklist(self):
         self.black_list = set()
-        link_combinations = set(combinations_with_replacement(self.robot.link_names_with_collisions, 2))
-        for link_a, link_b in link_combinations:
-            link_combination = self.world.sort_links(link_a, link_b)
-            if link_a == link_b \
-                    or link_a in self.ignored_pairs \
-                    or link_b in self.ignored_pairs \
-                    or (link_a, link_b) in self.ignored_pairs \
-                    or (link_b, link_a) in self.ignored_pairs:
-                self.black_list.add(link_combination)
         self.update_collision_blacklist(white_list_combinations=self.white_list_pairs)
 
     def remove_black_list_entries(self, part_list: set):
         self.black_list = {x for x in self.black_list if x[0] not in part_list and x[1] not in part_list}
 
-    @profile
-    def update_collision_blacklist(self,
-                                   link_combinations: Optional[set] = None,
-                                   white_list_combinations: Optional[set] = None,
-                                   distance_threshold_zero: float = 0.05,
-                                   distance_threshold_rnd: float = 0.0,
-                                   non_controlled: bool = False,
-                                   steps: int = 10):
-        np.random.seed(1337)
+    def update_group_blacklist(self,
+                               group_name: str,
+                               link_combinations: Optional[set] = None,
+                               white_list_combinations: Optional[set] = None,
+                               distance_threshold_zero: float = 0.05,
+                               distance_threshold_rnd: float = 0.0,
+                               non_controlled: bool = False,
+                               steps: int = 10):
+        group: SubWorldTree = self.world.groups[group_name]
         if link_combinations is None:
-            link_combinations = set(combinations_with_replacement(self.world.link_names_with_collisions, 2))
+            link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
         # logging.loginfo('calculating self collision matrix')
         joint_state_tmp = self.world.state
         t = time()
 
         # find meaningless collisions
         for link_a, link_b in link_combinations:
-            link_combination = self.world.sort_links(link_a, link_b)
+            link_combination = group.sort_links(link_a, link_b)
             if link_combination in self.black_list:
                 continue
-            if link_a == link_b \
-                    or self.world.are_linked(link_a, link_b, non_controlled=non_controlled) \
-                    or (not self.world.is_link_controlled(link_a) and not self.world.is_link_controlled(link_b)):
-                self.black_list.add(link_combination)
+            try:
+                if link_a == link_b \
+                        or link_a in self.ignored_pairs \
+                        or link_b in self.ignored_pairs \
+                        or (link_a, link_b) in self.ignored_pairs \
+                        or (link_b, link_a) in self.ignored_pairs \
+                        or group.are_linked(link_a, link_b, non_controlled=non_controlled) \
+                        or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
+                    self.black_list.add(link_combination)
+            except Exception as e:
+                pass
 
         unknown = link_combinations.difference(self.black_list)
         self.set_joint_state_to_zero()
         for link_a, link_b in self.check_collisions2(unknown, distance_threshold_zero):
-            link_combination = self.world.sort_links(link_a, link_b)
+            link_combination = group.sort_links(link_a, link_b)
             self.black_list.add(link_combination)
         unknown = unknown.difference(self.black_list)
 
         # Remove combinations which can never touch
         # by checking combinations which a single joint can influence
-        for joint_name in self.world.controlled_joints:
-            parent_links = self.world.get_siblings_with_collisions(joint_name)
+        for joint_name in group.controlled_joints:
+            parent_links = group.get_siblings_with_collisions(joint_name)
             if not parent_links:
                 continue
-            child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name)
-            if self.world.is_joint_continuous(joint_name):
+            child_links = group.get_directly_controlled_child_links_with_collisions(joint_name)
+            if group.is_joint_continuous(joint_name):
                 min_position = -np.pi
                 max_position = np.pi
             else:
-                min_position, max_position = self.world.get_joint_position_limits(joint_name)
+                min_position, max_position = group.get_joint_position_limits(joint_name)
 
             # joint_name can make these links touch.
             current_combinations = set(product(parent_links, child_links))
@@ -365,11 +361,11 @@ class CollisionWorldSynchronizer(object):
                 continue
             sometimes = set()
             for position in np.linspace(min_position, max_position, steps):
-                self.world.state[joint_name].position = position
+                group.state[joint_name].position = position
                 self.sync()
                 for link_a, link_b in subset_of_unknown:
                     if self.in_collision(link_a, link_b, distance_threshold_rnd):
-                        sometimes.add(self.world.sort_links(link_a, link_b))
+                        sometimes.add(group.sort_links(link_a, link_b))
             never = set(subset_of_unknown).difference(sometimes)
             unknown = unknown.difference(never)
             self.black_list.update(never)
@@ -381,6 +377,28 @@ class CollisionWorldSynchronizer(object):
             self.black_list.difference_update(white_list_combinations)
         # self.black_list[group_name] = unknown
         # return self.collision_matrices[group_name]
+
+    @profile
+    def update_collision_blacklist(self,
+                                   link_combinations: Optional[set] = None,
+                                   white_list_combinations: Optional[set] = None,
+                                   distance_threshold_zero: float = 0.05,
+                                   distance_threshold_rnd: float = 0.0,
+                                   non_controlled: bool = False,
+                                   steps: int = 10):
+        for group_name in self.world.minimal_group_names:
+            self.update_group_blacklist(group_name, link_combinations, white_list_combinations, distance_threshold_zero,
+                                        distance_threshold_rnd, non_controlled, steps)
+        self.blacklist_inter_group_collisions()
+
+    def blacklist_inter_group_collisions(self):
+        for group_a_name, group_b_name in combinations(self.world.minimal_group_names, 2):
+            if RobotName in (group_a_name, group_b_name):
+                continue
+            group_a: SubWorldTree = self.world.groups[group_a_name]
+            group_b: SubWorldTree = self.world.groups[group_b_name]
+            for link_a, link_b in product(group_a.link_names_with_collisions, group_b.link_names_with_collisions):
+                self.black_list.add(self.world.sort_links(link_a, link_b))
 
     def get_pose(self, link_name):
         return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name)

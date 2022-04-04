@@ -160,7 +160,7 @@ class WorldUpdater(GiskardBehavior):
                     if req.operation == UpdateWorldRequest.ADD:
                         self.add_object(req)
                     elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
-                        self.reattach_object(req)
+                        self.update_parent_link(req)
                     elif req.operation == UpdateWorldRequest.UPDATE_POSE:
                         self.update_group_pose(req)
                     elif req.operation == UpdateWorldRequest.REMOVE:
@@ -223,9 +223,11 @@ class WorldUpdater(GiskardBehavior):
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
-        self.collision_scene.update_collision_blacklist(
-            link_combinations=set(product(self.world.groups[req.group_name].link_names_with_collisions,
-                                          self.world.link_names_with_collisions)))
+        if req.group_name in self.world.groups[RobotName].group_names:
+            self.collision_scene.update_group_blacklist(RobotName)
+        else:
+            self.collision_scene.update_group_blacklist(req.group_name)
+        self.collision_scene.blacklist_inter_group_collisions()
 
     def update_group_pose(self, req: UpdateWorldRequest):
         if req.group_name not in self.world.groups:
@@ -235,13 +237,12 @@ class WorldUpdater(GiskardBehavior):
         pose = self.world.transform_pose(self.world.joints[joint_name].parent_link_name, req.pose).pose
         pose = w.Matrix(msg_to_homogeneous_matrix(pose))
         self.world.update_joint_parent_T_child(joint_name, pose)
-        self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
-        self.collision_scene.update_collision_blacklist(
-            link_combinations=set(product(group.link_names_with_collisions,
-                                          self.world.link_names_with_collisions)))
+        # self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
+        # self.collision_scene.update_collision_blacklist(
+        #     link_combinations=set(product(group.link_names_with_collisions,
+        #                                   self.world.link_names_with_collisions)))
 
-
-    def reattach_object(self, req: UpdateWorldRequest):
+    def update_parent_link(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
         req = self.handle_convention(req)
         if req.group_name not in self.world.groups:

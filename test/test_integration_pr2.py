@@ -2697,6 +2697,7 @@ class TestCollisionAvoidanceGoals(object):
         # pocky_pose_setup.allow_all_collisions()
 
         pocky_pose_setup.plan_and_execute()
+        assert ('box', 'bl') not in pocky_pose_setup.collision_scene.black_list
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_group_info('r_gripper').links, 0.04)
 
     def test_avoid_collision_two_sticks(self, pocky_pose_setup: PR2):

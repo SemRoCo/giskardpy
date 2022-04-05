@@ -327,7 +327,7 @@ class CollisionWorldSynchronizer(object):
                         or (link_b, link_a) in self.ignored_pairs \
                         or group.are_linked(link_a, link_b, non_controlled=non_controlled) \
                         or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
-                    self.black_list.add(link_combination)
+                    self.add_black_list_entry(*link_combination)
             except Exception as e:
                 pass
 
@@ -335,7 +335,7 @@ class CollisionWorldSynchronizer(object):
         self.set_joint_state_to_zero()
         for link_a, link_b in self.check_collisions2(unknown, distance_threshold_zero):
             link_combination = group.sort_links(link_a, link_b)
-            self.black_list.add(link_combination)
+            self.add_black_list_entry(*link_combination)
         unknown = unknown.difference(self.black_list)
 
         # Remove combinations which can never touch
@@ -362,6 +362,7 @@ class CollisionWorldSynchronizer(object):
             sometimes = set()
             for position in np.linspace(min_position, max_position, steps):
                 group.state[joint_name].position = position
+                self.world.notify_state_change()
                 self.sync()
                 for link_a, link_b in subset_of_unknown:
                     if self.in_collision(link_a, link_b, distance_threshold_rnd):
@@ -369,14 +370,22 @@ class CollisionWorldSynchronizer(object):
             never = set(subset_of_unknown).difference(sometimes)
             unknown = unknown.difference(never)
             self.black_list.update(never)
+            self.add_black_list_entries(never)
 
         logging.logdebug(f'Calculated self collision matrix in {time() - t:.3f}s')
         self.world.state = joint_state_tmp
+        self.world.notify_state_change()
         # unknown.update(self.white_list_pairs)
         if white_list_combinations is not None:
             self.black_list.difference_update(white_list_combinations)
         # self.black_list[group_name] = unknown
         # return self.collision_matrices[group_name]
+
+    def add_black_list_entry(self, link_a, link_b):
+        self.black_list.add((link_a, link_b))
+
+    def add_black_list_entries(self, entries):
+        self.black_list.update(entries)
 
     @profile
     def update_collision_blacklist(self,
@@ -398,13 +407,14 @@ class CollisionWorldSynchronizer(object):
             group_a: SubWorldTree = self.world.groups[group_a_name]
             group_b: SubWorldTree = self.world.groups[group_b_name]
             for link_a, link_b in product(group_a.link_names_with_collisions, group_b.link_names_with_collisions):
-                self.black_list.add(self.world.sort_links(link_a, link_b))
+                self.add_black_list_entry(*self.world.sort_links(link_a, link_b))
 
     def get_pose(self, link_name):
         return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name)
 
     def set_joint_state_to_zero(self):
         self.world.state = JointStates()
+        self.world.notify_state_change()
 
     def set_max_joint_state(self, group):
         def f(joint_name):

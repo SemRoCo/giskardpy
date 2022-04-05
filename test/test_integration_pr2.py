@@ -3066,13 +3066,14 @@ class TestCollisionAvoidanceGoals(object):
                           parent_link=zero_pose.l_tip,
                           pose=p)
 
+        # zero_pose.set_prediction_horizon(1)
         zero_pose.set_joint_goal({'r_forearm_roll_joint': 0.0,
                                   'r_shoulder_lift_joint': 0.0,
                                   'r_shoulder_pan_joint': 0.0,
                                   'r_upper_arm_roll_joint': 0.0,
-                                  'r_wrist_flex_joint': 0.0,
+                                  'r_wrist_flex_joint': -0.10001,
                                   'r_wrist_roll_joint': 0.0,
-                                  'r_elbow_flex_joint': 0.0,
+                                  'r_elbow_flex_joint': -0.15,
                                   'torso_lift_joint': 0.2})
 
         p = PoseStamped()

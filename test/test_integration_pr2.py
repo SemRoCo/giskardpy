@@ -3672,7 +3672,11 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.plan_and_execute()
 
         attached_link_name = 'pocky'
-        zero_pose.attach_box(attached_link_name, [0.16, 0.04, 0.04], zero_pose.l_tip, [0.04, 0, 0], [0, 0, 0, 1])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.pose.position.x = 0.04
+        p.pose.orientation.w = 1
+        zero_pose.attach_box(attached_link_name, [0.16, 0.04, 0.04], zero_pose.l_tip, pose=p)
 
         zero_pose.set_joint_goal({'r_forearm_roll_joint': 0.0,
                                   'r_shoulder_lift_joint': 0.0,

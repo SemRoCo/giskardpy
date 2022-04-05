@@ -38,6 +38,7 @@ class CollisionChecker(GiskardBehavior):
             max_distances = self.make_max_distances()
             try:
                 added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
+                self.god_map.set_data(identifier.added_collision_checks, {})
             except KeyError:
                 # no collision checks added
                 added_checks = {}

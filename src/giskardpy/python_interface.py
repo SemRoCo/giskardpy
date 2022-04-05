@@ -259,6 +259,9 @@ class GiskardWrapper(object):
             params['max_angular_velocity'] = max_angular_velocity
         self.set_json_goal('AlignPlanes', **params)
 
+    def set_prediction_horizon(self, prediction_horizon):
+        self.set_json_goal('SetPredictionHorizon', prediction_horizon=prediction_horizon)
+
     def avoid_joint_limits(self, percentage=15, weight=WEIGHT_BELOW_CA):
         """
         This goal will push joints away from their position limits

@@ -1044,6 +1044,8 @@ class PR2(GiskardTestWrapper):
     def __init__(self):
         self.r_tip = 'r_gripper_tool_frame'
         self.l_tip = 'l_gripper_tool_frame'
+        self.l_gripper_group = 'l_gripper'
+        self.r_gripper_group = 'r_gripper'
         self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         super(PR2, self).__init__('package://giskardpy/config/pr2.yaml')
@@ -1053,18 +1055,14 @@ class PR2(GiskardTestWrapper):
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
-        return [str(x) for x in self.world.groups['l_gripper'].link_names_with_collisions]
+        return [str(x) for x in self.world.groups[self.l_gripper_group].link_names_with_collisions]
 
     def get_r_gripper_links(self):
-        return [str(x) for x in self.world.groups['r_gripper'].link_names_with_collisions]
+        return [str(x) for x in self.world.groups[self.r_gripper_group].link_names_with_collisions]
 
     def get_r_forearm_links(self):
         return ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link', 'r_forearm_link',
                 'r_forearm_link']
-
-    def get_allow_l_gripper(self, body_b='box'):
-        links = self.get_l_gripper_links()
-        return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, [link], body_b, []) for link in links]
 
     def get_l_gripper_collision_entries(self, body_b='box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
         links = self.get_l_gripper_links()

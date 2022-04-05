@@ -2543,6 +2543,24 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
+    def test_attach_box_to_finger(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = 'http://muh#pocky'
+        finger = 'l_gripper_l_finger_tip_link'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = zero_pose.l_tip
+        box_pose.pose.position = Point(0.05, 0, 0, )
+        box_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], box_pose)
+        zero_pose.attach_object(pocky, finger)
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
+        zero_pose.plan_and_execute()
+
     def test_attach_remove_box(self, zero_pose):
         """
         :type zero_pose: PR2

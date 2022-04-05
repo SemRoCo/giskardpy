@@ -129,6 +129,7 @@ class CollisionWorldSynchronizer(object):
 
         logging.logdebug('Calculated self collision matrix in {:.3f}s'.format(time() - t))
         self.world.state = joint_state_tmp
+        self.world.notify_state_change()
         unknown.update(self.added_pairs)
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]

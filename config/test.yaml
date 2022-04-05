@@ -7,7 +7,7 @@ plugins:
     enabled: True
     in_planning_loop: False
   CPIMarker: # contact visualization, slows planning down a little bit
-    enabled: False
+    enabled: True
     in_planning_loop: False
 #  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
 #    enabled: True

@@ -2130,11 +2130,29 @@ class TestWorldManipulation(object):
         p.header.frame_id = 'map'
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
-        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip)
-        zero_pose.detach_group(object_name)
-        zero_pose.remove_group(object_name)
-        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p, timeout=0)
+        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip, timeout=0)
+        zero_pose.detach_group(object_name, timeout=0)
+        zero_pose.remove_group(object_name, timeout=0)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p, timeout=0)
+
+    def test_attach_to_kitchen(self, kitchen_setup: PR2):
+        object_name = 'muh'
+        drawer_joint = 'sink_area_left_middle_drawer_main_joint'
+
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        cup_pose.pose.position = Point(0.1, 0.2, -.05)
+        cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder(object_name, height=0.07, radius=0.04, pose=cup_pose, parent_link_group='kitchen',
+                                   parent_link='sink_area_left_middle_drawer_main')
+        kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.detach_group(object_name)
+        kitchen_setup.set_kitchen_js({drawer_joint: 0})
+        kitchen_setup.plan_and_execute()
+
 
     def test_update_group_pose1(self, zero_pose: PR2):
         group_name = 'muh'
@@ -3213,14 +3231,13 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision_gripper(self, box_setup: PR2):
         box_setup.allow_all_collisions()
-        ces = box_setup.get_l_gripper_collision_entries('box', 0.05, CollisionEntry.AVOID_COLLISION)
-        box_setup.set_collision_entries(ces)
+        box_setup.avoid_collision(0.05, box_setup.l_gripper_group, 'box')
         p = PoseStamped()
         p.header.frame_id = box_setup.l_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.15
         p.pose.orientation.w = 1
-        box_setup.set_cart_goal(p, box_setup.l_tip, box_setup.default_root)
+        box_setup.set_cart_goal(p, box_setup.l_tip, box_setup.default_root, check=False)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), -1e-3)
 

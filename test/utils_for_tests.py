@@ -749,10 +749,9 @@ class GiskardTestWrapper(GiskardWrapper):
                 assert old_joint_name not in self.world.joint_names
         return r
 
-    def detach_group(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+    def detach_group(self, name, timeout: float = TimeOut, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
-            expected_pose = self.robot.compute_fk_pose(self.robot.root_link_name, name)
-            response = super().detach_group(name)
+            response = super().detach_group(name, timeout=timeout)
             self.check_add_object_result(response=response,
                                          name=name,
                                          size=None,
@@ -1063,10 +1062,6 @@ class PR2(GiskardTestWrapper):
     def get_r_forearm_links(self):
         return ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link', 'r_forearm_link',
                 'r_forearm_link']
-
-    def get_l_gripper_collision_entries(self, body_b='box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
-        links = self.get_l_gripper_links()
-        return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
 
     def open_r_gripper(self):
         sjs = SetJointStateRequest()

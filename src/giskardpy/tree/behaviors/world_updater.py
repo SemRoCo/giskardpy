@@ -224,10 +224,8 @@ class WorldUpdater(GiskardBehavior):
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
-        if req.group_name in self.world.groups[RobotName].group_names:
-            self.collision_scene.update_group_blacklist(RobotName)
-        else:
-            self.collision_scene.update_group_blacklist(req.group_name)
+        parent_group = self.world.get_parent_group_name(req.group_name)
+        self.collision_scene.update_group_blacklist(parent_group)
         self.collision_scene.blacklist_inter_group_collisions()
 
     def update_group_pose(self, req: UpdateWorldRequest):

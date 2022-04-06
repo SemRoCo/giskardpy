@@ -375,6 +375,13 @@ class WorldTree(object):
             joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
         return joint
 
+    def get_parent_group_name(self, group_name):
+        for potential_parent_group in self.minimal_group_names:
+            if group_name in self.groups[potential_parent_group].groups:
+                return potential_parent_group
+        return group_name
+
+
     @profile
     def add_world_body(self, group_name: str,
                        msg: WorldBody,

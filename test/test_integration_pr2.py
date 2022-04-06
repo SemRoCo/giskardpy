@@ -3621,6 +3621,23 @@ class TestCollisionAvoidanceGoals(object):
         percentage = 50
         drawer_handle = 'sink_area_left_middle_drawer_handle'
         drawer_joint = 'sink_area_left_middle_drawer_main_joint'
+        # spawn cup
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        cup_pose.pose.position = Point(0.1, 0.2, -.05)
+        cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder(cup_name, height=0.07, radius=0.04, pose=cup_pose, parent_link_group='kitchen',
+                                   parent_link='sink_area_left_middle_drawer_main')
+
+        # spawn bowl
+        bowl_pose = PoseStamped()
+        bowl_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        bowl_pose.pose.position = Point(0.1, -0.2, -.05)
+        bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder(bowl_name, height=0.05, radius=0.07, pose=bowl_pose, parent_link_group='kitchen',
+                                   parent_link='sink_area_left_middle_drawer_main')
 
         # grasp drawer handle
         bar_axis = Vector3Stamped()
@@ -3662,21 +3679,6 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
 
-        # spawn cup
-        cup_pose = PoseStamped()
-        cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
-        cup_pose.pose.position = Point(0.1, 0.2, -.05)
-        cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-
-        kitchen_setup.add_cylinder(cup_name, height=0.07, radius=0.04, pose=cup_pose)
-
-        # spawn bowl
-        bowl_pose = PoseStamped()
-        bowl_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
-        bowl_pose.pose.position = Point(0.1, -0.2, -.05)
-        bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-
-        kitchen_setup.add_cylinder(bowl_name, height=0.05, radius=0.07, pose=bowl_pose)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 

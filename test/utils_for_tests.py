@@ -12,7 +12,7 @@ import numpy as np
 import rospy
 from angles import shortest_angular_distance
 from control_msgs.msg import FollowJointTrajectoryActionGoal
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
@@ -329,7 +329,7 @@ class TranslationGoalChecker(GoalChecker):
     def __call__(self):
         expected = self.expected
         current_pose = tf.lookup_pose(self.root_link, self.tip_link)
-        np.testing.assert_array_almost_equal(msg_to_list(expected.pose.position),
+        np.testing.assert_array_almost_equal(msg_to_list(expected.point),
                                              msg_to_list(current_pose.pose.position), decimal=2)
 
 
@@ -382,10 +382,10 @@ class RotationGoalChecker(GoalChecker):
         current_pose = tf.lookup_pose(self.root_link, self.tip_link)
 
         try:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.orientation),
+            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
                                                  msg_to_list(current_pose.pose.orientation), decimal=2)
         except AssertionError:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.orientation),
+            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
                                                  -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
 
 
@@ -533,23 +533,30 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_base.call(goal)
         rospy.sleep(0.5)
 
-    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
+    def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
                           **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
+        super(GiskardTestWrapper, self).set_rotation_goal(goal_orientation=goal_orientation,
+                                                          tip_link=tip_link,
+                                                          root_link=root_link,
+                                                          max_velocity=max_velocity,
                                                           weight=weight, **kwargs)
         if check:
-            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_orientation))
 
-    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
+    def set_translation_goal(self, goal_point, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
                              **kwargs):
-        if not root_link:
+        if root_link is None:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
-                                                             weight=weight, **kwargs)
+        super(GiskardTestWrapper, self).set_translation_goal(goal_point=goal_point,
+                                                             tip_link=tip_link,
+                                                             root_link=root_link,
+                                                             max_velocity=max_velocity,
+                                                             weight=weight,
+                                                             **kwargs)
         if check:
-            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_point))
 
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None,
                                       **kwargs):
@@ -561,24 +568,24 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
                       angular_velocity=None, check=True):
-        kwargs = {
-            'goal_pose': goal_pose,
-            'tip_link': tip_link,
-            'root_link': root_link,
-            'check': check,
-        }
-        if root_link:
-            kwargs['root_link'] = root_link
-        if weight:
-            kwargs['weight'] = weight
-        linear_kwargs = copy(kwargs)
-        if linear_velocity:
-            linear_kwargs['max_velocity'] = linear_velocity
-        self.set_translation_goal(**linear_kwargs)
-        angular_kwargs = copy(kwargs)
-        if angular_velocity:
-            angular_kwargs['max_velocity'] = angular_velocity
-        self.set_rotation_goal(**angular_kwargs)
+        goal_point = PointStamped()
+        goal_point.header = goal_pose.header
+        goal_point.point = goal_pose.pose.position
+        self.set_translation_goal(goal_point=goal_point,
+                                  tip_link=tip_link,
+                                  root_link=root_link,
+                                  weight=weight,
+                                  max_velocity=linear_velocity,
+                                  check=check)
+        goal_orientation = QuaternionStamped()
+        goal_orientation.header = goal_pose.header
+        goal_orientation.quaternion = goal_pose.pose.orientation
+        self.set_rotation_goal(goal_orientation=goal_orientation,
+                               tip_link=tip_link,
+                               root_link=root_link,
+                               weight=weight,
+                               max_velocity=angular_velocity,
+                               check=check)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
         super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
@@ -589,15 +596,19 @@ class GiskardTestWrapper(GiskardWrapper):
         self.add_goal_check(PointingGoalChecker(self.god_map,
                                                 tip_link=tip_link,
                                                 goal_point=goal_point,
-                                                root_link=root_link if root_link else self.get_root(),
+                                                root_link=root_link if root_link else self.get_robot_root_link(),
                                                 pointing_axis=pointing_axis))
 
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
                               weight=None, check=True):
         if root_link is None:
             root_link = self.robot.root_link_name
-        super(GiskardTestWrapper, self).set_align_planes_goal(tip_link, tip_normal, root_link, root_normal,
-                                                              max_angular_velocity, weight)
+        super(GiskardTestWrapper, self).set_align_planes_goal(tip_link=str(tip_link),
+                                                              tip_normal=tip_normal,
+                                                              root_link=str(root_link),
+                                                              root_normal=root_normal,
+                                                              max_angular_velocity=max_angular_velocity,
+                                                              weight=weight)
         if check:
             self.add_goal_check(AlignPlanesGoalChecker(self.god_map, tip_link, tip_normal, root_link, root_normal))
 
@@ -613,8 +624,14 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                max_angular_velocity=angular_velocity)
 
         if check:
-            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
-            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            goal_point = PointStamped()
+            goal_point.header = goal_pose.header
+            goal_point.point = goal_pose.pose.position
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_point))
+            goal_orientation = QuaternionStamped()
+            goal_orientation.header = goal_pose.header
+            goal_orientation.quaternion = goal_pose.pose.orientation
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_orientation))
 
     #
     # GENERAL GOAL STUFF ###############################################################################################

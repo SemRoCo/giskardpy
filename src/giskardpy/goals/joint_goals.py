@@ -437,7 +437,7 @@ class AvoidJointLimitsPrismatic(Goal):
 
 
 class JointPositionList(Goal):
-    def __init__(self, goal_state: Union[Dict[str, float], JointState], weight: float = None,
+    def __init__(self, goal_state: Dict[str, float], weight: float = None,
                  max_velocity: float = None, hard: bool = False, **kwargs):
         """
         This goal takes a joint state and adds the other JointPosition goals depending on their type
@@ -445,12 +445,11 @@ class JointPositionList(Goal):
         :param max_velocity: default is the default of the added joint goals
         """
         super(JointPositionList, self).__init__(**kwargs)
-        if len(goal_state.name) == 0:
+        if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
-        for i, joint_name in enumerate(goal_state.name):
+        for joint_name, goal_position in goal_state.items():
             if not self.world.has_joint(joint_name):
                 raise KeyError(f'unknown joint \'{joint_name}\'')
-            goal_position = goal_state.position[i]
             params = kwargs
             params.update({'joint_name': joint_name,
                            'goal': goal_position})

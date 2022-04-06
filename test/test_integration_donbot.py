@@ -636,6 +636,6 @@ class TestCollisionAvoidanceGoals(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = 'asdf'
-        zero_pose.set_collision_entries([ce])
+        zero_pose._set_collision_entries([ce])
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_OBJECT])
         zero_pose.plan_and_execute()

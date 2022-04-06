@@ -7,7 +7,7 @@ from typing import Dict, Union, Tuple, Set, Optional
 
 import numpy as np
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3
+from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
@@ -324,7 +324,7 @@ class WorldTree(object):
                               joint_name=PrefixName(PrefixName(urdf.name, prefix), self.connection_prefix))
 
         # create urdf root link and fix to odom with diff drive
-        base_footprint_name = urdf.get_root()
+        base_footprint_name = urdf.get_robot_root_link()
         base_footprint = Link.from_urdf(urdf.link_map[base_footprint_name], None)
 
         trans_lower_limits = {1: -1}
@@ -835,6 +835,8 @@ class WorldTree(object):
             return self.transform_point(target_frame, msg)
         elif isinstance(msg, Vector3Stamped):
             return self.transform_vector(target_frame, msg)
+        elif isinstance(msg, QuaternionStamped):
+            return self.transform_quaternion(target_frame, msg)
         else:
             raise NotImplementedError('World can\'t transform message of type \'{}\''.format(type(msg)))
 
@@ -851,6 +853,16 @@ class WorldTree(object):
         result.header.frame_id = target_frame
         result.pose = np_to_pose(t_T_p)
         return result
+
+    def transform_quaternion(self, target_frame: str, quaternion: QuaternionStamped) -> QuaternionStamped:
+        p = PoseStamped()
+        p.header = quaternion.header
+        p.pose.orientation = quaternion.quaternion
+        new_pose = self.transform_pose(target_frame, p)
+        new_quaternion = QuaternionStamped()
+        new_quaternion.header = new_pose.header
+        new_quaternion.quaternion = new_pose.pose.orientation
+        return new_quaternion
 
     def transform_point(self, target_frame, point):
         """

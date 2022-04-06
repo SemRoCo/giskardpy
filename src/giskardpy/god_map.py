@@ -5,7 +5,8 @@ from copy import copy, deepcopy
 from multiprocessing import Lock
 
 import numpy as np
-from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
+from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
+    Quaternion
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict
@@ -315,6 +316,10 @@ class GodMap(object):
             return self.vector_msg_to_vector3(identifier + ['vector'])
         elif isinstance(data, list):
             return self.list_to_symbol_matrix(identifier, data)
+        elif isinstance(data, Quaternion):
+            return self.quaternion_msg_to_rotation(identifier)
+        elif isinstance(data, QuaternionStamped):
+            return self.quaternion_msg_to_rotation(identifier + ['quaternion'])
         elif isinstance(data, np.ndarray):
             return self.list_to_symbol_matrix(identifier, data)
         else:
@@ -392,6 +397,14 @@ class GodMap(object):
             qy=self.to_symbol(identifier + ['orientation', 'y']),
             qz=self.to_symbol(identifier + ['orientation', 'z']),
             qw=self.to_symbol(identifier + ['orientation', 'w']),
+        )
+
+    def quaternion_msg_to_rotation(self, identifier):
+        return w.rotation_matrix_from_quaternion(
+            x=self.to_symbol(identifier + ['x']),
+            y=self.to_symbol(identifier + ['y']),
+            z=self.to_symbol(identifier + ['z']),
+            w=self.to_symbol(identifier + ['w']),
         )
 
     def point_msg_to_point3(self, identifier):

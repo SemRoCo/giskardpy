@@ -264,22 +264,21 @@ class TestConstraints(object):
 
     def test_CartesianPosition(self, zero_pose: PR2):
         tip = zero_pose.r_tip
-        p = PoseStamped()
+        p = PointStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = tip
-        p.pose.position = Point(-0.4, -0.2, -0.3)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        p.point = Point(-0.4, -0.2, -0.3)
 
-        expected = tf.transform_pose('map', p)
+        expected = tf.transform_point('map', p)
 
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('CartesianPosition',
                                 root_link=zero_pose.default_root,
                                 tip_link=tip,
-                                goal=p)
+                                goal_point=p)
         zero_pose.plan_and_execute()
         new_pose = tf.lookup_pose('map', tip)
-        compare_points(expected.pose.position, new_pose.pose.position)
+        compare_points(expected.point, new_pose.pose.position)
 
     def test_CartesianPose(self, zero_pose: PR2):
         tip = zero_pose.r_tip
@@ -295,7 +294,7 @@ class TestConstraints(object):
         zero_pose.set_json_goal('CartesianPose',
                                 root_link=zero_pose.default_root,
                                 tip_link=tip,
-                                goal=p)
+                                goal_pose=p)
         zero_pose.plan_and_execute()
         new_pose = tf.lookup_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
@@ -357,7 +356,7 @@ class TestConstraints(object):
         zero_pose.set_json_goal('CartesianOrientation',
                                 root_link=root,
                                 tip_link=tip,
-                                goal=p,
+                                goal_orientation=p,
                                 max_velocity=0.15
                                 )
         zero_pose.plan_and_execute()
@@ -394,7 +393,7 @@ class TestConstraints(object):
     def test_CartesianVelocityLimit(self, zero_pose: PR2):
         base_linear_velocity = 0.1
         base_angular_velocity = 0.2
-        zero_pose.limit_cartesian_velocity(
+        zero_pose.set_limit_cartesian_velocity_goal(
             root_link=zero_pose.default_root,
             tip_link='base_footprint',
             max_linear_velocity=base_linear_velocity,
@@ -496,7 +495,7 @@ class TestConstraints(object):
 
         old_pose = tf.lookup_pose('map', 'base_footprint')
 
-        pocky_pose_setup.overwrite_joint_weights(updates)
+        pocky_pose_setup.set_overwrite_joint_weights_goal(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip, check=False)
         pocky_pose_setup.plan_and_execute()
 
@@ -515,7 +514,7 @@ class TestConstraints(object):
         }
         # old_pose = tf.lookup_pose('map', 'base_footprint')
         # old_pose.pose.position.x += 0.1
-        pocky_pose_setup.overwrite_joint_weights(updates)
+        pocky_pose_setup.set_overwrite_joint_weights_goal(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.plan_and_execute()
 
@@ -1017,11 +1016,10 @@ class TestConstraints(object):
         kitchen_setup.set_align_planes_goal(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
-        elbow_pose = PoseStamped()
-        elbow_pose.header.frame_id = handle_frame_id
-        elbow_pose.pose.position.x += 0.1
-        elbow_pose.pose.orientation.w = 1
-        kitchen_setup.set_translation_goal(elbow_pose, elbow)
+        elbow_point = PointStamped()
+        elbow_point.header.frame_id = handle_frame_id
+        elbow_point.point.x += 0.1
+        kitchen_setup.set_translation_goal(elbow_point, elbow)
         kitchen_setup.set_align_planes_goal(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
@@ -1098,14 +1096,14 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.grasp_bar(root_link=kitchen_setup.default_root,
-                                tip_link=kitchen_setup.r_tip,
-                                tip_grasp_axis=tip_grasp_axis,
-                                bar_center=bar_center,
-                                bar_axis=bar_axis,
-                                bar_length=.3)
+        kitchen_setup.set_grasp_bar_goal(root_link=kitchen_setup.default_root,
+                                         tip_link=kitchen_setup.r_tip,
+                                         tip_grasp_axis=tip_grasp_axis,
+                                         bar_center=bar_center,
+                                         bar_axis=bar_axis,
+                                         bar_length=.3)
         kitchen_setup.register_group('handle', 'kitchen', 'sink_area_dish_washer_door_handle')
-        kitchen_setup.allow_collision('robot', 'handle')
+        kitchen_setup.allow_collision(kitchen_setup.get_robot_name(), 'handle')
         kitchen_setup.plan_and_execute()
 
 
@@ -2263,17 +2261,11 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.HARD_CONSTRAINTS_VIOLATED])
 
     def test_unknown_group1(self, box_setup: PR2):
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.group1 = 'muh'
-        box_setup.set_collision_entries([ce])
+        box_setup.avoid_collision(min_distance=0.05, group1='muh')
         box_setup.plan_and_execute([MoveResult.UNKNOWN_GROUP])
 
     def test_unknown_group2(self, box_setup: PR2):
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.group2 = 'muh'
-        box_setup.set_collision_entries([ce])
+        box_setup.avoid_collision(group2='muh')
         box_setup.plan_and_execute([MoveResult.UNKNOWN_GROUP])
 
     def test_base_link_in_collision(self, zero_pose: PR2):
@@ -2443,12 +2435,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
 
     def test_avoid_collision(self, box_setup: PR2):
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.group1 = box_setup.get_robot_name()
-        ce.group2 = 'box'
-        # ce.min_dist = 0.05
-        box_setup.set_collision_entries([ce])
+        box_setup.avoid_collision(min_distance=0.05, group1=box_setup.get_robot_name(), group2='box')
         box_setup.allow_self_collision()
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
@@ -2491,10 +2478,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(0.15, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.group2 = 'box'
-        box_setup.set_collision_entries([collision_entry])
+        box_setup.allow_collision(group2='box')
 
         box_setup.allow_self_collision()
         box_setup.set_cart_goal(p, 'base_footprint', box_setup.default_root)

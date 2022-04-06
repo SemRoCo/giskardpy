@@ -9,7 +9,7 @@ from py_trees import Status
 import giskardpy.goals
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
-from giskardpy import casadi_wrapper as w, RobotName
+from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
@@ -215,7 +215,7 @@ class GoalToConstraints(GetGoal):
         vel_constraints = {}
         debug_expr = {}
         config = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        for link_a_o, link_b_o in self.collision_scene.world.groups[RobotName].possible_collision_combinations():
+        for link_a_o, link_b_o in self.collision_scene.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)].possible_collision_combinations():
             link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
             try:
                 link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)

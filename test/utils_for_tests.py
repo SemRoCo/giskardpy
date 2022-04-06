@@ -27,7 +27,7 @@ from visualization_msgs.msg import Marker
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
-from giskardpy import identifier, RobotPrefix, RobotName
+from giskardpy import identifier, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -274,7 +274,7 @@ class GoalChecker(object):
         """
         self.god_map = god_map
         self.world = self.god_map.unsafe_get_data(identifier.world)
-        self.robot = self.god_map.unsafe_get_data(identifier.robot)
+        self.robot = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
@@ -460,7 +460,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.world.groups['robot']
+        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
     def heart_beat(self, timer_thing):
         self.tree.tick()
@@ -1104,8 +1104,12 @@ class PR2(GiskardTestWrapper):
         self.open_r_gripper()
         self.clear_world()
         self.reset_base()
-        self.register_group('l_gripper', parent_group_name=RobotName, root_link_name='l_wrist_roll_link')
-        self.register_group('r_gripper', parent_group_name=RobotName, root_link_name='r_wrist_roll_link')
+        self.register_group('l_gripper',
+                            parent_group_name=self.god_map.unsafe_get_data(identifier.robot_group_name),
+                            root_link_name='l_wrist_roll_link')
+        self.register_group('r_gripper',
+                            parent_group_name=self.god_map.unsafe_get_data(identifier.robot_group_name),
+                            root_link_name='r_wrist_roll_link')
 
 
 class PR2CloseLoop(PR2):

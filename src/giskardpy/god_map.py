@@ -9,6 +9,7 @@ from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, V
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.utils.config_loader import upload_config_file_to_paramserver
 
 
@@ -205,7 +206,11 @@ class GodMap(object):
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        self.set_data(identifier.robot_description, rospy.get_param('robot_description'))
+        robot_urdf = rospy.get_param('robot_description')
+        self.set_data(identifier.robot_description, robot_urdf)
+        self.set_data(identifier.robot_group_name, robot_name_from_urdf_string(robot_urdf))
+
+
         path_to_data_folder = self.get_data(identifier.data_folder)
         # fix path to data folder
         if not path_to_data_folder.endswith('/'):

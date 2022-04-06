@@ -10,7 +10,7 @@ from sortedcontainers import SortedList
 
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
-from giskardpy import identifier, RobotName
+from giskardpy import identifier
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
@@ -503,8 +503,10 @@ class OpenLoop(TreeManager):
     def grow_sync_branch(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(running_is_success(SyncConfiguration)('update robot configuration', RobotName))
-        sync.add_child(SyncLocalization('update robot localization', RobotName))
+        sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
+                                                             self.god_map.unsafe_get_data(identifier.robot_group_name)))
+        sync.add_child(SyncLocalization('update robot localization',
+                                        self.god_map.unsafe_get_data(identifier.robot_group_name)))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -655,7 +657,8 @@ class ClosedLoop(OpenLoop):
             C = behaviors[params['plugin']]
             del params['plugin']
             planning_4.add_plugin(C(execution_action_server_name, **params))
-        planning_4.add_plugin(SyncConfiguration2('update robot configuration', RobotName))
+        planning_4.add_plugin(SyncConfiguration2('update robot configuration',
+                                                 self.god_map.unsafe_get_data(identifier.robot_group_name)))
         planning_4.add_plugin(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_plugin(CollisionChecker('collision checker'))
@@ -674,8 +677,8 @@ class ClosedLoop(OpenLoop):
         return planning_4
 
 
-def sanity_check(god_map):
-    check_velocity_limits_reachable(god_map)
+# def sanity_check(god_map):
+#     check_velocity_limits_reachable(god_map)
 
 
 def sanity_check_derivatives(god_map):
@@ -702,27 +705,27 @@ def check_derivatives(entries, name):
             '{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
 
 
-def check_velocity_limits_reachable(god_map):
-    # TODO a more general version of this
-    robot = god_map.get_data(identifier.robot)
-    sample_period = god_map.get_data(identifier.sample_period)
-    prediction_horizon = god_map.get_data(identifier.prediction_horizon)
-    print_help = False
-    for joint_name in robot.get_joint_names():
-        velocity_limit = robot.get_joint_limit_expr_evaluated(joint_name, 1, god_map)
-        jerk_limit = robot.get_joint_limit_expr_evaluated(joint_name, 3, god_map)
-        velocity_limit_horizon = max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period)
-        if velocity_limit_horizon < velocity_limit:
-            logging.logwarn('Joint \'{}\' '
-                            'can reach at most \'{:.4}\' '
-                            'with to prediction horizon of \'{}\' '
-                            'and jerk limit of \'{}\', '
-                            'but limit in urdf/config is \'{}\''.format(joint_name,
-                                                                        velocity_limit_horizon,
-                                                                        prediction_horizon,
-                                                                        jerk_limit,
-                                                                        velocity_limit
-                                                                        ))
-            print_help = True
-    if print_help:
-        logging.logwarn('Check utils.py/max_velocity_from_horizon_and_jerk for help.')
+# def check_velocity_limits_reachable(god_map):
+#     # TODO a more general version of this
+#     robot = god_map.get_data(identifier.robot)
+#     sample_period = god_map.get_data(identifier.sample_period)
+#     prediction_horizon = god_map.get_data(identifier.prediction_horizon)
+#     print_help = False
+#     for joint_name in robot.get_joint_names():
+#         velocity_limit = robot.get_joint_limit_expr_evaluated(joint_name, 1, god_map)
+#         jerk_limit = robot.get_joint_limit_expr_evaluated(joint_name, 3, god_map)
+#         velocity_limit_horizon = max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period)
+#         if velocity_limit_horizon < velocity_limit:
+#             logging.logwarn('Joint \'{}\' '
+#                             'can reach at most \'{:.4}\' '
+#                             'with to prediction horizon of \'{}\' '
+#                             'and jerk limit of \'{}\', '
+#                             'but limit in urdf/config is \'{}\''.format(joint_name,
+#                                                                         velocity_limit_horizon,
+#                                                                         prediction_horizon,
+#                                                                         jerk_limit,
+#                                                                         velocity_limit
+#                                                                         ))
+#             print_help = True
+#     if print_help:
+#         logging.logwarn('Check utils.py/max_velocity_from_horizon_and_jerk for help.')

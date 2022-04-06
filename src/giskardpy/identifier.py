@@ -1,5 +1,5 @@
 world = ['world']
-robot = world + ['groups', 'robot']
+robot_group_name = ['robot_name']
 fk_pose = world + ['compute_fk_pose']
 fk_np = world + ['compute_fk_np']
 joint_states = world + ['state']
@@ -127,4 +127,3 @@ robot_interface = rosparam + ['robot_interface']
 
 # rnd stuff
 timer_collector = ['timer_collector']
-

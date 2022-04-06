@@ -7,9 +7,10 @@ import numpy as np
 from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
-from giskardpy import RobotName, identifier
+from giskardpy import identifier
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
+from giskardpy.god_map import GodMap
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
@@ -74,9 +75,10 @@ class Collision(object):
 
 class Collisions(object):
     @profile
-    def __init__(self, world: WorldTree, collision_list_size):
-        self.world = world
-        self.robot = self.world.groups[RobotName]
+    def __init__(self, god_map: GodMap, collision_list_size):
+        self.god_map = god_map
+        self.world = self.god_map.get_data(identifier.world)
+        self.robot = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
         self.robot_root = self.robot.root_link_name
         self.root_T_map = self.robot.compute_fk_np(self.robot_root, self.world.root_link_name)
         self.collision_list_size = collision_list_size
@@ -277,7 +279,7 @@ class CollisionWorldSynchronizer(object):
         """
         :rtype: SubWorldTree
         """
-        return self.world.groups[RobotName]
+        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
     @property
     def god_map(self):
@@ -402,7 +404,7 @@ class CollisionWorldSynchronizer(object):
 
     def blacklist_inter_group_collisions(self):
         for group_a_name, group_b_name in combinations(self.world.minimal_group_names, 2):
-            if RobotName in (group_a_name, group_b_name):
+            if self.god_map.unsafe_get_data(identifier.robot_group_name) in (group_a_name, group_b_name):
                 continue
             group_a: SubWorldTree = self.world.groups[group_a_name]
             group_b: SubWorldTree = self.world.groups[group_b_name]
@@ -563,16 +565,6 @@ class CollisionWorldSynchronizer(object):
 
         return collision_goals
 
-    def get_possible_collisions(self, link):
-        # TODO speed up by saving this
-        possible_collisions = set()
-        for link1, link2 in self.collision_matrices[RobotName]:
-            if link == link1:
-                possible_collisions.add(link2)
-            elif link == link2:
-                possible_collisions.add(link1)
-        return possible_collisions
-
     def is_avoid_collision(self, collision_entry: CollisionEntry) -> bool:
         return collision_entry.type == CollisionEntry.AVOID_COLLISION
 
@@ -581,11 +573,13 @@ class CollisionWorldSynchronizer(object):
 
     def is_avoid_all_self_collision(self, collision_entry: CollisionEntry) -> bool:
         return self.is_avoid_collision(collision_entry) \
-               and collision_entry.group1 == RobotName and collision_entry.group2 == RobotName
+               and collision_entry.group1 == self.god_map.unsafe_get_data(identifier.robot_group_name) \
+               and collision_entry.group2 == self.god_map.unsafe_get_data(identifier.robot_group_name)
 
     def is_allow_all_self_collision(self, collision_entry: CollisionEntry) -> bool:
         return self.is_allow_collision(collision_entry) \
-               and collision_entry.group1 == RobotName and collision_entry.group2 == RobotName
+               and collision_entry.group1 == self.god_map.unsafe_get_data(identifier.robot_group_name) \
+               and collision_entry.group2 == self.god_map.unsafe_get_data(identifier.robot_group_name)
 
     def is_avoid_all_collision(self, collision_entry: CollisionEntry) -> bool:
         """

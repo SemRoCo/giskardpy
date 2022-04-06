@@ -13,7 +13,6 @@ import giskardpy.identifier as identifier
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNames, GetGroupInfo, \
     GetGroupNamesResponse, GetGroupNamesRequest, RegisterGroup, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest
-from giskardpy import RobotName
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
@@ -189,7 +188,7 @@ class WorldUpdater(GiskardBehavior):
         # default to robot group, if parent link name is not empty
         else:
             if req.parent_link_group == '':
-                req.parent_link_group = RobotName
+                req.parent_link_group = self.god_map.unsafe_get_data(identifier.robot_group_name)
             elif req.parent_link == '':
                 req.parent_link = self.world.groups[req.parent_link_group].root_link_name
             req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)

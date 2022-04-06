@@ -11,7 +11,7 @@ from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Sta
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
-from giskardpy import casadi_wrapper as w, RobotName, identifier
+from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
@@ -267,6 +267,8 @@ class WorldTree(object):
     def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
+        if group_name is None:
+            group_name = parsed_urdf.name
         if group_name in self.groups:
             raise DuplicateNameException(
                 'Failed to add group \'{}\' because one with such a name already exists'.format(group_name))
@@ -424,7 +426,7 @@ class WorldTree(object):
     @profile
     def delete_all_but_robot(self):
         self._clear()
-        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
+        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=None, prefix=None)
         self.fast_all_fks = None
         self.notify_model_change()
 

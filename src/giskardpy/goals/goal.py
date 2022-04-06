@@ -75,7 +75,7 @@ class Goal(object):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.world.groups['robot']
+        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
     def get_joint_position_symbol(self, joint_name):
         """

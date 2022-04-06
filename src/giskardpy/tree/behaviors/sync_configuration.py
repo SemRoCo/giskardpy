@@ -68,5 +68,5 @@ class SyncConfiguration(GiskardBehavior):
             pass
 
         self.get_world().state.update(self.mjs)
-        # self.world.notify_state_change()
+        self.world.notify_state_change()
         return Status.RUNNING

@@ -6,7 +6,7 @@ from betterpybullet import ContactPoint
 from geometry_msgs.msg import PoseStamped, Quaternion
 from sortedcontainers import SortedDict
 
-from giskardpy import RobotName
+from giskardpy import identifier
 from giskardpy.data_types import BiDict
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
@@ -102,7 +102,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a)
                     map_P_b = map_T_b.dot(p.point_b)
-                    body_b = RobotName if link_b in self.robot.link_names else ''
+                    body_b = self.god_map.unsafe_get_data(identifier.robot_group_name) if link_b in self.robot.link_names else ''
                     c = Collision(link_a=link_a,
                                   body_b=body_b,
                                   link_b=link_b,
@@ -121,7 +121,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def bpb_result_to_collisions(self, result, collision_list_size=15):
-        collisions = Collisions(self.world, collision_list_size)
+        collisions = Collisions(self.god_map, collision_list_size)
         for c in self.bpb_result_to_list(result):
             collisions.add(c)
         return collisions

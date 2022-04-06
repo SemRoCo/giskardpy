@@ -16,7 +16,7 @@ from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, Regist
 from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, DyeGroup, GetGroupInfo, \
     GetGroupNames, RegisterGroup
-from giskardpy import RobotName
+from giskardpy import identifier
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
@@ -63,13 +63,13 @@ class GiskardWrapper(object):
         self.last_feedback = msg
 
     def get_robot_name(self) -> str:
-        return RobotName
+        return self._god_map.unsafe_get_data(identifier.robot_group_name)
 
     def get_root(self) -> str:
         """
         Returns the name of the robot's root link
         """
-        return str(self._world.groups[RobotName].root_link_name)
+        return str(self._world.groups[self.get_robot_name()].root_link_name)
 
     def set_cart_goal(self,
                       goal_pose: PoseStamped,
@@ -745,7 +745,9 @@ class GiskardWrapper(object):
         """
         return self._get_group_info_srv(group_name)
 
-    def get_controlled_joints(self, name: str = 'robot'):
+    def get_controlled_joints(self, name: Optional[str] = None):
+        if name is None:
+            name = self.get_robot_name()
         return self.get_group_info(name).controlled_joints
 
     def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 0) -> UpdateWorldResponse:

@@ -1,5 +1,5 @@
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w, identifier, RobotName
+from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA
 
 
@@ -129,7 +129,7 @@ class SelfCollisionAvoidance(Goal):
         self.idx = idx
         super(SelfCollisionAvoidance, self).__init__(**kwargs)
         self.root = self.world.root_link_name
-        self.robot_name = RobotName
+        self.robot_name = self.god_map.unsafe_get_data(identifier.robot_group_name)
 
     def get_contact_normal_in_b(self):
         return self.god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',

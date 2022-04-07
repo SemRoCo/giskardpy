@@ -51,18 +51,12 @@ class CollisionWorldSynchronizer(object):
         return [self.world.groups[robot_name] for robot_name in self.robot_names]
 
     @property
-    def robot_names(self):
-        """
-        :rtype: list of str
-        """
-        return self.world.god_map.get_data(identifier.rosparam + ['namespaces'])
+    def robot_namespaces(self):
+        return [self.robot(n).prefix for n in self.robot_names]
 
     @property
-    def unsafe_robot_names(self):
-        """
-        :rtype: list of str
-        """
-        return self.world.god_map.unsafe_get_data(identifier.rosparam + ['namespaces'])
+    def robot_names(self):
+        return list(self.world.groups.keys())
 
     @property
     def god_map(self):
@@ -293,8 +287,7 @@ class CollisionWorldSynchronizer(object):
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if self.is_avoid_all_self_collision(collision_entry):
-                for robot_name in self.robot_names:
-                    min_allowed_distance.update(self.get_robot_collision_matrix(min_dist, robot_name))
+                min_allowed_distance.update(self.get_robot_collision_matrix(min_dist, collision_entry.robot_name))
                 continue
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
@@ -316,7 +309,7 @@ class CollisionWorldSynchronizer(object):
                         del min_allowed_distance[r_key]
 
                 elif self.is_avoid_collision(collision_entry):
-                    min_allowed_distance[key] = min_dist[collision_entry.robot_name][key[0]]
+                    min_allowed_distance[key] = min_dist.default_factory()
                 else:
                     raise Exception('todo')
         for (link_a, link_b), distance in added_checks.items():
@@ -424,6 +417,7 @@ class CollisionWorldSynchronizer(object):
                 for link_b in link_bs:
                     ce = CollisionEntry()
                     ce.type = collision_entry.type
+                    ce.robot_name = collision_entry.robot_name
                     ce.robot_links = collision_entry.robot_links
                     ce.body_b = collision_entry.body_b
                     ce.link_bs = [link_b]
@@ -438,6 +432,7 @@ class CollisionWorldSynchronizer(object):
                 for link_b in collision_entry.link_bs:
                     ce = CollisionEntry()
                     ce.type = collision_entry.type
+                    ce.robot_name = collision_entry.robot_name
                     ce.robot_links = collision_entry.robot_links
                     ce.body_b = collision_entry.body_b
                     ce.link_bs = [link_b]
@@ -491,6 +486,7 @@ class CollisionWorldSynchronizer(object):
                 for robot_link in collision_entry.robot_links:
                     ce = CollisionEntry()
                     ce.type = collision_entry.type
+                    ce.robot_name = collision_entry.robot_name
                     ce.robot_links = [robot_link]
                     ce.body_b = collision_entry.body_b
                     ce.min_dist = collision_entry.min_dist
@@ -512,16 +508,15 @@ class CollisionWorldSynchronizer(object):
             if self.all_body_bs(collision_entry):
                 collision_goals.remove(collision_entry)
                 new_ces = []
-                for robot_name in self.robot_names:
-                    for body_b in self.world.minimal_group_names:
-                        ce = CollisionEntry()
-                        ce.type = collision_entry.type
-                        ce.robot_name = robot_name
-                        ce.robot_links = collision_entry.robot_links
-                        ce.min_dist = collision_entry.min_dist
-                        ce.body_b = body_b
-                        ce.link_bs = collision_entry.link_bs
-                        new_ces.append(ce)
+                for body_b in self.world.minimal_group_names:
+                    ce = CollisionEntry()
+                    ce.type = collision_entry.type
+                    ce.robot_name = collision_entry.robot_name
+                    ce.robot_links = collision_entry.robot_links
+                    ce.min_dist = collision_entry.min_dist
+                    ce.body_b = body_b
+                    ce.link_bs = collision_entry.link_bs
+                    new_ces.append(ce)
                 for new_ce in reversed(new_ces):
                     collision_goals.insert(i, new_ce)
                 i += len(new_ces)

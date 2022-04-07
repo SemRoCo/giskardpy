@@ -3,9 +3,10 @@ from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 from giskardpy import casadi_wrapper as w
 import giskardpy.utils.tfwrapper as tf
 
+
 class AlignPlanes(Goal):
-    def __init__(self, root_link, tip_link, root_normal, tip_normal,
-                 max_angular_velocity=0.5, prefix=None, weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link, root_group, tip_link, tip_group, root_normal, tip_normal,
+                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
         :param root_link: str, name of the root link for the kinematic chain
@@ -17,8 +18,10 @@ class AlignPlanes(Goal):
         :param goal_constraint: bool, default False
         """
         super(AlignPlanes, self).__init__(**kwargs)
-        self.root = PrefixName(root_link, prefix)
-        self.tip = PrefixName(tip_link, prefix)
+        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root = PrefixName(root_link, root_prefix)
+        self.tip = PrefixName(tip_link, tip_prefix)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 
@@ -28,13 +31,12 @@ class AlignPlanes(Goal):
         self.root_V_root_normal = self.transform_msg(self.root, root_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
-
     def __str__(self):
         s = super(AlignPlanes, self).__str__()
         return '{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
-                                                 self.tip_V_tip_normal.vector.x,
-                                                 self.tip_V_tip_normal.vector.y,
-                                                 self.tip_V_tip_normal.vector.z)
+                                                self.tip_V_tip_normal.vector.x,
+                                                self.tip_V_tip_normal.vector.y,
+                                                self.tip_V_tip_normal.vector.z)
 
     def make_constraints(self):
         tip_V_tip_normal = self.get_parameter_as_symbolic_expression('tip_V_tip_normal')
@@ -45,4 +47,3 @@ class AlignPlanes(Goal):
                                          frame_V_goal=root_V_root_normal,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-

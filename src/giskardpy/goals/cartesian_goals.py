@@ -11,7 +11,7 @@ from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 
 
 class CartesianPosition(Goal):
-    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2, prefix=None,
+    def __init__(self, root_link, root_group, tip_link, tip_group, goal, reference_velocity=None, max_velocity=0.2,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link.
@@ -32,20 +32,22 @@ class CartesianPosition(Goal):
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.goal = deepcopy(goal)
-        self.goal.header.frame_id = str(PrefixName(self.goal.header.frame_id, prefix))
-        self.root_link = PrefixName(root_link, prefix)
-        self.tip_link = PrefixName(tip_link, prefix)
+        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = PrefixName(tip_link, tip_prefix)
         self.goal_pose = self.transform_msg(self.root_link, self.goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
         if self.max_velocity is not None:
             self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
+                                                                  root_group=root_group,
                                                                   tip_link=tip_link,
+                                                                  tip_group=tip_group,
                                                                   weight=weight,
                                                                   max_velocity=max_velocity,
                                                                   hard=False,
-                                                                  prefix=prefix,
                                                                   **kwargs))
 
     def make_constraints(self):
@@ -63,15 +65,16 @@ class CartesianPosition(Goal):
 
 
 class CartesianOrientation(Goal):
-    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5, prefix=None,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link, root_group, tip_link, tip_group, goal, reference_velocity=None,
+                 max_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianOrientation, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.goal = deepcopy(goal)
-        self.goal.header.frame_id = str(PrefixName(self.goal.header.frame_id, prefix))
-        self.root_link = PrefixName(root_link, prefix)
-        self.tip_link = PrefixName(tip_link, prefix)
+        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = PrefixName(tip_link, tip_prefix)
         self.goal_pose = self.transform_msg(self.root_link, self.goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
@@ -101,16 +104,18 @@ class CartesianOrientation(Goal):
 
 
 class CartesianPositionStraight(Goal):
-    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
-                 prefix=None, weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link, root_group, tip_link, tip_group, goal, reference_velocity=None, max_velocity=0.2,
+                 weight=WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPositionStraight, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        self.root_link = PrefixName(root_link, prefix)
-        self.tip_link = PrefixName(tip_link, prefix)
+        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = PrefixName(tip_link, tip_prefix)
         self.goal_pose = self.transform_msg(self.root_link, goal)
 
         self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)
@@ -144,7 +149,7 @@ class CartesianPositionStraight(Goal):
 
 
 class CartesianPose(Goal):
-    def __init__(self, root_link, tip_link, goal, max_linear_velocity=0.1,
+    def __init__(self, root_link, root_group, tip_link, tip_group, goal, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
@@ -157,13 +162,17 @@ class CartesianPose(Goal):
         """
         super(CartesianPose, self).__init__(**kwargs)
         self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
+                                                       root_group=root_group,
                                                        tip_link=tip_link,
+                                                       tip_group=tip_group,
                                                        goal=goal,
                                                        max_velocity=max_linear_velocity,
                                                        weight=weight,
                                                        **kwargs))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
+                                                          root_group=root_group,
                                                           tip_link=tip_link,
+                                                          tip_group=tip_group,
                                                           goal=goal,
                                                           max_velocity=max_angular_velocity,
                                                           weight=weight,
@@ -171,17 +180,21 @@ class CartesianPose(Goal):
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, root_link, tip_link, goal, translation_max_velocity=0.1, rotation_max_velocity=0.5,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link, root_group, tip_link, tip_group, goal, translation_max_velocity=0.1,
+                 rotation_max_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPoseStraight, self).__init__(**kwargs)
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
+                                                               root_group=root_group,
                                                                tip_link=tip_link,
+                                                               tip_group=tip_group,
                                                                goal=goal,
                                                                max_velocity=translation_max_velocity,
                                                                weight=weight,
                                                                **kwargs))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
+                                                          root_group=root_group,
                                                           tip_link=tip_link,
+                                                          tip_group=tip_group,
                                                           goal=goal,
                                                           max_velocity=rotation_max_velocity,
                                                           weight=weight,
@@ -189,7 +202,8 @@ class CartesianPoseStraight(Goal):
 
 
 class TranslationVelocityLimit(Goal):
-    def __init__(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, prefix=None, **kwargs):
+    def __init__(self, root_link, root_group, tip_link, tip_group, weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True,
+                 **kwargs):
         """
         This goal will limit the cartesian velocity of the tip link relative to root link
         :param root_link: str, root link of the kin chain
@@ -200,12 +214,14 @@ class TranslationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = PrefixName(root_link, prefix)
-        self.tip_link = PrefixName(tip_link, prefix)
+        super(TranslationVelocityLimit, self).__init__(**kwargs)
+        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = PrefixName(tip_link, tip_prefix)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
-        super(TranslationVelocityLimit, self).__init__(**kwargs)
 
     def make_constraints(self):
         r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
@@ -226,7 +242,8 @@ class TranslationVelocityLimit(Goal):
 
 
 class RotationVelocityLimit(Goal):
-    def __init__(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, prefix=None, **kwargs):
+    def __init__(self, root_link, root_group, tip_link, tip_group, weight=WEIGHT_ABOVE_CA, max_velocity=0.5,
+                 hard=True, **kwargs):
         """
         This goal will limit the cartesian velocity of the tip link relative to root link
         :param root_link: str, root link of the kin chain
@@ -237,13 +254,16 @@ class RotationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = PrefixName(root_link, prefix)
-        self.tip_link = PrefixName(tip_link, prefix)
+        super(RotationVelocityLimit, self).__init__(**kwargs)
+
+        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = PrefixName(tip_link, tip_prefix)
         self.hard = hard
 
         self.weight = weight
         self.max_velocity = max_velocity
-        super(RotationVelocityLimit, self).__init__(**kwargs)
 
     def make_constraints(self):
         r_R_c = w.rotation_of(self.get_fk(self.root_link, self.tip_link))
@@ -263,8 +283,8 @@ class RotationVelocityLimit(Goal):
 
 
 class CartesianVelocityLimit(Goal):
-    def __init__(self, root_link, tip_link, max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA,
-                 hard=False, **kwargs):
+    def __init__(self, root_link, root_group, tip_link, tip_group, max_linear_velocity=0.1, max_angular_velocity=0.5,
+                 weight=WEIGHT_ABOVE_CA, hard=False, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -276,13 +296,17 @@ class CartesianVelocityLimit(Goal):
         """
         super(CartesianVelocityLimit, self).__init__(**kwargs)
         self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
+                                                              root_group=root_group,
                                                               tip_link=tip_link,
+                                                              tip_group=tip_group,
                                                               max_velocity=max_linear_velocity,
                                                               weight=weight,
                                                               hard=hard,
                                                               **kwargs))
         self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
+                                                           root_group=root_group,
                                                            tip_link=tip_link,
+                                                           tip_group=tip_group,
                                                            max_velocity=max_angular_velocity,
                                                            weight=weight,
                                                            hard=hard,

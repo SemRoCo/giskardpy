@@ -37,33 +37,33 @@ def get_default(block_identifiers, god_map, prefix=None):
     return new_default_value
 
 
-def override_default(default, block_identifier, god_map, prefix=None):
-    try:
-        override = god_map.get_data(block_identifier)
-    except KeyError:
-        override = None
-    new_override_dicts = dict()
-    new_override_values = dict()
+def override_default(default, block_identifiers, god_map, prefix=None):
     d = dict()
-    if isinstance(override, dict):
-        if prefix is not None:
-            for key, value in override.items():
-                if isinstance(value, dict):
-                    if isinstance(default, dict):
-                        new_override_dicts[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda a: default[a])
-                        if any([isinstance(x, dict) for _, x in value.items()]):
-                            raise Exception('Nested dictionaries are not supported for overrides.')
+    for block_identifier in block_identifiers:
+        try:
+            override = god_map.get_data(block_identifier)
+        except KeyError:
+            continue
+        new_override_dicts = dict()
+        new_override_values = dict()
+        if isinstance(override, dict):
+            if prefix is not None:
+                for key, value in override.items():
+                    if isinstance(value, dict):
+                        if isinstance(default, dict):
+                            new_override_dicts[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda a: default[a])
+                            if any([isinstance(x, dict) for _, x in value.items()]):
+                                raise Exception('Nested dictionaries are not supported for overrides.')
+                        else:
+                            new_override_dicts[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda _: default)
+                        keys = {PrefixName(n, prefix[0]): None for n, _ in value.items()}
+                        new_override_dicts[PrefixName(key, prefix[0])].update(keys)
+                        for k, v in value.items():
+                            new_override_dicts[PrefixName(key, prefix[0])][PrefixName(k, prefix[0])] = v
                     else:
-                        new_override_dicts[PrefixName(key, prefix[0])] = KeyDefaultDict(lambda _: default)
-                    keys = {PrefixName(n, prefix[0]): None for n, _ in value.items()}
-                    new_override_dicts[PrefixName(key, prefix[0])].update(keys)
-                    for k, v in value.items():
-                        new_override_dicts[PrefixName(key, prefix[0])][PrefixName(k, prefix[0])] = v
-                else:
-                    new_override_values.update({PrefixName(key, prefix[0]): value})
-        else:
-            new_override = defaultdict(lambda: default)
-            new_override.update(override)
+                        new_override_values.update({PrefixName(key, prefix[0]): value})
+            else:
+                d.update(override)
         d.update(new_override_dicts)
         d.update(new_override_values)
     return d
@@ -80,7 +80,7 @@ def get_default_in_override_block(block_identifier, god_map, prefix=None):
         full_block_identifier = block_identifier
 
     default_value = get_default([block_identifier, full_block_identifier], god_map, prefix=prefix)
-    override = override_default(default_value, full_block_identifier, god_map, prefix=prefix)
+    override = override_default(default_value, [block_identifier, full_block_identifier], god_map, prefix=prefix)
 
     ret_d = defaultdict(lambda: default_value)
     if override:
@@ -93,12 +93,22 @@ def set_default_in_override_block(block_identifier, god_map, namespaces):
     d = dict()
     for prefix in namespaces:
         d[prefix] = get_default_in_override_block(block_identifier, god_map, [prefix])
+
     defaults = dict()
     for prefix in namespaces:
         defaults[PrefixName('default', prefix)] = d[prefix].default_factory()
-    new_d = PrefixDefaultDict(lambda p: [v for k, v in defaults.items() if str(p) == str(k.prefix)][0])
+
+    def get_default_from_prefix(prefix):
+        ds = [v for k, v in defaults.items() if str(prefix) == str(k.prefix)]
+        if len(ds) != 0:
+            return ds[0]
+        else:
+            return get_default([block_identifier], god_map)
+
+    new_d = PrefixDefaultDict(get_default_from_prefix)
     for prefix in namespaces:
         new_d.update(d[prefix])
+
     god_map.set_data(block_identifier, new_d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
 

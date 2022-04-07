@@ -28,7 +28,7 @@ DEFAULT_WORLD_TIMEOUT = 500
 class GiskardWrapper(object):
     last_feedback: MoveFeedback = None
 
-    def __init__(self, node_name=u'giskard', namespaces=None):
+    def __init__(self, node_name=u'giskard', robot_names=None, namespaces=None):
         giskard_topic = u'{}/command'.format(node_name)
         if giskard_topic is not None:
             self._client = SimpleActionClient(giskard_topic, MoveAction)
@@ -42,7 +42,7 @@ class GiskardWrapper(object):
             self._client.wait_for_server()
         self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)
         self._world = WorldTree(self._god_map)
-        self._world.delete_all_but_robots(namespaces)
+        self._world.delete_all_but_robots(robot_names, namespaces)
 
         self.collisions = []
         self.clear_cmds()
@@ -79,8 +79,8 @@ class GiskardWrapper(object):
         self.set_translation_goal(goal_pose, tip_link, root_link, rob_name=rob_name, weight=weight, max_velocity=max_linear_velocity)
         self.set_rotation_goal(goal_pose, tip_link, root_link, rob_name=rob_name, weight=weight, max_velocity=max_angular_velocity)
 
-    def set_straight_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None,
-                               weight=None):
+    def set_straight_cart_goal(self, goal_pose, tip_link, tip_group, root_link, root_group,
+                               max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link on the straightest
         line into the goal pose
@@ -97,10 +97,15 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        self.set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_linear_velocity, weight=weight)
-        self.set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_angular_velocity, weight=weight)
+        self.set_straight_translation_goal(goal_pose=goal_pose, tip_link=tip_link, tip_group=tip_group,
+                                           root_link=root_link, root_group=root_group,
+                                           max_velocity=max_linear_velocity, weight=weight)
+        self.set_rotation_goal(goal_pose=goal_pose, tip_link=tip_link, tip_group=tip_group,
+                               root_link=root_link, root_group=root_group,
+                               max_velocity=max_angular_velocity, weight=weight)
 
-    def set_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None, prefix=None, **kwargs):
+    def set_translation_goal(self, goal_pose, tip_link, tip_group, root_link, root_group,
+                             weight=None, max_velocity=None, prefix=None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal position
         :param root_link: name of the root link of the kin chain
@@ -117,7 +122,9 @@ class GiskardWrapper(object):
         constraint = Constraint()
         constraint.type = 'CartesianPosition'
         params = {'root_link': root_link,
+                  'root_group': root_group,
                   'tip_link': tip_link,
+                  'tip_group': tip_group,
                   'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
             params['max_velocity'] = max_velocity
@@ -129,7 +136,8 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_straight_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None, **kwargs):
+    def set_straight_translation_goal(self, goal_pose, tip_link, tip_group, root_link, root_group,
+                                      weight=None, max_velocity=None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link on the straightest
         line into the goal position
@@ -147,7 +155,9 @@ class GiskardWrapper(object):
         constraint = Constraint()
         constraint.type = 'CartesianPositionStraight'
         params = {'root_link': root_link,
+                  'root_group': root_group,
                   'tip_link': tip_link,
+                  'tip_group': tip_group,
                   'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
             params['max_velocity'] = max_velocity
@@ -157,7 +167,8 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None, prefix=None, **kwargs):
+    def set_rotation_goal(self, goal_pose, tip_link, tip_group, root_link, root_group, weight=None,
+                          max_velocity=None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal orientation
         :param root_link: name of the root link of the kin chain
@@ -174,19 +185,19 @@ class GiskardWrapper(object):
         constraint = Constraint()
         constraint.type = 'CartesianOrientation'
         params = {'root_link': root_link,
+                  'root_group': root_group,
                   'tip_link': tip_link,
+                  'tip_group': tip_group,
                   'goal': convert_ros_message_to_dictionary(goal_pose)}
         if max_velocity:
             params['max_velocity'] = max_velocity
         if weight:
             params['weight'] = weight
-        if prefix:
-            params['prefix'] = prefix
         params.update(kwargs)
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, goal_state, weight=None, max_velocity=None, hard=False, prefix=None):
+    def set_joint_goal(self, goal_state, group_name, weight=None, max_velocity=None, hard=False):
         """
         This goal will move the robots joint to the desired configuration.
         :param goal_state: Can either be a joint state messages or a dict mapping joint name to position. 
@@ -206,19 +217,18 @@ class GiskardWrapper(object):
                 goal_state2.name.append(joint_name)
                 goal_state2.position.append(joint_position)
             goal_state = goal_state2
-        params = {'goal_state': convert_ros_message_to_dictionary(goal_state)}
+        params = {'goal_state': convert_ros_message_to_dictionary(goal_state),
+                  'group_name': group_name}
         if weight is not None:
             params['weight'] = weight
         if max_velocity is not None:
             params['max_velocity'] = max_velocity
-        if prefix is not None:
-            params['prefix'] = prefix
         params['hard'] = hard
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_align_planes_goal(self, tip_link, tip_normal, root_link, root_normal=None, max_angular_velocity=None,
-                              weight=WEIGHT_ABOVE_CA):
+    def set_align_planes_goal(self, tip_link, tip_group, tip_normal, root_link, root_group, root_normal=None,
+                              max_angular_velocity=None, weight=WEIGHT_ABOVE_CA):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
         :param root_link: name of the root link for the kinematic chain, default robot root link
@@ -240,8 +250,10 @@ class GiskardWrapper(object):
             root_normal.vector.z = 1
 
         params = {'tip_link': str(tip_link),
+                  'tip_group': str(tip_group),
                   'tip_normal': tip_normal,
                   'root_link': str(root_link),
+                  'root_group': str(root_group),
                   'root_normal': root_normal}
         if weight is not None:
             params['weight'] = weight
@@ -259,8 +271,8 @@ class GiskardWrapper(object):
         """
         self.set_json_goal('AvoidJointLimits', percentage=percentage, weight=weight)
 
-    def limit_cartesian_velocity(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
-                                 max_angular_velocity=0.5, hard=True):
+    def limit_cartesian_velocity(self, root_link, tip_link, root_group=None, tip_group=None, weight=WEIGHT_ABOVE_CA,
+                                 max_linear_velocity=0.1, max_angular_velocity=0.5, hard=True):
         """
         This goal will limit the cartesian velocity of the tip link relative to root link
         :param root_link: root link of the kin chain
@@ -277,9 +289,23 @@ class GiskardWrapper(object):
                                 make some goal combination infeasible
         :type hard: bool
         """
+        if tip_group is None:
+            groups = self.world.get_groups_containing_link(tip_link)
+            if len(groups) == 1:
+                tip_group = groups.pop()
+            else:
+                raise Exception('Please define a tip_group.')
+        if root_group is None:
+            groups = self.world.get_groups_containing_link(root_link)
+            if len(groups) == 1:
+                root_group = groups.pop()
+            else:
+                raise Exception('Please define a root_group.')
         self.set_json_goal('CartesianVelocityLimit',
                            root_link=root_link,
+                           root_group=root_group,
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            weight=weight,
                            max_linear_velocity=max_linear_velocity,
                            max_angular_velocity=max_angular_velocity,
@@ -329,7 +355,7 @@ class GiskardWrapper(object):
         """
         self.set_json_goal('OverwriteWeights', updates=updates)
 
-    def set_pointing_goal(self, tip_link, goal_point, root_link, pointing_axis=None, weight=None):
+    def set_pointing_goal(self, tip_link, tip_group, goal_point, root_link, root_group, pointing_axis=None, weight=None):
         """
         Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
         :param tip_link: name of the tip of the kin chain
@@ -344,7 +370,9 @@ class GiskardWrapper(object):
         :type weight: float
         """
         kwargs = {'tip_link': tip_link,
+                  'tip_group': tip_group,
                   'root_link': root_link,
+                  'root_group': root_group,
                   'goal_point': goal_point}
         if pointing_axis is not None:
             kwargs['pointing_axis'] = pointing_axis

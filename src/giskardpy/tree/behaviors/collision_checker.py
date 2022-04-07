@@ -49,8 +49,8 @@ class CollisionChecker(GiskardBehavior):
         self.collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_goals),
                                                                                          max_distances,
                                                                                          added_checks)
-        self.collision_list_sizes = {r_n: self._cal_max_param(PrefixName('number_of_repeller', r_n))
-                                     for r_n in self.robot_names()}
+        self.collision_list_sizes = {n: self._cal_max_param(PrefixName('number_of_repeller', r_n))
+                                     for n, r_n in zip(self.robot_names(), self.robot_namespaces())}
 
         super(CollisionChecker, self).initialise()
         t2 = time() - t
@@ -60,14 +60,17 @@ class CollisionChecker(GiskardBehavior):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
         # FIXME check all dict entries
-        default_distance = {r_n: self._cal_max_param(PrefixName('soft_threshold', r_n)) for r_n in self.robot_names()}
+        default_distance = {r_n: self._cal_max_param(PrefixName('soft_threshold', r_n)) for r_n in self.robot_namespaces()}
 
-        max_distances = defaultdict(lambda: default_distance)
+        max_distances = defaultdict(lambda: max(default_distance.values()))
         # override max distances based on external distances dict
         for robot in self.collision_scene.robots:
             for link_name in robot.link_names_with_collisions:
-                controlled_parent_joint = robot.get_controlled_parent_joint_of_link(link_name)
-                distance = external_distances[controlled_parent_joint][PrefixName('soft_threshold', robot.name)]
+                try:
+                    controlled_parent_joint = robot.get_controlled_parent_joint_of_link(link_name)
+                except KeyError: # FIXME: not sure, if bug: e.g. links of attached objects may throw a KeyError if they have no parent joint
+                    continue
+                distance = external_distances[controlled_parent_joint][PrefixName('soft_threshold', robot.prefix)]
                 for child_link_name in robot.get_directly_controlled_child_links_with_collisions(
                         controlled_parent_joint):
                     max_distances[child_link_name] = distance

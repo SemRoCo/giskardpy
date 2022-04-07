@@ -55,7 +55,13 @@ class GiskardBehavior(Behaviour):
         return self.world.groups[robot_name]
 
     def robot_names(self):
-        return self.world.god_map.get_data(identifier.rosparam + ['namespaces'])
+        return self.collision_scene.robot_names
+
+    def robot_namespaces(self):
+        """
+        :rtype: list of str
+        """
+        return self.collision_scene.robot_namespaces
 
     def get_world(self):
         """

@@ -4,7 +4,6 @@ import json
 import traceback
 from collections import defaultdict
 from copy import deepcopy
-from time import time
 from typing import List
 
 from py_trees import Status
@@ -82,8 +81,8 @@ class GoalToConstraints(GetGoal):
                 return Status.SUCCESS
 
             l = self.active_free_symbols()
-            free_variables = list(
-                sorted([v for v in self.world.joint_constraints if v.name in l], key=lambda x: x.name))
+            free_variables = list(sorted([v for v in self.world.joint_constraints if v.name in l],
+                                         key=lambda x: x.name))
             self.get_god_map().set_data(identifier.free_variables, free_variables)
             loginfo('Done parsing goal message.')
             return Status.SUCCESS

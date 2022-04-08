@@ -226,7 +226,7 @@ class TreeManager(object):
         return self
 
     def live(self):
-        sleeper = rospy.Rate(self.god_map.get_data(identifier.tree_tick_rate))
+        sleeper = rospy.Rate(1/self.god_map.get_data(identifier.tree_tick_rate))
         logging.loginfo('giskard is ready')
         while not rospy.is_shutdown():
             try:

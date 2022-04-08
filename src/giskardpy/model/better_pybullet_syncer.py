@@ -94,17 +94,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             link_a = obj_a.name
             for contact in contacts:  # type: ClosestPair
                 map_T_b = contact.obj_b.np_transform
-                try:
-                    link_b = contact.obj_b.name
-                except Exception as e:
-                    result_list = []
-                    pass
+                link_b = contact.obj_b.name
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a)
                     map_P_b = map_T_b.dot(p.point_b)
-                    body_b = self.god_map.unsafe_get_data(identifier.robot_group_name) if link_b in self.robot.link_names else ''
                     c = Collision(link_a=link_a,
-                                  body_b=body_b,
                                   link_b=link_b,
                                   contact_distance=p.distance,
                                   map_V_n=p.normal_world_b,

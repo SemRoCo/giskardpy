@@ -974,7 +974,14 @@ class GiskardTestWrapper(GiskardWrapper):
         :rtype: list
         """
         self.collision_scene.reset_cache()
-        collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_COLLISION, distance=distance_threshold)]
+        collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
+                                          distance=distance_threshold,
+                                          group1=self.get_robot_name()),
+                           CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
+                                          distance=distance_threshold,
+                                          group1=self.get_robot_name(),
+                                          group2=self.get_robot_name())
+                           ]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
                                                                                     defaultdict(lambda: 0.3), {})
         collisions = self.collision_scene.check_collisions(collision_matrix)

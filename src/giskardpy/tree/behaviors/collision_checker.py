@@ -32,50 +32,13 @@ class CollisionChecker(GiskardBehavior):
     @profile
     def initialise(self):
         try:
-            t = time()
-            self.collision_scene.sync()
-            collision_goals = self.get_god_map().get_data(identifier.collision_goal)
-            max_distances = self.make_max_distances()
-            try:
-                added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
-                self.god_map.set_data(identifier.added_collision_checks, {})
-            except KeyError:
-                # no collision checks added
-                added_checks = {}
-            self.collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_goals),
-                                                                                             max_distances,
-                                                                                             added_checks)
+            self.collision_matrix = self.god_map.get_data(identifier.collision_matrix)
             self.collision_list_size = self._cal_max_param('number_of_repeller')
-
+            self.collision_scene.sync()
             super(CollisionChecker, self).initialise()
-            t2 = time() - t
-            self.get_blackboard().runtime += t2
         except Exception as e:
             self.raise_to_blackboard(e)
 
-    def make_max_distances(self):
-        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        # FIXME check all dict entries
-        default_distance = self._cal_max_param('soft_threshold')
-
-        max_distances = defaultdict(lambda: default_distance)
-        # override max distances based on external distances dict
-        for link_name in self.robot.link_names_with_collisions:
-            controlled_parent_joint = self.get_robot().get_controlled_parent_joint_of_link(link_name)
-            distance = external_distances[controlled_parent_joint]['soft_threshold']
-            for child_link_name in self.get_robot().get_directly_controlled_child_links_with_collisions(
-                    controlled_parent_joint):
-                max_distances[child_link_name] = distance
-
-        for link_name in self_distances:
-            distance = self_distances[link_name]['soft_threshold']
-            if link_name in max_distances:
-                max_distances[link_name] = max(distance, max_distances[link_name])
-            else:
-                max_distances[link_name] = distance
-
-        return max_distances
 
     @profile
     def update(self):

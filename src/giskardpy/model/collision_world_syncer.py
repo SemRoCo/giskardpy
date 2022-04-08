@@ -1,37 +1,38 @@
 from collections import defaultdict
 from itertools import product, combinations_with_replacement, combinations
 from time import time
-from typing import List, Dict, Tuple, Union, Optional
+from typing import List, Dict, Tuple, Optional
 
 import numpy as np
 from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
-from giskardpy.data_types import JointStates, PrefixName
+from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
+from giskardpy.my_types import my_string
 from giskardpy.utils import logging
 
 np.random.seed(1337)
 
-class Collision(object):
-    def __init__(self, link_a, body_b, link_b, contact_distance,
+
+class Collision:
+    def __init__(self, link_a, link_b, contact_distance,
                  map_P_pa=None, map_P_pb=None, map_V_n=None,
                  a_P_pa=None, b_P_pb=None):
         self.contact_distance = contact_distance
-        self.body_b = body_b
         self.link_a = link_a
         self.original_link_a = link_a
         self.link_b = link_b
+        self.link_b_hash = self.link_b.__hash__()
         self.original_link_b = link_b
 
         self.map_P_pa = self.__point_to_4d(map_P_pa)
         self.map_P_pb = self.__point_to_4d(map_P_pb)
         self.map_V_n = self.__vector_to_4d(map_V_n)
-        self.old_key = (link_a, body_b, link_a)
         self.a_P_pa = self.__point_to_4d(a_P_pa)
         self.b_P_pb = self.__point_to_4d(b_P_pb)
 
@@ -55,15 +56,8 @@ class Collision(object):
             return np.append(vector, 0)
         return vector
 
-    def get_link_b_hash(self):
-        return self.link_b.__hash__()
-
-    def get_body_b_hash(self):
-        return self.body_b.__hash__()
-
     def reverse(self):
         return Collision(link_a=self.original_link_b,
-                         body_b=self.body_b,
                          link_b=self.original_link_a,
                          map_P_pa=self.map_P_pb,
                          map_P_pb=self.map_P_pa,
@@ -73,12 +67,12 @@ class Collision(object):
                          contact_distance=self.contact_distance)
 
 
-class Collisions(object):
+class Collisions:
     @profile
     def __init__(self, god_map: GodMap, collision_list_size):
         self.god_map = god_map
-        self.world = self.god_map.get_data(identifier.world)
-        self.robot = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+        self.world: WorldTree = self.god_map.get_data(identifier.world)
+        self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
         self.robot_root = self.robot.root_link_name
         self.root_T_map = self.robot.compute_fk_np(self.robot_root, self.world.root_link_name)
         self.collision_list_size = collision_list_size
@@ -102,20 +96,11 @@ class Collisions(object):
         self.number_of_external_collisions = defaultdict(int)
 
     @profile
-    def add(self, collision):
-        """
-        :type collision: Collision
-        :return:
-        """
-        collision = self.transform_closest_point(collision)
-        self.all_collisions.add(collision)
-
-        if collision.body_b == self.robot.name:
-            key = collision.link_a, collision.link_b
-            self.self_collisions[key].add(collision)
-            self.number_of_self_collisions[key] = min(self.collision_list_size,
-                                                      self.number_of_self_collisions[key] + 1)
-        else:
+    def add(self, collision: Collision):
+        is_external = collision.link_b not in self.robot.link_names_with_collisions \
+                or collision.link_a not in self.robot.link_names_with_collisions
+        if is_external:
+            collision = self.transform_external_collision(collision)
             key = collision.link_a
             self.external_collision[key].add(collision)
             self.number_of_external_collisions[key] = min(self.collision_list_size,
@@ -126,23 +111,16 @@ class Collisions(object):
             else:
                 self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
                                                                  key=lambda x: x.contact_distance)
-
-    def transform_closest_point(self, collision):
-        """
-        :type collision: Collision
-        :rtype: Collision
-        """
-        if collision.body_b == self.robot.name:
-            return self.transform_self_collision(collision)
         else:
-            return self.transform_external_collision(collision)
+            collision = self.transform_self_collision(collision)
+            key = collision.link_a, collision.link_b
+            self.self_collisions[key].add(collision)
+            self.number_of_self_collisions[key] = min(self.collision_list_size,
+                                                      self.number_of_self_collisions[key] + 1)
+        self.all_collisions.add(collision)
 
     @profile
-    def transform_self_collision(self, collision):
-        """
-        :type collision: Collision
-        :rtype: Collision
-        """
+    def transform_self_collision(self, collision: Collision) -> Collision:
         link_a = collision.original_link_a
         link_b = collision.original_link_b
         new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b)
@@ -190,7 +168,6 @@ class Collisions(object):
 
     def _default_collision(self, link_a, body_b, link_b):
         c = Collision(link_a=link_a,
-                      body_b=body_b,
                       link_b=link_b,
                       contact_distance=100,
                       map_P_pa=[0, 0, 0, 1],
@@ -499,8 +476,7 @@ class CollisionWorldSynchronizer(object):
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
                                             min_dist: dict,
-                                            added_checks: Dict[
-                                                Tuple[Union[str, PrefixName], Union[str, PrefixName]], float]):
+                                            added_checks: Dict[Tuple[my_string, my_string], float]):
         """
         :param collision_goals: list of CollisionEntry
         :type collision_goals: list
@@ -529,7 +505,7 @@ class CollisionWorldSynchronizer(object):
                             del min_allowed_distance[r_key]
                     elif self.is_avoid_collision(collision_entry):
                         if key not in self.black_list:
-                            min_allowed_distance[key] = min_dist[key[0]]
+                            min_allowed_distance[key] = max(min_dist[key[0]], collision_entry.distance)
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
         for (link1, link2), distance in added_checks.items():

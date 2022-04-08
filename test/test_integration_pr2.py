@@ -2435,11 +2435,13 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
 
     def test_avoid_collision(self, box_setup: PR2):
-        box_setup.avoid_collision(min_distance=0.05, group1=box_setup.get_robot_name(), group2='box')
+        box_setup.avoid_collision(min_distance=0.05, group1=box_setup.get_robot_name())
+        box_setup.avoid_collision(min_distance=0.15, group1=box_setup.l_gripper_group, group2='box')
+        box_setup.avoid_collision(min_distance=0.10, group1=box_setup.r_gripper_group, group2='box')
         box_setup.allow_self_collision()
         box_setup.plan_and_execute()
-        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.148)
+        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.088)
 
     def test_collision_override(self, box_setup: PR2):
         # FIXME

@@ -29,10 +29,27 @@ class CollisionChecker(GiskardBehavior):
             default_distance = max(default_distance, value[parameter_name])
         return default_distance
 
+    def add_added_checks(self, collision_matrix):
+        try:
+            added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
+            self.god_map.set_data(identifier.added_collision_checks, {})
+        except KeyError:
+            # no collision checks added
+            added_checks = {}
+        for (link1, link2), distance in added_checks.items():
+            key = self.world.sort_links(link1, link2)
+            if key in collision_matrix:
+                collision_matrix[key] = max(distance, collision_matrix[key])
+            else:
+                collision_matrix[key] = distance
+        return collision_matrix
+
+
     @profile
     def initialise(self):
         try:
             self.collision_matrix = self.god_map.get_data(identifier.collision_matrix)
+            self.collision_matrix = self.add_added_checks(self.collision_matrix)
             self.collision_list_size = self._cal_max_param('number_of_repeller')
             self.collision_scene.sync()
             super(CollisionChecker, self).initialise()

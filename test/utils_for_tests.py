@@ -983,7 +983,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                           group2=self.get_robot_name())
                            ]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
-                                                                                    defaultdict(lambda: 0.3), {})
+                                                                                    defaultdict(lambda: 0.3))
         collisions = self.collision_scene.check_collisions(collision_matrix)
         controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link)
         controlled_parent_link = self.robot.joints[controlled_parent_joint].child_link_name

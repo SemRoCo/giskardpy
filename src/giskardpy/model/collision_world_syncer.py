@@ -119,6 +119,7 @@ class CollisionWorldSynchronizer(object):
             sometimes = set()
             for position in np.linspace(min_position, max_position, steps):
                 self.world.state[joint_name].position = position
+                self.world.notify_state_change()
                 self.sync()
                 for link_a, link_b in subset_of_unknown:
                     if self.in_collision(link_a, link_b, d2):
@@ -128,21 +129,17 @@ class CollisionWorldSynchronizer(object):
 
         logging.logdebug('Calculated self collision matrix in {:.3f}s'.format(time() - t))
         self.world.state = joint_state_tmp
+        self.world.notify_state_change()
         unknown.update(self.added_pairs)
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]
-
-    def load_self_collision_matrix(self):
-        path = '/home/stelter/workspace20/giskard_ws/src/giskardpy/tmp_data/collision_matrix//pr2/ecde0c3a330b5e4a094b7ca46100a7e5'
-        with open(path, 'rb') as f:
-            logging.loginfo('loaded self collision matrix {}'.format(path))
-            return pickle.load(f)
 
     def get_pose(self, link_name):
         return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name)
 
     def set_joint_state_to_zero(self, group):
         group.state = JointStates()
+        self.world.notify_state_change()
 
     def set_max_joint_state(self, group):
         def f(joint_name):

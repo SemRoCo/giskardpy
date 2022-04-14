@@ -52,7 +52,7 @@ class GiskardBehavior(Behaviour):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.world.groups[robot_name]
+        return self.collision_scene.robot(robot_name=robot_name)
 
     def robot_names(self):
         return self.collision_scene.robot_names

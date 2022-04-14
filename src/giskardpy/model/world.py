@@ -17,11 +17,11 @@ from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
-    FixedJoint, MimicJoint, DiffDriveWheelsJoint
-from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.links import Link
+from giskardpy.model.joints import Joint, FixedJoint, FixedURDFJoint, PrismaticURDFJoint, URDFJoint, MimicJoint, \
+    PrismaticJoint, RevoluteJoint, ContinuousJoint
 from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.my_types import my_string
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize
@@ -276,15 +276,11 @@ class WorldTree(object):
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
-        if False:
-            base_footprint, odom = self._add_diff_drive_joint(urdf=parsed_urdf,
-                                                              map_link=parent_link,
-                                                              prefix=prefix)
-        else:
-            odom = Link.from_urdf(parsed_urdf.link_map[parsed_urdf.get_root()], None)
-            base_footprint = odom
-            self._add_fixed_joint(parent_link, odom,
-                                  joint_name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix))
+
+        odom = Link.from_urdf(parsed_urdf.link_map[parsed_urdf.get_root()], None)
+        base_footprint = odom
+        self._add_fixed_joint(parent_link, odom,
+                              joint_name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix))
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
@@ -294,8 +290,9 @@ class WorldTree(object):
                 urdf_link = urdf.link_map[child_link_name]
                 child_link = Link.from_urdf(urdf_link, prefix)
 
-                urdf_joint = urdf.joint_map[child_joint_name]
-                joint = Joint.from_urdf(urdf_joint, prefix, parent_link.name, child_link.name, self.god_map)
+                urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
+
+                joint = URDFJoint.from_urdf(urdf_joint, prefix, self.god_map)
 
                 self._link_joint_to_links(joint, child_link)
                 helper(urdf, child_link)
@@ -313,7 +310,8 @@ class WorldTree(object):
             joint_name = '{}_{}_fixed_joint'.format(parent_link.name, child_link.name)
         connecting_joint = FixedJoint(name=joint_name,
                                       parent_link_name=parent_link.name,
-                                      child_link_name=child_link.name)
+                                      child_link_name=child_link.name,
+                                      god_map=self.god_map)
         self._link_joint_to_links(connecting_joint, child_link)
 
     def _add_diff_drive_joint(self, urdf, map_link, odom_link_name='odom', prefix=None):
@@ -407,7 +405,7 @@ class WorldTree(object):
 
     @cached_property
     def movable_joints(self):
-        return [j.name for j in self.joints.values() if isinstance(j, MovableJoint) and not isinstance(j, MimicJoint)]
+        return [j.name for j in self.joints.values() if not isinstance(j, FixedJoint) and not isinstance(j, MimicJoint)]
 
     @cached_property
     def movable_joints_as_set(self):
@@ -758,7 +756,7 @@ class WorldTree(object):
                 self.fks = {self.world.root_link_name: w.eye(4)}
 
             @profile
-            def joint_call(self, joint_name: Union[PrefixName, str]) -> bool:
+            def joint_call(self, joint_name: my_string) -> bool:
                 joint = self.world.joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = w.dot(map_T_parent, joint.parent_T_child)
@@ -947,7 +945,7 @@ class WorldTree(object):
         return isinstance(self.joints[joint_name], PrismaticJoint)
 
     def is_joint_fixed(self, joint_name):
-        return not isinstance(self.joints[joint_name], MovableJoint)
+        return isinstance(self.joints[joint_name], FixedJoint)
 
     def is_joint_movable(self, joint_name):
         return not self.is_joint_fixed(joint_name)
@@ -1108,7 +1106,7 @@ class SubWorldTree(WorldTree):
             :rtype: list
             """
             links = {root_link.name: root_link}
-            for j in root_link.child_joint_names:  # type: Joint
+            for j in root_link.child_joint_names:
                 j = self.world.joints[j]
                 child_link = self.world.links[j.child_link_name]
                 links.update(helper(child_link))

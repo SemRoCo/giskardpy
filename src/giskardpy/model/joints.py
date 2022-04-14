@@ -1,247 +1,247 @@
-from typing import Dict, Union
+import abc
+from abc import ABC
+from typing import Dict, Tuple, Optional, Union, List
 
-import numpy as np
+import urdf_parser_py.urdf as up
 
-from giskardpy import casadi_wrapper as w, identifier
+import giskardpy.casadi_wrapper as w
+from giskardpy import identifier
 from giskardpy.data_types import PrefixName
+from giskardpy.god_map import GodMap
+from giskardpy.my_types import my_string, expr_symbol, expr_matrix, derivative_joint_map
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.utils.utils import limits_from_urdf_joint
 
 
-class Joint(object):
-    def __init__(self, name, parent_link_name, child_link_name, parent_T_child=None,
-                 translation_offset=None,
-                 rotation_offset=None):
-        assert isinstance(name, PrefixName)
-        self.name = name  # type: PrefixName
+class Joint(ABC):
+    name: my_string
+    parent_link_name: my_string
+    child_link_name: my_string
+    god_map: GodMap
+    horizon_function = {1: 0.1}
+    state_identifier = identifier.joint_states
+
+    def __init__(self,
+                 name: my_string,
+                 parent_link_name: my_string,
+                 child_link_name: my_string,
+                 god_map: GodMap,
+                 parent_T_child: expr_matrix):
+        self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
+        self.parent_T_child = parent_T_child
+        self.god_map = god_map
+        self.create_free_variables()
+        self.apply_joint_effect()
 
-        if translation_offset is None:
-            translation_offset = [0, 0, 0]
-        if rotation_offset is None:
-            rotation_offset = [0, 0, 0]
+    @abc.abstractmethod
+    def create_free_variables(self):
+        """
+        """
+
+    @abc.abstractmethod
+    def apply_joint_effect(self):
+        """
+        modifies self.parent_T_child using free variables
+        """
+
+    @abc.abstractmethod
+    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
+        """
+        updates the world state
+        :param new_cmds: result from the qp solver
+        :param dt: delta time
+        """
+
+    @abc.abstractmethod
+    def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
+        """
+        :param linear_limits:
+        :param angular_limits:
+        """
+
+    @abc.abstractmethod
+    def update_weights(self, weights: Dict[int, float]):
+        """
+        :param weights: maps derivative to weight. e.g. {1:0.001, 2:0, 3:0.001}
+        :return:
+        """
+
+    @abc.abstractmethod
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+        """
+        """
+
+    @abc.abstractmethod
+    def has_free_variables(self) -> bool:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def free_variable_list(self) -> List[FreeVariable]:
+        pass
+
+class DependentJoint(Joint, ABC):
+    @abc.abstractmethod
+    def connect_to_existing_free_variables(self):
+        """
+
+        """
+
+
+class FixedJoint(Joint):
+
+    def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
+                 god_map: GodMap, parent_T_child: Optional[expr_matrix] = None):
         if parent_T_child is None:
-            self.parent_T_child = w.dot(w.translation3(*translation_offset),
-                                        w.rotation_matrix_from_rpy(*rotation_offset))
-        else:
-            self.parent_T_child = parent_T_child
+            parent_T_child = w.eye(4)
+        super().__init__(name, parent_link_name, child_link_name, god_map, parent_T_child)
 
-    def __repr__(self):
-        return str(self.name)
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+        return None
 
-    def has_free_variables(self):
+    def update_limits(self, linear_limits, angular_limits):
+        pass
+
+    def update_weights(self, weights: Dict[int, float]):
+        pass
+
+    def apply_joint_effect(self):
+        pass
+
+    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
+        pass
+
+    def has_free_variables(self) -> bool:
         return False
 
-    @classmethod
-    def from_urdf(cls, urdf_joint, prefix, parent_link_name, child_link_name, god_map):
+    @property
+    def free_variable_list(self) -> List[FreeVariable]:
+        return []
+
+    def create_free_variables(self):
+        pass
+
+
+class URDFJoint(Joint, ABC):
+    urdf_joint: up.Joint
+
+    def __init__(self, urdf_joint: up.Joint, prefix: str, god_map: GodMap):
+        self.urdf_joint = urdf_joint
         joint_name = PrefixName(urdf_joint.name, prefix)
+        parent_link_name = PrefixName(urdf_joint.parent, prefix)
+        child_link_name = PrefixName(urdf_joint.child, prefix)
         if urdf_joint.origin is not None:
             translation_offset = urdf_joint.origin.xyz
             rotation_offset = urdf_joint.origin.rpy
         else:
             translation_offset = None
             rotation_offset = None
+        if translation_offset is None:
+            translation_offset = [0, 0, 0]
+        if rotation_offset is None:
+            rotation_offset = [0, 0, 0]
+        parent_T_child = w.dot(w.translation3(*translation_offset),
+                               w.rotation_matrix_from_rpy(*rotation_offset))
+        super().__init__(name=joint_name, parent_link_name=parent_link_name, child_link_name=child_link_name,
+                         god_map=god_map, parent_T_child=parent_T_child)
 
-        if urdf_joint.mimic is not None:
+    @classmethod
+    def from_urdf(cls, urdf_joint: up.Joint, prefix: my_string, god_map: GodMap):
+        if urdf_joint.type == 'fixed':
+            joint_class = FixedURDFJoint
+        elif urdf_joint.mimic is not None:
             if urdf_joint.type == 'prismatic':
-                joint = MimicedPrismaticJoint(name=joint_name,
-                                              parent_link_name=parent_link_name,
-                                              child_link_name=child_link_name,
-                                              translation_offset=translation_offset,
-                                              rotation_offset=rotation_offset,
-                                              god_map=god_map,
-                                              axis=urdf_joint.axis,
-                                              multiplier=urdf_joint.mimic.multiplier,
-                                              offset=urdf_joint.mimic.offset,
-                                              mimed_joint_name=PrefixName(urdf_joint.mimic.joint, prefix))
+                joint_class = MimicPrismaticURDFJoint
             elif urdf_joint.type == 'revolute':
-                joint = MimicedRevoluteJoint(name=joint_name,
-                                             parent_link_name=parent_link_name,
-                                             child_link_name=child_link_name,
-                                             translation_offset=translation_offset,
-                                             rotation_offset=rotation_offset,
-                                             god_map=god_map,
-                                             axis=urdf_joint.axis,
-                                             multiplier=urdf_joint.mimic.multiplier,
-                                             offset=urdf_joint.mimic.offset,
-                                             mimed_joint_name=PrefixName(urdf_joint.mimic.joint, prefix))
+                joint_class = MimicRevoluteURDFJoint
             elif urdf_joint.type == 'continuous':
-                joint = MimicedContinuousJoint(name=joint_name,
-                                               parent_link_name=parent_link_name,
-                                               child_link_name=child_link_name,
-                                               translation_offset=translation_offset,
-                                               rotation_offset=rotation_offset,
-                                               god_map=god_map,
-                                               axis=urdf_joint.axis,
-                                               multiplier=urdf_joint.mimic.multiplier,
-                                               offset=urdf_joint.mimic.offset,
-                                               mimed_joint_name=PrefixName(urdf_joint.mimic.joint, prefix))
+                joint_class = MimicContinuousURDFJoint
             else:
-                raise NotImplementedError('Joint type \'{}\' of \'{}\' is not implemented.'.format(urdf_joint.name,
-                                                                                                   urdf_joint.type))
+                raise NotImplementedError(
+                    f'Joint type \'{urdf_joint.type}\' of \'{urdf_joint.name}\' is not implemented.')
         else:
-            if urdf_joint.type == 'fixed':
-                joint = FixedJoint(name=joint_name,
-                                   parent_link_name=parent_link_name,
-                                   child_link_name=child_link_name,
-                                   translation_offset=translation_offset,
-                                   rotation_offset=rotation_offset)
+            if urdf_joint.type == 'prismatic':
+                joint_class = PrismaticURDFJoint
             elif urdf_joint.type == 'revolute':
-                joint = RevoluteJoint(name=joint_name,
-                                      parent_link_name=parent_link_name,
-                                      child_link_name=child_link_name,
-                                      translation_offset=translation_offset,
-                                      rotation_offset=rotation_offset,
-                                      god_map=god_map,
-                                      axis=urdf_joint.axis)
-            elif urdf_joint.type == 'prismatic':
-                joint = PrismaticJoint(name=joint_name,
-                                       parent_link_name=parent_link_name,
-                                       child_link_name=child_link_name,
-                                       translation_offset=translation_offset,
-                                       rotation_offset=rotation_offset,
-                                       god_map=god_map,
-                                       axis=urdf_joint.axis)
+                joint_class = RevoluteURDFJoint
             elif urdf_joint.type == 'continuous':
-                joint = ContinuousJoint(name=joint_name,
-                                        parent_link_name=parent_link_name,
-                                        child_link_name=child_link_name,
-                                        translation_offset=translation_offset,
-                                        rotation_offset=rotation_offset,
-                                        god_map=god_map,
-                                        axis=urdf_joint.axis)
+                joint_class = ContinuousURDFJoint
             else:
-                raise NotImplementedError('Joint type \'{}\' of \'{}\' is not implemented.'.format(urdf_joint.name,
-                                                                                                   urdf_joint.type))
+                raise NotImplementedError(
+                    f'Joint type \'{urdf_joint.type}\' of \'{urdf_joint.name}\' is not implemented.')
 
-        if isinstance(joint, OneDofJoint):
-            if not isinstance(joint, MimicJoint):
-                lower_limits, upper_limits = limits_from_urdf_joint(urdf_joint)
-                joint.create_free_variables(where_am_i=identifier.joint_states,
-                                            lower_limits=lower_limits,
-                                            upper_limits=upper_limits)
-        return joint
+        return joint_class(urdf_joint=urdf_joint, prefix=prefix, god_map=god_map)
 
-    def update_state(self, new_cmds, dt):
-        pass
+    def urdf_limits(self):
+        lower_limits = {}
+        upper_limits = {}
+        if not self.urdf_joint.type == 'continuous':
+            try:
+                lower_limits[0] = max(self.urdf_joint.safety_controller.soft_lower_limit, self.urdf_joint.limit.lower)
+                upper_limits[0] = min(self.urdf_joint.safety_controller.soft_upper_limit, self.urdf_joint.limit.upper)
+            except AttributeError:
+                try:
+                    lower_limits[0] = self.urdf_joint.limit.lower
+                    upper_limits[0] = self.urdf_joint.limit.upper
+                except AttributeError:
+                    pass
+        try:
+            lower_limits[1] = -self.urdf_joint.limit.velocity
+            upper_limits[1] = self.urdf_joint.limit.velocity
+        except AttributeError:
+            pass
+        return lower_limits, upper_limits
 
 
-class FixedJoint(Joint):
+class FixedURDFJoint(URDFJoint, FixedJoint):
     pass
 
 
-class MovableJoint(Joint):
-    def __init__(self, name, parent_link_name, child_link_name, god_map, parent_T_child=None,
-                 translation_offset=None, rotation_offset=None):
-        """
-        :type name: str
-        :type parent_link_name: str
-        :type child_link_name: str
-        :type god_map: giskardpy.god_map.GodMap
-        :type parent_T_child:
-        :type translation_offset:
-        :type rotation_offset:
-        """
-        super(MovableJoint, self).__init__(name=name,
-                                           parent_link_name=parent_link_name,
-                                           child_link_name=child_link_name,
-                                           parent_T_child=parent_T_child,
-                                           translation_offset=translation_offset,
-                                           rotation_offset=rotation_offset)
-        self.god_map = god_map
-        self._world = self.god_map.unsafe_get_data(identifier.world)
+class OneDofJoint(Joint, ABC):
+    free_variable: FreeVariable
+    axis: Tuple[float, float, float]
 
-    @property
-    def world(self):
-        """
-        :rtype: giskardpy.model.world.WorldTree
-        """
-        return self._world
+    def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
+                 parent_T_child: expr_matrix,
+                 axis: Tuple[float, float, float], lower_limits, upper_limits, god_map: GodMap):
+        self.axis = axis
+        self.lower_limits = lower_limits
+        self.upper_limits = upper_limits
+        Joint.__init__(self, name, parent_link_name, child_link_name, god_map, parent_T_child)
 
-    @property
-    def free_variables(self):
-        return self._free_variables
-
-    @property
-    def free_variable_list(self):
-        return list(self._free_variables.values())
-
-    def create_free_variables(self, **kwargs):
-        self._free_variables = kwargs
-        self.update_parent_T_child()
-
-    def has_free_variables(self):
-        return len(self.free_variables) > 0
-
-    def update_parent_T_child(self):
-        pass
-
-    def update_limits(self, linear_limits, angular_limits):
-        raise NotImplementedError()
-
-    def update_weights(self, weights: Dict[int, float]):
-        """
-        :param weights: maps derivative to weight. e.g. {1:0.001, 2:0, 3:0.001}
-        :return:
-        """
-        raise NotImplementedError()
-
-    def get_limit_expressions(self, order):
-        raise NotImplementedError()
-
-
-class OneDofJoint(MovableJoint):
-    @property
-    def free_variable(self):
-        """
-        :rtype: FreeVariable
-        """
-        return self._free_variables['position']
-
-    @property
-    def position_symbol(self):
-        return self._free_variables['position'].get_symbol(0)
-
-    @property
-    def position_limits(self):
-        return self.get_limit_expressions(0)
-
-    @property
-    def velocity_limit(self):
-        return self.get_limit_expressions(1)[1]
-
-    def get_limit_expressions(self, order):
-        return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
-
-    def create_free_variables(self, where_am_i, lower_limits, upper_limits, horizon_function=None):
-        free_variable = FreeVariable(
+    def create_free_variables(self):
+        self.free_variable = FreeVariable(
             symbols={
-                0: self.god_map.to_symbol(where_am_i + [self.name, 'position']),
-                1: self.god_map.to_symbol(where_am_i + [self.name, 'velocity']),
-                2: self.god_map.to_symbol(where_am_i + [self.name, 'acceleration']),
-                3: self.god_map.to_symbol(where_am_i + [self.name, 'jerk']),
+                0: self.god_map.to_symbol(self.state_identifier + [self.name, 'position']),
+                1: self.god_map.to_symbol(self.state_identifier + [self.name, 'velocity']),
+                2: self.god_map.to_symbol(self.state_identifier + [self.name, 'acceleration']),
+                3: self.god_map.to_symbol(self.state_identifier + [self.name, 'jerk']),
             },
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
+            lower_limits=self.lower_limits,
+            upper_limits=self.upper_limits,
             quadratic_weights={},
-            horizon_functions={1: 0.1})
-        super(OneDofJoint, self).create_free_variables(position=free_variable)
+            horizon_functions=self.horizon_function)
 
-    def update_state(self, new_cmds, dt):
+    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
+        world = self.god_map.unsafe_get_data(identifier.world)
         try:
             vel = new_cmds[0][self.free_variable.name]
         except KeyError as e:
-            # joint is currently not active
+            # joint is currently not part of the optimization problem
             return
-        self.world.state[self.name].position += vel * dt
-        self.world.state[self.name].velocity = vel
+        world.state[self.name].position += vel * dt
+        world.state[self.name].velocity = vel
         if len(new_cmds) >= 2:
             acc = new_cmds[1][self.free_variable.name]
-            self.world.state[self.name].acceleration = acc
+            world.state[self.name].acceleration = acc
         if len(new_cmds) >= 3:
             jerk = new_cmds[2][self.free_variable.name]
-            self.world.state[self.name].jerk = jerk
+            world.state[self.name].jerk = jerk
+
+    @property
+    def position_expression(self) -> expr_symbol:
+        return self.free_variable.get_symbol(0)
 
     def delete_limits(self):
         self.free_variable.lower_limits = {}
@@ -250,7 +250,7 @@ class OneDofJoint(MovableJoint):
     def delete_weights(self):
         self.free_variable.quadratic_weights = {}
 
-    def update_weights(self, weights: Dict[int, Dict[Union[str, PrefixName], float]]):
+    def update_weights(self, weights: Dict[int, Dict[my_string, float]]):
         # self.delete_weights()
         for order, weight in weights.items():
             try:
@@ -259,76 +259,65 @@ class OneDofJoint(MovableJoint):
                 # can't do if in, because the dict may be a defaultdict
                 pass
 
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+        return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
 
-class RevoluteJoint(OneDofJoint):
-    def __init__(self, name, parent_link_name, child_link_name, axis, god_map, parent_T_child=None,
-                 translation_offset=None,
-                 rotation_offset=None):
-        super(RevoluteJoint, self).__init__(name=name,
-                                            parent_link_name=parent_link_name,
-                                            child_link_name=child_link_name,
-                                            god_map=god_map,
-                                            parent_T_child=parent_T_child,
-                                            translation_offset=translation_offset,
-                                            rotation_offset=rotation_offset)
-        self.axis = np.array(axis)
+    def has_free_variables(self) -> bool:
+        return True
 
-    def update_parent_T_child(self):
-        expr = self.position_symbol
-        self.parent_T_child = w.dot(self.parent_T_child,
-                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis), expr))
-
-    def update_limits(self, linear_limits, angular_limits):
-        self.delete_limits()
-        for order, angular_limit in angular_limits.items():
-            self.free_variable.set_upper_limit(order, angular_limit[self.name])
-            self.free_variable.set_lower_limit(order, -angular_limit[self.name])
+    @property
+    def free_variable_list(self) -> List[FreeVariable]:
+        return [self.free_variable]
 
 
-class ContinuousJoint(OneDofJoint):
-    def __init__(self, name, parent_link_name, child_link_name, axis, god_map, parent_T_child=None,
-                 translation_offset=None,
-                 rotation_offset=None):
-        super(ContinuousJoint, self).__init__(name=name,
-                                              parent_link_name=parent_link_name,
-                                              child_link_name=child_link_name,
-                                              god_map=god_map,
-                                              parent_T_child=parent_T_child,
-                                              translation_offset=translation_offset,
-                                              rotation_offset=rotation_offset)
-        self.axis = np.array(axis)
+class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
-    def update_parent_T_child(self):
-        expr = self.position_symbol
-        self.parent_T_child = w.dot(self.parent_T_child,
-                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis), expr))
+    def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
+                 parent_T_child: w.ca.SX,
+                 mimed_joint_name: my_string, multiplier: float, offset: float, god_map: GodMap):
+        super().__init__(name, parent_link_name, child_link_name, god_map, parent_T_child)
+        self.mimed_joint_name = mimed_joint_name
+        self.multiplier = multiplier
+        self.offset = offset
 
-    def update_limits(self, linear_limits, angular_limits):
-        self.delete_limits()
-        for order, angular_limit in angular_limits.items():
-            self.free_variable.set_upper_limit(order, angular_limit[self.name])
-            self.free_variable.set_lower_limit(order, -angular_limit[self.name])
+    @property
+    def position_expression(self) -> expr_symbol:
+        multiplier = 1 if self.multiplier is None else self.multiplier
+        offset = 0 if self.offset is None else self.offset
+        return self.free_variable.get_symbol(0) * multiplier + offset
+
+    def connect_to_existing_free_variables(self):
+        mimed_joint: OneDofJoint = self.god_map.unsafe_get_data(identifier.world).joints[self.mimed_joint_name]
+        self.free_variable = mimed_joint.free_variable
+
+    def has_free_variables(self) -> bool:
+        return False
+
+    @property
+    def free_variable_list(self) -> List[FreeVariable]:
+        return [self.free_variable]
+
+    def delete_limits(self):
+        pass
+
+    def delete_weights(self):
+        pass
+
+    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
+        super().update_state(new_cmds, dt)
+
+    def update_weights(self, weights: Dict[int, Dict[my_string, float]]):
+        pass
+
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+        return None
 
 
 class PrismaticJoint(OneDofJoint):
-    def __init__(self, name, parent_link_name, child_link_name, axis, god_map, parent_T_child=None,
-                 translation_offset=None,
-                 rotation_offset=None):
-        super(PrismaticJoint, self).__init__(name=name,
-                                             parent_link_name=parent_link_name,
-                                             child_link_name=child_link_name,
-                                             god_map=god_map,
-                                             parent_T_child=parent_T_child,
-                                             translation_offset=translation_offset,
-                                             rotation_offset=rotation_offset)
-        self.axis = np.array(axis)
-
-    def update_parent_T_child(self):
-        expr = self.position_symbol
-        translation_axis = (w.point3(*self.axis) * expr)
-        self.parent_T_child = w.dot(self.parent_T_child, w.translation3(translation_axis[0],
-                                                                        translation_axis[1],
-                                                                        translation_axis[2]))
+    def apply_joint_effect(self):
+        translation_axis = w.point3(*self.axis) * self.position_expression
+        parent_P_child = w.translation3(translation_axis[0], translation_axis[1], translation_axis[2])
+        self.parent_T_child = w.dot(self.parent_T_child, parent_P_child)
 
     def update_limits(self, linear_limits, angular_limits):
         self.delete_limits()
@@ -337,482 +326,75 @@ class PrismaticJoint(OneDofJoint):
             self.free_variable.set_lower_limit(order, -linear_limit[self.name])
 
 
-class MimicJoint(OneDofJoint):
-    def __init__(self, name, parent_link_name, child_link_name, god_map, mimed_joint_name, multiplier, offset,
-                 parent_T_child=None, translation_offset=None, rotation_offset=None):
+class RevoluteJoint(OneDofJoint):
+    def apply_joint_effect(self):
+        rotation_axis = w.vector3(*self.axis)
+        parent_R_child = w.rotation_matrix_from_axis_angle(rotation_axis, self.position_expression)
+        self.parent_T_child = w.dot(self.parent_T_child, parent_R_child)
+
+    def update_limits(self, linear_limits, angular_limits):
+        self.delete_limits()
+        for order, angular_limit in angular_limits.items():
+            self.free_variable.set_upper_limit(order, angular_limit[self.name])
+            self.free_variable.set_lower_limit(order, -angular_limit[self.name])
+
+
+class ContinuousJoint(RevoluteJoint):
+    pass
+
+
+class OneDofURDFJoint(OneDofJoint, URDFJoint, ABC):
+    def __init__(self, urdf_joint: up.Joint, prefix: str, god_map: GodMap):
+        try:
+            URDFJoint.__init__(self, urdf_joint, prefix, god_map)
+        except AttributeError:
+            # to be expected, because the next init will set the attributes
+            pass
+        lower_limits, upper_limits = self.urdf_limits()
         OneDofJoint.__init__(self,
-                             name=name,
-                             parent_link_name=parent_link_name,
-                             child_link_name=child_link_name,
-                             god_map=god_map,
-                             parent_T_child=parent_T_child,
-                             translation_offset=translation_offset,
-                             rotation_offset=rotation_offset)
-        self.mimed_joint_name = mimed_joint_name
-        self.multiplier = multiplier
-        self.offset = offset
-
-    def _apply_mimic(self, expr):
-        multiplier = 1 if self.multiplier is None else self.multiplier
-        offset = 0 if self.offset is None else self.offset
-        return expr * multiplier + offset
-
-    @property
-    def position_symbol(self):
-        mimed_free_variable = self._free_variables['position'].get_symbol(0)
-        return self._apply_mimic(mimed_free_variable)
-
-    @property
-    def position_limits(self):
-        lower_limit = self._apply_mimic(self.free_variable.get_lower_limit(0))
-        upper_limit = self._apply_mimic(self.free_variable.get_upper_limit(0))
-        return lower_limit, upper_limit
-
-    @property
-    def velocity_limit(self):
-        return self._apply_mimic(self.free_variable.get_upper_limit(1))
-
-    @property
-    def free_variables(self):
-        return []
-
-    def update_limits(self, linear_limits, angular_limits):
-        pass
-
-    def update_state(self, new_cmds, dt):
-        pass
-
-    def update_weights(self, weights):
-        pass
-
-    def set_mimed_free_variable(self, free_variable):
-        self._free_variables = {'position': free_variable}
-        self.update_parent_T_child()
+                             name=self.name,
+                             parent_link_name=self.parent_link_name,
+                             child_link_name=self.child_link_name,
+                             parent_T_child=self.parent_T_child,
+                             axis=self.urdf_joint.axis,
+                             lower_limits=lower_limits,
+                             upper_limits=upper_limits,
+                             god_map=self.god_map)
 
 
-class MimicedPrismaticJoint(MimicJoint, PrismaticJoint):
-    def __init__(self, name, parent_link_name, child_link_name, god_map, axis, mimed_joint_name, multiplier, offset,
-                 parent_T_child=None, translation_offset=None, rotation_offset=None):
-        PrismaticJoint.__init__(self,
-                                name=name,
-                                parent_link_name=parent_link_name,
-                                child_link_name=child_link_name,
-                                axis=axis,
-                                god_map=god_map,
-                                parent_T_child=parent_T_child,
-                                translation_offset=translation_offset,
-                                rotation_offset=rotation_offset)
+class PrismaticURDFJoint(OneDofURDFJoint, PrismaticJoint):
+    pass
+
+
+class RevoluteURDFJoint(OneDofURDFJoint, RevoluteJoint):
+    pass
+
+
+class ContinuousURDFJoint(OneDofURDFJoint, ContinuousJoint):
+    pass
+
+
+class MimicURDFJoint(MimicJoint, URDFJoint, ABC):
+    def __init__(self, urdf_joint: up.Joint, prefix: str, god_map: GodMap):
+        URDFJoint.__init__(self, urdf_joint, prefix, god_map)
         MimicJoint.__init__(self,
-                            name=name,
-                            parent_link_name=parent_link_name,
-                            child_link_name=child_link_name,
-                            god_map=god_map,
-                            mimed_joint_name=mimed_joint_name,
-                            multiplier=multiplier,
-                            offset=offset,
-                            parent_T_child=parent_T_child,
-                            translation_offset=translation_offset,
-                            rotation_offset=rotation_offset)
-
-    def update_parent_T_child(self):
-        PrismaticJoint.update_parent_T_child(self)
+                            name=self.name,
+                            parent_link_name=self.parent_link_name,
+                            child_link_name=self.child_link_name,
+                            parent_T_child=self.parent_T_child,
+                            mimed_joint_name=PrefixName(self.urdf_joint.mimic.joint, prefix),
+                            multiplier=self.urdf_joint.mimic.multiplier,
+                            offset=self.urdf_joint.mimic.offset,
+                            god_map=self.god_map)
 
 
-class MimicedRevoluteJoint(MimicJoint, RevoluteJoint):
-    def __init__(self, name, parent_link_name, child_link_name, god_map, axis, mimed_joint_name, multiplier, offset,
-                 parent_T_child=None, translation_offset=None, rotation_offset=None):
-        RevoluteJoint.__init__(self,
-                               name=name,
-                               parent_link_name=parent_link_name,
-                               child_link_name=child_link_name,
-                               axis=axis,
-                               god_map=god_map,
-                               parent_T_child=parent_T_child,
-                               translation_offset=translation_offset,
-                               rotation_offset=rotation_offset)
-        MimicJoint.__init__(self,
-                            name=name,
-                            parent_link_name=parent_link_name,
-                            child_link_name=child_link_name,
-                            god_map=god_map,
-                            mimed_joint_name=mimed_joint_name,
-                            multiplier=multiplier,
-                            offset=offset,
-                            parent_T_child=parent_T_child,
-                            translation_offset=translation_offset,
-                            rotation_offset=rotation_offset)
-
-    def update_parent_T_child(self):
-        RevoluteJoint.update_parent_T_child(self)
+class MimicPrismaticURDFJoint(MimicURDFJoint, PrismaticJoint):
+    pass
 
 
-class MimicedContinuousJoint(MimicJoint, ContinuousJoint):
-    def __init__(self, name, parent_link_name, child_link_name, god_map, axis, mimed_joint_name, multiplier, offset,
-                 parent_T_child=None, translation_offset=None, rotation_offset=None):
-        ContinuousJoint.__init__(self,
-                                 name=name,
-                                 parent_link_name=parent_link_name,
-                                 child_link_name=child_link_name,
-                                 axis=axis,
-                                 god_map=god_map,
-                                 parent_T_child=parent_T_child,
-                                 translation_offset=translation_offset,
-                                 rotation_offset=rotation_offset)
-        MimicJoint.__init__(self,
-                            name=name,
-                            parent_link_name=parent_link_name,
-                            child_link_name=child_link_name,
-                            god_map=god_map,
-                            mimed_joint_name=mimed_joint_name,
-                            multiplier=multiplier,
-                            offset=offset,
-                            parent_T_child=parent_T_child,
-                            translation_offset=translation_offset,
-                            rotation_offset=rotation_offset)
-
-    def update_parent_T_child(self):
-        ContinuousJoint.update_parent_T_child(self)
+class MimicRevoluteURDFJoint(MimicURDFJoint, RevoluteJoint):
+    pass
 
 
-class DiffDriveJoint(MovableJoint):
-    trans_s = 'trans'
-    rot_s = 'rot'
-
-    def __init__(self, name, parent_link_name, child_link_name, god_map, translation_axis=None,
-                 rotation_axis=None, parent_T_child=None):
-        super().__init__(name, parent_link_name, child_link_name, god_map, parent_T_child,
-                         translation_offset=[0, 0, 0],
-                         rotation_offset=[0, 0, 0])
-        if translation_axis is None:
-            translation_axis = [1, 0, 0]
-        self.translation_axis = translation_axis
-        if rotation_axis is None:
-            rotation_axis = [0, 0, 1]
-        self.rotation_axis = rotation_axis
-
-    def create_free_variables(self, where_am_i, trans_lower_limits, trans_upper_limits, rot_lower_limits,
-                              rot_upper_limits, horizon_function=None):
-        names = ['{}/x'.format(self.name),
-                 '{}/y'.format(self.name),
-                 '{}/z'.format(self.name)]
-        variables = []
-        for name in names:
-            variables.append(FreeVariable(
-                symbols={
-                    0: self.god_map.to_symbol(where_am_i + [name, 'position']),
-                    1: self.god_map.to_symbol(where_am_i + [name, 'velocity']),
-                    2: self.god_map.to_symbol(where_am_i + [name, 'acceleration']),
-                    3: self.god_map.to_symbol(where_am_i + [name, 'jerk']),
-                },
-                lower_limits={},
-                upper_limits={},
-                quadratic_weights={},
-                horizon_functions={1: 0.1}))
-        x, y, z = variables
-        trans = FreeVariable(
-            symbols={
-                0: self.god_map.to_symbol(where_am_i + [self.trans_name, 'position']),
-                1: self.god_map.to_symbol(where_am_i + [self.trans_name, 'velocity']),
-                2: self.god_map.to_symbol(where_am_i + [self.trans_name, 'acceleration']),
-                3: self.god_map.to_symbol(where_am_i + [self.trans_name, 'jerk']),
-            },
-            lower_limits=trans_lower_limits,
-            upper_limits=trans_upper_limits,
-            quadratic_weights={},
-            horizon_functions={1: 0.1})
-        rot = FreeVariable(
-            symbols={
-                0: self.god_map.to_symbol(where_am_i + [self.rot_name, 'position']),
-                1: self.god_map.to_symbol(where_am_i + [self.rot_name, 'velocity']),
-                2: self.god_map.to_symbol(where_am_i + [self.rot_name, 'acceleration']),
-                3: self.god_map.to_symbol(where_am_i + [self.rot_name, 'jerk']),
-            },
-            lower_limits=rot_lower_limits,
-            upper_limits=rot_upper_limits,
-            quadratic_weights={},
-            horizon_functions={1: 0.1})
-        super().create_free_variables(x=x, y=y, z=z, trans=trans, rot=rot)
-
-    @property
-    def x(self):
-        return self._free_variables['x'].get_symbol(0)
-
-    def state_name(self, thing):
-        return '{}/{}'.format(self.name, thing)
-
-    @property
-    def y(self):
-        return self._free_variables['y'].get_symbol(0)
-
-    @property
-    def z(self):
-        return self._free_variables['z'].get_symbol(0)
-
-    @property
-    def trans(self):
-        return self._free_variables[self.trans_s].get_symbol(0)
-
-    @property
-    def rot(self):
-        return self._free_variables[self.rot_s].get_symbol(0)
-
-    @property
-    def trans_name(self):
-        return self.state_name(self.trans_s)
-
-    @property
-    def trans_name_long(self):
-        return self._free_variables[self.trans_s].name
-
-    @property
-    def rot_name(self):
-        return self.state_name(self.rot_s)
-
-    @property
-    def rot_name_long(self):
-        return self._free_variables[self.rot_s].name
-
-    @property
-    def free_variable_list(self):
-        return [self._free_variables[self.trans_s], self._free_variables[self.rot_s]]
-
-    def update_parent_T_child(self):
-        odom_T_x = w.translation3(self.x, 0, 0)
-        x_T_y = w.translation3(0, self.y, 0)
-        y_T_z = w.rotation_matrix_from_axis_angle(w.vector3(0, 0, 1), self.z)
-        z_T_rot = w.rotation_matrix_from_axis_angle(w.vector3(*self.rotation_axis), self.rot)
-        translation_axis = w.point3(*self.translation_axis) * (self.trans)
-        rot_T_base = w.translation3(translation_axis[0],
-                                    translation_axis[1],
-                                    translation_axis[2])
-        self.parent_T_child = w.dot(self.parent_T_child, odom_T_x, x_T_y, y_T_z, z_T_rot, rot_T_base)
-
-    def update_state(self, new_cmds, dt):
-        try:
-            trans_vel = new_cmds[0][self.trans_name_long]
-            rot_vel = new_cmds[0][self.rot_name_long]
-        except KeyError as e:
-            # joint is currently not active
-            return
-        self.world.state[self.trans_name].position = 0
-        self.world.state[self.trans_name].velocity = trans_vel
-        self.world.state[self.trans_name].acceleration = new_cmds[1][self.trans_name_long]
-        self.world.state[self.trans_name].jerk = new_cmds[2][self.trans_name_long]
-
-        self.world.state[self.rot_name].position = 0
-        self.world.state[self.rot_name].velocity = rot_vel
-        self.world.state[self.rot_name].acceleration = new_cmds[1][self.rot_name_long]
-        self.world.state[self.rot_name].jerk = new_cmds[2][self.rot_name_long]
-
-        delta = self.world.state[self.state_name('z')].position
-        self.world.state[self.state_name('x')].position += np.cos(delta) * trans_vel * dt
-        self.world.state[self.state_name('y')].position += np.sin(delta) * trans_vel * dt
-        self.world.state[self.state_name('z')].position += rot_vel * dt
-        pass
-
-    def delete_limits(self):
-        self.trans.lower_limits = {}
-        self.trans.upper_limits = {}
-        self.rot.lower_limits = {}
-        self.rot.upper_limits = {}
-
-    def delete_weights(self):
-        self.trans.quadratic_weights = {}
-        self.rot.quadratic_weights = {}
-
-    def update_limits(self, linear_limits, angular_limits):
-        self.delete_limits()
-        for order, linear_limit in linear_limits.items():
-            angular_limit = angular_limits[order]
-            self._free_variables[self.trans_s].set_upper_limit(order, linear_limit[self.trans_name])
-            self._free_variables[self.trans_s].set_lower_limit(order, -linear_limit[self.trans_name])
-            self._free_variables[self.rot_s].set_upper_limit(order, angular_limit[self.rot_name])
-            self._free_variables[self.rot_s].set_lower_limit(order, -angular_limit[self.rot_name])
-
-    def update_weights(self, weights):
-        self.delete_weights()
-        for order, weight in weights.items():
-            self._free_variables[self.trans_s].quadratic_weights[order] = weight[self.trans_name]
-            self._free_variables[self.rot_s].quadratic_weights[order] = weight[self.rot_name]
-
-    def get_limit_expressions(self, order):
-        pass
-
-
-class DiffDriveWheelsJoint(MovableJoint):
-    l_wheel_s = 'l_wheel'
-    r_wheel_s = 'r_wheel'
-    wheel_dist = 0.404
-    wheel_radius = 0.198
-
-    def __init__(self, name, parent_link_name, child_link_name, god_map, translation_axis=None,
-                 rotation_axis=None, parent_T_child=None):
-        super().__init__(name, parent_link_name, child_link_name, god_map, parent_T_child,
-                         translation_offset=[0, 0, 0],
-                         rotation_offset=[0, 0, 0])
-        if translation_axis is None:
-            translation_axis = [1, 0, 0]
-        self.translation_axis = translation_axis
-        if rotation_axis is None:
-            rotation_axis = [0, 0, 1]
-        self.rotation_axis = rotation_axis
-
-    def create_free_variables(self, where_am_i, trans_lower_limits, trans_upper_limits, rot_lower_limits,
-                              rot_upper_limits, horizon_function=None):
-        names = ['{}/x'.format(self.name),
-                 '{}/y'.format(self.name),
-                 '{}/z'.format(self.name)]
-        variables = []
-        for name in names:
-            variables.append(FreeVariable(
-                symbols={
-                    0: self.god_map.to_symbol(where_am_i + [name, 'position']),
-                    1: self.god_map.to_symbol(where_am_i + [name, 'velocity']),
-                    2: self.god_map.to_symbol(where_am_i + [name, 'acceleration']),
-                    3: self.god_map.to_symbol(where_am_i + [name, 'jerk']),
-                },
-                lower_limits={},
-                upper_limits={},
-                quadratic_weights={},
-                horizon_functions={1: 0.1}))
-        x, y, z = variables
-        trans = FreeVariable(
-            symbols={
-                0: self.god_map.to_symbol(where_am_i + [self.l_wheel_name, 'position']),
-                1: self.god_map.to_symbol(where_am_i + [self.l_wheel_name, 'velocity']),
-                2: self.god_map.to_symbol(where_am_i + [self.l_wheel_name, 'acceleration']),
-                3: self.god_map.to_symbol(where_am_i + [self.l_wheel_name, 'jerk']),
-            },
-            lower_limits=trans_lower_limits,
-            upper_limits=trans_upper_limits,
-            quadratic_weights={},
-            horizon_functions={1: 0.1})
-        rot = FreeVariable(
-            symbols={
-                0: self.god_map.to_symbol(where_am_i + [self.r_wheel_name, 'position']),
-                1: self.god_map.to_symbol(where_am_i + [self.r_wheel_name, 'velocity']),
-                2: self.god_map.to_symbol(where_am_i + [self.r_wheel_name, 'acceleration']),
-                3: self.god_map.to_symbol(where_am_i + [self.r_wheel_name, 'jerk']),
-            },
-            lower_limits=rot_lower_limits,
-            upper_limits=rot_upper_limits,
-            quadratic_weights={},
-            horizon_functions={1: 0.1})
-        super().create_free_variables(x=x, y=y, z=z, l_wheel=trans, r_wheel=rot)
-
-    @property
-    def x(self):
-        return self._free_variables['x'].get_symbol(0)
-
-    def state_name(self, thing):
-        return '{}/{}'.format(self.name, thing)
-
-    @property
-    def y(self):
-        return self._free_variables['y'].get_symbol(0)
-
-    @property
-    def z(self):
-        return self._free_variables['z'].get_symbol(0)
-
-    @property
-    def l_wheel(self):
-        return self._free_variables[self.l_wheel_s].get_symbol(0)
-
-    @property
-    def r_wheel(self):
-        return self._free_variables[self.r_wheel_s].get_symbol(0)
-
-    @property
-    def l_wheel_name(self):
-        return self.state_name(self.l_wheel_s)
-
-    @property
-    def l_wheel_name_long(self):
-        return self._free_variables[self.l_wheel_s].name
-
-    @property
-    def r_wheel_name(self):
-        return self.state_name(self.r_wheel_s)
-
-    @property
-    def r_wheel_name_long(self):
-        return self._free_variables[self.r_wheel_s].name
-
-    @property
-    def free_variable_list(self):
-        return [self._free_variables[self.l_wheel_s], self._free_variables[self.r_wheel_s]]
-
-    def update_parent_T_child(self):
-        rot = self.wheel_radius / self.wheel_dist * (self.r_wheel - self.l_wheel)
-        # trans = wheel_radius / 2 * (self.r_wheel + self.l_wheel)
-        trans_r = self.wheel_radius / 2 * (self.r_wheel)
-        trans_l = self.wheel_radius / 2 * (self.l_wheel)
-        # self.world.state[self.state_name('x')].position += np.cos(delta) * trans_vel * dt
-        # self.world.state[self.state_name('y')].position += np.sin(delta) * trans_vel * dt
-        # self.world.state[self.state_name('z')].position += rot_vel * dt
-        odom_T_x = w.translation3(self.x, 0, 0)
-        x_T_y = w.translation3(0, self.y, 0)
-        y_T_z = w.rotation_matrix_from_axis_angle(w.vector3(0, 0, 1), self.z)
-        z_T_rot = w.rotation_matrix_from_axis_angle(w.vector3(*self.rotation_axis), rot)
-        rot_T_base = w.translation3(w.cos(self.z + 0.01) * trans_r,
-                                    w.sin(self.z + 0.01) * trans_r,
-                                    0)
-        rot_T_base2 = w.translation3(w.cos(self.z - 0.01) * trans_l,
-                                     w.sin(self.z - 0.01) * trans_l,
-                                     0)
-        self.parent_T_child = w.dot(self.parent_T_child, odom_T_x, x_T_y, y_T_z, z_T_rot, rot_T_base, rot_T_base2)
-
-    def update_state(self, new_cmds, dt):
-        try:
-            l_wheel_vel = new_cmds[0][self.l_wheel_name_long]
-            r_wheel_vel = new_cmds[0][self.r_wheel_name_long]
-        except KeyError as e:
-            # joint is currently not active
-            return
-        self.world.state[self.l_wheel_name].position = 0
-        self.world.state[self.l_wheel_name].velocity = l_wheel_vel
-        self.world.state[self.l_wheel_name].acceleration = new_cmds[1][self.l_wheel_name_long]
-        self.world.state[self.l_wheel_name].jerk = new_cmds[2][self.l_wheel_name_long]
-
-        self.world.state[self.r_wheel_name].position = 0
-        self.world.state[self.r_wheel_name].velocity = r_wheel_vel
-        self.world.state[self.r_wheel_name].acceleration = new_cmds[1][self.r_wheel_name_long]
-        self.world.state[self.r_wheel_name].jerk = new_cmds[2][self.r_wheel_name_long]
-
-        rot_vel = self.wheel_radius / self.wheel_dist * (r_wheel_vel - l_wheel_vel)
-        trans_vel = self.wheel_radius / 2 * (r_wheel_vel + l_wheel_vel)
-
-        delta = self.world.state[self.state_name('z')].position
-        self.world.state[self.state_name('x')].position += np.cos(delta) * trans_vel * dt
-        self.world.state[self.state_name('y')].position += np.sin(delta) * trans_vel * dt
-        self.world.state[self.state_name('z')].position += rot_vel * dt
-        pass
-
-    def delete_limits(self):
-        self.l_wheel.lower_limits = {}
-        self.l_wheel.upper_limits = {}
-        self.r_wheel.lower_limits = {}
-        self.r_wheel.upper_limits = {}
-
-    def delete_weights(self):
-        self.l_wheel.quadratic_weights = {}
-        self.r_wheel.quadratic_weights = {}
-
-    def update_limits(self, linear_limits, angular_limits):
-        self.delete_limits()
-        for order, linear_limit in linear_limits.items():
-            angular_limit = angular_limits[order]
-            self._free_variables[self.l_wheel_s].set_upper_limit(order, linear_limit[self.l_wheel_name])
-            self._free_variables[self.l_wheel_s].set_lower_limit(order, -linear_limit[self.l_wheel_name])
-            self._free_variables[self.r_wheel_s].set_upper_limit(order, angular_limit[self.r_wheel_name])
-            self._free_variables[self.r_wheel_s].set_lower_limit(order, -angular_limit[self.r_wheel_name])
-
-    def update_weights(self, weights):
-        self.delete_weights()
-        for order, weight in weights.items():
-            self._free_variables[self.l_wheel_s].quadratic_weights[order] = 1000 * weight[self.l_wheel_name]
-            self._free_variables[self.r_wheel_s].quadratic_weights[order] = 1000 * weight[self.r_wheel_name]
-
-    def get_limit_expressions(self, order):
-        pass
+class MimicContinuousURDFJoint(MimicURDFJoint, ContinuousJoint):
+    pass

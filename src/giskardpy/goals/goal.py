@@ -3,7 +3,6 @@ from __future__ import division
 from collections import OrderedDict
 
 from giskard_msgs.msg import Constraint as Constraint_msg
-from tf2_py import LookupException
 
 import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
@@ -79,11 +78,11 @@ class Goal(object):
 
     def get_joint_position_symbol(self, joint_name):
         """
-        returns a symbol that referes to the given joint
+        returns a symbol that refers to the given joint
         """
         if not self.world.has_joint(joint_name):
             raise KeyError('World doesn\'t have joint named: {}'.format(joint_name))
-        return self.world.joints[joint_name].position_symbol
+        return self.world.joints[joint_name].position_expression
 
     def get_joint_velocity_symbols(self, joint_name):
         """

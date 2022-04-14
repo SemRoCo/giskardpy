@@ -1,16 +1,16 @@
 from collections import defaultdict
+from typing import Dict
+
 import giskardpy.casadi_wrapper as w
 
 
 class FreeVariable(object):
-    def __init__(self, symbols, lower_limits, upper_limits, quadratic_weights, horizon_functions=None):
-        """
-        :type symbols:  dict
-        :type lower_limits: dict
-        :type upper_limits: dict
-        :type quadratic_weights: dict
-        :type horizon_functions: dict
-        """
+    def __init__(self,
+                 symbols: Dict[int, w.ca.SX],
+                 lower_limits: Dict[int, float],
+                 upper_limits: Dict[int, float],
+                 quadratic_weights: Dict[int, float],
+                 horizon_functions: Dict[int, float] = None):
         self._symbols = symbols
         self.name = str(self._symbols[0])
         self.default_lower_limits = lower_limits

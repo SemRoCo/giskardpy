@@ -573,13 +573,13 @@ class GiskardTestWrapper(GiskardWrapper):
             else:
                 root_link = self.default_root
         if tip_group is None:
-            groups = self.world.get_groups_containing_link(tip_link)
+            groups = self.world.get_groups_containing_link_short_name(tip_link)
             if len(groups) == 1:
                 tip_group = groups.pop()
             else:
                 raise Exception('Please define a tip_group.')
         if root_group is None:
-            groups = self.world.get_groups_containing_link(root_link)
+            groups = self.world.get_groups_containing_link_short_name(root_link)
             if len(groups) == 1:
                 root_group = groups.pop()
             else:
@@ -610,13 +610,13 @@ class GiskardTestWrapper(GiskardWrapper):
             else:
                 root_link = self.default_root
         if tip_group is None:
-            groups = self.world.get_groups_containing_link(tip_link)
+            groups = self.world.get_groups_containing_link_short_name(tip_link)
             if len(groups) == 1:
                 tip_group = groups.pop()
             else:
                 raise Exception('Please define a tip_group.')
         if root_group is None:
-            groups = self.world.get_groups_containing_link(root_link)
+            groups = self.world.get_groups_containing_link_short_name(root_link)
             if len(groups) == 1:
                 root_group = groups.pop()
             else:
@@ -638,13 +638,13 @@ class GiskardTestWrapper(GiskardWrapper):
         if not root_link:
             root_link = self.default_root
         if tip_group is None:
-            groups = self.world.get_groups_containing_link(tip_link)
+            groups = self.world.get_groups_containing_link_short_name(tip_link)
             if len(groups) == 1:
                 tip_group = groups.pop()
             else:
                 raise Exception('Please define a tip_group.')
         if root_group is None:
-            groups = self.world.get_groups_containing_link(root_link)
+            groups = self.world.get_groups_containing_link_short_name(root_link)
             if len(groups) == 1:
                 root_group = groups.pop()
             else:
@@ -693,13 +693,13 @@ class GiskardTestWrapper(GiskardWrapper):
             else:
                 root_link = self.default_root
         if tip_group is None:
-            groups = self.world.get_groups_containing_link(tip_link)
+            groups = self.world.get_groups_containing_link_short_name(tip_link)
             if len(groups) == 1:
                 tip_group = groups.pop()
             else:
                 raise Exception('Please define a tip_group.')
         if root_group is None:
-            groups = self.world.get_groups_containing_link(root_link)
+            groups = self.world.get_groups_containing_link_short_name(root_link)
             if len(groups) == 1:
                 root_group = groups.pop()
             else:
@@ -726,13 +726,13 @@ class GiskardTestWrapper(GiskardWrapper):
         if not root_link:
             root_link = self.default_root
         if tip_group is None:
-            groups = self.world.get_groups_containing_link(tip_link)
+            groups = self.world.get_groups_containing_link_short_name(tip_link)
             if len(groups) == 1:
                 tip_group = groups.pop()
             else:
                 raise Exception('Please define a tip_group.')
         if root_group is None:
-            groups = self.world.get_groups_containing_link(root_link)
+            groups = self.world.get_groups_containing_link_short_name(root_link)
             if len(groups) == 1:
                 root_group = groups.pop()
             else:
@@ -753,13 +753,13 @@ class GiskardTestWrapper(GiskardWrapper):
         if not root_link:
             root_link = self.default_root
         if tip_group is None:
-            groups = self.world.get_groups_containing_link(tip_link)
+            groups = self.world.get_groups_containing_link_short_name(tip_link)
             if len(groups) == 1:
                 tip_group = groups.pop()
             else:
                 raise Exception('Please define a tip_group.')
         if root_group is None:
-            groups = self.world.get_groups_containing_link(root_link)
+            groups = self.world.get_groups_containing_link_short_name(root_link)
             if len(groups) == 1:
                 root_group = groups.pop()
             else:
@@ -901,7 +901,12 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
-            expected_pose = self.robot().compute_fk_pose(self.robot.root_link_name, name)
+            object_root_link = self.world.groups[name].root_link_name
+            robot_groups = self.world.get_groups_containing_link(object_root_link)
+            if len(robot_groups) == 0:
+                raise Exception(f'Could not find root link of object named {name} attached in any group.')
+            st = self.world.groups[robot_groups.pop()]
+            expected_pose = st.compute_fk_pose(st.root_link_name, name)
             response = super(GiskardTestWrapper, self).detach_object(name)
             self.check_add_object_result(response, expected_response, expected_pose, name)
 
@@ -1002,8 +1007,10 @@ class GiskardTestWrapper(GiskardWrapper):
         assert r.error_codes == expected_response, \
             'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                            update_world_error_code(expected_response))
-        for robot_name in self.god_map.get_data(identifier.rosparam + ['namespaces']):
-            assert name in self.get_attached_objects(robot_name).object_names
+        robot_names = self.world.get_groups_containing_link(parent_link)
+        if len(robot_names) != 1:
+            raise Exception('')
+        assert name in self.get_attached_objects(robot_names.pop()).object_names
         if self.god_map.get_data(identifier.collision_checker) is not None:
             self.is_link_in_collision_matrix(name, parent_link)
             assert self.world.groups[name].parent_link_of_root == parent_link

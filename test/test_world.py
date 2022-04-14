@@ -13,7 +13,7 @@ from giskardpy.exceptions import DuplicateNameException
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
-from giskardpy.utils.config_loader import ros_load_robot_config
+from giskardpy.utils.config_loader import ros_load_robot_config, get_namespaces
 from giskardpy.utils.utils import suppress_stderr
 from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, rnd_joint_state, hsr_urdf
 
@@ -90,6 +90,7 @@ def avoid_all_entry(min_dist):
 def world_with_robot(urdf, prefix):
     god_map = GodMap()
     god_map.set_data(identifier.rosparam, ros_load_robot_config('package://giskardpy/config/default.yaml'))
+    god_map.set_data(identifier.rosparam + ['namespaces'], [prefix])
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.add_urdf(urdf, prefix=prefix, group_name=RobotName)
@@ -209,9 +210,10 @@ class TestWorldTree(object):
         assert PrefixName(box_name, world.connection_prefix) in world.joints
 
     def test_attach_box(self):
-        world = create_world_with_pr2()
-        box = make_world_body_box()
-        box_name = PrefixName(box.name, None)
+        RobotPrefix = 'pr2'
+        world = create_world_with_pr2(RobotPrefix)
+        box_name = PrefixName('box', None)
+        box = make_world_body_box(str(box_name))
         pose = Pose()
         pose.orientation.w = 1
         world.add_world_body(box, pose)

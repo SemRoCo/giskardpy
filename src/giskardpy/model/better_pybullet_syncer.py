@@ -96,7 +96,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a)
                     map_P_b = map_T_b.dot(p.point_b)
-                    body_b = link_b.prefix if link_b in self.robot(link_b.prefix).link_names else ' '
+                    groups_b = self.world.get_groups_containing_link(link_b)
+                    if len(groups_b) == 1:
+                        body_b = groups_b.pop()
+                    else:
+                        body_b = ' '
                     c = Collision(link_a=link_a,
                                   body_b=body_b,
                                   link_b=link_b,
@@ -123,7 +127,12 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             all_collisions[robot_name] = collisions
 
         for c in self.bpb_result_to_list(result):
-            all_collisions[c.link_a.prefix].add(c)
+            groups_a = self.world.get_robots_containing_link(c.link_a)
+            if len(groups_a) == 1:
+                k = groups_a.pop()
+            else:
+                raise Exception('')
+            all_collisions[k].add(c)
 
         return all_collisions
 

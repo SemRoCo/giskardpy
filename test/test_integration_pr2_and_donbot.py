@@ -83,7 +83,7 @@ def resetted_giskard(giskard):
     giskard.open_r_gripper(giskard.pr2)
     giskard.open_gripper(giskard.donbot)
     giskard.clear_world()
-    for robot_name in giskard.robot_names:
+    for robot_name in giskard.collision_scene.robot_names:
         giskard.reset_base(robot_name)
     p = PoseStamped()
     p.header.frame_id = 'map'
@@ -99,8 +99,8 @@ def zero_pose(resetted_giskard):
     :type resetted_giskard: PR2AndDonbot
     """
     resetted_giskard.allow_all_collisions()
-    for robot_name in resetted_giskard.robot_names:
-        resetted_giskard.set_joint_goal(resetted_giskard.default_poses[robot_name], prefix=robot_name)
+    for robot_name in resetted_giskard.collision_scene.robot_names:
+        resetted_giskard.set_joint_goal(resetted_giskard.default_poses[robot_name], group_name=robot_name)
     resetted_giskard.plan_and_execute()
     return resetted_giskard
 
@@ -111,8 +111,8 @@ class TestJointGoals(object):
         :type zero_pose: PR2AndDonbot
         """
         zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(floor_detection_js, prefix=zero_pose.donbot)
-        zero_pose.set_joint_goal(pocky_pose, prefix=zero_pose.pr2)
+        zero_pose.set_joint_goal(floor_detection_js, group_name=zero_pose.donbot)
+        zero_pose.set_joint_goal(pocky_pose, group_name=zero_pose.pr2)
         zero_pose.plan_and_execute()
 
 
@@ -128,6 +128,6 @@ class TestCollisionAvoidance(object):
         zero_pose.move_base(p, zero_pose.donbot)
 
         zero_pose.avoid_all_collisions()
-        zero_pose.set_joint_goal(floor_detection_js, prefix=zero_pose.donbot)
-        zero_pose.set_joint_goal(pocky_pose, prefix=zero_pose.pr2)
+        zero_pose.set_joint_goal(floor_detection_js, group_name=zero_pose.donbot)
+        zero_pose.set_joint_goal(pocky_pose, group_name=zero_pose.pr2)
         zero_pose.plan_and_execute()

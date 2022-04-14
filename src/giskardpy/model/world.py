@@ -6,6 +6,7 @@ from itertools import combinations
 from typing import Dict, Union, Tuple, Set
 
 import numpy as np
+import rospy
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3
 
@@ -353,7 +354,7 @@ class WorldTree(object):
             if joint_name in subtree.joints:
                 ret.add(subtree)
         if len(ret) != 1:
-            raise KeyError(f'Multiple groups fround with joint name {joint_name}.')
+            raise KeyError(f'Multiple or no groups fround with joint name {joint_name}.')
         else:
             return ret.pop()
 
@@ -1024,6 +1025,8 @@ class SubWorldTree(WorldTree):
         self.root_link_name = root_link_name
         self.world = world
         self.actuated = actuated
+        rospy.logerr(prefix)
+        rospy.logerr(name)
 
     @property
     def controlled_joints(self):

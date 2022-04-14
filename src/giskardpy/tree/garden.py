@@ -175,11 +175,15 @@ class TreeManager(object):
                     c.position -= 1
 
     @profile
-    def __init__(self, god_map, robot_names, tree=None):
+    def __init__(self, god_map, robot_names, namespaces, tree=None):
         self.god_map = god_map
         self.action_server_name = self.god_map.get_data(identifier.action_server_name)
         world = WorldTree(self.god_map)
-        self.namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
+        found_namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
+        for n in namespaces:
+            if n not in found_namespaces:
+                raise Exception('')
+        self.namespaces = namespaces
         self.robot_names = robot_names
         world.delete_all_but_robots(self.robot_names, self.namespaces)
 
@@ -211,16 +215,16 @@ class TreeManager(object):
 
     @classmethod
     @profile
-    def from_param_server(cls, robot_names):
+    def from_param_server(cls, robot_names, namespaces):
         god_map = GodMap.init_from_paramserver(rospy.get_name())
         god_map.set_data(identifier.timer_collector, TimeCollector(god_map))
         blackboard = Blackboard
         blackboard.god_map = god_map
         mode = god_map.get_data(identifier.control_mode)
         if mode == 'OpenLoop':
-            self = OpenLoop(god_map, robot_names)
+            self = OpenLoop(god_map, robot_names, namespaces)
         elif mode == 'ClosedLoop':
-            self = ClosedLoop(god_map, robot_names)
+            self = ClosedLoop(god_map, robot_names, namespaces)
         else:
             raise KeyError('Robot interface mode \'{}\' is not supported.'.format(mode))
 

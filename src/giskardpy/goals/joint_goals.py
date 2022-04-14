@@ -476,12 +476,12 @@ class JointPosition(Goal):
                  max_velocity: float = 100, **kwargs):
         super(JointPosition, self).__init__(**kwargs)
         prefix = self.world.groups[group_name].prefix
-        joint_name = PrefixName(joint_name, prefix)
-        if self.world.is_joint_continuous(joint_name):
+        full_joint_name = PrefixName(joint_name, prefix)
+        if self.world.is_joint_continuous(full_joint_name):
             C = JointPositionContinuous
-        elif self.world.is_joint_revolute(joint_name):
+        elif self.world.is_joint_revolute(full_joint_name):
             C = JointPositionRevolute
-        elif self.world.is_joint_prismatic(joint_name):
+        elif self.world.is_joint_prismatic(full_joint_name):
             C = JointPositionPrismatic
         else:
             raise ConstraintInitalizationException(f'\'{joint_name}\' has to be continuous, revolute or prismatic')

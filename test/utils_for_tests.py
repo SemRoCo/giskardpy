@@ -395,7 +395,7 @@ class GiskardTestWrapper(GiskardWrapper):
     default_pose = {}
     better_pose = {}
 
-    def __init__(self, config_file, robot_names):
+    def __init__(self, config_file, robot_names, namespaces):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
@@ -405,11 +405,17 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
-        self.tree = TreeManager.from_param_server(robot_names)
+        self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
-        self.namespaces = self.god_map.get_data(identifier.collision_scene).robot_namespaces
+        found_namespaces = self.god_map.get_data(identifier.collision_scene).robot_namespaces
+        for n in namespaces:
+            if n not in found_namespaces:
+                raise Exception('')
+        self.namespaces = namespaces
+        rospy.logerr(robot_names)
+        rospy.logerr(self.namespaces)
         super(GiskardTestWrapper, self).__init__(node_name='tests', robot_names=robot_names, namespaces=self.namespaces)
         self.results = Queue(100)
         self.map = 'map'
@@ -1306,10 +1312,12 @@ class PR2AndDonbot(GiskardTestWrapper):
         self.gripper_pubs = dict()
         self.default_poses = dict()
         self.better_poses = dict()
-        super(PR2AndDonbot, self).__init__(u'package://giskardpy/config/pr2_and_donbot.yaml')
         self.pr2 = 'pr2'
         self.donbot = 'donbot'
-        for robot_name in self.namespaces:
+        robot_names = [self.pr2, self.donbot]
+        super(PR2AndDonbot, self).__init__(u'package://giskardpy/config/pr2_and_donbot.yaml',
+                                           robot_names=robot_names, namespaces=robot_names)
+        for robot_name in self.collision_scene.robot_names:
             if self.pr2 == robot_name:
                 self.r_tips[robot_name] = u'r_gripper_tool_frame'
                 self.l_tips[robot_name] = u'l_gripper_tool_frame'
@@ -1400,7 +1408,7 @@ class PR2AndDonbot(GiskardTestWrapper):
                                                                            goal_pose.pose.orientation.z,
                                                                            goal_pose.pose.orientation.w]))[0]}
             self.allow_all_collisions()
-            self.set_joint_goal(js, prefix=robot_name, decimal=1)
+            self.set_joint_goal(js, group_name=robot_name, decimal=1)
             self.plan_and_execute()
 
     def get_l_gripper_links(self):
@@ -1519,7 +1527,7 @@ class PR2(GiskardTestWrapper):
         self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.robot_name = 'pr2'
-        super(PR2, self).__init__('package://giskardpy/config/pr2.yaml', [self.robot_name])
+        super(PR2, self).__init__('package://giskardpy/config/pr2.yaml', [self.robot_name], [''])
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')

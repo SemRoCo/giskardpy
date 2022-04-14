@@ -41,22 +41,30 @@ class CollisionWorldSynchronizer(object):
         """
         :rtype: SubWorldTree
         """
-        return self.world.groups[robot_name]
+        for robot in self.robots:
+            if robot.name == robot_name:
+                return robot
+        raise KeyError('')
 
     @property
     def robots(self):
         """
         :rtype: list of SubWorldTree
         """
-        return [self.world.groups[robot_name] for robot_name in self.robot_names]
+        return [self.world.groups[robot_name] for robot_name in self.world.groups.keys()
+                if self.world.groups[robot_name].actuated]
 
     @property
     def robot_namespaces(self):
         return [self.robot(n).prefix for n in self.robot_names]
 
     @property
-    def robot_names(self):
+    def group_names(self):
         return list(self.world.groups.keys())
+
+    @property
+    def robot_names(self):
+        return [r.name for r in self.robots]
 
     @property
     def god_map(self):
@@ -264,9 +272,10 @@ class CollisionWorldSynchronizer(object):
                 for robot_link in collision_entry.robot_links:
                     if robot_link not in self.world.groups[collision_entry.robot_name].link_names:
                         raise UnknownBodyException('robot link \'{}\' unknown'.format(robot_link))
-            if collision_entry.body_b in self.robot_names:
+            if collision_entry.body_b in self.group_names:
                 for robot_link in collision_entry.link_bs:
-                    if robot_link != CollisionEntry.ALL and robot_link not in self.world.groups[collision_entry.body_b].link_names:
+                    if robot_link != CollisionEntry.ALL and robot_link not in self.world.groups[
+                        collision_entry.body_b].link_names:
                         raise UnknownBodyException(
                             'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
             elif not self.all_body_bs(collision_entry) and not self.all_link_bs(collision_entry):
@@ -367,6 +376,7 @@ class CollisionWorldSynchronizer(object):
                 # remove everything before the allow all, including the allow all
                 collision_goals = collision_goals[len(collision_goals) - i:]
                 break
+            # todo: error: if robot name given, allow collisions migh be ignored
         else:
             # put an avoid all at the front
             ce = CollisionEntry()
@@ -381,12 +391,48 @@ class CollisionWorldSynchronizer(object):
         # split body bs
         collision_goals = self.split_body_b(collision_goals)
 
+        # split robot names
+        collision_goals = self.split_robot_names(collision_goals)
+
         # split robot links
         collision_goals = self.robot_related_stuff(collision_goals)
 
         # split link_bs
         collision_goals = self.split_link_bs(collision_goals)
 
+        return collision_goals
+
+    def split_robot_names(self, collision_goals):
+        i = 0
+        while i < len(collision_goals):
+            collision_entry = collision_goals[i]
+            if collision_entry.robot_name == CollisionEntry.ALL:
+                collision_goals.remove(collision_entry)
+                new_ces = list()
+                for robot_name in self.robot_names:
+                    ce = CollisionEntry()
+                    ce.type = collision_entry.type
+                    ce.robot_name = robot_name
+                    ce.robot_links = collision_entry.robot_links
+                    ce.body_b = collision_entry.body_b
+                    ce.link_bs = collision_entry.link_bs
+                    ce.min_dist = collision_entry.min_dist
+                    if ce not in new_ces:
+                        new_ces.append(ce)
+                non_redundant_new_ces = list()
+                for c in collision_goals:
+                    for new_ce in new_ces:
+                        if (c.robot_name == new_ce.robot_name and c.body_b == new_ce.body_b) or \
+                                (c.body_b == new_ce.robot_name and c.robot_name == new_ce.body_b):
+                            continue
+                        else:
+                            if new_ce not in non_redundant_new_ces:
+                                non_redundant_new_ces.append(new_ce)
+                for new_ce in non_redundant_new_ces:
+                    collision_goals.insert(i, new_ce)
+                    i += 1
+            else:
+                i += 1
         return collision_goals
 
     def split_link_bs(self, collision_goals):

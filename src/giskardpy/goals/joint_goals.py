@@ -216,9 +216,9 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
+        super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(**kwargs)
         prefix = self.world.groups[group_name].prefix
         self.joint_name = PrefixName(joint_name, prefix)
-        super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(**kwargs)
         if not self.world.is_joint_revolute(joint_name) and not self.world.is_joint_prismatic(joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
 
@@ -280,6 +280,7 @@ class ShakyJointPositionContinuous(Goal):
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
+        super(ShakyJointPositionContinuous, self).__init__(**kwargs)
         prefix = self.world.groups[group_name].prefix
         self.joint_name = PrefixName(joint_name, prefix)
         self.goal = goal
@@ -287,7 +288,6 @@ class ShakyJointPositionContinuous(Goal):
         self.noise_amplitude = noise_amplitude
         self.weight = weight
         self.max_velocity = max_velocity
-        super(ShakyJointPositionContinuous, self).__init__(**kwargs)
         if not self.world.is_joint_continuous(joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
@@ -342,12 +342,12 @@ class AvoidJointLimitsRevolute(Goal):
         :param max_linear_velocity: float, default 1e9, meaning the urdf/config limit will kick in
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         """
+        super(AvoidJointLimitsRevolute, self).__init__(**kwargs)
         prefix = self.world.groups[group_name].prefix
         self.joint_name = PrefixName(joint_name, prefix)
         self.weight = weight
         self.max_velocity = max_linear_velocity
         self.percentage = percentage
-        super(AvoidJointLimitsRevolute, self).__init__(**kwargs)
         if not self.world.is_joint_revolute(joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
@@ -397,12 +397,12 @@ class AvoidJointLimitsPrismatic(Goal):
         :param max_angular_velocity: float, default 1e9, meaning the urdf/config limit will kick in
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         """
+        super(AvoidJointLimitsPrismatic, self).__init__(**kwargs)
         prefix = self.world.groups[group_name].prefix
         self.joint_name = PrefixName(joint_name, prefix)
         self.weight = weight
         self.max_velocity = max_angular_velocity
         self.percentage = percentage
-        super(AvoidJointLimitsPrismatic, self).__init__(**kwargs)
         if not self.world.is_joint_prismatic(joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 

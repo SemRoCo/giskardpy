@@ -397,7 +397,10 @@ class WorldTree(object):
                           prefix=None)
         else:
             link = Link.from_world_body(prefix=group_name, msg=msg)
-            joint = FixedJoint(PrefixName(group_name, self.connection_prefix), parent_link_name, link.name,
+            joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
+                               parent_link_name=parent_link_name,
+                               child_link_name=link.name,
+                               god_map=self.god_map,
                                parent_T_child=w.Matrix(msg_to_homogeneous_matrix(pose)))
             self._link_joint_to_links(joint, link)
             self.register_group(group_name, link.name)
@@ -962,7 +965,7 @@ class WorldTree(object):
             return False
 
     def is_joint_revolute(self, joint_name):
-        return isinstance(self.joints[joint_name], RevoluteJoint)
+        return isinstance(self.joints[joint_name], RevoluteJoint) and not self.is_joint_continuous(joint_name)
 
     def is_joint_continuous(self, joint_name):
         return isinstance(self.joints[joint_name], ContinuousJoint)

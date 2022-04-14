@@ -1,6 +1,6 @@
 import abc
 from abc import ABC
-from typing import Dict, Tuple, Optional, Union, List
+from typing import Dict, Tuple, Optional, List
 
 import urdf_parser_py.urdf as up
 
@@ -8,7 +8,7 @@ import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.data_types import PrefixName
 from giskardpy.god_map import GodMap
-from giskardpy.my_types import my_string, expr_symbol, expr_matrix, derivative_joint_map
+from giskardpy.my_types import my_string, expr_symbol, expr_matrix, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
 
 
@@ -17,7 +17,6 @@ class Joint(ABC):
     parent_link_name: my_string
     child_link_name: my_string
     god_map: GodMap
-    horizon_function = {1: 0.1}
     state_identifier = identifier.joint_states
 
     def __init__(self,
@@ -33,6 +32,14 @@ class Joint(ABC):
         self.god_map = god_map
         self.create_free_variables()
         self.apply_joint_effect()
+
+    def create_free_variable(self, name: str, lower_limits: derivative_map, upper_limits: derivative_map):
+        return FreeVariable(symbols={0: self.god_map.to_symbol(self.state_identifier + [name, 'position']),
+                                     1: self.god_map.to_symbol(self.state_identifier + [name, 'velocity']),
+                                     2: self.god_map.to_symbol(self.state_identifier + [name, 'acceleration']),
+                                     3: self.god_map.to_symbol(self.state_identifier + [name, 'jerk'])},
+                            lower_limits=lower_limits,
+                            upper_limits=upper_limits)
 
     @abc.abstractmethod
     def create_free_variables(self):
@@ -80,6 +87,7 @@ class Joint(ABC):
     @abc.abstractmethod
     def free_variable_list(self) -> List[FreeVariable]:
         pass
+
 
 class DependentJoint(Joint, ABC):
     @abc.abstractmethod
@@ -211,17 +219,7 @@ class OneDofJoint(Joint, ABC):
         Joint.__init__(self, name, parent_link_name, child_link_name, god_map, parent_T_child)
 
     def create_free_variables(self):
-        self.free_variable = FreeVariable(
-            symbols={
-                0: self.god_map.to_symbol(self.state_identifier + [self.name, 'position']),
-                1: self.god_map.to_symbol(self.state_identifier + [self.name, 'velocity']),
-                2: self.god_map.to_symbol(self.state_identifier + [self.name, 'acceleration']),
-                3: self.god_map.to_symbol(self.state_identifier + [self.name, 'jerk']),
-            },
-            lower_limits=self.lower_limits,
-            upper_limits=self.upper_limits,
-            quadratic_weights={},
-            horizon_functions=self.horizon_function)
+        self.free_variable = self.create_free_variable(self.name, self.lower_limits, self.upper_limits)
 
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
         world = self.god_map.unsafe_get_data(identifier.world)
@@ -398,3 +396,76 @@ class MimicRevoluteURDFJoint(MimicURDFJoint, RevoluteJoint):
 
 class MimicContinuousURDFJoint(MimicURDFJoint, ContinuousJoint):
     pass
+
+
+class OmniDrive(Joint):
+    x: FreeVariable
+    y: FreeVariable
+    rot: FreeVariable
+
+    def __init__(self,
+                 god_map: GodMap,
+                 name: my_string,
+                 parent_link_name: my_string,
+                 child_link_name: my_string,
+                 translation_velocity_limit: Optional[float] = None,
+                 rotation_velocity_limit: Optional[float] = None,
+                 x_name: Optional[str] = None,
+                 y_name: Optional[str] = None,
+                 rot_name: Optional[str] = None):
+        super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
+        self.translation_velocity_limit = translation_velocity_limit
+        self.rotation_velocity_limit = rotation_velocity_limit
+        self.x_name = x_name
+        self.y_name = y_name
+        self.rot_name = rot_name
+
+    def create_free_variables(self):
+        self.x = self.create_free_variable(self.x_name,
+                                           {1: -self.translation_velocity_limit},
+                                           {1: self.translation_velocity_limit})
+        self.y = self.create_free_variable(self.y_name,
+                                           {1: -self.translation_velocity_limit},
+                                           {1: self.translation_velocity_limit})
+        self.rot = self.create_free_variable(self.rot_name,
+                                             {1: -self.rotation_velocity_limit},
+                                             {1: self.rotation_velocity_limit})
+
+    def apply_joint_effect(self):
+        parent_P_link = w.translation3(self.x.get_symbol(0), self.y.get_symbol(0), 0)
+        link_R_child = w.rotation_matrix_from_axis_angle(w.vector3(0, 0, 1),
+                                                         self.rot.get_symbol(0))
+        self.parent_T_child = w.dot(self.parent_T_child, w.dot(parent_P_link, link_R_child))
+
+    def update_state(self, new_cmds: derivative_joint_map, dt: float):
+        world = self.god_map.unsafe_get_data(identifier.world)
+        for free_variable in self.free_variable_list:
+            try:
+                vel = new_cmds[0][free_variable.name]
+            except KeyError as e:
+                # joint is currently not part of the optimization problem
+                return
+            world.state[self.name].position += vel * dt
+            world.state[self.name].velocity = vel
+            if len(new_cmds) >= 2:
+                acc = new_cmds[1][free_variable.name]
+                world.state[self.name].acceleration = acc
+            if len(new_cmds) >= 3:
+                jerk = new_cmds[2][free_variable.name]
+                world.state[self.name].jerk = jerk
+
+    def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
+        pass
+
+    def update_weights(self, weights: Dict[int, float]):
+        pass
+
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+        pass
+
+    def has_free_variables(self) -> bool:
+        return True
+
+    @property
+    def free_variable_list(self) -> List[FreeVariable]:
+        return [self.x, self.y, self.rot]

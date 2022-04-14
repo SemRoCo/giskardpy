@@ -5,6 +5,15 @@ robot_interface:
     namespace: /whole_body_controller/base/follow_joint_trajectory
     state_topic: /whole_body_controller/base/state
     fill_velocity_values: True
+    drive:
+      type: OmniDrive
+      parent_link_name: odom_combined
+      child_link_name: base_footprint
+      x_name: odom_x_joint
+      y_name: odom_y_joint
+      rot_name: odom_z_joint
+      translation_velocity_limit: 1
+      rotation_velocity_limit: 1
   body:
     plugin: SendFollowJointTrajectory
     namespace: /whole_body_controller/body/follow_joint_trajectory

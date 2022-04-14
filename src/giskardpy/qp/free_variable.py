@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Optional
 
 import giskardpy.casadi_wrapper as w
 
@@ -9,20 +9,24 @@ class FreeVariable(object):
                  symbols: Dict[int, w.ca.SX],
                  lower_limits: Dict[int, float],
                  upper_limits: Dict[int, float],
-                 quadratic_weights: Dict[int, float],
-                 horizon_functions: Dict[int, float] = None):
+                 quadratic_weights: Optional[Dict[int, float]]= None,
+                 horizon_functions: Optional[Dict[int, float]] = None):
         self._symbols = symbols
         self.name = str(self._symbols[0])
         self.default_lower_limits = lower_limits
         self.default_upper_limits = upper_limits
         self.lower_limits = {}
         self.upper_limits = {}
-        self.quadratic_weights = quadratic_weights
+        if quadratic_weights is None:
+            self.quadratic_weights = {}
+        else:
+            self.quadratic_weights = quadratic_weights
         assert max(self._symbols.keys()) == len(self._symbols) - 1
 
         self.horizon_functions = defaultdict(float)
-        if horizon_functions is not None:
-            self.horizon_functions.update(horizon_functions)
+        if horizon_functions is None:
+            horizon_functions = {1: 0.1}
+        self.horizon_functions.update(horizon_functions)
 
     @property
     def order(self):

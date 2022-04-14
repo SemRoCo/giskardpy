@@ -111,9 +111,9 @@ class WorldUpdater(GiskardBehavior):
         return res
 
     def get_attached_objects(self, req):
-        robot_names = self.collision_scene.robot_names
+        group_names = self.collision_scene.group_names
         # Check if empty string is allowed, meaning only one robot is specified and...
-        if req.robot_name not in robot_names:
+        if req.robot_name not in group_names:
             Exception('Robot with robot_name {} is not known.'.format(req.robot_name))
         robot_name = req.robot_name
         link_names = self.world.groups[robot_name].link_names
@@ -244,8 +244,10 @@ class WorldUpdater(GiskardBehavior):
     def clear_world(self):
         # assumes that parent has god map lock
 
-        namespaces = self.god_map.unsafe_get_data(identifier.collision_scene).unsafe_robot_names
-        self.world.delete_all_but_robots(namespaces)
+        collision_scene = self.god_map.unsafe_get_data(identifier.collision_scene)
+        namespaces = collision_scene.robot_namespaces
+        robot_names = collision_scene.robot_names
+        self.world.delete_all_but_robots(robot_names, namespaces)
         for plugin_name in self.added_plugin_names:
             self.tree.remove_node(plugin_name)
         self.added_plugin_names = []

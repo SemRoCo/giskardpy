@@ -175,12 +175,13 @@ class TreeManager(object):
                     c.position -= 1
 
     @profile
-    def __init__(self, god_map, tree=None):
+    def __init__(self, god_map, robot_names, tree=None):
         self.god_map = god_map
         self.action_server_name = self.god_map.get_data(identifier.action_server_name)
         world = WorldTree(self.god_map)
         self.namespaces = god_map.get_data(identifier.rosparam + ['namespaces'])
-        world.delete_all_but_robots(self.namespaces)
+        self.robot_names = robot_names
+        world.delete_all_but_robots(self.robot_names, self.namespaces)
 
         collision_checker = self.god_map.get_data(identifier.collision_checker)
         if collision_checker == 'bpb':
@@ -210,16 +211,16 @@ class TreeManager(object):
 
     @classmethod
     @profile
-    def from_param_server(cls):
+    def from_param_server(cls, robot_names):
         god_map = GodMap.init_from_paramserver(rospy.get_name())
         god_map.set_data(identifier.timer_collector, TimeCollector(god_map))
         blackboard = Blackboard
         blackboard.god_map = god_map
         mode = god_map.get_data(identifier.control_mode)
         if mode == 'OpenLoop':
-            self = OpenLoop(god_map)
+            self = OpenLoop(god_map, robot_names)
         elif mode == 'ClosedLoop':
-            self = ClosedLoop(god_map)
+            self = ClosedLoop(god_map, robot_names)
         else:
             raise KeyError('Robot interface mode \'{}\' is not supported.'.format(mode))
 
@@ -504,9 +505,10 @@ class OpenLoop(TreeManager):
     def grow_sync_branch(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        for namespace in self.namespaces:
-            sync.add_child(running_is_success(SyncConfiguration)('{}: update robot configuration'.format(namespace), namespace, prefix=namespace))
-            sync.add_child(SyncLocalization('{}: update robot localization'.format(namespace), namespace))
+        for group_name, namespace in zip(self.robot_names, self.namespaces):
+            sync.add_child(running_is_success(SyncConfiguration)('{}: update robot configuration'.format(namespace),
+                                                                 group_name, prefix=namespace))
+            sync.add_child(SyncLocalization('{}: update robot localization'.format(namespace), group_name))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -573,7 +575,7 @@ class OpenLoop(TreeManager):
         planning_4 = PluginBehavior('planning IIII')
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_plugin(CollisionChecker('collision checker'))
-        # planning_4.add_plugin(VisualizationBehavior('visualization'))
+        planning_4.add_plugin(VisualizationBehavior('visualization'))
         # planning_4.add_plugin(CollisionMarker('cpi marker'))
         planning_4.add_plugin(ControllerPlugin('controller'))
         planning_4.add_plugin(KinSimPlugin('kin sim'))

@@ -290,13 +290,13 @@ class GiskardWrapper(object):
         :type hard: bool
         """
         if tip_group is None:
-            groups = self.world.get_groups_containing_link(tip_link)
+            groups = self.world.get_groups_containing_link_short_name(tip_link)
             if len(groups) == 1:
                 tip_group = groups.pop()
             else:
                 raise Exception('Please define a tip_group.')
         if root_group is None:
-            groups = self.world.get_groups_containing_link(root_link)
+            groups = self.world.get_groups_containing_link_short_name(root_link)
             if len(groups) == 1:
                 root_group = groups.pop()
             else:

@@ -178,19 +178,19 @@ class GoalToConstraints(GetGoal):
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
         for joint_name in controlled_joints:
-            robot_name = joint_name.prefix
-            child_links = self.world.groups[robot_name].get_directly_controlled_child_links_with_collisions(joint_name)
+            robot = self.world.get_group_of_joint(joint_name)
+            child_links = self.world.groups[robot.name].get_directly_controlled_child_links_with_collisions(joint_name)
             if child_links:
-                number_of_repeller = config[joint_name][PrefixName('number_of_repeller', robot_name)]
+                number_of_repeller = config[joint_name][PrefixName('number_of_repeller', robot.prefix)]
                 for i in range(number_of_repeller):
-                    child_link = self.world.groups[robot_name].joints[joint_name].child_link_name
-                    hard_threshold = config[joint_name][PrefixName('hard_threshold', robot_name)]
+                    child_link = self.world.joints[joint_name].child_link_name
+                    hard_threshold = config[joint_name][PrefixName('hard_threshold', robot.prefix)]
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
                     else:
-                        soft_threshold = config[joint_name][PrefixName('soft_threshold', robot_name)]
+                        soft_threshold = config[joint_name][PrefixName('soft_threshold', robot.prefix)]
                     constraint = ExternalCollisionAvoidance(god_map=self.god_map,
-                                                            robot_name=robot_name,
+                                                            robot_name=robot.name,
                                                             link_name=child_link,
                                                             hard_threshold=hard_threshold,
                                                             soft_threshold=soft_threshold,
@@ -249,10 +249,16 @@ class GoalToConstraints(GetGoal):
                                          config[link_b][PrefixName('soft_threshold', link_a.prefix)])
                     number_of_repeller = min(config[link_a][PrefixName('number_of_repeller', link_a.prefix)],
                                              config[link_b][PrefixName('number_of_repeller', link_a.prefix)])
+                groups_a = self.world.get_groups_containing_link(link_a)
+                groups_b = self.world.get_groups_containing_link(link_b)
+                if groups_b == groups_a and len(groups_b) == 1:
+                    robot_name = groups_b.pop()
+                else:
+                    raise Exception(f'Could not find group containing the link {link_a} and {link_b}.')
                 constraint = SelfCollisionAvoidance(god_map=self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,
-                                                    robot_name=link_a.prefix,
+                                                    robot_name=robot_name,
                                                     hard_threshold=hard_threshold,
                                                     soft_threshold=soft_threshold,
                                                     idx=i,

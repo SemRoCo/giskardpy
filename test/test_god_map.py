@@ -383,7 +383,7 @@ class TestGodMap(unittest.TestCase):
         block_id_over = ['bla', 'override']
         default = get_default([[], block_id_over], gm, prefix='p')
         assert default == {PrefixName('a', 'p'): 0, PrefixName('b', 'p'): 2}
-        assert {'p/b': 3} == override_default(default, block_id_over, gm, prefix='p')
+        assert {'p/b': 3} == override_default(default, [block_id_over], gm, prefix='p')
 
     def test_override_default2(self):
         gm = GodMap()
@@ -392,7 +392,7 @@ class TestGodMap(unittest.TestCase):
         block_id_over = ['bla', 'override']
         default = get_default([[], block_id_over], gm, prefix='p')
         assert default == {PrefixName('a', 'p'): 0, PrefixName('b', 'p'): 2}
-        res = override_default(default, block_id_over, gm, prefix='p')
+        res = override_default(default, [block_id_over], gm, prefix='p')
         assert res['p/something']['p/b'] == 3
         assert res['p/something']['p/a'] == 0
         assert res['p/something'].default_factory('p/b') == 2
@@ -404,7 +404,7 @@ class TestGodMap(unittest.TestCase):
         block_id_over = ['bla', 'override']
         default = get_default([[], block_id_over], gm, prefix='p')
         assert default == -1
-        overwritten = override_default(default, block_id_over, gm, prefix='p')
+        overwritten = override_default(default, [block_id_over], gm, prefix='p')
         assert overwritten['p/something']['p/b'] == 3
         assert overwritten['p/something']['p/a'] == -1
         assert overwritten['p/something'].default_factory('p/b') == -1

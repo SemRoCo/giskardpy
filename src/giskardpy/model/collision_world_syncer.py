@@ -475,8 +475,7 @@ class CollisionWorldSynchronizer(object):
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
-                                            min_dist: dict,
-                                            added_checks: Dict[Tuple[my_string, my_string], float]):
+                                            min_dist: dict,):
         """
         :param collision_goals: list of CollisionEntry
         :type collision_goals: list
@@ -508,12 +507,6 @@ class CollisionWorldSynchronizer(object):
                             min_allowed_distance[key] = max(min_dist[key[0]], collision_entry.distance)
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
-        for (link1, link2), distance in added_checks.items():
-            key = self.world.sort_links(link1, link2)
-            if key in min_allowed_distance:
-                min_allowed_distance[key] = max(distance, min_allowed_distance[key])
-            else:
-                min_allowed_distance[key] = distance
         return min_allowed_distance
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:

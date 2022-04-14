@@ -253,13 +253,13 @@ class TestConstraints(object):
                                     max_threshold=0.4,
                                     spring_threshold=0.5,
                                     # max_linear_velocity=1,
-                                    object_name='kitchen',
                                     object_link_name='kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
         kitchen_setup.set_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
+        # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
     def test_CartesianPosition(self, zero_pose: PR2):

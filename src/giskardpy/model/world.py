@@ -456,7 +456,7 @@ class WorldTree(object):
                     self.diff = diff
 
                 def __call__(self, key):
-                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['linear', 'override', key])
+                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['angular', 'override', key])
 
             d_linear = KeyDefaultDict(Linear(self.god_map, diff))
             d_angular = KeyDefaultDict(Angular(self.god_map, diff))

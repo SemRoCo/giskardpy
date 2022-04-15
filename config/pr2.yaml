@@ -1,7 +1,7 @@
 parent: !include default.yaml
 robot_interface:
   base:
-    plugin: SendFollowJointTrajectory
+    plugin: SendFollowJointTrajectoryOmniDrive
     namespace: /whole_body_controller/base/follow_joint_trajectory
     state_topic: /whole_body_controller/base/state
     fill_velocity_values: True

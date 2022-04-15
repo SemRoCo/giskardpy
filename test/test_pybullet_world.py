@@ -162,20 +162,20 @@ class TestPyBulletSyncer(object):
         p = Pose()
         p.orientation.w = 1
         pr2_world.world.add_world_body(o, p)
-        pr2_world.world.move_group(o.name, 'r_gripper_tool_frame')
+        pr2_world.world.move_group(o.position_name, 'r_gripper_tool_frame')
         pr2_world.init_collision_matrix(RobotName)
         assert len(pr2_world.collision_matrices[RobotName]) > len(old_collision_matrix)
         contains_box = False
         for entry in pr2_world.collision_matrices[RobotName]:
-            contains_box |= o.name in entry
-            if o.name in entry:
+            contains_box |= o.position_name in entry
+            if o.position_name in entry:
                 contains_box |= True
-                if o.name == entry[0]:
+                if o.position_name == entry[0]:
                     assert entry[1] not in pr2_world.world.groups['r_hand'].links
-                if o.name == entry[1]:
+                if o.position_name == entry[1]:
                     assert entry[0] not in pr2_world.world.groups['r_hand'].links
         assert contains_box
-        pr2_world.world.delete_branch(o.name)
+        pr2_world.world.delete_branch(o.position_name)
         pr2_world.init_collision_matrix(RobotName)
         assert pr2_world.collision_matrices[RobotName] == old_collision_matrix
 
@@ -424,7 +424,7 @@ class TestPyBulletSyncer(object):
         assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
-            if body_b != donbot_world.robot.name:
+            if body_b != donbot_world.robot.position_name:
                 assert body_b_link == name or body_b_link == name2
             assert robot_link in robot_link_names
             if body_b == name2:
@@ -441,7 +441,7 @@ class TestPyBulletSyncer(object):
         collision_entry.robot_links = ['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link',
                                        'l_gripper_l_finger_link', 'l_gripper_r_finger_link',
                                        'l_gripper_r_finger_link', 'l_gripper_palm_link']
-        collision_entry.body_b = pr2_world.robot.name
+        collision_entry.body_b = pr2_world.robot.position_name
         collision_entry.link_bs = ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link',
                                    'r_forearm_link', 'r_forearm_link']
         ces.append(collision_entry)

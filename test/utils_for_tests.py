@@ -432,7 +432,7 @@ class GiskardTestWrapper(GiskardWrapper):
         req.transform.translation = map_T_odom.pose.position
         req.transform.rotation = map_T_odom.pose.orientation
         assert self.set_localization_srv(req).success
-        self.wait_heartbeats(10)
+        self.wait_heartbeats(15)
         p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot.root_link_name)
         compare_poses(p2.pose, map_T_odom.pose)
 

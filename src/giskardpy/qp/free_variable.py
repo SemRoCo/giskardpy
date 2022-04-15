@@ -1,18 +1,29 @@
 from collections import defaultdict
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Union
 
 import giskardpy.casadi_wrapper as w
+from giskardpy import identifier
+from giskardpy.data_types import derivative_to_name
+from giskardpy.god_map import GodMap
+from giskardpy.my_types import expr_symbol
 
 
-class FreeVariable(object):
+class FreeVariable:
+    state_identifier: List[str] = identifier.joint_states
+
     def __init__(self,
-                 symbols: Dict[int, w.ca.SX],
+                 name: str,
+                 god_map: GodMap,
                  lower_limits: Dict[int, float],
                  upper_limits: Dict[int, float],
-                 quadratic_weights: Optional[Dict[int, float]]= None,
+                 quadratic_weights: Optional[Dict[int, float]] = None,
                  horizon_functions: Optional[Dict[int, float]] = None):
-        self._symbols = symbols
-        self.name = str(self._symbols[0])
+        self.god_map = god_map
+        self._symbols = {}
+        self.name = name
+        for derivative_number, derivative_name in derivative_to_name.items():
+            self._symbols[derivative_number] = self.god_map.to_symbol(self.state_identifier + [name, derivative_name])
+        self.position_name = str(self._symbols[0])
         self.default_lower_limits = lower_limits
         self.default_upper_limits = upper_limits
         self.lower_limits = {}
@@ -29,40 +40,40 @@ class FreeVariable(object):
         self.horizon_functions.update(horizon_functions)
 
     @property
-    def order(self):
+    def order(self) -> int:
         return len(self.quadratic_weights) + 1
 
-    def get_symbol(self, order):
+    def get_symbol(self, order: int) -> expr_symbol:
         try:
             return self._symbols[order]
         except KeyError:
-            raise KeyError('Free variable {} doesn\'t have symbol for derivative of order {}'.format(self, order))
+            raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {order}')
 
-    def get_lower_limit(self, order):
+    def get_lower_limit(self, order: int) -> Union[expr_symbol, float]:
         if order in self.default_lower_limits and order in self.lower_limits:
             return w.max(self.default_lower_limits[order], self.lower_limits[order])
         if order in self.default_lower_limits:
             return self.default_lower_limits[order]
         if order in self.lower_limits:
             return self.lower_limits[order]
-        raise KeyError('Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
+        raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {order}')
 
-    def set_lower_limit(self, order, limit):
+    def set_lower_limit(self, order: int, limit: Union[expr_symbol, float]):
         self.lower_limits[order] = limit
 
-    def set_upper_limit(self, order, limit):
+    def set_upper_limit(self, order: int, limit: Union[expr_symbol, float]):
         self.upper_limits[order] = limit
 
-    def get_upper_limit(self, order):
+    def get_upper_limit(self, order: int) -> Union[expr_symbol, float]:
         if order in self.default_upper_limits and order in self.upper_limits:
             return w.min(self.default_upper_limits[order], self.upper_limits[order])
         if order in self.default_upper_limits:
             return self.default_upper_limits[order]
         if order in self.upper_limits:
             return self.upper_limits[order]
-        raise KeyError('Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
+        raise KeyError(f'Free variable {self} doesn\'t have upper limit for derivative of order {order}')
 
-    def has_position_limits(self):
+    def has_position_limits(self) -> bool:
         try:
             lower_limit = self.get_lower_limit(0)
             upper_limit = self.get_upper_limit(0)
@@ -71,12 +82,12 @@ class FreeVariable(object):
         except Exception:
             return False
 
-    def normalized_weight(self, t, order, prediction_horizon):
+    def normalized_weight(self, t: int, order: int, prediction_horizon: int) -> Union[expr_symbol, float]:
         weight = self.quadratic_weights[order]
         start = weight * self.horizon_functions[order]
         a = (weight - start) / prediction_horizon
-        weight = a*t + start
+        weight = a * t + start
         return weight * (1 / self.get_upper_limit(order)) ** 2
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return self.position_name

@@ -112,8 +112,8 @@ class H(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):
-                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o,
-                                                                                           self.prediction_horizon)
+                    weights[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = v.normalized_weight(t, o,
+                                                                                                    self.prediction_horizon)
         slack_weights = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:  # type: VelocityConstraint
@@ -182,11 +182,11 @@ class B(Parent):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):  # start with velocity
                     if t == self.prediction_horizon - 1 and o < min(v.order, self.order) - 1 and self.prediction_horizon > 2:  # and False:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
+                        lb[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
+                        ub[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
                     else:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.get_lower_limit(o)
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.get_upper_limit(o)
+                        lb[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = v.get_lower_limit(o)
+                        ub[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = v.get_upper_limit(o)
         lb_params = []
         for o, x in sorted(lb.items()):
             lb_params.append(x)
@@ -231,15 +231,15 @@ class BA(Parent):
     @memoize
     def get_lower_constraint_error(self):
         return {'{}/e'.format(c.name): w.limit(c.lower_error,
-                                               -c.velocity_limit * self.sample_period * c.control_horizon,
-                                               c.velocity_limit * self.sample_period * c.control_horizon)
+                                                        -c.velocity_limit * self.sample_period * c.control_horizon,
+                                                        c.velocity_limit * self.sample_period * c.control_horizon)
                 for c in self.constraints}
 
     @memoize
     def get_upper_constraint_error(self):
         return {'{}/e'.format(c.name): w.limit(c.upper_error,
-                                               -c.velocity_limit * self.sample_period * c.control_horizon,
-                                               c.velocity_limit * self.sample_period * c.control_horizon)
+                                                        -c.velocity_limit * self.sample_period * c.control_horizon,
+                                                        c.velocity_limit * self.sample_period * c.control_horizon)
                 for c in self.constraints}
 
     def __call__(self) -> tuple:
@@ -249,23 +249,23 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
-                    lb['t{:03d}/{}/p_limit'.format(t, v.name)] = w.round_up(v.get_lower_limit(0) - v.get_symbol(0),
-                                                                            self.round_to2)
-                    ub['t{:03d}/{}/p_limit'.format(t, v.name)] = w.round_down(v.get_upper_limit(0) - v.get_symbol(0),
-                                                                              self.round_to2)
+                    lb['t{:03d}/{}/p_limit'.format(t, v.position_name)] = w.round_up(v.get_lower_limit(0) - v.get_symbol(0),
+                                                                                     self.round_to2)
+                    ub['t{:03d}/{}/p_limit'.format(t, v.position_name)] = w.round_down(v.get_upper_limit(0) - v.get_symbol(0),
+                                                                                       self.round_to2)
 
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
             for o in range(1, min(v.order, self.order) - 1):
-                l_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_down(v.get_symbol(o), self.round_to)
-                u_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_up(v.get_symbol(o), self.round_to)
+                l_last_stuff[o]['{}/last_{}'.format(v.position_name, o)] = w.round_down(v.get_symbol(o), self.round_to)
+                u_last_stuff[o]['{}/last_{}'.format(v.position_name, o)] = w.round_up(v.get_symbol(o), self.round_to)
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
                 for o in range(1, min(v.order, self.order) - 1):
-                    derivative_link[o]['t{:03d}/{}/{}/link'.format(t, o, v.name)] = 0
+                    derivative_link[o]['t{:03d}/{}/{}/link'.format(t, o, v.position_name)] = 0
 
         lb_params = [lb]
         ub_params = [ub]
@@ -330,7 +330,7 @@ class A(Parent):
         return self._sorter({c.name: c.expression for c in self.velocity_constraints})[0]
 
     def get_free_variable_symbols(self):
-        return self._sorter({v.name: v.get_symbol(0) for v in self.free_variables})[0]
+        return self._sorter({v.position_name: v.get_symbol(0) for v in self.free_variables})[0]
 
     @profile
     def construct_A(self):
@@ -490,7 +490,7 @@ class A(Parent):
         return self.construct_A()
 
 
-class QPController(object):
+class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
@@ -537,8 +537,8 @@ class QPController(object):
         :type free_variables: list
         """
         # TODO check for empty goals
-        self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.name)))
-        l = [x.name for x in free_variables]
+        self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
+        l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
         self.order = min(self.prediction_horizon + 1, max(v.order for v in self.free_variables))
         assert duplicates == set(), 'there are free variables with the same name: {}'.format(duplicates)
@@ -549,7 +549,7 @@ class QPController(object):
         :rtype: FreeVariable
         """
         for v in self.free_variables:
-            if v.name == name:
+            if v.position_name == name:
                 return v
         raise KeyError('No free variable with name: {}'.format(name))
 
@@ -560,7 +560,7 @@ class QPController(object):
         self.constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), 'there are multiple constraints with the same name: {}'.format(duplicates)
+        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
         for c in self.constraints:
             self.check_control_horizon(c)
 
@@ -571,7 +571,7 @@ class QPController(object):
         self.velocity_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), 'there are multiple constraints with the same name: {}'.format(duplicates)
+        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
         for c in self.velocity_constraints:
             self.check_control_horizon(c)
 
@@ -579,14 +579,12 @@ class QPController(object):
         if constraint.control_horizon is None:
             constraint.control_horizon = self.prediction_horizon
         elif constraint.control_horizon <= 0 or not isinstance(constraint.control_horizon, int):
-            raise ValueError('Control horizon of {} is {}, it has to be an integer '
-                             '1 <= control horizon <= prediction horizon'.format(constraint.name,
-                                                                                 constraint.control_horizon))
+            raise ValueError(f'Control horizon of {constraint.name} is {constraint.control_horizon}, '
+                             f'it has to be an integer 1 <= control horizon <= prediction horizon')
         elif constraint.control_horizon > self.prediction_horizon:
-            logging.logwarn('Specified control horizon of {} is bigger than prediction horizon.'
-                            'Reducing control horizon of {} to prediction horizon of {}'.format(constraint.name,
-                                                                                                constraint.control_horizon,
-                                                                                                self.prediction_horizon))
+            logging.logwarn(f'Specified control horizon of {constraint.name} is bigger than prediction horizon.'
+                            f'Reducing control horizon of {constraint.control_horizon} '
+                            f'to prediction horizon of {self.prediction_horizon}')
 
     def add_debug_expressions(self, debug_expressions):
         """
@@ -876,7 +874,7 @@ class QPController(object):
         split = []
         offset = len(self.free_variables)
         for derivative in range(self.order - 1):
-            split.append(OrderedDict((x.name, xdot[i + offset * self.prediction_horizon * derivative])
+            split.append(OrderedDict((x.position_name, xdot[i + offset * self.prediction_horizon * derivative])
                                      for i, x in enumerate(self.free_variables)))
         return split
 

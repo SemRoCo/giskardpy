@@ -17,7 +17,6 @@ class Joint(ABC):
     parent_link_name: my_string
     child_link_name: my_string
     god_map: GodMap
-    state_identifier = identifier.joint_states
 
     def __init__(self,
                  name: my_string,
@@ -34,10 +33,8 @@ class Joint(ABC):
         self.apply_joint_effect()
 
     def create_free_variable(self, name: str, lower_limits: derivative_map, upper_limits: derivative_map):
-        return FreeVariable(symbols={0: self.god_map.to_symbol(self.state_identifier + [name, 'position']),
-                                     1: self.god_map.to_symbol(self.state_identifier + [name, 'velocity']),
-                                     2: self.god_map.to_symbol(self.state_identifier + [name, 'acceleration']),
-                                     3: self.god_map.to_symbol(self.state_identifier + [name, 'jerk'])},
+        return FreeVariable(name=name,
+                            god_map=self.god_map,
                             lower_limits=lower_limits,
                             upper_limits=upper_limits)
 
@@ -68,7 +65,7 @@ class Joint(ABC):
         """
 
     @abc.abstractmethod
-    def update_weights(self, weights: Dict[int, float]):
+    def update_weights(self, weights: derivative_joint_map):
         """
         :param weights: maps derivative to weight. e.g. {1:0.001, 2:0, 3:0.001}
         :return:
@@ -224,17 +221,17 @@ class OneDofJoint(Joint, ABC):
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
         world = self.god_map.unsafe_get_data(identifier.world)
         try:
-            vel = new_cmds[0][self.free_variable.name]
+            vel = new_cmds[0][self.free_variable.position_name]
         except KeyError as e:
             # joint is currently not part of the optimization problem
             return
         world.state[self.name].position += vel * dt
         world.state[self.name].velocity = vel
         if len(new_cmds) >= 2:
-            acc = new_cmds[1][self.free_variable.name]
+            acc = new_cmds[1][self.free_variable.position_name]
             world.state[self.name].acceleration = acc
         if len(new_cmds) >= 3:
-            jerk = new_cmds[2][self.free_variable.name]
+            jerk = new_cmds[2][self.free_variable.position_name]
             world.state[self.name].jerk = jerk
 
     @property
@@ -245,10 +242,7 @@ class OneDofJoint(Joint, ABC):
         self.free_variable.lower_limits = {}
         self.free_variable.upper_limits = {}
 
-    def delete_weights(self):
-        self.free_variable.quadratic_weights = {}
-
-    def update_weights(self, weights: Dict[int, Dict[my_string, float]]):
+    def update_weights(self, weights: derivative_joint_map):
         # self.delete_weights()
         for order, weight in weights.items():
             try:
@@ -412,13 +406,14 @@ class OmniDrive(Joint):
                  rotation_velocity_limit: Optional[float] = None,
                  x_name: Optional[str] = None,
                  y_name: Optional[str] = None,
-                 rot_name: Optional[str] = None):
-        super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
+                 rot_name: Optional[str] = None,
+                 **kwargs):
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
         self.x_name = x_name
         self.y_name = y_name
         self.rot_name = rot_name
+        super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
 
     def create_free_variables(self):
         self.x = self.create_free_variable(self.x_name,
@@ -441,24 +436,43 @@ class OmniDrive(Joint):
         world = self.god_map.unsafe_get_data(identifier.world)
         for free_variable in self.free_variable_list:
             try:
-                vel = new_cmds[0][free_variable.name]
+                vel = new_cmds[0][free_variable.position_name]
             except KeyError as e:
                 # joint is currently not part of the optimization problem
                 return
-            world.state[self.name].position += vel * dt
-            world.state[self.name].velocity = vel
+            world.state[free_variable.name].position += vel * dt
+            world.state[free_variable.name].velocity = vel
             if len(new_cmds) >= 2:
-                acc = new_cmds[1][free_variable.name]
-                world.state[self.name].acceleration = acc
+                acc = new_cmds[1][free_variable.position_name]
+                world.state[free_variable.name].acceleration = acc
             if len(new_cmds) >= 3:
-                jerk = new_cmds[2][free_variable.name]
-                world.state[self.name].jerk = jerk
+                jerk = new_cmds[2][free_variable.position_name]
+                world.state[free_variable.name].jerk = jerk
 
     def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
-        pass
+        for free_variable in self.free_variable_list:
+            free_variable.lower_limits = {}
+            free_variable.upper_limits = {}
 
-    def update_weights(self, weights: Dict[int, float]):
-        pass
+        for order, linear_limit in linear_limits.items():
+            self.x.set_upper_limit(order, linear_limit[self.name])
+            self.y.set_upper_limit(order, linear_limit[self.name])
+            self.x.set_lower_limit(order, -linear_limit[self.name])
+            self.y.set_lower_limit(order, -linear_limit[self.name])
+
+        for order, angular_limit in angular_limits.items():
+            self.rot.set_upper_limit(order, angular_limit[self.name])
+            self.rot.set_lower_limit(order, -angular_limit[self.name])
+
+    def update_weights(self, weights: derivative_joint_map):
+        # self.delete_weights()
+        for order, weight in weights.items():
+            try:
+                for free_variable in self.free_variable_list:
+                    free_variable.quadratic_weights[order] = weight[self.name]
+            except KeyError:
+                # can't do if in, because the dict may be a defaultdict
+                pass
 
     def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
         pass

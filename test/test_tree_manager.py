@@ -233,84 +233,84 @@ class TestTreeManager():
 
     def test_disable_enable_vis(self, tree_manager, tree):
         ascii_tree = display.ascii_tree(tree.root)
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         tree_manager.disable_node('visualization')
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
         tree_manager.enable_node('visualization')
         assert display.ascii_tree(tree.root) == ascii_tree
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
 
     def test_disable_node_twice(self, tree_manager, tree):
         ascii_tree = display.ascii_tree(tree.root)
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         tree_manager.disable_node('visualization')
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
         ascii_tree2 = display.ascii_tree(tree.root)
         with pytest.raises(ValueError):
             tree_manager.disable_node('visualization')
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
         assert display.ascii_tree(tree.root) == ascii_tree2
         tree_manager.enable_node('visualization')
         assert display.ascii_tree(tree.root) == ascii_tree
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
 
     def test_enable_node_twice(self, tree_manager, tree):
         ascii_tree = display.ascii_tree(tree.root)
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         with pytest.raises(ValueError):
             tree_manager.enable_node('visualization')
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert ascii_tree == display.ascii_tree(tree.root)
 
     def test_enable_disable_multiple_nodes(self, tree_manager, tree):
         ascii_tree = display.ascii_tree(tree.root)
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
-        assert 'cpi marker' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'cpi marker' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
-        assert 'wait for goal' not in [x.node.name for x in tree_manager.tree_nodes['root'].disabled_children]
-        assert 'wait for goal' in [x.node.name for x in tree_manager.tree_nodes['root'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'cpi marker' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'cpi marker' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'wait for goal' not in [x.node.position_name for x in tree_manager.tree_nodes['root'].disabled_children]
+        assert 'wait for goal' in [x.node.position_name for x in tree_manager.tree_nodes['root'].enabled_children]
         tree_manager.disable_node('visualization')
         tree_manager.disable_node('cpi marker')
         tree_manager.disable_node('wait for goal')
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
-        assert 'cpi marker' in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'cpi marker' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'cpi marker' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'cpi marker' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'cpi marker' not in display.ascii_tree(tree.root)
-        assert 'wait for goal' in [x.node.name for x in tree_manager.tree_nodes['root'].disabled_children]
-        assert 'wait for goal' not in [x.node.name for x in tree_manager.tree_nodes['root'].enabled_children]
+        assert 'wait for goal' in [x.node.position_name for x in tree_manager.tree_nodes['root'].disabled_children]
+        assert 'wait for goal' not in [x.node.position_name for x in tree_manager.tree_nodes['root'].enabled_children]
         assert 'wait for goal' not in display.ascii_tree(tree.root)
         tree_manager.enable_node('cpi marker')
         tree_manager.enable_node('visualization')
         tree_manager.enable_node('wait for goal')
         assert display.ascii_tree(tree.root) == ascii_tree
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
-        assert 'cpi marker' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'cpi marker' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
-        assert 'wait for goal' not in [x.node.name for x in tree_manager.tree_nodes['root'].disabled_children]
-        assert 'wait for goal' in [x.node.name for x in tree_manager.tree_nodes['root'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'cpi marker' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'cpi marker' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'wait for goal' not in [x.node.position_name for x in tree_manager.tree_nodes['root'].disabled_children]
+        assert 'wait for goal' in [x.node.position_name for x in tree_manager.tree_nodes['root'].enabled_children]
 
     def test_remove_enabled_node(self, tree_manager, tree):
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         tree_manager.remove_node('visualization')
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
         with pytest.raises(KeyError):
             tree_manager.enable_node('visualization')
@@ -341,16 +341,16 @@ class TestTreeManager():
         --> send traj
 --> send result
 """
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
 
     def test_remove_disabled_node(self, tree_manager, tree):
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         tree_manager.disable_node('visualization')
         tree_manager.remove_node('visualization')
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
         with pytest.raises(KeyError):
             tree_manager.enable_node('visualization')
@@ -381,26 +381,26 @@ class TestTreeManager():
         --> send traj
 --> send result
 """
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
 
     def test_add_node(self, tree_manager, tree):
         visualization = tree_manager.tree_nodes['visualization'].node
         tree_manager.remove_node('visualization')
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
         with pytest.raises(KeyError):
             tree_manager.enable_node('visualization')
         tree_manager.insert_node(visualization, 'wait for goal', 3)
         assert 'visualization'in tree_manager.tree_nodes.keys()
         assert 'visualization' in display.ascii_tree(tree.root)
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['wait for goal'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['wait for goal'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['wait for goal'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['wait for goal'].enabled_children]
 
     def test_remove_node_twice(self, tree_manager, tree):
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         tree_manager.remove_node('visualization')
         with pytest.raises(KeyError):
             tree_manager.remove_node('visualization')
@@ -483,36 +483,36 @@ class TestTreeManager():
     def test_disable_plugin_behavior_node(self, tree_manager, tree):
         planningIII = tree_manager.tree_nodes['planning III'].node
         assert 'coll' in [x for x in planningIII.get_plugins()]
-        assert 'coll' not in [x.node.name for x in tree_manager.tree_nodes['planning III'].disabled_children]
-        assert 'coll' in [x.node.name for x in tree_manager.tree_nodes['planning III'].enabled_children]
+        assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
+        assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         tree_manager.disable_node('coll')
         assert 'coll' not in [x for x in planningIII.get_plugins()]
 
     def test_enable_plugin_behavior_node(self, tree_manager, tree):
         planningIII = tree_manager.tree_nodes['planning III'].node
         assert 'coll' in [x for x in planningIII.get_plugins()]
-        assert 'coll' not in [x.node.name for x in tree_manager.tree_nodes['planning III'].disabled_children]
-        assert 'coll' in [x.node.name for x in tree_manager.tree_nodes['planning III'].enabled_children]
+        assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
+        assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         tree_manager.disable_node('coll')
         assert 'coll' not in [x for x in planningIII.get_plugins()]
         tree_manager.enable_node('coll')
         assert 'coll' in [x for x in planningIII.get_plugins()]
-        assert 'coll' in [x.node.name for x in tree_manager.tree_nodes['planning III'].enabled_children]
-        assert 'coll' not in [x.node.name for x in tree_manager.tree_nodes['planning III'].disabled_children]
+        assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
+        assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
 
     def test_disable_child_of_disabled_node(self, tree_manager, tree):
         ascii_tree = display.ascii_tree(tree.root)
-        assert 'process move goal' not in [x.node.name for x in tree_manager.tree_nodes['root'].disabled_children]
-        assert 'process move goal' in [x.node.name for x in tree_manager.tree_nodes['root'].enabled_children]
+        assert 'process move goal' not in [x.node.position_name for x in tree_manager.tree_nodes['root'].disabled_children]
+        assert 'process move goal' in [x.node.position_name for x in tree_manager.tree_nodes['root'].enabled_children]
         tree_manager.disable_node('process move goal')
         assert 'process move goal' not in display.ascii_tree(tree.root)
         assert 'visualization' not in display.ascii_tree(tree.root)
-        assert 'process move goal' in [x.node.name for x in tree_manager.tree_nodes['root'].disabled_children]
-        assert 'process move goal' not in [x.node.name for x in tree_manager.tree_nodes['root'].enabled_children]
+        assert 'process move goal' in [x.node.position_name for x in tree_manager.tree_nodes['root'].disabled_children]
+        assert 'process move goal' not in [x.node.position_name for x in tree_manager.tree_nodes['root'].enabled_children]
         assert 'process move goal' not in display.ascii_tree(tree.root)
         tree_manager.disable_node('visualization')
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         tree_manager.enable_node('process move goal')
         assert 'process move goal' in display.ascii_tree(tree.root)
         assert 'visualization' not in display.ascii_tree(tree.root)
@@ -524,27 +524,27 @@ class TestTreeManager():
         planningIII = tree_manager.tree_nodes['planning III'].node
         coll = tree_manager.tree_nodes['coll'].node
         assert 'coll' in [x for x in planningIII.get_plugins()]
-        assert 'coll' not in [x.node.name for x in tree_manager.tree_nodes['planning III'].disabled_children]
-        assert 'coll' in [x.node.name for x in tree_manager.tree_nodes['planning III'].enabled_children]
+        assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
+        assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         tree_manager.remove_node('coll')
         assert 'coll' not in [x for x in planningIII.get_plugins()]
         with pytest.raises(KeyError):
             tree_manager.enable_node('coll')
         assert 'coll' not in [x for x in planningIII.get_plugins()]
-        assert 'coll' not in [x.node.name for x in tree_manager.tree_nodes['planning III'].enabled_children]
-        assert 'coll' not in [x.node.name for x in tree_manager.tree_nodes['planning III'].disabled_children]
+        assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
+        assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
         tree_manager.insert_node(coll, 'planning III')
         assert 'coll' in [x for x in planningIII.get_plugins()]
-        assert 'coll' not in [x.node.name for x in tree_manager.tree_nodes['planning III'].disabled_children]
-        assert 'coll' in [x.node.name for x in tree_manager.tree_nodes['planning III'].enabled_children]
+        assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
+        assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
 
 
     def test_enable_child_of_disabled_node(self, tree_manager, tree):
         tree_manager.disable_node('visualization')
         tree_manager.disable_node('planning II')
         tree_manager.enable_node('visualization')
-        assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['planning II'].disabled_children]
-        assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['planning II'].enabled_children]
+        assert 'visualization' not in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].disabled_children]
+        assert 'visualization' in [x.node.position_name for x in tree_manager.tree_nodes['planning II'].enabled_children]
         assert 'visualization' not in display.ascii_tree(tree.root)
         assert 'planning II' not in display.ascii_tree(tree.root)
 
@@ -651,7 +651,7 @@ class TestTreeManagerGiskardIntegration():
         replace_behavior = ReplaceBehavior('replace', test_behavior2, 'test_behavior1', 'planning III', 3, Status.SUCCESS)
         tree_manager.insert_node(test_behavior1, 'planning III', 3)
         tree_manager.insert_node(replace_behavior, 'wait for goal', 3)
-        assert 'replace' in [x.name for x in wait_for_goal.children]
+        assert 'replace' in [x.position_name for x in wait_for_goal.children]
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)
         assert 'test_behavior1' not in [x for x in planningIII.get_plugins()]
@@ -664,9 +664,9 @@ class TestTreeManagerGiskardIntegration():
         test_behavior = GiskardTestBehavior('test_behavior', Status.FAILURE)
         replaces_itself = ReplaceBehavior('replace', test_behavior, 'replace', 'planning II', 3, Status.FAILURE)
         tree_manager.insert_node(replaces_itself, 'planning II', 3)
-        assert 'replace' in [x.name for x in planningII.children]
+        assert 'replace' in [x.position_name for x in planningII.children]
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)
-        assert 'replace' not in [x.name for x in planningII.children]
-        assert 'test_behavior' in [x.name for x in planningII.children]
+        assert 'replace' not in [x.position_name for x in planningII.children]
+        assert 'test_behavior' in [x.position_name for x in planningII.children]
         assert test_behavior.executed

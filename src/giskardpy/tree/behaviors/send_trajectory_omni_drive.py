@@ -1,5 +1,3 @@
-from typing import List
-
 import control_msgs
 from rospy import ROSException
 from rostopic import ROSTopicException
@@ -9,7 +7,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
-from giskardpy.model.joints import OneDofJoint
+from giskardpy.model.joints import OmniDrive
 
 try:
     import pr2_controllers_msgs.msg
@@ -28,10 +26,9 @@ from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
 
 
-class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
+class SendFollowJointTrajectoryOmniDrive(ActionClient, GiskardBehavior):
     min_deadline: rospy.Time
     max_deadline: rospy.Time
-    controlled_joints: List[OneDofJoint] = []
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
@@ -45,7 +42,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
     @profile
-    def __init__(self, name, namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
+    def __init__(self, name, namespace, state_topic, drive, goal_time_tolerance=1, fill_velocity_values=True):
         GiskardBehavior.__init__(self, name)
         self.action_namespace = namespace
         self.fill_velocity_values = fill_velocity_values
@@ -74,7 +71,6 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         loginfo('Waiting for state topic \'{}\' to appear.'.format(state_topic))
         msg = None
-        controlled_joint_names = []
         while not msg and not rospy.is_shutdown():
             try:
                 status_msg_type, _, _ = rostopic.get_topic_class(state_topic)
@@ -85,28 +81,24 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                                     'Must be one of: {}'.format(status_msg_type, self.supported_state_types))
                 msg = rospy.wait_for_message(state_topic, status_msg_type, timeout=2.0)
                 if isinstance(msg, JointState):
-                    controlled_joint_names = msg.name
+                    self.controlled_joints = msg.name
                 elif isinstance(msg, control_msgs.msg.JointTrajectoryControllerState) \
                         or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
-                    controlled_joint_names = msg.joint_names
+                    self.controlled_joints = msg.joint_names
             except ROSException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
                 rospy.sleep(1)
-        if len(controlled_joint_names) == 0:
-            raise ValueError(f'\'{state_topic}\' has no joints')
+
         for joint in self.world.joints.values():
-            if isinstance(joint, OneDofJoint):
-                if joint.free_variable.name in controlled_joint_names:
-                    self.controlled_joints.append(joint)
-        if len(self.controlled_joints) != len(controlled_joint_names):
-            raise ValueError(f'Unable to link {set(controlled_joint_names).difference(self.controlled_joints)} '
-                             f'to joints in the world.')
+            if isinstance(joint, OmniDrive):
+                # FIXME can only handle one drive
+                self.controlled_joints = [joint]
         self.world.register_controlled_joints(self.controlled_joints)
         loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
 
     @profile
     def initialise(self):
-        super(SendFollowJointTrajectory, self).initialise()
+        super().initialise()
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)

@@ -455,14 +455,14 @@ class OmniDrive(Joint):
             free_variable.upper_limits = {}
 
         for order, linear_limit in linear_limits.items():
-            self.x.set_upper_limit(order, linear_limit[self.name])
-            self.y.set_upper_limit(order, linear_limit[self.name])
-            self.x.set_lower_limit(order, -linear_limit[self.name])
-            self.y.set_lower_limit(order, -linear_limit[self.name])
+            self.x.set_upper_limit(order, linear_limit[self.x.name])
+            self.y.set_upper_limit(order, linear_limit[self.y.name])
+            self.x.set_lower_limit(order, -linear_limit[self.x.name])
+            self.y.set_lower_limit(order, -linear_limit[self.y.name])
 
         for order, angular_limit in angular_limits.items():
-            self.rot.set_upper_limit(order, angular_limit[self.name])
-            self.rot.set_lower_limit(order, -angular_limit[self.name])
+            self.rot.set_upper_limit(order, angular_limit[self.rot.name])
+            self.rot.set_lower_limit(order, -angular_limit[self.rot.name])
 
     def update_weights(self, weights: derivative_joint_map):
         # self.delete_weights()

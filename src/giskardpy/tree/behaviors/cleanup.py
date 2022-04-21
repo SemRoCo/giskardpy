@@ -3,7 +3,8 @@ from copy import deepcopy
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.data_types import Trajectory, Collisions
+from giskardpy.data_types import Trajectory
+from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
@@ -20,8 +21,7 @@ class CleanUp(GiskardBehavior):
         self.god_map.set_data(identifier.goal_msg, None)
         self.world.fast_all_fks = None
         self.collision_scene.reset_cache()
-        init_robot_collisions = {n:  Collisions(self.world, 1, n) for n in self.collision_scene.robot_names}
-        self.get_god_map().set_data(identifier.closest_point, init_robot_collisions)
+        self.get_god_map().set_data(identifier.closest_point, Collisions(self.god_map, 1))
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.get_god_map().set_data(identifier.time, 1)
         current_js = deepcopy(self.get_god_map().get_data(identifier.joint_states))

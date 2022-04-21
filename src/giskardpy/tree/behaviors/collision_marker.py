@@ -6,7 +6,7 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import Collision, Collisions
+from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
@@ -23,9 +23,8 @@ class CollisionMarker(GiskardBehavior):
         Computes closest point info for all robot links and safes it to the god map.
         """
         collisions = self.get_god_map().get_data(identifier.closest_point)
-        for robot_name in self.collision_scene.robot_names:
-            if len(collisions[robot_name].all_collisions) > 0:
-                self.publish_cpi_markers(collisions[robot_name])
+        if len(collisions.all_collisions) > 0:
+            self.publish_cpi_markers(collisions)
         return Status.RUNNING
 
     def publish_cpi_markers(self, collisions):

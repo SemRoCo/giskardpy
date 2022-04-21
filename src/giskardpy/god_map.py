@@ -5,10 +5,12 @@ from copy import copy, deepcopy
 from multiprocessing import Lock
 
 import numpy as np
-from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
+from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
+    Quaternion
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict, PrefixName, PrefixDefaultDict
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.utils.config_loader import upload_config_file_to_paramserver, get_namespaces
 
 
@@ -101,8 +103,10 @@ def set_default_in_override_block(block_identifier, god_map, namespaces):
     def get_default_from_prefix(prefix):
         ds = [v for k, v in defaults.items() if str(prefix) == str(k.prefix)]
         if len(ds) != 0:
+            # Returns robot dependent defaults
             return ds[0]
         else:
+            # Returns robot independent defaults
             return get_default([block_identifier], god_map)
 
     new_d = PrefixDefaultDict(get_default_from_prefix)
@@ -282,7 +286,7 @@ class GodMap(object):
 
     @classmethod
     @profile
-    def init_from_paramserver(cls, node_name, upload_config=True):
+    def init_from_paramserver(cls, node_name, robot_names, namespaces, upload_config=True):
         import rospy
         from giskardpy.data_types import order_map
 
@@ -291,11 +295,14 @@ class GodMap(object):
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        namespaces = list(set(get_namespaces(self.get_data(identifier.robot_interface))))
-        self.set_data(identifier.rosparam + ['namespaces'], namespaces)
+        found_namespaces = list(set(get_namespaces(self.get_data(identifier.robot_interface))))
+        self.set_data(identifier.rosparam + ['namespaces'], found_namespaces)
+        for n in namespaces:
+            if n not in found_namespaces:
+                raise Exception('')
         robot_descriptions = dict()
-        for robot_name in namespaces:
-            robot_description_topic = PrefixName('robot_description', robot_name)
+        for robot_name, namespace in zip(robot_names, namespaces):
+            robot_description_topic = PrefixName('robot_description', namespace)
             robot_descriptions[robot_name] = rospy.get_param('/{}'.format(robot_description_topic))
         self.set_data(identifier.robot_descriptions,  robot_descriptions)
         path_to_data_folder = self.get_data(identifier.data_folder)
@@ -304,16 +311,16 @@ class GodMap(object):
             path_to_data_folder += '/'
         self.set_data(identifier.data_folder, path_to_data_folder)
 
-        set_default_in_override_block(identifier.external_collision_avoidance, self, namespaces)
-        set_default_in_override_block(identifier.self_collision_avoidance, self, namespaces)
+        set_default_in_override_block(identifier.external_collision_avoidance, self, robot_names)
+        set_default_in_override_block(identifier.self_collision_avoidance, self, robot_names)
         # weights
         for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
-            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self, namespaces)
+            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self, robot_names)
 
         # limits
         for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self, namespaces)
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self, namespaces)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self, robot_names)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self, robot_names)
 
         return self
 
@@ -402,6 +409,10 @@ class GodMap(object):
             return self.vector_msg_to_vector3(identifier + ['vector'])
         elif isinstance(data, list):
             return self.list_to_symbol_matrix(identifier, data)
+        elif isinstance(data, Quaternion):
+            return self.quaternion_msg_to_rotation(identifier)
+        elif isinstance(data, QuaternionStamped):
+            return self.quaternion_msg_to_rotation(identifier + ['quaternion'])
         elif isinstance(data, np.ndarray):
             return self.list_to_symbol_matrix(identifier, data)
         else:
@@ -479,6 +490,14 @@ class GodMap(object):
             qy=self.to_symbol(identifier + ['orientation', 'y']),
             qz=self.to_symbol(identifier + ['orientation', 'z']),
             qw=self.to_symbol(identifier + ['orientation', 'w']),
+        )
+
+    def quaternion_msg_to_rotation(self, identifier):
+        return w.rotation_matrix_from_quaternion(
+            x=self.to_symbol(identifier + ['x']),
+            y=self.to_symbol(identifier + ['y']),
+            z=self.to_symbol(identifier + ['z']),
+            w=self.to_symbol(identifier + ['w']),
         )
 
     def point_msg_to_point3(self, identifier):

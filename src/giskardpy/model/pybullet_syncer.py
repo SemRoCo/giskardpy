@@ -4,6 +4,7 @@ from collections import defaultdict
 from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
+from giskardpy import identifier
 from giskardpy.data_types import BiDict, Collisions, Collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_wrapper import ContactInfo

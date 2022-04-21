@@ -29,7 +29,7 @@ class Open(Goal):
                                                    root_group=environment_group,
                                                    tip_link=tip_link,
                                                    tip_group=tip_group,
-                                                   goal=self.handle_T_tip,
+                                                   goal_pose=self.handle_T_tip,
                                                    weight=self.weight, **kwargs))
         self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name.short_name,
                                                    group_name=self.joint_group.name,

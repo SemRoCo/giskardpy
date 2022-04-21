@@ -3,6 +3,12 @@ general_options:
   enable_gui: False
   test_mode: True
 plugins:
+  VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
+    enabled: True
+    in_planning_loop: False
+  CPIMarker: # contact visualization, slows planning down a little bit
+    enabled: True
+    in_planning_loop: False
 #  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
 #    enabled: True
 #  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
@@ -20,8 +26,6 @@ plugins:
 #    height_per_derivative: 5.3
 #    cm_per_second: 3.365
 #    hspace: 0.5
-  CPIMarker: # contact visualization, slows planning down a little bit
-    enabled: True
   MaxTrajectoryLength:
     enabled: True
     length: 30 # will abort planning if the trajectory becomes longer than this many seconds

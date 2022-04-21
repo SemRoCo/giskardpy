@@ -12,6 +12,7 @@ from functools import wraps
 from itertools import product
 from multiprocessing import Lock
 
+import matplotlib.colors as mcolors
 import numpy as np
 import pylab as plt
 import rospkg
@@ -24,7 +25,7 @@ from rospy_message_converter.message_converter import \
 from sensor_msgs.msg import JointState
 
 from giskardpy.utils import logging
-import matplotlib.colors as mcolors
+
 
 @contextmanager
 def suppress_stderr():
@@ -89,6 +90,7 @@ def limits_from_urdf_joint(urdf_joint):
     except AttributeError:
         pass
     return lower_limits, upper_limits
+
 
 #
 # CONVERSION FUNCTIONS FOR ROS MESSAGES
@@ -200,7 +202,10 @@ def create_path(path):
 def cm_to_inch(cm):
     return cm * 0.393701
 
+
 plot_lock = Lock()
+
+
 @profile
 def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0,
                     cm_per_second=0.2, normalize_position=False, tick_stride=1.0, file_name='trajectory.pdf', history=5,
@@ -253,7 +258,6 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
                     data[3].append([point[joint_name].jerk for joint_name in names])
             times.append(time)
 
-
         for i in range(0, order):
             if i < diff_after:
                 data[i] = np.array(data[i])
@@ -291,7 +295,8 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
             if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
                 for j in range(order):
                     try:
-                        axs[j].plot(times, data[j][:, i], color=fmts[color_counter][1], linestyle=fmts[color_counter][0],
+                        axs[j].plot(times, data[j][:, i], color=fmts[color_counter][1],
+                                    linestyle=fmts[color_counter][0],
                                     label=names[i])
                     except KeyError:
                         logging.logwarn('Not enough colors to plot all joints, skipping {}.'.format(names[i]))

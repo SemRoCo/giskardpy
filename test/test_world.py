@@ -70,26 +70,23 @@ def delete_test_folder(request):
 def allow_all_entry():
     ce = CollisionEntry()
     ce.type = CollisionEntry.ALLOW_COLLISION
-    ce.robot_links = [CollisionEntry.ALL]
-    ce.body_b = CollisionEntry.ALL
-    ce.link_bs = [CollisionEntry.ALL]
-    ce.min_dist = 0.0
+    ce.group1 = CollisionEntry.ALL
+    ce.group2 = CollisionEntry.ALL
     return ce
 
 
 def avoid_all_entry(min_dist):
     ce = CollisionEntry()
     ce.type = CollisionEntry.AVOID_COLLISION
-    ce.robot_links = [CollisionEntry.ALL]
-    ce.body_b = CollisionEntry.ALL
-    ce.link_bs = [CollisionEntry.ALL]
-    ce.min_dist = min_dist
+    ce.group1 = CollisionEntry.ALL
+    ce.group2 = CollisionEntry.ALL
+    ce.distance = min_dist
     return ce
 
 
-def world_with_robot(urdf, prefix):
+def world_with_robot(urdf, prefix, config='package://giskardpy/config/default.yaml'):
     god_map = GodMap()
-    god_map.set_data(identifier.rosparam, ros_load_robot_config('package://giskardpy/config/default.yaml'))
+    god_map.set_data(identifier.rosparam, ros_load_robot_config(config))
     god_map.set_data(identifier.rosparam + ['namespaces'], [prefix])
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
@@ -101,7 +98,7 @@ def create_world_with_pr2(prefix=None):
     """
     :rtype: WorldTree
     """
-    world = world_with_robot(pr2_urdf(), prefix=prefix)
+    world = world_with_robot(pr2_urdf(), prefix=prefix, config='package://giskardpy/config/pr2.yaml')
     world.god_map.set_data(identifier.controlled_joints, ['torso_lift_joint',
                                                           'r_upper_arm_roll_joint',
                                                           'r_shoulder_pan_joint',

@@ -70,13 +70,6 @@ class Goal(object):
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
 
-    @property
-    def robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.world.groups['robot']
-
     def get_joint_position_symbol(self, joint_name):
         """
         returns a symbol that referes to the given joint

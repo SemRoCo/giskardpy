@@ -1,18 +1,22 @@
+from typing import Dict, Optional
+
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA
+from giskardpy.my_types import my_string
 
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, link_name, robot_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_name, robot_name, max_velocity=0.2, hard_threshold=0.0,
+                 soft_thresholds: Optional[Dict[my_string, float]] = None, idx=0,
                  num_repeller=1, **kwargs):
         """
         Don't use me
         """
         self.max_velocity = max_velocity
         self.hard_threshold = hard_threshold
-        self.soft_threshold = soft_threshold
+        self.soft_thresholds = soft_thresholds
         self.num_repeller = num_repeller
         self.link_name = link_name
         self.idx = idx
@@ -60,6 +64,12 @@ class ExternalCollisionAvoidance(Goal):
                                                                   self.idx,
                                                                   'contact_distance'])
 
+    def get_link_b_hash(self):
+        return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
+                                                                  (self.link_name,),
+                                                                  self.idx,
+                                                                  'link_b_hash'])
+
     def get_number_of_external_collisions(self):
         return self.god_map.to_symbol(identifier.closest_point + [self.robot_name,
                                                                   'get_number_of_external_collisions',
@@ -81,14 +91,22 @@ class ExternalCollisionAvoidance(Goal):
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
-        lower_limit = self.soft_threshold - actual_distance
+        soft_threshold = 99
+        actual_link_b_hash = self.get_link_b_hash()
+
+        for k, v in self.soft_thresholds.items():
+            if self.link_name in k:
+                link_b_hash = k[1].__hash__()
+                soft_threshold = w.if_eq(actual_link_b_hash, link_b_hash, v, soft_threshold)
+
+        lower_limit = soft_threshold - actual_distance
 
         lower_limit_limited = w.limit(lower_limit,
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
 
         upper_slack = w.if_greater(actual_distance, self.hard_threshold,
-                                   w.limit(self.soft_threshold - self.hard_threshold,
+                                   w.limit(soft_threshold - self.hard_threshold,
                                            -qp_limits_for_lba,
                                            qp_limits_for_lba),
                                    lower_limit_limited)
@@ -106,6 +124,7 @@ class ExternalCollisionAvoidance(Goal):
                                  w.min(number_of_external_collisions, self.num_repeller))
         # if self.link_name == 'r_wrist_roll_link' and self.idx <= 1:
         #     self.add_debug_expr('weight', weight)
+        #     self.add_debug_expr('soft_threshold', soft_threshold)
         #     self.add_debug_expr('dist', dist)
         #     self.add_debug_expr('actual_distance', actual_distance)
         self.add_constraint(reference_velocity=self.max_velocity,

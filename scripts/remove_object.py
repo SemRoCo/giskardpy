@@ -15,7 +15,7 @@ if __name__ == '__main__':
         except IndexError:
             logging.loginfo('Example call: rosrun giskardpy remove_object.py _name:=muh')
             sys.exit()
-    result = giskard.remove_object(name)
+    result = giskard.remove_group(name)
     if result.error_codes == result.SUCCESS:
         logging.loginfo('{} removed'.format(name))
     else:

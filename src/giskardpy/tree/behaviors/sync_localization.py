@@ -4,19 +4,22 @@ from py_trees import Status
 from tf.transformations import rotation_from_matrix
 from tf2_py import LookupException
 
+from giskardpy.data_types import PrefixName
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import lookup_pose, msg_to_homogeneous_matrix
 
 
 class SyncLocalization(GiskardBehavior):
-    def __init__(self, name, group_name, tf_root_link_name=None):
+    def __init__(self, name, group_name, namespace, tf_root_link_name=None):
         super(SyncLocalization, self).__init__(name)
         self.map_frame = self.world.root_link_name
         self.group_name = group_name
+        self.tf_prefix = namespace
         self.group = self.world.groups[self.group_name]  # type: SubWorldTree
         if tf_root_link_name is None:
-            self.tf_root_link_name = self.group.root_link_name
+            root_link_name = self.group.root_link_name
+            self.tf_root_link_name = PrefixName(root_link_name.short_name, self.tf_prefix)
         else:
             self.tf_root_link_name = tf_root_link_name
         self.last_position = np.zeros(3)

@@ -71,7 +71,7 @@ def override_default(default, block_identifiers, god_map, prefix=None):
     return d
 
 
-def get_default_in_override_block(block_identifier, god_map, prefix=None):
+def get_default_in_override_block(block_identifier, god_map, group_name, prefix=None):
 
     if prefix is not None:
         if identifier.rosparam[0] in block_identifier:
@@ -81,8 +81,8 @@ def get_default_in_override_block(block_identifier, god_map, prefix=None):
     else:
         full_block_identifier = block_identifier
 
-    default_value = get_default([block_identifier, full_block_identifier], god_map, prefix=prefix)
-    override = override_default(default_value, [block_identifier, full_block_identifier], god_map, prefix=prefix)
+    default_value = get_default([block_identifier, full_block_identifier], god_map, prefix=group_name)
+    override = override_default(default_value, [block_identifier, full_block_identifier], god_map, prefix=group_name)
 
     ret_d = defaultdict(lambda: default_value)
     if override:
@@ -91,17 +91,17 @@ def get_default_in_override_block(block_identifier, god_map, prefix=None):
     return ret_d
 
 
-def set_default_in_override_block(block_identifier, god_map, namespaces):
+def set_default_in_override_block(block_identifier, god_map, robot_names, namespaces):
     d = dict()
-    for prefix in namespaces:
-        d[prefix] = get_default_in_override_block(block_identifier, god_map, [prefix])
+    for robot_name, prefix in zip(robot_names, namespaces):
+        d[robot_name] = get_default_in_override_block(block_identifier, god_map, [robot_name], [prefix])
 
     defaults = dict()
-    for prefix in namespaces:
-        defaults[PrefixName('default', prefix)] = d[prefix].default_factory()
+    for robot_name in robot_names:
+        defaults[PrefixName('default', robot_name)] = d[robot_name].default_factory()
 
-    def get_default_from_prefix(prefix):
-        ds = [v for k, v in defaults.items() if str(prefix) == str(k.prefix)]
+    def get_default_from_prefix(p):
+        ds = [v for k, v in defaults.items() if str(p) == str(k.prefix)]
         if len(ds) != 0:
             # Returns robot dependent defaults
             return ds[0]
@@ -110,8 +110,8 @@ def set_default_in_override_block(block_identifier, god_map, namespaces):
             return get_default([block_identifier], god_map)
 
     new_d = PrefixDefaultDict(get_default_from_prefix)
-    for prefix in namespaces:
-        new_d.update(d[prefix])
+    for robot_name in robot_names:
+        new_d.update(d[robot_name])
 
     god_map.set_data(block_identifier, new_d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
@@ -311,16 +311,16 @@ class GodMap(object):
             path_to_data_folder += '/'
         self.set_data(identifier.data_folder, path_to_data_folder)
 
-        set_default_in_override_block(identifier.external_collision_avoidance, self, robot_names)
-        set_default_in_override_block(identifier.self_collision_avoidance, self, robot_names)
+        set_default_in_override_block(identifier.external_collision_avoidance, self, robot_names, namespaces)
+        set_default_in_override_block(identifier.self_collision_avoidance, self, robot_names, namespaces)
         # weights
         for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
-            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self, robot_names)
+            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self, robot_names, namespaces)
 
         # limits
         for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self, robot_names)
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self, robot_names)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self, robot_names, namespaces)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self, robot_names, namespaces)
 
         return self
 

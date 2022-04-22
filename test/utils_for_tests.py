@@ -284,9 +284,10 @@ class GoalChecker(object):
 
 
 class JointGoalChecker(GoalChecker):
-    def __init__(self, god_map, goal_state, decimal=2, prefix=None):
+    def __init__(self, god_map, goal_state, group_name, decimal=2, prefix=None):
         super(JointGoalChecker, self).__init__(god_map)
         self.goal_state = goal_state
+        self.group_name = group_name
         self.decimal = decimal
         self.prefix = prefix
 
@@ -309,7 +310,7 @@ class JointGoalChecker(GoalChecker):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name].position
-            full_joint_name = PrefixName(joint_name, self.prefix)
+            full_joint_name = PrefixName(joint_name, self.group_name)
             if self.world.is_joint_continuous(full_joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(full_joint_name, current,
@@ -485,8 +486,8 @@ class GiskardTestWrapper(GiskardWrapper):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
         self.wait_heartbeats()
         current_js = self.world.groups[object_name].state
-        joint_names_without_prefix = set(j.short_name for j in current_js)
-        assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()
+        joint_names_with_prefix = set(j.long_name for j in current_js)
+        assert set(joint_state.keys()).difference(joint_names_with_prefix) == set()
         for joint_name, state in current_js.items():
             if joint_name.short_name in joint_state:
                 np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
@@ -538,7 +539,7 @@ class GiskardTestWrapper(GiskardWrapper):
         super(GiskardTestWrapper, self).set_joint_goal(goal, group_name, weight=weight, hard=hard)
         if check:
             prefix = self.namespaces[self.collision_scene.robot_names.index(group_name)]
-            self.add_goal_check(JointGoalChecker(self.god_map, goal, decimal, prefix=prefix))
+            self.add_goal_check(JointGoalChecker(self.god_map, goal, group_name, decimal, prefix=prefix))
 
     def teleport_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)

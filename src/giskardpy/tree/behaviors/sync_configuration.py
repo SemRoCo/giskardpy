@@ -67,7 +67,7 @@ class SyncConfiguration(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = JointStates.from_msg(js, self.prefix)
+            self.mjs = JointStates.from_msg(js, self.group_name)
         except Empty:
             pass
 

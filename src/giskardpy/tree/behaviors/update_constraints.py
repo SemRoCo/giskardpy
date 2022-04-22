@@ -317,10 +317,10 @@ class GoalToConstraints(GetGoal):
                                          config[link_b][PrefixName('soft_threshold', group_name)])
                     number_of_repeller = min(config[link_a][PrefixName('number_of_repeller', group_name)],
                                              config[link_b][PrefixName('number_of_repeller', group_name)])
-                groups_a = self.world.get_groups_containing_link(link_a)
-                groups_b = self.world.get_groups_containing_link(link_b)
-                if groups_b == groups_a and len(groups_b) == 1:
-                    robot_name = groups_b.pop()
+                groups_a = self.world.get_group_containing_link(link_a)
+                groups_b = self.world.get_group_containing_link(link_b)
+                if groups_b == groups_a:
+                    robot_name = groups_a
                 else:
                     raise Exception(f'Could not find group containing the link {link_a} and {link_b}.')
                 constraint = SelfCollisionAvoidance(god_map=self.god_map,

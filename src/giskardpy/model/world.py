@@ -403,6 +403,30 @@ class WorldTree(object):
             groups.add(group_name)
         return groups
 
+    def get_parents_of_group_name(self, group_name: str) -> Set[str]:
+        ancestry = list()
+        traversed = False
+        parent = self.get_parent_group_name(group_name)
+        while not traversed:
+            if parent in ancestry:
+                traversed = True
+            else:
+                ancestry.append(parent)
+            parent = self.get_parent_group_name(ancestry[-1])
+        return set(ancestry)
+
+    def get_group_containing_link(self, link_name: Union[PrefixName, str]) -> str:
+        groups = self.get_groups_containing_link(link_name)
+        group = groups.pop()
+        for g in groups:
+            if g != group:
+                g_ancestry = self.get_parents_of_group_name(g)
+                group_ancestry = self.get_parents_of_group_name(group)
+                relatives = list(g_ancestry & group_ancestry)
+                if relatives[0] in groups:
+                    group = relatives[0]
+        return group
+
     def get_groups_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
@@ -463,8 +487,7 @@ class WorldTree(object):
         if msg.type == msg.URDF_BODY:
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link_name,
-                          group_name=group_name,
-                          prefix=prefix)
+                          group_name=group_name)
         else:
             link = Link.from_world_body(prefix=group_name, msg=msg)
             joint = FixedJoint(PrefixName(group_name, self.connection_prefix), parent_link_name, link.name,
@@ -982,8 +1005,10 @@ class WorldTree(object):
             links = self.link_names_with_collisions
         else:
             links = self.groups[group_name].link_names_with_collisions
-        link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in
-                             combinations(self.groups[group_name].link_names_with_collisions, 2)}
+        try:
+            link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
+        except Exception:
+            pass
         for link_name in links:
             direct_children = set()
             for child_joint_name in self.links[link_name].child_joint_names:

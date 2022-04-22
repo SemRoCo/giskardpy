@@ -183,18 +183,23 @@ class WorldUpdater(GiskardBehavior):
 
     def handle_convention(self, req: UpdateWorldRequest):
         # todo: versuch sachen in req zu ermitteln, wenn möglich siehe todo.txt
-        # default to world root if all is empty
-        if req.parent_link_group == '' and req.parent_link == '':
-            req.parent_link = self.world.root_link_name
-        # default to robot group, if parent link name is not empty
-        else:
-            if req.parent_link_group == '' and len(self.collision_scene.robots) == 1:
+        if len(self.collision_scene.robots) == 1:
+            # default to world root if all is empty
+            if req.parent_link_group == '' and req.parent_link == '':
                 req.parent_link_group = self.collision_scene.robot_names[0]
-            elif req.parent_link == '':
-                req.parent_link = self.world.groups[req.parent_link_group].root_link_name
+                req.parent_link = self.world.root_link_name
+            # default to robot group, if parent link name is not empty
             else:
+                if req.parent_link_group == '':
+                    req.parent_link_group = self.collision_scene.robot_names[0]
+                if req.parent_link == '':
+                   req.parent_link = self.world.groups[req.parent_link_group].root_link_name
+                req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
+        else:
+            if req.parent_link_group == '':
                 raise UnknownGroupException('Parent link group has to be set.')
-            req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
+            if req.parent_link == '':
+                req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
         return req
 
     def add_object(self, req: UpdateWorldRequest):

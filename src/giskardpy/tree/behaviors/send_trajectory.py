@@ -44,6 +44,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     def __init__(self, name, namespace, state_topic, robot_name, goal_time_tolerance=1, fill_velocity_values=True, prefix=None):
         GiskardBehavior.__init__(self, name)
         self.prefix = prefix
+        self.robot_name = robot_name
         self.action_namespace = namespace
         self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
@@ -88,7 +89,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             except ROSException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
                 rospy.sleep(1)
-        self.world.register_controlled_joints(self.controlled_joints, robot_name)
+        self.world.register_controlled_joints(self.controlled_joints, self.robot_name)
         loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
 
     @profile
@@ -97,7 +98,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        goal.trajectory = trajectory.to_msg(sample_period, self.controlled_joints, self.fill_velocity_values, prefix=self.prefix)
+        goal.trajectory = trajectory.to_msg(sample_period, self.robot_name, self.controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
         deadline = self.action_goal.trajectory.header.stamp + \
                    self.action_goal.trajectory.points[-1].time_from_start + \

@@ -22,10 +22,10 @@ class GraspBar(Goal):
         :param weight: float default WEIGHT_ABOVE_CA
         """
         super(GraspBar, self).__init__(**kwargs)
-        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
-        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
-        self.root = PrefixName(root_link, root_prefix)
-        self.tip = PrefixName(tip_link, tip_prefix)
+        #root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        #tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root = PrefixName(root_link, root_group)
+        self.tip = PrefixName(tip_link, tip_group)
 
         bar_center = self.transform_msg(self.root, bar_center)
 

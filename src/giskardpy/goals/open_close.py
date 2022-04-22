@@ -11,10 +11,10 @@ class Open(Goal):
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         super(Open, self).__init__(**kwargs)
         self.weight = weight
-        environment_prefix = self.world.groups[environment_group].get_link_short_name_match(environment_link).prefix
-        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
-        self.tip_link = PrefixName(tip_link, tip_prefix)
-        self.handle_link = PrefixName(environment_link, environment_prefix)
+        #environment_prefix = self.world.groups[environment_group].get_link_short_name_match(environment_link).prefix
+        #tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.tip_link = PrefixName(tip_link, tip_group)
+        self.handle_link = PrefixName(environment_link, environment_group)
         self.joint_name = self.world.get_movable_parent_joint(environment_link)
         self.joint_group = self.world.get_group_of_joint(self.joint_name)
         self.handle_T_tip = self.world.compute_fk_pose(self.handle_link, self.tip_link)

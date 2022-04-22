@@ -22,10 +22,10 @@ class Pointing(Goal):
         super(Pointing, self).__init__(**kwargs)
         self.weight = weight
         self.max_velocity = max_velocity
-        root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
-        tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
-        self.root = PrefixName(root_link, root_prefix)
-        self.tip = PrefixName(tip_link, tip_prefix)
+        #root_prefix = self.world.groups[root_group].get_link_short_name_match(root_link).prefix
+        #tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
+        self.root = PrefixName(root_link, root_group)
+        self.tip = PrefixName(tip_link, tip_group)
         self.root_P_goal_point = tf.transform_point(self.root, goal_point)
 
         if pointing_axis is not None:

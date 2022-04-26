@@ -88,6 +88,8 @@ plugins:
   MaxTrajectoryLength:
     enabled: True
     length: 30 # will abort planning if the trajectory becomes longer than this many seconds
+  SyncTfFrames:
+    frames: []
 reachability_check:
   sample_period: 0.5
   prismatic_velocity: 2.0

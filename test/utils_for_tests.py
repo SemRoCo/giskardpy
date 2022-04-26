@@ -530,7 +530,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                       goal_pose.pose.orientation.w]))[0]}
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
-        self.set_base.call(goal)
+        # self.set_base.call(goal)
         rospy.sleep(0.5)
 
     def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
@@ -1069,8 +1069,8 @@ class PR2(GiskardTestWrapper):
         self.l_tip = 'l_gripper_tool_frame'
         self.l_gripper_group = 'l_gripper'
         self.r_gripper_group = 'r_gripper'
-        self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
-        self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
+        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
+        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         super(PR2, self).__init__('package://giskardpy/config/pr2.yaml')
 
     def move_base(self, goal_pose):
@@ -1088,6 +1088,7 @@ class PR2(GiskardTestWrapper):
                 'r_forearm_link']
 
     def open_r_gripper(self):
+        return
         sjs = SetJointStateRequest()
         sjs.state.name = ['r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'r_gripper_l_finger_tip_joint',
                           'r_gripper_r_finger_tip_joint']
@@ -1097,6 +1098,7 @@ class PR2(GiskardTestWrapper):
         self.r_gripper.call(sjs)
 
     def close_r_gripper(self):
+        return
         sjs = SetJointStateRequest()
         sjs.state.name = ['r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'r_gripper_l_finger_tip_joint',
                           'r_gripper_r_finger_tip_joint']
@@ -1106,6 +1108,7 @@ class PR2(GiskardTestWrapper):
         self.r_gripper.call(sjs)
 
     def open_l_gripper(self):
+        return
         sjs = SetJointStateRequest()
         sjs.state.name = ['l_gripper_l_finger_joint', 'l_gripper_r_finger_joint', 'l_gripper_l_finger_tip_joint',
                           'l_gripper_r_finger_tip_joint']
@@ -1115,6 +1118,7 @@ class PR2(GiskardTestWrapper):
         self.l_gripper.call(sjs)
 
     def close_l_gripper(self):
+        return
         sjs = SetJointStateRequest()
         sjs.state.name = ['l_gripper_l_finger_joint', 'l_gripper_r_finger_joint', 'l_gripper_l_finger_tip_joint',
                           'l_gripper_r_finger_tip_joint']

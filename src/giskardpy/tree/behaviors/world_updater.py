@@ -19,7 +19,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_localization import SyncLocalization
+from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
 
@@ -217,9 +217,9 @@ class WorldUpdater(GiskardBehavior):
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
             plugin_name = str(PrefixName(world_body.name, 'localization'))
-            plugin = SyncLocalization(plugin_name,
-                                      group_name=req.group_name,
-                                      tf_root_link_name=world_body.tf_root_link_name)
+            plugin = SyncTfFrames(plugin_name,
+                                  group_name=req.group_name,
+                                  tf_root_link_name=world_body.tf_root_link_name)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')

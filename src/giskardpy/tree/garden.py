@@ -1,10 +1,10 @@
-import pydot
+from typing import Type, TypeVar, Union, Generic
+
+import py_trees
 import pydot
 import rospy
-from py_trees import Behaviour, Chooser, common, Blackboard
+from py_trees import Behaviour, Chooser, common, Blackboard, Composite
 from py_trees import Selector, Sequence
-from py_trees.meta import running_is_success, failure_is_success, success_is_failure, running_is_failure, \
-    failure_is_running
 from py_trees_ros.trees import BehaviourTree
 from sortedcontainers import SortedList
 
@@ -38,11 +38,9 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
-from giskardpy.tree.behaviors.shaking_detector import WiggleCancel
-from giskardpy.tree.behaviors.start_timer import StartTimer
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
-from giskardpy.tree.behaviors.sync_localization import SyncLocalization
+from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.update_constraints import GoalToConstraints
@@ -51,127 +49,148 @@ from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import PluginBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
-from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
 
+T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])
 
-class TreeManager(object):
-    god_map: GodMap
 
-    class ManagerNode(object):
-        def __init__(self, node, parent, position):
-            """
-            :param node: the behavior that is represented by this ManagerNode
-            :type node: py_trees.behaviour.Behaviour
-            :param parent: the parent of the behavior that is represented by this ManagerNode
-            :type parent: py_trees.behaviour.Behaviour
-            :param position: the position of the node in the list of children of the parent
-            :type position: int
-            """
-            self.node = node
-            self.parent = parent
-            self.position = position
-            self.disabled_children = SortedList()
-            self.enabled_children = SortedList()
+def running_is_success(cls: T) -> T:
+    return py_trees.meta.running_is_success(cls)
 
-        def __lt__(self, other):
-            return self.position < other.position
 
-        def __gt__(self, other):
-            return self.position > other.position
+def success_is_failure(cls: T) -> T:
+    return py_trees.meta.success_is_failure(cls)
 
-        def __eq__(self, other):
-            return self.node == other.node and self.parent == other.parent
 
-        def disable_child(self, manager_node):
-            """
-            marks the given manager node as disabled in the internal tree representation and removes it to the behavior tree
-            :param manager_node:
-            :type manager_node: TreeManager.ManagerNode
-            :return:
-            """
-            self.enabled_children.remove(manager_node)
-            self.disabled_children.add(manager_node)
-            if isinstance(self.node, PluginBehavior):
-                self.node.remove_plugin(manager_node.node.name)
-            else:
-                self.node.remove_child(manager_node.node)
+def failure_is_success(cls: T) -> T:
+    return py_trees.meta.failure_is_success(cls)
 
-        def enable_child(self, manager_node):
-            """
-            marks the given manager node as enabled in the internal tree representation and adds it to the behavior tree
-            :param manager_node:
-            :type manager_node: TreeManager.ManagerNode
-            :return:
-            """
-            self.disabled_children.remove(manager_node)
+
+def running_is_failure(cls: T) -> T:
+    return py_trees.meta.running_is_failure(cls)
+
+
+def failure_is_running(cls: T) -> T:
+    return py_trees.meta.failure_is_running(cls)
+
+
+class ManagerNode:
+    def __init__(self, node, parent, position: int):
+        """
+        :param node: the behavior that is represented by this ManagerNode
+        :type node: ManagerNode
+        :param parent: the parent of the behavior that is represented by this ManagerNode
+        :type parent: ManagerNode
+        :param position: the position of the node in the list of children of the parent
+        """
+        self.node = node
+        self.parent = parent
+        self.position = position
+        self.disabled_children = SortedList()
+        self.enabled_children = SortedList()
+
+    def __lt__(self, other):
+        return self.position < other.position
+
+    def __gt__(self, other):
+        return self.position > other.position
+
+    def __eq__(self, other):
+        return self.node == other.node and self.parent == other.parent
+
+    def disable_child(self, manager_node):
+        """
+        marks the given manager node as disabled in the internal tree representation and removes it to the behavior tree
+        :param manager_node:
+        :type manager_node: ManagerNode
+        :return:
+        """
+        self.enabled_children.remove(manager_node)
+        self.disabled_children.add(manager_node)
+        if isinstance(self.node, PluginBehavior):
+            self.node.remove_plugin(manager_node.node.name)
+        else:
+            self.node.remove_child(manager_node.node)
+
+    def enable_child(self, manager_node):
+        """
+        marks the given manager node as enabled in the internal tree representation and adds it to the behavior tree
+        :param manager_node:
+        :type manager_node: TreeManager.ManagerNode
+        :return:
+        """
+        self.disabled_children.remove(manager_node)
+        self.enabled_children.add(manager_node)
+        if isinstance(self.node, PluginBehavior):
+            self.node.add_plugin(manager_node.node)
+        else:
+            idx = self.enabled_children.index(manager_node)
+            self.node.insert_child(manager_node.node, idx)
+
+    def add_child(self, manager_node):
+        """
+        adds the given manager node to the internal tree map and the corresponding behavior to the behavior tree
+        :param manager_node:
+        :type manager_node: TreeManager.ManagerNode
+        :return:
+        """
+        if isinstance(self.node, PluginBehavior):
             self.enabled_children.add(manager_node)
-            if isinstance(self.node, PluginBehavior):
-                self.node.add_plugin(manager_node.node)
+            self.node.add_plugin(manager_node.node)
+        else:
+            if manager_node.position < 0:
+                manager_node.position = 0
+                if self.enabled_children:
+                    manager_node.position = max(manager_node.position, self.enabled_children[-1].position + 1)
+                if self.disabled_children:
+                    manager_node.position = max(manager_node.position, self.disabled_children[-1].position + 1)
+                idx = manager_node.position
             else:
-                idx = self.enabled_children.index(manager_node)
-                self.node.insert_child(manager_node.node, idx)
-
-        def add_child(self, manager_node):
-            """
-            adds the given manager node to the internal tree map and the corresponding behavior to the behavior tree
-            :param manager_node:
-            :type manager_node: TreeManager.ManagerNode
-            :return:
-            """
-            if isinstance(self.node, PluginBehavior):
-                self.enabled_children.add(manager_node)
-                self.node.add_plugin(manager_node.node)
-            else:
-                if manager_node.position < 0:
-                    manager_node.position = 0
-                    if self.enabled_children:
-                        manager_node.position = max(manager_node.position, self.enabled_children[-1].position + 1)
-                    if self.disabled_children:
-                        manager_node.position = max(manager_node.position, self.disabled_children[-1].position + 1)
-                    idx = manager_node.position
-                else:
-                    idx = self.disabled_children.bisect_left(manager_node)
-                    for c in self.disabled_children.islice(start=idx):
-                        c.position += 1
-                    idx = self.enabled_children.bisect_left(manager_node)
-                    for c in self.enabled_children.islice(start=idx):
-                        c.position += 1
-                self.node.insert_child(manager_node.node, idx)
-                self.enabled_children.add(manager_node)
-
-        def remove_child(self, manager_node):
-            """
-            removes the given manager_node from the internal tree map and the corresponding behavior from the behavior tree
-            :param manager_node:
-            :type manager_node: TreeManager.ManagerNode
-            :return:
-            """
-            if isinstance(self.node, PluginBehavior):
-                if manager_node in self.enabled_children:
-                    self.enabled_children.remove(manager_node)
-                    self.node.remove_plugin(manager_node.node.name)
-                elif manager_node in self.disabled_children:
-                    self.disabled_children.remove(manager_node)
-                else:
-                    raise RuntimeError(
-                        'could not remove node from parent. this probably means that the tree is inconsistent')
-            else:
-                if manager_node in self.enabled_children:
-                    self.enabled_children.remove(manager_node)
-                    self.node.remove_child(manager_node.node)
-                elif manager_node in self.disabled_children:
-                    self.disabled_children.remove(manager_node)
-                else:
-                    raise RuntimeError('could not remove node. this probably means that the tree is inconsistent')
-                idx = self.disabled_children.bisect_right(manager_node)
+                idx = self.disabled_children.bisect_left(manager_node)
                 for c in self.disabled_children.islice(start=idx):
-                    c.position -= 1
-                idx = self.enabled_children.bisect_right(manager_node)
+                    c.position += 1
+                idx = self.enabled_children.bisect_left(manager_node)
                 for c in self.enabled_children.islice(start=idx):
-                    c.position -= 1
+                    c.position += 1
+            self.node.insert_child(manager_node.node, idx)
+            self.enabled_children.add(manager_node)
+
+    def remove_child(self, manager_node):
+        """
+        removes the given manager_node from the internal tree map and the corresponding behavior from the behavior tree
+        :param manager_node:
+        :type manager_node: TreeManager.ManagerNode
+        :return:
+        """
+        if isinstance(self.node, PluginBehavior):
+            if manager_node in self.enabled_children:
+                self.enabled_children.remove(manager_node)
+                self.node.remove_plugin(manager_node.node.name)
+            elif manager_node in self.disabled_children:
+                self.disabled_children.remove(manager_node)
+            else:
+                raise RuntimeError(
+                    'could not remove node from parent. this probably means that the tree is inconsistent')
+        else:
+            if manager_node in self.enabled_children:
+                self.enabled_children.remove(manager_node)
+                self.node.remove_child(manager_node.node)
+            elif manager_node in self.disabled_children:
+                self.disabled_children.remove(manager_node)
+            else:
+                raise RuntimeError('could not remove node. this probably means that the tree is inconsistent')
+            idx = self.disabled_children.bisect_right(manager_node)
+            for c in self.disabled_children.islice(start=idx):
+                c.position -= 1
+            idx = self.enabled_children.bisect_right(manager_node)
+            for c in self.enabled_children.islice(start=idx):
+                c.position -= 1
+
+
+class TreeManager:
+    god_map: GodMap
 
     @profile
     def __init__(self, god_map, tree=None):
@@ -226,7 +245,7 @@ class TreeManager(object):
         return self
 
     def live(self):
-        sleeper = rospy.Rate(1/self.god_map.get_data(identifier.tree_tick_rate))
+        sleeper = rospy.Rate(1 / self.god_map.get_data(identifier.tree_tick_rate))
         logging.loginfo('giskard is ready')
         while not rospy.is_shutdown():
             try:
@@ -263,13 +282,13 @@ class TreeManager(object):
         :param idx: 0 if root
         :return:
         """
-        manager_node = TreeManager.ManagerNode(node=node, parent=parent, position=idx)
+        manager_node = ManagerNode(node=node, parent=parent, position=idx)
         if parent is not None:
             parent.enabled_children.add(manager_node)
         if isinstance(node, PluginBehavior):
             children = node.get_plugins()
             for child_name in children:
-                child_node = TreeManager.ManagerNode(node=children[child_name], parent=manager_node, position=0)
+                child_node = ManagerNode(node=children[child_name], parent=manager_node, position=0)
                 self.tree_nodes[child_name] = child_node
                 manager_node.enabled_children.add(child_node)
         self.tree_nodes[node.name] = manager_node
@@ -316,7 +335,7 @@ class TreeManager(object):
         if node.name in self.tree_nodes:
             raise ValueError('node with that name already exists')
         parent = self.tree_nodes[parent_name]
-        tree_node = TreeManager.ManagerNode(node=node, parent=parent, position=position)
+        tree_node = ManagerNode(node=node, parent=parent, position=position)
         parent.add_child(tree_node)
         self.tree_nodes[node.name] = tree_node
         node.setup(1.0)
@@ -453,7 +472,7 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                 (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
                 proposed_dot_name = name
                 color = 'black'
-                if (isinstance(c, GiskardBehavior) or (hasattr(c,'original')
+                if (isinstance(c, GiskardBehavior) or (hasattr(c, 'original')
                                                        and isinstance(c.original, GiskardBehavior))) \
                         and not isinstance(c, PluginBehavior) and profile is not None:
                     if hasattr(c, 'original'):
@@ -461,10 +480,11 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                     else:
                         file_name = str(c.__class__).split('.')[-2]
                     if file_name in profile:
-                        max_time = max(profile[file_name].values(), key=lambda x: 0 if x=='n/a' else x)
+                        max_time = max(profile[file_name].values(), key=lambda x: 0 if x == 'n/a' else x)
                         if max_time > 1:
                             color = 'red'
-                        proposed_dot_name += '\n' + '\n'.join(['{}= {}'.format(k, v) for k,v in sorted(profile[file_name].items())])
+                        proposed_dot_name += '\n' + '\n'.join(
+                            ['{}= {}'.format(k, v) for k, v in sorted(profile[file_name].items())])
 
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
@@ -505,8 +525,8 @@ class OpenLoop(TreeManager):
         sync.add_child(WorldUpdater('update world'))
         sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
                                                              self.god_map.unsafe_get_data(identifier.robot_group_name)))
-        sync.add_child(SyncLocalization('update robot localization',
-                                        self.god_map.unsafe_get_data(identifier.robot_group_name)))
+        sync.add_child(SyncTfFrames('update robot localization',
+                                    **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -703,7 +723,6 @@ def check_derivatives(entries, name):
     if max(weight_ids) != len(weight_ids):
         raise AttributeError(
             '{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
-
 
 # def check_velocity_limits_reachable(god_map):
 #     # TODO a more general version of this

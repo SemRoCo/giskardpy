@@ -1,10 +1,8 @@
 parent: !include default.yaml
 robot_interface:
   base:
-    plugin: SendFollowJointTrajectoryOmniDrive
-    namespace: /whole_body_controller/base/follow_joint_trajectory
-    state_topic: /whole_body_controller/base/state
-    fill_velocity_values: True
+    plugin: SendTrajectoryOmniDrive
+    cmd_vel_topic: /pr2/cmd_vel
     drive:
       type: OmniDrive
       parent_link_name: odom_combined
@@ -16,9 +14,13 @@ robot_interface:
       rotation_velocity_limit: 1
   body:
     plugin: SendFollowJointTrajectory
-    namespace: /whole_body_controller/body/follow_joint_trajectory
-    state_topic: /whole_body_controller/body/state
+    namespace: /pr2/whole_body_controller/follow_joint_trajectory
+    state_topic: /pr2/whole_body_controller/state
     fill_velocity_values: False
+plugins:
+  SyncTfFrames:
+    frames:
+      - [map, odom_combined]
 general_options:
   joint_weights:
     # the planner prefers low weight joints to achieve solutions

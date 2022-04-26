@@ -95,6 +95,9 @@ GoalReached_window_size = plugins + ['GoalReached', 'window_size']
 
 TFPublisher = plugins + ['TFPublisher']
 
+SyncTfFrames = plugins + ['SyncTfFrames']
+SyncTfFrames_frames = SyncTfFrames + ['frames']
+
 # reachability check
 reachability_check = rosparam + ['reachability_check']
 rc_sample_period = reachability_check + ['sample_period']

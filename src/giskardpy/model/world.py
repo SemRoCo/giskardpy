@@ -22,7 +22,7 @@ from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
     PrismaticJoint, RevoluteJoint, ContinuousJoint, OmniDrive
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.my_types import my_string
+from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize
@@ -446,14 +446,29 @@ class WorldTree(object):
     @profile
     def delete_all_but_robot(self):
         self._clear()
+        frames_to_sync = self.god_map.unsafe_get_data(identifier.SyncTfFrames_frames)
+        self._add_tf_links(frames_to_sync)
         base_drive = self.god_map.unsafe_get_data(identifier.robot_base_drive)
         drive_joint = OmniDrive(god_map=self.god_map,
                                 name='brumbrum',
                                 **base_drive)
-        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=None, prefix=None)
+        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
+                      group_name=None,
+                      prefix=None,
+                      parent_link_name=drive_joint.parent_link_name)
         self._replace_joint(drive_joint)
         self.fast_all_fks = None
         self.notify_model_change()
+
+    def _add_tf_links(self, frames):
+        for parent_link_name, child_link_name in frames:
+            if parent_link_name not in self.links:
+                raise PhysicsWorldException(f'Parent link name {parent_link_name} does not exist.')
+            if child_link_name in self.links:
+                raise DuplicateNameException(f'Child link name {child_link_name} already exist.')
+            child_link = Link(child_link_name)
+            self._add_link(child_link)
+            self._add_fixed_joint(self.links[parent_link_name], child_link)
 
     def _set_joint_limits(self, linear_limits, angular_limits, order):
         for joint_name in self.movable_joints:  # type: OneDofJoint
@@ -550,10 +565,11 @@ class WorldTree(object):
         self.notify_model_change()
 
     @profile
-    def update_joint_parent_T_child(self, joint_name, new_parent_T_child):
+    def update_joint_parent_T_child(self, joint_name: my_string, new_parent_T_child: expr_matrix, notify: bool = True):
         joint = self.joints[joint_name]
         joint.parent_T_child = new_parent_T_child
-        self.notify_model_change()
+        if notify:
+            self.notify_model_change()
 
     def move_group(self, group_name, new_parent_link_name):
         group = self.groups[group_name]

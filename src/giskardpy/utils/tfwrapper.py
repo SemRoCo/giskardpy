@@ -13,8 +13,8 @@ from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
-tfBuffer = None  # type: Buffer
-tf_listener = None
+tfBuffer: Buffer
+tf_listener: TransformListener
 
 
 def init(tf_buffer_size=15):
@@ -273,6 +273,15 @@ def kdl_to_pose(frame):
     return p
 
 
+def kdl_to_transform(frame: PyKDL.Frame) -> Transform:
+    t = Transform()
+    t.translation.x = frame.p[0]
+    t.translation.y = frame.p[1]
+    t.translation.z = frame.p[2]
+    t.rotation = normalize(Quaternion(*frame.M.GetQuaternion()))
+    return t
+
+
 def kdl_to_pose_stamped(frame, frame_id):
     """
     :type frame: PyKDL.Frame
@@ -356,12 +365,12 @@ def kdl_to_np(kdl_thing):
                          [0, 0, 0, 1]])
 
 
-def np_to_pose(matrix):
-    """
-    :type matrix: np.ndarray
-    :rtype: Pose
-    """
+def np_to_pose(matrix: np.ndarray) -> Pose:
     return kdl_to_pose(np_to_kdl(matrix))
+
+
+def np_to_transform(matrix: np.ndarray) -> Transform:
+    return kdl_to_transform(np_to_kdl(matrix))
 
 
 def pose_to_np(msg):

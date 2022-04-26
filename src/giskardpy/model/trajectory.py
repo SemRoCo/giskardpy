@@ -40,11 +40,7 @@ class Trajectory(object):
     def values(self):
         return self._points.values()
 
-    def to_msg(self, sample_period, joints: List[Joint], fill_velocity_values):
-        """
-        :type traj: giskardpy.data_types.Trajectory
-        :return: JointTrajectory
-        """
+    def to_msg(self, sample_period: float, joints: List[Joint], fill_velocity_values: bool = True) -> JointTrajectory:
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
         trajectory_msg.joint_names = []

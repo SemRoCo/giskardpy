@@ -18,7 +18,8 @@ from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, External
 from giskardpy.goals.goal import Goal
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard, \
+    catch_and_raise_to_blackboard
 
 
 class GoalToConstraints(GetGoal):
@@ -43,53 +44,52 @@ class GoalToConstraints(GetGoal):
         self.clear_blackboard_exception()
 
     @profile
+    @catch_and_raise_to_blackboard
     def update(self):
         # TODO make this interruptable
+        loginfo('Parsing goal message.')
+        move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
+        if not move_cmd:
+            return Status.FAILURE
+
+        self.get_god_map().set_data(identifier.goals, {})
+
+        self.soft_constraints = {}
+        self.vel_constraints = {}
+        self.debug_expr = {}
+
         try:
-            loginfo('Parsing goal message.')
-            move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
-            if not move_cmd:
-                return Status.FAILURE
-
-            self.get_god_map().set_data(identifier.goals, {})
-
-            self.soft_constraints = {}
-            self.vel_constraints = {}
-            self.debug_expr = {}
-
-            try:
-                self.parse_constraints(move_cmd)
-            except AttributeError:
-                self.raise_to_blackboard(InvalidGoalException('couldn\'t transform goal'))
-                traceback.print_exc()
-                return Status.SUCCESS
-            except Exception as e:
-                self.raise_to_blackboard(e)
-                traceback.print_exc()
-                return Status.SUCCESS
-
-            if not (self.get_god_map().get_data(identifier.check_reachability)) and \
-                    self.god_map.get_data(identifier.collision_checker) is not None:
-                self.parse_collision_entries(move_cmd.collisions)
-
-            self.get_god_map().set_data(identifier.constraints, self.soft_constraints)
-            self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
-            self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
-
-            if self.get_god_map().get_data(identifier.check_reachability):
-                self.raise_to_blackboard(NotImplementedError('reachability check is not implemented'))
-                return Status.SUCCESS
-
-            l = self.active_free_symbols()
-            free_variables = list(sorted([v for v in self.world.joint_constraints if v.position_name in l],
-                                         key=lambda x: x.position_name))
-            self.get_god_map().set_data(identifier.free_variables, free_variables)
-            loginfo('Done parsing goal message.')
+            self.parse_constraints(move_cmd)
+        except AttributeError:
+            raise_to_blackboard(InvalidGoalException('couldn\'t transform goal'))
+            traceback.print_exc()
             return Status.SUCCESS
         except Exception as e:
+            raise_to_blackboard(e)
             traceback.print_exc()
-            self.raise_to_blackboard(e)
-            return Status.FAILURE
+            return Status.SUCCESS
+
+        if not (self.get_god_map().get_data(identifier.check_reachability)) and \
+                self.god_map.get_data(identifier.collision_checker) is not None:
+            self.parse_collision_entries(move_cmd.collisions)
+
+        self.get_god_map().set_data(identifier.constraints, self.soft_constraints)
+        self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
+        if len(self.soft_constraints) == 0 and len(self.vel_constraints) == 0:
+            raise GiskardException('Goals parsing resulted in no soft or velocity constraints')
+        self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
+
+        if self.get_god_map().get_data(identifier.check_reachability):
+            raise NotImplementedError('reachability check is not implemented')
+
+        l = self.active_free_symbols()
+        free_variables = list(sorted([v for v in self.world.joint_constraints if v.position_name in l],
+                                     key=lambda x: x.position_name))
+        if len(free_variables) == 0:
+            raise GiskardException('Goal parsing resulted in no free variables.')
+        self.get_god_map().set_data(identifier.free_variables, free_variables)
+        loginfo('Done parsing goal message.')
+        return Status.SUCCESS
 
     def active_free_symbols(self):
         symbols = set()
@@ -225,11 +225,11 @@ class GoalToConstraints(GetGoal):
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
         for joint_name in controlled_joints:
-            child_links = self.robot.get_directly_controlled_child_links_with_collisions(joint_name)
+            child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name)
             if child_links:
                 number_of_repeller = config[joint_name]['number_of_repeller']
                 for i in range(number_of_repeller):
-                    child_link = self.robot.joints[joint_name].child_link_name
+                    child_link = self.world.joints[joint_name].child_link_name
                     hard_threshold = config[joint_name]['hard_threshold']
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override

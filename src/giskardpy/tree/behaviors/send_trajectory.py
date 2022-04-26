@@ -10,6 +10,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
 from giskardpy.model.joints import OneDofJoint
+from giskardpy.utils.utils import raise_to_blackboard
 
 try:
     import pr2_controllers_msgs.msg
@@ -106,7 +107,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
     @profile
     def initialise(self):
-        super(SendFollowJointTrajectory, self).initialise()
+        super().initialise()
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
@@ -158,16 +159,16 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 e = FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(msg)
             else:
                 e = ExecutionException(msg)
-            self.raise_to_blackboard(e)
+            raise_to_blackboard(e)
             return py_trees.Status.FAILURE
         if self.action_client.get_state() in [GoalStatus.PREEMPTED, GoalStatus.PREEMPTING]:
             if rospy.get_rostime() > self.max_deadline:
                 msg = '\'{}\' preempted, ' \
                       'probably because it took to long to execute the goal.'.format(self.action_namespace)
-                self.raise_to_blackboard(ExecutionTimeoutException(msg))
+                raise_to_blackboard(ExecutionTimeoutException(msg))
             else:
                 msg = '\'{}\' preempted. Stopping execution.'.format(self.action_namespace)
-                self.raise_to_blackboard(ExecutionPreemptedException(msg))
+                raise_to_blackboard(ExecutionPreemptedException(msg))
             logging.logerr(msg)
             return py_trees.Status.FAILURE
 
@@ -176,7 +177,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             if current_time < self.min_deadline:
                 msg = '\'{}\' executed too quickly, stopping execution.'.format(self.action_namespace)
                 e = ExecutionSucceededPrematurely(msg)
-                self.raise_to_blackboard(e)
+                raise_to_blackboard(e)
                 return py_trees.Status.FAILURE
             self.feedback_message = "goal reached"
             logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
@@ -189,7 +190,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             self.cancel_tries += 1
             if self.cancel_tries > 5:
                 logging.logwarn('\'{}\' didn\'t cancel execution after 5 tries.'.format(self.action_namespace))
-                self.raise_to_blackboard(ExecutionTimeoutException(msg))
+                raise_to_blackboard(ExecutionTimeoutException(msg))
                 return py_trees.Status.FAILURE
             return py_trees.Status.RUNNING
 

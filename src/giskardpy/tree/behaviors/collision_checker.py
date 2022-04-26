@@ -7,6 +7,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.utils import raise_to_blackboard
 
 
 class CollisionChecker(GiskardBehavior):
@@ -54,7 +55,7 @@ class CollisionChecker(GiskardBehavior):
             self.collision_scene.sync()
             super(CollisionChecker, self).initialise()
         except Exception as e:
-            self.raise_to_blackboard(e)
+            raise_to_blackboard(e)
 
 
     @profile

@@ -1,5 +1,6 @@
 from threading import Thread
 import control_msgs
+import numpy as np
 from geometry_msgs.msg import Twist
 from py_trees import Status
 from rospy import ROSException
@@ -16,11 +17,13 @@ import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
+from giskardpy.utils.utils import catch_and_raise_to_blackboard, raise_to_blackboard
 
 
 class SendTrajectoryOmniDrive(GiskardBehavior):
     min_deadline: rospy.Time
     max_deadline: rospy.Time
+    update_thread: Thread
     supported_state_types = [Twist]
 
     @profile
@@ -50,14 +53,16 @@ class SendTrajectoryOmniDrive(GiskardBehavior):
         loginfo('Received controlled joints from \'{}\'.'.format(cmd_vel_topic))
 
     @profile
+    @catch_and_raise_to_blackboard
     def initialise(self):
         super().initialise()
         self.trajectory = self.get_god_map().get_data(identifier.trajectory)
-        # self.trajectory = self.trajectory.to_msg(0.05, ['diff_drive/trans', 'diff_drive/rot'], True)
-        self.trajectory = self.trajectory.to_msg(0.05, ['diff_drive/r_wheel', 'diff_drive/l_wheel'], True)
+        sample_period = self.god_map.unsafe_get_data(identifier.sample_period)
+        self.trajectory = self.trajectory.to_msg(sample_period, [self.world.joints['brumbrum']], True)
         self.update_thread = Thread(target=self.worker)
         self.update_thread.start()
 
+    @catch_and_raise_to_blackboard
     def update(self):
         if self.update_thread.is_alive():
             return Status.RUNNING
@@ -70,14 +75,12 @@ class SendTrajectoryOmniDrive(GiskardBehavior):
         dt = self.trajectory.points[1].time_from_start.to_sec() - self.trajectory.points[0].time_from_start.to_sec()
         r = rospy.Rate(1 / dt)
         for traj_point in self.trajectory.points:  # type: JointTrajectoryPoint
-            wheel_dist = 0.404
-            wheel_radius = 0.098
-            r_wheel_vel = traj_point.velocities[0]
-            l_wheel_vel = traj_point.velocities[1]
-            rot_vel = wheel_radius / wheel_dist * (r_wheel_vel - l_wheel_vel)
-            trans_vel = wheel_radius / 2 * (r_wheel_vel + l_wheel_vel)
-            cmd.linear.x = trans_vel
-            cmd.angular.z = rot_vel
+            fk = self.world.get_fk('base_footprint', 'odom_combined')
+            translation_velocity = np.array([traj_point.velocities[0], traj_point.velocities[1], 0, 0])
+            translation_velocity = np.dot(fk, translation_velocity)
+            cmd.linear.x = translation_velocity[0]
+            cmd.linear.y = translation_velocity[1]
+            cmd.angular.z = traj_point.velocities[2]
             self.vel_pub.publish(cmd)
             r.sleep()
         self.vel_pub.publish(Twist())

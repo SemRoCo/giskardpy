@@ -74,7 +74,7 @@ class _JointState(object):
 
 class JointStates(defaultdict):
     def __init__(self, *args, **kwargs):
-        super(JointStates, self).__init__(_JointState, *args, **kwargs)
+        super().__init__(_JointState, *args, **kwargs)
 
     @classmethod
     def from_msg(cls, msg, prefix=None):

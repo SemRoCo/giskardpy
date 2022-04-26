@@ -1,4 +1,4 @@
-from typing import Type, TypeVar, Union, Generic
+from typing import Type, TypeVar, Union
 
 import py_trees
 import pydot
@@ -41,6 +41,7 @@ from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
+from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.update_constraints import GoalToConstraints
@@ -525,8 +526,9 @@ class OpenLoop(TreeManager):
         sync.add_child(WorldUpdater('update world'))
         sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
                                                              self.god_map.unsafe_get_data(identifier.robot_group_name)))
-        sync.add_child(SyncTfFrames('update robot localization',
+        sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
+        sync.add_child(running_is_success(SyncOdometry)('sync odometry', odometry_topic='pr2/base_footprint'))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -635,6 +637,8 @@ class OpenLoop(TreeManager):
                                                                          identifier.action_server_name),
                                                                      MoveFeedback.EXECUTION))
         publish_result.add_child(execute_canceled)
+        publish_result.add_child(running_is_failure(SyncOdometry)('sync odometry',
+                                                                  odometry_topic='pr2/base_footprint'))
         publish_result.add_child(execution_action_server)
         publish_result.add_child(SetErrorCode('set error code', 'Execution'))
 

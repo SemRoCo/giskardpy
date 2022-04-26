@@ -6,6 +6,7 @@ import json
 import os
 import pkgutil
 import sys
+import traceback
 from collections import OrderedDict
 from contextlib import contextmanager
 from functools import wraps
@@ -19,6 +20,7 @@ import rospkg
 import rospy
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
+from py_trees import Status, Blackboard
 from rospy_message_converter.message_converter import \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
@@ -398,6 +400,24 @@ def memoize(function):
             rv = function(*args, **kwargs)
             memo[key] = rv
             return rv
+
+    return wrapper
+
+
+def raise_to_blackboard(exception):
+    Blackboard().set('exception', exception)
+
+
+def catch_and_raise_to_blackboard(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        try:
+            r = function(*args, **kwargs)
+        except Exception as e:
+            traceback.print_exc()
+            raise_to_blackboard(e)
+            return Status.FAILURE
+        return r
 
     return wrapper
 

@@ -10,7 +10,7 @@ import pandas as pd
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import OutOfJointLimitsException, \
-    HardConstraintsViolatedException
+    HardConstraintsViolatedException, QPSolverException
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
@@ -537,11 +537,13 @@ class QPController:
         :type free_variables: list
         """
         # TODO check for empty goals
+        if len(free_variables) == 0:
+            raise QPSolverException('Cannot solve qp with no free variables')
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
         self.order = min(self.prediction_horizon + 1, max(v.order for v in self.free_variables))
-        assert duplicates == set(), 'there are free variables with the same name: {}'.format(duplicates)
+        assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def get_free_variable(self, name):
         """

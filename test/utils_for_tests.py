@@ -410,7 +410,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
         super(GiskardTestWrapper, self).__init__(node_name='tests')
         self.results = Queue(100)
-        self.default_root = self.robot.root_link_name.short_name
+        self.default_root = self.world.root_link_name.long_name
         self.map = 'map'
         self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
         self.goal_checks = defaultdict(list)
@@ -705,9 +705,9 @@ class GiskardTestWrapper(GiskardWrapper):
         trajectory_pos = self.get_result_trajectory_position()
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         for joint_name in controlled_joints:
-            if isinstance(self.robot.joints[joint_name], OneDofJoint):
-                if not self.robot.is_joint_continuous(joint_name):
-                    joint_limits = self.robot.get_joint_position_limits(joint_name)
+            if isinstance(self.world.joints[joint_name], OneDofJoint):
+                if not self.world.is_joint_continuous(joint_name):
+                    joint_limits = self.world.get_joint_position_limits(joint_name)
                     error_msg = '{} has violated joint position limit'.format(joint_name)
                     eps = 0.0001
                     np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1] + eps, error_msg)
@@ -1071,6 +1071,7 @@ class PR2(GiskardTestWrapper):
         self.r_gripper_group = 'r_gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
+        self.mujoco_reset = rospy.ServiceProxy('pr2/reset', Trigger)
         super(PR2, self).__init__('package://giskardpy/config/pr2.yaml')
 
     def move_base(self, goal_pose):
@@ -1128,6 +1129,7 @@ class PR2(GiskardTestWrapper):
         self.l_gripper.call(sjs)
 
     def reset(self):
+        self.mujoco_reset()
         self.open_l_gripper()
         self.open_r_gripper()
         self.clear_world()

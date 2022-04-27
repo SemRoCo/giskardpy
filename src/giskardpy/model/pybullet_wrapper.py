@@ -72,7 +72,7 @@ def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientat
     if orientation is None:
         orientation = [0,0,0,1]
     object_name = robot_name_from_urdf_string(urdf_string)
-    if object_name in get_body_names():
+    if object_name in get_body_names(client_id=client_id):
         raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))
     resolved_urdf = resolve_ros_iris_in_urdf(urdf_string)
     filename = write_to_tmp(u'{}.urdf'.format(random_string()), resolved_urdf)
@@ -158,10 +158,11 @@ def clear_pybullet(client_id=0):
     p.resetSimulation(physicsClientId=client_id)
 
 
-def get_body_names():
+def get_body_names(client_id=0):
     # return [p.getBodyInfo(p.getBodyUniqueId(i))[1] for i in range(p.getNumBodies())]
-    return [p.getBodyInfo(p.getBodyUniqueId(i))[1].decode("utf-8")  for i in range(p.getNumBodies())]
+    return [p.getBodyInfo(p.getBodyUniqueId(i, physicsClientId=client_id), physicsClientId=client_id)[1].decode("utf-8")
+            for i in range(p.getNumBodies(physicsClientId=client_id))]
 
 
-def print_body_names():
-    logging.loginfo("".join(get_body_names()))
+def print_body_names(client_id=0):
+    logging.loginfo("".join(get_body_names(client_id=client_id)))

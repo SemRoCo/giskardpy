@@ -24,7 +24,7 @@ class GlobalPlannerNeeded(GetGoal):
 
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.global_path_needed_lock = threading.Lock()
-        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot']
+        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot', 'CartesianPreGrasp']
         self.solver = solver
         
     def setup(self, timeout=5.0):
@@ -73,7 +73,10 @@ class GlobalPlannerNeeded(GetGoal):
                 m = ObjectRayMotionValidator(self.collision_scene, tip_link, self.robot, collision_checker, self.god_map,
                                              js=self.get_god_map().get_data(identifier.joint_states))
                 start = np_to_pose(self.get_robot().get_fk(root_link, tip_link))
-                return not m.check_motion(start, pose_goal)
+                result = not m.check_motion(start, pose_goal)
+                del collision_checker
+                del m
+                return result
 
     def __is_global_path_needed(self, root_link, tip_link, pose_goal, coll_body_ids):
         """

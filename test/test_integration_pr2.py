@@ -2467,7 +2467,6 @@ class TestCartesianPath(object):
         #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
-
     def test_pathAroundKitchenIslandChangedOrientation_with_global_planner2(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
@@ -2499,7 +2498,6 @@ class TestCartesianPath(object):
         #kitchen_setup_avoid_collisions.send_goal()
         #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
-
 
     def test_pathAroundKitchenIslandChangedOrientation_with_global_planner_align_planes1(self, kitchen_setup_avoid_collisions):
         """
@@ -2639,7 +2637,7 @@ class TestCartesianPath(object):
         box_pose.pose.position.y = 0
         box_pose.pose.position.z = 0
         box_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-        kitchen_setup_avoid_collisions.add_box(pose=box_pose, size=(0.5, 0.5, 1))
+        kitchen_setup_avoid_collisions.add_box('box', [0.5, 0.5, 1], pose=box_pose)
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
@@ -3135,7 +3133,7 @@ class TestCartesianPath(object):
         # kitchen_setup.keep_orientation(u'milk')
         # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
         kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], False)
-        self.decrease_external_collision_avoidance(kitchen_setup_avoid_collisions)
+        decrease_external_collision_avoidance(kitchen_setup_avoid_collisions)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      tip_link=kitchen_setup_avoid_collisions.r_tip,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,

@@ -63,27 +63,39 @@ plugins:
     enabled: False
   GlobalPlannerNeeded:
     global_planner_needed: False
+  # Planners
+  # no python support: SPARS, SPARStwo, pRRT, VFRRT, TSRRT
+  # does not work: PDST
+  # not supported yet: CForest and AnytimePathShortening and QRRT
+  # multi-query:
+  #   suboptimal:  ['PRM', 'LazyPRM']
+  #   asymp. opt:  ['PRMstar', 'LazyPRMstar']
+  # single-query:
+  #   suboptimal:  ['RRT', 'RRTConnect', 'TRRT', 'LazyRRT',
+  #                 'EST', 'SBL',
+  #                 'KPIECE1', 'BKPIECE1', 'LBKPIECE1',
+  #                 'FMT', 'BFMT',
+  #                 'STRIDE']
+  #   asymp. opt:  ['BITstar', 'ABITstar'
+  #                 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
+  #                 'AITstar']
   global_planner:
     normal:
       navigation:
-        planner: ['PRM', 'LazyPRM']# sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        planner: ['RRTConnect'] # sublist of above planners
         motion_validator: ['rays', 'discrete'] # sublist of ['rays', 'box', 'discrete']
-        time: 60
+        time: 15
         range: 1.0
       movement:
-        planner: ['RRTConnect'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        planner: ['RRTConnect'] # sublist of above planners
         motion_validator: ['rays', 'discrete'] # sublist of ['rays', 'box', 'discrete']
         time: 30
         range: 0.05
     narrow:
-      #navigation:
-      #  planner: ['RRTConnect', 'ABITstar'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
-      #  motion_validator: [ 'discrete', 'rays' ] # sublist of ['rays', 'box', 'discrete']
-      #  range: 1.0
       movement:
-        planner: ['ABITstar', 'InformedRRTstar', 'RRTConnect'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        planner: ['InformedRRTstar', 'RRTConnect', 'ABITstar'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
         motion_validator: ['discrete', 'rays'] # sublist of ['rays', 'box', 'discrete']
-        time: 60
+        time: 30
         range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True

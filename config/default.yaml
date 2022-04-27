@@ -1,9 +1,4 @@
 reset_god_map: True # will reset god_map in cleanup.py by loading rosparam values if true
-global_planner:
-  navigation:
-    motion_validator: 'rays' # ['rays', 'box', 'discrete']
-  movement:
-    motion_validator: 'rays' # ['rays', 'box', 'discrete']
 general_options:
   path_to_data_folder: !find data # or 'find ros://giskardpy/data'
   enable_gui: False
@@ -68,6 +63,28 @@ plugins:
     enabled: False
   GlobalPlannerNeeded:
     global_planner_needed: False
+  global_planner:
+    normal:
+      navigation:
+        planner: ['PRM', 'LazyPRM']# sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        motion_validator: ['rays', 'discrete'] # sublist of ['rays', 'box', 'discrete']
+        time: 60
+        range: 1.0
+      movement:
+        planner: ['RRTConnect'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        motion_validator: ['rays', 'discrete'] # sublist of ['rays', 'box', 'discrete']
+        time: 30
+        range: 0.05
+    narrow:
+      #navigation:
+      #  planner: ['RRTConnect', 'ABITstar'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+      #  motion_validator: [ 'discrete', 'rays' ] # sublist of ['rays', 'box', 'discrete']
+      #  range: 1.0
+      movement:
+        planner: ['ABITstar', 'InformedRRTstar', 'RRTConnect'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        motion_validator: ['discrete', 'rays'] # sublist of ['rays', 'box', 'discrete']
+        time: 60
+        range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
     history: 5 # will save the x last plots

@@ -1118,7 +1118,7 @@ class TestCartGoals(object):
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi/5, [0, 0, 1]))
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()

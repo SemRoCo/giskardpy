@@ -49,6 +49,7 @@ class SendTrajectoryOmniDrive(GiskardBehavior):
             if isinstance(joint, OmniDrive):
                 # FIXME can only handle one drive
                 self.controlled_joints = [joint]
+                self.joint = joint
         self.world.register_controlled_joints(self.controlled_joints)
         loginfo('Received controlled joints from \'{}\'.'.format(cmd_vel_topic))
 
@@ -75,9 +76,9 @@ class SendTrajectoryOmniDrive(GiskardBehavior):
         dt = self.trajectory.points[1].time_from_start.to_sec() - self.trajectory.points[0].time_from_start.to_sec()
         r = rospy.Rate(1 / dt)
         for traj_point in self.trajectory.points:  # type: JointTrajectoryPoint
-            fk = self.world.get_fk('base_footprint', 'odom_combined')
+            child_T_parent = self.world.get_fk(self.joint.child_link_name, self.joint.parent_link_name)
             translation_velocity = np.array([traj_point.velocities[0], traj_point.velocities[1], 0, 0])
-            translation_velocity = np.dot(fk, translation_velocity)
+            translation_velocity = np.dot(child_T_parent, translation_velocity)
             cmd.linear.x = translation_velocity[0]
             cmd.linear.y = translation_velocity[1]
             cmd.angular.z = traj_point.velocities[2]

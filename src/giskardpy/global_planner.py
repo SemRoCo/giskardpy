@@ -2028,6 +2028,7 @@ class GlobalPlanner(GetGoal):
               navigation=False, movement=False, narrow=False):
         for motion_validator_type in motion_validator_types:
             for planner_name in planner_names:
+                rospy.loginfo(f'Starting search with Global Planner {planner_name}/{motion_validator_type} ...')
                 planner_f = self.get_planner_handle(navigation=navigation, movement=movement, narrow=narrow)
                 planner = planner_f(planner_name, motion_validator_type, range, time)
                 js = self.get_god_map().get_data(identifier.joint_states)

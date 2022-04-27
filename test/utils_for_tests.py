@@ -37,7 +37,7 @@ from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
-from iai_wsg_50_msgs.msg import PositionCmd
+
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -1182,6 +1182,7 @@ class Donbot(GiskardTestWrapper):
     }
 
     def __init__(self):
+        from iai_wsg_50_msgs.msg import PositionCmd
         self.camera_tip = 'camera_link'
         self.gripper_tip = 'gripper_tool_frame'
         self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
@@ -1210,6 +1211,7 @@ class Donbot(GiskardTestWrapper):
         :param width: goal width in m
         :type width: float
         """
+        from iai_wsg_50_msgs.msg import PositionCmd
         width = max(0.0065, min(0.109, width))
         goal = PositionCmd()
         goal.pos = width * 1000

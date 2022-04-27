@@ -1917,7 +1917,9 @@ class GlobalPlanner(GetGoal):
             elif motion_validator_type == 'discrete':
                 return None
             else:
-                return default
+                raise Exception('Unknown motion validator class {}.'.format(motion_validator_type))
+        else:
+            return default
 
     def get_cart_goal(self, cmd):
         try:
@@ -1969,10 +1971,13 @@ class GlobalPlanner(GetGoal):
         self.collision_scene.update_collision_environment()
         map_frame = self.get_god_map().get_data(identifier.map_frame)
         motion_validator_class = self._get_motion_validator_class(motion_validator_type)
-        planner = NavigationPlanner(planner_name, motion_validator_class, range, time,
-                                    self.kitchen_floor_space, self.collision_scene,
-                                    self.robot, self.root_link, self.tip_link, self.goal.pose, map_frame, self.god_map,
-                                    config=self.navigation_config)
+        state_validator_class = TwoDimStateValidator
+        verify_solution_f = verify_ompl_navigation_solution
+        dist = 0.1
+        planner = MovementPlanner(False, planner_name, state_validator_class, motion_validator_class, range, time,
+                                  self.kitchen_floor_space, self.collision_scene,
+                                  self.robot, self.root_link, self.tip_link, self.goal.pose, map_frame, self.god_map,
+                                  config=self.navigation_config, dist=dist, verify_solution_f=verify_solution_f)
         return planner
 
     def _get_movement_planner(self, planner_name, motion_validator_type, range, time):
@@ -1982,10 +1987,13 @@ class GlobalPlanner(GetGoal):
         self.collision_scene.update_collision_environment()
         map_frame = self.get_god_map().get_data(identifier.map_frame)
         motion_validator_class = self._get_motion_validator_class(motion_validator_type)
-        planner = MovementPlanner(planner_name, motion_validator_class, range, time,
+        state_validator_class = ThreeDimStateValidator
+        verify_solution_f = verify_ompl_movement_solution
+        dist = 0
+        planner = MovementPlanner(True, planner_name, state_validator_class, motion_validator_class, range, time,
                                   self.kitchen_space, self.collision_scene,
                                   self.robot, self.root_link, self.tip_link, self.goal.pose, map_frame, self.god_map,
-                                  config=self.movement_config, sampling_goal_axis=sampling_goal_axis)
+                                  config=self.movement_config, dist=dist, verify_solution_f=verify_solution_f)
         return planner
 
     def _get_narrow_movement_planner(self, planner_name, motion_validator_type, range, time):
@@ -1995,11 +2003,14 @@ class GlobalPlanner(GetGoal):
         self.collision_scene.update_collision_environment()
         map_frame = self.get_god_map().get_data(identifier.map_frame)
         motion_validator_class = self._get_motion_validator_class(motion_validator_type)
-        planner = NarrowMovementPlanner(planner_name, motion_validator_class, range, time,
+        state_validator_class = ThreeDimStateValidator
+        verify_solution_f = verify_ompl_movement_solution
+        dist = 0
+        planner = NarrowMovementPlanner(planner_name, state_validator_class, motion_validator_class, range, time,
                                         self.kitchen_space, self.collision_scene,
                                         self.robot, self.root_link, self.tip_link, self.goal.pose, map_frame,
-                                        self.god_map,
-                                        config=self.movement_config, sampling_goal_axis=sampling_goal_axis)
+                                        self.god_map, config=self.movement_config, dist=dist,
+                                        sampling_goal_axis=sampling_goal_axis, verify_solution_f=verify_solution_f)
         return planner
 
     def get_planner_handle(self, navigation=False, movement=False, narrow=False):
@@ -2179,8 +2190,9 @@ class GlobalPlanner(GetGoal):
 
 class OMPLPlanner(object):
 
-    def __init__(self, is_3D, planner_name, motion_validator_class, range, time, space, collision_scene, robot,
-                 root_link, tip_link, pose_goal, map_frame, config, god_map):
+    def __init__(self, is_3D, planner_name, state_validator_class, motion_validator_class, range, time, space,
+                 collision_scene, robot, root_link, tip_link, pose_goal, map_frame, config, god_map,
+                 verify_solution_f=None, dist=0.0):
         self.setup = None
         self.is_3D = is_3D
         self.space = space
@@ -2193,9 +2205,12 @@ class OMPLPlanner(object):
         self.config = config
         self.god_map = god_map
         self.planner_name = planner_name
+        self.state_validator_class = state_validator_class
         self.motion_validator_class = motion_validator_class
         self.range = range
         self.max_time = time
+        self.verify_solution_f = verify_solution_f
+        self.dist = dist
         self._planner_solve_params = dict()
         self._planner_solve_params['kABITstar'] = {
             'slow_without_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5,
@@ -2291,16 +2306,59 @@ class OMPLPlanner(object):
         # RRTsharp(with opt_obj), SST(with opt_obj), LBTRRT, PDST(many fp), STRIDE, BKPIECE1, FMT
         planner = None
         if self.planner_name is not None:
-            if self.planner_name == 'RRTConnect':
+            # RRT
+            if self.planner_name == 'RRT':
+                planner = og.RRT(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'TRRT':
+                planner = og.TRRT(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'LazyRRT':
+                planner = og.LazyRRT(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'RRTConnect':
                 planner = og.RRTConnect(si)
+                planner.setRange(self.range)
+            #elif self.planner_name == 'QRRT':
+            #    planner = og.QRRT(si) # todo: fixme
+            #    planner.setRange(self.range)
+            # RRTstar
+            elif self.planner_name == 'RRTstar':
+                planner = og.RRTstar(si)
                 planner.setRange(self.range)
             elif self.planner_name == 'InformedRRTstar':
                 planner = og.InformedRRTstar(si)
                 planner.setRange(self.range)
-            elif self.planner_name == 'ABITstar':
-                planner = og.ABITstar(si)
+            elif self.planner_name == 'LBTRRT':
+                planner = og.LBTRRT(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'SST':
+                planner = og.SST(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'RRTXstatic':
+                planner = og.RRTXstatic(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'RRTsharp':
+                planner = og.RRTsharp(si)
+                planner.setRange(self.range)
+            # EST
+            elif self.planner_name == 'EST':
+                planner = og.EST(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'SBL':
+                planner = og.SBL(si)
+                planner.setRange(self.range)
+            # KPIECE
             elif self.planner_name == 'KPIECE1':
                 planner = og.KPIECE1(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'BKPIECE1':
+                planner = og.BKPIECE1(si)
+                planner.setRange(self.range)
+            elif self.planner_name == 'LBKPIECE1':
+                planner = og.LBKPIECE1(si)
+                planner.setRange(self.range)
+            # PRM
             elif self.planner_name == 'PRM':
                 planner = og.PRM(si)
             elif self.planner_name == 'LazyPRM':
@@ -2309,10 +2367,22 @@ class OMPLPlanner(object):
                 planner = og.PRMstar(si)
             elif self.planner_name == 'LazyPRMstar':
                 planner = og.PRM(si)
-            elif self.planner_name == 'SPARS':
-                planner = og.SPARS(si)
-            elif self.planner_name == 'SPARStwo':
-                planner = og.SPARStwo(si)
+            # FMT
+            elif self.planner_name == 'FMT':
+                planner = og.FMT(si)
+            elif self.planner_name == 'BFMT':
+                planner = og.BFMT(si)
+            # BITstar
+            elif self.planner_name == 'BITstar':
+                planner = og.BITstar(si)
+            elif self.planner_name == 'ABITstar':
+                planner = og.ABITstar(si)
+            # Other
+            elif self.planner_name == 'AITstar':
+                planner = og.AITstar(si)
+            elif self.planner_name == 'STRIDE':
+                planner = og.STRIDE(si)
+                planner.setRange(self.range)
             else:
                 raise Exception('Planner name {} is not known.'.format(self.planner_name))
         # planner.setSampleRejection(True)
@@ -2376,8 +2446,8 @@ class OMPLPlanner(object):
                                                                collision_scene, dist=0.0)
         p.motion_validator = ObjectRayMotionValidator(collision_scene, self.tip_link, robot, p.state_validator,
                                                       self.god_map, js=js)
-        pose, debug_pose = p.sample(js, self.tip_link, ompl_se3_state_to_pose(goal()))
-        return pose_to_ompl_se3(self.space, pose)
+        pose, debug_pose = p.sample(js, self.tip_link, ompl_state_to_pose(goal(), self.is_3D))
+        return pose_to_ompl_state(self.space, pose, self.is_3D)
 
     def shorten_path(self, path, goal):
         if type(goal) == ob.State:
@@ -2436,13 +2506,13 @@ class OMPLPlanner(object):
 
 class MovementPlanner(OMPLPlanner):
 
-    def __init__(self, planner_name, motion_validator_class, range, time, kitchen_space, collision_scene, robot,
-                 root_link, tip_link, pose_goal, map_frame, god_map,
-                 config='slow_without_refine', sampling_goal_axis=None):
-        super(MovementPlanner, self).__init__(True, planner_name, motion_validator_class, range, time, kitchen_space,
-                                              collision_scene, robot, root_link, tip_link,
-                                              pose_goal, map_frame, config, god_map)
-        self.sampling_goal_axis = sampling_goal_axis
+    def __init__(self, is_3D, planner_name, state_validator_class, motion_validator_class, range, time, kitchen_space,
+                 collision_scene, robot, root_link, tip_link, pose_goal, map_frame, god_map,
+                 config='slow_without_refine', verify_solution_f=None, dist=0.0):
+        super(MovementPlanner, self).__init__(is_3D, planner_name, state_validator_class, motion_validator_class, range,
+                                              time, kitchen_space, collision_scene, robot, root_link, tip_link,
+                                              pose_goal, map_frame, config, god_map,
+                                              verify_solution_f=verify_solution_f, dist=dist)
 
     def get_planner(self, si):
         # rays do not hit the object:
@@ -2460,6 +2530,7 @@ class MovementPlanner(OMPLPlanner):
             if self.range is None:
                 self.range = 0.05
             planner.setRange(self.range)
+            rospy.logwarn('No global planner specified: using RRTConnect with a range of 0.05m.')
         # planner.setSampleRejection(True)
         # planner.setOrderedSampling(True)
         # planner.setInformedSampling(True)
@@ -2534,34 +2605,46 @@ class MovementPlanner(OMPLPlanner):
             path = self.setup.getSolutionPath()
             # self.shorten_path(path, goal)
             if self.motion_validator_class is None:
-                path.interpolate(int(path.cost(self.optimization_objective).value() / 0.01))
-
+                if self.is_3D:
+                    path.interpolate(int(path.cost(self.optimization_objective).value() / 0.01))
+                else:
+                    self.setup.getSolutionPath().interpolate(20)
             data = ompl_states_matrix_to_np(path.printAsMatrix())  # [x y z xw yw zw w]
             # print the simplified path
             if plot:
-                plt.close()
-                fig, ax = plt.subplots()
-                ax.plot(data[:, 1], data[:, 0])
-                ax.invert_xaxis()
-                ax.set(xlabel='y (m)', ylabel='x (m)',
-                       title=u'2D Path in map - FP: {}, Time: {}s'.format(
-                           verify_ompl_movement_solution(self.setup, debug=True),
-                           self.setup.getLastPlanComputationTime()))
-                # ax = fig.gca(projection='2d')
-                # ax.plot(data[:, 0], data[:, 1], '.-')
-                plt.show()
+                self.plot_solution(data)
         self.setup.clear()
         return data
 
+    def plot_solution(self, data, debug=True):
+        plt.close()
+        dim = '3D' if self.is_3D else '2D'
+        if self.verify_solution_f is not None:
+            verify = ' - FP: {}, Time: {}s'.format(
+                   self.verify_solution_f(self.setup, debug=debug),
+                   self.setup.getLastPlanComputationTime())
+        else:
+            verify = ''
+        fig, ax = plt.subplots()
+        ax.plot(data[:, 1], data[:, 0])
+        ax.invert_xaxis()
+        ax.set(xlabel='y (m)', ylabel='x (m)',
+               title=u'{} Path in map{}'.format(dim, verify))
+        # ax = fig.gca(projection='2d')
+        # ax.plot(data[:, 0], data[:, 1], '.-')
+        plt.show()
+
 
 class NarrowMovementPlanner(MovementPlanner):
-    def __init__(self, planner_name, motion_validator_class, range, time, kitchen_space, collision_scene, robot,
-                 root_link, tip_link, pose_goal, map_frame, god_map,
-                 config='slow_without_refine', sampling_goal_axis=None):
-        super(NarrowMovementPlanner, self).__init__(planner_name, motion_validator_class, range, time, kitchen_space,
+    def __init__(self, planner_name, state_validator_class, motion_validator_class, range, time, kitchen_space,
+                 collision_scene, robot, root_link, tip_link, pose_goal, map_frame, god_map,
+                 config='slow_without_refine', dist=0.1, sampling_goal_axis=None, verify_solution_f=None):
+        super(NarrowMovementPlanner, self).__init__(True, planner_name, state_validator_class,
+                                                    motion_validator_class, range, time, kitchen_space,
                                                     collision_scene, robot, root_link, tip_link,
-                                                    pose_goal, map_frame, god_map, config=config,
-                                                    sampling_goal_axis=sampling_goal_axis)
+                                                    pose_goal, map_frame, god_map, config=config, dist=dist,
+                                                    verify_solution_f=verify_solution_f)
+        self.sampling_goal_axis = sampling_goal_axis
         self.reversed_start_and_goal = False
 
     def recompute_start_and_goal(self, start, goal):
@@ -2618,13 +2701,14 @@ class NarrowMovementPlanner(MovementPlanner):
 
     def get_solution(self, planner_status, plot=True):
         data = super().get_solution(planner_status, plot=plot)
-        if not self.reversed_start_and_goal:
-            data = np.append(data, [np.append(pose_to_np(self.pose_goal)[0], pose_to_np(self.pose_goal)[1])],
-                             axis=0)
-        else:
-            data = np.append(data, [np.append(pose_to_np(ompl_se3_state_to_pose(self.start()))[0],
-                                              pose_to_np(ompl_se3_state_to_pose(self.start()))[1])], axis=0)
-        data = data if not self.reversed_start_and_goal else np.flip(data, axis=0)
+        if len(data) > 0:
+            if not self.reversed_start_and_goal:
+                data = np.append(data, [np.append(pose_to_np(self.pose_goal)[0], pose_to_np(self.pose_goal)[1])],
+                                 axis=0)
+            else:
+                data = np.append(data, [np.append(pose_to_np(ompl_se3_state_to_pose(self.start()))[0],
+                                                  pose_to_np(ompl_se3_state_to_pose(self.start()))[1])], axis=0)
+            data = data if not self.reversed_start_and_goal else np.flip(data, axis=0)
         return data
 
     def plan(self):
@@ -2632,102 +2716,6 @@ class NarrowMovementPlanner(MovementPlanner):
         self.recompute_start_and_goal(self.start, self.goal)
         self.setup.setup()
         return super().plan()
-
-
-class NavigationPlanner(OMPLPlanner):
-
-    def __init__(self, planner_name, motion_validator_class, range, time, kitchen_floor_space, collision_scene, robot,
-                 root_link, tip_link, pose_goal, map_frame, god_map,
-                 config='fast_without_refine'):
-        super(NavigationPlanner, self).__init__(False, planner_name, motion_validator_class, range, time,
-                                                kitchen_floor_space, collision_scene, robot, root_link, tip_link,
-                                                pose_goal, map_frame, config, god_map)
-
-    def get_planner(self, si):
-        # Navigation:
-        # RRTstar, RRTsharp: very sparse(= path length eq max range), high number of fp, slow relative to RRTConnect
-        # RRTConnect: many points, low number of fp
-        # PRMstar: no set_range function, finds no solutions
-        # ABITstar: slow, sparse, but good
-        # if self.fast_navigation:
-        #    planner = og.RRTConnect(si)
-        #    planner.setRange(0.1)
-        # else:
-        planner = super().get_planner(si)
-        if planner is None:
-            planner = og.RRTConnect(si)
-            if self.range is None:
-                self.range = 1.0
-            planner.setRange(self.range)
-        # planner.setIntermediateStates(True)
-        # planner.setup()
-        return planner
-
-    def setup_and_plan(self, js, plot=True):
-
-        si = self.setup.getSpaceInformation()
-        self.collision_checker = GiskardRobotBulletCollisionChecker(self.is_3D, self.robot.root_link, u'base_footprint',
-                                                                    self.collision_scene, dist=0.1)
-        si.setStateValidityChecker(TwoDimStateValidator(si, self.collision_checker))
-        if self.motion_validator_class is not None:
-            self.motion_validator = self.motion_validator_class(self.collision_scene, u'base_footprint', self.robot,
-                                                                self.collision_checker, self.god_map, js=js)
-            si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, self.motion_validator))
-        else:
-            si.setStateValidityCheckingResolution(1. / ((self.space.getMaximumExtent() * 3) / self.range))
-            rospy.loginfo('NavigationPlanner: Using DiscreteMotionValidator with max cost of {} and'
-                          ' validity checking resolution of {} where the maximum distance is {}'
-                          ' achieving a validity checking distance of {}.'
-                          ''.format(self.range,
-                                    si.getStateValidityCheckingResolution(),
-                                    self.space.getMaximumExtent(),
-                                    self.space.getMaximumExtent() * si.getStateValidityCheckingResolution()))
-
-        si.setup()
-        # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(allocGiskardValidStateSample))
-
-        # Set Start and Goal pose for Planner
-        start = self.get_start_state(self.space)
-        goal = self.get_goal_state(self.space)
-        self.setup.setStartAndGoalStates(start, goal)
-
-        # Set Optimization Function
-        # optimization_objective = PathLengthAndGoalOptimizationObjective(self.setup.getSpaceInformation(),
-        #                                                                goal)
-        # self.setup.setOptimizationObjective(optimization_objective)
-
-        if not self.setup.getSpaceInformation().isValid(goal()):
-            raise Exception('The given goal pose is not valid.')  # todo: make GlobalPlanningException
-
-        self.setup.setup()
-        planner_status = self.solve()
-        # og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
-        # og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
-        data = numpy.array([])
-        if planner_status in [ob.PlannerStatus.EXACT_SOLUTION]:
-            # try to shorten the path
-            # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
-            # Make sure enough subpaths are available for Path Following
-            self.setup.getSolutionPath().interpolate(20)
-            data = ompl_states_matrix_to_np(
-                self.setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
-            # print the simplified path
-            if plot:
-                plt.close()
-                fig, ax = plt.subplots()
-                ax.plot(data[:, 1], data[:, 0])
-                ax.invert_xaxis()
-                ax.set(xlabel='y (m)', ylabel='x (m)',
-                       title=u'Navigation Path in map - FP: {}, Time: {}s'.format(
-                           verify_ompl_navigation_solution(self.setup, debug=True),
-                           self.setup.getLastPlanComputationTime()
-                       ))
-                # ax = fig.gca(projection='2d')
-                # ax.plot(data[:, 0], data[:, 1], '.-')
-                plt.show()
-        self.setup.clear()
-        return data
-
 
 def is_3D(space):
     return type(space) == type(ob.SE3StateSpace())

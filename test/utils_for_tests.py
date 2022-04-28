@@ -470,9 +470,10 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         return self.world.groups['robot']
 
-    def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float]):
+    def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float],
+                  expected_error_codes=(DyeGroupResponse.SUCCESS,)):
         res = super(GiskardTestWrapper, self).dye_group(group_name, rgba)
-        assert res.error_codes == DyeGroupResponse.SUCCESS
+        assert res.error_codes in expected_error_codes
 
     def heart_beat(self, timer_thing):
         self.tree.tick()

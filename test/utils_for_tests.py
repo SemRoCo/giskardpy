@@ -1172,7 +1172,8 @@ class PR22(GiskardTestWrapper):
         self.set_bases = dict()
         self.default_roots = dict()
         self.tf_prefix = dict()
-        super(PR22, self).__init__(u'package://giskardpy/config/pr2_twice.yaml', ['pr2_a', 'pr2_b'], ['pr2_a', 'pr2_b'])
+        self.robot_names = ['pr2_a', 'pr2_b']
+        super(PR22, self).__init__(u'package://giskardpy/config/pr2_twice.yaml', self.robot_names , self.robot_names)
         for robot_name in self.namespaces:
             self.r_tips[robot_name] = u'r_gripper_tool_frame'
             self.l_tips[robot_name] = u'l_gripper_tool_frame'
@@ -1249,7 +1250,7 @@ class PR22(GiskardTestWrapper):
         return_val = super(GiskardTestWrapper, self).clear_world()
         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 2
-        assert len(self.get_object_names().object_names) == 2
+        assert len(self.world.robot_names) == 2
         assert self.original_number_of_links == len(self.world.links)
 
     def teleport_base(self, goal_pose, robot_name):

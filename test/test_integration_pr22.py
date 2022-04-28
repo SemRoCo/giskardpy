@@ -1,29 +1,19 @@
 from __future__ import division
 
 import itertools
-import re
-from copy import deepcopy
 
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from numpy import pi
-from sensor_msgs.msg import JointState
-from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
-from giskardpy import identifier
 from giskardpy.data_types import PrefixName
-from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
-from giskardpy.python_interface import DEFAULT_WORLD_TIMEOUT
 from giskardpy.utils import logging
-from utils_for_tests import PR22, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
-    JointGoalChecker
+from utils_for_tests import PR22, compare_poses, compare_points
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -123,7 +113,7 @@ def zero_pose(resetted_giskard):
     """
     resetted_giskard.allow_all_collisions()
     for robot_name in resetted_giskard.robot_names:
-        resetted_giskard.set_joint_goal(resetted_giskard.default_pose, prefix=robot_name)
+        resetted_giskard.set_joint_goal(resetted_giskard.default_pose, group_name=robot_name)
     resetted_giskard.plan_and_execute()
     return resetted_giskard
 
@@ -207,7 +197,7 @@ class TestJointGoals(object):
         """
         zero_pose.allow_all_collisions()
         for robot_name in zero_pose.robot_names:
-            zero_pose.set_joint_goal(pocky_pose, prefix=robot_name)
+            zero_pose.set_joint_goal(pocky_pose, group_name=robot_name)
         zero_pose.plan_and_execute()
 
     def test_joint_movement1b(self, zero_pose):
@@ -223,7 +213,7 @@ class TestJointGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.move_base(p, zero_pose.robot_names[1])
         for robot_name in zero_pose.robot_names:
-            zero_pose.set_joint_goal(pocky_pose, prefix=robot_name)
+            zero_pose.set_joint_goal(pocky_pose, group_name=robot_name)
         zero_pose.plan_and_execute()
 
     def test_partial_joint_state_goal1(self, zero_pose):

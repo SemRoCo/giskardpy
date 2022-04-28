@@ -377,8 +377,10 @@ class WorldTree(object):
         for group_name, subtree in self.groups.items():
             if joint_name in subtree.joints:
                 ret.add(subtree)
-        if len(ret) != 1:
-            raise KeyError(f'Multiple or no groups fround with joint name {joint_name}.')
+        if len(ret) == 0:
+            raise KeyError(f'No groups found with joint name {joint_name}.')
+        if len(ret) > 1:
+            raise KeyError(f'Multiple groups {ret} found with joint name {joint_name}.')
         else:
             return ret.pop()
 
@@ -398,7 +400,10 @@ class WorldTree(object):
         groups_size = len(groups)
         ret = self._get_group_from_groups(groups)
         if ret is None and groups_size > 0:
-            raise Exception(f'Found multiple seperated groups {groups} for link_name {link_name}.')
+            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {link_name}.'
+                                        f'Please define a group name for link {link_name}.')
+        elif ret is None:
+            raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
         return ret
 
     def get_groups_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
@@ -406,6 +411,27 @@ class WorldTree(object):
         for group_name, subtree in self.groups.items():
             try:
                 subtree.get_link_short_name_match(link_name)
+            except KeyError:
+                continue
+            groups.add(group_name)
+        return groups
+
+    def get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> str:
+        groups = self.get_groups_containing_joint_short_name(joint_name)
+        groups_size = len(groups)
+        ret = self._get_group_from_groups(groups)
+        if ret is None and groups_size > 0:
+            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {joint_name}.'
+                                        f'Please define a group name for link {joint_name}.')
+        elif ret is None:
+            raise UnknownGroupException(f'Did not find any group containing the link {joint_name}.')
+        return ret
+
+    def get_groups_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Set[str]:
+        groups = set()
+        for group_name, subtree in self.groups.items():
+            try:
+                subtree.get_joint_short_name_match(joint_name)
             except KeyError:
                 continue
             groups.add(group_name)
@@ -425,7 +451,10 @@ class WorldTree(object):
 
     def get_group_containing_link(self, link_name: Union[PrefixName, str]) -> str:
         groups = self.get_groups_containing_link(link_name)
-        return self._get_group_from_groups(groups)
+        ret = self._get_group_from_groups(groups)
+        if ret is None:
+            raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
+        return ret
 
     def _get_group_from_groups(self, groups: Set[Union[PrefixName, str]]) -> str:
         if len(groups) == 1:
@@ -1164,6 +1193,17 @@ class SubWorldTree(WorldTree):
             raise ValueError(f'Found multiple link matches \'{matches}\'.')
         if len(matches) == 0:
             raise UnknownLinkException(f'Found no link match for \'{link_name}\'.')
+        return matches[0]
+
+    def get_joint_short_name_match(self, joint_name):
+        matches = []
+        for joint_name2 in self.joint_names:
+            if joint_name == joint_name2 or joint_name == joint_name2.short_name:
+                matches.append(joint_name2)
+        if len(matches) > 1:
+            raise ValueError(f'Found multiple link matches \'{matches}\'.')
+        if len(matches) == 0:
+            raise UnknownLinkException(f'Found no link match for \'{joint_name}\'.')
         return matches[0]
 
     def reset_cache(self):

@@ -5,14 +5,13 @@ from typing import Union, Dict
 from sensor_msgs.msg import JointState
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 
 
 class JointPositionContinuous(Goal):
 
-    def __init__(self, joint_name: str, group_name: str, goal: float, weight: float =WEIGHT_BELOW_CA,
+    def __init__(self, joint_name: str, goal: float, group_name: str = None, weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1, hard: bool = False, **kwargs):
         """
         This goal will move a continuous joint to the goal position
@@ -22,8 +21,7 @@ class JointPositionContinuous(Goal):
         :param max_velocity: float, rad/s, default 1423, meaning the urdf/config limits are active
         """
         super(JointPositionContinuous, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         if not self.world.is_joint_continuous(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {self.joint_name}')
         self.joint_goal = goal
@@ -70,7 +68,7 @@ class JointPositionContinuous(Goal):
 
 
 class JointPositionPrismatic(Goal):
-    def __init__(self, joint_name: str, group_name: str, goal: float, weight: float = WEIGHT_BELOW_CA,
+    def __init__(self, joint_name: str, goal: float, group_name: str = None, weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1, hard: bool = False, **kwargs):
         """
         This goal will move a prismatic joint to the goal position
@@ -78,8 +76,7 @@ class JointPositionPrismatic(Goal):
         :param max_velocity: m/s, default 4535, meaning the urdf/config limits are active
         """
         super(JointPositionPrismatic, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         if not self.world.is_joint_prismatic(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {self.joint_name}')
         self.goal = goal
@@ -147,7 +144,7 @@ class JointPositionPrismatic(Goal):
 
 class JointPositionRevolute(Goal):
 
-    def __init__(self, joint_name: str, group_name: str, goal: float, weight: float = WEIGHT_BELOW_CA,
+    def __init__(self, joint_name: str, goal: float, group_name: str = None, weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1, hard: bool = False, **kwargs):
         """
         This goal will move a revolute joint to the goal position
@@ -157,8 +154,7 @@ class JointPositionRevolute(Goal):
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
         super(JointPositionRevolute, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         if not self.world.is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {self.joint_name}')
         self.goal = goal
@@ -210,7 +206,7 @@ class JointPositionRevolute(Goal):
 
 
 class ShakyJointPositionRevoluteOrPrismatic(Goal):
-    def __init__(self, joint_name, group_name, goal, frequency, noise_amplitude=1.0, weight=WEIGHT_BELOW_CA,
+    def __init__(self, joint_name, goal, frequency, group_name: str = None, noise_amplitude=1.0, weight=WEIGHT_BELOW_CA,
                  max_velocity=1, **kwargs):
         """
         This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given frequency.
@@ -222,8 +218,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
         super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         if not self.world.is_joint_revolute(joint_name) and not self.world.is_joint_prismatic(joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
 
@@ -274,7 +269,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
 
 
 class ShakyJointPositionContinuous(Goal):
-    def __init__(self, joint_name, group_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
+    def __init__(self, joint_name, goal, frequency, group_name: str = None, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
                  max_velocity=1, **kwargs):
         """
         This goal will move a continuous joint to the goal position and shake the joint with the given frequency.
@@ -286,8 +281,7 @@ class ShakyJointPositionContinuous(Goal):
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
         super(ShakyJointPositionContinuous, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         self.goal = goal
         self.frequency = frequency
         self.noise_amplitude = noise_amplitude
@@ -339,7 +333,7 @@ class ShakyJointPositionContinuous(Goal):
 
 
 class AvoidJointLimitsRevolute(Goal):
-    def __init__(self, joint_name, group_name, weight=0.1, max_linear_velocity=100, percentage=5, **kwargs):
+    def __init__(self, joint_name, group_name: str = None, weight=0.1, max_linear_velocity=100, percentage=5, **kwargs):
         """
         This goal will push revolute joints away from their position limits
         :param joint_name: str
@@ -348,8 +342,7 @@ class AvoidJointLimitsRevolute(Goal):
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         """
         super(AvoidJointLimitsRevolute, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         self.weight = weight
         self.max_velocity = max_linear_velocity
         self.percentage = percentage
@@ -394,7 +387,7 @@ class AvoidJointLimitsRevolute(Goal):
 
 
 class AvoidJointLimitsPrismatic(Goal):
-    def __init__(self, joint_name, group_name, weight=0.1, max_angular_velocity=100, percentage=5, **kwargs):
+    def __init__(self, joint_name, group_name: str = None, weight=0.1, max_angular_velocity=100, percentage=5, **kwargs):
         """
         This goal will push prismatic joints away from their position limits
         :param joint_name: str
@@ -403,8 +396,7 @@ class AvoidJointLimitsPrismatic(Goal):
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         """
         super(AvoidJointLimitsPrismatic, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         self.weight = weight
         self.max_velocity = max_angular_velocity
         self.percentage = percentage
@@ -449,7 +441,7 @@ class AvoidJointLimitsPrismatic(Goal):
 
 
 class JointPositionList(Goal):
-    def __init__(self, goal_state: Dict[str, float], group_name: str, weight: float = None,
+    def __init__(self, goal_state: Dict[str, float], group_name: str = None, weight: float = None,
                  max_velocity: float = None, hard: bool = False, **kwargs):
         """
         This goal takes a joint state and adds the other JointPosition goals depending on their type
@@ -459,9 +451,8 @@ class JointPositionList(Goal):
         super(JointPositionList, self).__init__(**kwargs)
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
-        #prefix = self.world.namespaces[self.world.robot_names.index(group_name)] # todo: put namespaces and robot_names and other robot related stuff into world
         for joint_name, goal_position in goal_state.items():
-            if not self.world.has_joint(PrefixName(joint_name, group_name)):
+            if not self.world.has_joint(self.get_joint(joint_name, group_name)):
                 raise KeyError(f'unknown joint \'{joint_name}\'')
             params = kwargs
             params.update({'joint_name': joint_name,
@@ -476,10 +467,10 @@ class JointPositionList(Goal):
 
 
 class JointPosition(Goal):
-    def __init__(self, joint_name: str, group_name: str, goal: float, weight: float = WEIGHT_BELOW_CA,
+    def __init__(self, joint_name: str, goal: float, group_name: str = None, weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 100, **kwargs):
         super(JointPosition, self).__init__(**kwargs)
-        full_joint_name = PrefixName(joint_name, group_name)
+        full_joint_name = self.get_joint(joint_name, group_name)
         if self.world.is_joint_continuous(full_joint_name):
             C = JointPositionContinuous
         elif self.world.is_joint_revolute(full_joint_name):
@@ -519,10 +510,9 @@ class AvoidJointLimits(Goal):
 
 
 class JointPositionRange(Goal):
-    def __init__(self, joint_name, group_name, upper_limit, lower_limit, hard=False, **kwargs):
+    def __init__(self, joint_name, upper_limit, lower_limit, group_name: str = None, hard=False, **kwargs):
         super(JointPositionRange, self).__init__(**kwargs)
-        #prefix = self.world.groups[group_name].prefix
-        self.joint_name = PrefixName(joint_name, group_name)
+        self.joint_name = self.get_joint(joint_name, group_name)
         if self.world.is_joint_continuous(joint_name):
             raise NotImplementedError(f'Can\'t limit range of continues joint \'{self.joint_name}\'.')
         self.upper_limit = upper_limit

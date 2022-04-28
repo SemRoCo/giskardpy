@@ -89,9 +89,10 @@ class WorldUpdater(GiskardBehavior):
         if group_name in self.world.groups:
             for _, link in self.world.groups[req.group_name].links.items():
                 link.dye_collisions(req.color)
-            return res.SUCCESS
+            res.error_codes = DyeGroupResponse.SUCCESS
         else:
-            return res.GROUP_NOT_FOUND_ERROR
+            res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
+        return res
 
     def get_object_names(self, req):
         object_names = self.world.group_names

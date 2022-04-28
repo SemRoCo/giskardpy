@@ -26,7 +26,7 @@ from visualization_msgs.msg import Marker
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, DyeGroup, DyeGroupRequest
+from giskard_msgs.srv import UpdateWorldResponse
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.god_map import GodMap
@@ -412,7 +412,6 @@ class GiskardTestWrapper(GiskardWrapper):
         self.default_root = self.robot.root_link_name.short_name
         self.map = 'map'
         self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
-        self.dye_group_srv = rospy.ServiceProxy('~dye_group', DyeGroup)
         self.goal_checks = defaultdict(list)
 
         def create_publisher(topic):
@@ -469,15 +468,6 @@ class GiskardTestWrapper(GiskardWrapper):
         :rtype: giskardpy.model.world.SubWorldTree
         """
         return self.world.groups['robot']
-
-    def dye_group(self, group_name, rgba: list):
-        req = DyeGroupRequest()
-        req.group_name = group_name
-        req.color.r = rgba[0]
-        req.color.g = rgba[1]
-        req.color.b = rgba[2]
-        req.color.a = rgba[3]
-        return self.dye_group_srv(req)
 
     def heart_beat(self, timer_thing):
         self.tree.tick()

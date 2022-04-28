@@ -353,8 +353,8 @@ class AvoidJointLimitsRevolute(Goal):
         self.weight = weight
         self.max_velocity = max_linear_velocity
         self.percentage = percentage
-        if not self.world.is_joint_revolute(joint_name):
-            raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
+        if not self.world.is_joint_revolute(self.joint_name):
+            raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {self.joint_name}')
 
     def make_constraints(self):
         weight = self.get_parameter_as_symbolic_expression('weight')
@@ -408,8 +408,8 @@ class AvoidJointLimitsPrismatic(Goal):
         self.weight = weight
         self.max_velocity = max_angular_velocity
         self.percentage = percentage
-        if not self.world.is_joint_prismatic(joint_name):
-            raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
+        if not self.world.is_joint_prismatic(self.joint_name):
+            raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {self.joint_name}')
 
     def make_constraints(self):
         weight = self.get_parameter_as_symbolic_expression('weight')

@@ -331,9 +331,9 @@ class TranslationGoalChecker(GoalChecker):
 
     def __call__(self):
         expected = self.expected
-        current_pose = tf.lookup_pose(self.root_link, self.tip_link)
+        current_pose = tf.np_to_pose(self.world.get_fk(self.root_link, self.tip_link))
         np.testing.assert_array_almost_equal(msg_to_list(expected.point),
-                                             msg_to_list(current_pose.pose.position), decimal=2)
+                                             msg_to_list(current_pose.position), decimal=2)
 
 
 class AlignPlanesGoalChecker(GoalChecker):
@@ -382,14 +382,14 @@ class RotationGoalChecker(GoalChecker):
 
     def __call__(self):
         expected = self.expected
-        current_pose = tf.lookup_pose(self.root_link, self.tip_link)
+        current_pose = tf.np_to_pose(self.world.get_fk(self.root_link, self.tip_link))
 
         try:
             np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
-                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
+                                                 msg_to_list(current_pose.orientation), decimal=2)
         except AssertionError:
             np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
-                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
+                                                 -np.array(msg_to_list(current_pose.orientation)), decimal=2)
 
 
 class GiskardTestWrapper(GiskardWrapper):
@@ -567,8 +567,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           max_velocity=max_velocity,
                                                           weight=weight, **kwargs)
         if check:
-            root_prefix = self.world.groups[root_group].prefix
-            tip_prefix = self.world.groups[tip_group].prefix
+            root_prefix = root_group
+            tip_prefix = tip_group
             self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, tip_prefix, root_link, root_prefix,
                                                     goal_orientation))
 
@@ -584,8 +584,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                                              weight=weight,
                                                              **kwargs)
         if check:
-            root_prefix = self.world.groups[root_group].prefix
-            tip_prefix = self.world.groups[tip_group].prefix
+            root_prefix = root_group
+            tip_prefix = tip_group
             self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, tip_prefix, root_link, root_prefix,
                                                        goal_point))
 
@@ -668,8 +668,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           root_group=root_group,
                                                           pointing_axis=pointing_axis,
                                                           weight=weight)
-        root_prefix = self.world.groups[root_group].prefix
-        tip_prefix = self.world.groups[tip_group].prefix
+        root_prefix = root_group
+        tip_prefix = tip_group
         self.add_goal_check(PointingGoalChecker(self.god_map,
                                                 tip_link=tip_link,
                                                 tip_prefix=tip_prefix,
@@ -689,9 +689,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                               max_angular_velocity=max_angular_velocity,
                                                               weight=weight)
         if check:
-            root_prefix = self.world.groups[root_group].prefix
-            tip_prefix = self.world.groups[tip_group].prefix
-            self.add_goal_check(AlignPlanesGoalChecker(self.god_map, tip_link, tip_prefix, tip_normal, root_link, root_prefix, root_normal))
+            self.add_goal_check(AlignPlanesGoalChecker(self.god_map, tip_link, tip_group, tip_normal, root_link, root_group, root_normal))
 
     def add_goal_check(self, goal_checker):
         self.goal_checks[self.number_of_cmds - 1].append(goal_checker)
@@ -721,8 +719,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                max_angular_velocity=angular_velocity)
 
         if check:
-            root_prefix = self._world.groups[root_group].prefix
-            tip_prefix = self._world.groups[tip_group].prefix
+            root_prefix = root_group
+            tip_prefix = tip_group
             goal_point = PointStamped()
             goal_point.header = goal_pose.header
             goal_point.point = goal_pose.pose.position
@@ -903,6 +901,9 @@ class GiskardTestWrapper(GiskardWrapper):
             else:
                 if parent_link == '':
                     parent_link = self.world.root_link_name
+                else:
+                    parent_link_group = self.world.get_group_containing_link_short_name(parent_link)
+                    parent_link = PrefixName(parent_link, parent_link_group)
                 assert parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:

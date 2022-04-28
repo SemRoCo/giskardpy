@@ -393,6 +393,14 @@ class WorldTree(object):
                 groups.add(group_name)
         return groups
 
+    def get_group_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> str:
+        groups = self.get_groups_containing_link_short_name(link_name)
+        groups_size = len(groups)
+        ret = self._get_group_from_groups(groups)
+        if ret is None and groups_size > 0:
+            raise Exception(f'Found multiple seperated groups {groups} for link_name {link_name}.')
+        return ret
+
     def get_groups_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
@@ -417,15 +425,27 @@ class WorldTree(object):
 
     def get_group_containing_link(self, link_name: Union[PrefixName, str]) -> str:
         groups = self.get_groups_containing_link(link_name)
-        group = groups.pop()
-        for g in groups:
-            if g != group:
-                g_ancestry = self.get_parents_of_group_name(g)
-                group_ancestry = self.get_parents_of_group_name(group)
-                relatives = list(g_ancestry & group_ancestry)
-                if relatives[0] in groups:
-                    group = relatives[0]
-        return group
+        return self._get_group_from_groups(groups)
+
+    def _get_group_from_groups(self, groups: Set[Union[PrefixName, str]]) -> str:
+        if len(groups) == 1:
+            return list(groups)[0]
+        else:
+            groups_l = list(groups)
+            group = None
+            for i in range(len(groups_l)):
+                g_a = groups_l[i]
+                if i + 1 == len(groups):
+                    break
+                else:
+                   g_b = groups_l[i+1]
+                if g_a != g_b:
+                    g_ancestry = self.get_parents_of_group_name(g_a)
+                    group_ancestry = self.get_parents_of_group_name(g_b)
+                    relatives = list(g_ancestry & group_ancestry)
+                    if relatives and relatives[0] in groups:
+                        group = relatives[0]
+            return group
 
     def get_groups_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()

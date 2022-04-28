@@ -18,7 +18,7 @@ def get_default(block_identifiers, god_map, prefix=None):
     new_default_value = dict()
     for block_identifier in block_identifiers:
         try:
-            default_value = god_map.get_data(block_identifier[:-1] + ['default'])
+            default_value = god_map.unsafe_get_data(block_identifier[:-1] + ['default'])
         except KeyError:
             continue
         if isinstance(default_value, dict):

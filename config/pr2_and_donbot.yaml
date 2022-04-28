@@ -9,18 +9,22 @@ robot_interface:
     namespace: /pr2/whole_body_controller/base/follow_joint_trajectory
     state_topic: /pr2/whole_body_controller/base/state
     fill_velocity_values: True
+    robot_name: pr2
   /pr2/body:
     plugin: SendFollowJointTrajectory
     namespace: /pr2/whole_body_controller/body/follow_joint_trajectory
     state_topic: /pr2/whole_body_controller/body/state
     fill_velocity_values: False
+    robot_name: pr2
   /donbot/base:
     plugin: SendFollowJointTrajectory
     namespace: /donbot/whole_body_controller/base/follow_joint_trajectory
     state_topic: /donbot/whole_body_controller/base/state
     fill_velocity_values: True
+    robot_name: donbot
   /donbot/body:
     plugin: SendFollowJointTrajectory
     namespace: /donbot/whole_body_controller/body/follow_joint_trajectory
     state_topic: /donbot/whole_body_controller/body/state
     fill_velocity_values: False
+    robot_name: donbot

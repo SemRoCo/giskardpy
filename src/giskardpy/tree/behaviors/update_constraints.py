@@ -194,15 +194,18 @@ class GoalToConstraints(GetGoal):
     def _cal_max_param(self, parameter_name):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        try:
-            default_distance = max(external_distances.default_factory(parameter_name.prefix)[parameter_name],
-                                   self_distances.default_factory(parameter_name.prefix)[parameter_name])
-        except Exception:
-            pass
+        default_distance = max(external_distances.default_factory(parameter_name.prefix)[parameter_name],
+                               self_distances.default_factory(parameter_name.prefix)[parameter_name])
         for value in external_distances.values():
-            default_distance = max(default_distance, value[parameter_name])
+            try:
+                default_distance = max(default_distance, value[parameter_name])
+            except KeyError:
+                pass
         for value in self_distances.values():
-            default_distance = max(default_distance, value[parameter_name])
+            try:
+                default_distance = max(default_distance, value[parameter_name])
+            except KeyError:
+                pass
         return default_distance
 
     def make_max_distances(self):

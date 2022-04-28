@@ -1172,7 +1172,7 @@ class PR22(GiskardTestWrapper):
         self.set_bases = dict()
         self.default_roots = dict()
         self.tf_prefix = dict()
-        super(PR22, self).__init__(u'package://giskardpy/config/pr2_twice.yaml')
+        super(PR22, self).__init__(u'package://giskardpy/config/pr2_twice.yaml', ['pr2_a', 'pr2_b'], ['pr2_a', 'pr2_b'])
         for robot_name in self.namespaces:
             self.r_tips[robot_name] = u'r_gripper_tool_frame'
             self.l_tips[robot_name] = u'l_gripper_tool_frame'
@@ -1435,7 +1435,7 @@ class PR2AndDonbot(GiskardTestWrapper):
         return_val = super(GiskardTestWrapper, self).clear_world()
         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 2
-        assert len(self.get_object_names().object_names) == 2
+        assert len(self.world.robot_names) == 2
         assert self.original_number_of_links == len(self.world.links)
 
     def reset(self):
@@ -1751,7 +1751,8 @@ class Donbot2(GiskardTestWrapper):
         self.gripper_pubs = dict()
         self.default_roots = dict()
         self.set_localization_srvs = dict()
-        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml')
+        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml', ['donbot_a', 'donbot_b'],
+                                      ['donbot_a', 'donbot_b'])
         for robot_name in self.namespaces:
             self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
             self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)

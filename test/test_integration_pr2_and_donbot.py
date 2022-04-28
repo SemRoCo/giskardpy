@@ -1,7 +1,9 @@
 import pytest
+import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 
 from giskardpy.utils import logging
+import giskardpy.utils.tfwrapper as tf
 from src.giskardpy.test.utils_for_tests import PR2AndDonbot
 
 folder_name = 'tmp_data/'
@@ -105,12 +107,30 @@ def zero_pose(resetted_giskard):
     return resetted_giskard
 
 
+@pytest.fixture()
+def kitchen_setup(zero_pose):
+    """
+    :type better_pose: GiskardTestWrapper
+    :return: GiskardTestWrapper
+    """
+    object_name = 'kitchen'
+    zero_pose.add_urdf(name=object_name,
+                       urdf=rospy.get_param('kitchen_description'),
+                       pose=tf.lookup_pose('map', 'iai_kitchen/world'),
+                       js_topic='/kitchen/joint_states',
+                       set_js_topic='/kitchen/cram_joint_states')
+    js = {str(k): 0.0 for k in zero_pose.world.groups[object_name].movable_joints}
+    zero_pose.set_kitchen_js(js)
+    return zero_pose
+
+
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
         """
         :type zero_pose: PR2AndDonbot
         """
-        zero_pose.allow_self_collision()
+        zero_pose.allow_self_collision(zero_pose.pr2)
+        zero_pose.allow_self_collision(zero_pose.donbot)
         zero_pose.set_joint_goal(floor_detection_js, group_name=zero_pose.donbot)
         zero_pose.set_joint_goal(pocky_pose, group_name=zero_pose.pr2)
         zero_pose.plan_and_execute()
@@ -131,3 +151,18 @@ class TestCollisionAvoidance(object):
         zero_pose.set_joint_goal(floor_detection_js, group_name=zero_pose.donbot)
         zero_pose.set_joint_goal(pocky_pose, group_name=zero_pose.pr2)
         zero_pose.plan_and_execute()
+
+    def test_joint_movement2(self, kitchen_setup):
+        """
+        :type zero_pose: PR2AndDonbot
+        """
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 1, 0)
+        kitchen_setup.move_base(p, kitchen_setup.donbot)
+
+        kitchen_setup.avoid_all_collisions()
+        kitchen_setup.set_joint_goal(floor_detection_js, group_name=kitchen_setup.donbot)
+        kitchen_setup.set_joint_goal(pocky_pose, group_name=kitchen_setup.pr2)
+        kitchen_setup.plan_and_execute()

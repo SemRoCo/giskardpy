@@ -1,5 +1,4 @@
 import os
-from collections import namedtuple
 
 import numpy as np
 import urdf_parser_py.urdf as up

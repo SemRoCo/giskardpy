@@ -5,6 +5,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.qp.qp_controller import QPController
+from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class ControllerPlugin(GiskardBehavior):
@@ -19,6 +20,7 @@ class ControllerPlugin(GiskardBehavior):
         self.controller = None
 
     @profile
+    @catch_and_raise_to_blackboard
     def initialise(self):
         t = time()
         super(ControllerPlugin, self).initialise()
@@ -46,6 +48,7 @@ class ControllerPlugin(GiskardBehavior):
         self.get_blackboard().runtime += t2
 
     @profile
+    @catch_and_raise_to_blackboard
     def update(self):
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)

@@ -1,6 +1,7 @@
 from __future__ import division
 
 from collections import OrderedDict
+from typing import Optional
 
 from giskard_msgs.msg import Constraint as Constraint_msg
 
@@ -8,9 +9,10 @@ import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import PrefixName
-from giskardpy.exceptions import ConstraintInitalizationException
+from giskardpy.exceptions import ConstraintInitalizationException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
+from giskardpy.my_types import my_string, expr_matrix, expr_symbol
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
@@ -105,22 +107,16 @@ class Goal(object):
     def __str__(self):
         return self.__class__.__name__
 
-    def get_fk(self, root, tip):
+    def get_fk(self, root: my_string, tip: my_string) -> expr_matrix:
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
-        :type root: PrefixName
-        :type tip: PrefixName
-        :return: root_T_tip
         """
         return self.world.compose_fk_expression(root, tip)
 
-    def get_fk_evaluated(self, root, tip):
+    def get_fk_evaluated(self, root: my_string, tip: my_string) -> expr_matrix:
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
         It is not dependent on the joint state.
-        :type root: PrefixName
-        :type tip: PrefixName
-        :return: root_T_tip
         """
         return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
 
@@ -196,13 +192,21 @@ class Goal(object):
                                                               upper_slack_limit=upper_slack_limit,
                                                               control_horizon=self.control_horizon)
 
-    def add_constraint(self, reference_velocity, lower_error, upper_error, weight, expression, name_suffix=None,
-                       lower_slack_limit=None, upper_slack_limit=None):
-
+    def add_constraint(self,
+                       reference_velocity: expr_symbol,
+                       lower_error: expr_symbol,
+                       upper_error: expr_symbol,
+                       weight: expr_symbol,
+                       expression: expr_symbol,
+                       name_suffix: Optional[str] = None,
+                       lower_slack_limit: Optional[expr_symbol] = None,
+                       upper_slack_limit: Optional[expr_symbol] = None):
+        if expression.shape != (1, 1):
+            raise GiskardException(f'expression must have shape (1,1), has {expression.shape}')
         name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
         if name in self._constraints:
-            raise KeyError('a constraint with name \'{}\' already exists'.format(name))
+            raise KeyError(f'a constraint with name \'{name}\' already exists')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
         self._constraints[name] = Constraint(name=name,
@@ -247,13 +251,11 @@ class Goal(object):
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
 
-    def add_debug_expr(self, name, expr):
+    def add_debug_expr(self, name: str, expr: expr_symbol):
         """
         Adds a constraint with weight 0 to the qp problem.
         Used to inspect subexpressions for debugging.
         :param name: a name to identify the expression
-        :type name: str
-        :type expr: w.Symbol
         """
         name = '{}/{}'.format(self, name)
         self._debug_expressions[name] = expr

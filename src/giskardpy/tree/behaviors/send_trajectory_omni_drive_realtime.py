@@ -20,7 +20,7 @@ from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import catch_and_raise_to_blackboard, raise_to_blackboard
 
 
-class SendTrajectoryOmniDrive(GiskardBehavior):
+class SendTrajectoryOmniDriveRealTime(GiskardBehavior):
     min_deadline: rospy.Time
     max_deadline: rospy.Time
     update_thread: Thread
@@ -71,18 +71,21 @@ class SendTrajectoryOmniDrive(GiskardBehavior):
 
     def worker(self):
         start_time = self.trajectory.header.stamp
-        cmd = Twist()
+        end_time = start_time + self.trajectory.points[-1].time_from_start
+        twist = Twist()
         rospy.sleep(start_time - rospy.get_rostime())
-        dt = self.trajectory.points[1].time_from_start.to_sec() - self.trajectory.points[0].time_from_start.to_sec()
-        r = rospy.Rate(1 / dt)
-        for traj_point in self.trajectory.points:  # type: JointTrajectoryPoint
+        # dt = self.trajectory.points[1].time_from_start.to_sec() - self.trajectory.points[0].time_from_start.to_sec()
+        r = rospy.Rate(100)
+        cmd = self.god_map.get_data(identifier.qp_solver_solution)
+        # for traj_point in self.trajectory.points:  # type: JointTrajectoryPoint
+        while rospy.get_rostime() < end_time:
             # base_footprint_T_odom = self.world.get_fk(self.joint.child_link_name, self.joint.parent_link_name)
-            translation_velocity = np.array([traj_point.velocities[0], traj_point.velocities[1], 0, 0])
+            # translation_velocity = np.array([traj_point.velocities[0], traj_point.velocities[1], 0, 0])
             # translation_velocity = np.dot(base_footprint_T_odom, translation_velocity)
-            cmd.linear.x = translation_velocity[0]
-            cmd.linear.y = translation_velocity[1]
-            cmd.angular.z = traj_point.velocities[2]
-            self.vel_pub.publish(cmd)
+            twist.linear.x = cmd[0][self.joint.x_vel.position_name]
+            twist.linear.y = cmd[0][self.joint.y_vel.position_name]
+            twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
+            self.vel_pub.publish(twist)
             r.sleep()
         self.vel_pub.publish(Twist())
 

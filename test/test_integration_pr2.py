@@ -1110,9 +1110,10 @@ class TestConstraints(object):
 class TestCartGoals(object):
     def test_move_base(self, zero_pose: PR2):
         map_T_odom = PoseStamped()
-        map_T_odom.pose.position.x = 1
-        map_T_odom.pose.position.y = 1
+        # map_T_odom.pose.position.x = 1
+        # map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        # map_T_odom.pose.orientation.w = 1
         zero_pose.set_localization(map_T_odom)
 
         base_goal = PoseStamped()

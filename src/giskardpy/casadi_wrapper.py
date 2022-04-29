@@ -1,12 +1,14 @@
 import errno
 import os
 import pickle
+from typing import List, Tuple, Union
 
 import casadi as ca
 import numpy as np
-from casadi import sign, cos, sin, sqrt, atan2, acos, substitute
+from casadi import sign, cos, sin, sqrt, atan2, acos
 from numpy import pi
 
+from giskardpy.my_types import expr_symbol, expr_matrix
 from giskardpy.utils import logging
 
 pathSeparator = '_'
@@ -139,7 +141,6 @@ def matrix_to_list(m):
         return [m[i] for i in range(m.shape[0])]
 
 
-
 def zeros(x, y):
     return ca.SX.zeros(x, y)
 
@@ -255,6 +256,32 @@ def if_eq(a, b, if_result, else_result):
     return ca.if_else(ca.eq(a, b), if_result, else_result)
 
 
+def if_eq_cases(a, b_result_cases: Union[List[Tuple[expr_symbol, expr_symbol]], expr_matrix],
+                else_result: expr_symbol) -> expr_symbol:
+    result = else_result
+    if isinstance(b_result_cases, list):
+        b_result_cases = Matrix(b_result_cases)
+    for i in range(b_result_cases.shape[0]):
+        b = b_result_cases[i, 0]
+        b_result = b_result_cases[i, 1]
+        result = if_eq(a, b, b_result, result)
+    return result
+
+
+def if_less_eq_cases(a, b_result_cases: List[Tuple[expr_symbol, expr_symbol]], else_result: expr_symbol) -> expr_symbol:
+    """
+    This only works if b_result_cases is sorted in an ascending order.
+    """
+    result = else_result
+    if isinstance(b_result_cases, list):
+        b_result_cases = Matrix(b_result_cases)
+    for i in reversed(range(b_result_cases.shape[0]-1)):
+        b = b_result_cases[i, 0]
+        b_result = b_result_cases[i, 1]
+        result = if_less_eq(a, b, b_result, result)
+    return result
+
+
 def safe_compiled_function(f, file_name):
     if not os.path.exists(os.path.dirname(file_name)):
         try:
@@ -366,12 +393,7 @@ def scale(v, a):
     return save_division(v, norm(v)) * a
 
 
-def dot(*matrices):
-    """
-    :type a: Matrix
-    :type b: Matrix
-    :rtype: Union[float, Symbol]
-    """
+def dot(*matrices: expr_matrix) -> expr_matrix:
     return ca.mtimes(matrices)
 
 
@@ -513,6 +535,13 @@ def frame_quaternion(x, y, z, qx, qy, qz, qw):
     return dot(translation3(x, y, z), rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
 
+def frame_from_x_y_rot(x: expr_symbol, y: expr_symbol, rot: expr_symbol) -> expr_matrix:
+    parent_P_link = translation3(x, y, 0)
+    link_R_child = rotation_matrix_from_axis_angle(vector3(0, 0, 1),
+                                                   rot)
+    return dot(parent_P_link, link_R_child)
+
+
 def eye(size):
     return ca.SX.eye(size)
 
@@ -621,13 +650,11 @@ def asdf(a_R_b, a_R_c):
     return axis_angle_from_matrix(difference)[0]
 
 
-def axis_angle_from_matrix(rotation_matrix):
+def axis_angle_from_matrix(rotation_matrix: expr_matrix) -> Tuple[expr_matrix, expr_symbol]:
     """
     MAKE SURE MATRIX IS NORMALIZED
     :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
     :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
     """
     q = quaternion_from_matrix(rotation_matrix)
     return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])

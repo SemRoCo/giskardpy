@@ -297,7 +297,10 @@ class GodMap(object):
         return self.key_to_expr[identifier]
 
     def to_expr(self, identifier):
-        data = self.get_data(identifier)
+        try:
+            data = self.get_data(identifier)
+        except KeyError as e:
+            raise KeyError(f'to_expr only works, when there is already data at the path: {e}')
         if isinstance(data, np.ndarray):
             data = data.tolist()
         if isinstance(data, numbers.Number):

@@ -1,7 +1,7 @@
 parent: !include default.yaml
 robot_interface:
   base:
-    plugin: SendTrajectoryOmniDrive
+    plugin: SendTrajectoryOmniDriveRealTime
     cmd_vel_topic: /pr2/cmd_vel
     drive:
       type: OmniDrive

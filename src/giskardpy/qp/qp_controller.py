@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
+from typing import List, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +12,7 @@ import pandas as pd
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException
+from giskardpy.my_types import expr_symbol
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
@@ -496,14 +498,23 @@ class QPController:
     """
     time_collector: TimeCollector
 
-    def __init__(self, sample_period, prediction_horizon, solver_name,
-                 free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
-                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None):
+    def __init__(self,
+                 sample_period: float,
+                 prediction_horizon: int,
+                 solver_name: str,
+                 free_variables: List[FreeVariable] = None,
+                 constraints: List[Constraint] = None,
+                 velocity_constraints: List[VelocityConstraint] = None,
+                 debug_expressions: Dict[str, expr_symbol] = None,
+                 retries_with_relaxed_constraints: int = 0,
+                 retry_added_slack: float = 100,
+                 retry_weight_factor: float = 100,
+                 time_collector: TimeCollector = None):
         self.time_collector = time_collector
-        self.free_variables = []  # type: list[FreeVariable]
-        self.constraints = []  # type: list[Constraint]
-        self.velocity_constraints = []  # type: list[VelocityConstraint]
-        self.debug_expressions = {}  # type: dict
+        self.free_variables = []
+        self.constraints = []
+        self.velocity_constraints = []
+        self.debug_expressions = {}
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
@@ -529,8 +540,8 @@ class QPController:
             from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             self.qp_solver = QPSolverCplex()
         else:
-            raise KeyError('Solver \'{}\' not supported'.format(solver_name))
-        logging.loginfo('Using QP Solver \'{}\''.format(solver_name))
+            raise KeyError(f'Solver \'{solver_name}\' not supported')
+        logging.loginfo(f'Using QP Solver \'{solver_name}\'')
 
     def add_free_variables(self, free_variables):
         """

@@ -38,6 +38,7 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
+from giskardpy.tree.behaviors.setup_base_traj_constraints import SetupBaseTrajConstraints
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
@@ -623,9 +624,21 @@ class OpenLoop(TreeManager):
         action_servers = self.god_map.get_data(identifier.robot_interface)
         behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
         for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-            C = behaviors[params['plugin']]
-            del params['plugin']
-            execution_action_server.add_child(C(execution_action_server_name, **params))
+            if execution_action_server_name == 'base':
+                C = behaviors[params['plugin']]
+                del params['plugin']
+                base = Sequence('base sequence')
+                base.add_child(SyncTfFrames('sync tf frames',
+                                            **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
+                base.add_child(running_is_success(SyncOdometry)('sync odometry',
+                                                                odometry_topic='pr2/base_footprint'))
+                base.add_child(running_is_success(ControllerPlugin)('base controller'))
+                base.add_child(C(execution_action_server_name, **params))
+                execution_action_server.add_child(base)
+            else:
+                C = behaviors[params['plugin']]
+                del params['plugin']
+                execution_action_server.add_child(C(execution_action_server_name, **params))
 
         execute_canceled = Sequence('execute canceled')
         execute_canceled.add_child(GoalCanceled('goal canceled', self.action_server_name))
@@ -637,13 +650,12 @@ class OpenLoop(TreeManager):
                                                                          identifier.action_server_name),
                                                                      MoveFeedback.EXECUTION))
         publish_result.add_child(execute_canceled)
-        publish_result.add_child(running_is_failure(SyncOdometry)('sync odometry',
-                                                                  odometry_topic='pr2/base_footprint'))
         publish_result.add_child(execution_action_server)
         publish_result.add_child(SetErrorCode('set error code', 'Execution'))
 
         move_robot = failure_is_success(Sequence)('move robot')
         move_robot.add_child(IF('execute?', identifier.execute))
+        move_robot.add_child(SetupBaseTrajConstraints('SetupBaseTrajConstraints'))
         move_robot.add_child(publish_result)
         return move_robot
 

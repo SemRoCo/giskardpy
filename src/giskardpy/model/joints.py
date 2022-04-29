@@ -2,6 +2,7 @@ import abc
 from abc import ABC
 from typing import Dict, Tuple, Optional, List
 
+import numpy as np
 import urdf_parser_py.urdf as up
 
 import giskardpy.casadi_wrapper as w
@@ -396,6 +397,9 @@ class OmniDrive(Joint):
     x: FreeVariable
     y: FreeVariable
     rot: FreeVariable
+    x_vel: FreeVariable
+    y_vel: FreeVariable
+    rot_vel: FreeVariable
 
     def __init__(self,
                  god_map: GodMap,
@@ -413,6 +417,9 @@ class OmniDrive(Joint):
         self.x_name = x_name
         self.y_name = y_name
         self.rot_name = rot_name
+        self.x_vel_name = f'{self.x_name}_vel'
+        self.y_vel_name = f'{self.y_name}_vel'
+        self.rot_vel_name = f'{self.rot_name}_vel'
         super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
 
     def create_free_variables(self):
@@ -425,12 +432,24 @@ class OmniDrive(Joint):
         self.rot = self.create_free_variable(self.rot_name,
                                              {1: -self.rotation_velocity_limit},
                                              {1: self.rotation_velocity_limit})
+        self.x_vel = self.create_free_variable(self.x_vel_name,
+                                               {1: -self.translation_velocity_limit},
+                                               {1: self.translation_velocity_limit})
+        self.y_vel = self.create_free_variable(self.y_vel_name,
+                                               {1: -self.translation_velocity_limit},
+                                               {1: self.translation_velocity_limit})
+        self.rot_vel = self.create_free_variable(self.rot_vel_name,
+                                                 {1: -self.rotation_velocity_limit},
+                                                 {1: self.rotation_velocity_limit})
 
     def apply_joint_effect(self):
-        parent_P_link = w.translation3(self.x.get_symbol(0), self.y.get_symbol(0), 0)
-        link_R_child = w.rotation_matrix_from_axis_angle(w.vector3(0, 0, 1),
-                                                         self.rot.get_symbol(0))
-        self.parent_T_child = w.dot(self.parent_T_child, w.dot(parent_P_link, link_R_child))
+        odom_T_base_footprint = w.frame_from_x_y_rot(self.x.get_symbol(0),
+                                                     self.y.get_symbol(0),
+                                                     self.rot.get_symbol(0))
+        base_footprint_T_base_footprint_vel = w.frame_from_x_y_rot(self.x_vel.get_symbol(0),
+                                                                   self.y_vel.get_symbol(0),
+                                                                   self.rot_vel.get_symbol(0))
+        self.parent_T_child = w.dot(self.parent_T_child, odom_T_base_footprint, base_footprint_T_base_footprint_vel)
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         world = self.god_map.unsafe_get_data(identifier.world)
@@ -440,7 +459,6 @@ class OmniDrive(Joint):
             except KeyError as e:
                 # joint is currently not part of the optimization problem
                 return
-            world.state[free_variable.name].position += vel * dt
             world.state[free_variable.name].velocity = vel
             if len(new_cmds) >= 2:
                 acc = new_cmds[1][free_variable.position_name]
@@ -448,27 +466,43 @@ class OmniDrive(Joint):
             if len(new_cmds) >= 3:
                 jerk = new_cmds[2][free_variable.position_name]
                 world.state[free_variable.name].jerk = jerk
+        x = world.state[self.x_vel_name].velocity
+        y = world.state[self.y_vel_name].velocity
+        delta = world.state[self.rot_vel_name].velocity
+        world.state[self.x_name].velocity = (np.cos(delta) * x - np.sin(delta) * y)
+        world.state[self.x_name].position += world.state[self.x_name].velocity * dt
+        world.state[self.y_name].velocity = (np.sin(delta) * x + np.cos(delta) * y)
+        world.state[self.y_name].position += world.state[self.y_name].velocity * dt
+        world.state[self.rot_name].velocity = delta
+        world.state[self.rot_name].position += delta * dt
 
     def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
-        for free_variable in self.free_variable_list:
+        for free_variable in self._all_symbols():
             free_variable.lower_limits = {}
             free_variable.upper_limits = {}
 
         for order, linear_limit in linear_limits.items():
-            self.x.set_upper_limit(order, linear_limit[self.x.name])
-            self.y.set_upper_limit(order, linear_limit[self.y.name])
-            self.x.set_lower_limit(order, -linear_limit[self.x.name])
-            self.y.set_lower_limit(order, -linear_limit[self.y.name])
+            self.x.set_upper_limit(order, linear_limit[self.x_name])
+            self.y.set_upper_limit(order, linear_limit[self.y_name])
+            self.x_vel.set_upper_limit(order, linear_limit[self.x_vel_name])
+            self.y_vel.set_upper_limit(order, linear_limit[self.y_vel_name])
+
+            self.x.set_lower_limit(order, -linear_limit[self.x_name])
+            self.y.set_lower_limit(order, -linear_limit[self.y_name])
+            self.x_vel.set_lower_limit(order, -linear_limit[self.x_vel_name])
+            self.y_vel.set_lower_limit(order, -linear_limit[self.y_vel_name])
 
         for order, angular_limit in angular_limits.items():
-            self.rot.set_upper_limit(order, angular_limit[self.rot.name])
-            self.rot.set_lower_limit(order, -angular_limit[self.rot.name])
+            self.rot.set_upper_limit(order, angular_limit[self.rot_name])
+            self.rot.set_lower_limit(order, -angular_limit[self.rot_name])
+            self.rot_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
+            self.rot_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
 
     def update_weights(self, weights: derivative_joint_map):
         # self.delete_weights()
         for order, weight in weights.items():
             try:
-                for free_variable in self.free_variable_list:
+                for free_variable in self._all_symbols():
                     free_variable.quadratic_weights[order] = weight[self.name]
             except KeyError:
                 # can't do if in, because the dict may be a defaultdict
@@ -482,4 +516,7 @@ class OmniDrive(Joint):
 
     @property
     def free_variable_list(self) -> List[FreeVariable]:
-        return [self.x, self.y, self.rot]
+        return [self.x_vel, self.y_vel, self.rot_vel]
+
+    def _all_symbols(self) -> List[FreeVariable]:
+        return self.free_variable_list + [self.x, self.y, self.rot]

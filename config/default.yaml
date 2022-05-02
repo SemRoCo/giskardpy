@@ -68,7 +68,7 @@ plugins:
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     cm_per_second: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     height_per_derivative: 6
-    normalize_position: False # centers the joint positions around 0 on the y axis
+    normalize_position: True # centers the joint positions around 0 on the y axis
     tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
   PlotDebugTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True

@@ -29,8 +29,8 @@ class BaseTrajFollower(Goal):
 
     def current_traj_point(self, free_variable_name: str) -> expr_symbol:
         time = self.god_map.to_expr(identifier.time)
-        return w.if_less_eq_cases(time * self.get_sampling_period_symbol(),
-                                  [(t * self.get_sampling_period_symbol(), self.x_symbol(t, free_variable_name))
+        return w.if_less_eq_cases(time,
+                                  [(t * self.get_sampling_period_symbol() + 0.5, self.x_symbol(t, free_variable_name))
                                    for t in range(self.trajectory_length)],
                                   self.x_symbol(self.trajectory_length-1, free_variable_name))
 
@@ -44,6 +44,11 @@ class BaseTrajFollower(Goal):
         map_T_odom = self.get_fk_evaluated(self.world.root_link_name, odom_link)
         map_T_base_footprint_goal = w.dot(map_T_odom, odom_T_base_footprint_goal)
         map_T_base_footprint_current = self.get_fk(self.world.root_link_name, base_footprint_link)
+        # self.add_debug_expr('x goal', map_T_base_footprint_goal[0,3])
+        # self.add_debug_expr('y goal', map_T_base_footprint_goal[1,3])
+        # self.add_debug_expr('rot', rot)
+        # self.add_debug_expr('x current', map_T_base_footprint_current[0,3])
+        # self.add_debug_expr('y current', map_T_base_footprint_current[1,3])
 
         self.add_point_goal_constraints(frame_P_goal=w.position_of(map_T_base_footprint_goal),
                                         frame_P_current=w.position_of(map_T_base_footprint_current),
@@ -51,8 +56,19 @@ class BaseTrajFollower(Goal):
                                         weight=WEIGHT_BELOW_CA)
 
         _, rotation_goal = w.axis_angle_from_matrix(map_T_base_footprint_goal)
-        _, rotation_current = w.axis_angle_from_matrix(map_T_base_footprint_current)
-        self.add_position_constraint(rotation_current, rotation_goal, 0.5, self.weight, name_suffix='rotation')
+        axis_current, rotation_current = w.axis_angle_from_matrix(map_T_base_footprint_current)
+
+        error = w.shortest_angular_distance(rotation_current, rotation_goal)
+        self.add_constraint(reference_velocity=0.5,
+                            lower_error=error,
+                            upper_error=error,
+                            weight=self.weight,
+                            expression=rotation_current)
+        self.add_debug_expr('rot goal', rotation_goal)
+        self.add_debug_expr('error', error)
+        self.add_debug_expr('rot current', rotation_current)
+        self.add_debug_vector('axis_current', axis_current)
+
 
     def __str__(self):
         return f'{super().__str__()}/{self.joint_name}'

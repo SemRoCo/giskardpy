@@ -15,6 +15,7 @@ class SetupBaseTrajConstraints(GiskardBehavior):
     def update(self):
         # TODO make this interruptable
         loginfo('setting up base traj constraints.')
+        self.get_god_map().set_data(identifier.time, 0)
         self.get_god_map().set_data(identifier.goals, {})
 
         self.soft_constraints = {}

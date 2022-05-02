@@ -35,6 +35,7 @@ from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.plugin_if import IF
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
+from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
@@ -45,6 +46,7 @@ from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin
+from giskardpy.tree.behaviors.time_real import RosTime
 from giskardpy.tree.behaviors.update_constraints import GoalToConstraints
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
@@ -76,6 +78,10 @@ def running_is_failure(cls: T) -> T:
 
 def failure_is_running(cls: T) -> T:
     return py_trees.meta.failure_is_running(cls)
+
+
+def success_is_running(cls: T) -> T:
+    return py_trees.meta.success_is_running(cls)
 
 
 class ManagerNode:
@@ -627,13 +633,15 @@ class OpenLoop(TreeManager):
             if execution_action_server_name == 'base':
                 C = behaviors[params['plugin']]
                 del params['plugin']
-                base = Sequence('base sequence')
-                base.add_child(SyncTfFrames('sync tf frames',
-                                            **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-                base.add_child(running_is_success(SyncOdometry)('sync odometry',
-                                                                odometry_topic='pr2/base_footprint'))
-                base.add_child(running_is_success(ControllerPlugin)('base controller'))
-                base.add_child(C(execution_action_server_name, **params))
+                base = PluginBehavior('base sequence')
+                base.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
+                                                                **self.god_map.unsafe_get_data(
+                                                                    identifier.SyncTfFrames)))
+                base.add_plugin(SyncOdometry('sync odometry', odometry_topic='pr2/base_footprint'))
+                base.add_plugin(RosTime('time'))
+                base.add_plugin(ControllerPlugin('base controller'))
+                base.add_plugin(RealKinSimPlugin('kin sim'))
+                base.add_plugin(C(execution_action_server_name, **params))
                 execution_action_server.add_child(base)
             else:
                 C = behaviors[params['plugin']]

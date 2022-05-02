@@ -119,7 +119,7 @@ def print_joint_state(joint_msg):
 def print_dict(d):
     print('{')
     for key, value in d.items():
-        print("\'{}\': {},".format(key, value))
+        print(f'{key}: {value},')
     print('}')
 
 

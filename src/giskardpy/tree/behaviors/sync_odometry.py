@@ -59,23 +59,31 @@ class SyncOdometry(GiskardBehavior):
     @profile
     @catch_and_raise_to_blackboard
     def update(self):
+        joint: OmniDrive = self.world.joints[self.brumbrum]
         try:
-            if self.last_msg is None:
-                odometry: Odometry = self.lock.get()
-            else:
-                odometry = self.lock.get_nowait()
+            odometry: Odometry = self.lock.get()
             pose = odometry.pose.pose
-            joint: OmniDrive = self.world.joints[self.brumbrum]
             self.last_msg = JointStates()
-            self.last_msg[joint.x_name].position = pose.position.x
-            self.last_msg[joint.y_name].position = pose.position.y
-            self.last_msg[joint.rot_name].position = getAxisAngleFromQuaternion([pose.orientation.x,
-                                                                                 pose.orientation.y,
-                                                                                 pose.orientation.z,
-                                                                                 pose.orientation.w])[1]
+            self.world.state[joint.x_name].position = pose.position.x
+            self.world.state[joint.y_name].position = pose.position.y
+            axis, angle = getAxisAngleFromQuaternion([pose.orientation.x,
+                                                      pose.orientation.y,
+                                                      pose.orientation.z,
+                                                      pose.orientation.w])
+            if axis[-1] < 0:
+                angle = -angle
+            self.world.state[joint.rot_name].position = angle
+
         except Empty:
             pass
+        # print(f'odometry: x:{self.world.state[joint.x_name].position} '
+        #       f'y:{self.world.state[joint.y_name].position} '
+        #       f'z:{self.world.state[joint.rot_name].position}')
+        # print(f'odometry vel: x:{self.world.state[joint.x_name].velocity} '
+        #       f'y:{self.world.state[joint.y_name].velocity} '
+        #       f'z:{self.world.state[joint.rot_name].velocity}')
+        # print(f' odometry axis {axis}')
 
-        self.world.state.update(self.last_msg)
+        # self.world.state.update(self.last_msg)
         self.world.notify_state_change()
         return Status.RUNNING

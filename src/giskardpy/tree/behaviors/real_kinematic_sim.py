@@ -21,7 +21,7 @@ class RealKinSimPlugin(GiskardBehavior):
         joints = self.world.joints
         next_time = rospy.get_rostime()
         dt = (next_time - self.last_time).to_sec()
-        print(f'dt: {dt}')
+        # print(f'dt: {dt}')
         for joint_name in self.world.controlled_joints:
             joints[joint_name].update_state(next_cmds, dt)
         self.last_time = next_time

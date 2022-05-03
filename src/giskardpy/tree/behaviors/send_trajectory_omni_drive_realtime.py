@@ -73,9 +73,9 @@ class SendTrajectoryOmniDriveRealTime(GiskardBehavior):
             twist.linear.x = cmd[0][self.joint.x_vel.position_name]
             twist.linear.y = cmd[0][self.joint.y_vel.position_name]
             twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
-            print(f'twist: {twist.linear.x:.4} {twist.linear.y:.4} {twist.angular.z:.4}')
-            print_dict(self.god_map.get_data(identifier.debug_expressions_evaluated))
-            print('-----------------')
+            # print(f'twist: {twist.linear.x:.4} {twist.linear.y:.4} {twist.angular.z:.4}')
+            # print_dict(self.god_map.get_data(identifier.debug_expressions_evaluated))
+            # print('-----------------')
             self.vel_pub.publish(twist)
             return Status.RUNNING
         self.vel_pub.publish(Twist())

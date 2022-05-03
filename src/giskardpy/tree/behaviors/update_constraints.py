@@ -260,8 +260,8 @@ class GoalToConstraints(GetGoal):
         vel_constraints = {}
         debug_expr = {}
         config = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        for link_a_o, link_b_o in self.collision_scene.world.groups[
-            self.god_map.unsafe_get_data(identifier.robot_group_name)].possible_collision_combinations():
+        robot_group_name = self.god_map.unsafe_get_data(identifier.robot_group_name)
+        for link_a_o, link_b_o in self.world.groups[robot_group_name].possible_collision_combinations():
             link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
             try:
                 link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
@@ -276,8 +276,8 @@ class GoalToConstraints(GetGoal):
         for link_a, link_b in counter:
             num_of_constraints = min(1, counter[link_a, link_b])
             for i in range(num_of_constraints):
-                key = '{}, {}'.format(link_a, link_b)
-                key_r = '{}, {}'.format(link_b, link_a)
+                key = f'{link_a}, {link_b}'
+                key_r = f'{link_b}, {link_a}'
                 # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
                 if key in config:
                     hard_threshold = config[key]['hard_threshold']
@@ -307,7 +307,7 @@ class GoalToConstraints(GetGoal):
                 soft_constraints.update(c)
                 vel_constraints.update(c_vel)
                 debug_expr.update(debug_expressions)
-        loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
+        loginfo(f'Adding {len(soft_constraints)} self collision avoidance constraints.')
         self.time_collector.collision_avoidance[-1] += len(soft_constraints)
         self.soft_constraints.update(soft_constraints)
         self.vel_constraints.update(vel_constraints)

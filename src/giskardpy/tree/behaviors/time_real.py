@@ -13,5 +13,5 @@ class RosTime(GiskardBehavior):
     def update(self):
         with self.god_map:
             self.god_map.unsafe_set_data(identifier.time, (rospy.get_rostime() - self.last_call).to_sec())
-        print(f'time {self.god_map.get_data(identifier.time):.4}')
+        # print(f'time {self.god_map.get_data(identifier.time):.4}')
         return Status.RUNNING

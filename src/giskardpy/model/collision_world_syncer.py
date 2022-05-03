@@ -295,7 +295,7 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless collisions
         for link_a, link_b in link_combinations:
-            link_combination = group.sort_links(link_a, link_b)
+            link_combination = self.world.sort_links(link_a, link_b)
             if link_combination in self.black_list:
                 continue
             try:
@@ -348,7 +348,6 @@ class CollisionWorldSynchronizer(object):
                         sometimes.add(group.sort_links(link_a, link_b))
             never = set(subset_of_unknown).difference(sometimes)
             unknown = unknown.difference(never)
-            self.black_list.update(never)
             self.add_black_list_entries(never)
 
         logging.logdebug(f'Calculated self collision matrix in {time() - t:.3f}s')

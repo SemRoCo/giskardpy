@@ -2,7 +2,7 @@ import copy
 import numbers
 from collections import defaultdict
 from copy import copy, deepcopy
-from multiprocessing import Lock
+from multiprocessing import RLock
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
@@ -194,7 +194,7 @@ class GodMap(object):
         self.expr_to_key = {}
         self.last_expr_values = {}
         self.shortcuts = {}
-        self.lock = Lock()
+        self.lock = RLock()
 
     @classmethod
     @profile

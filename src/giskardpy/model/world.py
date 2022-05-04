@@ -87,38 +87,39 @@ class WorldTree(object):
 
     @profile
     def notify_model_change(self):
-        for group in self.groups.values():
-            group.reset_cache()
-        try:
-            del self.link_names
-        except:
-            pass  # property wasn't called
-        try:
-            del self.link_names_with_collisions
-        except:
-            pass  # property wasn't called
-        try:
-            del self.movable_joints_as_set
-        except:
-            pass  # property wasn't called
-        try:
-            del self.movable_joints
-        except:
-            pass  # property wasn't called
-        self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
-        self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
-        self._clear_memo(self.compute_chain_reduced_to_controlled_joints)
-        self._clear_memo(self.get_movable_parent_joint)
-        self._clear_memo(self.get_controlled_parent_joint_of_link)
-        self._clear_memo(self.get_controlled_parent_joint_of_joint)
-        self._clear_memo(self.compute_split_chain)
-        self._clear_memo(self.are_linked)
-        self._clear_memo(self.compose_fk_expression)
-        self._clear_memo(self.compute_chain)
-        self._clear_memo(self.is_link_controlled)
-        self.init_all_fks()
-        self.notify_state_change()
-        self._model_version += 1
+        with self.god_map:
+            for group in self.groups.values():
+                group.reset_cache()
+            try:
+                del self.link_names
+            except:
+                pass  # property wasn't called
+            try:
+                del self.link_names_with_collisions
+            except:
+                pass  # property wasn't called
+            try:
+                del self.movable_joints_as_set
+            except:
+                pass  # property wasn't called
+            try:
+                del self.movable_joints
+            except:
+                pass  # property wasn't called
+            self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
+            self._clear_memo(self.get_directly_controlled_child_links_with_collisions)
+            self._clear_memo(self.compute_chain_reduced_to_controlled_joints)
+            self._clear_memo(self.get_movable_parent_joint)
+            self._clear_memo(self.get_controlled_parent_joint_of_link)
+            self._clear_memo(self.get_controlled_parent_joint_of_joint)
+            self._clear_memo(self.compute_split_chain)
+            self._clear_memo(self.are_linked)
+            self._clear_memo(self.compose_fk_expression)
+            self._clear_memo(self.compute_chain)
+            self._clear_memo(self.is_link_controlled)
+            self.init_all_fks()
+            self.notify_state_change()
+            self._model_version += 1
 
     def travel_branch(self, link_name, companion: TravelCompanion):
         link = self.links[link_name]

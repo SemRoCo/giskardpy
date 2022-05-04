@@ -8,6 +8,7 @@ from tf2_py import LookupException
 
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import lookup_pose, msg_to_homogeneous_matrix
+from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class SyncTfFrames(GiskardBehavior):
@@ -30,8 +31,9 @@ class SyncTfFrames(GiskardBehavior):
         return result
 
     @profile
+    @catch_and_raise_to_blackboard
     def update(self):
-        try:
+        with self.god_map:
             for parent_link, child_link in self.frames:
                 parent_T_child = lookup_pose(parent_link, child_link)
                 parent_T_child = msg_to_homogeneous_matrix(parent_T_child)
@@ -42,8 +44,5 @@ class SyncTfFrames(GiskardBehavior):
                 joint_name = chain[0]
                 # if self.should_update(map_T_base):
                 self.world.update_joint_parent_T_child(joint_name, parent_T_child)
-        except LookupException as e:
-            rospy.logwarn(e)
-            return Status.FAILURE
 
         return Status.SUCCESS

@@ -63,11 +63,14 @@ general_options:
         override:
           torso_lift_joint: 5
           odom_x_joint: 5
+          odom_x_joint_vel: 5
           odom_y_joint: 5
+          odom_y_joint_vel: 5
       angular: # rad/s**3
         default: 30
         override:
           odom_z_joint: 10
+          odom_z_joint_vel: 10
 #    snap:
 #      linear: # m/s**4
 #        default: 250

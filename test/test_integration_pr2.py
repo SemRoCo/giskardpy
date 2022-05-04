@@ -19,6 +19,7 @@ from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
+from giskardpy.model.world import SubWorldTree
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
     JointGoalChecker
 
@@ -112,7 +113,11 @@ def fake_table_setup(pocky_pose_setup: PR2) -> PR2:
 class TestFk(object):
     def test_fk(self, zero_pose: PR2):
         for root, tip in itertools.product(zero_pose.robot.link_names, repeat=2):
-            fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
+            try:
+                fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
+            except Exception as e:
+                fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
+                pass
             fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
 
@@ -127,6 +132,31 @@ class TestFk(object):
             fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
             fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
+
+    def test_fk_world(self, kitchen_setup: PR2):
+        kitchen: SubWorldTree = kitchen_setup.world.groups['kitchen']
+        robot: SubWorldTree = kitchen_setup.robot
+        kitchen_links = list(kitchen.link_names)
+        robot_links = list(robot.link_names)
+        for i in range(25):
+            if i % 2 == 0:
+                root = kitchen_links[i]
+                tip = robot_links[i]
+            else:
+                tip = kitchen_links[i]
+                root = robot_links[i]
+            fk1 = kitchen_setup.god_map.get_data(fk_pose + [(root, tip)])
+            if i % 2 == 0:
+                root = f'iai_kitchen/{root}'
+            else:
+                tip = f'iai_kitchen/{tip}'
+            fk2 = tf.lookup_pose(str(root), str(tip))
+            print(f'{root} {tip}')
+            try:
+                compare_poses(fk1.pose, fk2.pose)
+            except Exception as e:
+                pass
+                raise
 
 
 class TestJointGoals(object):
@@ -1110,10 +1140,9 @@ class TestConstraints(object):
 class TestCartGoals(object):
     def test_move_base(self, zero_pose: PR2):
         map_T_odom = PoseStamped()
-        # map_T_odom.pose.position.x = 1
-        # map_T_odom.pose.position.y = 1
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        # map_T_odom.pose.orientation.w = 1
         zero_pose.set_localization(map_T_odom)
 
         base_goal = PoseStamped()

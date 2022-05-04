@@ -482,19 +482,19 @@ class OmniDrive(Joint):
             free_variable.upper_limits = {}
 
         for order, linear_limit in linear_limits.items():
-            self.x.set_upper_limit(order, linear_limit[self.x_name])
-            self.y.set_upper_limit(order, linear_limit[self.y_name])
+            # self.x.set_upper_limit(order, linear_limit[self.x_name])
+            # self.y.set_upper_limit(order, linear_limit[self.y_name])
             self.x_vel.set_upper_limit(order, linear_limit[self.x_vel_name])
             self.y_vel.set_upper_limit(order, linear_limit[self.y_vel_name])
 
-            self.x.set_lower_limit(order, -linear_limit[self.x_name])
-            self.y.set_lower_limit(order, -linear_limit[self.y_name])
+            # self.x.set_lower_limit(order, -linear_limit[self.x_name])
+            # self.y.set_lower_limit(order, -linear_limit[self.y_name])
             self.x_vel.set_lower_limit(order, -linear_limit[self.x_vel_name])
             self.y_vel.set_lower_limit(order, -linear_limit[self.y_vel_name])
 
         for order, angular_limit in angular_limits.items():
-            self.rot.set_upper_limit(order, angular_limit[self.rot_name])
-            self.rot.set_lower_limit(order, -angular_limit[self.rot_name])
+            # self.rot.set_upper_limit(order, angular_limit[self.rot_name])
+            # self.rot.set_lower_limit(order, -angular_limit[self.rot_name])
             self.rot_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
             self.rot_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
 

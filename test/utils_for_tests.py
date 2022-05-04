@@ -26,7 +26,7 @@ from visualization_msgs.msg import Marker
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse
+from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
@@ -461,6 +461,11 @@ class GiskardTestWrapper(GiskardWrapper):
         :rtype: giskardpy.model.world.SubWorldTree
         """
         return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+
+    def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float],
+                  expected_error_codes=(DyeGroupResponse.SUCCESS,)):
+        res = super().dye_group(group_name, rgba)
+        assert res.error_codes in expected_error_codes
 
     def heart_beat(self, timer_thing):
         self.tree.tick()

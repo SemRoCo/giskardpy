@@ -1904,6 +1904,13 @@ class TestShaking(object):
 
 class TestWorldManipulation(object):
 
+    def test_dye_group(self, kitchen_setup: PR2):
+        kitchen_setup.dye_group(kitchen_setup.get_robot_name(), (1,0,0,1))
+        kitchen_setup.dye_group('kitchen', (0,1,0,1))
+        kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0,0,1,1))
+        kitchen_setup.set_joint_goal(kitchen_setup.default_pose)
+        kitchen_setup.plan_and_execute()
+
     def test_clear_world(self, zero_pose: PR2):
         object_name = 'muh'
         p = PoseStamped()

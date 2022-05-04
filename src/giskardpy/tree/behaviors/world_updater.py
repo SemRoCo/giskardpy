@@ -2,17 +2,18 @@ import traceback
 from itertools import product
 from queue import Queue
 from xml.etree.ElementTree import ParseError
-import giskardpy.casadi_wrapper as w
+
 import rospy
 from py_trees import Status
 from py_trees.meta import running_is_success
 from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
 
+import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
-from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNames, GetGroupInfo, \
-    GetGroupNamesResponse, GetGroupNamesRequest, RegisterGroup, RegisterGroupRequest, RegisterGroupResponse, \
-    GetGroupInfoResponse, GetGroupInfoRequest
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
+    GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
+    GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
@@ -82,7 +83,20 @@ class WorldUpdater(GiskardBehavior):
         self.get_group_names = rospy.Service('~get_group_names', GetGroupNames, self.get_group_names_cb)
         self.get_group_info = rospy.Service('~get_group_info', GetGroupInfo, self.get_group_info_cb)
         self.register_groups = rospy.Service('~register_groups', RegisterGroup, self.register_groups_cb)
+        self.dye_group = rospy.Service('~dye_group', DyeGroup, self.dye_group)
+        # self.dump_state_srv = rospy.Service('~dump_state', Trigger, self.dump_state_cb)
         return super(WorldUpdater, self).setup(timeout)
+
+    def dye_group(self, req):
+        group_name = req.group_name
+        res = DyeGroupResponse()
+        if group_name in self.world.groups:
+            for _, link in self.world.groups[req.group_name].links.items():
+                link.dye_collisions(req.color)
+            res.error_codes = DyeGroupResponse.SUCCESS
+        else:
+            res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
+        return res
 
     def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
         link_name = self.world.groups[req.parent_group_name].get_link_short_name_match(req.root_link_name)

@@ -1,5 +1,5 @@
 import json
-from typing import Dict
+from typing import Dict, Tuple
 
 import rospy
 from actionlib import SimpleActionClient
@@ -8,7 +8,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Po
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, MoveFeedback
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
-    UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
+    UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse, DyeGroupRequest, DyeGroup
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
@@ -38,6 +38,7 @@ class GiskardWrapper(object):
             self._update_rviz_markers_srv = rospy.ServiceProxy('{}/update_rviz_markers'.format(node_name), UpdateRvizMarkers)
             self._get_attached_objects_srv = rospy.ServiceProxy('{}/get_attached_objects'.format(node_name), GetAttachedObjects)
             self._marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+            self.dye_group_srv = rospy.ServiceProxy('~dye_group', DyeGroup)
             rospy.wait_for_service('{}/update_world'.format(node_name))
             self._client.wait_for_server()
         self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)
@@ -785,6 +786,15 @@ class GiskardWrapper(object):
         if isinstance(joint_states, dict):
             joint_states = position_dict_to_joint_states(joint_states)
         self._object_js_topics[object_name].publish(joint_states)
+
+    def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float]):
+        req = DyeGroupRequest()
+        req.group_name = group_name
+        req.color.r = rgba[0]
+        req.color.g = rgba[1]
+        req.color.b = rgba[2]
+        req.color.a = rgba[3]
+        return self.dye_group_srv(req)
 
     def get_object_names(self):
         """

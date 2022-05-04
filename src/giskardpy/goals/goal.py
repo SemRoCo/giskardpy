@@ -39,6 +39,8 @@ class Goal(object):
             key = (link_a, link_b)
         else:
             key = (link_b, link_a)
+        if self.world.are_linked(link_a, link_b):
+            return
         try:
             added_checks = self.god_map.get_data(identifier.added_collision_checks)
         except KeyError:

@@ -1,26 +1,49 @@
+import abc
+from abc import ABC
 from threading import Thread
-import control_msgs
-import numpy as np
+from typing import List
+
+import rospy
+import rostopic
 from geometry_msgs.msg import Twist
 from py_trees import Status
 from rospy import ROSException
 from rostopic import ROSTopicException
-from sensor_msgs.msg import JointState
-
-from giskardpy.model.joints import OmniDrive
-
-import rospy
-import rostopic
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult
 
 import giskardpy.identifier as identifier
+from giskardpy.goals.base_traj_follower import BaseTrajFollower
+from giskardpy.goals.goal import Goal
+from giskardpy.model.joints import OmniDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import catch_and_raise_to_blackboard, raise_to_blackboard, print_dict
+from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
-class SendTrajectoryOmniDriveRealTime(GiskardBehavior):
+class SendTrajectoryClosedLoop(GiskardBehavior, ABC):
+    def __init__(self, name):
+        super().__init__(name)
+        self.put_drive_goals_on_godmap()
+
+    def put_drive_goals_on_godmap(self):
+        try:
+            drive_goals = self.god_map.get_data(identifier.drive_goals)
+        except KeyError:
+            drive_goals = []
+        drive_goals.extend(self.get_drive_goals())
+        self.god_map.set_data(identifier.drive_goals, drive_goals)
+
+    @abc.abstractmethod
+    def get_drive_goals(self) -> List[Goal]:
+        """
+        """
+
+    @abc.abstractmethod
+    def update(self):
+        pass
+
+
+class SendTrajectoryOmniDriveRealTime(SendTrajectoryClosedLoop):
     min_deadline: rospy.Time
     max_deadline: rospy.Time
     update_thread: Thread
@@ -28,7 +51,7 @@ class SendTrajectoryOmniDriveRealTime(GiskardBehavior):
 
     @profile
     def __init__(self, name, cmd_vel_topic, drive, goal_time_tolerance=1, fill_velocity_values=True):
-        GiskardBehavior.__init__(self, name)
+        super().__init__(name)
         self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
@@ -51,7 +74,10 @@ class SendTrajectoryOmniDriveRealTime(GiskardBehavior):
                 self.controlled_joints = [joint]
                 self.joint = joint
         self.world.register_controlled_joints(self.controlled_joints)
-        loginfo('Received controlled joints from \'{}\'.'.format(cmd_vel_topic))
+        loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
+
+    def get_drive_goals(self) -> List[Goal]:
+        return [BaseTrajFollower(god_map=self.god_map, joint_name='brumbrum')]
 
     @profile
     @catch_and_raise_to_blackboard

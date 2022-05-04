@@ -403,44 +403,73 @@ class OmniDrive(Joint):
 
     def __init__(self,
                  god_map: GodMap,
-                 name: my_string,
                  parent_link_name: my_string,
                  child_link_name: my_string,
-                 translation_velocity_limit: Optional[float] = None,
-                 rotation_velocity_limit: Optional[float] = None,
-                 x_name: Optional[str] = None,
-                 y_name: Optional[str] = None,
-                 rot_name: Optional[str] = None,
+                 name: Optional[my_string] = 'brumbrum',
+                 translation_velocity_limit: Optional[float] = 0.5,
+                 rotation_velocity_limit: Optional[float] = 0.6,
+                 translation_acceleration_limit: Optional[float] = None,
+                 rotation_acceleration_limit: Optional[float] = None,
+                 translation_jerk_limit: Optional[float] = 5,
+                 rotation_jerk_limit: Optional[float] = 10,
+                 x_name: Optional[str] = 'odom_x',
+                 y_name: Optional[str] = 'odom_y',
+                 rot_name: Optional[str] = 'odom_rot',
+                 x_vel_name: Optional[str] = 'base_footprint_x_vel',
+                 y_vel_name: Optional[str] = 'base_footprint_y_vel',
+                 rot_vel_name: Optional[str] = 'base_footprint_rot_vel',
                  **kwargs):
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
+        self.translation_acceleration_limit = translation_acceleration_limit
+        self.rotation_acceleration_limit = rotation_acceleration_limit
+        self.translation_jerk_limit = translation_jerk_limit
+        self.rotation_jerk_limit = rotation_jerk_limit
         self.x_name = x_name
         self.y_name = y_name
         self.rot_name = rot_name
-        self.x_vel_name = f'{self.x_name}_vel'
-        self.y_vel_name = f'{self.y_name}_vel'
-        self.rot_vel_name = f'{self.rot_name}_vel'
+        self.x_vel_name = x_vel_name
+        self.y_vel_name = y_vel_name
+        self.rot_vel_name = rot_vel_name
         super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
 
     def create_free_variables(self):
+        translation_upper_limits = {}
+        if self.translation_velocity_limit is not None:
+            translation_upper_limits[1] = self.translation_velocity_limit
+        if self.translation_acceleration_limit is not None:
+            translation_upper_limits[2] = self.translation_acceleration_limit
+        if self.translation_jerk_limit is not None:
+            translation_upper_limits[3] = self.translation_jerk_limit
+        translation_lower_limits = {k: -v for k, v in translation_upper_limits.items()}
+
+        rotation_upper_limits = {}
+        if self.rotation_velocity_limit is not None:
+            rotation_upper_limits[1] = self.rotation_velocity_limit
+        if self.rotation_acceleration_limit is not None:
+            rotation_upper_limits[2] = self.rotation_acceleration_limit
+        if self.rotation_jerk_limit is not None:
+            rotation_upper_limits[3] = self.rotation_jerk_limit
+        rotation_lower_limits = {k: -v for k, v in rotation_upper_limits.items()}
+
         self.x = self.create_free_variable(self.x_name,
-                                           {1: -self.translation_velocity_limit},
-                                           {1: self.translation_velocity_limit})
+                                           translation_lower_limits,
+                                           translation_upper_limits)
         self.y = self.create_free_variable(self.y_name,
-                                           {1: -self.translation_velocity_limit},
-                                           {1: self.translation_velocity_limit})
+                                           translation_lower_limits,
+                                           translation_upper_limits)
         self.rot = self.create_free_variable(self.rot_name,
-                                             {1: -self.rotation_velocity_limit},
-                                             {1: self.rotation_velocity_limit})
+                                             rotation_lower_limits,
+                                             rotation_upper_limits)
         self.x_vel = self.create_free_variable(self.x_vel_name,
-                                               {1: -self.translation_velocity_limit},
-                                               {1: self.translation_velocity_limit})
+                                               translation_lower_limits,
+                                               translation_upper_limits)
         self.y_vel = self.create_free_variable(self.y_vel_name,
-                                               {1: -self.translation_velocity_limit},
-                                               {1: self.translation_velocity_limit})
+                                               translation_lower_limits,
+                                               translation_upper_limits)
         self.rot_vel = self.create_free_variable(self.rot_vel_name,
-                                                 {1: -self.rotation_velocity_limit},
-                                                 {1: self.rotation_velocity_limit})
+                                                 rotation_lower_limits,
+                                                 rotation_upper_limits)
 
     def apply_joint_effect(self):
         odom_T_base_footprint = w.frame_from_x_y_rot(self.x.get_symbol(0),

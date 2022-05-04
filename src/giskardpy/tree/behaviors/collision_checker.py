@@ -1,7 +1,4 @@
-from collections import defaultdict
-from copy import deepcopy
 from multiprocessing import Lock
-from time import time
 
 from py_trees import Status
 
@@ -45,7 +42,6 @@ class CollisionChecker(GiskardBehavior):
                 collision_matrix[key] = distance
         return collision_matrix
 
-
     @profile
     def initialise(self):
         try:
@@ -56,7 +52,6 @@ class CollisionChecker(GiskardBehavior):
             super(CollisionChecker, self).initialise()
         except Exception as e:
             raise_to_blackboard(e)
-
 
     @profile
     def update(self):

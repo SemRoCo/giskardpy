@@ -21,8 +21,6 @@ class BaseTrajFollower(Goal):
         self.weight = weight
         self.joint_name = joint_name
         self.joint: OmniDrive = self.world.joints[joint_name]
-        self.trajectory = self.god_map.get_data(identifier.trajectory)
-        self.trajectory_length = len(self.trajectory.items())
 
     def x_symbol(self, t: int, free_variable_name: str) -> expr_symbol:
         return self.god_map.to_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, 'position'])
@@ -35,6 +33,8 @@ class BaseTrajFollower(Goal):
                                   self.x_symbol(self.trajectory_length-1, free_variable_name))
 
     def make_constraints(self):
+        trajectory = self.god_map.get_data(identifier.trajectory)
+        self.trajectory_length = len(trajectory.items())
         odom_link = self.joint.parent_link_name
         base_footprint_link = self.joint.child_link_name
         x = self.current_traj_point(self.joint.x_name)
@@ -64,10 +64,10 @@ class BaseTrajFollower(Goal):
                             upper_error=error,
                             weight=self.weight,
                             expression=rotation_current)
-        self.add_debug_expr('rot goal', rotation_goal)
-        self.add_debug_expr('error', error)
-        self.add_debug_expr('rot current', rotation_current)
-        self.add_debug_vector('axis_current', axis_current)
+        # self.add_debug_expr('rot goal', rotation_goal)
+        # self.add_debug_expr('error', error)
+        # self.add_debug_expr('rot current', rotation_current)
+        # self.add_debug_vector('axis_current', axis_current)
 
 
     def __str__(self):

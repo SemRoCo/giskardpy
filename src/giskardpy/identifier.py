@@ -14,6 +14,7 @@ qp_solver_solution = ['qp_solver_solution']
 # collisions = ['collisions']
 goal_msg = ['goal_msg']
 goals = ['goals']
+drive_goals = ['drive_goals']
 constraints = ['constraints']
 vel_constraints = ['vel_constraints']
 free_variables = ['free_variables']
@@ -61,6 +62,7 @@ joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk', 'angular',
 joint_weights = general_options + ['joint_weights']
 
 # qp solver
+qp_controller = rosparam + ['qp_controller']
 qp_solver = rosparam + ['qp_solver']
 qp_solver_name = qp_solver + ['name']
 prediction_horizon = qp_solver + ['prediction_horizon']

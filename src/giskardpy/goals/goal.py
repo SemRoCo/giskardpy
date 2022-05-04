@@ -1,7 +1,7 @@
 from __future__ import division
 
 from collections import OrderedDict
-from typing import Optional
+from typing import Optional, Tuple, Dict, List
 
 from giskard_msgs.msg import Constraint as Constraint_msg
 
@@ -22,7 +22,7 @@ WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
-class Goal(object):
+class Goal:
     def __init__(self, god_map: GodMap, control_horizon: int = None, **kwargs):
         self.god_map = god_map
         self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
@@ -31,7 +31,7 @@ class Goal(object):
         if control_horizon is None:
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
-        self._sub_goals = []
+        self._sub_goals: List[Goal] = []
         self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
 
     def add_collision_check(self, link_a, link_b, distance):
@@ -51,7 +51,7 @@ class Goal(object):
         else:
             added_checks[key] = distance
 
-    def _save_self_on_god_map(self):
+    def save_self_on_god_map(self):
         self.god_map.set_data(self._get_identifier(), self)
 
     def make_constraints(self):
@@ -62,7 +62,7 @@ class Goal(object):
             return identifier.goals + [str(self)]
         except AttributeError as e:
             raise AttributeError(
-                'You have to ensure that str(self) is possible before calling parents __init__: {}'.format(e))
+                f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
     def get_world_object_pose(self, object_name, link_name):
         pass
@@ -159,16 +159,13 @@ class Goal(object):
                        r_R_t_axis_angle[2]])
         return self.get_expr_velocity(fk)
 
-    def get_constraints(self):
-        """
-        :rtype: OrderedDict
-        """
-        self._save_self_on_god_map()
+    def get_constraints(self) -> Tuple[Dict[str, Constraint], Dict[str, VelocityConstraint], Dict[str, expr_symbol]]:
         self._constraints = OrderedDict()
         self._velocity_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
         self.make_constraints()
         for sub_goal in self._sub_goals:
+            sub_goal.save_self_on_god_map()
             c, c_vel, debug_expressions = sub_goal.get_constraints()
             # TODO check for duplicates
             self._constraints.update(_prepend_prefix(self.__class__.__name__, c))

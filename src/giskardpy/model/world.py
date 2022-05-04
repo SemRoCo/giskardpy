@@ -451,7 +451,6 @@ class WorldTree(object):
         self._add_tf_links(frames_to_sync)
         base_drive = self.god_map.unsafe_get_data(identifier.robot_base_drive)
         drive_joint = OmniDrive(god_map=self.god_map,
-                                name='brumbrum',
                                 **base_drive)
         self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
                       group_name=None,

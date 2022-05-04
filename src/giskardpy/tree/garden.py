@@ -24,6 +24,7 @@ from giskardpy.tree.behaviors.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.goal_reached import GoalReachedPlugin
 from giskardpy.tree.behaviors.goal_received import GoalReceived
+from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
@@ -36,10 +37,11 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.plugin_if import IF
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
+from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
-from giskardpy.tree.behaviors.setup_base_traj_constraints import SetupBaseTrajConstraints
+from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
@@ -47,7 +49,6 @@ from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.time_real import RosTime
-from giskardpy.tree.behaviors.update_constraints import GoalToConstraints
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import PluginBehavior
@@ -558,7 +559,8 @@ class OpenLoop(TreeManager):
     def grow_planning(self):
         planning = failure_is_success(Sequence)('planning')
         planning.add_child(IF('command set?', identifier.next_move_goal))
-        planning.add_child(GoalToConstraints('update constraints', self.action_server_name))
+        planning.add_child(RosMsgToGoal('RosMsgToGoal', self.action_server_name))
+        planning.add_child(InitQPController('InitQPController'))
         planning.add_child(self.grow_planning2())
         # planning.add_child(planning_1)
         # planning.add_child(SetErrorCode('set error code'))
@@ -635,8 +637,8 @@ class OpenLoop(TreeManager):
                 del params['plugin']
                 base = PluginBehavior('base sequence')
                 base.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
-                                                                **self.god_map.unsafe_get_data(
-                                                                    identifier.SyncTfFrames)))
+                                                                 **self.god_map.unsafe_get_data(
+                                                                     identifier.SyncTfFrames)))
                 base.add_plugin(SyncOdometry('sync odometry', odometry_topic='pr2/base_footprint'))
                 base.add_plugin(RosTime('time'))
                 base.add_plugin(ControllerPlugin('base controller'))
@@ -663,7 +665,8 @@ class OpenLoop(TreeManager):
 
         move_robot = failure_is_success(Sequence)('move robot')
         move_robot.add_child(IF('execute?', identifier.execute))
-        move_robot.add_child(SetupBaseTrajConstraints('SetupBaseTrajConstraints'))
+        move_robot.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
+        move_robot.add_child(InitQPController('InitQPController for base'))
         move_robot.add_child(publish_result)
         return move_robot
 

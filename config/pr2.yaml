@@ -7,11 +7,6 @@ robot_interface:
       type: OmniDrive
       parent_link_name: odom_combined
       child_link_name: base_footprint
-      x_name: odom_x_joint
-      y_name: odom_y_joint
-      rot_name: odom_z_joint
-      translation_velocity_limit: 1
-      rotation_velocity_limit: 1
   body:
     plugin: SendFollowJointTrajectory
     namespace: /pr2/whole_body_controller/follow_joint_trajectory
@@ -41,13 +36,10 @@ general_options:
     velocity:
       linear: # m/s
         default: 1
-        override:
-          odom_x_joint: 0.5
-          odom_y_joint: 0.5
+        override: {}
       angular: # rad/s
         default: 1
         override:
-          odom_z_joint: 0.6
           head_pan_joint: 0.5
           head_tilt_joint: 0.5
     acceleration:
@@ -62,15 +54,9 @@ general_options:
         default: 30
         override:
           torso_lift_joint: 5
-          odom_x_joint: 5
-          odom_x_joint_vel: 5
-          odom_y_joint: 5
-          odom_y_joint_vel: 5
       angular: # rad/s**3
         default: 30
-        override:
-          odom_z_joint: 10
-          odom_z_joint_vel: 10
+        override: {}
 #    snap:
 #      linear: # m/s**4
 #        default: 250

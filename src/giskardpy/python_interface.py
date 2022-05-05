@@ -71,9 +71,9 @@ class GiskardWrapper(object):
     def set_cart_goal(self,
                       goal_pose: PoseStamped,
                       tip_link: str,
-                      tip_group: str,
                       root_link: str,
-                      root_group: str,
+                      tip_group: str = None,
+                      root_group: str = None,
                       weight: Optional[float] = None,
                       max_linear_velocity: Optional[float] = None,
                       max_angular_velocity: Optional[float] = None,
@@ -101,9 +101,9 @@ class GiskardWrapper(object):
     def set_straight_cart_goal(self,
                                goal_pose: PoseStamped,
                                tip_link: str,
-                               tip_group: str,
                                root_link: str,
-                               root_group: str,
+                               tip_group: str = None,
+                               root_group: str = None,
                                weight: Optional[float] = None,
                                max_linear_velocity: Optional[float] = None,
                                max_angular_velocity: Optional[float] = None,
@@ -132,9 +132,9 @@ class GiskardWrapper(object):
     def set_translation_goal(self,
                              goal_point: PointStamped,
                              tip_link: str,
-                             tip_group: str,
                              root_link: str,
-                             root_group: str,
+                             tip_group: str = None,
+                             root_group: str = None,
                              weight: Optional[float] = None,
                              max_velocity: Optional[float] = None,
                              **kwargs: goal_parameter):
@@ -159,9 +159,9 @@ class GiskardWrapper(object):
     def set_straight_translation_goal(self,
                                       goal_pose: PoseStamped,
                                       tip_link: str,
-                                      tip_group: str,
                                       root_link: str,
-                                      root_group: str,
+                                      tip_group: str = None,
+                                      root_group: str = None,
                                       weight: Optional[float] = None,
                                       max_velocity: Optional[float] = None,
                                       **kwargs: goal_parameter):
@@ -187,9 +187,9 @@ class GiskardWrapper(object):
     def set_rotation_goal(self,
                           goal_orientation: PoseStamped,
                           tip_link: str,
-                          tip_group: str,
                           root_link: str,
-                          root_group: str,
+                          tip_group: str = None,
+                          root_group: str = None,
                           weight: Optional[float] = None,
                           max_velocity: Optional[float] = None,
                           **kwargs: goal_parameter):
@@ -234,10 +234,10 @@ class GiskardWrapper(object):
 
     def set_align_planes_goal(self,
                               tip_link: str,
-                              tip_group: str,
                               tip_normal: Vector3Stamped,
                               root_link: str,
-                              root_group: str,
+                              tip_group: str = None,
+                              root_group: str = None,
                               root_normal: Optional[Vector3Stamped] = None,
                               max_angular_velocity: Optional[float] = None,
                               weight: Optional[float] = None,
@@ -274,9 +274,9 @@ class GiskardWrapper(object):
 
     def set_limit_cartesian_velocity_goal(self,
                                           root_link: str,
-                                          root_group: str,
                                           tip_link: str,
-                                          tip_group: str,
+                                          tip_group: str = None,
+                                          root_group: str = None,
                                           weight: Optional[float] = None,
                                           max_linear_velocity: float = 0.1,
                                           max_angular_velocity: float = 0.5,
@@ -292,18 +292,6 @@ class GiskardWrapper(object):
         :param hard: default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        if tip_group is None:
-            groups = self._world.get_groups_containing_link_short_name(tip_link)
-            if len(groups) == 1:
-                tip_group = groups.pop()
-            else:
-                raise Exception('Please define a tip_group.')
-        if root_group is None:
-            groups = self._world.get_groups_containing_link_short_name(root_link)
-            if len(groups) == 1:
-                root_group = groups.pop()
-            else:
-                raise Exception('Please define a root_group.')
         self.set_json_goal('CartesianVelocityLimit',
                            root_link=root_link,
                            root_group=root_group,
@@ -362,10 +350,10 @@ class GiskardWrapper(object):
 
     def set_pointing_goal(self,
                           tip_link: str,
-                          tip_group: str,
                           goal_point: PointStamped,
                           root_link: str,
-                          root_group: str,
+                          tip_group: str = None,
+                          root_group: str = None,
                           pointing_axis: Optional[Vector3Stamped] = None,
                           weight: Optional[float] = None,
                           **kwargs: goal_parameter):

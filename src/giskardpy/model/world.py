@@ -416,6 +416,15 @@ class WorldTree(object):
             groups.add(group_name)
         return groups
 
+    def get_group_of_joint_short_names(self, joint_names: [PrefixName, str]) -> Union[PrefixName, str]:
+        if len(joint_names) > 0:
+            groups = [self.get_group_containing_joint_short_name(j_n) for j_n in joint_names]
+            if all(map(lambda e: e == groups[0], groups)):
+                return groups[0]
+            else:
+                raise Exception(f'Containing different group names {groups} '
+                                f'for given list of joint_names {joint_names}.')
+
     def get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> str:
         groups = self.get_groups_containing_joint_short_name(joint_name)
         groups_size = len(groups)

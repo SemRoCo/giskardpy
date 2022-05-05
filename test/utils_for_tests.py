@@ -322,11 +322,11 @@ class JointGoalChecker(GoalChecker):
 
 
 class TranslationGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, tip_prefix, root_link, root_prefix, expected):
+    def __init__(self, god_map, tip_link, root_link, expected):
         super(TranslationGoalChecker, self).__init__(god_map)
         self.expected = deepcopy(expected)
-        self.tip_link = PrefixName(tip_link, tip_prefix)
-        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = tip_link
+        self.root_link = root_link
         self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
@@ -337,11 +337,11 @@ class TranslationGoalChecker(GoalChecker):
 
 
 class AlignPlanesGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, tip_prefix, tip_normal, root_link, root_prefix, root_normal):
+    def __init__(self, god_map, tip_link, tip_normal, root_link, root_normal):
         super(AlignPlanesGoalChecker, self).__init__(god_map)
         self.tip_normal = tip_normal
-        self.tip_link = PrefixName(tip_link, tip_prefix)
-        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = tip_link
+        self.root_link = root_link
         self.expected = self.transform_msg(self.root_link, root_normal)
 
     def __call__(self):
@@ -351,10 +351,10 @@ class AlignPlanesGoalChecker(GoalChecker):
 
 
 class PointingGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, tip_prefix, goal_point, root_link, root_prefix, pointing_axis=None):
+    def __init__(self, god_map, tip_link, goal_point, root_link, pointing_axis=None):
         super(PointingGoalChecker, self).__init__(god_map)
-        self.tip_link = str(PrefixName(tip_link, tip_prefix))
-        self.root_link = str(PrefixName(root_link, root_prefix))
+        self.tip_link = tip_link
+        self.root_link = root_link
         if pointing_axis:
             self.tip_V_pointer = self.transform_msg(self.tip_link, pointing_axis)
         else:
@@ -373,11 +373,11 @@ class PointingGoalChecker(GoalChecker):
 
 
 class RotationGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, tip_prefix, root_link, root_prefix, expected):
+    def __init__(self, god_map, tip_link, root_link, expected):
         super(RotationGoalChecker, self).__init__(god_map)
         self.expected = deepcopy(expected)
-        self.tip_link = PrefixName(tip_link, tip_prefix)
-        self.root_link = PrefixName(root_link, root_prefix)
+        self.tip_link = tip_link
+        self.root_link = root_link
         self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
@@ -487,7 +487,13 @@ class GiskardTestWrapper(GiskardWrapper):
         self.wait_heartbeats()
         current_js = self.world.groups[object_name].state
         joint_names_with_prefix = set(j.long_name for j in current_js)
-        assert set(joint_state.keys()).difference(joint_names_with_prefix) == set()
+        joint_state_names = list()
+        for j_n in joint_state.keys():
+            if type(j_n) == PrefixName or '/' in j_n:
+                joint_state_names.append(j_n)
+            else:
+                joint_state_names.append(str(PrefixName(j_n, object_name)))
+        assert set(joint_state_names).difference(joint_names_with_prefix) == set()
         for joint_name, state in current_js.items():
             if joint_name.short_name in joint_state:
                 np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
@@ -513,6 +519,31 @@ class GiskardTestWrapper(GiskardWrapper):
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
                                                                                            goal))
 
+    def get_robot_short_root_link_name(self, root_group: str = None):
+        # If robots exist
+        if len(self.world.robot_names) != 0:
+            # If a group is given, just return the root_link_name of the SubTreeWorld
+            if root_group is not None:
+                root_link = self.world.groups[root_group].root_link_name
+            else:
+                # If only one robot is imported
+                if len(self.world.robot_names) == 1:
+                    root_link = self.world.groups[self.world.robot_names[0]].root_link_name
+                else:
+                    raise Exception('Multiple Robots detected: root group is needed'
+                                    ' to get the root link automatically.')
+            return root_link.short_name if type(root_link) == PrefixName else root_link
+
+    def get_root_and_tip_link(self, root_link: str, tip_link: str,
+                              root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
+        if root_group is None:
+            root_group = self.world.get_group_containing_link_short_name(root_link)
+        root_link = PrefixName(root_link, root_group)
+        if tip_group is None:
+            tip_group = self.world.get_group_containing_link_short_name(tip_link)
+        tip_link = PrefixName(tip_link, tip_group)
+        return root_link, tip_link
+
     #
     # GOAL STUFF #################################################################################################
     #
@@ -522,22 +553,10 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         :type goal: dict
         """
-        if group_name is None:
-            # Get group name from only group:
-            if len(self.collision_scene.robot_names) == 1:
-                group_name = self.collision_scene.robot_names[0]
-            # Search group name from joint names:
-            else:
-                group_name = self.world.get_group_of_joint(list(goal.keys())[0]).name
-                for j_name, _ in goal.items():
-                    try:
-                        j_group_name = self.world.get_group_of_joint(j_name).name
-                    except KeyError:
-                        raise Exception('Please specify a group name.')
-                    if j_group_name != group_name:
-                        raise Exception('Different group names found in given goal.')
         super(GiskardTestWrapper, self).set_joint_goal(goal, group_name, weight=weight, hard=hard)
         if check:
+            if group_name is None:
+                group_name = self.world.get_group_of_joint_short_names(list(goal.keys()))
             prefix = self.namespaces[self.collision_scene.robot_names.index(group_name)]
             self.add_goal_check(JointGoalChecker(self.god_map, goal, group_name, decimal, prefix=prefix))
 
@@ -554,11 +573,11 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_base.call(goal)
         rospy.sleep(0.5)
 
-    def set_rotation_goal(self, goal_orientation, tip_link, tip_group=None, root_link=None, root_group=None,
+    def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, tip_group=None, root_group=None,
                           weight=None, max_velocity=None, check=True,
                           **kwargs):
-        if not root_link:
-            root_link = self.default_root
+        if root_link is None:
+            root_link = self.get_robot_short_root_link_name(root_group)
         super(GiskardTestWrapper, self).set_rotation_goal(goal_orientation=goal_orientation,
                                                           tip_link=tip_link,
                                                           tip_group=tip_group,
@@ -567,14 +586,15 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           max_velocity=max_velocity,
                                                           weight=weight, **kwargs)
         if check:
-            root_prefix = root_group
-            tip_prefix = tip_group
-            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, tip_prefix, root_link, root_prefix,
-                                                    goal_orientation))
+            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+                                                                       tip_link=tip_link, tip_group=tip_group)
+            self.add_goal_check(RotationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_orientation))
 
-    def set_translation_goal(self, goal_point, tip_link, tip_group=None, root_link=None, root_group=None,
+    def set_translation_goal(self, goal_point, tip_link, root_link=None, tip_group=None, root_group=None,
                              weight=None, max_velocity=None, check=True,
                              **kwargs):
+        if root_link is None:
+            root_link = self.get_robot_short_root_link_name(root_group)
         super(GiskardTestWrapper, self).set_translation_goal(goal_point=goal_point,
                                                              tip_link=tip_link,
                                                              tip_group=tip_group,
@@ -584,35 +604,24 @@ class GiskardTestWrapper(GiskardWrapper):
                                                              weight=weight,
                                                              **kwargs)
         if check:
-            root_prefix = root_group
-            tip_prefix = tip_group
-            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, tip_prefix, root_link, root_prefix,
-                                                       goal_point))
+            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+                                                                       tip_link=tip_link, tip_group=tip_group)
+            self.add_goal_check(TranslationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_point))
 
-    def set_straight_translation_goal(self, goal_pose, tip_link, tip_group=None, root_link=None, root_group=None,
+    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                       weight=None, max_velocity=None,
                                       **kwargs):
-        if not root_link:
-            root_link = self.default_root
-        if tip_group is None:
-            groups = self.world.get_groups_containing_link_short_name(tip_link)
-            if len(groups) == 1:
-                tip_group = groups.pop()
-            else:
-                raise Exception('Please define a tip_group.')
-        if root_group is None:
-            groups = self.world.get_groups_containing_link_short_name(root_link)
-            if len(groups) == 1:
-                root_group = groups.pop()
-            else:
-                raise Exception('Please define a root_group.')
-        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose,
-                                                                      tip_link, tip_group,
-                                                                      root_link, root_group,
+        if root_link is None:
+            root_link = self.get_robot_short_root_link_name(root_group)
+        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose=goal_pose,
+                                                                      tip_link=tip_link,
+                                                                      root_link=root_link,
+                                                                      tip_group=tip_group,
+                                                                      root_group=root_group,
                                                                       max_velocity=max_velocity, weight=weight,
                                                                       **kwargs)
 
-    def set_cart_goal(self, goal_pose, tip_link, tip_group=None, root_link=None, root_group=None, weight=None, linear_velocity=None,
+    def set_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None, weight=None, linear_velocity=None,
                       angular_velocity=None, check=True):
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
@@ -637,30 +646,9 @@ class GiskardTestWrapper(GiskardWrapper):
                                max_velocity=angular_velocity,
                                check=check)
 
-    def set_pointing_goal(self, tip_link, goal_point, tip_group=None, root_link=None, root_group=None, pointing_axis=None, weight=None):
-        if not root_link:
-            if len(self.collision_scene.robot_names) != 0:
-                if root_group is not None:
-                    root_link = self.world.groups[root_group].root_link_name.short_name
-                else:
-                    if len(self.collision_scene.robot_names) == 1:
-                        root_link = self.world.groups[self.collision_scene.robot_names[0]].root_link_name.short_name
-                    else:
-                        raise Exception('Prefix needed to get root_link automatically.')
-            else:
-                root_link = self.default_root
-        if tip_group is None:
-            groups = self.world.get_groups_containing_link_short_name(tip_link)
-            if len(groups) == 1:
-                tip_group = groups.pop()
-            else:
-                raise Exception('Please define a tip_group.')
-        if root_group is None:
-            groups = self.world.get_groups_containing_link_short_name(root_link)
-            if len(groups) == 1:
-                root_group = groups.pop()
-            else:
-                raise Exception('Please define a root_group.')
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, tip_group=None, root_group=None, pointing_axis=None, weight=None):
+        if root_link is None:
+            root_link = self.get_robot_short_root_link_name(root_group)
         super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
                                                           tip_group=tip_group,
                                                           goal_point=goal_point,
@@ -668,18 +656,18 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           root_group=root_group,
                                                           pointing_axis=pointing_axis,
                                                           weight=weight)
-        root_prefix = root_group
-        tip_prefix = tip_group
+        full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+                                                                   tip_link=tip_link, tip_group=tip_group)
         self.add_goal_check(PointingGoalChecker(self.god_map,
-                                                tip_link=tip_link,
-                                                tip_prefix=tip_prefix,
+                                                tip_link=full_tip_link,
                                                 goal_point=goal_point,
-                                                root_link=root_link,
-                                                root_prefix=root_prefix,
+                                                root_link=full_root_link,
                                                 pointing_axis=pointing_axis))
 
-    def set_align_planes_goal(self, tip_link, tip_normal, tip_group=None, root_link=None, root_group=None, root_normal=None, max_angular_velocity=None,
+    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, tip_group=None, root_group=None, root_normal=None, max_angular_velocity=None,
                               weight=None, check=True):
+        if root_link is None:
+            root_link = self.get_robot_short_root_link_name(root_group)
         super(GiskardTestWrapper, self).set_align_planes_goal(tip_link=tip_link,
                                                               tip_group=tip_group,
                                                               root_link=root_link,
@@ -689,46 +677,38 @@ class GiskardTestWrapper(GiskardWrapper):
                                                               max_angular_velocity=max_angular_velocity,
                                                               weight=weight)
         if check:
-            self.add_goal_check(AlignPlanesGoalChecker(self.god_map, tip_link, tip_group, tip_normal, root_link, root_group, root_normal))
+            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+                                                                       tip_link=tip_link, tip_group=tip_group)
+            self.add_goal_check(AlignPlanesGoalChecker(self.god_map, full_tip_link, tip_normal, full_root_link, root_normal))
 
     def add_goal_check(self, goal_checker):
         self.goal_checks[self.number_of_cmds - 1].append(goal_checker)
 
-    def set_straight_cart_goal(self, goal_pose, tip_link, tip_group=None, root_link=None, root_group=None,
+    def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                weight=None, linear_velocity=None, angular_velocity=None,
                                check=True):
-        if not root_link:
-            root_link = self.default_root
-        if tip_group is None:
-            groups = self.world.get_groups_containing_link_short_name(tip_link)
-            if len(groups) == 1:
-                tip_group = groups.pop()
-            else:
-                raise Exception('Please define a tip_group.')
-        if root_group is None:
-            groups = self.world.get_groups_containing_link_short_name(root_link)
-            if len(groups) == 1:
-                root_group = groups.pop()
-            else:
-                raise Exception('Please define a root_group.')
+        if root_link is None:
+            root_link = self.get_robot_short_root_link_name(root_group)
         super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose,
-                                                               tip_link, tip_group,
-                                                               root_link, root_group,
+                                                               tip_link,
+                                                               root_link,
+                                                               tip_group=tip_group,
+                                                               root_group=root_group,
                                                                weight=weight,
                                                                max_linear_velocity=linear_velocity,
                                                                max_angular_velocity=angular_velocity)
 
         if check:
-            root_prefix = root_group
-            tip_prefix = tip_group
+            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+                                                                       tip_link=tip_link, tip_group=tip_group)
             goal_point = PointStamped()
             goal_point.header = goal_pose.header
             goal_point.point = goal_pose.pose.position
-            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, tip_prefix, root_link, root_prefix, goal_point))
+            self.add_goal_check(TranslationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_point))
             goal_orientation = QuaternionStamped()
             goal_orientation.header = goal_pose.header
             goal_orientation.quaternion = goal_pose.pose.orientation
-            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, tip_prefix, root_link, root_prefix, goal_orientation))
+            self.add_goal_check(RotationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_orientation))
 
     #
     # GENERAL GOAL STUFF ###############################################################################################

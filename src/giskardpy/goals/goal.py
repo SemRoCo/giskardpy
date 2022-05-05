@@ -70,25 +70,18 @@ class Goal(object):
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
 
-    def get_root(self, root_group=None) -> str:
-        if len(self.world.robot_names) != 0:
-            if root_group is not None:
-                root_link = self.world.groups[root_group].root_link_name.short_name
-            else:
-                if len(self.world.robot_names) == 1:
-                    root_link = self.world.groups[self.world.robot_names[0]].root_link_name.short_name
-                else:
-                    raise Exception('Root group is needed to get the root link automatically.')
-        else:
-            raise Exception('Please define a root link.')
-        return root_link
-
     def get_link(self, link_name: str, group_name: str) -> PrefixName:
+        if '/' in link_name:
+            raise Exception(f'Link name {link_name} contains invalid character \'/\''
+                            f' or may contain already a prefix.')
         if group_name is None:
             group_name = self.world.get_group_containing_link_short_name(link_name)
         return PrefixName(link_name, group_name)
 
     def get_joint(self, joint_name: str, group_name: str) -> PrefixName:
+        if '/' in joint_name:
+            raise Exception(f'Link name {joint_name} contains invalid character \'/\''
+                            f' or may contain already a prefix.')
         if group_name is None:
             group_name = self.world.get_group_containing_joint_short_name(joint_name)
         return PrefixName(joint_name, group_name)

@@ -1,20 +1,17 @@
 from __future__ import division
 
-from giskardpy.data_types import PrefixName
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 from giskardpy.goals.joint_goals import JointPosition
 
 
 class Open(Goal):
-    def __init__(self, tip_link, tip_group, environment_link, environment_group, goal_joint_state=None,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, tip_link, environment_link, tip_group: str = None, environment_group: str = None,
+                 goal_joint_state=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         super(Open, self).__init__(**kwargs)
         self.weight = weight
-        #environment_prefix = self.world.groups[environment_group].get_link_short_name_match(environment_link).prefix
-        #tip_prefix = self.world.groups[tip_group].get_link_short_name_match(tip_link).prefix
-        self.tip_link = PrefixName(tip_link, tip_group)
-        self.handle_link = PrefixName(environment_link, environment_group)
+        self.tip_link = self.get_link(tip_link, tip_group)
+        self.handle_link = self.get_link(environment_link, environment_group)
         self.joint_name = self.world.get_movable_parent_joint(self.handle_link)
         self.joint_group = self.world.get_group_of_joint(self.joint_name)
         self.handle_T_tip = self.world.compute_fk_pose(self.handle_link, self.tip_link)
@@ -42,9 +39,10 @@ class Open(Goal):
 
 
 class Close(Goal):
-    def __init__(self, tip_link, tip_group, environment_link, environment_group, weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, tip_link, environment_link, tip_group: str = None, environment_group: str = None,
+                 weight=WEIGHT_ABOVE_CA, **kwargs):
         super(Close, self).__init__(**kwargs)
-        handle_link = PrefixName(environment_link, environment_group)
+        handle_link = self.get_link(environment_link, environment_group)
         joint_name = self.world.get_movable_parent_joint(handle_link)
         goal_joint_state, _ = self.world.get_joint_position_limits(joint_name)
         self.add_constraints_of_goal(Open(tip_link=tip_link,

@@ -605,7 +605,7 @@ class OpenLoop(TreeManager):
         return planning_3
 
     def grow_planning4(self):
-        planning_4 = PluginBehavior('planning IIII')
+        planning_4 = PluginBehavior('planning IV')
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_plugin(CollisionChecker('collision checker'))
         if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):

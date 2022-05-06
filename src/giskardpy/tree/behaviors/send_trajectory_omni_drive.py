@@ -59,7 +59,7 @@ class SendTrajectoryOmniDrive(GiskardBehavior):
         super().initialise()
         self.trajectory = self.get_god_map().get_data(identifier.trajectory)
         sample_period = self.god_map.unsafe_get_data(identifier.sample_period)
-        self.trajectory = self.trajectory.to_msg(sample_period, [self.world.joints['brumbrum']], True)
+        self.trajectory = self.trajectory.to_msg(sample_period, [self.joint], True)
         self.update_thread = Thread(target=self.worker)
         self.update_thread.start()
 

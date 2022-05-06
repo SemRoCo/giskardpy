@@ -1,7 +1,7 @@
 parent: !include default.yaml
 robot_interface:
   base:
-    plugin: SendTrajectoryOmniDriveRealTime
+    plugin: CmdVelInterface
     cmd_vel_topic: /pr2/cmd_vel
     drive:
       type: OmniDrive
@@ -17,21 +17,6 @@ plugins:
     frames:
       - [map, odom_combined]
 general_options:
-  joint_weights:
-    # the planner prefers low weight joints to achieve solutions
-    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
-    velocity:
-      default: 0.001
-      override: {}
-    acceleration:
-      default: 0
-      override: { }
-    jerk:
-      default: 0.001
-      override: { }
-#    snap:
-#      default: 0
-#      override: { }
   joint_limits: # giskard will use the min of this number and limits from the urdf
     velocity:
       linear: # m/s

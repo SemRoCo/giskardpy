@@ -21,8 +21,11 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class SendTrajectoryClosedLoop(GiskardBehavior, ABC):
-    def __init__(self, name):
+    def __init__(self, name, **kwargs):
         super().__init__(name)
+
+    def setup(self, timeout):
+        super().setup(timeout)
         self.put_drive_goals_on_godmap()
 
     def put_drive_goals_on_godmap(self):
@@ -43,7 +46,7 @@ class SendTrajectoryClosedLoop(GiskardBehavior, ABC):
         pass
 
 
-class SendTrajectoryOmniDriveRealTime(SendTrajectoryClosedLoop):
+class CmdVelInterface(SendTrajectoryClosedLoop):
     min_deadline: rospy.Time
     max_deadline: rospy.Time
     update_thread: Thread
@@ -77,7 +80,7 @@ class SendTrajectoryOmniDriveRealTime(SendTrajectoryClosedLoop):
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def get_drive_goals(self) -> List[Goal]:
-        return [BaseTrajFollower(god_map=self.god_map, joint_name='brumbrum')]
+        return [BaseTrajFollower(god_map=self.god_map, joint_name=self.joint.name)]
 
     @profile
     @catch_and_raise_to_blackboard
@@ -85,7 +88,7 @@ class SendTrajectoryOmniDriveRealTime(SendTrajectoryClosedLoop):
         super().initialise()
         self.trajectory = self.get_god_map().get_data(identifier.trajectory)
         sample_period = self.god_map.unsafe_get_data(identifier.sample_period)
-        self.trajectory = self.trajectory.to_msg(sample_period, [self.world.joints['brumbrum']], True)
+        self.trajectory = self.trajectory.to_msg(sample_period, [self.joint], True)
         self.start_time = self.trajectory.header.stamp
         self.end_time = self.start_time + self.trajectory.points[-1].time_from_start
         # self.update_thread = Thread(target=self.worker)

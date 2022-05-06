@@ -39,6 +39,7 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
+from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryClosedLoop
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
@@ -627,28 +628,29 @@ class OpenLoop(TreeManager):
         return planning_4
 
     def grow_follow_joint_trajectory_execution(self):
+        add_real_time_tracking = False
         execution_action_server = Parallel('execution action servers',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         action_servers = self.god_map.get_data(identifier.robot_interface)
         behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
+        real_time_tracking = PluginBehavior('base sequence')
+        real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
+                                                         **self.god_map.unsafe_get_data(
+                                                             identifier.SyncTfFrames)))
+        real_time_tracking.add_plugin(SyncOdometry('sync odometry', odometry_topic='pr2/base_footprint'))
+        real_time_tracking.add_plugin(RosTime('time'))
+        real_time_tracking.add_plugin(ControllerPlugin('base controller'))
+        real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
         for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-            if execution_action_server_name == 'base':
-                C = behaviors[params['plugin']]
-                del params['plugin']
-                base = PluginBehavior('base sequence')
-                base.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
-                                                                 **self.god_map.unsafe_get_data(
-                                                                     identifier.SyncTfFrames)))
-                base.add_plugin(SyncOdometry('sync odometry', odometry_topic='pr2/base_footprint'))
-                base.add_plugin(RosTime('time'))
-                base.add_plugin(ControllerPlugin('base controller'))
-                base.add_plugin(RealKinSimPlugin('kin sim'))
-                base.add_plugin(C(execution_action_server_name, **params))
-                execution_action_server.add_child(base)
+            C = behaviors[params['plugin']]
+            del params['plugin']
+            if issubclass(C, SendTrajectoryClosedLoop):
+                add_real_time_tracking = True
+                real_time_tracking.add_plugin(C(execution_action_server_name, **params))
             else:
-                C = behaviors[params['plugin']]
-                del params['plugin']
                 execution_action_server.add_child(C(execution_action_server_name, **params))
+        if add_real_time_tracking:
+            execution_action_server.add_child(real_time_tracking)
 
         execute_canceled = Sequence('execute canceled')
         execute_canceled.add_child(GoalCanceled('goal canceled', self.action_server_name))
@@ -665,8 +667,9 @@ class OpenLoop(TreeManager):
 
         move_robot = failure_is_success(Sequence)('move robot')
         move_robot.add_child(IF('execute?', identifier.execute))
-        move_robot.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
-        move_robot.add_child(InitQPController('InitQPController for base'))
+        if add_real_time_tracking:
+            move_robot.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
+            move_robot.add_child(InitQPController('InitQPController for base'))
         move_robot.add_child(publish_result)
         return move_robot
 

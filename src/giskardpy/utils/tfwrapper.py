@@ -13,8 +13,8 @@ from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
-tfBuffer: Buffer
-tf_listener: TransformListener
+tfBuffer: Buffer = None
+tf_listener: TransformListener = None
 
 
 def init(tf_buffer_size=15):

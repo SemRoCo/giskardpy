@@ -686,7 +686,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 except:
                     logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
                     raise
-            self.are_joint_limits_violated()
+            # self.are_joint_limits_violated()
         finally:
             self.goal_checks = defaultdict(list)
         return r
@@ -713,7 +713,7 @@ class GiskardTestWrapper(GiskardWrapper):
             if isinstance(self.world.joints[joint_name], OneDofJoint):
                 if not self.world.is_joint_continuous(joint_name):
                     joint_limits = self.world.get_joint_position_limits(joint_name)
-                    error_msg = '{} has violated joint position limit'.format(joint_name)
+                    error_msg = f'{joint_name} has violated joint position limit'
                     eps = 0.0001
                     np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1] + eps, error_msg)
                     np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0] + eps, error_msg)

@@ -266,12 +266,17 @@ class OneDofJoint(Joint, ABC):
 class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
     def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
-                 parent_T_child: w.ca.SX,
+                 parent_T_child: w.ca.SX, axis, lower_limits, upper_limits,
                  mimed_joint_name: my_string, multiplier: float, offset: float, god_map: GodMap):
-        super().__init__(name, parent_link_name, child_link_name, god_map, parent_T_child)
+        try:
+            Joint.__init__(self, name, parent_link_name, child_link_name, god_map, parent_T_child)
+        except AttributeError as e:
+            pass
         self.mimed_joint_name = mimed_joint_name
         self.multiplier = multiplier
         self.offset = offset
+        OneDofJoint.__init__(self, name, parent_link_name, child_link_name, parent_T_child, axis,
+                             lower_limits, upper_limits, god_map)
 
     @property
     def position_expression(self) -> expr_symbol:
@@ -367,9 +372,14 @@ class ContinuousURDFJoint(OneDofURDFJoint, ContinuousJoint):
     pass
 
 
-class MimicURDFJoint(MimicJoint, URDFJoint, ABC):
+class MimicURDFJoint(MimicJoint, OneDofURDFJoint, ABC):
     def __init__(self, urdf_joint: up.Joint, prefix: str, god_map: GodMap):
-        URDFJoint.__init__(self, urdf_joint, prefix, god_map)
+        try:
+            URDFJoint.__init__(self, urdf_joint, prefix, god_map)
+        except AttributeError:
+            # to be expected, because the next init will set the attributes
+            pass
+        lower_limits, upper_limits = self.urdf_limits()
         MimicJoint.__init__(self,
                             name=self.name,
                             parent_link_name=self.parent_link_name,
@@ -378,7 +388,19 @@ class MimicURDFJoint(MimicJoint, URDFJoint, ABC):
                             mimed_joint_name=PrefixName(self.urdf_joint.mimic.joint, prefix),
                             multiplier=self.urdf_joint.mimic.multiplier,
                             offset=self.urdf_joint.mimic.offset,
-                            god_map=self.god_map)
+                            god_map=self.god_map,
+                            axis=self.urdf_joint.axis,
+                            lower_limits=lower_limits,
+                            upper_limits=upper_limits)
+        # OneDofJoint.__init__(self,
+        #                      name=self.name,
+        #                      parent_link_name=self.parent_link_name,
+        #                      child_link_name=self.child_link_name,
+        #                      parent_T_child=self.parent_T_child,
+        #                      axis=self.urdf_joint.axis,
+        #                      lower_limits=lower_limits,
+        #                      upper_limits=upper_limits,
+        #                      god_map=self.god_map)
 
 
 class MimicPrismaticURDFJoint(MimicURDFJoint, PrismaticJoint):

@@ -363,8 +363,7 @@ class WorldTree(object):
         # TODO prevent this from happening twice
         for joint_name, joint in self.groups[group_name].joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
-                mimed_joint = self.joints[joint.mimed_joint_name]  # type: OneDofJoint
-                joint.set_mimed_free_variable(mimed_joint.free_variable)
+                joint.connect_to_existing_free_variables()
 
     def get_parent_link_of_link(self, link_name: Union[PrefixName, str]) -> PrefixName:
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name

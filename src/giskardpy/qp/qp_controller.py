@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from giskardpy import casadi_wrapper as w
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException
 from giskardpy.my_types import expr_symbol
@@ -530,13 +531,13 @@ class QPController:
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        if solver_name == 'gurobi':
+        if solver_name == SupportedQPSolver.gurobi:
             from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
             self.qp_solver = QPSolverGurobi()
-        elif solver_name == 'qpoases':
+        elif solver_name == SupportedQPSolver.qp_oases:
             from giskardpy.qp.qp_solver import QPSolver
             self.qp_solver = QPSolver()
-        elif solver_name == 'cplex':
+        elif solver_name == SupportedQPSolver.cplex:
             from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             self.qp_solver = QPSolverCplex()
         else:

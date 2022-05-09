@@ -9,9 +9,9 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 # fast
 
-class GoalReachedPlugin(GiskardBehavior):
+class GoalReached(GiskardBehavior):
     def __init__(self, name):
-        super(GoalReachedPlugin, self).__init__(name)
+        super(GoalReached, self).__init__(name)
         self.window_size = self.get_god_map().get_data(identifier.GoalReached_window_size)
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
 

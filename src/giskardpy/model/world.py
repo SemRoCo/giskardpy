@@ -19,7 +19,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
     PhysicsWorldException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
-    PrismaticJoint, RevoluteJoint, ContinuousJoint, OmniDrive
+    PrismaticJoint, RevoluteJoint, ContinuousJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import my_string, expr_matrix
@@ -42,7 +42,7 @@ class TravelCompanion(object):
         return False
 
 
-class WorldTree(object):
+class WorldTree:
     joints: Dict[Union[PrefixName, str], Joint]
     links: Dict[Union[PrefixName, str], Link]
     god_map: GodMap
@@ -449,8 +449,7 @@ class WorldTree(object):
         frames_to_sync = self.god_map.unsafe_get_data(identifier.SyncTfFrames_frames)
         self._add_tf_links(frames_to_sync)
         base_drive = self.god_map.unsafe_get_data(identifier.robot_base_drive)
-        drive_joint = OmniDrive(god_map=self.god_map,
-                                **base_drive)
+        drive_joint = base_drive.make_joint(self.god_map)
         self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
                       group_name=None,
                       prefix=None,
@@ -487,7 +486,7 @@ class WorldTree(object):
                     self.diff = diff
 
                 def __call__(self, key):
-                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['linear', 'override', key])
+                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + [key])
 
             class Angular(object):
                 def __init__(self, god_map, diff):
@@ -495,7 +494,7 @@ class WorldTree(object):
                     self.diff = diff
 
                 def __call__(self, key):
-                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + ['angular', 'override', key])
+                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + [key])
 
             d_linear = KeyDefaultDict(Linear(self.god_map, diff))
             d_angular = KeyDefaultDict(Angular(self.god_map, diff))
@@ -508,7 +507,7 @@ class WorldTree(object):
         new_weights = {}
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights)) + 1):
             def default(joint_name):
-                return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
+                return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
 
             d = KeyDefaultDict(default)
             new_weights[i] = d

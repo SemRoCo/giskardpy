@@ -42,9 +42,9 @@ class GiskardWrapper(object):
             self.dye_group_srv = rospy.ServiceProxy('~dye_group', DyeGroup)
             rospy.wait_for_service(f'{node_name}/update_world')
             self._client.wait_for_server()
-        self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)
-        self._world = WorldTree(self._god_map)
-        self._world.delete_all_but_robot()
+        self._god_map = GodMap.init_from_paramserver()
+        # self._world = WorldTree(self._god_map)
+        # self._world.delete_all_but_robot()
         self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
@@ -232,11 +232,9 @@ class GiskardWrapper(object):
         :param max_angular_velocity: rad/s, default 0.5
         :param weight: default WEIGHT_BELOW_CA
         """
-        if root_link is None:
-            root_link = self.get_robot_root_link()
         if root_normal is None:
             root_normal = Vector3Stamped()
-            root_normal.header.frame_id = self.get_robot_root_link()
+            root_normal.header.frame_id = 'map'
             root_normal.vector.z = 1
 
         self.set_json_goal(constraint_type='AlignPlanes',
@@ -340,8 +338,6 @@ class GiskardWrapper(object):
         :param pointing_axis: default is z axis, this axis will point towards the goal_point
         :param weight: default WEIGHT_BELOW_CA
         """
-        if root_link is None:
-            root_link = self.get_robot_root_link()
         self.set_json_goal(constraint_type='Pointing',
                            tip_link=tip_link,
                            goal_point=goal_point,

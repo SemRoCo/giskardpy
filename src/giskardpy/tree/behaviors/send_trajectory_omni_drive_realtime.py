@@ -46,16 +46,15 @@ class SendTrajectoryClosedLoop(GiskardBehavior, ABC):
         pass
 
 
-class CmdVelInterface(SendTrajectoryClosedLoop):
+class OmniDriveCmdVel(SendTrajectoryClosedLoop):
     min_deadline: rospy.Time
     max_deadline: rospy.Time
     update_thread: Thread
     supported_state_types = [Twist]
 
     @profile
-    def __init__(self, name, cmd_vel_topic, drive, goal_time_tolerance=1, fill_velocity_values=True):
+    def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1):
         super().__init__(name)
-        self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
         loginfo(f'Waiting for cmd_vel topic \'{cmd_vel_topic}\' to appear.')

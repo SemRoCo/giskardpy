@@ -198,36 +198,13 @@ class GodMap(object):
 
     @classmethod
     @profile
-    def init_from_paramserver(cls, node_name, upload_config=True):
+    def init_from_paramserver(cls):
         import rospy
-        from giskardpy.data_types import order_map
-
-        if upload_config:
-            upload_config_file_to_paramserver()
 
         self = cls()
-        self.set_data(identifier.rosparam, rospy.get_param(node_name))
         robot_urdf = rospy.get_param('robot_description')
         self.set_data(identifier.robot_description, robot_urdf)
         self.set_data(identifier.robot_group_name, robot_name_from_urdf_string(robot_urdf))
-
-
-        path_to_data_folder = self.get_data(identifier.data_folder)
-        # fix path to data folder
-        if not path_to_data_folder.endswith('/'):
-            path_to_data_folder += '/'
-        self.set_data(identifier.data_folder, path_to_data_folder)
-
-        set_default_in_override_block(identifier.external_collision_avoidance, self)
-        set_default_in_override_block(identifier.self_collision_avoidance, self)
-        # weights
-        for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
-            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self)
-
-        # limits
-        for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self)
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self)
 
         return self
 

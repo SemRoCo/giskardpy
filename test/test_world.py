@@ -86,7 +86,7 @@ def avoid_all_entry(min_dist):
 
 def world_with_robot(urdf, prefix, config='package://giskardpy/config/default.yaml'):
     god_map = GodMap()
-    god_map.set_data(identifier.rosparam, ros_load_robot_config(config))
+    god_map.set_data(identifier.giskard, ros_load_robot_config(config))
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.add_urdf(urdf, prefix=prefix, group_name=RobotName)

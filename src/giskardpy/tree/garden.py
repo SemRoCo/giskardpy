@@ -3,7 +3,7 @@ from typing import Type, TypeVar, Union
 import py_trees
 import pydot
 import rospy
-from py_trees import Behaviour, Chooser, common, Blackboard, Composite
+from py_trees import Behaviour, Chooser, common, Composite
 from py_trees import Selector, Sequence
 from py_trees_ros.trees import BehaviourTree
 from sortedcontainers import SortedList
@@ -22,7 +22,7 @@ from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdat
 from giskardpy.tree.behaviors.commands_remaining import CommandsRemaining
 from giskardpy.tree.behaviors.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
-from giskardpy.tree.behaviors.goal_reached import GoalReachedPlugin
+from giskardpy.tree.behaviors.goal_reached import GoalReached
 from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
@@ -39,7 +39,6 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
-from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryClosedLoop
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
@@ -55,7 +54,6 @@ from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import PluginBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
 
@@ -235,24 +233,6 @@ class TreeManager:
 
         self.__init_map(self.tree.root, None, 0)
         self.render()
-
-    @classmethod
-    @profile
-    def from_param_server(cls):
-        god_map = GodMap.init_from_paramserver(rospy.get_name())
-        god_map.set_data(identifier.timer_collector, TimeCollector(god_map))
-        blackboard = Blackboard
-        blackboard.god_map = god_map
-        mode = god_map.get_data(identifier.control_mode)
-        if mode == 'OpenLoop':
-            self = OpenLoop(god_map)
-        elif mode == 'ClosedLoop':
-            self = ClosedLoop(god_map)
-        else:
-            raise KeyError('Robot interface mode \'{}\' is not supported.'.format(mode))
-
-        god_map.set_data(identifier.tree_manager, self)
-        return self
 
     def live(self):
         sleeper = rospy.Rate(1 / self.god_map.get_data(identifier.tree_tick_rate))
@@ -620,7 +600,7 @@ class OpenLoop(TreeManager):
             planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
         # planning_4.add_plugin(WiggleCancel('wiggle'))
         planning_4.add_plugin(LoopDetector('loop detector'))
-        planning_4.add_plugin(GoalReachedPlugin('goal reached'))
+        planning_4.add_plugin(GoalReached('goal reached'))
         planning_4.add_plugin(TimePlugin('time'))
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
@@ -632,23 +612,20 @@ class OpenLoop(TreeManager):
         execution_action_server = Parallel('execution action servers',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         action_servers = self.god_map.get_data(identifier.robot_interface)
-        behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
         real_time_tracking = PluginBehavior('base sequence')
         real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
-                                                         **self.god_map.unsafe_get_data(
-                                                             identifier.SyncTfFrames)))
+                                                                       **self.god_map.unsafe_get_data(
+                                                                           identifier.SyncTfFrames)))
         real_time_tracking.add_plugin(SyncOdometry('sync odometry', odometry_topic='pr2/base_footprint'))
         real_time_tracking.add_plugin(RosTime('time'))
         real_time_tracking.add_plugin(ControllerPlugin('base controller'))
         real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
-        for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-            C = behaviors[params['plugin']]
-            del params['plugin']
-            if issubclass(C, SendTrajectoryClosedLoop):
-                add_real_time_tracking = True
-                real_time_tracking.add_plugin(C(execution_action_server_name, **params))
-            else:
-                execution_action_server.add_child(C(execution_action_server_name, **params))
+        for follow_joint_trajectory_config in action_servers:
+            execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
+        base_drive = self.god_map.get_data(identifier.robot_base_drive)
+        if base_drive is not None:
+            add_real_time_tracking = True
+            real_time_tracking.add_plugin(base_drive.make_plugin())
         if add_real_time_tracking:
             execution_action_server.add_child(real_time_tracking)
 
@@ -719,7 +696,7 @@ class ClosedLoop(OpenLoop):
             planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
         # planning_4.add_plugin(WiggleCancel('wiggle'))
         # planning_4.add_plugin(LoopDetector('loop detector'))
-        planning_4.add_plugin(GoalReachedPlugin('goal reached'))
+        planning_4.add_plugin(GoalReached('goal reached'))
         planning_4.add_plugin(TimePlugin('time'))
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)

@@ -36,52 +36,50 @@ result_message = ['result_message']
 # stuff from rosparam
 robot_description = ['robot_description']
 
-rosparam = ['rosparam']
+giskard = ['giskard']
 
 # config file
 # general options
-general_options = rosparam + ['general_options']
-control_mode = general_options + ['mode']
-action_server_name = general_options + ['action_server_name']
-gui = general_options + ['enable_gui']
-data_folder = general_options + ['path_to_data_folder']
-sample_period = general_options + ['sample_period']
-map_frame = general_options + ['map_frame']
-debug = general_options + ['debug']
-fill_velocity_values = general_options + ['fill_velocity_values']
-test_mode = general_options + ['test_mode']
+action_server_name = giskard + ['action_server_name']
+gui = giskard + ['enable_gui']
+data_folder = giskard + ['path_to_data_folder']
+sample_period = giskard + ['sample_period']
+map_frame = giskard + ['map_frame']
+debug = giskard + ['debug']
+fill_velocity_values = giskard + ['fill_velocity_values']
+test_mode = giskard + ['test_mode']
 
-joint_limits = general_options + ['joint_limits']
+joint_limits = giskard + ['joint_limits']
 
-joint_acceleration_linear_limit = general_options + ['joint_limits', 'acceleration', 'linear', 'override']
-joint_acceleration_angular_limit = general_options + ['joint_limits', 'acceleration', 'angular', 'override']
+joint_acceleration_linear_limit = giskard + ['joint_limits', 'acceleration']
+joint_acceleration_angular_limit = giskard + ['joint_limits', 'acceleration']
 
-joint_jerk_linear_limit = general_options + ['joint_limits', 'jerk', 'linear', 'override']
-joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk', 'angular', 'override']
+joint_jerk_linear_limit = giskard + ['joint_limits', 'jerk']
+joint_jerk_angular_limit = giskard + ['joint_limits', 'jerk']
 
-joint_weights = general_options + ['joint_weights']
+joint_weights = giskard + ['joint_weights']
 
 # qp solver
-qp_controller = rosparam + ['qp_controller']
-qp_solver = rosparam + ['qp_solver']
-qp_solver_name = qp_solver + ['name']
-prediction_horizon = qp_solver + ['prediction_horizon']
-retries_with_relaxed_constraints = qp_solver + ['hard_constraint_handling', 'retries_with_relaxed_constraints']
-retry_added_slack = qp_solver + ['hard_constraint_handling', 'added_slack']
-retry_weight_factor = qp_solver + ['hard_constraint_handling', 'weight_factor']
+qp_controller = giskard + ['qp_controller']
+qp_solver = giskard + ['qp_solver_config']
+qp_solver_name = qp_solver + ['qp_solver']
+prediction_horizon = giskard + ['prediction_horizon']
+retries_with_relaxed_constraints = qp_solver + ['retries_with_relaxed_constraints']
+retry_added_slack = qp_solver + ['added_slack']
+retry_weight_factor = qp_solver + ['weight_factor']
 
 # tree
-plugins = rosparam + ['plugins']
+plugins = giskard + ['plugin_config']
 enable_VisualizationBehavior = plugins + ['VisualizationBehavior', 'enabled']
 VisualizationBehavior_in_planning_loop = plugins + ['VisualizationBehavior', 'in_planning_loop']
 enable_WorldVisualizationBehavior = plugins + ['WorldVisualizationBehavior', 'enabled']
-enable_CPIMarker = plugins + ['CPIMarker', 'enabled']
-CPIMarker_in_planning_loop = plugins + ['CPIMarker', 'in_planning_loop']
+enable_CPIMarker = plugins + ['CollisionMarker', 'enabled']
+CPIMarker_in_planning_loop = plugins + ['CollisionMarker', 'in_planning_loop']
 
 PlotTrajectory = plugins + ['PlotTrajectory']
 PlotTrajectory_enabled = PlotTrajectory + ['enabled']
 
-PlotDebugTrajectory = plugins + ['PlotDebugTrajectory']
+PlotDebugTrajectory = plugins + ['PlotDebugExpressions']
 PlotDebugTrajectory_enabled = PlotDebugTrajectory + ['enabled']
 
 MaxTrajectoryLength = plugins + ['MaxTrajectoryLength']
@@ -101,7 +99,7 @@ SyncTfFrames = plugins + ['SyncTfFrames']
 SyncTfFrames_frames = SyncTfFrames + ['frames']
 
 # reachability check
-reachability_check = rosparam + ['reachability_check']
+reachability_check = giskard + ['reachability_check']
 rc_sample_period = reachability_check + ['sample_period']
 rc_prismatic_velocity = reachability_check + ['prismatic_velocity']
 rc_continuous_velocity = reachability_check + ['continuous_velocity']
@@ -109,9 +107,8 @@ rc_revolute_velocity = reachability_check + ['revolute_velocity']
 rc_other_velocity = reachability_check + ['other_velocity']
 
 # behavior tree
-tree_manager = ['tree_manager']
-behavior_tree = rosparam + ['behavior_tree']
-tree_tick_rate = behavior_tree + ['tree_tick_rate']
+tree_manager = giskard + ['tree']
+tree_tick_rate = giskard + ['tree_tick_rate']
 
 # collision avoidance
 collision_scene = ['collision_scene']
@@ -119,18 +116,18 @@ collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
-collision_avoidance = rosparam + ['collision_avoidance']
-collision_checker = collision_avoidance + ['collision_checker']
+collision_avoidance = giskard + ['collision_avoidance']
+collision_checker = giskard + ['collision_checker']
 
-self_collision_avoidance = collision_avoidance + ['self_collision_avoidance', 'override']
-ignored_self_collisions = self_collision_avoidance[:-1] + ['ignore']
-added_self_collisions = self_collision_avoidance[:-1] + ['add']
+self_collision_avoidance = giskard + ['self_collision_avoidance']
+added_self_collisions = giskard + ['add_self_collisions']
+ignored_self_collisions = giskard + ['ignored_self_collisions']
 
-external_collision_avoidance = collision_avoidance + ['external_collision_avoidance', 'override']
+external_collision_avoidance = giskard + ['external_collision_avoidance']
 
 # robot interface
-robot_interface = rosparam + ['robot_interface']
-robot_base_drive = rosparam + ['robot_interface', 'base', 'drive']
+robot_interface = giskard + ['follow_joint_trajectory_interfaces']
+robot_base_drive = giskard + ['drive_interface']
 
 # rnd stuff
 timer_collector = ['timer_collector']

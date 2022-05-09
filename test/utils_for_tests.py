@@ -28,6 +28,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
+from giskardpy.configs.default_config import GiskardConfig
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -1077,7 +1078,7 @@ class PR2(GiskardTestWrapper):
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('pr2/reset', Trigger)
-        super(PR2, self).__init__('package://giskardpy/config/pr2.yaml')
+        super().__init__(GiskardConfig)
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')

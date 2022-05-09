@@ -12,7 +12,6 @@ class SetCmd(GetGoal):
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.sample_period_backup = None
-        self.rc_sample_period = self.get_god_map().get_data(identifier.rc_sample_period)
 
     @property
     def goal(self):

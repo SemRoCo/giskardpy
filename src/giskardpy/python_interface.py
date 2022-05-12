@@ -4,7 +4,7 @@ from typing import Dict, Tuple, Optional, Union, List
 import rospy
 from actionlib import SimpleActionClient
 from genpy import Message
-from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped
+from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
 from rospy import ServiceException
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -185,7 +185,7 @@ class GiskardWrapper(object):
                            **kwargs)
 
     def set_rotation_goal(self,
-                          goal_orientation: PoseStamped,
+                          goal_orientation: QuaternionStamped,
                           tip_link: str,
                           root_link: str,
                           tip_group: str = None,

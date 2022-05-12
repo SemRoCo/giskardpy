@@ -182,7 +182,6 @@ class WorldUpdater(GiskardBehavior):
             self.service_in_use.get_nowait()
 
     def handle_convention(self, req: UpdateWorldRequest):
-        # todo: versuch sachen in req zu ermitteln, wenn möglich siehe todo.txt
         # default to world root if all is empty
         if req.parent_link_group == '' and req.parent_link == '':
             req.parent_link = self.world.root_link_name
@@ -195,6 +194,8 @@ class WorldUpdater(GiskardBehavior):
                req.parent_link = self.world.groups[req.parent_link_group].root_link_name
             req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
         else:
+            if req.parent_link != '':
+                req.parent_link_group = self.world.get_group_containing_link_short_name(req.parent_link)
             if req.parent_link_group == '':
                 raise UnknownGroupException('Parent link group has to be set.')
             if req.parent_link == '':
@@ -213,7 +214,7 @@ class WorldUpdater(GiskardBehavior):
                                   parent_link_name=req.parent_link)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
-        logging.loginfo(f'Added object \'{req.group_name}\' at \'{req.parent_link_group}/{req.parent_link}\'.')
+        logging.loginfo(f'Added object \'{req.group_name}\' on \'{req.parent_link_group}\' at \'{req.parent_link}\'.')
         if world_body.joint_state_topic:
             plugin_name = str(PrefixName(req.group_name, 'js'))
             plugin = running_is_success(SyncConfiguration)(plugin_name,

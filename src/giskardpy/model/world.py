@@ -400,7 +400,7 @@ class WorldTree(object):
         groups_size = len(groups)
         ret = self._get_group_from_groups(groups)
         if ret is None and groups_size > 0:
-            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {link_name}.'
+            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {link_name}. '
                                         f'Please define a group name for link {link_name}.')
         elif ret is None:
             raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
@@ -1150,7 +1150,6 @@ class SubWorldTree(WorldTree):
         self.root_link_name = root_link_name
         self.world = world
         self.actuated = actuated
-        rospy.logerr(name)
 
     @property
     def controlled_joints(self):

@@ -9,19 +9,24 @@ robot_interface:
   base:
     plugin: SendFollowJointTrajectoryDiffDrive
     namespace: /mobile_base_controller
+    robot_name: tiago_dual
   torso:
     plugin: SendFollowJointTrajectory
     namespace: /torso_controller/follow_joint_trajectory
     state_topic: /torso_controller/state
+    robot_name: tiago_dual
   neck:
     plugin: SendFollowJointTrajectory
     namespace: /head_controller/follow_joint_trajectory
     state_topic: /head_controller/state
+    robot_name: tiago_dual
   left_arm:
     plugin: SendFollowJointTrajectory
     namespace: /arm_left_controller/follow_joint_trajectory
     state_topic: /arm_left_controller/state
+    robot_name: tiago_dual
   right_arm:
     plugin: SendFollowJointTrajectory
     namespace: /arm_right_controller/follow_joint_trajectory
     state_topic: /arm_right_controller/state
+    robot_name: tiago_dual

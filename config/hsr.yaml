@@ -10,3 +10,4 @@ robot_interface:
     plugin: SendFollowJointTrajectory
     namespace: /whole_body_controller/follow_joint_trajectory
     state_topic: /whole_body_controller/state
+    robot_name: hsr

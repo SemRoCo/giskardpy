@@ -22,7 +22,7 @@ cd ~/giskardpy_ws                           # go to workspace directory
 catkin init                                 # init workspace, you might have to pip install catkin-tools
 cd src                                      # go to source directory of workspace
 wstool init                                 # init rosinstall
-wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/devel/rosinstall/<ros-version>.rosinstall
+wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/master/rosinstall/<ros-version>.rosinstall
                                             # update rosinstall file
 wstool update                               # pull source repositories
 rosdep install --ignore-src --from-paths .  # install dependencies available through apt

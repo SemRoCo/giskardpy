@@ -54,11 +54,8 @@
   <exec_depend>rospy_message_converter</exec_depend>
   <exec_depend condition="$ROS_PYTHON_VERSION == 2">python-pytest</exec_depend>
   <exec_depend condition="$ROS_PYTHON_VERSION == 3">python3-pytest</exec_depend>
-  <exec_depend>omni_pose_follower</exec_depend>
   <exec_depend>joint_state_publisher</exec_depend>
-  <exec_depend>topic_tools</exec_depend>
   <exec_depend>xacro</exec_depend>
-  <test_depend>rosunit</test_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

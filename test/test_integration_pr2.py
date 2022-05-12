@@ -341,6 +341,8 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         js = {u'torso_lift_joint': 0.1}
         zero_pose.send_and_check_joint_goal(js)
+        js = {u'torso_lift_joint': 0.32}
+        zero_pose.send_and_check_joint_goal(js)
 
     def test_hard_joint_limits(self, zero_pose):
         """

@@ -10,9 +10,9 @@ from giskardpy.plugin import GiskardBehavior
 
 class LoopDetector(GiskardBehavior):
     def __init__(self, name):
-        self.precision = 3
-        self.window_size = 21
         super(LoopDetector, self).__init__(name)
+        self.precision = self.get_god_map().get_data(identifier.LoopDetector_precision)
+        self.window_size = 21
 
     def initialise(self):
         super(LoopDetector, self).initialise()

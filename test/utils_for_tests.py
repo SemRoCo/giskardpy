@@ -354,7 +354,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         self.set_joint_goal(goal, weight=weight)
         self.send_and_check_goal(expected_error_codes=expected_error_codes)
-        if expected_error_codes == [MoveResult.SUCCESS]:
+        if expected_error_codes is None:
             self.check_current_joint_state(goal, decimal=decimal)
 
     #

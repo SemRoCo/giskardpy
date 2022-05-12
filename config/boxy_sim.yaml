@@ -1,4 +1,4 @@
-parent: !include default.
+parent: !include default.yaml
 # parent: !include robots/boxy.yaml
 robot_interface:
   base:

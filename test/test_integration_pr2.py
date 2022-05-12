@@ -455,8 +455,10 @@ class TestConstraints(object):
         zero_pose.add_sphere('sphere', 0.05, pose=object_pose)
 
         publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
-        zero_pose.allow_self_collision()
-        zero_pose.set_straight_cart_goal(goal_position, zero_pose.l_tip)
+        zero_pose.allow_self_collision(zero_pose.robot_name)
+        goal_position_p = deepcopy(goal_position)
+        goal_position_p.header.frame_id = str(PrefixName('base_link', zero_pose.robot_name))
+        zero_pose.set_straight_cart_goal(goal_position_p, zero_pose.l_tip)
         zero_pose.plan_and_execute()
 
     def test_CartesianVelocityLimit(self, zero_pose: PR2):
@@ -611,13 +613,13 @@ class TestConstraints(object):
         goal_point = tf.lookup_point('map', 'iai_kitchen/iai_fridge_door_handle')
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
-        pointing_axis.header.frame_id = tip
+        pointing_axis.header.frame_id = str(PrefixName(tip, kitchen_setup.robot_name))
         pointing_axis.vector.x = 1
         kitchen_setup.set_pointing_goal(tip, goal_point, root_link=kitchen_setup.default_root, pointing_axis=pointing_axis)
         kitchen_setup.plan_and_execute()
 
         base_goal = PoseStamped()
-        base_goal.header.frame_id = 'base_footprint'
+        base_goal.header.frame_id = 'pr2/base_footprint'
         base_goal.pose.position.y = 2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
         kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis)
@@ -628,7 +630,7 @@ class TestConstraints(object):
         kitchen_setup.move_base(base_goal)
 
         current_x = Vector3Stamped()
-        current_x.header.frame_id = tip
+        current_x.header.frame_id = str(PrefixName(tip, kitchen_setup.robot_name))
         current_x.vector.x = 1
 
         expected_x = tf.transform_point(tip, goal_point)
@@ -640,7 +642,7 @@ class TestConstraints(object):
         goal_point = tf.lookup_point('map', kitchen_setup.r_tip)
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
-        pointing_axis.header.frame_id = tip
+        pointing_axis.header.frame_id = str(PrefixName(tip, kitchen_setup.robot_name))
         pointing_axis.vector.x = 1
         kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
 
@@ -655,7 +657,7 @@ class TestConstraints(object):
                                                                       [0, 1, 0, 0],
                                                                       [1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-
+        r_goal.header.frame_id = str(PrefixName(kitchen_setup.r_tip, kitchen_setup.robot_name))
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, 'base_footprint', weight=WEIGHT_BELOW_CA)
         kitchen_setup.plan_and_execute()
 
@@ -724,7 +726,7 @@ class TestConstraints(object):
         kitchen_setup.plan_and_execute()
 
     def test_open_drawer(self, kitchen_setup: PR2):
-        handle_frame_id = 'iai_kitchen/sink_area_left_middle_drawer_handle'
+        handle_frame_id = 'kitchen/sink_area_left_middle_drawer_handle'
         handle_name = 'sink_area_left_middle_drawer_handle'
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_frame_id
@@ -734,7 +736,7 @@ class TestConstraints(object):
         bar_center.header.frame_id = handle_frame_id
 
         tip_grasp_axis = Vector3Stamped()
-        tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+        tip_grasp_axis.header.frame_id = str(PrefixName(kitchen_setup.l_tip, 'pr2'))
         tip_grasp_axis.vector.z = 1
 
         kitchen_setup.set_json_goal('GraspBar',
@@ -745,7 +747,7 @@ class TestConstraints(object):
                                     bar_axis=bar_axis,
                                     bar_length=0.4)  # TODO: check for real length
         x_gripper = Vector3Stamped()
-        x_gripper.header.frame_id = kitchen_setup.l_tip
+        x_gripper.header.frame_id = str(PrefixName(kitchen_setup.l_tip, 'pr2'))
         x_gripper.vector.x = 1
 
         x_goal = Vector3Stamped()
@@ -754,7 +756,7 @@ class TestConstraints(object):
 
         kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip,
                                             x_gripper,
-                                            root_normal=x_goal)
+                                            root_normal=x_goal, check=False)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
@@ -939,10 +941,10 @@ class TestConstraints(object):
 
     def test_align_planes1(self, zero_pose: PR2):
         x_gripper = Vector3Stamped()
-        x_gripper.header.frame_id = zero_pose.r_tip
+        x_gripper.header.frame_id = str(PrefixName(zero_pose.r_tip, zero_pose.robot_name))
         x_gripper.vector.x = 1
         y_gripper = Vector3Stamped()
-        y_gripper.header.frame_id = zero_pose.r_tip
+        y_gripper.header.frame_id = str(PrefixName(zero_pose.r_tip, zero_pose.robot_name))
         y_gripper.vector.y = 1
 
         x_goal = Vector3Stamped()
@@ -1153,7 +1155,7 @@ class TestConstraints(object):
         kitchen_setup.set_kitchen_js({'oven_area_oven_door_joint': 0})
 
     def test_grasp_dishwasher_handle(self, kitchen_setup: PR2):
-        handle_name = 'iai_kitchen/sink_area_dish_washer_door_handle'
+        handle_name = 'kitchen/sink_area_dish_washer_door_handle'
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_name
         bar_axis.vector.y = 1
@@ -1162,7 +1164,7 @@ class TestConstraints(object):
         bar_center.header.frame_id = handle_name
 
         tip_grasp_axis = Vector3Stamped()
-        tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
+        tip_grasp_axis.header.frame_id = str(PrefixName(kitchen_setup.r_tip, kitchen_setup.robot_name))
         tip_grasp_axis.vector.z = 1
 
         kitchen_setup.set_grasp_bar_goal(root_link=kitchen_setup.default_root,
@@ -1172,7 +1174,7 @@ class TestConstraints(object):
                                          bar_axis=bar_axis,
                                          bar_length=.3)
         kitchen_setup.register_group('handle', 'kitchen', 'sink_area_dish_washer_door_handle')
-        kitchen_setup.allow_collision(kitchen_setup.get_robot_name(), 'handle')
+        kitchen_setup.allow_collision(kitchen_setup.robot_name, 'handle')
         kitchen_setup.plan_and_execute()
 
 

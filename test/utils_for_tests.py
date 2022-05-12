@@ -412,8 +412,6 @@ class GiskardTestWrapper(GiskardWrapper):
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
         self.namespaces = namespaces
-        rospy.logerr(robot_names)
-        rospy.logerr(self.namespaces)
         super(GiskardTestWrapper, self).__init__(node_name='tests', robot_names=robot_names, namespaces=self.namespaces)
         self.results = Queue(100)
         self.map = 'map'
@@ -1665,7 +1663,8 @@ class Donbot(GiskardTestWrapper):
         self.camera_tip = 'camera_link'
         self.gripper_tip = 'gripper_tool_frame'
         self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
-        super(Donbot, self).__init__('package://giskardpy/config/donbot.yaml')
+        self.robot_name = 'donbot'
+        super(Donbot, self).__init__('package://giskardpy/config/donbot.yaml', [self.robot_name], [''])
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -1732,8 +1731,8 @@ class Donbot2(GiskardTestWrapper):
         self.gripper_pubs = dict()
         self.default_roots = dict()
         self.set_localization_srvs = dict()
-        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml', ['donbot_a', 'donbot_b'],
-                                      ['donbot_a', 'donbot_b'])
+        self.robot_names = ['donbot_a', 'donbot_b']
+        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml', self.robot_names, self.robot_names)
         for robot_name in self.namespaces:
             self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
             self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)
@@ -1752,7 +1751,7 @@ class Donbot2(GiskardTestWrapper):
                                                                       goal_pose.pose.orientation.z,
                                                                       goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
-        self.set_joint_goal(js, prefix=robot_name, decimal=1)
+        self.set_joint_goal(js, group_name=robot_name, decimal=1)
         self.plan_and_execute()
 
     def set_localization(self, map_T_odom, robot_name):
@@ -1798,7 +1797,7 @@ class Donbot2(GiskardTestWrapper):
         return_val = super(GiskardTestWrapper, self).clear_world()
         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 2
-        assert len(self.get_object_names().object_names) == 2
+        assert len(self.robot_names) == 2
         assert self.original_number_of_links == len(self.world.links)
 
     def reset(self):
@@ -1816,7 +1815,8 @@ class BaseBot(GiskardTestWrapper):
     }
 
     def __init__(self):
-        super().__init__('package://giskardpy/config/base_bot.yaml')
+        self.robot_name = 'base_bot'
+        super().__init__('package://giskardpy/config/base_bot.yaml', [self.robot_name], [''])
 
     def reset(self):
         self.clear_world()
@@ -1877,8 +1877,9 @@ class Boxy(GiskardTestWrapper):
         self.camera_tip = 'camera_link'
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
+        self.robot_name = 'boxy'
         if config is None:
-            super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml')
+            super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml', [self.robot_name], [''])
         else:
             super(Boxy, self).__init__(config)
 
@@ -1939,7 +1940,8 @@ class TiagoDual(GiskardTestWrapper):
     }
 
     def __init__(self):
-        super(TiagoDual, self).__init__('package://giskardpy/config/tiago_dual.yaml')
+        self.robot_name = 'tiago_dual'
+        super(TiagoDual, self).__init__('package://giskardpy/config/tiago_dual.yaml', [self.robot_name], [''])
         self.base_reset = rospy.ServiceProxy('/diff_drive_vel_integrator/reset', Trigger)
 
     def move_base(self, goal_pose):
@@ -1974,7 +1976,8 @@ class HSR(GiskardTestWrapper):
 
     def __init__(self):
         self.tip = 'hand_gripper_tool_frame'
-        super(HSR, self).__init__('package://giskardpy/config/hsr.yaml')
+        self.robot_name = 'hsr'
+        super(HSR, self).__init__('package://giskardpy/config/hsr.yaml', [self.robot_name], [''])
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)

@@ -2605,11 +2605,14 @@ class MovementPlanner(OMPLPlanner):
             # Make sure enough subpaths are available for Path Following
             path = self.setup.getSolutionPath()
             # self.shorten_path(path, goal)
+            path_cost = path.cost(self.optimization_objective).value()
             if self.motion_validator_class is None:
+                path.interpolate(int(path_cost / 0.01))
+            else:
                 if self.is_3D:
-                    path.interpolate(int(path.cost(self.optimization_objective).value() / 0.01))
+                    path.interpolate(int(path_cost/0.05))
                 else:
-                    self.setup.getSolutionPath().interpolate(20)
+                    path.interpolate(int(path_cost/0.1))
             data = ompl_states_matrix_to_np(path.printAsMatrix())  # [x y z xw yw zw w]
             # print the simplified path
             if plot:

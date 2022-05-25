@@ -239,7 +239,7 @@ class CollisionWorldSynchronizer(object):
         try:
             self.white_list_pairs = self.god_map.get_data(identifier.added_self_collisions)
             self.white_list_pairs = set(
-                x if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
+                tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
         except KeyError as e:
             self.white_list_pairs = set()
 

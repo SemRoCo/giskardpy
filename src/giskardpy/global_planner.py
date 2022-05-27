@@ -5,6 +5,7 @@ import os
 import random
 import sys
 import threading
+import time
 from collections import namedtuple
 from random import uniform
 from time import sleep
@@ -33,6 +34,7 @@ from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded, GetPreGr
     GetPreGraspOrientation, GetAttachedObjects, GetAttachedObjectsRequest
 from giskardpy import RobotName
 from giskardpy.exceptions import GlobalPlanningException
+from giskardpy.model.pybullet_syncer import PyBulletRayTester, PyBulletRayTesterEnv
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.get_goal import GetGoal
@@ -50,7 +52,6 @@ from ompl import geometric as og
 # todo: put below in ros params
 SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve_time max_initial_iterations '
                                                 'max_refine_iterations min_refine_thresh')
-CollisionAABB = namedtuple('CollisionAABB', 'link d u')
 
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp, \
     resolve_ros_iris_in_urdf
@@ -447,144 +448,6 @@ class PathLengthAndGoalOptimizationObjective(ob.PathLengthOptimizationObjective)
         return ob.Cost(self.getSpaceInformation().distance(s1, s2))
 
 
-class CollisionObjects(object):
-
-    def __init__(self):
-        self.collision_objects = list()
-
-    def update(self):
-        raise Exception('not implemented')
-
-    def add_collision(self, link_name):
-        raise Exception('not implemented')
-
-    def get_collision(self, link_name):
-        raise Exception('not implemented')
-
-
-class AABBCollision(CollisionObjects):
-
-    def __init__(self):
-        super(AABBCollision, self).__init__()
-
-    def get_link_names(self):
-        return list(map(lambda c: c.link, self.collision_objects))
-
-    def add_collision(self, collision_object: CollisionAABB):
-        link_names = self.get_link_names()
-        if collision_object.link in link_names:
-            i = link_names.index(collision_object.link)
-            self.collision_objects.remove(link_names[i])
-        self.collision_objects.append(collision_object)
-
-    def get_points(self, collision_objects=None):
-        if collision_objects is None:
-            collision_objects = self.collision_objects
-        return self._get_points(collision_objects)
-
-    def _get_points(self, collision_objects):
-        query = list()
-        for collision_info in collision_objects:
-            aabbs = self.aabb_to_3d_points(collision_info.d, collision_info.u)
-            query.extend(aabbs)
-        return query
-
-    def aabb_to_3d_points(self, d, u):
-        d_new = [d[0], d[1], u[2]]
-        u_new = [u[0], u[1], d[2]]
-        bottom_cube_face = self.aabb_to_2d_points(d, u_new)
-        upper_cube_face = self.aabb_to_2d_points(d_new, u)
-        res = []
-        for p in bottom_cube_face:
-            res.append([p[0], p[1], d[2]])
-        for p in upper_cube_face:
-            res.append([p[0], p[1], u[2]])
-        return res
-
-    def aabb_to_2d_points(self, d, u):
-        d_l = [d[0], u[1], 0]
-        u_r = [u[0], d[1], 0]
-        return [d_l, d, u, u_r]
-
-
-# class GiskardPyBulletAABBCollision(AABBCollision):
-#     # fixme: rework
-#     # call for motion validator get_points_from_poses twice with s1 and s2. calculate with
-#     # get_collision the map poses and save them. therefore u can remove transform_points.
-#     # therefore ros tf is not needed only use pybullet aabb
-#
-#     def __init__(self, object_in_motion, collision_scene, tip_link, links=None, map_frame='map'):
-#         AABBCollision.__init__(self)
-#         self.tip_link = tip_link
-#         self.object_in_motion = object_in_motion
-#         self.map_frame = map_frame
-#         self.collision_scene = collision_scene
-#         self.links = links
-#         self.update()
-#
-#     def get_links(self):
-#         if self.links is not None:
-#             return self.links
-#         else:
-#             return self.object_in_motion.get_children_with_collisions_from_link(self.tip_link)
-#
-#     def update(self):
-#         """
-#         If tip link is not used for interaction and has collision information, we use only this information for
-#         continuous collision checking. Otherwise, we check the parent links of the tip link for fixed links and
-#         their collision information. If there were no fixed parent links with collision information added,
-#         we search for collision information in the childs links if possible.
-#         Further we model interaction tip_links such that it makes sense to search,
-#         for neighboring links and their collision information. Since the joints
-#         of these links are normally not fixed, we assume that they are.
-#
-#         """
-#         # Add collisions
-#         self.collision_scene.sync()
-#         self.collision_objects = list()
-#         for link_name in self.get_links():
-#             self.add_collision(link_name)
-#
-#     def get_points_from_poses(self, collision_objects=None):
-#         self.update()
-#         return super(GiskardPyBulletAABBCollision, self).get_points(collision_objects=collision_objects)
-#
-#     # def get_points_from_positions(self):
-#     #    self.update()
-#     #    return super(GiskardPyBulletAABBCollision, self).get_points(collision_objects=[self.get_cube_collision()])
-#
-#     @profile
-#     def get_cube_collision(self, link_names=None, from_link=None):
-#         d = np.array([1e10] * 3)
-#         u = np.array([-1e10] * 3)
-#         if link_names is None:
-#             link_names = self.get_links()
-#         if from_link is None:
-#             from_link = link_names[0]
-#         for link_name in link_names:
-#             link_id = self.collision_scene.object_name_to_bullet_id[link_name]
-#             d_i, u_i = p.getAABB(link_id, physicsClientId=0)
-#             if (np.array(d_i) < d).all():
-#                 d = d_i
-#             if (np.array(u_i) > u).all():
-#                 u = u_i
-#         l = max(abs(np.array(d) - np.array(u)))
-#         return CollisionAABB(link=from_link, d=tuple(d), u=tuple(d + l))
-#
-#     def get_distance(self, link_name):
-#         cc = self.get_cube_collision(link_names=[link_name], from_link=link_name)
-#         diameter = np.sqrt(sum((np.array(cc.d) - np.array(cc.u)) ** 2))
-#         c = self.collision_scene.get_aabb(link_name)
-#         l = min(abs(np.array(c.d) - np.array(c.u)))
-#         return diameter / 2. - l / 2.
-#
-#     def get_collision(self, link_name):
-#         if self.object_in_motion.has_link_collisions(link_name):
-#             link_id = self.collision_scene.object_name_to_bullet_id[link_name]
-#             aabbs = p.getAABB(link_id, physicsClientId=0)
-#             return CollisionAABB(link_name, aabbs[0], aabbs[1])
-
-
 class OMPLMotionValidator(ob.MotionValidator):
     """
     This class ensures that every Planner in OMPL makes the same assumption for
@@ -695,7 +558,7 @@ class AbstractMotionValidator():
         raise Exception('Please overwrite me')
 
 
-def get_simple_environment_objects(god_map, env_name='kitchen', robot_name=RobotName):
+def get_simple_environment_objects_as_urdf(god_map, env_name='kitchen', robot_name=RobotName):
     world = god_map.get_data(identifier.world)
     environment_objects = list()
     for g_n in world.group_names:
@@ -707,20 +570,35 @@ def get_simple_environment_objects(god_map, env_name='kitchen', robot_name=Robot
     return environment_objects
 
 
+def get_simple_environment_object_names(god_map, env_name='kitchen', robot_name=RobotName):
+    world = god_map.get_data(identifier.world)
+    environment_objects = list()
+    for g_n in world.group_names:
+        if env_name == g_n or robot_name == g_n:
+            continue
+        else:
+            if len(world.groups[g_n].links) == 1:
+                environment_objects.append(g_n)
+    return environment_objects
+
+
 class PyBulletEnv(object):
 
     def __init__(self, environment_description='kitchen_description', init_js=None, ignore_objects_ids=None,
                  environment_objects=None, gui=False):
-        self.environment_id = None
-        self.environment_description = environment_description
-        self.environment_objects = environment_objects
+        self.environment_ids = list()
         self.environment_object_ids = list()
+        self.environment_description = environment_description
         self.init_js = init_js
         self.gui = gui
         if ignore_objects_ids is None:
             self.ignore_object_ids = list()
         else:
             self.ignore_object_ids = ignore_objects_ids
+        if ignore_objects_ids is None:
+            self.environment_objects = list()
+        else:
+            self.environment_objects = environment_objects
         self.setup()
 
     def setup(self):
@@ -729,22 +607,27 @@ class PyBulletEnv(object):
                 self.client_id = i
                 break
         pbw.start_pybullet(self.gui, client_id=self.client_id)
-        self.environment_id = pbw.load_urdf_string_into_bullet(rospy.get_param(self.environment_description),
-                                                               client_id=self.client_id)
+        self.environment_ids.append(pbw.load_urdf_string_into_bullet(rospy.get_param(self.environment_description),
+                                                                     client_id=self.client_id))
         if self.environment_objects is not None:
             for env_obj in self.environment_objects:
-                self.environment_object_ids = pbw.load_urdf_string_into_bullet(env_obj,
-                                                                               client_id=self.client_id)
+                self.environment_object_ids.append(pbw.load_urdf_string_into_bullet(env_obj,
+                                                                                    client_id=self.client_id))
         self.update(self.init_js)
+
+    def ignore_id(self, id):
+        return id in self.ignore_object_ids or (
+                    id not in self.environment_object_ids and id not in self.environment_ids and id != -1)
 
     def update(self, js):
         if js is not None:
             # Reset Joint State
-            for joint_id in range(0, pbw.p.getNumJoints(self.environment_id, physicsClientId=self.client_id)):
-                joint_name = pbw.p.getJointInfo(self.environment_id, joint_id, physicsClientId=self.client_id)[
-                    1].decode()
-                joint_state = js[joint_name].position
-                pbw.p.resetJointState(self.environment_id, joint_id, joint_state, physicsClientId=self.client_id)
+            for env_id in self.environment_ids:
+                for joint_id in range(0, pbw.p.getNumJoints(env_id, physicsClientId=self.client_id)):
+                    joint_name = pbw.p.getJointInfo(env_id, joint_id, physicsClientId=self.client_id)[
+                        1].decode()
+                    joint_state = js[joint_name].position
+                    pbw.p.resetJointState(env_id, joint_id, joint_state, physicsClientId=self.client_id)
             # Recalculate collision stuff
             pbw.p.stepSimulation(
                 physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
@@ -756,99 +639,56 @@ class PyBulletEnv(object):
         self.close_pybullet()
 
 
-class PyBulletRayTester(PyBulletEnv):
-
-    def __init__(self, environment_description='kitchen_description', init_js=None, ignore_objects_ids=None,
-                 environment_objects=None):
-        super(PyBulletRayTester, self).__init__(environment_description=environment_description, init_js=init_js,
-                                                ignore_objects_ids=ignore_objects_ids,
-                                                environment_objects=environment_objects, gui=False)
-        self.once = False
-        self.link_id_start = -1
-        self.collision_free_id = -1
-        self.collisionFilterGroup = 0x1
-        self.noCollisionFilterGroup = 0x0
-
-    def __del__(self):
-        self.close_pybullet()
-
-    def pre_ray_test(self):
-        bodies_num = p.getNumBodies(physicsClientId=self.client_id)
-        if bodies_num > 1:
-            for id in range(0, bodies_num):
-                links_num = p.getNumJoints(id, physicsClientId=self.client_id)
-                for link_id in range(self.link_id_start, links_num):
-                    if id not in self.ignore_object_ids:
-                        p.setCollisionFilterGroupMask(id, link_id, self.collisionFilterGroup, self.collisionFilterGroup,
-                                                      physicsClientId=self.client_id)
-                    else:
-                        p.setCollisionFilterGroupMask(id, link_id, self.noCollisionFilterGroup,
-                                                      self.noCollisionFilterGroup, physicsClientId=self.client_id)
-
-    def ray_test_batch(self, js, rayFromPositions, rayToPositions):
-        if not self.once:
-            self.update(js)
-            self.once = True
-        bodies_num = p.getNumBodies(physicsClientId=self.client_id)
-        if bodies_num > 1:
-            query_res = p.rayTestBatch(rayFromPositions, rayToPositions, numThreads=0, physicsClientId=self.client_id,
-                                       collisionFilterMask=self.collisionFilterGroup)
-        else:
-            query_res = p.rayTestBatch(rayFromPositions, rayToPositions, numThreads=0, physicsClientId=self.client_id)
-        if any(v[0] in self.ignore_object_ids for v in query_res):
-            rospy.logerr('fak')
-        coll_links = []
-        dists = []
-        for i in range(0, len(query_res)):
-            obj_id = query_res[i][0]
-            n = query_res[i][-1]
-            if obj_id != self.collision_free_id:
-                coll_links.append(p.getBodyInfo(obj_id)[0])
-                d = np.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2)
-                dists.append(d)
-        fractions = [query_res[i][2] for i in range(0, len(query_res))]
-        return all([v[0] == self.collision_free_id for v in query_res]), coll_links, dists, fractions
-
-    def post_ray_test(self):
-        bodies_num = p.getNumBodies(physicsClientId=self.client_id)
-        if bodies_num > 1:
-            for id in range(0, p.getNumBodies(physicsClientId=self.client_id)):
-                links_num = p.getNumJoints(id, physicsClientId=self.client_id)
-                for link_id in range(self.link_id_start, links_num):
-                    p.setCollisionFilterGroupMask(id, link_id, self.collisionFilterGroup, self.collisionFilterGroup,
-                                                  physicsClientId=self.client_id)
+def current_milli_time():
+    return round(time.time() * 1000)
 
 
 class SimpleRayMotionValidator(AbstractMotionValidator):
 
-    def __init__(self, tip_link, god_map, debug=False, raytester=None, js=None, ignore_state_validator=None):
+    def __init__(self, tip_link, god_map, debug=False, env_name='pybullet', js=None, ignore_state_validator=None):
         AbstractMotionValidator.__init__(self, tip_link, god_map, ignore_state_validator=ignore_state_validator)
         self.hitting = {}
         self.debug = debug
+        self.debug_times = list()
         self.js = js
         self.raytester_lock = threading.Lock()
-        if raytester is None:
-            environment_objects = get_simple_environment_objects(self.god_map)
-            self.raytester = PyBulletRayTester(init_js=js, environment_objects=environment_objects)
+        if env_name == 'pybullet':
+            environment_objects = get_simple_environment_objects_as_urdf(self.god_map)
+            pybulletenv = PyBulletEnv(init_js=js, environment_objects=environment_objects)
+        elif env_name == 'giskard':
+            environment_object_names = get_simple_environment_object_names(self.god_map)
+            pybulletenv = PyBulletRayTesterEnv(self.god_map.get_data(identifier.collision_scene),
+                                               environment_object_names=environment_object_names)
         else:
-            self.raytester = raytester
+            raise Exception(f'Environment {env_name} is not known.')
+        self.raytester = PyBulletRayTester(pybulletenv=pybulletenv)
 
     def __del__(self):
         del self.raytester
 
     def check_motion(self, s1, s2):
         with self.raytester_lock:
-            self.raytester.pre_ray_test()
-            res, _, _, _ = self._check_motion(s1, s2)
-            self.raytester.post_ray_test()
+            res, _, _, _ = self._ray_test_wrapper(s1, s2)
             return res
 
     def check_motion_timed(self, s1, s2):
         with self.raytester_lock:
-            self.raytester.pre_ray_test()
-            res, _, _, f = self._check_motion(s1, s2)
-            self.raytester.post_ray_test()
+            res, _, _, f = self._ray_test_wrapper(s1, s2)
             return res, f
+
+    def _ray_test_wrapper(self, s1, s2):
+        if self.debug:
+            s = current_milli_time()
+        self.raytester.pre_ray_test()
+        collision_free, coll_links, dists, fractions = self._check_motion(s1, s2)
+        self.raytester.post_ray_test()
+        if self.debug:
+            e = current_milli_time()
+            self.debug_times.append(e - s)
+            rospy.loginfo(f'Motion Validator {self.__class__.__name__}: '
+                          f'Raytester: {self.raytester.__class__.__name__}: '
+                          f'Summed time: {np.sum(np.array(self.debug_times))} ms.')
+        return collision_free, coll_links, dists, fractions
 
     @profile
     def _check_motion(self, s1, s2):
@@ -856,15 +696,15 @@ class SimpleRayMotionValidator(AbstractMotionValidator):
         # if so return false, else true.
         query_b = [[s1.position.x, s1.position.y, s1.position.z]]
         query_e = [[s2.position.x, s2.position.y, s2.position.z]]
-        collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(self.js, query_b, query_e)
+        collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(query_b, query_e)
         return collision_free, coll_links, dists, min(fractions)
 
 
 class ObjectRayMotionValidator(SimpleRayMotionValidator):
 
     def __init__(self, collision_scene, tip_link, object_in_motion, state_validator, god_map, debug=False,
-                 raytester=None, js=None, ignore_state_validator=False, links=None):
-        SimpleRayMotionValidator.__init__(self, tip_link, god_map, debug=debug, raytester=raytester,
+                 env_name='pybullet', js=None, ignore_state_validator=False):
+        SimpleRayMotionValidator.__init__(self, tip_link, god_map, debug=debug, env_name=env_name,
                                           js=js, ignore_state_validator=ignore_state_validator)
         self.state_validator = state_validator
         self.collision_scene = collision_scene
@@ -887,7 +727,7 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         query_e = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
         all_js.update(old_js)
         self.object_in_motion.state = all_js
-        collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(self.js, query_b, query_e)
+        collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(query_b, query_e)
         return collision_free, coll_links, dists, min(fractions)
 
 
@@ -898,10 +738,10 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
         self.collision_scene = collision_scene
         self.state_validator = state_validator
         self.object_in_motion = object_in_motion
-        environment_objects = get_simple_environment_objects(self.god_map)
+        environment_objects = get_simple_environment_objects_as_urdf(self.god_map)
         self.box_space = CompoundBoxSpace(self.collision_scene.world, self.object_in_motion, 'map',
                                           self.collision_scene, environment_objects=environment_objects, js=js)
-        #self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
+        # self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
         self.collision_link_names = self.collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
 
     def __del__(self):
@@ -1109,12 +949,15 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
             self.ik = PyBulletIK(root_link, tip_link)
         else:
             self.ik = ik(root_link, tip_link)
+        self.debug = False
+        self.debug_times_cc = list()
+        self.debug_times = list()
         self.is_3D = is_3D
         self.tip_link = tip_link
         self.dist = dist
         self.ik_sampling = ik_sampling
         self.ignore_orientation = ignore_orientation
-        #self.collision_objects = GiskardPyBulletAABBCollision(self.robot, collision_scene, tip_link)
+        # self.collision_objects = GiskardPyBulletAABBCollision(self.robot, collision_scene, tip_link)
         self.collision_link_names = collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
         self.publisher = None
         if publish:
@@ -1129,26 +972,31 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
             # Calc IK for navigating to given state and ...
             results = []
             for i in range(0, self.ik_sampling):
+                if self.debug:
+                    s_s = current_milli_time()
                 state_ik = self.ik.get_ik(old_js, pose)
                 # override on current joint states.
                 all_js.update(state_ik)
                 self.robot.state = all_js
-                # Check if kitchen is colliding with robot
-                #if self.ignore_orientation:
-                #    tmp = list()
-                #    for link_name in self.collision_objects.get_links():
-                #        dist = self.collision_objects.get_distance(link_name)
-                #        tmp.append(self.collision_scene.is_robot_link_external_collision_free(link_name, dist=dist))
-                #    results.append(all(tmp))
-                #else:
+                if self.debug:
+                    s_c = current_milli_time()
                 results.append(
                     self.collision_scene.are_robot_links_external_collision_free(self.collision_link_names,
                                                                                  dist=self.dist))
+                if self.debug:
+                    e_c = current_milli_time()
                 # Reset joint state
                 if any(results):
                     self.publish_robot_state()
                 all_js.update(old_js)
                 self.robot.state = all_js
+                if self.debug:
+                    e_s = current_milli_time()
+                    self.debug_times_cc.append(e_c - s_c)
+                    self.debug_times.append(e_s - s_s)
+                    rospy.loginfo(f'State Validator {self.__class__.__name__}: '
+                                  f'CC time: {np.mean(np.array(self.debug_times_cc))} ms. '
+                                  f'State Update time: {np.mean(np.array(self.debug_times))-np.mean(np.array(self.debug_times_cc))} ms.')
             return any(results)
 
     def publish_robot_state(self):
@@ -1216,7 +1064,7 @@ class PyBulletWorldObjectCollisionChecker(GiskardBehavior):
 
     def update_object_pose(self, p: Point, q: Quaternion):
         try:
-            obj = self.get_world().get_object(self.collision_object_name)
+            obj = self.world.groups[self.collision_object_name]
         except KeyError:
             raise Exception(u'Could not find object with name {}.'.format(self.collision_object_name))
         obj.base_pose = Pose(p, q)
@@ -2314,7 +2162,7 @@ class OMPLPlanner(object):
             elif self.planner_name == 'RRTConnect':
                 planner = og.RRTConnect(si)
                 planner.setRange(self.range)
-            #elif self.planner_name == 'QRRT':
+            # elif self.planner_name == 'QRRT':
             #    planner = og.QRRT(si) # todo: fixme
             #    planner.setRange(self.range)
             # RRTstar
@@ -2604,9 +2452,9 @@ class MovementPlanner(OMPLPlanner):
                 path.interpolate(int(path_cost / 0.01))
             else:
                 if self.is_3D:
-                    path.interpolate(int(path_cost/0.05))
+                    path.interpolate(int(path_cost / 0.05))
                 else:
-                    path.interpolate(int(path_cost/0.1))
+                    path.interpolate(int(path_cost / 0.1))
             data = ompl_states_matrix_to_np(path.printAsMatrix())  # [x y z xw yw zw w]
             # print the simplified path
             if plot:
@@ -2619,8 +2467,8 @@ class MovementPlanner(OMPLPlanner):
         dim = '3D' if self.is_3D else '2D'
         if self.verify_solution_f is not None:
             verify = ' - FP: {}, Time: {}s'.format(
-                   self.verify_solution_f(self.setup, debug=debug),
-                   self.setup.getLastPlanComputationTime())
+                self.verify_solution_f(self.setup, debug=debug),
+                self.setup.getLastPlanComputationTime())
         else:
             verify = ''
         fig, ax = plt.subplots()
@@ -2714,6 +2562,7 @@ class NarrowMovementPlanner(MovementPlanner):
         self.recompute_start_and_goal(self.start, self.goal)
         self.setup.setup()
         return super().plan()
+
 
 def is_3D(space):
     return type(space) == type(ob.SE3StateSpace())

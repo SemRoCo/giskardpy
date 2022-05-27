@@ -1,12 +1,12 @@
 import traceback
-from collections import defaultdict
 
+import numpy as np
+import rospy
 from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy import identifier, RobotName
-from giskardpy.data_types import BiDict, Collisions, Collision
-from giskardpy.global_planner import CollisionAABB, AABBCollision
+from giskardpy.data_types import BiDict, Collisions, Collision, CollisionAABB
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_wrapper import ContactInfo
 from giskardpy.model.world import WorldTree
@@ -42,7 +42,8 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         pose = self.fks[link.name]
         position = pose[:3]
         orientation = pose[4:]
-        pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[link.name], position, orientation, physicsClientId=self.client_id)
+        pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[link.name], position, orientation,
+                                            physicsClientId=self.client_id)
 
     def check_collisions2(self, link_combinations, distance):
         in_collision = set()
@@ -118,7 +119,8 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
 
     def get_pose(self, link_name):
         map_T_link = PoseStamped()
-        position, orientation = pbw.getBasePositionAndOrientation(self.object_name_to_bullet_id[link_name], physicsClientId=self.client_id)
+        position, orientation = pbw.getBasePositionAndOrientation(self.object_name_to_bullet_id[link_name],
+                                                                  physicsClientId=self.client_id)
         map_T_link.header.frame_id = self.world.root_link_name
         map_T_link.pose.position = Point(*position)
         map_T_link.pose.orientation = Quaternion(*orientation)
@@ -130,12 +132,12 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             aabbs = pbw.p.getAABB(link_id, physicsClientId=self.client_id)
             return CollisionAABB(link_name, aabbs[0], aabbs[1])
 
-
     def __add_pybullet_bug_fix_hack(self):
         if self.hack_name not in self.object_name_to_bullet_id:
             path = resolve_ros_iris(u'package://giskardpy/urdfs/tiny_ball.urdf')
             with open(path, 'r') as f:
-                self.object_name_to_bullet_id[self.hack_name] = pbw.load_urdf_string_into_bullet(f.read(), client_id=self.client_id)
+                self.object_name_to_bullet_id[self.hack_name] = pbw.load_urdf_string_into_bullet(f.read(),
+                                                                                                 client_id=self.client_id)
 
     def __move_hack(self, pose):
         position = [pose.position.x, pose.position.y, pose.position.z]
@@ -165,3 +167,94 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             return not contact_info3.body_unique_id_b == body_a_id
         except Exception as e:
             return True
+
+
+class PyBulletRayTesterEnv():
+
+    def __init__(self, collision_scene, environment_name='kitchen', environment_object_names=None,
+                 ignore_objects_ids=None):
+        self.collision_scene = collision_scene
+        self.client_id = collision_scene.client_id
+        if ignore_objects_ids is None:
+            self.ignore_object_ids = list()
+        else:
+            self.ignore_object_ids = ignore_objects_ids
+        if environment_object_names is None:
+            self.environment_object_groups = list()
+        else:
+            self.environment_object_groups = environment_object_names
+        self.environment_group = environment_name
+        self.setup()
+
+    def setup(self):
+        self.environment_ids = list()
+        for l_n in self.collision_scene.world.groups[self.environment_group].link_names_with_collisions:
+            self.environment_ids.append(self.collision_scene.object_name_to_bullet_id[l_n])
+        self.environment_object_ids = list()
+        for o_g in self.environment_object_groups:
+            for l_n in self.collision_scene.world.groups[o_g].link_names_with_collisions:
+                self.environment_object_ids.append(self.collision_scene.object_name_to_bullet_id[l_n])
+        #self.collision_scene.world.notify_state_change()
+        pbw.p.stepSimulation(physicsClientId=self.client_id)
+
+    def ignore_id(self, id):
+        return id in self.ignore_object_ids or (
+                id not in self.environment_object_ids and id not in self.environment_ids and id != -1)
+
+
+class PyBulletRayTester():
+
+    def __init__(self, pybulletenv):
+        self.pybulletenv = pybulletenv
+        self.once = False
+        self.link_id_start = -1
+        self.collision_free_id = -1
+        self.collisionFilterGroup = 0x1
+        self.noCollisionFilterGroup = 0x0
+
+    def pre_ray_test(self):
+        bodies_num = pbw.p.getNumBodies(physicsClientId=self.pybulletenv.client_id)
+        if bodies_num > 1:
+            for id in range(0, bodies_num):
+                links_num = pbw.p.getNumJoints(id, physicsClientId=self.pybulletenv.client_id)
+                for link_id in range(self.link_id_start, links_num):
+                    if not self.pybulletenv.ignore_id(id):
+                        pbw.p.setCollisionFilterGroupMask(id, link_id, self.collisionFilterGroup,
+                                                          self.collisionFilterGroup,
+                                                          physicsClientId=self.pybulletenv.client_id)
+                    else:
+                        pbw.p.setCollisionFilterGroupMask(id, link_id, self.noCollisionFilterGroup,
+                                                          self.noCollisionFilterGroup,
+                                                          physicsClientId=self.pybulletenv.client_id)
+
+    def ray_test_batch(self, rayFromPositions, rayToPositions):
+        bodies_num = pbw.p.getNumBodies(physicsClientId=self.pybulletenv.client_id)
+        if bodies_num > 1:
+            query_res = pbw.p.rayTestBatch(rayFromPositions, rayToPositions, numThreads=0,
+                                           physicsClientId=self.pybulletenv.client_id,
+                                           collisionFilterMask=self.collisionFilterGroup)
+        else:
+            query_res = pbw.p.rayTestBatch(rayFromPositions, rayToPositions, numThreads=0,
+                                           physicsClientId=self.pybulletenv.client_id)
+        if any(v[0] for v in query_res if self.pybulletenv.ignore_id(v[0])):
+            rospy.logerr('fak')
+        coll_links = []
+        dists = []
+        for i in range(0, len(query_res)):
+            obj_id = query_res[i][0]
+            n = query_res[i][-1]
+            if obj_id != self.collision_free_id:
+                coll_links.append(pbw.p.getBodyInfo(obj_id)[0])
+                d = np.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2)
+                dists.append(d)
+        fractions = [query_res[i][2] for i in range(0, len(query_res))]
+        return all([v[0] == self.collision_free_id for v in query_res]), coll_links, dists, fractions
+
+    def post_ray_test(self):
+        bodies_num = pbw.p.getNumBodies(physicsClientId=self.pybulletenv.client_id)
+        if bodies_num > 1:
+            for id in range(0, pbw.p.getNumBodies(physicsClientId=self.pybulletenv.client_id)):
+                links_num = pbw.p.getNumJoints(id, physicsClientId=self.pybulletenv.client_id)
+                for link_id in range(self.link_id_start, links_num):
+                    pbw.p.setCollisionFilterGroupMask(id, link_id, self.collisionFilterGroup, self.collisionFilterGroup,
+                                                      physicsClientId=self.pybulletenv.client_id)

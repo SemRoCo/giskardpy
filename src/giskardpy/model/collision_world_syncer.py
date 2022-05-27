@@ -10,9 +10,8 @@ import numpy as np
 from giskard_msgs.msg import CollisionEntry
 
 from giskardpy import RobotName, identifier
-from giskardpy.data_types import Collisions, JointStates
+from giskardpy.data_types import Collisions, JointStates, AABBCollision
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
-from giskardpy.global_planner import AABBCollision
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging

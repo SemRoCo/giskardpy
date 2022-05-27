@@ -467,10 +467,15 @@ class AABBCollision(CollisionObjects):
     def __init__(self):
         super(AABBCollision, self).__init__()
 
-    def add_collision(self, link_name):
-        link_names = [l for (l, _, _) in self.collision_objects]
-        if link_name not in link_names:
-            self.collision_objects.append(self.get_collision(link_name))
+    def get_link_names(self):
+        return list(map(lambda c: c.link, self.collision_objects))
+
+    def add_collision(self, collision_object: CollisionAABB):
+        link_names = self.get_link_names()
+        if collision_object.link in link_names:
+            i = link_names.index(collision_object.link)
+            self.collision_objects.remove(link_names[i])
+        self.collision_objects.append(collision_object)
 
     def get_points(self, collision_objects=None):
         if collision_objects is None:
@@ -502,94 +507,82 @@ class AABBCollision(CollisionObjects):
         return [d_l, d, u, u_r]
 
 
-class GiskardLinkCollision(object):
-
-    def __init__(self, object_in_motion, tip_link):
-        self.object_in_motion = object_in_motion
-        self.tip_link = tip_link
-
-    def get_links(self):
-        controlled_parent_joint_name = self.object_in_motion.get_controlled_parent_joint_of_link(self.tip_link)
-        child_links_with_collision, _ = self.object_in_motion.search_branch(controlled_parent_joint_name,
-                                                                            collect_link_when=self.object_in_motion.has_link_collisions)
-        return child_links_with_collision
-
-
-class GiskardPyBulletAABBCollision(AABBCollision, GiskardLinkCollision):
-    # fixme: rework
-    # call for motion validator get_points_from_poses twice with s1 and s2. calculate with
-    # get_collision the map poses and save them. therefore u can remove transform_points.
-    # therefore ros tf is not needed only use pybullet aabb
-
-    def __init__(self, object_in_motion, collision_scene, tip_link, links=None, map_frame='map'):
-        AABBCollision.__init__(self)
-        GiskardLinkCollision.__init__(self, object_in_motion, tip_link)
-        self.map_frame = map_frame
-        self.collision_scene = collision_scene
-        self.links = links
-        self.update()
-
-    def get_links(self):
-        if self.links is not None:
-            return self.links
-        else:
-            return super(GiskardPyBulletAABBCollision, self).get_links()
-
-    def update(self):
-        """
-        If tip link is not used for interaction and has collision information, we use only this information for
-        continuous collision checking. Otherwise, we check the parent links of the tip link for fixed links and
-        their collision information. If there were no fixed parent links with collision information added,
-        we search for collision information in the childs links if possible.
-        Further we model interaction tip_links such that it makes sense to search,
-        for neighboring links and their collision information. Since the joints
-        of these links are normally not fixed, we assume that they are.
-
-        """
-        # Add collisions
-        self.collision_scene.sync()
-        self.collision_objects = list()
-        for link_name in self.get_links():
-            self.add_collision(link_name)
-
-    def get_points_from_poses(self, collision_objects=None):
-        self.update()
-        return super(GiskardPyBulletAABBCollision, self).get_points(collision_objects=collision_objects)
-
-    # def get_points_from_positions(self):
-    #    self.update()
-    #    return super(GiskardPyBulletAABBCollision, self).get_points(collision_objects=[self.get_cube_collision()])
-
-    @profile
-    def get_cube_collision(self, link_names=None, from_link=None):
-        d = np.array([1e10] * 3)
-        u = np.array([-1e10] * 3)
-        if link_names is None:
-            link_names = self.get_links()
-        if from_link is None:
-            from_link = link_names[0]
-        for link_name in link_names:
-            link_id = self.collision_scene.object_name_to_bullet_id[link_name]
-            d_i, u_i = p.getAABB(link_id, physicsClientId=0)
-            if (np.array(d_i) < d).all():
-                d = d_i
-            if (np.array(u_i) > u).all():
-                u = u_i
-        l = max(abs(np.array(d) - np.array(u)))
-        return CollisionAABB(link=from_link, d=tuple(d), u=tuple(d + l))
-
-    def get_distance(self, link_name):
-        cc = self.get_cube_collision(link_names=[link_name], from_link=link_name)
-        diameter = np.sqrt(sum((np.array(cc.d) - np.array(cc.u)) ** 2))
-        c = self.get_collision(link_name)
-        l = min(abs(np.array(c.d) - np.array(c.u)))
-        return diameter / 2. - l / 2.
-
-    def get_collision(self, link_name):
-        if self.object_in_motion.has_link_collisions(link_name):
-            link_id = self.collision_scene.object_name_to_bullet_id[link_name]
-            aabbs = p.getAABB(link_id, physicsClientId=0)
-            return CollisionAABB(link_name, aabbs[0], aabbs[1])
+# class GiskardPyBulletAABBCollision(AABBCollision):
+#     # fixme: rework
+#     # call for motion validator get_points_from_poses twice with s1 and s2. calculate with
+#     # get_collision the map poses and save them. therefore u can remove transform_points.
+#     # therefore ros tf is not needed only use pybullet aabb
+#
+#     def __init__(self, object_in_motion, collision_scene, tip_link, links=None, map_frame='map'):
+#         AABBCollision.__init__(self)
+#         self.tip_link = tip_link
+#         self.object_in_motion = object_in_motion
+#         self.map_frame = map_frame
+#         self.collision_scene = collision_scene
+#         self.links = links
+#         self.update()
+#
+#     def get_links(self):
+#         if self.links is not None:
+#             return self.links
+#         else:
+#             return self.object_in_motion.get_children_with_collisions_from_link(self.tip_link)
+#
+#     def update(self):
+#         """
+#         If tip link is not used for interaction and has collision information, we use only this information for
+#         continuous collision checking. Otherwise, we check the parent links of the tip link for fixed links and
+#         their collision information. If there were no fixed parent links with collision information added,
+#         we search for collision information in the childs links if possible.
+#         Further we model interaction tip_links such that it makes sense to search,
+#         for neighboring links and their collision information. Since the joints
+#         of these links are normally not fixed, we assume that they are.
+#
+#         """
+#         # Add collisions
+#         self.collision_scene.sync()
+#         self.collision_objects = list()
+#         for link_name in self.get_links():
+#             self.add_collision(link_name)
+#
+#     def get_points_from_poses(self, collision_objects=None):
+#         self.update()
+#         return super(GiskardPyBulletAABBCollision, self).get_points(collision_objects=collision_objects)
+#
+#     # def get_points_from_positions(self):
+#     #    self.update()
+#     #    return super(GiskardPyBulletAABBCollision, self).get_points(collision_objects=[self.get_cube_collision()])
+#
+#     @profile
+#     def get_cube_collision(self, link_names=None, from_link=None):
+#         d = np.array([1e10] * 3)
+#         u = np.array([-1e10] * 3)
+#         if link_names is None:
+#             link_names = self.get_links()
+#         if from_link is None:
+#             from_link = link_names[0]
+#         for link_name in link_names:
+#             link_id = self.collision_scene.object_name_to_bullet_id[link_name]
+#             d_i, u_i = p.getAABB(link_id, physicsClientId=0)
+#             if (np.array(d_i) < d).all():
+#                 d = d_i
+#             if (np.array(u_i) > u).all():
+#                 u = u_i
+#         l = max(abs(np.array(d) - np.array(u)))
+#         return CollisionAABB(link=from_link, d=tuple(d), u=tuple(d + l))
+#
+#     def get_distance(self, link_name):
+#         cc = self.get_cube_collision(link_names=[link_name], from_link=link_name)
+#         diameter = np.sqrt(sum((np.array(cc.d) - np.array(cc.u)) ** 2))
+#         c = self.collision_scene.get_aabb(link_name)
+#         l = min(abs(np.array(c.d) - np.array(c.u)))
+#         return diameter / 2. - l / 2.
+#
+#     def get_collision(self, link_name):
+#         if self.object_in_motion.has_link_collisions(link_name):
+#             link_id = self.collision_scene.object_name_to_bullet_id[link_name]
+#             aabbs = p.getAABB(link_id, physicsClientId=0)
+#             return CollisionAABB(link_name, aabbs[0], aabbs[1])
 
 
 class OMPLMotionValidator(ob.MotionValidator):
@@ -876,24 +869,22 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         self.state_validator = state_validator
         self.collision_scene = collision_scene
         self.object_in_motion = object_in_motion
-        self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link,
-                                                             links=links)
+        self.collision_link_names = self.collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
 
     @profile
     def _check_motion(self, s1, s2):
         # Shoot ray from start to end pose and check if it intersects with the kitchen,
         # if so return false, else true.
-        get_points = self.collision_points.get_points_from_poses
         all_js = self.collision_scene.world.state
         old_js = self.object_in_motion.state
-        state_ik = self.state_validator.ik.get_ik(old_js, s1)
-        all_js.update(state_ik)
+        state1 = self.state_validator.ik.get_ik(old_js, s1)
+        all_js.update(state1)
         self.object_in_motion.state = all_js
-        query_b = get_points()
-        state_ik = self.state_validator.ik.get_ik(old_js, s2)
-        all_js.update(state_ik)
+        query_b = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
+        state2 = self.state_validator.ik.get_ik(old_js, s2)
+        all_js.update(state2)
         self.object_in_motion.state = all_js
-        query_e = get_points()
+        query_e = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
         all_js.update(old_js)
         self.object_in_motion.state = all_js
         collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(self.js, query_b, query_e)
@@ -910,7 +901,8 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
         environment_objects = get_simple_environment_objects(self.god_map)
         self.box_space = CompoundBoxSpace(self.collision_scene.world, self.object_in_motion, 'map',
                                           self.collision_scene, environment_objects=environment_objects, js=js)
-        self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
+        #self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
+        self.collision_link_names = self.collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
 
     def __del__(self):
         del self.box_space
@@ -919,18 +911,19 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
     def check_motion(self, s1, s2):
         all_js = self.collision_scene.world.state
         old_js = self.object_in_motion.state
-        for collision_object in self.collision_points.collision_objects:
+        for collision_link_name in self.collision_link_names:
             state_ik = self.state_validator.ik.get_ik(old_js, s1)
             all_js.update(state_ik)
             self.object_in_motion.state = all_js
             self.collision_scene.sync()
-            query_b = pose_stamped_to_np(self.collision_scene.get_pose(collision_object.link))
+            query_b = pose_stamped_to_np(self.collision_scene.get_pose(collision_link_name))
             state_ik = self.state_validator.ik.get_ik(old_js, s2)
             all_js.update(state_ik)
             self.object_in_motion.state = all_js
             self.collision_scene.sync()
-            query_e = pose_stamped_to_np(self.collision_scene.get_pose(collision_object.link))
+            query_e = pose_stamped_to_np(self.collision_scene.get_pose(collision_link_name))
             start_and_end_positions = [query_b[0], query_e[0]]
+            collision_object = self.collision_scene.get_aabb_info(collision_link_name)
             min_size = np.max(np.abs(np.array(collision_object.d) - np.array(collision_object.u)))
             if self.box_space.is_colliding(min_size, start_and_end_positions):
                 all_js.update(old_js)
@@ -1121,7 +1114,8 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
         self.dist = dist
         self.ik_sampling = ik_sampling
         self.ignore_orientation = ignore_orientation
-        self.collision_objects = GiskardPyBulletAABBCollision(self.robot, collision_scene, tip_link)
+        #self.collision_objects = GiskardPyBulletAABBCollision(self.robot, collision_scene, tip_link)
+        self.collision_link_names = collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
         self.publisher = None
         if publish:
             self.publisher = VisualizationBehavior('motion planning object publisher', ensure_publish=False)
@@ -1140,16 +1134,16 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                 all_js.update(state_ik)
                 self.robot.state = all_js
                 # Check if kitchen is colliding with robot
-                if self.ignore_orientation:
-                    tmp = list()
-                    for link_name in self.collision_objects.get_links():
-                        dist = self.collision_objects.get_distance(link_name)
-                        tmp.append(self.collision_scene.is_robot_link_external_collision_free(link_name, dist=dist))
-                    results.append(all(tmp))
-                else:
-                    results.append(
-                        self.collision_scene.are_robot_links_external_collision_free(self.collision_objects.get_links(),
-                                                                                     dist=self.dist))
+                #if self.ignore_orientation:
+                #    tmp = list()
+                #    for link_name in self.collision_objects.get_links():
+                #        dist = self.collision_objects.get_distance(link_name)
+                #        tmp.append(self.collision_scene.is_robot_link_external_collision_free(link_name, dist=dist))
+                #    results.append(all(tmp))
+                #else:
+                results.append(
+                    self.collision_scene.are_robot_links_external_collision_free(self.collision_link_names,
+                                                                                 dist=self.dist))
                 # Reset joint state
                 if any(results):
                     self.publish_robot_state()

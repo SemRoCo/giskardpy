@@ -6,6 +6,7 @@ from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy import identifier, RobotName
 from giskardpy.data_types import BiDict, Collisions, Collision
+from giskardpy.global_planner import CollisionAABB, AABBCollision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_wrapper import ContactInfo
 from giskardpy.model.world import WorldTree
@@ -122,6 +123,13 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         map_T_link.pose.position = Point(*position)
         map_T_link.pose.orientation = Quaternion(*orientation)
         return map_T_link
+
+    def get_aabb_info(self, link_name):
+        if self.world.has_link_collisions(link_name):
+            link_id = self.object_name_to_bullet_id[link_name]
+            aabbs = pbw.p.getAABB(link_id, physicsClientId=self.client_id)
+            return CollisionAABB(link_name, aabbs[0], aabbs[1])
+
 
     def __add_pybullet_bug_fix_hack(self):
         if self.hack_name not in self.object_name_to_bullet_id:

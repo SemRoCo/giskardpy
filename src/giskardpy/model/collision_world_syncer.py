@@ -4,6 +4,7 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import combinations, product
 from time import time, sleep
+from typing import List, Tuple
 
 import numpy as np
 from giskard_msgs.msg import CollisionEntry
@@ -11,6 +12,7 @@ from giskard_msgs.msg import CollisionEntry
 from giskardpy import RobotName, identifier
 from giskardpy.data_types import Collisions, JointStates
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
+from giskardpy.global_planner import AABBCollision
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
@@ -310,6 +312,19 @@ class CollisionWorldSynchronizer(object):
         self.sync()
         collisions = self.check_collisions(self.collision_matrix, self.collision_list_size)
         self.god_map.set_data(identifier.closest_point, collisions)
+
+    def get_aabb_info(self, link_name: str) -> Tuple[str, float, float]:
+        raise Exception('Implement me.')
+
+    def get_aabb_collisions(self, link_names: List[str], sync=True) -> AABBCollision:
+        if sync:
+            self.sync()
+        c = AABBCollision()
+        #obj = self.world.groups[group_name]
+        #link_names = obj.get_children_with_collisions_from_link(link_name)
+        for l_n in link_names:
+            c.add_collision(self.get_aabb_info(l_n))
+        return c
 
     def get_external_collisions(self, link_name):
         """

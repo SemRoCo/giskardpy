@@ -155,7 +155,13 @@ class WorldTree(object):
                                            collect_link_when=self.has_link_collisions)
         return links
 
-    def get_children_with_collisions(self, joint_name):
+    def get_children_with_collisions_from_link(self, link_name):
+        controlled_parent_joint_name = self.get_controlled_parent_joint_of_link(link_name)
+        child_links_with_collision, _ = self.search_branch(controlled_parent_joint_name,
+                                                           collect_link_when=self.has_link_collisions)
+        return child_links_with_collision
+
+    def get_children_with_collisions_from_joint(self, joint_name):
         def has_no_children(link_name):
             return not self.links[link_name].has_children()
         links, joints = self.search_branch(joint_name,

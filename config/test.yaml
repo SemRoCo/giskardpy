@@ -27,6 +27,6 @@ plugins:
 #    cm_per_second: 3.365
 #    hspace: 0.5
   MaxTrajectoryLength:
-    enabled: True
+    enabled: False
     length: 30 # will abort planning if the trajectory becomes longer than this many seconds
 

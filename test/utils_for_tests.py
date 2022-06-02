@@ -425,7 +425,7 @@ class GiskardTestWrapper(GiskardWrapper):
         # rospy.sleep(1)
         self.original_number_of_links = len(self.world.links)
 
-    def set_localization(self, map_T_odom):
+    def set_localization(self, map_T_odom, max_iterations=10):
         """
         :type map_T_odom: PoseStamped
         """

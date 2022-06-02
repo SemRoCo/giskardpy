@@ -85,8 +85,8 @@ class CartesianOrientation(Goal):
 
 
 class CartesianPositionStraight(Goal):
-    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link: str, tip_link: str, goal_point: PointStamped, reference_velocity: float = None,
+                 max_velocity: float = 0.2, weight: float = WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPositionStraight, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
@@ -95,14 +95,14 @@ class CartesianPositionStraight(Goal):
         self.weight = weight
         self.root_link = root_link
         self.tip_link = tip_link
-        self.goal_pose = self.transform_msg(self.root_link, goal)
+        self.goal_point = self.transform_msg(self.root_link, goal_point)
+        self.tip_goal_point = self.transform_msg(self.tip_link, goal_point)
+        self.start_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
 
-        self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)
-
-    def make_constraints(self):
-        root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal_pose'))
+    def old_make_constraints(self):
+        root_P_goal = self.get_parameter_as_symbolic_expression('goal_point')
         root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
-        root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start'))
+        root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start_pose'))
 
         # Constraint to go to goal pos
         self.add_point_goal_constraints(frame_P_current=root_P_tip,
@@ -111,15 +111,81 @@ class CartesianPositionStraight(Goal):
                                         weight=self.weight,
                                         name_suffix='goal')
 
-        dist, nearest = w.distance_point_to_line_segment(root_P_tip,
-                                                         root_V_start,
-                                                         root_P_goal)
+        _, nearest = w.distance_point_to_line_segment(root_P_tip,
+                                                      root_V_start,
+                                                      root_P_goal)
         # Constraint to stick to the line
         self.add_point_goal_constraints(frame_P_goal=nearest,
                                         frame_P_current=root_P_tip,
                                         reference_velocity=self.reference_velocity,
                                         name_suffix='line',
                                         weight=self.weight * 2)
+
+        if self.max_velocity is not None:
+            self.add_translational_velocity_limit(frame_P_current=root_P_tip,
+                                                  max_velocity=self.max_velocity,
+                                                  weight=self.weight)
+
+    def make_constraints(self):
+        root_P_goal = self.get_parameter_as_symbolic_expression('goal_point')
+        tip_P_goal = self.get_parameter_as_symbolic_expression('tip_goal_point')
+        root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start_pose'))
+
+        # Constraint to go to goal pos
+        #self.add_norm_point_goal_constraints(frame_P_current=root_P_tip,
+        #                                     frame_P_goal=root_P_goal,
+        #                                     reference_velocity=self.reference_velocity,
+        #                                     weight=self.weight,
+        #                                     name_suffix='goal')
+
+        dist, _ = w.distance_point_to_line_segment(root_P_tip,
+                                                   root_V_start,
+                                                   root_P_goal)
+        tip_P_error = tip_P_goal[:3]
+        trans_error = w.norm(tip_P_error)
+        trans_scale = self.get_sampling_period_symbol() * self.reference_velocity
+        tip_P_intermediate_error = w.save_division(tip_P_error, trans_error)[:3] * trans_scale
+        tip_P_intermediate_y = [0, 1, 0] * trans_scale # TODO: rmv [0,1,0] and add random vec on err?
+        y = w.cross(tip_P_intermediate_error, tip_P_intermediate_y)
+        z = w.cross(tip_P_intermediate_error, y)
+        t_R_a = w.Matrix([[tip_P_intermediate_error[0], y[0], z[0], 0],
+                          [tip_P_intermediate_error[1], y[1], z[1], 0],
+                          [tip_P_intermediate_error[2], y[2], z[2], 0],
+                          [0, 0, 0, 1]]) # todo norm, add tf publisher
+        #r_g = w.rotation_matrix_from_quaternion(a[0], a[1], a[2],
+        #                                        w.sqrt((w.norm(tip_P_intermediate_start)**2) *
+        #                                               (w.norm(tip_P_intermediate_error)**2)) +
+        #                                        w.dot(w.ca.transpose(tip_P_intermediate_start),
+        #                                              tip_P_intermediate_error))
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        a_T_t = w.dot(w.inverse_frame(t_R_a),
+                      self.get_fk_evaluated(self.tip_link, self.root_link),
+                      self.get_fk(self.root_link, self.tip_link),
+                      hack)
+        self.add_debug_vector()
+        expr_p = w.position_of(a_T_t)
+        # self.add_debug_expr('error', w.norm(r_P_intermediate_error))
+        self.add_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
+                                   lower_errors=[dist, 0, 0],
+                                   upper_errors=[dist, 0, 0],
+                                   weights=[self.weight] * 3,
+                                   expressions=expr_p[:3],
+                                   name_suffixes=['{}/x'.format('line'),
+                                                  '{}/y'.format('line'),
+                                                  '{}/z'.format('line')])
+        # Constraint to stick to the line
+        #self.add_norm_point_goal_constraints(frame_P_goal=nearest,
+        #                                     frame_P_current=root_P_tip,
+        #                                     reference_velocity=self.reference_velocity,
+        #                                     name_suffix='line',
+        #                                     weight=self.weight * 2)
+        #self.add_constraint(reference_velocity=self.reference_velocity,
+        #                    lower_error=dist,
+        #                    upper_error=dist,
+        #                    weight=self.weight,
+        #                    expression=w.ca.SX(1),
+        #                    name_suffix='dist')
 
         if self.max_velocity is not None:
             self.add_translational_velocity_limit(frame_P_current=root_P_tip,
@@ -161,18 +227,24 @@ class CartesianPose(Goal):
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, root_link, tip_link, goal_pose, max_linear_velocity=0.1, max_angular_velocity=0.5,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity : float = 0.1,
+                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPoseStraight, self).__init__(**kwargs)
+        goal_point = PointStamped()
+        goal_point.header = goal_pose.header
+        goal_point.point = goal_pose.pose.position
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
                                                                tip_link=tip_link,
-                                                               goal=goal_pose,
+                                                               goal_point=goal_point,
                                                                max_velocity=max_linear_velocity,
                                                                weight=weight,
                                                                **kwargs))
+        goal_orientation = QuaternionStamped()
+        goal_orientation.header = goal_pose.header
+        goal_orientation.quaternion = goal_pose.pose.orientation
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
-                                                          goal_orientation=goal_pose,
+                                                          goal_orientation=goal_orientation,
                                                           max_velocity=max_angular_velocity,
                                                           weight=weight,
                                                           **kwargs))

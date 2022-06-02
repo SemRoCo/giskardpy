@@ -1123,6 +1123,140 @@ class TestCartGoals(object):
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
+    def test_move_base1(self, zero_pose: PR2):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.y = 2
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.teleport_base(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base2(self, zero_pose: PR2):
+        map_T_odom = PoseStamped()
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = -1
+        base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base3(self, zero_pose: PR2):
+        map_T_odom = PoseStamped()
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = -1
+        base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base4(self, zero_pose: PR2):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.teleport_base(map_T_odom)
+
+        base_goal = PointStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.point.x = 1
+        zero_pose.set_json_goal('CartesianPositionStraight',
+                                root_link=zero_pose.default_root,
+                                tip_link='base_footprint',
+                                goal_point=base_goal)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_base_driving1a(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation = Quaternion(*quaternion_about_axis(1/2, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = -2
+        p.pose.position.y = 5
+        p.pose.orientation = Quaternion(*quaternion_about_axis(-1, [0, 0, 1]))
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.allow_collision()
+        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
+    def test_base_driving1b(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation = Quaternion(*quaternion_about_axis(1/2, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position.x = -2
+        p.pose.position.y = 5
+        p.pose.orientation = Quaternion(*quaternion_about_axis(-1, [0, 0, 1]))
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.allow_collision()
+        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
+    def test_base_driving2(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position.x = -2
+        p.pose.position.y = 5
+        p.pose.orientation.w = 1
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        zero_pose.allow_collision()
+        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
+    def test_base_driving3(self, zero_pose: PR2):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.plan_and_execute()
+
+        base_goal = PointStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.point.x = -2
+        base_goal.point.y = 5
+        zero_pose.set_json_goal('CartesianPositionStraight',
+                                root_link=zero_pose.default_root,
+                                tip_link='base_footprint',
+                                goal_point=base_goal)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_rotate_gripper(self, zero_pose: PR2):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip

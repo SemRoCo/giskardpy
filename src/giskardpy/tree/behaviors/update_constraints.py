@@ -178,15 +178,8 @@ class GoalToConstraints(GetGoal):
         # t = time()
         self.collision_scene.sync()
         max_distances = self.make_max_distances()
-        try:
-            added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
-            self.god_map.set_data(identifier.added_collision_checks, {})
-        except KeyError:
-            # no collision checks added
-            added_checks = {}
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                    max_distances,
-                                                                                    added_checks)
+                                                                                    max_distances)
         # t2 = time() - t
         # self.get_blackboard().runtime += t2
         return collision_matrix

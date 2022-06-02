@@ -26,12 +26,13 @@ from visualization_msgs.msg import Marker
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse
-from giskardpy import identifier
+from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
+from giskardpy import identifier, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
+from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
@@ -466,6 +467,11 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         return self.world.groups[group_name]
 
+    def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float],
+                  expected_error_codes=(DyeGroupResponse.SUCCESS,)):
+        res = super().dye_group(group_name, rgba)
+        assert res.error_codes in expected_error_codes
+
     def heart_beat(self, timer_thing):
         self.tree.tick()
 
@@ -644,7 +650,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                max_velocity=angular_velocity,
                                check=check)
 
-    def set_pointing_goal(self, tip_link, goal_point, root_link=None, tip_group=None, root_group=None, pointing_axis=None, weight=None):
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, tip_group=None, root_group=None, pointing_axis=None, weight=None, check=True):
         if root_link is None:
             root_link = self.get_robot_short_root_link_name(root_group)
         super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
@@ -654,13 +660,14 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           root_group=root_group,
                                                           pointing_axis=pointing_axis,
                                                           weight=weight)
-        full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+        if check:
+            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                    tip_link=tip_link, tip_group=tip_group)
-        self.add_goal_check(PointingGoalChecker(self.god_map,
-                                                tip_link=full_tip_link,
-                                                goal_point=goal_point,
-                                                root_link=full_root_link,
-                                                pointing_axis=pointing_axis))
+            self.add_goal_check(PointingGoalChecker(self.god_map,
+                                                    tip_link=full_tip_link,
+                                                    goal_point=goal_point,
+                                                    root_link=full_root_link,
+                                                    pointing_axis=pointing_axis))
 
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, tip_group=None, root_group=None, root_normal=None, max_angular_velocity=None,
                               weight=None, check=True):
@@ -1061,7 +1068,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                           group2=self.get_robot_name())
                            ]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
-                                                                                    defaultdict(lambda: 0.3), {})
+                                                                                    defaultdict(lambda: 0.3))
         collisions = self.collision_scene.check_collisions(collision_matrix)
         controlled_parent_joint = self.robot().get_controlled_parent_joint_of_link(link)
         controlled_parent_link = self.robot().joints[controlled_parent_joint].child_link_name
@@ -1878,6 +1885,7 @@ class Boxy(GiskardTestWrapper):
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
         self.robot_name = 'boxy'
+        self.r_gripper_group = 'r_gripper'
         if config is None:
             super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml', [self.robot_name], [''])
         else:
@@ -1898,6 +1906,7 @@ class Boxy(GiskardTestWrapper):
     def reset(self):
         self.clear_world()
         self.reset_base()
+        self.register_group(self.r_gripper_group, self.get_robot_name(), 'right_arm_7_link')
 
 
 class BoxyCloseLoop(Boxy):

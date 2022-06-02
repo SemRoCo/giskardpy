@@ -86,11 +86,12 @@ class ExternalCollisionAvoidance(Goal):
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
-        soft_threshold = 99
+        soft_threshold = 0
         actual_link_b_hash = self.get_link_b_hash()
-
+        parent_joint = self.world.links[self.link_name].parent_joint_name
+        direct_children = self.world.get_directly_controlled_child_links_with_collisions(parent_joint)
         for k, v in self.soft_thresholds.items():
-            if self.link_name in k:
+            if k[0] in direct_children:
                 link_b_hash = k[1].__hash__()
                 soft_threshold = w.if_eq(actual_link_b_hash, link_b_hash, v, soft_threshold)
 
@@ -117,7 +118,8 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, self.num_repeller))
-        # if self.link_name == 'r_wrist_roll_link' and self.idx <= 1:
+        if self.link_name == 'base_footprint' and self.idx <= 1:
+            self.add_debug_expr('soft_threshold', soft_threshold)
         #     self.add_debug_expr('weight', weight)
         #     self.add_debug_expr('soft_threshold', soft_threshold)
         #     self.add_debug_expr('dist', dist)
@@ -234,8 +236,9 @@ class SelfCollisionAvoidance(Goal):
         return '{}/{}/{}/{}'.format(s, self.link_a, self.link_b, self.idx)
 
 
+
 class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_testing
-    def __init__(self, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
+    def __init__(self, tip_link, avoidance_hint, object_link_name, object_group = None, max_linear_velocity=0.1,
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
@@ -254,9 +257,8 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
         super(CollisionAvoidanceHint, self).__init__(**kwargs)
         self.link_name = tip_link
         self.key = (tip_link, None, object_link_name)
-        self.body_b = object_name
+        self.object_group = object_group
         self.link_b = object_link_name
-        self.body_b_hash = object_name.__hash__()
         self.link_b_hash = object_link_name.__hash__()
         if root_link is None:
             self.root_link = self.robot.root_link_name
@@ -268,7 +270,9 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        self.add_collision_check(self.world.links[tip_link].name, self.world.links[object_link_name].name, spring_threshold)
+        self.add_collision_check(self.world.links[tip_link].name,
+                                 self.world.links[object_link_name].name,
+                                 spring_threshold)
 
         self.avoidance_hint = tf.transform_vector(self.root_link, avoidance_hint)
         self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
@@ -285,7 +289,8 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
 
     def get_link_b(self):
         return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
-                                                                  self.key, 'get_link_b_hash', tuple()])
+                                                                  self.key,
+                                                                  'link_b_hash'])
 
     def make_constraints(self):
         weight = self.get_parameter_as_symbolic_expression('weight')
@@ -316,8 +321,7 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
         # FIXME really?
-        self.add_debug_expr('dist', actual_distance)
-        self.add_debug_expr('dist', actual_distance)
+        # self.add_debug_expr('dist', actual_distance)
         self.add_constraint(name_suffix='avoidance_hint',
                             reference_velocity=max_velocity,
                             lower_error=max_velocity,
@@ -327,4 +331,4 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
 
     def __str__(self):
         s = super(CollisionAvoidanceHint, self).__str__()
-        return '{}/{}/{}/{}'.format(s, self.link_name, self.body_b, self.link_b)
+        return f'{s}/{self.link_name}/{self.link_b}'

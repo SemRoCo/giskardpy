@@ -242,7 +242,7 @@ class CollisionWorldSynchronizer(object):
         try:
             self.white_list_pairs = self.god_map.get_data(identifier.added_self_collisions)
             self.white_list_pairs = set(
-                x if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
+                tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
         except KeyError as e:
             self.white_list_pairs = set()
 
@@ -496,8 +496,7 @@ class CollisionWorldSynchronizer(object):
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
-                                            min_dist: dict,
-                                            added_checks: Dict[Tuple[my_string, my_string], float]):
+                                            min_dist: dict,):
         """
         :param collision_goals: list of CollisionEntry
         :type collision_goals: list
@@ -529,12 +528,6 @@ class CollisionWorldSynchronizer(object):
                             min_allowed_distance[key] = max(min_dist[key[0]], collision_entry.distance)
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
-        for (link1, link2), distance in added_checks.items():
-            key = self.world.sort_links(link1, link2)
-            if key in min_allowed_distance:
-                min_allowed_distance[key] = max(distance, min_allowed_distance[key])
-            else:
-                min_allowed_distance[key] = distance
         return min_allowed_distance
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:
@@ -542,7 +535,7 @@ class CollisionWorldSynchronizer(object):
             if collision_entry.group1 != collision_entry.ALL and collision_entry.group1 not in self.world.groups:
                 raise UnknownGroupException(f'group1 \'{collision_entry.group1}\' unknown.')
             if collision_entry.group2 != collision_entry.ALL and collision_entry.group2 not in self.world.groups:
-                raise UnknownGroupException(f'group2 \'{collision_entry.group1}\' unknown.')
+                raise UnknownGroupException(f'group2 \'{collision_entry.group2}\' unknown.')
 
         for i, ce in enumerate(reversed(collision_goals)):
             if self.is_avoid_all_collision(ce):

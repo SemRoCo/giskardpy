@@ -263,13 +263,13 @@ class TestConstraints(object):
                                     max_threshold=0.4,
                                     spring_threshold=0.5,
                                     # max_linear_velocity=1,
-                                    object_name='kitchen',
                                     object_link_name='kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
         kitchen_setup.set_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
+        # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
     def test_CartesianPosition(self, zero_pose: PR2):
@@ -1191,6 +1191,7 @@ class TestCartGoals(object):
         base_goal.pose.position.x = 1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_rotate_gripper(self, zero_pose: PR2):
@@ -1973,6 +1974,13 @@ class TestShaking(object):
 
 
 class TestWorldManipulation(object):
+
+    def test_dye_group(self, kitchen_setup: PR2):
+        kitchen_setup.dye_group(kitchen_setup.get_robot_name(), (1,0,0,1))
+        kitchen_setup.dye_group('kitchen', (0,1,0,1))
+        kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0,0,1,1))
+        kitchen_setup.set_joint_goal(kitchen_setup.default_pose)
+        kitchen_setup.plan_and_execute()
 
     def test_clear_world(self, zero_pose: PR2):
         object_name = 'muh'

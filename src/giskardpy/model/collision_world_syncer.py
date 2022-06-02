@@ -514,7 +514,7 @@ class CollisionWorldSynchronizer(object):
             if collision_entry.group1 != collision_entry.ALL and collision_entry.group1 not in self.world.groups:
                 raise UnknownGroupException(f'group1 \'{collision_entry.group1}\' unknown.')
             if collision_entry.group2 != collision_entry.ALL and collision_entry.group2 not in self.world.groups:
-                raise UnknownGroupException(f'group2 \'{collision_entry.group1}\' unknown.')
+                raise UnknownGroupException(f'group2 \'{collision_entry.group2}\' unknown.')
 
         for i, ce in enumerate(reversed(collision_goals)):
             if self.is_avoid_all_collision(ce):

@@ -548,7 +548,7 @@ class GiskardWrapper(object):
                 pose: PoseStamped,
                 parent_link: str = '',
                 parent_link_group: str = '',
-                timeout: float = 0) -> UpdateWorldResponse:
+                timeout: float = 1) -> UpdateWorldResponse:
         """
         Adds a new box to the world tree and attaches it to 'parent_link_group'/'parent_link'.
         If 'parent_link_group' and 'parent_link' are empty, the box will be attached to the world root link

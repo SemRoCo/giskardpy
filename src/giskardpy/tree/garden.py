@@ -205,8 +205,6 @@ class TreeManager:
     def __init__(self, god_map, tree=None):
         self.god_map = god_map
         self.action_server_name = self.god_map.get_data(identifier.action_server_name)
-        world = WorldTree(self.god_map)
-        world.delete_all_but_robot()
 
         # collision_checker = self.god_map.get_data(identifier.collision_checker)
         # if collision_checker == CollisionChecker.:

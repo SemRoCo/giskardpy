@@ -7,7 +7,7 @@ from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from utils_for_tests import PR2, HSR, compare_poses
+from utils_for_tests import TestPR2, HSR, compare_poses
 
 
 @pytest.fixture(scope='module')
@@ -20,8 +20,8 @@ def giskard(request, ros):
 @pytest.fixture()
 def box_setup(zero_pose):
     """
-    :type pocky_pose_setup: PR2
-    :rtype: PR2
+    :type pocky_pose_setup: TestPR2
+    :rtype: TestPR2
     """
     p = PoseStamped()
     p.header.frame_id = 'map'

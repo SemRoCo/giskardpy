@@ -11,17 +11,4 @@ if __name__ == '__main__':
     rospy.init_node('giskard')
     check_dependencies()
     giskard = PR2()
-    giskard.plugin_config['SyncTfFrames'] = {
-        'frames': [['map', 'odom_combined']]
-    }
-    giskard.plugin_config['SyncOdometry'] = {
-        'odometry_topic': '/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint'
-    }
-    giskard.follow_joint_trajectory_interfaces = [
-        FollowJointTrajectoryInterface(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
-                                       state_topic='/pr2/whole_body_controller/state')
-    ]
-    giskard.drive_interface = OmniDriveCmdVelInterface(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
-                                                       parent_link_name='odom_combined',
-                                                       child_link_name='base_footprint')
     giskard.live()

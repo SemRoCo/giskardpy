@@ -68,7 +68,7 @@ class GiskardConfig:
     test_mode: bool = False
     debug: bool = False
     tree_tick_rate: float = 0.1
-    collision_checker: CollisionCheckerLib = CollisionCheckerLib.none
+    collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
     external_collision_avoidance: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
     self_collision_avoidance: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
     add_self_collisions: List[str] = []
@@ -96,10 +96,10 @@ class GiskardConfig:
         },
         'VisualizationBehavior': {
             'enabled': True,
-            'in_planning_loop': True
+            'in_planning_loop': False
         },
         'CollisionMarker': {
-            'enabled': False,
+            'enabled': True,
             'in_planning_loop': False
         },
         'PlotTrajectory': {

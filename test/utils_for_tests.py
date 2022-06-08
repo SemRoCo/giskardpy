@@ -29,6 +29,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
 from giskardpy.configs.default_config import GiskardConfig
+from giskardpy.configs.pr2 import PR2
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -400,13 +401,16 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
-        rospy.set_param('~config', config_file)
-        rospy.set_param('~test', True)
+        # rospy.set_param('~config', config_file)
+        # rospy.set_param('~test', True)
 
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
-        self.tree = TreeManager.from_param_server()
+        self.giskard = PR2()
+        self.giskard.grow()
+        self.tree = self.giskard.tree
+        # self.tree = TreeManager.from_param_server()
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
@@ -1034,7 +1038,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.teleport_base(p)
 
 
-class PR2(GiskardTestWrapper):
+class TestPR2(GiskardTestWrapper):
     default_pose = {'r_elbow_flex_joint': -0.15,
                     'r_forearm_roll_joint': 0,
                     'r_shoulder_lift_joint': 0,
@@ -1151,7 +1155,7 @@ class PR2(GiskardTestWrapper):
                             root_link_name='r_wrist_roll_link')
 
 
-class PR2CloseLoop(PR2):
+class TestPR2CloseLoop(TestPR2):
 
     def __init__(self):
         self.r_tip = 'r_gripper_tool_frame'

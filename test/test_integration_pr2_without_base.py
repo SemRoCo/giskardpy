@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped
 
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init, lookup_pose
-from utils_for_tests import PR2
+from utils_for_tests import TestPR2
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -124,7 +124,7 @@ def ros(request):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    c = PR2()
+    c = TestPR2()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -132,7 +132,7 @@ def giskard(request, ros):
 @pytest.fixture()
 def resetted_giskard(giskard):
     """
-    :type giskard: PR2
+    :type giskard: TestPR2
     """
     logging.loginfo('resetting giskard')
     giskard.clear_world()
@@ -142,7 +142,7 @@ def resetted_giskard(giskard):
 @pytest.fixture()
 def zero_pose(resetted_giskard):
     """
-    :type giskard: PR2
+    :type giskard: TestPR2
     """
     resetted_giskard.set_joint_goal(default_pose)
     resetted_giskard.allow_all_collisions()
@@ -161,8 +161,8 @@ def pocky_pose_setup(resetted_giskard):
 @pytest.fixture()
 def box_setup(pocky_pose_setup):
     """
-    :type pocky_pose_setup: PR2
-    :rtype: PR2
+    :type pocky_pose_setup: TestPR2
+    :rtype: TestPR2
     """
     p = PoseStamped()
     p.header.frame_id = 'map'
@@ -177,8 +177,8 @@ def box_setup(pocky_pose_setup):
 @pytest.fixture()
 def fake_table_setup(zero_pose):
     """
-    :type zero_pose: PR2
-    :rtype: PR2
+    :type zero_pose: TestPR2
+    :rtype: TestPR2
     """
     p = PoseStamped()
     p.header.frame_id = 'map'
@@ -210,7 +210,7 @@ class TestJointGoals(object):
 
     def test_joint_movement1(self, zero_pose):
         """
-        :type zero_pose: PR2
+        :type zero_pose: TestPR2
         """
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)

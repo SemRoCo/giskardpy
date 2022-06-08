@@ -13,7 +13,7 @@ from giskardpy import identifier
 
 import rospy
 from giskardpy.utils.tfwrapper import init as tf_init
-from utils_for_tests import PR2
+from utils_for_tests import TestPR2
 from giskardpy.model.pybullet_wrapper import stop_pybullet
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
@@ -81,7 +81,7 @@ def ros():
 
 @pytest.fixture(scope='function')
 def giskard(ros):
-    c = PR2()
+    c = TestPR2()
     yield c
     tree_manager = c.god_map.get_data(identifier.tree_manager)
     tree_manager.get_node('pybullet updater').srv_update_world.shutdown()
@@ -99,7 +99,7 @@ def giskard(ros):
 @pytest.fixture()
 def zero_pose(giskard):
     """
-    :type giskard: PR2
+    :type giskard: TestPR2
     """
     giskard.allow_all_collisions()
     giskard.send_and_check_joint_goal(default_pose)

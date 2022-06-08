@@ -93,9 +93,9 @@ plugins:
         range: 0.05
     narrow:
       movement:
-        planner: ['InformedRRTstar', 'RRTConnect', 'ABITstar'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        planner: ['EST', 'InformedRRTstar', 'RRTConnect', 'ABITstar'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
         motion_validator: ['discrete', 'rays'] # sublist of ['rays', 'box', 'discrete']
-        time: 30
+        time: 15
         range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True

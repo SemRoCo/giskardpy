@@ -1430,7 +1430,7 @@ def verify_ompl_navigation_solution(setup, debug=False):
 
 
 def allocGiskardValidStateSample(si):
-    return GiskardValidStateSample(si)  # ob.GaussianValidStateSampler(si)
+    return ob.BridgeTestValidStateSampler(si)
 
 class GiskardValidStateSample(ob.ValidStateSampler):
     def __init__(self, si):
@@ -2054,6 +2054,7 @@ class OMPLPlanner(object):
         self.verify_solution_f = verify_solution_f
         self.dist = dist
         self._planner_solve_params = dict()
+        self._bidirectional_planner_names = ['RRTConnect', 'BFMT', 'SBL']
         self._planner_solve_params['kABITstar'] = {
             'slow_without_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5,
                                                    max_initial_iterations=1,
@@ -2406,7 +2407,7 @@ class MovementPlanner(OMPLPlanner):
             self.motion_validator = self.motion_validator_class(self.collision_scene, self.tip_link, self.robot,
                                                                 self.collision_checker, self.god_map, js=js)
             si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, self.motion_validator))
-
+        si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(allocGiskardValidStateSample))
         si.setup()
 
         self.start = self.get_start_state(self.space)
@@ -2497,32 +2498,33 @@ class NarrowMovementPlanner(MovementPlanner):
         self.reversed_start_and_goal = False
 
     def recompute_start_and_goal(self, start, goal):
-        si = self.setup.getSpaceInformation()
-        st = ob.State(self.space)
-        goal_space_n = 0
-        start_space_n = 0
-        goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, start, goal)
-        for i in range(0, 10):
-            goal_space.sampleGoal(st())
-            if si.isValid(st()):
-                goal_space_n += 1
-        start_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, goal, start)
-        for j in range(0, 10):
-            start_space.sampleGoal(st())
-            if si.isValid(st()):
-                start_space_n += 1
-        # Set Goal Space instead of goal state
-        goal_state = self.setup.getGoal().getState()
-        if start_space_n > goal_space_n:
-            self.reversed_start_and_goal = True
-            self.setup.setStartState(goal)
-            goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, goal_state, start(),
-                                           sampling_axis=self.sampling_goal_axis)
-        else:
-            goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, start(), goal_state,
-                                           sampling_axis=self.sampling_goal_axis)
-        goal_space.setThreshold(0.01)
-        self.setup.setGoal(goal_space)
+        if self.planner_name not in self._bidirectional_planner_names:
+            si = self.setup.getSpaceInformation()
+            st = ob.State(self.space)
+            goal_space_n = 0
+            start_space_n = 0
+            goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, start, goal)
+            for i in range(0, 10):
+                goal_space.sampleGoal(st())
+                if si.isValid(st()):
+                    goal_space_n += 1
+            start_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, goal, start)
+            for j in range(0, 10):
+                start_space.sampleGoal(st())
+                if si.isValid(st()):
+                    start_space_n += 1
+            # Set Goal Space instead of goal state
+            goal_state = self.setup.getGoal().getState()
+            if start_space_n > goal_space_n:
+                self.reversed_start_and_goal = True
+                self.setup.setStartState(goal)
+                goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, goal_state, start(),
+                                               sampling_axis=self.sampling_goal_axis)
+            else:
+                goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, start(), goal_state,
+                                               sampling_axis=self.sampling_goal_axis)
+            goal_space.setThreshold(0.01)
+            self.setup.setGoal(goal_space)
 
     def create_goal_specific_space(self, padding=0.2):
 

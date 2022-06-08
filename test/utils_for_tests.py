@@ -32,6 +32,7 @@ from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
+from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
@@ -592,17 +593,19 @@ class GiskardTestWrapper(GiskardWrapper):
                                max_velocity=angular_velocity,
                                check=check)
 
-    def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None, check=True,
+                          **kwargs: goal_parameter):
         super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
                                                           goal_point=goal_point,
                                                           root_link=root_link,
                                                           pointing_axis=pointing_axis,
                                                           weight=weight)
-        self.add_goal_check(PointingGoalChecker(self.god_map,
-                                                tip_link=tip_link,
-                                                goal_point=goal_point,
-                                                root_link=root_link if root_link else self.get_robot_root_link(),
-                                                pointing_axis=pointing_axis))
+        if check:
+            self.add_goal_check(PointingGoalChecker(self.god_map,
+                                                    tip_link=tip_link,
+                                                    goal_point=goal_point,
+                                                    root_link=root_link if root_link else self.get_robot_root_link(),
+                                                    pointing_axis=pointing_axis))
 
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
                               weight=None, check=True):
@@ -1300,6 +1303,7 @@ class Boxy(GiskardTestWrapper):
         self.camera_tip = 'camera_link'
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
+        self.r_gripper_group = 'r_gripper'
         if config is None:
             super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml')
         else:
@@ -1320,6 +1324,7 @@ class Boxy(GiskardTestWrapper):
     def reset(self):
         self.clear_world()
         self.reset_base()
+        self.register_group(self.r_gripper_group, self.get_robot_name(), 'right_arm_7_link')
 
 
 class BoxyCloseLoop(Boxy):

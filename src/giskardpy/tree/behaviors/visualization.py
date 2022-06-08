@@ -17,6 +17,7 @@ class VisualizationBehavior(GiskardBehavior):
 
     @profile
     def update(self):
+        # print('hi')
         markers = []
         time_stamp = rospy.Time()
         links = self.world.link_names_with_collisions

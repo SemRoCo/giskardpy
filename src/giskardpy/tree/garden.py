@@ -11,6 +11,7 @@ from sortedcontainers import SortedList
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
+from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
@@ -207,21 +208,21 @@ class TreeManager:
         world = WorldTree(self.god_map)
         world.delete_all_but_robot()
 
-        collision_checker = self.god_map.get_data(identifier.collision_checker)
-        if collision_checker == 'bpb':
-            logging.loginfo('Using bpb for collision checking.')
-            from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-            collision_scene = BetterPyBulletSyncer(world)
-        elif collision_checker == 'pybullet':
-            logging.loginfo('Using pybullet for collision checking.')
-            from giskardpy.model.pybullet_syncer import PyBulletSyncer
-            collision_scene = PyBulletSyncer(world)
-        else:
-            logging.logwarn('Unknown collision checker {}. Collision avoidance is disabled'.format(collision_checker))
-            from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-            collision_scene = CollisionWorldSynchronizer(world)
-            self.god_map.set_data(identifier.collision_checker, None)
-        self.god_map.set_data(identifier.collision_scene, collision_scene)
+        # collision_checker = self.god_map.get_data(identifier.collision_checker)
+        # if collision_checker == CollisionChecker.:
+        #     logging.loginfo('Using bpb for collision checking.')
+        #     from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
+        #     collision_scene = BetterPyBulletSyncer(world)
+        # elif collision_checker == 'pybullet':
+        #     logging.loginfo('Using pybullet for collision checking.')
+        #     from giskardpy.model.pybullet_syncer import PyBulletSyncer
+        #     collision_scene = PyBulletSyncer(world)
+        # else:
+        #     logging.logwarn(f'Unknown collision checker {collision_checker}. Collision avoidance is disabled')
+        #     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+        #     collision_scene = CollisionWorldSynchronizer(world)
+        #     self.god_map.set_data(identifier.collision_checker, None)
+        # self.god_map.set_data(identifier.collision_scene, collision_scene)
 
         if tree is None:
             self.tree = BehaviourTree(self.grow_giskard())
@@ -229,7 +230,7 @@ class TreeManager:
         else:
             self.tree = tree
         self.tree_nodes = {}
-        collision_scene.reset_collision_blacklist()
+        self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
         self.render()
@@ -517,7 +518,8 @@ class OpenLoop(TreeManager):
                                                              self.god_map.unsafe_get_data(identifier.robot_group_name)))
         sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        sync.add_child(running_is_success(SyncOdometry)('sync odometry', odometry_topic='pr2/base_footprint'))
+        sync.add_child(running_is_success(SyncOdometry)('sync odometry',
+                                                        **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -580,19 +582,19 @@ class OpenLoop(TreeManager):
                 and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_3.add_child(running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
         if self.god_map.get_data(identifier.enable_CPIMarker) \
-                and self.god_map.get_data(identifier.collision_checker) is not None \
+                and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
                 and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
             planning_3.add_child(running_is_success(CollisionMarker)('collision marker'))
         return planning_3
 
     def grow_planning4(self):
         planning_4 = PluginBehavior('planning IV')
-        if self.god_map.get_data(identifier.collision_checker) is not None:
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_plugin(CollisionChecker('collision checker'))
+            if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+                planning_4.add_plugin(CollisionMarker('cpi marker'))
         if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_4.add_plugin(VisualizationBehavior('visualization'))
-        if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            planning_4.add_plugin(CollisionMarker('cpi marker'))
         planning_4.add_plugin(ControllerPlugin('controller'))
         planning_4.add_plugin(KinSimPlugin('kin sim'))
         planning_4.add_plugin(LogTrajPlugin('log'))
@@ -616,7 +618,8 @@ class OpenLoop(TreeManager):
         real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
                                                                        **self.god_map.unsafe_get_data(
                                                                            identifier.SyncTfFrames)))
-        real_time_tracking.add_plugin(SyncOdometry('sync odometry', odometry_topic='pr2/base_footprint'))
+        real_time_tracking.add_plugin(SyncOdometry('sync odometry',
+                                                   **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
         real_time_tracking.add_plugin(RosTime('time'))
         real_time_tracking.add_plugin(ControllerPlugin('base controller'))
         real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))

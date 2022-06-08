@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class CollisionChecker(Enum):
+class CollisionCheckerLib(Enum):
     bpb = 1
     pybullet = 2
     none = 3

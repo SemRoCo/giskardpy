@@ -95,6 +95,8 @@ GoalReached_window_size = plugins + ['GoalReached', 'window_size']
 
 TFPublisher = plugins + ['TFPublisher']
 
+SyncOdometry = plugins + ['SyncOdometry']
+
 SyncTfFrames = plugins + ['SyncTfFrames']
 SyncTfFrames_frames = SyncTfFrames + ['frames']
 

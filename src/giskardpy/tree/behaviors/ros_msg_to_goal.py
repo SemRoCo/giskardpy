@@ -12,6 +12,7 @@ import giskardpy.goals
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
 from giskardpy import casadi_wrapper as w
+from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
@@ -52,7 +53,8 @@ class RosMsgToGoal(GetGoal):
             raise_to_blackboard(e)
             traceback.print_exc()
             return Status.SUCCESS
-        self.parse_collision_entries(move_cmd.collisions)
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+            self.parse_collision_entries(move_cmd.collisions)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
 

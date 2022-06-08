@@ -1432,7 +1432,6 @@ def verify_ompl_navigation_solution(setup, debug=False):
 def allocGiskardValidStateSample(si):
     return GiskardValidStateSample(si)  # ob.GaussianValidStateSampler(si)
 
-
 class GiskardValidStateSample(ob.ValidStateSampler):
     def __init__(self, si):
         super(GiskardValidStateSample, self).__init__(si)
@@ -2466,16 +2465,20 @@ class MovementPlanner(OMPLPlanner):
         plt.close()
         dim = '3D' if self.is_3D else '2D'
         if self.verify_solution_f is not None:
-            verify = ' - FP: {}, Time: {}s'.format(
+            verify = 'FP: {} - Time: {}s'.format(
                 self.verify_solution_f(self.setup, debug=debug),
-                self.setup.getLastPlanComputationTime())
+                round(self.setup.getLastPlanComputationTime(), 5))
         else:
             verify = ''
+        path = self.setup.getSolutionPath()
+        path_cost = path.cost(self.optimization_objective).value()
+        cost = '- Cost: {}'.format(str(round(path_cost, 5)))
+        title = u'{} Path from {} in map\n{} {}'.format(dim, self.setup.getPlanner().getName(), verify, cost)
         fig, ax = plt.subplots()
         ax.plot(data[:, 1], data[:, 0])
         ax.invert_xaxis()
         ax.set(xlabel='y (m)', ylabel='x (m)',
-               title=u'{} Path in map{}'.format(dim, verify))
+               title=title)
         # ax = fig.gca(projection='2d')
         # ax.plot(data[:, 0], data[:, 1], '.-')
         plt.show()

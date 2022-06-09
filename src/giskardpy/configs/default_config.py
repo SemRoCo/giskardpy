@@ -13,6 +13,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.tree.garden import OpenLoop, ClosedLoop
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
+from giskardpy.utils.utils import resolve_ros_iris
 
 
 class QPSolverConfig:
@@ -61,7 +62,7 @@ class CollisionAvoidanceConfig:
 class GiskardConfig:
     control_mode: ControlModes = ControlModes.open_loop
     action_server_name: str = '~command'
-    path_to_data_folder: str = 'ros://giskardpy/data'
+    path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
     enable_gui: bool = False
     sample_period: float = 0.05
     map_frame: str = 'map'

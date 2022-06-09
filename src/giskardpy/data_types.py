@@ -86,7 +86,8 @@ class JointStates(defaultdict):
         for i, joint_name in enumerate(msg.name):
             joint_name = PrefixName(joint_name, prefix)
             sjs = _JointState(position=msg.position[i],
-                              velocity=msg.velocity[i] if msg.velocity else 0,
+                              # velocity=msg.velocity[i] if msg.velocity else 0,
+                              velocity=0,
                               acceleration=0,
                               jerk=0,
                               snap=0,

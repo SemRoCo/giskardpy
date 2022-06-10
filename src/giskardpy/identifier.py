@@ -100,6 +100,8 @@ SyncOdometry = plugins + ['SyncOdometry']
 SyncTfFrames = plugins + ['SyncTfFrames']
 SyncTfFrames_frames = SyncTfFrames + ['frames']
 
+PublishDebugExpressions = plugins + ['PublishDebugExpressions']
+
 # reachability check
 reachability_check = giskard + ['reachability_check']
 rc_sample_period = reachability_check + ['sample_period']

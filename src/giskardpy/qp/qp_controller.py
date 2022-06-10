@@ -184,7 +184,8 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < min(v.order, self.order) - 1 and self.prediction_horizon > 2:  # and False:
+                    if t == self.prediction_horizon - 1 and o < min(v.order,
+                                                                    self.order) - 1 and self.prediction_horizon > 2:  # and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
                     else:
@@ -220,7 +221,9 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.lower_velocity_limit * self.sample_period
+                    result[f't{t:03}/{c.name}'] = w.limit(c.lower_velocity_limit[t] * self.sample_period,
+                                                          -c.velocity_limit * self.sample_period,
+                                                          c.velocity_limit * self.sample_period)
         return result
 
     def get_upper_constraint_velocities(self):
@@ -228,21 +231,23 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.upper_velocity_limit * self.sample_period
+                    result[f't{t:03}/{c.name}'] = w.limit(c.upper_velocity_limit[t] * self.sample_period,
+                                                          -c.velocity_limit * self.sample_period,
+                                                          c.velocity_limit * self.sample_period)
         return result
 
     @memoize
     def get_lower_constraint_error(self):
-        return {'{}/e'.format(c.name): w.limit(c.lower_error,
-                                                        -c.velocity_limit * self.sample_period * c.control_horizon,
-                                                        c.velocity_limit * self.sample_period * c.control_horizon)
+        return {f'{c.name}/e': w.limit(c.lower_error,
+                                       -c.velocity_limit * self.sample_period * c.control_horizon,
+                                       c.velocity_limit * self.sample_period * c.control_horizon)
                 for c in self.constraints}
 
     @memoize
     def get_upper_constraint_error(self):
-        return {'{}/e'.format(c.name): w.limit(c.upper_error,
-                                                        -c.velocity_limit * self.sample_period * c.control_horizon,
-                                                        c.velocity_limit * self.sample_period * c.control_horizon)
+        return {f'{c.name}/e': w.limit(c.upper_error,
+                                       -c.velocity_limit * self.sample_period * c.control_horizon,
+                                       c.velocity_limit * self.sample_period * c.control_horizon)
                 for c in self.constraints}
 
     def __call__(self) -> tuple:
@@ -252,10 +257,12 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
-                    lb['t{:03d}/{}/p_limit'.format(t, v.position_name)] = w.round_up(v.get_lower_limit(0) - v.get_symbol(0),
-                                                                                     self.round_to2)
-                    ub['t{:03d}/{}/p_limit'.format(t, v.position_name)] = w.round_down(v.get_upper_limit(0) - v.get_symbol(0),
-                                                                                       self.round_to2)
+                    lb['t{:03d}/{}/p_limit'.format(t, v.position_name)] = w.round_up(
+                        v.get_lower_limit(0) - v.get_symbol(0),
+                        self.round_to2)
+                    ub['t{:03d}/{}/p_limit'.format(t, v.position_name)] = w.round_down(
+                        v.get_upper_limit(0) - v.get_symbol(0),
+                        self.round_to2)
 
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
@@ -287,7 +294,8 @@ class BA(Parent):
 
 
 class A(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order, time_collector):
+    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
+                 time_collector):
         super(A, self).__init__(sample_period, prediction_horizon, order, time_collector)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
@@ -443,6 +451,10 @@ class A(Parent):
         A_soft[vertical_offset:next_vertical_offset, :J_vel_limit_block.shape[1]] = J_vel_limit_block
         I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
         A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - J_err.shape[0]:-J_err.shape[0]] = I
+        # if J_err.shape[0] > 0:
+        #     A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - J_err.shape[0]:-J_err.shape[0]] = I
+        # else:
+        #     A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
         # delete rows if control horizon of constraint shorter than prediction horizon
         rows_to_delete = []
         for t in range(self.prediction_horizon):
@@ -461,23 +473,24 @@ class A(Parent):
                     columns_to_delete.append(index)
 
         # J stack for total error
-        J_hstack = w.hstack([J_err for _ in range(self.prediction_horizon)])
-        vertical_offset = next_vertical_offset
-        next_vertical_offset = vertical_offset + J_hstack.shape[0]
-        # set jacobian entry to 0 if control horizon shorter than prediction horizon
-        for i, c in enumerate(self.constraints):
-            # offset = vertical_offset + i
-            J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
-        A_soft[vertical_offset:next_vertical_offset, :J_hstack.shape[1]] = J_hstack
+        if len(self.constraints) > 0:
+            J_hstack = w.hstack([J_err for _ in range(self.prediction_horizon)])
+            vertical_offset = next_vertical_offset
+            next_vertical_offset = vertical_offset + J_hstack.shape[0]
+            # set jacobian entry to 0 if control horizon shorter than prediction horizon
+            for i, c in enumerate(self.constraints):
+                # offset = vertical_offset + i
+                J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
+            A_soft[vertical_offset:next_vertical_offset, :J_hstack.shape[1]] = J_hstack
 
-        # sum of vel slack for total error
-        # I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
-        #            w.eye(J_hstack.shape[0])) * self.sample_period
-        # A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
-        # TODO multiply with control horizon instead?
-        # extra slack variable for total error
-        I = w.eye(J_hstack.shape[0]) * self.sample_period * self.prediction_horizon
-        A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
+            # sum of vel slack for total error
+            # I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
+            #            w.eye(J_hstack.shape[0])) * self.sample_period
+            # A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
+            # TODO multiply with control horizon instead?
+            # extra slack variable for total error
+            I = w.eye(J_hstack.shape[0]) * self.sample_period * self.prediction_horizon
+            A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
 
         # delete rows with position limits of continuous joints
         continuous_joint_indices = [i for i, v in enumerate(self.free_variables) if not v.has_position_limits()]
@@ -634,7 +647,7 @@ class QPController:
     def _are_joint_limits_violated(self, error_message):
         violations = (self.p_ub - self.p_lb)[self.p_lb.data > self.p_ub.data]
         if len(violations) > 0:
-            error_message += '\nThe following joints are outside of their limits: \n {}'.format(violations)
+            error_message += f'\nThe following joints are outside of their limits: \n {violations}'
             raise OutOfJointLimitsException(error_message)
         logging.loginfo('All joints are within limits')
         return False
@@ -675,15 +688,27 @@ class QPController:
                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
                         '../tmp_data')
 
-    def __is_nan_in_array(self, name, p_array):
-        p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
-        p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
-        if len(p_filtered) > 0:
-            logging.logerr('{} has the following nans:'.format(name))
-            self.__print_pandas_array(p_filtered)
-            return True
-        logging.loginfo('{} has no nans'.format(name))
-        return False
+    def _is_inf_in_data(self):
+        logging.logerr(f'The following weight entries contain inf:\n'
+                       f'{self.p_weights[self.p_weights == np.inf].dropna()}')
+        logging.logerr(f'The following lbA entries contain inf:\n'
+                       f'{self.p_lbA[self.p_lbA == np.inf].dropna()}')
+        logging.logerr(f'The following ubA entries contain inf:\n'
+                       f'{self.p_ubA[self.p_ubA == np.inf].dropna()}')
+        logging.logerr(f'The following lb entries contain inf:\n'
+                       f'{self.p_lb[self.p_lb == np.inf].dropna()}')
+        logging.logerr(f'The following ub entries contain inf:\n'
+                       f'{self.p_ub[self.p_ub == np.inf].dropna()}')
+        if len(self.p_A[self.p_A == np.inf].dropna()) > 0:
+            logging.logerr(f'A contains inf')
+        # p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
+        # p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
+        # if len(p_filtered) > 0:
+        #     logging.logerr('{} has the following nans:'.format(name))
+        #     self.__print_pandas_array(p_filtered)
+        #     return True
+        # logging.loginfo('{} has no nans'.format(name))
+        return True
 
     def __print_pandas_array(self, array):
         import pandas as pd
@@ -796,6 +821,7 @@ class QPController:
         :return: joint name -> joint command
         :rtype: [list, dict]
         """
+        self.substitutions = substitutions
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
         self.np_weights = np_big_ass_M[self.A.height, :-2]
         self.np_A = np_big_ass_M[:self.A.height, :self.A.width]
@@ -823,6 +849,7 @@ class QPController:
             self._are_joint_limits_violated(str(e_original))
             self._is_close_to_joint_limits()
             self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
+            self._is_inf_in_data()
             # if isinstance(e, QPSolverException):
             # FIXME
             #     arrays = [(p_weights, 'H'),
@@ -841,6 +868,7 @@ class QPController:
             return None
         # for debugging to might want to execute this line to create named panda matrices
         # self._create_debug_pandas(substitutions)
+        # logging.loginfo(self.p_debug)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
@@ -944,7 +972,8 @@ class QPController:
         plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self, substitutions):
+    def _create_debug_pandas(self):
+        substitutions = self.substitutions
         self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.state[str(self.sample_period)]

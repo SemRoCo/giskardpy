@@ -1140,14 +1140,16 @@ class TestConstraints(object):
 class TestCartGoals(object):
     def test_move_base(self, zero_pose: TestPR2):
         map_T_odom = PoseStamped()
-        map_T_odom.pose.position.x = 1
-        map_T_odom.pose.position.y = 1
+        # map_T_odom.pose.position.x = 1
+        # map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
         zero_pose.set_localization(map_T_odom)
 
+        # zero_pose.set_prediction_horizon(1)
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
-        base_goal.pose.position.x = 1
+        # base_goal.pose.position.x = 2
+        # base_goal.pose.position.y = -1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi/5, [0, 0, 1]))
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()

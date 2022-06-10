@@ -314,7 +314,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
             axs[i].grid()
 
         file_name = path_to_data_folder + file_name
-        last_file_name = file_name.replace('.pdf', '{}.pdf'.format(history))
+        last_file_name = file_name.replace('.pdf', f'{history}.pdf')
 
         if os.path.isfile(file_name):
             if os.path.isfile(last_file_name):
@@ -323,13 +323,14 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
                 if i == 1:
                     previous_file_name = file_name
                 else:
-                    previous_file_name = file_name.replace('.pdf', '{}.pdf'.format(i - 1))
-                current_file_name = file_name.replace('.pdf', '{}.pdf'.format(i))
+                    previous_file_name = file_name.replace('.pdf', f'{i-1}.pdf')
+                current_file_name = file_name.replace('.pdf', f'{i}.pdf')
                 try:
                     os.rename(previous_file_name, current_file_name)
                 except FileNotFoundError:
                     pass
         plt.savefig(file_name, bbox_inches="tight")
+        logging.loginfo(f'saved {file_name}')
 
 
 def resolve_ros_iris_in_urdf(input_urdf):

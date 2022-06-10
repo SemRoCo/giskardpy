@@ -176,17 +176,18 @@ class Goal:
     def add_constraints_of_goal(self, goal):
         self._sub_goals.append(goal)
 
-    def add_velocity_constraint(self, name_suffix, velocity_limit, weight, expression,
-                                lower_slack_limit=-1e4, upper_slack_limit=1e4):
-
+    def add_velocity_constraint(self, lower_velocity_limit, upper_velocity_limit, weight, expression,
+                                velocity_limit, name_suffix=None, lower_slack_limit=-1e4, upper_slack_limit=1e4):
+        name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
         if name in self._velocity_constraints:
-            raise KeyError('a constraint with name \'{}\' already exists'.format(name))
+            raise KeyError(f'a constraint with name \'{name}\' already exists')
         self._velocity_constraints[name] = VelocityConstraint(name=name,
                                                               expression=expression,
-                                                              lower_velocity_limit=-velocity_limit,
-                                                              upper_velocity_limit=velocity_limit,
+                                                              lower_velocity_limit=lower_velocity_limit,
+                                                              upper_velocity_limit=upper_velocity_limit,
                                                               quadratic_weight=weight,
+                                                              velocity_limit=velocity_limit,
                                                               lower_slack_limit=lower_slack_limit,
                                                               upper_slack_limit=upper_slack_limit,
                                                               control_horizon=self.control_horizon)
@@ -282,6 +283,8 @@ class Goal:
     def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
         error = frame_P_goal[:3] - frame_P_current[:3]
         # self.add_debug_expr('error', w.norm(error))
+        self.add_debug_vector('goal', frame_P_goal[:3])
+        self.add_debug_vector('current', frame_P_current[:3])
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
@@ -294,12 +297,14 @@ class Goal:
     def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4,
                                          name_suffix=''):
         trans_error = w.norm(frame_P_current)
-        self.add_velocity_constraint(velocity_limit=max_velocity,
+        self.add_velocity_constraint(upper_velocity_limit=max_velocity,
+                                     lower_velocity_limit=-max_velocity,
                                      weight=weight,
                                      expression=trans_error,
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
-                                     name_suffix='{}/vel'.format(name_suffix))
+                                     velocity_limit=max_velocity,
+                                     name_suffix=f'{name_suffix}/vel')
         # if self._test_mode:
         #     # self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
         #     self.add_debug_expr('trans_error', trans_error)
@@ -351,12 +356,14 @@ class Goal:
     def add_rotational_velocity_limit(self, frame_R_current, max_velocity, weight, max_violation=1e4, name_suffix=''):
         root_Q_tipCurrent = w.quaternion_from_matrix(frame_R_current)
         angle_error = w.quaternion_angle(root_Q_tipCurrent)
-        self.add_velocity_constraint(velocity_limit=max_velocity,
+        self.add_velocity_constraint(upper_velocity_limit=max_velocity,
+                                     lower_velocity_limit=-max_velocity,
                                      weight=weight,
                                      expression=angle_error,
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
-                                     name_suffix='{}/q/vel'.format(name_suffix))
+                                     name_suffix='{}/q/vel'.format(name_suffix),
+                                     velocity_limit=max_velocity)
 
 
 def _prepend_prefix(prefix, d):

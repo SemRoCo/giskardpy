@@ -1,3 +1,4 @@
+from itertools import chain
 from time import time
 from typing import Dict
 
@@ -17,7 +18,7 @@ class InitQPController(GiskardBehavior):
     @catch_and_raise_to_blackboard
     def update(self):
         constraints, vel_constraints, debug_expressions = self.get_constraints_from_goals()
-        free_variables = self.get_active_free_symbols(constraints)
+        free_variables = self.get_active_free_symbols(constraints, vel_constraints)
 
         qp_controller = QPController(
             free_variables=free_variables,
@@ -53,10 +54,10 @@ class InitQPController(GiskardBehavior):
         self.get_god_map().set_data(identifier.debug_expressions, debug_expressions)
         return constraints, vel_constraints, debug_expressions
 
-    def get_active_free_symbols(self, constraints):
+    def get_active_free_symbols(self, constraints, vel_constraints):
         # fixme shoudn't this use vel constraints as well?
         symbols = set()
-        for c in constraints.values():
+        for c in chain(constraints.values(), vel_constraints.values()):
             symbols.update(str(s) for s in w.free_symbols(c.expression))
         free_variables = list(sorted([v for v in self.world.joint_constraints if v.position_name in symbols],
                                      key=lambda x: x.position_name))

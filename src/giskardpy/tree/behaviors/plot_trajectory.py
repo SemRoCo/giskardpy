@@ -11,10 +11,11 @@ from giskardpy.utils.utils import plot_trajectory
 class PlotTrajectory(GiskardBehavior):
     plot_thread: Thread
 
-    def __init__(self, name, enabled, wait=False, **kwargs):
+    def __init__(self, name, enabled, wait=False, joint_filter=None, **kwargs):
         super(PlotTrajectory, self).__init__(name)
         self.wait = wait
         self.kwargs = kwargs
+        self.joint_filter = joint_filter
         self.path_to_data_folder = self.get_god_map().get_data(identifier.data_folder)
 
     @profile
@@ -26,7 +27,10 @@ class PlotTrajectory(GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         if trajectory:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
-            controlled_joints = list(trajectory.get_exact(0).keys())
+            if self.joint_filter is not None:
+                controlled_joints = self.joint_filter
+            else:
+                controlled_joints = list(trajectory.get_exact(0).keys())
             try:
                 plot_trajectory(tj=trajectory,
                                 controlled_joints=controlled_joints,

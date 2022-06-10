@@ -36,6 +36,7 @@ from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.plugin_if import IF
+from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
@@ -520,7 +521,7 @@ class OpenLoop(TreeManager):
                                                         **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
-        sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
+        # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
 
     def grow_process_goal(self):
@@ -621,6 +622,9 @@ class OpenLoop(TreeManager):
         real_time_tracking.add_plugin(RosTime('time'))
         real_time_tracking.add_plugin(ControllerPlugin('base controller'))
         real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
+        if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
+            real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
+                                                               **self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)))
         for follow_joint_trajectory_config in action_servers:
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
         base_drive = self.god_map.get_data(identifier.robot_base_drive)

@@ -246,7 +246,7 @@ class GiskardWrapper(object):
                            weight=weight,
                            **kwargs)
 
-    def set_prediction_horizon(self, prediction_horizon: float, **kwargs: goal_parameter):
+    def set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
         self.set_json_goal(constraint_type='SetPredictionHorizon',
                            prediction_horizon=prediction_horizon,
                            **kwargs)

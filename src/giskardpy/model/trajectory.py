@@ -4,6 +4,7 @@ from typing import List
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from giskardpy.data_types import JointStates
 from giskardpy.model.joints import Joint
 
 
@@ -17,7 +18,7 @@ class Trajectory(object):
     def get_exact(self, time):
         return self._points[time]
 
-    def set(self, time, point):
+    def set(self, time, point: JointStates):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:
             raise KeyError('Cannot append a trajectory point that is before the current end time of the trajectory.')
         self._points[time] = point
@@ -40,9 +41,10 @@ class Trajectory(object):
     def values(self):
         return self._points.values()
 
-    def to_msg(self, sample_period: float, joints: List[Joint], fill_velocity_values: bool = True) -> JointTrajectory:
+    def to_msg(self, sample_period: float, start_time: rospy.Duration, joints: List[Joint],
+               fill_velocity_values: bool = True) -> JointTrajectory:
         trajectory_msg = JointTrajectory()
-        trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+        trajectory_msg.header.stamp = start_time
         trajectory_msg.joint_names = []
         for i, (time, traj_point) in enumerate(self.items()):
             p = JointTrajectoryPoint()

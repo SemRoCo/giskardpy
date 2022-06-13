@@ -43,6 +43,7 @@ from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
+from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
@@ -652,6 +653,7 @@ class OpenLoop(TreeManager):
         if add_real_time_tracking:
             move_robot.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
             move_robot.add_child(InitQPController('InitQPController for base'))
+        move_robot.add_child(SetTrackingStartTime('start start time'))
         move_robot.add_child(publish_result)
         return move_robot
 

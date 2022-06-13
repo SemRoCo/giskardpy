@@ -340,6 +340,21 @@ class TestConstraints(object):
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
 
+    def test_JointVelocityRevolute(self, zero_pose: TestPR2):
+        joint = 'r_shoulder_lift_joint'
+        joint_goal = 1
+        zero_pose.allow_all_collisions()
+        zero_pose.set_json_goal('JointVelocityRevolute',
+                                joint_name=joint,
+                                max_velocity=0.5,
+                                hard=True)
+        zero_pose.set_json_goal('JointPositionRevolute',
+                                joint_name=joint,
+                                goal=joint_goal,
+                                max_velocity=0.5)
+        zero_pose.plan_and_execute()
+        np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
+
     def test_JointPositionContinuous(self, zero_pose: TestPR2):
         joint = 'odom_z_joint'
         joint_goal = 4

@@ -9,12 +9,14 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 class RealKinSimPlugin(GiskardBehavior):
     last_time: rospy.Time()
 
-    def __init__(self, name):
+    def initialise(self):
         self.last_time = None
-        super().__init__(name)
+        self.start_time = self.god_map.get_data(identifier.tracking_start_time)
 
     @profile
     def update(self):
+        if self.start_time > rospy.get_rostime():
+            return Status.RUNNING
         if self.last_time is None:
             self.last_time = rospy.get_rostime()
         next_cmds = self.god_map.get_data(identifier.qp_solver_solution)

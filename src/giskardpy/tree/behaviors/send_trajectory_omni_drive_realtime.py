@@ -87,15 +87,19 @@ class OmniDriveCmdVel(SendTrajectoryClosedLoop):
         super().initialise()
         self.trajectory = self.get_god_map().get_data(identifier.trajectory)
         sample_period = self.god_map.unsafe_get_data(identifier.sample_period)
-        self.trajectory = self.trajectory.to_msg(sample_period, [self.joint], True)
-        self.start_time = self.trajectory.header.stamp
+        self.start_time = self.god_map.unsafe_get_data(identifier.tracking_start_time)
+        self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
         self.end_time = self.start_time + self.trajectory.points[-1].time_from_start
         # self.update_thread = Thread(target=self.worker)
         # self.update_thread.start()
 
     @catch_and_raise_to_blackboard
     def update(self):
-        if rospy.get_rostime() < self.end_time:
+        t = rospy.get_rostime()
+        if self.start_time > t:
+            self.vel_pub.publish(Twist())
+            return Status.RUNNING
+        if t <= self.end_time:
             cmd = self.god_map.get_data(identifier.qp_solver_solution)
             twist = Twist()
             twist.linear.x = 0#cmd[0][self.joint.x_vel.position_name]

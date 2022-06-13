@@ -32,6 +32,7 @@ cmd_id = ['cmd_id']
 post_processing = ['post_processing']
 soft_constraints = post_processing + ['soft_constraints']
 result_message = ['result_message']
+tracking_start_time = ['tracking_start_time']
 
 # stuff from rosparam
 robot_description = ['robot_description']

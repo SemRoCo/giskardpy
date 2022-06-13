@@ -509,7 +509,7 @@ class OmniDrive(Joint):
                 vel = new_cmds[0][free_variable.position_name]
             except KeyError as e:
                 # joint is currently not part of the optimization problem
-                return
+                continue
             world.state[free_variable.name].velocity = vel
             if len(new_cmds) >= 2:
                 acc = new_cmds[1][free_variable.position_name]

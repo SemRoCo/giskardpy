@@ -450,11 +450,10 @@ class A(Parent):
         next_vertical_offset = vertical_offset + J_vel_limit_block.shape[0]
         A_soft[vertical_offset:next_vertical_offset, :J_vel_limit_block.shape[1]] = J_vel_limit_block
         I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
-        A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - J_err.shape[0]:-J_err.shape[0]] = I
-        # if J_err.shape[0] > 0:
-        #     A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - J_err.shape[0]:-J_err.shape[0]] = I
-        # else:
-        #     A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
+        if J_err.shape[0] > 0:
+            A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - J_err.shape[0]:-J_err.shape[0]] = I
+        else:
+            A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
         # delete rows if control horizon of constraint shorter than prediction horizon
         rows_to_delete = []
         for t in range(self.prediction_horizon):
@@ -867,7 +866,7 @@ class QPController:
         if self.xdot_full is None:
             return None
         # for debugging to might want to execute this line to create named panda matrices
-        # self._create_debug_pandas(substitutions)
+        # self._create_debug_pandas()
         # logging.loginfo(self.p_debug)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 

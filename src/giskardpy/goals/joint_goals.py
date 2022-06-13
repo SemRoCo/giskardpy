@@ -138,6 +138,63 @@ class JointPositionPrismatic(Goal):
         return f'{s}/{self.joint_name}'
 
 
+class JointVelocityRevolute(Goal):
+    def __init__(self, joint_name: str, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 1,
+                 hard: bool = False, **kwargs):
+        """
+        This goal will move a prismatic joint to the goal position
+        :param weight: default WEIGHT_BELOW_CA
+        :param max_velocity: m/s, default 4535, meaning the urdf/config limits are active
+        """
+        self.joint_name = joint_name
+        self.weight = weight
+        self.max_velocity = max_velocity
+        self.hard = hard
+        super().__init__(**kwargs)
+        if not self.world.is_joint_revolute(joint_name):
+            raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
+
+    def make_constraints(self):
+        current_joint = self.get_joint_position_symbol(self.joint_name)
+
+        # joint_goal = self.get_parameter_as_symbolic_expression('goal')
+        # weight = self.get_parameter_as_symbolic_expression('weight')
+
+        try:
+            # if self.world.is_joint_mimic(self.joint_name):
+            #     mimed_joint_name = self.world.joints[self.joint_name].mimed_joint_name
+            #     mimed_joint_symbol = self.get_joint_position_symbol(mimed_joint_name)
+            #     mimied_limit = self.world.joint_limit_expr(self.joint_name, 1)[1]
+            #     limit_expr = w.substitute(current_joint, mimed_joint_symbol, mimied_limit)
+            # else:
+            limit_expr = self.world.joint_limit_expr(self.joint_name, 1)[1]
+            max_velocity = w.min(self.get_parameter_as_symbolic_expression('max_velocity'),
+                                 limit_expr)
+        except IndexError:
+            max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
+
+        # error = joint_goal - current_joint
+
+        if self.hard:
+            self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
+                                         upper_velocity_limit=max_velocity,
+                                         weight=self.weight,
+                                         expression=current_joint,
+                                         velocity_limit=max_velocity,
+                                         lower_slack_limit=0,
+                                         upper_slack_limit=0)
+        else:
+            self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
+                                         upper_velocity_limit=max_velocity,
+                                         weight=self.weight,
+                                         expression=current_joint,
+                                         velocity_limit=max_velocity)
+
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.joint_name}'
+
+
 class JointPositionRevolute(Goal):
 
     def __init__(self, joint_name: str, goal: float, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 1,

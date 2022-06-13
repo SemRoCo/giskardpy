@@ -111,7 +111,9 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        goal.trajectory = trajectory.to_msg(sample_period, self.controlled_joints, self.fill_velocity_values)
+        start_time = self.god_map.get_data(identifier.tracking_start_time)
+        goal.trajectory = trajectory.to_msg(sample_period, start_time, self.controlled_joints,
+                                            self.fill_velocity_values)
         self.action_goal = goal
         deadline = self.action_goal.trajectory.header.stamp + \
                    self.action_goal.trajectory.points[-1].time_from_start + \

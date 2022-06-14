@@ -102,9 +102,18 @@ class OmniDriveCmdVel(SendTrajectoryClosedLoop):
         if t <= self.end_time:
             cmd = self.god_map.get_data(identifier.qp_solver_solution)
             twist = Twist()
-            twist.linear.x = 0#cmd[0][self.joint.x_vel.position_name]
-            twist.linear.y = 0#cmd[0][self.joint.y_vel.position_name]
-            twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
+            try:
+                twist.linear.x = cmd[0][self.joint.x_vel.position_name]
+            except:
+                twist.linear.x = 0
+            try:
+                twist.linear.y = cmd[0][self.joint.y_vel.position_name]
+            except:
+                twist.linear.y = 0
+            try:
+                twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
+            except:
+                twist.angular.z = 0
             # print(f'twist: {twist.linear.x:.4} {twist.linear.y:.4} {twist.angular.z:.4}')
             # print_dict(self.god_map.get_data(identifier.debug_expressions_evaluated))
             # print('-----------------')

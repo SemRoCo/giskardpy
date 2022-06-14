@@ -39,7 +39,7 @@ class BaseTrajFollower(Goal):
                                   b_result_cases=b_result_cases,
                                   else_result=self.x_symbol(self.trajectory_length - 1, free_variable_name, derivative))
 
-    def error_at(self, t: int):
+    def trans_error_at(self, t: int):
         odom_link = self.joint.parent_link_name
         base_footprint_link = self.joint.child_link_name
         x = self.current_traj_point(self.joint.x_name, t)
@@ -49,53 +49,86 @@ class BaseTrajFollower(Goal):
         map_T_odom = self.get_fk_evaluated(self.world.root_link_name, odom_link)
         map_T_base_footprint_goal = w.dot(map_T_odom, odom_T_base_footprint_goal)
         map_T_base_footprint_current = self.get_fk(self.world.root_link_name, base_footprint_link)
-        _, rotation_goal = w.axis_angle_from_matrix(map_T_base_footprint_goal)
-        axis_current, rotation_current = w.axis_angle_from_matrix(map_T_base_footprint_current)
+        self.add_debug_expr('x goal', map_T_base_footprint_goal[0,3])
+        self.add_debug_expr('y goal', map_T_base_footprint_goal[1,3])
+        self.add_debug_expr('rot', rot)
+        self.add_debug_expr('x current', map_T_base_footprint_current[0,3])
+        self.add_debug_expr('y current', map_T_base_footprint_current[1,3])
 
-        # rotation_goal = self.current_traj_point(self.joint.rot_name, t)
-        # rotation_current = self.joint.rot.get_symbol(0)
-        error = w.shortest_angular_distance(rotation_current, rotation_goal)/self.get_sampling_period_symbol()
-        return error
+        frame_P_goal = w.position_of(map_T_base_footprint_goal)
+        frame_P_current = w.position_of(map_T_base_footprint_current)
+        error = frame_P_goal[:3] - frame_P_current[:3]
+        error /= self.get_sampling_period_symbol()
+        # self.add_debug_expr('error', w.norm(error))
+        return error[0], error[1]
+        # self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
+        #                            lower_errors=error[:3],
+        #                            upper_errors=error[:3],
+        #                            weights=[weight] * 3,
+        #                            expressions=frame_P_current[:3],
+        #                            name_suffixes=['{}/x'.format(name_suffix),
+        #                                           '{}/y'.format(name_suffix),
+        #                                           '{}/z'.format(name_suffix)])
 
-    def make_constraints(self):
-        trajectory = self.god_map.get_data(identifier.trajectory)
-        self.trajectory_length = len(trajectory.items())
+    def add_trans_constraints(self):
+        # x
+        errors = []
+        for t in range(self.prediction_horizon):
+            if t == 0:
+                errors.append(self.trans_error_at(t)[0])
+            else:
+                errors.append(self.current_traj_point(self.joint.x_name, t * self.get_sampling_period_symbol(), 1))
+        self.add_velocity_constraint(lower_velocity_limit=errors,
+                                     upper_velocity_limit=errors,
+                                     weight=self.weight,
+                                     expression=self.joint.x_vel.get_symbol(0),
+                                     velocity_limit=0.5,
+                                     name_suffix='/x')
+        # y
+        errors = []
+        for t in range(self.prediction_horizon):
+            if t == 0:
+                errors.append(self.trans_error_at(t)[1])
+            else:
+                errors.append(self.current_traj_point(self.joint.y_name, t * self.get_sampling_period_symbol(), 1))
+        self.add_velocity_constraint(lower_velocity_limit=errors,
+                                     upper_velocity_limit=errors,
+                                     weight=self.weight,
+                                     expression=self.joint.y_vel.get_symbol(0),
+                                     velocity_limit=0.5,
+                                     name_suffix='/y')
+        self.add_debug_expr('ref x traj', self.current_traj_point(self.joint.x_name, 0, 0))
+        self.add_debug_expr('ref x vel traj/0', self.current_traj_point(self.joint.x_name, 0, 1))
+
+    def rot_error_at(self, t: int):
         # odom_link = self.joint.parent_link_name
         # base_footprint_link = self.joint.child_link_name
-        # x = self.current_traj_point(self.joint.x_name)
-        # y = self.current_traj_point(self.joint.y_name)
-        # rot = self.current_traj_point(self.joint.rot_name)
+        # x = self.current_traj_point(self.joint.x_name, t)
+        # y = self.current_traj_point(self.joint.y_name, t)
+        # rot = self.current_traj_point(self.joint.rot_name, t)
         # odom_T_base_footprint_goal = w.frame_from_x_y_rot(x, y, rot)
         # map_T_odom = self.get_fk_evaluated(self.world.root_link_name, odom_link)
         # map_T_base_footprint_goal = w.dot(map_T_odom, odom_T_base_footprint_goal)
         # map_T_base_footprint_current = self.get_fk(self.world.root_link_name, base_footprint_link)
-        # self.add_debug_expr('x goal', map_T_base_footprint_goal[0,3])
-        # self.add_debug_expr('y goal', map_T_base_footprint_goal[1,3])
-        # self.add_debug_expr('rot', rot)
-        # self.add_debug_expr('x current', map_T_base_footprint_current[0,3])
-        # self.add_debug_expr('y current', map_T_base_footprint_current[1,3])
-
-        # self.add_point_goal_constraints(frame_P_goal=w.position_of(map_T_base_footprint_goal),
-        #                                 frame_P_current=w.position_of(map_T_base_footprint_current),
-        #                                 reference_velocity=1,
-        #                                 weight=WEIGHT_ABOVE_CA)
-
         # _, rotation_goal = w.axis_angle_from_matrix(map_T_base_footprint_goal)
         # axis_current, rotation_current = w.axis_angle_from_matrix(map_T_base_footprint_current)
-        # a = self.joint.rot.get_symbol(0)
-        b = self.joint.rot_vel.get_symbol(0)
 
-        # error = w.shortest_angular_distance(rotation_current, rotation_goal)
+        rotation_goal = self.current_traj_point(self.joint.rot_name, t)
+        rotation_current = self.joint.rot.get_symbol(0)
+        error = w.shortest_angular_distance(rotation_current, rotation_goal)/self.get_sampling_period_symbol()
+        return error
+
+    def add_rot_constraints(self):
         errors = []
         for t in range(self.prediction_horizon):
             if t == 0:
-                errors.append(self.error_at(t))
+                errors.append(self.rot_error_at(t))
             else:
                 errors.append(self.current_traj_point(self.joint.rot_name, t*self.get_sampling_period_symbol(), 1))
         self.add_velocity_constraint(lower_velocity_limit=errors,
                                      upper_velocity_limit=errors,
                                      weight=self.weight,
-                                     expression=b,
+                                     expression=self.joint.rot_vel.get_symbol(0),
                                      velocity_limit=0.5,
                                      name_suffix='/rot')
         # self.add_constraint(reference_velocity=0.5,
@@ -110,12 +143,19 @@ class BaseTrajFollower(Goal):
         self.add_debug_expr('ref traj', self.current_traj_point(self.joint.rot_name, 0, 0))
         self.add_debug_expr('ref vel traj/0', self.current_traj_point(self.joint.rot_name, 0, 1))
         self.add_debug_expr('ref vel traj/1', self.current_traj_point(self.joint.rot_name, 1*self.get_sampling_period_symbol(), 1))
-        self.add_debug_expr('ref vel traj/2', self.current_traj_point(self.joint.rot_name, 2*self.get_sampling_period_symbol(), 1))
-        self.add_debug_expr('ref vel traj/3', self.current_traj_point(self.joint.rot_name, 3*self.get_sampling_period_symbol(), 1))
+        # self.add_debug_expr('ref vel traj/2', self.current_traj_point(self.joint.rot_name, 2*self.get_sampling_period_symbol(), 1))
+        # self.add_debug_expr('ref vel traj/3', self.current_traj_point(self.joint.rot_name, 3*self.get_sampling_period_symbol(), 1))
         self.add_debug_expr('time', self.god_map.to_expr(identifier.time))
         # self.add_debug_expr('ref acc traj', self.current_traj_point(self.joint.rot_name, 0, 2))
         # self.add_debug_expr('ref jerk traj', self.current_traj_point(self.joint.rot_name, 0, 3))
         # self.add_debug_vector('axis_current', axis_current)
+
+    def make_constraints(self):
+        trajectory = self.god_map.get_data(identifier.trajectory)
+        self.trajectory_length = len(trajectory.items())
+        # self.add_trans_constraints()
+        self.add_rot_constraints()
+
 
     def __str__(self):
         return f'{super().__str__()}/{self.joint_name}'

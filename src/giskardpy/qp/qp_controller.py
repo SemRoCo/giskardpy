@@ -844,7 +844,7 @@ class QPController:
                     logging.logerr('Relaxing hard constraints failed.')
             else:
                 logging.logwarn('Ran out of allowed retries with relaxed hard constraints.')
-            self._create_debug_pandas(substitutions)
+            self._create_debug_pandas()
             self._are_joint_limits_violated(str(e_original))
             self._is_close_to_joint_limits()
             self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)

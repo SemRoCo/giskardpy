@@ -1169,7 +1169,7 @@ class TestCartGoals(object):
         # base_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()
-        zero_pose.plan()
+        zero_pose.plan_and_execute()
 
     def test_rotate_gripper(self, zero_pose: TestPR2):
         r_goal = PoseStamped()

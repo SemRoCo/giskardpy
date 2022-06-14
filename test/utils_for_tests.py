@@ -673,7 +673,7 @@ class GiskardTestWrapper(GiskardWrapper):
             self.total_time_spend_giskarding += diff
             self.total_time_spend_moving += len(self.god_map.get_data(identifier.trajectory).keys()) * \
                                             self.god_map.get_data(identifier.sample_period)
-            logging.logwarn('Goal processing took {}'.format(diff))
+            logging.logwarn(f'Goal processing took {diff}')
             for cmd_id in range(len(r.error_codes)):
                 error_code = r.error_codes[cmd_id]
                 error_message = r.error_messages[cmd_id]

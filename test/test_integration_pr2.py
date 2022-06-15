@@ -1163,9 +1163,18 @@ class TestCartGoals(object):
         # zero_pose.set_prediction_horizon(1)
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
-        base_goal.pose.position.x = 1.5
+        # base_goal.pose.position.x = 1.5
+        # base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi/4, [0, 0, 1]))
+        # base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi/3, [0, 0, 1]))
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi/4, [0, 0, 1]))
         # base_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()

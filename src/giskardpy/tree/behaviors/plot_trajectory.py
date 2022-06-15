@@ -45,5 +45,5 @@ class PlotTrajectory(GiskardBehavior):
     @profile
     def update(self):
         if self.wait and self.plot_thread.is_alive():
-                return Status.RUNNING
+            return Status.RUNNING
         return Status.SUCCESS

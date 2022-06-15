@@ -15,7 +15,7 @@ from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.tree.behaviors.append_zero_velocity import AppendZeroVelocity
+from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.collision_marker import CollisionMarker
@@ -36,6 +36,7 @@ from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.plugin_if import IF
+from giskardpy.tree.behaviors.print_text import PrintText
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
@@ -417,16 +418,20 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                                  common.BlackBoxLevel.COMPONENT: "lawngreen",
                                  common.BlackBoxLevel.BIG_PICTURE: "white"
                                  }
-        if isinstance(node, Chooser):
+        node_type = type(node)
+        if hasattr(node, 'original'):
+            node_type = type(node.original)
+
+        if node_type == Chooser:
             attributes = ('doubleoctagon', 'cyan', 'black')  # octagon
-        elif isinstance(node, Selector):
+        elif node_type == Selector:
             attributes = ('octagon', 'cyan', 'black')  # octagon
-        elif isinstance(node, Sequence):
+        elif node_type == Sequence:
             attributes = ('box', 'orange', 'black')
-        elif isinstance(node, Parallel):
+        elif node_type == Parallel:
             attributes = ('note', 'gold', 'black')
-        elif isinstance(node, PluginBehavior):
-            attributes = ('box', 'green', 'black')
+        elif node_type == PluginBehavior:
+            attributes = ('house', 'green', 'black')
         # elif isinstance(node, PluginBase) or node.children != []:
         #     attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
         else:
@@ -462,6 +467,8 @@ def generate_pydot_graph(root, visibility_level, profile=None):
             for name, c in zip(names2, childrens):
                 (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
                 proposed_dot_name = name
+                if hasattr(c, 'original'):
+                    proposed_dot_name += f'\n{type(c).__name__}'
                 color = 'black'
                 if (isinstance(c, GiskardBehavior) or (hasattr(c, 'original')
                                                        and isinstance(c.original, GiskardBehavior))) \
@@ -494,24 +501,26 @@ def generate_pydot_graph(root, visibility_level, profile=None):
 
 
 class OpenLoop(TreeManager):
+    add_real_time_tracking = True
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
         root.add_child(CleanUp('cleanup'))
         root.add_child(self.grow_process_goal())
-        root.add_child(self.grow_follow_joint_trajectory_execution())
+        root.add_child(self.grow_execution())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
 
     def grow_wait_for_goal(self):
         wait_for_goal = Sequence('wait for goal')
-        wait_for_goal.add_child(self.grow_sync_branch())
-        wait_for_goal.add_child(GoalReceived('has goal',
+        wait_for_goal.add_child(self.grow_Synchronize())
+        wait_for_goal.add_child(GoalReceived('has goal?',
                                              self.action_server_name,
                                              MoveAction))
         return wait_for_goal
 
-    def grow_sync_branch(self):
+    def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
         sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
@@ -526,18 +535,21 @@ class OpenLoop(TreeManager):
         return sync
 
     def grow_process_goal(self):
-        process_move_cmd = success_is_failure(Sequence)('Process move commands')
-        process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
-        process_move_cmd.add_child(self.grow_planning())
-        process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
         process_move_goal = failure_is_success(Selector)('Process goal')
         process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                         self.action_server_name,
                                                                         MoveFeedback.PLANNING))
-        process_move_goal.add_child(process_move_cmd)
+        process_move_goal.add_child(self.grow_process_move_commands())
         process_move_goal.add_child(ExceptionToExecute('clear exception'))
         process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
         return process_move_goal
+
+    def grow_process_move_commands(self):
+        process_move_cmd = success_is_failure(Sequence)('Process move commands')
+        process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
+        process_move_cmd.add_child(self.grow_planning())
+        process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
+        return process_move_cmd
 
     def grow_planning(self):
         planning = failure_is_success(Sequence)('planning')
@@ -547,12 +559,6 @@ class OpenLoop(TreeManager):
         planning.add_child(self.grow_planning2())
         # planning.add_child(planning_1)
         # planning.add_child(SetErrorCode('set error code'))
-        if self.god_map.get_data(identifier.PlotTrajectory_enabled):
-            kwargs = self.god_map.get_data(identifier.PlotTrajectory)
-            planning.add_child(PlotTrajectory('plot trajectory', **kwargs))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            kwargs = self.god_map.get_data(identifier.PlotDebugTrajectory)
-            planning.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))
         return planning
 
     def grow_planning2(self):
@@ -573,22 +579,14 @@ class OpenLoop(TreeManager):
         return planning_2
 
     def grow_planning3(self):
-        planning_3 = Sequence('planning III', sleep=0)
-        planning_3.add_child(self.grow_planning4())
-        planning_3.add_child(running_is_success(TimePlugin)('time for zero velocity'))
-        planning_3.add_child(AppendZeroVelocity('append zero velocity'))
-        planning_3.add_child(running_is_success(LogTrajPlugin)('log zero velocity'))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            planning_3.add_child(running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
-        if self.god_map.get_data(identifier.enable_CPIMarker) \
-                and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
-                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            planning_3.add_child(running_is_success(CollisionMarker)('collision marker'))
+        planning_3 = Sequence('planning III')
+        # planning_3.add_child(PrintText('asdf'))
+        planning_3.add_child(self.grow_closed_loop_control())
+        planning_3.add_child(self.grow_plan_postprocessing())
         return planning_3
 
-    def grow_planning4(self):
-        planning_4 = PluginBehavior('planning IV')
+    def grow_closed_loop_control(self):
+        planning_4 = PluginBehavior('closed loop control')
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_plugin(CollisionChecker('collision checker'))
             if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
@@ -603,15 +601,63 @@ class OpenLoop(TreeManager):
         # planning_4.add_plugin(WiggleCancel('wiggle'))
         planning_4.add_plugin(LoopDetector('loop detector'))
         planning_4.add_plugin(GoalReached('goal reached'))
-        planning_4.add_plugin(TimePlugin('time'))
+        planning_4.add_plugin(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_plugin(MaxTrajectoryLength('traj length check', **kwargs))
         return planning_4
 
-    def grow_follow_joint_trajectory_execution(self):
-        add_real_time_tracking = False
-        execution_action_server = Parallel('execution action servers',
+    def grow_plan_postprocessing(self):
+        plan_postprocessing = Sequence('plan postprocessing')
+        plan_postprocessing.add_child(running_is_success(TimePlugin)())
+        plan_postprocessing.add_child(SetZeroVelocity())
+        plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+            plan_postprocessing.add_child(running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
+        if self.god_map.get_data(identifier.enable_CPIMarker) \
+                and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
+                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+            plan_postprocessing.add_child(running_is_success(CollisionMarker)('collision marker'))
+        if self.god_map.get_data(identifier.PlotTrajectory_enabled):
+            kwargs = self.god_map.get_data(identifier.PlotTrajectory)
+            plan_postprocessing.add_child(PlotTrajectory('plot trajectory', **kwargs))
+        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+            kwargs = self.god_map.get_data(identifier.PlotDebugTrajectory)
+            plan_postprocessing.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))
+        return plan_postprocessing
+
+    def grow_execution(self):
+        move_robot = failure_is_success(Sequence)('execution')
+        move_robot.add_child(IF('execute?', identifier.execute))
+        if self.add_real_time_tracking:
+            move_robot.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
+            move_robot.add_child(InitQPController('InitQPController for base'))
+        move_robot.add_child(SetTrackingStartTime('start start time'))
+        move_robot.add_child(self.grow_monitor_execution())
+        return move_robot
+
+    def grow_monitor_execution(self):
+        monitor_execution = failure_is_success(Selector)('monitor execution')
+        monitor_execution.add_child(success_is_failure(PublishFeedback)('publish feedback',
+                                                                     self.god_map.get_data(
+                                                                         identifier.action_server_name),
+                                                                     MoveFeedback.EXECUTION))
+        monitor_execution.add_child(self.grow_execution_cancelled())
+        monitor_execution.add_child(self.grow_move_robots())
+        monitor_execution.add_child(SetZeroVelocity())
+        monitor_execution.add_child(SetErrorCode('set error code', 'Execution'))
+        return monitor_execution
+
+    def grow_execution_cancelled(self):
+        execute_canceled = Sequence('execute canceled')
+        execute_canceled.add_child(GoalCanceled('goal canceled', self.action_server_name))
+        execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
+        return execute_canceled
+
+    def grow_move_robots(self):
+        self.add_real_time_tracking = False
+        execution_action_server = Parallel('move robots',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         action_servers = self.god_map.get_data(identifier.robot_interface)
         real_time_tracking = PluginBehavior('base sequence')
@@ -625,37 +671,19 @@ class OpenLoop(TreeManager):
         real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
         if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
             real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
-                                                               **self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)))
+                                                                  **self.god_map.unsafe_get_data(
+                                                                      identifier.PublishDebugExpressions)))
         for follow_joint_trajectory_config in action_servers:
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
         base_drive = self.god_map.get_data(identifier.robot_base_drive)
         if base_drive is not None:
-            add_real_time_tracking = True
+            self.add_real_time_tracking = True
             real_time_tracking.add_plugin(base_drive.make_plugin())
-        if add_real_time_tracking:
+        if self.add_real_time_tracking:
             execution_action_server.add_child(real_time_tracking)
+        return execution_action_server
 
-        execute_canceled = Sequence('execute canceled')
-        execute_canceled.add_child(GoalCanceled('goal canceled', self.action_server_name))
-        execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
 
-        publish_result = failure_is_success(Selector)('monitor execution')
-        publish_result.add_child(success_is_failure(PublishFeedback)('publish feedback',
-                                                                     self.god_map.get_data(
-                                                                         identifier.action_server_name),
-                                                                     MoveFeedback.EXECUTION))
-        publish_result.add_child(execute_canceled)
-        publish_result.add_child(execution_action_server)
-        publish_result.add_child(SetErrorCode('set error code', 'Execution'))
-
-        move_robot = failure_is_success(Sequence)('move robot')
-        move_robot.add_child(IF('execute?', identifier.execute))
-        if add_real_time_tracking:
-            move_robot.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
-            move_robot.add_child(InitQPController('InitQPController for base'))
-        move_robot.add_child(SetTrackingStartTime('start start time'))
-        move_robot.add_child(publish_result)
-        return move_robot
 
 
 class ClosedLoop(OpenLoop):
@@ -680,10 +708,10 @@ class ClosedLoop(OpenLoop):
 
     def grow_planning3(self):
         planning_3 = Sequence('planning III', sleep=0)
-        planning_3.add_child(self.grow_planning4())
+        planning_3.add_child(self.grow_closed_loop_control())
         return planning_3
 
-    def grow_planning4(self):
+    def grow_closed_loop_control(self):
         planning_4 = PluginBehavior('planning IIII')
         action_servers = self.god_map.get_data(identifier.robot_interface)
         behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)

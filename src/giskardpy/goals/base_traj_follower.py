@@ -84,6 +84,8 @@ class BaseTrajFollower(Goal):
                                      expression=self.joint.x_vel.get_symbol(0),
                                      velocity_limit=0.5,
                                      name_suffix='/x')
+        self.add_debug_expr('ref x traj', self.current_traj_point(self.joint.x_name, 0, 0))
+        self.add_debug_expr('ref x vel traj/0', self.current_traj_point(self.joint.x_name, 0, 1))
         # y
         errors = []
         for t in range(self.prediction_horizon):
@@ -97,8 +99,8 @@ class BaseTrajFollower(Goal):
                                      expression=self.joint.y_vel.get_symbol(0),
                                      velocity_limit=0.5,
                                      name_suffix='/y')
-        self.add_debug_expr('ref x traj', self.current_traj_point(self.joint.x_name, 0, 0))
-        self.add_debug_expr('ref x vel traj/0', self.current_traj_point(self.joint.x_name, 0, 1))
+        self.add_debug_expr('ref y traj', self.current_traj_point(self.joint.y_name, 0, 0))
+        self.add_debug_expr('ref y vel traj/0', self.current_traj_point(self.joint.y_name, 0, 1))
 
     def rot_error_at(self, t: int):
         # odom_link = self.joint.parent_link_name

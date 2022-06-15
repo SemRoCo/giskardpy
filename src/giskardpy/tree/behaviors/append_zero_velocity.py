@@ -13,10 +13,10 @@ class SetZeroVelocity(GiskardBehavior):
 
     @profile
     def update(self):
-        for joint_name in self.world.movable_joints:
+        for free_variable, state in self.world.state.items():
             for derivative in derivative_to_name:
                 if derivative == 0:
                     continue
-                self.world.state[joint_name].set_derivative(derivative, 0)
+                self.world.state[free_variable].set_derivative(derivative, 0)
         self.world.notify_state_change()
         return Status.SUCCESS

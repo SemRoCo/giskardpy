@@ -628,14 +628,15 @@ class OpenLoop(TreeManager):
         return plan_postprocessing
 
     def grow_execution(self):
-        move_robot = failure_is_success(Sequence)('execution')
-        move_robot.add_child(IF('execute?', identifier.execute))
+        execution = failure_is_success(Sequence)('execution')
+        execution.add_child(IF('execute?', identifier.execute))
         if self.add_real_time_tracking:
-            move_robot.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
-            move_robot.add_child(InitQPController('InitQPController for base'))
-        move_robot.add_child(SetTrackingStartTime('start start time'))
-        move_robot.add_child(self.grow_monitor_execution())
-        return move_robot
+            execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
+            execution.add_child(InitQPController('InitQPController for base'))
+        execution.add_child(SetTrackingStartTime('start start time'))
+        execution.add_child(self.grow_monitor_execution())
+        execution.add_child(SetZeroVelocity())
+        return execution
 
     def grow_monitor_execution(self):
         monitor_execution = failure_is_success(Selector)('monitor execution')
@@ -645,7 +646,6 @@ class OpenLoop(TreeManager):
                                                                      MoveFeedback.EXECUTION))
         monitor_execution.add_child(self.grow_execution_cancelled())
         monitor_execution.add_child(self.grow_move_robots())
-        monitor_execution.add_child(SetZeroVelocity())
         monitor_execution.add_child(SetErrorCode('set error code', 'Execution'))
         return monitor_execution
 

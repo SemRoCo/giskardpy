@@ -519,13 +519,14 @@ class OmniDrive(Joint):
                 world.state[free_variable.name].jerk = jerk
         x = world.state[self.x_vel_name].velocity
         y = world.state[self.y_vel_name].velocity
-        delta = world.state[self.rot_vel_name].velocity
+        rot = world.state[self.rot_vel_name].velocity
+        delta = world.state[self.rot_name].position
         world.state[self.x_name].velocity = (np.cos(delta) * x - np.sin(delta) * y)
         world.state[self.x_name].position += world.state[self.x_name].velocity * dt
         world.state[self.y_name].velocity = (np.sin(delta) * x + np.cos(delta) * y)
         world.state[self.y_name].position += world.state[self.y_name].velocity * dt
-        world.state[self.rot_name].velocity = delta
-        world.state[self.rot_name].position += delta * dt
+        world.state[self.rot_name].velocity = rot
+        world.state[self.rot_name].position += rot * dt
 
     def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
         for free_variable in self._all_symbols():

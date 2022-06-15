@@ -77,30 +77,30 @@ class BaseTrajFollower(Goal):
             if t == 0:
                 errors.append(self.trans_error_at(t)[0])
             else:
-                errors.append(self.current_traj_point(self.joint.x_name, t * self.get_sampling_period_symbol(), 1))
+                errors.append(self.current_traj_point(self.joint.x_vel_name, t * self.get_sampling_period_symbol(), 1))
         self.add_velocity_constraint(lower_velocity_limit=errors,
                                      upper_velocity_limit=errors,
                                      weight=self.weight,
                                      expression=self.joint.x_vel.get_symbol(0),
                                      velocity_limit=0.5,
                                      name_suffix='/x')
-        self.add_debug_expr('ref x traj', self.current_traj_point(self.joint.x_name, 0, 0))
-        self.add_debug_expr('ref x vel traj/0', self.current_traj_point(self.joint.x_name, 0, 1))
+        self.add_debug_expr('ref x traj', self.current_traj_point(self.joint.x_vel_name, 0, 0))
+        self.add_debug_expr('ref x vel traj/0', self.current_traj_point(self.joint.x_vel_name, 0, 1))
         # y
         errors = []
         for t in range(self.prediction_horizon):
             if t == 0:
                 errors.append(self.trans_error_at(t)[1])
             else:
-                errors.append(self.current_traj_point(self.joint.y_name, t * self.get_sampling_period_symbol(), 1))
+                errors.append(self.current_traj_point(self.joint.y_vel_name, t * self.get_sampling_period_symbol(), 1))
         self.add_velocity_constraint(lower_velocity_limit=errors,
                                      upper_velocity_limit=errors,
                                      weight=self.weight,
                                      expression=self.joint.y_vel.get_symbol(0),
                                      velocity_limit=0.5,
                                      name_suffix='/y')
-        self.add_debug_expr('ref y traj', self.current_traj_point(self.joint.y_name, 0, 0))
-        self.add_debug_expr('ref y vel traj/0', self.current_traj_point(self.joint.y_name, 0, 1))
+        self.add_debug_expr('ref y traj', self.current_traj_point(self.joint.y_vel_name, 0, 0))
+        self.add_debug_expr('ref y vel traj/0', self.current_traj_point(self.joint.y_vel_name, 0, 1))
 
     def rot_error_at(self, t: int):
         # odom_link = self.joint.parent_link_name

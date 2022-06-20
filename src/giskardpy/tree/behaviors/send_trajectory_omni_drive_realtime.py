@@ -13,6 +13,7 @@ from rostopic import ROSTopicException
 import giskardpy.identifier as identifier
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.joints import OmniDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
@@ -79,7 +80,8 @@ class OmniDriveCmdVel(SendTrajectoryClosedLoop):
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def get_drive_goals(self) -> List[Goal]:
-        return [BaseTrajFollower(god_map=self.god_map, joint_name=self.joint.name)]
+        return [SetPredictionHorizon(god_map=self.god_map, prediction_horizon=13),
+                BaseTrajFollower(god_map=self.god_map, joint_name=self.joint.name)]
 
     @profile
     @catch_and_raise_to_blackboard
@@ -89,7 +91,7 @@ class OmniDriveCmdVel(SendTrajectoryClosedLoop):
         sample_period = self.god_map.unsafe_get_data(identifier.sample_period)
         self.start_time = self.god_map.unsafe_get_data(identifier.tracking_start_time)
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
-        self.end_time = self.start_time + self.trajectory.points[-1].time_from_start
+        self.end_time = self.start_time + self.trajectory.points[-1].time_from_start + self.goal_time_tolerance
         # self.update_thread = Thread(target=self.worker)
         # self.update_thread.start()
 

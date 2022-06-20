@@ -177,7 +177,8 @@ class Goal:
         self._sub_goals.append(goal)
 
     def add_velocity_constraint(self, lower_velocity_limit, upper_velocity_limit, weight, expression,
-                                velocity_limit, name_suffix=None, lower_slack_limit=-1e4, upper_slack_limit=1e4):
+                                velocity_limit, name_suffix=None, lower_slack_limit=-1e4, upper_slack_limit=1e4,
+                                horizon_function=None):
         name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
         if name in self._velocity_constraints:
@@ -190,7 +191,8 @@ class Goal:
                                                               velocity_limit=velocity_limit,
                                                               lower_slack_limit=lower_slack_limit,
                                                               upper_slack_limit=upper_slack_limit,
-                                                              control_horizon=self.control_horizon)
+                                                              control_horizon=self.control_horizon,
+                                                              horizon_function=horizon_function)
 
     def add_constraint(self,
                        reference_velocity: expr_symbol,
@@ -200,7 +202,8 @@ class Goal:
                        expression: expr_symbol,
                        name_suffix: Optional[str] = None,
                        lower_slack_limit: Optional[expr_symbol] = None,
-                       upper_slack_limit: Optional[expr_symbol] = None):
+                       upper_slack_limit: Optional[expr_symbol] = None,
+                       control_horizon: Optional[int] = None):
         if expression.shape != (1, 1):
             raise GiskardException(f'expression must have shape (1,1), has {expression.shape}')
         name_suffix = name_suffix if name_suffix else ''
@@ -209,6 +212,7 @@ class Goal:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
+        control_horizon = control_horizon if control_horizon is not None else self.control_horizon
         self._constraints[name] = Constraint(name=name,
                                              expression=expression,
                                              lower_error=lower_error,
@@ -217,7 +221,7 @@ class Goal:
                                              quadratic_weight=weight,
                                              lower_slack_limit=lower_slack_limit,
                                              upper_slack_limit=upper_slack_limit,
-                                             control_horizon=self.control_horizon)
+                                             control_horizon=control_horizon)
 
     def add_constraint_vector(self, reference_velocities, lower_errors, upper_errors, weights, expressions,
                               name_suffixes=None, lower_slack_limits=None, upper_slack_limits=None):

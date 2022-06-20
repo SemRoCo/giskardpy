@@ -100,7 +100,7 @@ class GiskardConfig:
             'in_planning_loop': False
         },
         'PublishDebugExpressions': {
-            'enabled': True,
+            'enabled': False,
             'expression_filter': None
         },
         'CollisionMarker': {
@@ -154,6 +154,10 @@ class GiskardConfig:
         self.god_map.set_data(identifier.timer_collector, TimeCollector(self.god_map))
         blackboard = Blackboard
         blackboard.god_map = self.god_map
+
+    def reset_config(self):
+        #FIXME
+        self.prediction_horizon = 9
 
     def grow(self):
         world = WorldTree(self.god_map)

@@ -26,9 +26,9 @@ class PublishDebugExpressions(GiskardBehavior):
         msg.header.stamp = rospy.get_rostime()
         msg.name = [f'debug_expressions/{x}' for x in debug_pandas.keys()]
         msg.position = list(debug_pandas.values())
-        for name, thing in zip(['lbA', 'ubA', 'lb', 'ub', 'weights', 'xdot'],
+        for name, thing in zip(['lbA', 'ubA', 'lb', 'ub', 'weights', 'xdot', 'Ax no slack'],
                          [qp_controller.p_lbA, qp_controller.p_ubA, qp_controller.p_lb, qp_controller.p_ub,
-                          qp_controller.p_weights, qp_controller.p_xdot]):
+                          qp_controller.p_weights, qp_controller.p_xdot, qp_controller.p_Ax_without_slack]):
             msg.name.extend([f'{name}/{x}' for x in thing.index])
             msg.position.extend(list(thing.values.T[0]))
 

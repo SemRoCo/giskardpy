@@ -7,22 +7,23 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class RealKinSimPlugin(GiskardBehavior):
-    last_time: rospy.Time()
+    last_time: float
 
-    def initialise(self):
-        self.last_time = None
-        self.start_time = self.god_map.get_data(identifier.tracking_start_time)
+    # def initialise(self):
+    #     self.last_time = None
+        # self.start_time = self.god_map.get_data(identifier.tracking_start_time)
 
     @profile
     def update(self):
-        if self.start_time > rospy.get_rostime():
+        next_time = self.god_map.get_data(identifier.time)
+        if next_time <= 0.0:
+            self.last_time = next_time
             return Status.RUNNING
-        if self.last_time is None:
-            self.last_time = rospy.get_rostime()
+        # if self.last_time is None:
         next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
         joints = self.world.joints
-        next_time = rospy.get_rostime()
-        dt = (next_time - self.last_time).to_sec()
+        # next_time = rospy.get_rostime()
+        dt = next_time - self.last_time
         # print(f'dt: {dt}')
         for joint_name in self.world.controlled_joints:
             joints[joint_name].update_state(next_cmds, dt)

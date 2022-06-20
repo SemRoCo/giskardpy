@@ -161,7 +161,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.lower_slack_limit
+                    result[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
         return result
 
     def get_upper_slack_limits(self):
@@ -169,14 +169,14 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.upper_slack_limit
+                    result[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
         return result
 
     def get_lower_error_slack_limits(self):
-        return {'{}/error'.format(c.name): c.lower_slack_limit for c in self.constraints}
+        return {f'{c.name}/error': c.lower_slack_limit for c in self.constraints}
 
     def get_upper_error_slack_limits(self):
-        return {'{}/error'.format(c.name): c.upper_slack_limit for c in self.constraints}
+        return {f'{c.name}/error': c.upper_slack_limit for c in self.constraints}
 
     def __call__(self):
         lb = defaultdict(dict)
@@ -184,8 +184,9 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < min(v.order,
-                                                                    self.order) - 1 and self.prediction_horizon > 2:  # and False:
+                    if t == self.prediction_horizon - 1 \
+                            and o < min(v.order, self.order) - 1 \
+                            and self.prediction_horizon > 2:  # and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
                     else:
@@ -555,6 +556,7 @@ class QPController:
         else:
             raise KeyError(f'Solver \'{solver_name}\' not supported')
         logging.loginfo(f'Using QP Solver \'{solver_name}\'')
+        logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
 
     def add_free_variables(self, free_variables):
         """

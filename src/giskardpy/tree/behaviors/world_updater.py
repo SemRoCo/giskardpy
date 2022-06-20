@@ -273,6 +273,8 @@ class WorldUpdater(GiskardBehavior):
 
     def remove_object(self, name):
         # assumes that parent has god map lock
+        if name not in self.world.groups:
+            raise UnknownGroupException(f'Group {name} does not exist.')
         self.collision_scene.remove_black_list_entries(set(self.world.groups[name].link_names_with_collisions))
         self.world.delete_group(name)
         self._remove_plugin(str(PrefixName(name, 'js')))

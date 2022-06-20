@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import List, Union
+from typing import List, Union, Optional, Callable
 import giskardpy.casadi_wrapper as w
 from giskardpy.my_types import expr_symbol
 
@@ -55,10 +55,10 @@ class VelocityConstraint:
                  velocity_limit,
                  quadratic_weight,
                  control_horizon,
-                 lower_slack_limit=None,
-                 upper_slack_limit=None,
+                 lower_slack_limit: Union[expr_symbol, List[expr_symbol]],
+                 upper_slack_limit: Union[expr_symbol, List[expr_symbol]],
                  linear_weight=None,
-                 horizon_function=None):
+                 horizon_function: Optional[Callable[[float, int], float]] = None):
         self.name = name
         self.expression = expression
         self.quadratic_weight = quadratic_weight
@@ -68,14 +68,22 @@ class VelocityConstraint:
             self.lower_velocity_limit = lower_velocity_limit
         else:
             self.lower_velocity_limit = [lower_velocity_limit] * self.control_horizon
+
         if self.is_iterable(upper_velocity_limit):
             self.upper_velocity_limit = upper_velocity_limit
         else:
             self.upper_velocity_limit = [upper_velocity_limit] * self.control_horizon
-        if lower_slack_limit is not None:
+
+        if self.is_iterable(lower_slack_limit):
             self.lower_slack_limit = lower_slack_limit
-        if upper_slack_limit is not None:
+        else:
+            self.lower_slack_limit = [lower_slack_limit] * self.control_horizon
+
+        if self.is_iterable(upper_slack_limit):
             self.upper_slack_limit = upper_slack_limit
+        else:
+            self.upper_slack_limit = [upper_slack_limit] * self.control_horizon
+
         if linear_weight is not None:
             self.linear_weight = linear_weight
 

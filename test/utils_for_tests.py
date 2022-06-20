@@ -449,9 +449,9 @@ class GiskardTestWrapper(GiskardWrapper):
             return self.world.transform_msg(target_frame, msg)
 
     def wait_heartbeats(self, number=2):
-        tree = self.tree
-        c = tree.count
-        while tree.count < c + number:
+        behavior_tree = self.tree.tree
+        c = behavior_tree.count
+        while behavior_tree.count < c + number:
             rospy.sleep(0.001)
 
     @property

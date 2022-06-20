@@ -1,3 +1,4 @@
+import inspect
 from collections import defaultdict
 from enum import Enum
 from typing import Dict, Optional, List
@@ -149,18 +150,28 @@ class GiskardConfig:
     }
 
     def __init__(self):
-        self.god_map = GodMap.init_from_paramserver()
-        self.god_map.set_data(identifier.giskard, self)
-        self.god_map.set_data(identifier.timer_collector, TimeCollector(self.god_map))
+        self._god_map = GodMap.init_from_paramserver()
+        self._god_map.set_data(identifier.giskard, self)
+        self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
         blackboard = Blackboard
-        blackboard.god_map = self.god_map
+        blackboard.god_map = self._god_map
+        self._backup = {}
 
     def reset_config(self):
-        #FIXME
-        self.prediction_horizon = 9
+        for parameter, value in self._backup.items():
+            setattr(self, parameter, value)
+
+    def create_parameter_backup(self):
+        self._backup = {}
+        for parameter in dir(self):
+            if not parameter.startswith('_'):
+                value = getattr(self, parameter)
+                if not inspect.ismethod(value):
+                    self._backup[parameter] = value
 
     def grow(self):
-        world = WorldTree(self.god_map)
+        self.create_parameter_backup()
+        world = WorldTree(self._god_map)
         world.delete_all_but_robot()
 
         if self.collision_checker == CollisionCheckerLib.bpb:
@@ -177,15 +188,15 @@ class GiskardConfig:
             collision_scene = CollisionWorldSynchronizer(world)
         else:
             raise KeyError(f'Unknown collision checker {self.collision_checker}. Collision avoidance is disabled')
-        self.god_map.set_data(identifier.collision_checker, self.collision_checker)
-        self.god_map.set_data(identifier.collision_scene, collision_scene)
+        self._god_map.set_data(identifier.collision_checker, self.collision_checker)
+        self._god_map.set_data(identifier.collision_scene, collision_scene)
         if self.control_mode == ControlModes.open_loop:
-            self.tree = OpenLoop(self.god_map)
+            self._tree = OpenLoop(self._god_map)
         elif self.control_mode == ControlModes.close_loop:
-            self.tree = ClosedLoop(self.god_map)
+            self._tree = ClosedLoop(self._god_map)
         else:
             raise KeyError(f'Robot interface mode \'{self.control_mode}\' is not supported.')
 
     def live(self):
         self.grow()
-        self.god_map.get_data(identifier.tree_manager).live()
+        self._god_map.get_data(identifier.tree_manager).live()

@@ -409,7 +409,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.giskard = PR2()
         self.giskard.grow()
-        self.tree = self.giskard.tree
+        self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server()
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
@@ -449,7 +449,7 @@ class GiskardTestWrapper(GiskardWrapper):
             return self.world.transform_msg(target_frame, msg)
 
     def wait_heartbeats(self, number=2):
-        tree = self.god_map.get_data(identifier.tree_manager).tree
+        tree = self.tree
         c = tree.count
         while tree.count < c + number:
             rospy.sleep(0.001)

@@ -112,7 +112,7 @@ rc_revolute_velocity = reachability_check + ['revolute_velocity']
 rc_other_velocity = reachability_check + ['other_velocity']
 
 # behavior tree
-tree_manager = giskard + ['tree']
+tree_manager = giskard + ['_tree']
 tree_tick_rate = giskard + ['tree_tick_rate']
 
 # collision avoidance

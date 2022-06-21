@@ -1173,14 +1173,15 @@ class TestCartGoals(object):
     def test_move_base4(self, zero_pose: PR2):
         map_T_odom = PoseStamped()
         map_T_odom.header.frame_id = 'map'
-        map_T_odom.pose.position.x = 1
-        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.position.x = 2
+        map_T_odom.pose.position.y = 0
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
         zero_pose.teleport_base(map_T_odom)
 
         base_goal = PointStamped()
         base_goal.header.frame_id = 'map'
-        base_goal.point.x = 1
+        base_goal.point.x = -1
+        base_goal.point.y = 2
         zero_pose.set_json_goal('CartesianPositionStraight',
                                 root_link=zero_pose.default_root,
                                 tip_link='base_footprint',

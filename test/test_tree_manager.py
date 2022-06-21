@@ -1,95 +1,80 @@
 import pytest
 from py_trees.composites import Sequence, Selector
-from giskardpy.plugin import PluginBehavior
+from giskardpy.tree.behaviors.plugin import PluginBehavior
 from py_trees.meta import failure_is_success, success_is_failure
 from py_trees import display, Blackboard
 from py_trees_ros.trees import BehaviourTree
 from py_trees.behaviour import Behaviour
 from py_trees.common import Status
-from giskardpy.tree_manager import TreeManager
+from giskardpy.tree.garden import TreeManager
 from giskardpy.god_map import GodMap
-from giskardpy import logging
+from giskardpy.utils import logging
 from giskardpy import identifier
 
-import roslaunch
 import rospy
-from giskardpy.tfwrapper import init as tf_init
+from giskardpy.utils.tfwrapper import init as tf_init
 from utils_for_tests import PR2
-from giskardpy.pybullet_wrapper import stop_pybullet
-from giskardpy.plugin import GiskardBehavior
+from giskardpy.model.pybullet_wrapper import stop_pybullet
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
-default_pose = {u'r_elbow_flex_joint': -0.15,
-                u'r_forearm_roll_joint': 0,
-                u'r_shoulder_lift_joint': 0,
-                u'r_shoulder_pan_joint': 0,
-                u'r_upper_arm_roll_joint': 0,
-                u'r_wrist_flex_joint': -0.10001,
-                u'r_wrist_roll_joint': 0,
+default_pose = {'r_elbow_flex_joint': -0.15,
+                'r_forearm_roll_joint': 0,
+                'r_shoulder_lift_joint': 0,
+                'r_shoulder_pan_joint': 0,
+                'r_upper_arm_roll_joint': 0,
+                'r_wrist_flex_joint': -0.10001,
+                'r_wrist_roll_joint': 0,
 
-                u'l_elbow_flex_joint': -0.15,
-                u'l_forearm_roll_joint': 0,
-                u'l_shoulder_lift_joint': 0,
-                u'l_shoulder_pan_joint': 0,
-                u'l_upper_arm_roll_joint': 0,
-                u'l_wrist_flex_joint': -0.10001,
-                u'l_wrist_roll_joint': 0,
+                'l_elbow_flex_joint': -0.15,
+                'l_forearm_roll_joint': 0,
+                'l_shoulder_lift_joint': 0,
+                'l_shoulder_pan_joint': 0,
+                'l_upper_arm_roll_joint': 0,
+                'l_wrist_flex_joint': -0.10001,
+                'l_wrist_roll_joint': 0,
 
-                u'torso_lift_joint': 0.2,
-                u'head_pan_joint': 0,
-                u'head_tilt_joint': 0,
+                'torso_lift_joint': 0.2,
+                'head_pan_joint': 0,
+                'head_tilt_joint': 0,
                 }
 
-pocky_pose = {u'r_elbow_flex_joint': -1.29610152504,
-              u'r_forearm_roll_joint': -0.0301682323805,
-              u'r_shoulder_lift_joint': 1.20324921318,
-              u'r_shoulder_pan_joint': -0.73456435706,
-              u'r_upper_arm_roll_joint': -0.70790051778,
-              u'r_wrist_flex_joint': -0.10001,
-              u'r_wrist_roll_joint': 0.258268529825,
+pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
+              'r_forearm_roll_joint': -0.0301682323805,
+              'r_shoulder_lift_joint': 1.20324921318,
+              'r_shoulder_pan_joint': -0.73456435706,
+              'r_upper_arm_roll_joint': -0.70790051778,
+              'r_wrist_flex_joint': -0.10001,
+              'r_wrist_roll_joint': 0.258268529825,
 
-              u'l_elbow_flex_joint': -1.29610152504,
-              u'l_forearm_roll_joint': 0.0301682323805,
-              u'l_shoulder_lift_joint': 1.20324921318,
-              u'l_shoulder_pan_joint': 0.73456435706,
-              u'l_upper_arm_roll_joint': 0.70790051778,
-              u'l_wrist_flex_joint': -0.1001,
-              u'l_wrist_roll_joint': -0.258268529825,
+              'l_elbow_flex_joint': -1.29610152504,
+              'l_forearm_roll_joint': 0.0301682323805,
+              'l_shoulder_lift_joint': 1.20324921318,
+              'l_shoulder_pan_joint': 0.73456435706,
+              'l_upper_arm_roll_joint': 0.70790051778,
+              'l_wrist_flex_joint': -0.1001,
+              'l_wrist_roll_joint': -0.258268529825,
 
-              u'torso_lift_joint': 0.2,
-              u'head_pan_joint': 0,
-              u'head_tilt_joint': 0,
+              'torso_lift_joint': 0.2,
+              'head_pan_joint': 0,
+              'head_tilt_joint': 0,
               }
 
 
 @pytest.fixture(scope='module')
 def ros():
     try:
-        logging.loginfo(u'deleting tmp test folder')
+        logging.loginfo('deleting tmp test folder')
     except Exception:
         pass
-    logging.loginfo(u'init ros')
-    rospy.init_node(u'tests')
+    logging.loginfo('init ros')
+    rospy.init_node('tests')
     tf_init(60)
-    launch = roslaunch.scriptapi.ROSLaunch()
-    launch.start()
-
-    rospy.set_param('/joint_trajectory_splitter/state_topics',
-                    ['/whole_body_controller/base/state',
-                     '/whole_body_controller/body/state'])
-    rospy.set_param('/joint_trajectory_splitter/client_topics',
-                    ['/whole_body_controller/base/follow_joint_trajectory',
-                     '/whole_body_controller/body/follow_joint_trajectory'])
-    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
-    joint_trajectory_splitter = launch.launch(node)
     yield
-    joint_trajectory_splitter.stop()
-    rospy.delete_param('/joint_trajectory_splitter/state_topics')
-    rospy.delete_param('/joint_trajectory_splitter/client_topics')
-    logging.loginfo(u'shutdown ros')
-    rospy.signal_shutdown(u'die')
+    logging.loginfo('shutdown ros')
+    rospy.signal_shutdown('die')
     try:
-        logging.loginfo(u'deleting tmp test folder')
+        logging.loginfo('deleting tmp test folder')
     except Exception:
         pass
 
@@ -98,12 +83,11 @@ def ros():
 def giskard(ros):
     c = PR2()
     yield c
-    tree_manager = c.get_god_map().get_data(identifier.tree_manager)
+    tree_manager = c.god_map.get_data(identifier.tree_manager)
     tree_manager.get_node('pybullet updater').srv_update_world.shutdown()
-    tree_manager.get_node('pybullet updater').get_object_names.shutdown()
-    tree_manager.get_node('pybullet updater').get_object_info.shutdown()
+    tree_manager.get_node('pybullet updater').get_group_names_cb.shutdown()
+    tree_manager.get_node('pybullet updater').get_object_info_cb.shutdown()
     tree_manager.get_node('pybullet updater').get_attached_objects.shutdown()
-    tree_manager.get_node('pybullet updater').update_rviz_markers.shutdown()
     tree_manager.get_node('coll').srv_activate_rendering.shutdown()
     c.tree.blackboard_exchange.get_blackboard_variables_srv.shutdown()
     c.tree.blackboard_exchange.open_blackboard_watcher_srv.shutdown()
@@ -177,61 +161,61 @@ def blackboard():
 @pytest.fixture()
 def tree(blackboard):
     # ----------------------------------------------
-    wait_for_goal = Sequence(u'wait for goal')
-    wait_for_goal.add_child(TestBehavior(u'tf'))
-    wait_for_goal.add_child(TestBehavior(u'js1'))
-    wait_for_goal.add_child(TestBehavior(u'pybullet updater'))
-    wait_for_goal.add_child(TestBehavior(u'has goal'))
-    wait_for_goal.add_child(TestBehavior(u'js2'))
+    wait_for_goal = Sequence('wait for goal')
+    wait_for_goal.add_child(TestBehavior('tf'))
+    wait_for_goal.add_child(TestBehavior('js1'))
+    wait_for_goal.add_child(TestBehavior('pybullet updater'))
+    wait_for_goal.add_child(TestBehavior('has goal'))
+    wait_for_goal.add_child(TestBehavior('js2'))
     # ----------------------------------------------
-    planning_3 = PluginBehavior(u'planning III', sleep=0)
-    planning_3.add_plugin(TestBehavior(u'coll'))
-    planning_3.add_plugin(TestBehavior(u'controller'))
-    planning_3.add_plugin(TestBehavior(u'kin sim'))
-    planning_3.add_plugin(TestBehavior(u'log'))
-    planning_3.add_plugin(TestBehavior(u'goal reached'))
-    planning_3.add_plugin(TestBehavior(u'wiggle'))
-    planning_3.add_plugin(TestBehavior(u'time'))
+    planning_3 = PluginBehavior('planning III', sleep=0)
+    planning_3.add_plugin(TestBehavior('coll'))
+    planning_3.add_plugin(TestBehavior('controller'))
+    planning_3.add_plugin(TestBehavior('kin sim'))
+    planning_3.add_plugin(TestBehavior('log'))
+    planning_3.add_plugin(TestBehavior('goal reached'))
+    planning_3.add_plugin(TestBehavior('wiggle'))
+    planning_3.add_plugin(TestBehavior('time'))
     # ----------------------------------------------
-    publish_result = failure_is_success(Selector)(u'monitor execution')
-    publish_result.add_child(TestBehavior(u'goal canceled'))
-    publish_result.add_child(TestBehavior(u'send traj'))
+    publish_result = failure_is_success(Selector)('monitor execution')
+    publish_result.add_child(TestBehavior('goal canceled'))
+    publish_result.add_child(TestBehavior('send traj'))
     # ----------------------------------------------
     # ----------------------------------------------
-    planning_2 = failure_is_success(Selector)(u'planning II')
-    planning_2.add_child(TestBehavior(u'goal canceled'))
-    planning_2.add_child(success_is_failure(TestBehavior)(u'visualization'))
-    planning_2.add_child(success_is_failure(TestBehavior)(u'cpi marker'))
+    planning_2 = failure_is_success(Selector)('planning II')
+    planning_2.add_child(TestBehavior('goal canceled'))
+    planning_2.add_child(success_is_failure(TestBehavior)('visualization'))
+    planning_2.add_child(success_is_failure(TestBehavior)('cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
-    move_robot = failure_is_success(Sequence)(u'move robot')
-    move_robot.add_child(TestBehavior(u'execute?'))
+    move_robot = failure_is_success(Sequence)('move robot')
+    move_robot.add_child(TestBehavior('execute?'))
     move_robot.add_child(publish_result)
     # ----------------------------------------------
     # ----------------------------------------------
-    planning_1 = success_is_failure(Sequence)(u'planning I')
-    planning_1.add_child(TestBehavior(u'update constraints'))
+    planning_1 = success_is_failure(Sequence)('planning I')
+    planning_1.add_child(TestBehavior('update constraints'))
     planning_1.add_child(planning_2)
     # ----------------------------------------------
     # ----------------------------------------------
-    process_move_goal = failure_is_success(Selector)(u'process move goal')
+    process_move_goal = failure_is_success(Selector)('process move goal')
     process_move_goal.add_child(planning_1)
-    process_move_goal.add_child(TestBehavior(u'set move goal'))
+    process_move_goal.add_child(TestBehavior('set move goal'))
     # ----------------------------------------------
     #
-    post_processing = failure_is_success(Sequence)(u'post processing')
-    post_processing.add_child(TestBehavior(u'wiggle_cancel_final_detection'))
-    post_processing.add_child(TestBehavior(u'post_processing'))
+    post_processing = failure_is_success(Sequence)('post processing')
+    post_processing.add_child(TestBehavior('wiggle_cancel_final_detection'))
+    post_processing.add_child(TestBehavior('post_processing'))
     # ----------------------------------------------
     # ----------------------------------------------
-    root = Sequence(u'root')
+    root = Sequence('root')
     root.add_child(wait_for_goal)
-    root.add_child(TestBehavior(u'cleanup'))
+    root.add_child(TestBehavior('cleanup'))
     root.add_child(process_move_goal)
-    root.add_child(TestBehavior(u'plot trajectory'))
+    root.add_child(TestBehavior('plot trajectory'))
     root.add_child(post_processing)
     root.add_child(move_robot)
-    root.add_child(TestBehavior(u'send result'))
+    root.add_child(TestBehavior('send result'))
 
     tree = BehaviourTree(root)
     return tree

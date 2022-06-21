@@ -6,8 +6,8 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from tf.transformations import quaternion_from_euler
 
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.tfwrapper import lookup_transform, lookup_pose
-from giskardpy import logging
+from giskardpy.utils.tfwrapper import lookup_pose
+from giskardpy.utils import logging
 
 if __name__ == '__main__':
     rospy.init_node('add_urdf')

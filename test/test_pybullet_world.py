@@ -1,73 +1,72 @@
 import shutil
 from collections import defaultdict
-from itertools import product
 
-import pybullet as p
 import pytest
-from geometry_msgs.msg import Pose, Point, Quaternion
+from geometry_msgs.msg import Pose
+from giskard_msgs.msg import CollisionEntry
 
-import giskardpy.pybullet_wrapper as pbw
-from giskardpy import logging
-from giskardpy.pybullet_world import PyBulletWorld
-from giskardpy.pybullet_world_object import PyBulletWorldObject
-from giskardpy.robot import Robot
-from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
-from giskardpy.world_object import WorldObject
-from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf
+from giskardpy import RobotName
+from giskardpy.exceptions import PhysicsWorldException, UnknownGroupException
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.pybullet_syncer import PyBulletSyncer
+from giskardpy.model.utils import make_world_body_box
+from giskardpy.utils import logging
+from test_world import create_world_with_pr2, create_world_with_donbot, allow_all_entry, avoid_all_entry
 
-# this import has to come last
-import test_world
-
-folder_name = u'tmp_data/'
+folder_name = 'tmp_data/'
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def module_setup(request):
-    logging.loginfo(u'starting pybullet')
-    pbw.start_pybullet(False)
+    logging.loginfo('starting pybullet')
+    # pbw.start_pybullet(True)
 
-    logging.loginfo(u'deleting tmp test folder')
+    logging.loginfo('deleting tmp test folder')
     try:
         shutil.rmtree(folder_name)
     except:
         pass
 
     def kill_pybullet():
-        logging.loginfo(u'shutdown pybullet')
-        pbw.stop_pybullet()
+        logging.loginfo('shutdown pybullet')
+        # pbw.stop_pybullet()
 
     request.addfinalizer(kill_pybullet)
 
 
 @pytest.fixture()
 def function_setup(request, module_setup):
-    """
-    :rtype: WorldObject
-    """
-    pbw.clear_pybullet()
+    # pbw.clear_pybullet()
 
     def kill_pybullet():
-        logging.loginfo(u'resetting pybullet')
-        pbw.clear_pybullet()
+        logging.loginfo('resetting pybullet')
+        # pbw.clear_pybullet()
 
     request.addfinalizer(kill_pybullet)
 
 
 @pytest.fixture()
-def test_folder(request, function_setup):
+def pr2_world(request, function_setup):
     """
     :rtype: World
     """
 
-    def kill_pybullet():
-        try:
-            logging.loginfo(u'deleting tmp test folder')
-            # shutil.rmtree(folder_name)
-        except Exception:
-            pass
+    world = create_world_with_pr2()
+    pbs = CollisionWorldSynchronizer(world)
+    pbs.sync()
+    return pbs
 
-    request.addfinalizer(kill_pybullet)
-    return folder_name
+
+@pytest.fixture()
+def donbot_world(request, function_setup):
+    """
+    :rtype: World
+    """
+
+    world = create_world_with_donbot()
+    pbs = CollisionWorldSynchronizer(world)
+    pbs.sync()
+    return pbs
 
 
 @pytest.fixture()
@@ -75,7 +74,7 @@ def delete_test_folder(request):
     """
     :rtype: World
     """
-    folder_name = u'tmp_data/'
+    folder_name = 'tmp_data/'
     try:
         shutil.rmtree(folder_name)
     except:
@@ -83,372 +82,394 @@ def delete_test_folder(request):
     return folder_name
 
 
-def assert_num_pybullet_objects(num):
-    assert p.getNumBodies() == num, pbw.print_body_names()
+# def assert_num_pybullet_objects(num):
+#     assert p.getNumBodies() == num, pbw.print_body_names()
 
 
-class TestPyBulletWorldObject(test_world.TestWorldObj):
-    cls = PyBulletWorldObject
+class TestPyBulletSyncer(object):
+    def test_load_pr2(self, pr2_world):
+        pass
+        # assert len(pbw.get_body_names()) == 46
 
-    def test_create_object(self, function_setup):
-        parsed_base_bot = self.cls(base_bot_urdf())
-        assert_num_pybullet_objects(1)
-        assert u'pointy' in pbw.get_body_names()
+    def test_set_pr2_js(self, pr2_world):
+        pr2_world.world.state['torso_lift_link'] = 1
+        pr2_world.sync()
+        # assert len(pbw.get_body_names()) == 46
 
+    def test_update_blacklist(self, pr2_world: CollisionWorldSynchronizer):
+        pr2_world.update_collision_blacklist()
+        pass
 
-class TestPyBulletRobot(test_world.TestRobot):
-    cls = Robot
+    def test_compute_collision_matrix_donbot(self, donbot_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        donbot_world.init_collision_matrix(RobotName)
+        collision_matrix = donbot_world.collision_matrices[RobotName]
+        for entry in collision_matrix:
+            assert entry[0] != entry[-1]
 
-    def test_from_world_body_box(self, function_setup):
-        wb = make_world_body_box()
-        urdf_obj = self.cls.from_world_body(wb)
-        assert len(urdf_obj.get_link_names()) == 1
-        assert len(urdf_obj.get_joint_names()) == 0
+        assert len(collision_matrix) == 125
 
-    def test_from_world_body_sphere(self, function_setup):
-        wb = make_world_body_sphere()
-        urdf_obj = self.cls.from_world_body(wb)
-        assert len(urdf_obj.get_link_names()) == 1
-        assert len(urdf_obj.get_joint_names()) == 0
-
-    def test_from_world_body_cylinder(self, function_setup):
-        wb = make_world_body_cylinder()
-        urdf_obj = self.cls.from_world_body(wb)
-        assert len(urdf_obj.get_link_names()) == 1
-        assert len(urdf_obj.get_joint_names()) == 0
-
-    def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.init_self_collision_matrix()
-        expected = r.get_self_collision_matrix()
-        r.safe_self_collision_matrix(test_folder)
-        assert r.load_self_collision_matrix(test_folder)
-        actual = r.get_self_collision_matrix()
-        assert expected == actual
-
-    def test_attach_urdf_object1_2(self, test_folder):
-        parsed_pr2 = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        parsed_pr2.init_self_collision_matrix()
-        scm = parsed_pr2.get_self_collision_matrix()
-        num_of_links_before = len(parsed_pr2.get_link_names())
-        num_of_joints_before = len(parsed_pr2.get_joint_names())
-        link_chain_before = len(parsed_pr2.get_links_from_sub_tree(u'ur5_shoulder_pan_joint'))
-        box = self.cls.from_world_body(make_world_body_box())
+    def test_add_object(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        o = make_world_body_box()
         p = Pose()
-        p.position = Point(0, 0, 0)
-        p.orientation = Quaternion(0, 0, 0, 1)
-        parsed_pr2.attach_urdf_object(box, u'gripper_tool_frame', p)
-        assert box.get_name() in parsed_pr2.get_link_names()
-        assert len(parsed_pr2.get_link_names()) == num_of_links_before + 1
-        assert len(parsed_pr2.get_joint_names()) == num_of_joints_before + 1
-        assert len(parsed_pr2.get_links_from_sub_tree(u'ur5_shoulder_pan_joint')) == link_chain_before + 1
-        assert scm.difference(parsed_pr2.get_self_collision_matrix()) == set()
-        assert len(scm) < len(parsed_pr2.get_self_collision_matrix())
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(group_name='box',
+                                       msg=o,
+                                       pose=p)
+        pr2_world.sync()
+        # assert len(pbw.get_body_names()) == 47
 
-    def test_detach_object2(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.init_self_collision_matrix()
-        scm = r.get_self_collision_matrix()
-        box = WorldObject.from_world_body(make_world_body_box())
+    def test_delete_object(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        o_name = 'box'
+        o = make_world_body_box()
         p = Pose()
-        p.position = Point(0, 0, 0)
-        p.orientation = Quaternion(0, 0, 0, 1)
-        r.attach_urdf_object(box, u'gripper_tool_frame', p)
-        assert len(scm) < len(r.get_self_collision_matrix())
-        r.detach_sub_tree(box.get_name())
-        assert scm.symmetric_difference(r.get_self_collision_matrix()) == set()
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(group_name=o_name, msg=o, pose=p)
+        pr2_world.sync()
+        pr2_world.world.delete_branch(o_name)
+        pr2_world.sync()
+        # assert len(pbw.get_body_names()) == 46
 
-    def test_reset_collision_matrix(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.init_self_collision_matrix()
-        scm = r.get_self_collision_matrix()
-
-        box = self.cls.from_world_body(make_world_body_box())
+    def test_attach_object(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        o_name = 'box'
+        o = make_world_body_box()
         p = Pose()
-        p.position = Point(0, 0, 0)
-        p.orientation = Quaternion(0, 0, 0, 1)
-        r.attach_urdf_object(box, u'gripper_tool_frame', p)
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(group_name=o_name, msg=o, pose=p)
+        pr2_world.world.move_group(o_name, 'r_gripper_tool_frame')
+        pr2_world.sync()
+        # assert len(pbw.get_body_names()) == 47
 
-        assert scm.symmetric_difference(r.get_self_collision_matrix()) != set()
-        r.reset()
-        assert scm.symmetric_difference(r.get_self_collision_matrix()) == set()
+    def test_compute_collision_matrix_attached(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        pr2_world.init_collision_matrix(RobotName)
+        pr2_world.world.register_group('r_hand', 'r_wrist_roll_link')
+        old_collision_matrix = pr2_world.collision_matrices[RobotName]
+        o = make_world_body_box()
+        p = Pose()
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(o, p)
+        pr2_world.world.move_group(o.name, 'r_gripper_tool_frame')
+        pr2_world.init_collision_matrix(RobotName)
+        assert len(pr2_world.collision_matrices[RobotName]) > len(old_collision_matrix)
+        contains_box = False
+        for entry in pr2_world.collision_matrices[RobotName]:
+            contains_box |= o.name in entry
+            if o.name in entry:
+                contains_box |= True
+                if o.name == entry[0]:
+                    assert entry[1] not in pr2_world.world.groups['r_hand'].links
+                if o.name == entry[1]:
+                    assert entry[0] not in pr2_world.world.groups['r_hand'].links
+        assert contains_box
+        pr2_world.world.delete_branch(o.name)
+        pr2_world.init_collision_matrix(RobotName)
+        assert pr2_world.collision_matrices[RobotName] == old_collision_matrix
 
+    def test_verify_collision_entries_empty(self, donbot_world):
+        ces = []
+        new_ces = donbot_world.verify_collision_entries(ces)
+        assert len(new_ces) == 1
 
-class TestPyBulletWorld(test_world.TestWorld):
-    cls = WorldObject
-    world_cls = PyBulletWorld
+    def test_verify_collision_entries_allow_all(self, donbot_world):
+        ces = [allow_all_entry()]
+        new_ces = donbot_world.verify_collision_entries(ces)
+        assert len(new_ces) == 0
 
-    def test_add_robot(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_add_robot(function_setup)
-        assert_num_pybullet_objects(3)
+    def test_verify_collision_entries_allow_all_self(self, donbot_world):
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.group1 = CollisionEntry.ALL
+        ce.group2 = CollisionEntry.ALL
+        ces = [ce]
+        new_ces = donbot_world.verify_collision_entries(ces)
+        assert len(new_ces) == 0
 
-    def test_add_object(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_add_object(function_setup)
-        assert_num_pybullet_objects(3)
+    def test_verify_collision_entries_unknown_group(self, donbot_world):
+        min_dist = 0.1
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.group1 = 'muh'
+        ce.distance = min_dist
+        ces.append(ce)
+        try:
+            new_ces = donbot_world.verify_collision_entries(ces)
+        except UnknownGroupException:
+            assert True
+        else:
+            assert False, 'expected exception'
 
-    def test_add_object_twice(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_add_object_twice(function_setup)
-        assert_num_pybullet_objects(3)
+    def test_verify_collision_entries_unknown_group2(self, donbot_world):
+        min_dist = 0.1
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.group2 = 'asdf'
+        ce.distance = min_dist
+        ces.append(ce)
+        try:
+            new_ces = donbot_world.verify_collision_entries(ces)
+        except UnknownGroupException:
+            assert True
+        else:
+            assert False, 'expected exception'
 
-    def test_add_object_with_robot_name(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_add_object_with_robot_name(function_setup)
-        assert_num_pybullet_objects(3)
+    def test_verify_collision_entries_cut_off1(self, donbot_world):
+        min_dist = 0.1
+        ces = []
+        ces.append(avoid_all_entry(min_dist))
+        ces.append(allow_all_entry())
+        new_ces = donbot_world.verify_collision_entries(ces)
+        assert len(new_ces) == 0
 
-    def test_hard_reset1(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_hard_reset1(function_setup)
-        assert_num_pybullet_objects(2)
+    def test_collision_goals_to_collision_matrix1(self, donbot_world: CollisionWorldSynchronizer):
+        """
+        test with no collision entries which is equal to avoid all collisions
+        collision matrix should be empty, because world has no collision checker
+        :param test_folder:
+        :return:
+        """
+        min_dist = defaultdict(lambda: 0.05)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix([], min_dist, {})
+        assert len(collision_matrix) == 0
 
-    def test_hard_reset2(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_hard_reset2(function_setup)
-        assert_num_pybullet_objects(2)
+    def test_collision_goals_to_collision_matrix2(self, donbot_world):
+        """
+        avoid all with an added object should enlarge the collision matrix
+        :type donbot_world: PyBulletSyncer
+        """
+        min_dist = defaultdict(lambda: 0.05)
+        base_collision_matrix = donbot_world.collision_goals_to_collision_matrix([], min_dist)
+        name = 'muh'
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name), p)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix([], min_dist)
+        assert len(collision_matrix) == len(base_collision_matrix) + len(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = donbot_world.robot.link_names
+        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
+            assert dist == min_dist[robot_link]
+            if body_b == name:
+                assert body_b_link == name
+            assert robot_link in robot_link_names
 
-    def test_soft_reset1(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_soft_reset1(function_setup)
-        assert_num_pybullet_objects(3)
+    def test_collision_goals_to_collision_matrix3(self, donbot_world):
+        """
+        empty list should have the same effect than avoid all entry
+        :type donbot_world: PyBulletSyncer
+        """
+        min_dist = defaultdict(lambda: 0.05)
+        base_collision_matrix = donbot_world.collision_goals_to_collision_matrix([], min_dist)
+        name = 'muh'
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name), p)
+        ces = []
+        ces.append(avoid_all_entry(min_dist))
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix(ces, min_dist)
+        assert len(collision_matrix) == len(base_collision_matrix) + len(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = donbot_world.robot.link_names
+        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
+            assert dist == min_dist[robot_link]
+            if body_b == name:
+                assert body_b_link == name
+            assert robot_link in robot_link_names
 
-    def test_soft_reset2(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_soft_reset2(function_setup)
-        assert_num_pybullet_objects(3)
+    def test_collision_goals_to_collision_matrix4(self, donbot_world):
+        """
+        allow all should lead to an empty collision matrix
+        :param test_folder:
+        :return:
+        """
+        name = 'muh'
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name), p)
 
-    def test_remove_object1(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_remove_object1(function_setup)
-        assert_num_pybullet_objects(3)
+        ces = []
+        ces.append(allow_all_entry())
+        ces.append(allow_all_entry())
+        min_dist = defaultdict(lambda: 0.05)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix(ces, min_dist)
 
-    def test_remove_object2(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_remove_object2(function_setup)
-        assert_num_pybullet_objects(4)
+        assert len(collision_matrix) == 0
 
-    def test_attach_existing_obj_to_robot(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_attach_existing_obj_to_robot1(function_setup)
-        assert_num_pybullet_objects(3)
+    def test_collision_goals_to_collision_matrix_avoid_only_box(self, donbot_world):
+        name = 'muh'
+        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
 
-    def test_collision_goals_to_collision_matrix1(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name), p)
 
-        assert collision_matrix == {('base_link', 'iai_donbot', 'camera_holder_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_base_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_finger_left_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_finger_right_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_gripper_left_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_gripper_right_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_ee_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'charger'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_base_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_finger_left_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_finger_right_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_gripper_left_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_gripper_right_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('e_stop', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('plate', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('plate', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('plate', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('plate', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_ee_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_ee_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('ur5_ee_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('ur5_ee_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_wrist_1_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_wrist_2_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_wrist_3_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('wlan', 'iai_donbot', 'wrist_collision'): 0.05}
+        ces = []
+        ces.append(allow_all_entry())
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.robot_links = [robot_link_names[0]]
+        ce.body_b = name
+        ce.min_dist = 0.1
+        ces.append(ce)
+        min_dist = defaultdict(lambda: 0.1)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix(ces, min_dist)
 
-        return world_with_donbot
+        assert len(collision_matrix) == 1
+        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
+            assert dist == ce.min_dist
+            assert body_b == name
+            assert body_b_link == name
+            assert robot_link in robot_link_names
 
-    def test_attach_detach_existing_obj_to_robot1(self, function_setup):
-        w = super(TestPyBulletWorld, self).test_attach_detach_existing_obj_to_robot1(function_setup)
-        assert_num_pybullet_objects(4)
+    def test_collision_goals_to_collision_matrix6(self, donbot_world):
+        """
+        allow collision with a specific object
+        """
+        name = 'muh'
+        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        min_dist = defaultdict(lambda: 0.1)
 
-    def test_verify_collision_entries_empty(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_empty(test_folder)
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name), p)
 
-    def test_verify_collision_entries_split0(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_split0(test_folder)
+        allowed_link = robot_link_names[0]
 
-    def test_verify_collision_entries_split1(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_split1(test_folder)
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_links = [allowed_link]
+        ce.link_bs = [CollisionEntry.ALL]
+        ce.min_dist = 0.1
+        ces.append(ce)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix(ces, min_dist)
 
-    def test_verify_collision_entries_split2(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_split2(test_folder)
+        assert len([x for x in collision_matrix if x[0] == allowed_link]) == 0
+        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
+            assert dist == min_dist[robot_link]
+            if body_b == name:
+                assert body_b_link == name
+            assert robot_link in robot_link_names
 
-    def test_verify_collision_entries_split3(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_split3(test_folder)
+    def test_collision_goals_to_collision_matrix7(self, donbot_world):
+        """
+        allow collision with specific object
+        """
+        name = 'muh'
+        name2 = 'muh2'
+        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        min_dist = defaultdict(lambda: 0.05)
 
-    def test_verify_collision_entries_split4(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_split4(test_folder)
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name), p)
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name2), p)
 
-    def test_collision_goals_to_collision_matrix3(self, test_folder):
-        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix3(test_folder)
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.body_b = name2
+        ce.min_dist = 0.1
+        ces.append(ce)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix(ces, min_dist)
 
-    def test_collision_goals_to_collision_matrix5(self, test_folder):
-        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix5(test_folder)
+        assert len([x for x in collision_matrix if x[2] == name2]) == 0
+        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
+            assert dist == min_dist[robot_link]
+            if body_b == name:
+                assert body_b_link == name
+            assert robot_link in robot_link_names
 
-    def test_collision_goals_to_collision_matrix6(self, test_folder):
-        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix6(test_folder)
+    def test_collision_goals_to_collision_matrix8(self, donbot_world):
+        """
+        allow collision between specific object and link
+        """
+        name = 'muh'
+        name2 = 'muh2'
+        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        allowed_link = robot_link_names[0]
+        min_dist = defaultdict(lambda: 0.05)
 
-    def test_collision_goals_to_collision_matrix7(self, test_folder):
-        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix7(test_folder)
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name), p)
+        p = Pose()
+        p.orientation.w = 1
+        donbot_world.world.add_world_body(make_world_body_box(name2), p)
 
-    def test_collision_goals_to_collision_matrix8(self, test_folder):
-        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix8(test_folder)
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_links = [allowed_link]
+        ce.body_b = name2
+        ce.min_dist = 0.1
+        ces.append(ce)
+        collision_matrix = donbot_world.collision_goals_to_collision_matrix(ces, min_dist)
 
-    def test_collision_goals_to_collision_matrix9(self, test_folder):
-        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix9(test_folder)
+        assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
+        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
+            assert dist == min_dist[robot_link]
+            if body_b != donbot_world.robot.name:
+                assert body_b_link == name or body_b_link == name2
+            assert robot_link in robot_link_names
+            if body_b == name2:
+                assert robot_link != robot_link_names[0]
 
-    def test_verify_collision_entries_allow_all(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_allow_all(test_folder)
+    def test_collision_goals_to_collision_matrix9(self, pr2_world):
+        """
+        allow self collision
+        """
+        min_dist = defaultdict(lambda: 0.05)
+        ces = []
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.robot_links = ['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link',
+                                       'l_gripper_l_finger_link', 'l_gripper_r_finger_link',
+                                       'l_gripper_r_finger_link', 'l_gripper_palm_link']
+        collision_entry.body_b = pr2_world.robot.name
+        collision_entry.link_bs = ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link',
+                                   'r_forearm_link', 'r_forearm_link']
+        ces.append(collision_entry)
 
-    def test_verify_collision_entries_cut_off1(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_cut_off1(test_folder)
+        collision_matrix = pr2_world.collision_goals_to_collision_matrix(ces, min_dist)
 
-    def test_verify_collision_entries_split5(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_split5(test_folder)
+        for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
+            assert not (robot_link in collision_entry.robot_links and body_b_link in collision_entry.link_bs)
+            assert not (body_b_link in collision_entry.robot_links and robot_link in collision_entry.link_bs)
 
-    def test_verify_collision_entries_allow_all_self(self, test_folder):
-        super(TestPyBulletWorld, self).test_verify_collision_entries_allow_all_self(test_folder)
+    def test_collision_goals_to_collision_matrix10(self, pr2_world):
+        """
+        avoid self collision with only specific links
+        :param test_folder:
+        :return:
+        """
+        min_dist = defaultdict(lambda: 0.05)
+        ces = [allow_all_entry()]
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_links = ['base_link']
+        collision_entry.body_b = RobotName
+        collision_entry.link_bs = ['r_wrist_flex_link']
+        ces.append(collision_entry)
 
-    def test_check_collisions(self, test_folder):
-        w = self.make_world_with_pr2()
-        pr22 = self.cls(pr2_urdf())
-        pr22.set_name('pr22')
-        w.add_object(pr22)
-        base_pose = Pose()
-        base_pose.position.x = 10
-        base_pose.orientation.w = 1
-        w.set_object_pose('pr22', base_pose)
-        robot_links = pr22.get_link_names()
-        cut_off_distances = {(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2)}
+        collision_matrix = pr2_world.collision_goals_to_collision_matrix(ces, min_dist)
 
-        assert len(w.check_collisions(cut_off_distances).all_collisions) == 0
+        assert {('base_link', RobotName, 'r_wrist_flex_link'): 0.05} == collision_matrix
 
-    def test_check_collisions2(self, test_folder):
-        w = self.make_world_with_pr2()
-        pr22 = self.cls(pr2_urdf())
-        pr22.set_name('pr22')
-        w.add_object(pr22)
-        base_pose = Pose()
-        base_pose.position.x = 0.05
-        base_pose.orientation.w = 1
-        w.set_object_pose('pr22', base_pose)
-
-        pr23 = self.cls(pr2_urdf())
-        pr23.set_name('pr23')
-        w.add_object(pr23)
-        base_pose = Pose()
-        base_pose.position.y = 0.05
-        base_pose.orientation.w = 1
-        w.set_object_pose('pr23', base_pose)
-
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
-        cut_off_distances = w.collision_goals_to_collision_matrix([], min_dist)
-
-        for i in range(160):
-            assert len(w.check_collisions(cut_off_distances).all_collisions) == 1328
-
-    def test_check_collisions3(self, test_folder):
-        w = self.make_world_with_pr2()
-        pr22 = self.cls(pr2_urdf())
-        pr22.set_name('pr22')
-        w.add_object(pr22)
-        base_pose = Pose()
-        base_pose.position.x = 1.5
-        base_pose.orientation.w = 1
-        w.set_object_pose('pr22', base_pose)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
-        cut_off_distances = w.collision_goals_to_collision_matrix([], min_dist)
-        robot_links = pr22.get_link_names()
-        cut_off_distances.update({(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2)})
-
-        for i in range(160):
-            assert len(w.check_collisions(cut_off_distances).all_collisions) == 60
-
-    # TODO test that has collision entries of robot links without collision geometry
-
-    # TODO test that makes sure adding avoid specific self collisions works
+# import pytest
+# pytest.main(['-s', __file__ + '::TestPyBulletSyncer::test_compute_collision_matrix'])

@@ -1,85 +1,117 @@
 parent: !include default.yaml
+robot_interface:
+  base:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+    fill_velocity_values: True
+  body:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/body/follow_joint_trajectory
+    state_topic: /whole_body_controller/body/state
+    fill_velocity_values: False
 general_options:
-  joint_vel_limit: # giskard will use the min of this number and limits from the urdf
-    linear: # m/s
-      default: 1
-      override:
-        odom_x_joint: 0.5
-        odom_y_joint: 0.5
-    angular: # rad/s
-      default: 1
-      override:
-        odom_z_joint: 0.6
-        head_pan_joint: 0.5
-        head_tilt_joint: 0.5
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
-    default: 0.01
-    override:
-      odom_x_joint: 0.05
-      odom_y_joint: 0.05
-      odom_z_joint: 0.05
-      torso_lift_joint: 0.05
+    velocity:
+      default: 0.001
+      override: {}
+    acceleration:
+      default: 0
+      override: { }
+    jerk:
+      default: 0.001
+      override: { }
+#    snap:
+#      default: 0
+#      override: { }
+  joint_limits: # giskard will use the min of this number and limits from the urdf
+    velocity:
+      linear: # m/s
+        default: 1
+        override:
+          odom_x_joint: 0.5
+          odom_y_joint: 0.5
+      angular: # rad/s
+        default: 1
+        override:
+          odom_z_joint: 0.6
+          head_pan_joint: 0.5
+          head_tilt_joint: 0.5
+    acceleration:
+      linear: # m/s**2
+        default: 1e3
+        override: { }
+      angular: # rad/s**2
+        default: 1e3
+        override: { }
+    jerk:
+      linear: # m/s**3
+        default: 30
+        override:
+          torso_lift_joint: 5
+          odom_x_joint: 5
+          odom_y_joint: 5
+      angular: # rad/s**3
+        default: 30
+        override:
+          odom_z_joint: 10
+#    snap:
+#      linear: # m/s**4
+#        default: 250
+#        override: { }
+#      angular: # rad/s**3
+#        default: 250
+#        override: { }
 plugins:
   LoopDetector:
     precision: 4 # decimal places
 collision_avoidance:
   external_collision_avoidance:
-    distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links
-      default:
-        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
-        soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-      override:
-        zero: &zero
-          hard_threshold: 0.0
-          soft_threshold: 0.0
-        5cm: &5cm
-          hard_threshold: 0.0
-          soft_threshold: 0.05
-        25mm: &25mm
-          hard_threshold: 0.0
-          soft_threshold: 0.025
-        odom_z_joint: # this affects all links between this and the next controlled joint
-          hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
-          soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-        r_forearm_roll_joint: *25mm
-        l_forearm_roll_joint: *25mm
-        r_elbow_flex_joint: *5cm
-        l_elbow_flex_joint: *5cm
-        r_wrist_roll_joint: *5cm
-        l_wrist_roll_joint: *5cm
-        r_wrist_flex_joint: *5cm
-        l_wrist_flex_joint: *5cm
-    # each controlled joint gets pushed away from its X nearest objects
-    # to reduce the runtime, you can set different values for joints that control end effectors
-    number_of_repeller:
-      default: 1
-      end_effector_joints: 4
+    default:
+      hard_threshold: 0.0
+      soft_threshold: 0.1
+    override:
+      4eef: &4eef
+        number_of_repeller: 4
+        hard_threshold: 0.00
+        soft_threshold: 0.05
+      2eef: &2eef
+        number_of_repeller: 2
+        hard_threshold: 0.00
+        soft_threshold: 0.05
+      50mm: &50mm
+        hard_threshold: 0.00
+        soft_threshold: 0.05
+      25mm: &25mm
+        number_of_repeller: 2
+        hard_threshold: 0.00
+        soft_threshold: 0.025
+      r_wrist_roll_joint: *4eef
+      l_wrist_roll_joint: *4eef
+      r_forearm_roll_joint: *25mm
+      l_forearm_roll_joint: *25mm
+      r_elbow_flex_joint: *50mm
+      l_elbow_flex_joint: *50mm
+      r_wrist_flex_joint: *2eef
+      l_wrist_flex_joint: *2eef
   self_collision_avoidance:
-    distance_thresholds: # thresholds for self collision avoidance are set for each link pair
-      default: &default # you can set variables and reuse them
-        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
-        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-      override:
-        # examples, that don't have an affect:
-        base_link: *default  # this would count for all pairs containing 'base_link', if not specified otherwise
-        base_link, r_upper_arm_link: *default # you can set thresholds for specific pairs
-        bl_caster_l_wheel_link: *zero
-        bl_caster_r_wheel_link: *zero
-        bl_caster_rotation_link: *zero
-        br_caster_l_wheel_link: *zero
-        br_caster_r_wheel_link: *zero
-        br_caster_rotation_link: *zero
-        fl_caster_l_wheel_link: *zero
-        fl_caster_r_wheel_link: *zero
-        fl_caster_rotation_link: *zero
-        fr_caster_l_wheel_link: *zero
-        fr_caster_r_wheel_link: *zero
-        fr_caster_rotation_link: *zero
-    ignore: [] # list pairs of links that should be removed from the self collision avoidance
-#    ignore: #example
-#      - [base_link, l_upper_arm_link]
-    add: [] # list pairs of links that should be added to the self collision matrix
+    ignore: # list pairs of links that should be removed from the self collision avoidance
+      - bl_caster_l_wheel_link
+      - bl_caster_r_wheel_link
+      - bl_caster_rotation_link
+      - br_caster_l_wheel_link
+      - br_caster_r_wheel_link
+      - br_caster_rotation_link
+      - fl_caster_l_wheel_link
+      - fl_caster_r_wheel_link
+      - fl_caster_rotation_link
+      - fr_caster_l_wheel_link
+      - fr_caster_r_wheel_link
+      - fr_caster_rotation_link
+      - l_shoulder_lift_link
+      - r_shoulder_lift_link
+      - base_link
+    add: [ ] # list pairs of links that should be added to the self collision matrix
     number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it
-

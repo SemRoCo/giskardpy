@@ -1,46 +1,23 @@
 parent: !include default.yaml
-general_options:
-  joint_vel_limit: # giskard will use the min of this number and limits from the
-    linear: # m/s
-      default: 0.5
-      override:
-        odom_x_joint: 0.5
-        odom_y_joint: 0.5
-    angular: # rad/s
-      default: 0.5
-      override:
-        odom_z_joint: 0.6
-        left_arm_5_joint: 0.5
-        left_arm_6_joint: 0.5
-  joint_weights:
-    # the planner prefers low weight joints to achieve solutions
-    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
-    default: 0.01
-    override:
-      odom_x_joint: 0.05
-      odom_y_joint: 0.05
-      odom_z_joint: 0.05
-      torso_lift_joint: 0.05
-plugins:
-  GoalReached:
-    joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
-    window_size: 21 # in sample points, should be identical to WiggleCancel window_size
-  WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    amplitude_threshold: 0.15 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
-    window_size: 21 # size of the moving window of sample points
-    frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
-collision_avoidance:
-  external_collision_avoidance:
-    distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links
-      default:
-        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
-        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-      override:
-        odom_z_joint: # this affects all links between this and the next controlled joint
-          hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
-          soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-    # each controlled joint gets pushed away from its X nearest objects
-    # to reduce the runtime, you can set different values for joints that control end effectors
-    number_of_repeller:
-      default: 1
-      end_effector_joints: 4
+robot_interface:
+  base:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+  torso:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/torso/follow_joint_trajectory
+    state_topic: /whole_body_controller/torso/state
+  neck:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/neck/follow_joint_trajectory
+    state_topic: /whole_body_controller/neck/state
+  left_arm:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/left_arm/follow_joint_trajectory
+    state_topic: /whole_body_controller/left_arm/state
+  right_arm:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/right_arm/follow_joint_trajectory
+    state_topic: /whole_body_controller/right_arm/state
+

@@ -1,9 +1,10 @@
 from __future__ import division
 
+import numpy as np
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 
 
 class CartesianPosition(Goal):
@@ -126,12 +127,19 @@ class CartesianPositionStraight(Goal):
                                                   max_velocity=self.max_velocity,
                                                   weight=self.weight)
 
+    def norm_rot_m(self, R, scale=1.0):
+        R[:3, 0] = w.scale(R[:3, 0], scale)
+        R[:3, 1] = w.scale(R[:3, 1], scale)
+        R[:3, 2] = w.scale(R[:3, 2], scale)
+        return R
+
     def make_constraints(self):
         root_P_goal = self.get_parameter_as_symbolic_expression('goal_point')
-        tip_P_goal = self.get_parameter_as_symbolic_expression('tip_goal_point')
         root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
-        root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start_pose'))
-
+        dist = w.norm(root_P_goal - root_P_tip)
+        t_T_r = self.get_fk(self.tip_link, self.root_link)
+        tip_start_P_goal = w.dot(t_T_r, root_P_goal)
+        # tip_start_P_goal = self.get_parameter_as_symbolic_expression('tip_goal_point')
         # Constraint to go to goal pos
         #self.add_norm_point_goal_constraints(frame_P_current=root_P_tip,
         #                                     frame_P_goal=root_P_goal,
@@ -139,37 +147,41 @@ class CartesianPositionStraight(Goal):
         #                                     weight=self.weight,
         #                                     name_suffix='goal')
 
-        dist, _ = w.distance_point_to_line_segment(root_P_tip,
-                                                   root_V_start,
-                                                   root_P_goal)
-        tip_P_error = tip_P_goal[:3]
+        #dist, _ = w.distance_point_to_line_segment(root_P_tip,
+        #                                           root_V_start,
+        #                                           root_P_goal)
+        tip_P_error = tip_start_P_goal[:3]
         trans_error = w.norm(tip_P_error)
-        trans_scale = self.get_sampling_period_symbol() * self.reference_velocity
-        tip_P_intermediate_error = w.save_division(tip_P_error, trans_error)[:3] * trans_scale
-        tip_P_intermediate_y = [0, 1, 0] * trans_scale # TODO: rmv [0,1,0] and add random vec on err?
+        tip_P_intermediate_error = w.save_division(tip_P_error, trans_error)[:3] #* trans_scale
+        tip_P_intermediate_y = w.scale(w.Matrix(np.random.random((3,))), 1)
         y = w.cross(tip_P_intermediate_error, tip_P_intermediate_y)
         z = w.cross(tip_P_intermediate_error, y)
-        t_R_a = w.Matrix([[tip_P_intermediate_error[0], y[0], z[0], 0],
-                          [tip_P_intermediate_error[1], y[1], z[1], 0],
-                          [tip_P_intermediate_error[2], y[2], z[2], 0],
-                          [0, 0, 0, 1]]) # todo norm, add tf publisher
-        #r_g = w.rotation_matrix_from_quaternion(a[0], a[1], a[2],
-        #                                        w.sqrt((w.norm(tip_P_intermediate_start)**2) *
-        #                                               (w.norm(tip_P_intermediate_error)**2)) +
-        #                                        w.dot(w.ca.transpose(tip_P_intermediate_start),
-        #                                              tip_P_intermediate_error))
-        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        a_T_t = w.dot(w.inverse_frame(t_R_a),
+        t_R_a = w.Matrix([[tip_P_intermediate_error[0], -z[0], y[0], 0],
+                          [tip_P_intermediate_error[1], -z[1], y[1], 0],
+                          [tip_P_intermediate_error[2], -z[2], y[2], 0],
+                          [0, 0, 0, 1]])
+        #
+        #v1 = [1, 0, 0]
+        #v2 = tip_P_intermediate_error
+        #a = w.cross(v1, v2)
+        #t_R_a = w.rotation_matrix_from_quaternion(a[0], a[1], a[2],
+        #                                          w.sqrt((w.norm(v1)**2) * (w.norm(v2)**2)) +
+        #                                          w.dot(w.ca.transpose(v1), v2))
+        # hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        t_R_a = self.norm_rot_m(t_R_a)
+        a_T_t = w.dot(w.inverse_frame(t_R_a) ,
                       self.get_fk_evaluated(self.tip_link, self.root_link),
-                      self.get_fk(self.root_link, self.tip_link),
-                      hack)
-        self.add_debug_vector()
+                      self.get_fk(self.root_link, self.tip_link))
+        #self.add_debug_vector('t_T_a',  w.position_of(w.inverse_frame(a_T_t)))
+        #self.add_debug_vector('t_R_a1', t_R_a[:,1])
+        #self.add_debug_vector('t_R_a2', t_R_a[:,2])
+        #self.add_debug_vector('t_R_a0', t_R_a[:,0])
+        self.add_debug_expr('error', dist)
         expr_p = w.position_of(a_T_t)
-        # self.add_debug_expr('error', w.norm(r_P_intermediate_error))
         self.add_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
                                    lower_errors=[dist, 0, 0],
                                    upper_errors=[dist, 0, 0],
-                                   weights=[self.weight] * 3,
+                                   weights=[WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA],
                                    expressions=expr_p[:3],
                                    name_suffixes=['{}/x'.format('line'),
                                                   '{}/y'.format('line'),
@@ -187,10 +199,10 @@ class CartesianPositionStraight(Goal):
         #                    expression=w.ca.SX(1),
         #                    name_suffix='dist')
 
-        if self.max_velocity is not None:
-            self.add_translational_velocity_limit(frame_P_current=root_P_tip,
-                                                  max_velocity=self.max_velocity,
-                                                  weight=self.weight)
+        #if self.max_velocity is not None:
+        #    self.add_translational_velocity_limit(frame_P_current=root_P_tip,
+        #                                          max_velocity=self.max_velocity,
+        #                                          weight=self.weight)
 
 
 class CartesianPose(Goal):

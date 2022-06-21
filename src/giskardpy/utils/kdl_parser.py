@@ -54,7 +54,7 @@ def urdf_inertial_to_kdl_rbi(i):
     return origin.M * rbi
 
 def kdl_tree_from_urdf_model(urdf):
-    root = urdf.get_root()
+    root = urdf.get_robot_root_link()
     tree = kdl.Tree(root)
     def add_children_to_tree(parent):
         if parent in urdf.child_map:

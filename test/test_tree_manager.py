@@ -85,10 +85,9 @@ def giskard(ros):
     yield c
     tree_manager = c.god_map.get_data(identifier.tree_manager)
     tree_manager.get_node('pybullet updater').srv_update_world.shutdown()
-    tree_manager.get_node('pybullet updater').get_object_names.shutdown()
+    tree_manager.get_node('pybullet updater').get_group_names_cb.shutdown()
     tree_manager.get_node('pybullet updater').get_object_info_cb.shutdown()
     tree_manager.get_node('pybullet updater').get_attached_objects.shutdown()
-    tree_manager.get_node('pybullet updater').update_rviz_markers.shutdown()
     tree_manager.get_node('coll').srv_activate_rendering.shutdown()
     c.tree.blackboard_exchange.get_blackboard_variables_srv.shutdown()
     c.tree.blackboard_exchange.open_blackboard_watcher_srv.shutdown()

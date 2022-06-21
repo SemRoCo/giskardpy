@@ -10,7 +10,7 @@ from sortedcontainers import SortedList
 
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
-from giskardpy import identifier, RobotName
+from giskardpy import identifier
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
@@ -202,6 +202,7 @@ class TreeManager(object):
         else:
             self.tree = tree
         self.tree_nodes = {}
+        collision_scene.reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
         self.render()
@@ -225,7 +226,7 @@ class TreeManager(object):
         return self
 
     def live(self):
-        sleeper = rospy.Rate(self.god_map.get_data(identifier.tree_tick_rate))
+        sleeper = rospy.Rate(1/self.god_map.get_data(identifier.tree_tick_rate))
         logging.loginfo('giskard is ready')
         while not rospy.is_shutdown():
             try:
@@ -502,8 +503,10 @@ class OpenLoop(TreeManager):
     def grow_sync_branch(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(running_is_success(SyncConfiguration)('update robot configuration', RobotName))
-        sync.add_child(SyncLocalization('update robot localization', RobotName))
+        sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
+                                                             self.god_map.unsafe_get_data(identifier.robot_group_name)))
+        sync.add_child(SyncLocalization('update robot localization',
+                                        self.god_map.unsafe_get_data(identifier.robot_group_name)))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -544,10 +547,12 @@ class OpenLoop(TreeManager):
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                  self.action_server_name,
                                                                  MoveFeedback.PLANNING))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_2.add_child(running_is_failure(VisualizationBehavior)('visualization'))
-        if self.god_map.get_data(identifier.enable_CPIMarker) and self.god_map.get_data(
-                identifier.collision_checker) is not None:
+        if self.god_map.get_data(identifier.enable_CPIMarker) \
+                and self.god_map.get_data(identifier.collision_checker) is not None \
+                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
             planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         planning_2.add_child(self.grow_planning3())
@@ -559,10 +564,12 @@ class OpenLoop(TreeManager):
         planning_3.add_child(running_is_success(TimePlugin)('time for zero velocity'))
         planning_3.add_child(AppendZeroVelocity('append zero velocity'))
         planning_3.add_child(running_is_success(LogTrajPlugin)('log zero velocity'))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_3.add_child(running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
-        if self.god_map.get_data(identifier.enable_CPIMarker) and self.god_map.get_data(
-                identifier.collision_checker) is not None:
+        if self.god_map.get_data(identifier.enable_CPIMarker) \
+                and self.god_map.get_data(identifier.collision_checker) is not None \
+                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
             planning_3.add_child(running_is_success(CollisionMarker)('collision marker'))
         return planning_3
 
@@ -570,8 +577,10 @@ class OpenLoop(TreeManager):
         planning_4 = PluginBehavior('planning IIII')
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_plugin(CollisionChecker('collision checker'))
-        # planning_4.add_plugin(VisualizationBehavior('visualization'))
-        # planning_4.add_plugin(CollisionMarker('cpi marker'))
+        if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+            planning_4.add_plugin(VisualizationBehavior('visualization'))
+        if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+            planning_4.add_plugin(CollisionMarker('cpi marker'))
         planning_4.add_plugin(ControllerPlugin('controller'))
         planning_4.add_plugin(KinSimPlugin('kin sim'))
         planning_4.add_plugin(LogTrajPlugin('log'))
@@ -648,7 +657,8 @@ class ClosedLoop(OpenLoop):
             C = behaviors[params['plugin']]
             del params['plugin']
             planning_4.add_plugin(C(execution_action_server_name, **params))
-        planning_4.add_plugin(SyncConfiguration2('update robot configuration', RobotName))
+        planning_4.add_plugin(SyncConfiguration2('update robot configuration',
+                                                 self.god_map.unsafe_get_data(identifier.robot_group_name)))
         planning_4.add_plugin(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_plugin(CollisionChecker('collision checker'))
@@ -667,8 +677,8 @@ class ClosedLoop(OpenLoop):
         return planning_4
 
 
-def sanity_check(god_map):
-    check_velocity_limits_reachable(god_map)
+# def sanity_check(god_map):
+#     check_velocity_limits_reachable(god_map)
 
 
 def sanity_check_derivatives(god_map):
@@ -695,27 +705,27 @@ def check_derivatives(entries, name):
             '{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
 
 
-def check_velocity_limits_reachable(god_map):
-    # TODO a more general version of this
-    robot = god_map.get_data(identifier.robot)
-    sample_period = god_map.get_data(identifier.sample_period)
-    prediction_horizon = god_map.get_data(identifier.prediction_horizon)
-    print_help = False
-    for joint_name in robot.get_joint_names():
-        velocity_limit = robot.get_joint_limit_expr_evaluated(joint_name, 1, god_map)
-        jerk_limit = robot.get_joint_limit_expr_evaluated(joint_name, 3, god_map)
-        velocity_limit_horizon = max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period)
-        if velocity_limit_horizon < velocity_limit:
-            logging.logwarn('Joint \'{}\' '
-                            'can reach at most \'{:.4}\' '
-                            'with to prediction horizon of \'{}\' '
-                            'and jerk limit of \'{}\', '
-                            'but limit in urdf/config is \'{}\''.format(joint_name,
-                                                                        velocity_limit_horizon,
-                                                                        prediction_horizon,
-                                                                        jerk_limit,
-                                                                        velocity_limit
-                                                                        ))
-            print_help = True
-    if print_help:
-        logging.logwarn('Check utils.py/max_velocity_from_horizon_and_jerk for help.')
+# def check_velocity_limits_reachable(god_map):
+#     # TODO a more general version of this
+#     robot = god_map.get_data(identifier.robot)
+#     sample_period = god_map.get_data(identifier.sample_period)
+#     prediction_horizon = god_map.get_data(identifier.prediction_horizon)
+#     print_help = False
+#     for joint_name in robot.get_joint_names():
+#         velocity_limit = robot.get_joint_limit_expr_evaluated(joint_name, 1, god_map)
+#         jerk_limit = robot.get_joint_limit_expr_evaluated(joint_name, 3, god_map)
+#         velocity_limit_horizon = max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period)
+#         if velocity_limit_horizon < velocity_limit:
+#             logging.logwarn('Joint \'{}\' '
+#                             'can reach at most \'{:.4}\' '
+#                             'with to prediction horizon of \'{}\' '
+#                             'and jerk limit of \'{}\', '
+#                             'but limit in urdf/config is \'{}\''.format(joint_name,
+#                                                                         velocity_limit_horizon,
+#                                                                         prediction_horizon,
+#                                                                         jerk_limit,
+#                                                                         velocity_limit
+#                                                                         ))
+#             print_help = True
+#     if print_help:
+#         logging.logwarn('Check utils.py/max_velocity_from_horizon_and_jerk for help.')

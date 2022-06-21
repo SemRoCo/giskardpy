@@ -34,7 +34,11 @@ class PhysicsWorldException(GiskardException):
 
 
 # int64 UNKNOWN_OBJECT=6
-class UnknownBodyException(PhysicsWorldException, KeyError):
+class UnknownGroupException(PhysicsWorldException, KeyError):
+    pass
+
+
+class UnknownLinkException(PhysicsWorldException, KeyError):
     pass
 
 

@@ -12,5 +12,4 @@ NORMAL = 1
 ERROR = 2
 PRINT_LEVEL = NORMAL
 
-RobotName = 'robot'
 RobotPrefix = None

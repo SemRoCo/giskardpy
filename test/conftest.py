@@ -69,9 +69,11 @@ def kitchen_setup(better_pose):
     :return: GiskardTestWrapper
     """
     object_name = 'kitchen'
-    better_pose.add_urdf(object_name, rospy.get_param('kitchen_description'),
-                              tf.lookup_pose('map', 'iai_kitchen/world'), '/kitchen/joint_states',
-                              set_js_topic='/kitchen/cram_joint_states')
+    better_pose.add_urdf(name=object_name,
+                         urdf=rospy.get_param('kitchen_description'),
+                         pose=tf.lookup_pose('map', 'iai_kitchen/world'),
+                         js_topic='/kitchen/joint_states',
+                         set_js_topic='/kitchen/cram_joint_states')
     js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
     better_pose.set_kitchen_js(js)
     return better_pose

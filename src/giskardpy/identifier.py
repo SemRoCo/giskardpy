@@ -90,6 +90,8 @@ amplitude_threshold = plugins + ['WiggleCancel', 'amplitude_threshold']
 num_samples_in_fft = plugins + ['WiggleCancel', 'window_size']
 frequency_range = plugins + ['WiggleCancel', 'frequency_range']
 
+LoopDetector_precision = plugins + [u'LoopDetector', u'precision']
+
 joint_convergence_threshold = plugins + ['GoalReached', 'joint_convergence_threshold']
 GoalReached_window_size = plugins + ['GoalReached', 'window_size']
 

@@ -166,6 +166,8 @@ class TestJointGoals(object):
                    'head_pan_joint': head_pan_joint_limits[0] - 0.2}
         zero_pose.set_joint_goal(goal_js, check=False)
         zero_pose.plan_and_execute()
+        js = {u'torso_lift_joint': 0.32}
+        zero_pose.send_and_check_joint_goal(js)
 
         goal_js = {'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
                    'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,

@@ -325,6 +325,30 @@ class GiskardWrapper(object):
         """
         self.set_json_goal(constraint_type='OverwriteWeights', updates=updates, **kwargs)
 
+    def set_open_drawer_goal(self, tip_link, object_name_prefix, object_link_name, distance_goal,
+                           weight=WEIGHT_ABOVE_CA):
+        """
+        :type tip_link: str
+        :param tip_link: tip of manipulator (gripper) which is used
+        :type object_name_prefix: object name link prefix
+        :param object_name_prefix: string
+        :type object_link_name str
+        :param object_link_name name of the object link name
+        :type object_link_name str
+        :param object_link_name knob to grasp
+        :type distance_goal: float
+        :param distance_goal: how far to open
+        :type weight float
+        :param weight Default = WEIGHT_ABOVE_CA
+        """
+        self.set_json_goal(u'OpenDrawer',
+                           tip_link=tip_link,
+                           object_name=object_name_prefix,
+                           object_link_name=object_link_name,
+                           distance_goal=distance_goal,
+                           weight=weight
+                           )
+
     def set_pointing_goal(self,
                           tip_link: str,
                           goal_point: PointStamped,

@@ -56,6 +56,8 @@ plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
     window_size: 21 # in sample points, should be identical to WiggleCancel window_size
+  LoopDetector:
+    precision: 3 # decimal places
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
     in_planning_loop: False

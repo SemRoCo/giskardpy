@@ -7,13 +7,19 @@ from time import time
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import rospy
+from geometry_msgs.msg import Quaternion, TransformStamped
+from tf.transformations import quaternion_about_axis
+from tf2_msgs.msg import TFMessage
 
+import giskardpy.utils.tfwrapper
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import np_to_kdl, kdl_to_quaternion
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import memoize, create_path
 
@@ -498,7 +504,8 @@ class QPController(object):
 
     def __init__(self, sample_period, prediction_horizon, solver_name,
                  free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
-                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None):
+                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None,
+                 tf_topic=None):
         self.time_collector = time_collector
         self.free_variables = []  # type: list[FreeVariable]
         self.constraints = []  # type: list[Constraint]
@@ -509,6 +516,7 @@ class QPController(object):
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
         self.retry_weight_factor = retry_weight_factor
+        self.tf_topic = tf_topic
         self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
@@ -594,6 +602,86 @@ class QPController(object):
         """
         # TODO check duplicates
         self.debug_expressions.update(debug_expressions)
+
+    def publish_debug_frame(self, substitutions, world):
+        self.tf_pub = rospy.Publisher(self.tf_topic, TFMessage, queue_size=10)
+        if len(self.debug_expressions.keys()) > 0:
+            debug_exprs = self._eval_debug_exprs(substitutions)
+            p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
+            frames = dict()
+            for r in p_debug.iterrows():
+                full_name = r[0]
+                name = full_name[:len(full_name) - full_name[::-1].index('/')]
+                data = r[1].data
+                if '/t_R_a' in name:
+                    if name in frames:
+                        frames[name].append(data)
+                    else:
+                        frames[name] = [data]
+            tf_msg = TFMessage()
+            # pub basefootprint from world
+            fk = world.get_fk('map', 'base_footprint')
+            parent_link_name = 'map'  # self.world.get_parent_link_of_link(link_name)
+            tf = TransformStamped()
+            tf.header.frame_id = parent_link_name
+            tf.header.stamp = rospy.get_rostime()
+            tf.child_frame_id = 'root_link'
+            tf.transform.translation.x = fk[0, -1]
+            tf.transform.translation.y = fk[1, -1]
+            tf.transform.translation.z = fk[2, -1]
+            tf.transform.rotation = kdl_to_quaternion(np_to_kdl(fk)) # TODO lol
+            tf_msg.transforms.append(tf)
+            # pub joint calc from qp solver
+            sol = self.split_xdot(self.xdot_full)[0]
+            tf = TransformStamped()
+            tf.header.frame_id = 'root_link'
+            tf.header.stamp = rospy.get_rostime()
+            tf.child_frame_id = 'odom_x_and_odom_y'
+            tf.transform.translation.z = 0
+            tf.transform.rotation = Quaternion(0,0,0,1)
+            #tf_msg.transforms.append(tf)
+            for j_n, v in sol.items():
+                if 'odom_x' in j_n:
+                    tf.transform.translation.x = v
+                elif 'odom_y' in j_n:
+                    tf.transform.translation.y = v
+            length = np.sqrt(tf.transform.translation.x**2 + tf.transform.translation.y**2)
+            tf.transform.translation.x /= length
+            tf.transform.translation.y /= length
+            # pub debug constraints
+            for name, pos in frames.items():
+                parent_link_name = 'root_link' #self.world.get_parent_link_of_link(link_name)
+                tf = TransformStamped()
+                tf.header.frame_id = parent_link_name
+                tf.header.stamp = rospy.get_rostime()
+                tf.child_frame_id = name
+                tf.transform.translation.x = pos[0]
+                tf.transform.translation.y = pos[1]
+                tf.transform.translation.z = pos[2]
+                tf.transform.rotation = Quaternion(0, 0, 0, 1)
+                tf_msg.transforms.append(tf)
+            #fk = world.get_fk('map', 'r_gripper_tool_frame')
+            #parent_link_name = 'map'  # self.world.get_parent_link_of_link(link_name)
+            #tf = TransformStamped()
+            #tf.header.frame_id = 'map'
+            #tf.header.stamp = rospy.get_rostime()
+            #tf.child_frame_id = 'root_P_current'
+            #tf.transform.translation.x = fk[0, -1]
+            #tf.transform.translation.y = fk[1, -1]
+            #tf.transform.translation.z = fk[2, -1]
+            #tf.transform.rotation = kdl_to_quaternion(np_to_kdl(fk))  # TODO lol
+            #tf_msg.transforms.append(tf)
+            #tf = TransformStamped()
+            #tf.header.frame_id = 'map'
+            #tf.header.stamp = rospy.get_rostime()
+            #tf.child_frame_id = 'root_P_goal'
+            #tf.transform.translation.x = 1.2 + 1.5
+            #tf.transform.translation.y = 0 + 1
+            #tf.transform.translation.z = 1.0
+            #tf.transform.rotation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+            #tf_msg.transforms.append(tf)
+            self.tf_pub.publish(tf_msg)
+            pass
 
     @profile
     def compile(self):
@@ -776,7 +864,7 @@ class QPController(object):
                self.np_ubA[bA_filter]
 
     @profile
-    def get_cmd(self, substitutions):
+    def get_cmd(self, substitutions, world):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:
@@ -796,6 +884,7 @@ class QPController(object):
         filtered_stuff = self.filter_zero_weight_stuff(*filters)
         try:
             self.xdot_full = self.qp_solver.solve(*filtered_stuff)
+            self.publish_debug_frame(substitutions, world)
         except Exception as e_original:
             if self.retries_with_relaxed_constraints:
                 try:

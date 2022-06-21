@@ -38,7 +38,8 @@ class ControllerPlugin(GiskardBehavior):
             retries_with_relaxed_constraints=self.get_god_map().unsafe_get_data(identifier.retries_with_relaxed_constraints),
             retry_added_slack=self.get_god_map().unsafe_get_data(identifier.retry_added_slack),
             retry_weight_factor=self.get_god_map().unsafe_get_data(identifier.retry_weight_factor),
-            time_collector=self.time_collector
+            time_collector=self.time_collector,
+            tf_topic=self.get_god_map().get_data(identifier.tf_topic)
         )
 
         self.controller.compile()
@@ -50,8 +51,9 @@ class ControllerPlugin(GiskardBehavior):
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)
 
-        next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
+        next_cmds, debug_expressions = self.controller.get_cmd(substitutions, self.world)
         self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
         self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
+        # TODO: plot debug_expressions_evaluated this in DebugTF behavior
 
         return Status.RUNNING

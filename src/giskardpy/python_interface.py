@@ -19,6 +19,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
     GetGroupNames, RegisterGroup
 from giskardpy import identifier
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
+from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.model.world import WorldTree
@@ -34,12 +35,11 @@ class GiskardWrapper(object):
         if giskard_topic is not None:
             self._client = SimpleActionClient(giskard_topic, MoveAction)
             self._update_world_srv = rospy.ServiceProxy(f'{node_name}/update_world', UpdateWorld)
-            # self._dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup) todo
             self._get_group_info_srv = rospy.ServiceProxy(f'{node_name}/get_group_info', GetGroupInfo)
             self._get_group_names_srv = rospy.ServiceProxy(f'{node_name}/get_group_names', GetGroupNames)
             self._register_groups_srv = rospy.ServiceProxy(f'{node_name}/register_groups', RegisterGroup)
             self._marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-            self.dye_group_srv = rospy.ServiceProxy('~dye_group', DyeGroup)
+            self.dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
             rospy.wait_for_service(f'{node_name}/update_world')
             self._client.wait_for_server()
         self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)

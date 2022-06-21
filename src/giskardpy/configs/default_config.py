@@ -64,6 +64,7 @@ class GiskardConfig:
     control_mode: ControlModes = ControlModes.open_loop
     action_server_name: str = '~command'
     path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
+    joint_state_topic = '/joint_states'
     enable_gui: bool = False
     sample_period: float = 0.05
     map_frame: str = 'map'

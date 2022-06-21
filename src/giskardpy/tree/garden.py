@@ -208,22 +208,7 @@ class TreeManager:
     def __init__(self, god_map, tree=None):
         self.god_map = god_map
         self.action_server_name = self.god_map.get_data(identifier.action_server_name)
-
-        # collision_checker = self.god_map.get_data(identifier.collision_checker)
-        # if collision_checker == CollisionChecker.:
-        #     logging.loginfo('Using bpb for collision checking.')
-        #     from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-        #     collision_scene = BetterPyBulletSyncer(world)
-        # elif collision_checker == 'pybullet':
-        #     logging.loginfo('Using pybullet for collision checking.')
-        #     from giskardpy.model.pybullet_syncer import PyBulletSyncer
-        #     collision_scene = PyBulletSyncer(world)
-        # else:
-        #     logging.logwarn(f'Unknown collision checker {collision_checker}. Collision avoidance is disabled')
-        #     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-        #     collision_scene = CollisionWorldSynchronizer(world)
-        #     self.god_map.set_data(identifier.collision_checker, None)
-        # self.god_map.set_data(identifier.collision_scene, collision_scene)
+        self.config = self.god_map.get_data(identifier.giskard)
 
         if tree is None:
             self.tree = BehaviourTree(self.grow_giskard())
@@ -675,7 +660,7 @@ class OpenLoop(TreeManager):
                                                                       identifier.PublishDebugExpressions)))
         for follow_joint_trajectory_config in action_servers:
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
-        base_drive = self.god_map.get_data(identifier.robot_base_drive)
+        base_drive = self.config.drive_interface
         if base_drive is not None:
             self.add_real_time_tracking = True
             real_time_tracking.add_plugin(base_drive.make_plugin())

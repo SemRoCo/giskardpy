@@ -117,13 +117,6 @@ class GiskardConfig:
             'height_per_derivative': 6,
             'normalize_position': True,
             'order': 4,
-            'joint_filter': ['base_footprint_x_vel',
-                             'base_footprint_y_vel',
-                             'base_footprint_rot_vel',
-                             'odom_x',
-                             'odom_y',
-                             'odom_rot',
-                             'r_shoulder_lift_joint'],
             'tick_stride': 0.5,
         },
         'PlotDebugExpressions': {

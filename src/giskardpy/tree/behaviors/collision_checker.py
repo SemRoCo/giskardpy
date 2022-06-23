@@ -49,7 +49,7 @@ class CollisionChecker(GiskardBehavior):
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
             self.collision_list_size = self._cal_max_param('number_of_repeller')
             self.collision_scene.sync()
-            super(CollisionChecker, self).initialise()
+            super().initialise()
         except Exception as e:
             raise_to_blackboard(e)
 

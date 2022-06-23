@@ -5,51 +5,44 @@ from giskardpy.configs.drives import OmniDriveCmdVelInterface
 from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
 
 
-class EndEffector4(CollisionAvoidanceConfig):
+class SuperCloseCollisionAvoidance(CollisionAvoidanceConfig):
     def __init__(self):
-        super().__init__(number_of_repeller=4,
-                         soft_threshold=0.05,
-                         hard_threshold=0.0,
-                         max_velocity=0.2)
+        super().__init__(soft_threshold=0.00001,
+                         hard_threshold=0.0)
 
 
-class EndEffector2(CollisionAvoidanceConfig):
+class CloseCollisionAvoidance(CollisionAvoidanceConfig):
     def __init__(self):
-        super().__init__(number_of_repeller=2,
-                         soft_threshold=0.05,
-                         hard_threshold=0.0,
-                         max_velocity=0.2)
+        super().__init__(soft_threshold=0.02,
+                         hard_threshold=0.005)
 
 
-class PR2(GiskardConfig):
+class Donbot(GiskardConfig):
     ignored_self_collisions = [
-        'bl_caster_l_wheel_link',
-        'bl_caster_r_wheel_link',
-        'bl_caster_rotation_link',
-        'br_caster_l_wheel_link',
-        'br_caster_r_wheel_link',
-        'br_caster_rotation_link',
-        'fl_caster_l_wheel_link',
-        'fl_caster_r_wheel_link',
-        'fl_caster_rotation_link',
-        'fr_caster_l_wheel_link',
-        'fr_caster_r_wheel_link',
-        'fr_caster_rotation_link',
-        'l_shoulder_lift_link',
-        'r_shoulder_lift_link',
-        'base_link',
+        ['ur5_forearm_link', 'ur5_wrist_3_link'],
+        ['ur5_base_link', 'ur5_upper_arm_link']
+    ]
+    add_self_collisions = [
+        ['plate', 'ur5_upper_arm_link']
     ]
     external_collision_avoidance = defaultdict(CollisionAvoidanceConfig.init_100mm,
                                                {
-                                                   'r_wrist_roll_joint': EndEffector4(),
-                                                   'l_wrist_roll_joint': EndEffector4(),
-                                                   'r_elbow_flex_joint': CollisionAvoidanceConfig.init_50mm(),
-                                                   'l_elbow_flex_joint': CollisionAvoidanceConfig.init_50mm(),
-                                                   'r_wrist_flex_joint': EndEffector2(),
-                                                   'l_wrist_flex_joint': EndEffector2(),
-                                                   'r_forearm_roll_joint': CollisionAvoidanceConfig.init_25mm(),
-                                                   'l_forearm_roll_joint': CollisionAvoidanceConfig.init_25mm()
+                                                   'brumbrum': CollisionAvoidanceConfig(
+                                                       number_of_repeller=2,
+                                                       soft_threshold=0.1,
+                                                       hard_threshold=0.05,
+                                                   ),
                                                })
+    self_collision_avoidance = defaultdict(CollisionAvoidanceConfig,
+                                           {
+                                               'ur5_wrist_1_link': CloseCollisionAvoidance(),
+                                               'ur5_wrist_2_link': CloseCollisionAvoidance(),
+                                               'ur5_wrist_3_link': CloseCollisionAvoidance(),
+                                               'ur5_forearm_link': CloseCollisionAvoidance(),
+                                               'ur5_upper_arm_link': CloseCollisionAvoidance(),
+                                               'gripper_gripper_left_link': SuperCloseCollisionAvoidance(),
+                                               'gripper_gripper_right_link': SuperCloseCollisionAvoidance(),
+                                           })
 
     def __init__(self):
         super().__init__()
@@ -67,5 +60,3 @@ class PR2(GiskardConfig):
             cmd_vel_topic='/donbot/cmd_vel',
             parent_link_name='odom',
             child_link_name='base_footprint')
-
-

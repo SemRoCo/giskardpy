@@ -1175,69 +1175,6 @@ class TestPR2CloseLoop(TestPR2):
         self.reset_base()
 
 
-class Donbot(GiskardTestWrapper):
-    default_pose = {
-        'ur5_elbow_joint': 0.0,
-        'ur5_shoulder_lift_joint': 0.0,
-        'ur5_shoulder_pan_joint': 0.0,
-        'ur5_wrist_1_joint': 0.0,
-        'ur5_wrist_2_joint': 0.0,
-        'ur5_wrist_3_joint': 0.0
-    }
-
-    better_pose = {
-        'ur5_shoulder_pan_joint': -np.pi / 2,
-        'ur5_shoulder_lift_joint': -2.44177755311,
-        'ur5_elbow_joint': 2.15026930371,
-        'ur5_wrist_1_joint': 0.291547812391,
-        'ur5_wrist_2_joint': np.pi / 2,
-        'ur5_wrist_3_joint': np.pi / 2
-    }
-
-    def __init__(self):
-        from iai_wsg_50_msgs.msg import PositionCmd
-        self.camera_tip = 'camera_link'
-        self.gripper_tip = 'gripper_tool_frame'
-        self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
-        super(Donbot, self).__init__('package://giskardpy/config/donbot.yaml')
-
-    def move_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                      goal_pose.pose.orientation.y,
-                                                                      goal_pose.pose.orientation.z,
-                                                                      goal_pose.pose.orientation.w]))[0]}
-        self.allow_all_collisions()
-        self.set_joint_goal(js)
-        self.plan_and_execute()
-
-    def open_gripper(self):
-        self.set_gripper(0.109)
-
-    def close_gripper(self):
-        self.set_gripper(0)
-
-    def set_gripper(self, width, gripper_joint='gripper_joint'):
-        """
-        :param width: goal width in m
-        :type width: float
-        """
-        from iai_wsg_50_msgs.msg import PositionCmd
-        width = max(0.0065, min(0.109, width))
-        goal = PositionCmd()
-        goal.pos = width * 1000
-        self.gripper_pub.publish(goal)
-        rospy.sleep(0.5)
-        self.wait_heartbeats()
-        np.testing.assert_almost_equal(self.world.state[gripper_joint].position, width, decimal=3)
-
-    def reset(self):
-        self.clear_world()
-        self.reset_base()
-        self.open_gripper()
-
 
 class BaseBot(GiskardTestWrapper):
     default_pose = {

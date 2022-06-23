@@ -129,8 +129,8 @@ class CartesianPositionStraight(Goal):
         expr_p = w.position_of(a_T_t)
         dist = w.norm(root_P_goal - root_P_tip)
 
-        self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
-        self.add_debug_matrix(self.tip_link + '_R_frame', t_R_a)
+        #self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
+        #self.add_debug_matrix(self.tip_link + '_R_frame', t_R_a)
         #self.add_debug_matrix(self.tip_link + '_T_a', w.inverse_frame(a_T_t))
         #self.add_debug_expr('error', dist)
 

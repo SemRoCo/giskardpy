@@ -97,10 +97,6 @@ joint_convergence_threshold = plugins + ['GoalReached', 'joint_convergence_thres
 GoalReached_window_size = plugins + ['GoalReached', 'window_size']
 
 TFPublisher = plugins + ['TFPublisher']
-tf_topic = TFPublisher + ['tf_topic']
-
-DebugTFPublisher = plugins + ['DebugTFPublisher']
-debug_tfs = DebugTFPublisher + ['debug_tfs']
 
 # reachability check
 reachability_check = rosparam + ['reachability_check']

@@ -5,7 +5,7 @@ general_options:
 plugins:
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
-    in_planning_loop: False
+    in_planning_loop: True
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: True
     in_planning_loop: False

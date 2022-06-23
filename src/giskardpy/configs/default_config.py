@@ -147,6 +147,9 @@ class GiskardConfig:
         'MaxTrajectoryLength': {
             'enabled': True,
             'length': 30
+        },
+        'LoopDetector': {
+            'precision': 3
         }
     }
 

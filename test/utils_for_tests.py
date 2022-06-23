@@ -407,7 +407,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
-        self.giskard = PR2()
+        self.giskard = config_file()
         self.giskard.grow()
         self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server()
@@ -1085,7 +1085,7 @@ class TestPR2(GiskardTestWrapper):
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('pr2/reset', Trigger)
-        super().__init__(GiskardConfig)
+        super().__init__(PR2)
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')

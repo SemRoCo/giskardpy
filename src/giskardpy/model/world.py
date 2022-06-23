@@ -1179,3 +1179,6 @@ class SubWorldTree(WorldTree):
 
     def delete_branch(self, parent_joint):
         raise NotImplementedError()
+
+    def is_link_controlled(self, link_name):
+        return self.world.is_link_controlled(link_name)

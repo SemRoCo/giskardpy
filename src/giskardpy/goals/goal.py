@@ -293,39 +293,6 @@ class Goal(object):
                                                   '{}/y'.format(name_suffix),
                                                   '{}/z'.format(name_suffix)])
 
-    def old_add_norm_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
-        r_P_error = frame_P_goal[:3] - frame_P_current[:3]
-        trans_error = w.norm(r_P_error)
-        trans_scale = self.get_sampling_period_symbol() * reference_velocity
-        r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
-        # self.add_debug_expr('error', w.norm(r_P_intermediate_error))
-        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
-                                   lower_errors=r_P_intermediate_error[:3],
-                                   upper_errors=r_P_intermediate_error[:3],
-                                   weights=[weight] * 3,
-                                   expressions=frame_P_current[:3],
-                                   name_suffixes=['{}/x'.format(name_suffix),
-                                                  '{}/y'.format(name_suffix),
-                                                  '{}/z'.format(name_suffix)])
-
-    def add_norm_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
-        dist, nearest = w.distance_point_to_line_segment(root_P_tip,
-                                                         root_V_start,
-                                                         root_P_goal)
-        r_P_error = frame_P_goal[:3] - frame_P_current[:3]
-        trans_error = w.norm(r_P_error)
-        trans_scale = self.get_sampling_period_symbol() * reference_velocity
-        r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
-        # self.add_debug_expr('error', w.norm(r_P_intermediate_error))
-        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
-                                   lower_errors=r_P_intermediate_error[:3],
-                                   upper_errors=r_P_intermediate_error[:3],
-                                   weights=[weight] * 3,
-                                   expressions=r_P_intermediate_error[:3],
-                                   name_suffixes=['{}/x'.format(name_suffix),
-                                                  '{}/y'.format(name_suffix),
-                                                  '{}/z'.format(name_suffix)])
-
     def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4,
                                          name_suffix=''):
         trans_error = w.norm(frame_P_current)

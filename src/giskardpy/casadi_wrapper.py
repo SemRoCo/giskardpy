@@ -674,6 +674,15 @@ def normalize_axis_angle(axis, angle):
     return axis, angle
 
 
+def normalize_rotation_matrix(R: Matrix) -> Matrix:
+    """Scales each of the axes to the length of one."""
+    scale_v = 1.0
+    R[:3, 0] = scale(R[:3, 0], scale_v)
+    R[:3, 1] = scale(R[:3, 1], scale_v)
+    R[:3, 2] = scale(R[:3, 2], scale_v)
+    return R
+
+
 def quaternion_from_axis_angle(axis, angle):
     """
     :param axis: 3x1 Matrix

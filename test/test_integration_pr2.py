@@ -363,7 +363,7 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose('map', tip)
         compare_orientations(expected.pose.orientation, new_pose.pose.orientation)
 
-    def test_CartesianPoseStraight(self, zero_pose: PR2):
+    def test_CartesianPoseStraight1(self, zero_pose: PR2):
         zero_pose.close_l_gripper()
         goal_position = PoseStamped()
         goal_position.header.frame_id = 'base_link'
@@ -389,6 +389,53 @@ class TestConstraints(object):
         zero_pose.allow_self_collision()
         zero_pose.set_straight_cart_goal(goal_position, zero_pose.l_tip)
         zero_pose.plan_and_execute()
+
+    def test_CartesianPoseStraight2(self, better_pose: PR2):
+        better_pose.close_l_gripper()
+        goal_position = PoseStamped()
+        goal_position.header.frame_id = 'base_link'
+        goal_position.pose.position.x = 0.8
+        goal_position.pose.position.y = 0.5
+        goal_position.pose.position.z = 1
+        goal_position.pose.orientation.w = 1
+
+        start_pose = tf.lookup_pose('map', better_pose.l_tip)
+        map_T_goal_position = tf.transform_pose('map', goal_position)
+
+        object_pose = PoseStamped()
+        object_pose.header.frame_id = 'map'
+        object_pose.pose.position.x = (start_pose.pose.position.x + map_T_goal_position.pose.position.x) / 2.
+        object_pose.pose.position.y = (start_pose.pose.position.y + map_T_goal_position.pose.position.y) / 2.
+        object_pose.pose.position.z = (start_pose.pose.position.z + map_T_goal_position.pose.position.z) / 2.
+        object_pose.pose.position.z += 0.08
+        object_pose.pose.orientation.w = 1
+
+        better_pose.add_sphere('sphere', 0.05, pose=object_pose)
+
+        publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
+
+        goal = deepcopy(object_pose)
+        goal.pose.position.x -= 0.1
+        goal.pose.position.y += 0.4
+        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.plan_and_execute()
+
+        goal = deepcopy(object_pose)
+        goal.pose.position.z -= 0.4
+        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.plan_and_execute()
+
+        goal = deepcopy(object_pose)
+        goal.pose.position.y -= 0.4
+        goal.pose.position.x -= 0.2
+        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.plan_and_execute()
+
+        goal = deepcopy(object_pose)
+        goal.pose.position.x -= 0.4
+        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.plan_and_execute()
+
 
     def test_CartesianVelocityLimit(self, zero_pose: PR2):
         base_linear_velocity = 0.1

@@ -54,6 +54,5 @@ class ControllerPlugin(GiskardBehavior):
         next_cmds, debug_expressions = self.controller.get_cmd(substitutions, self.world)
         self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
         self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
-        # TODO: plot debug_expressions_evaluated this in DebugTF behavior
 
         return Status.RUNNING

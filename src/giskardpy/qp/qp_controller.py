@@ -498,8 +498,7 @@ class QPController(object):
 
     def __init__(self, sample_period, prediction_horizon, solver_name,
                  free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
-                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None,
-                 tf_topic=None):
+                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None):
         self.time_collector = time_collector
         self.free_variables = []  # type: list[FreeVariable]
         self.constraints = []  # type: list[Constraint]
@@ -510,7 +509,6 @@ class QPController(object):
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
         self.retry_weight_factor = retry_weight_factor
-        self.tf_topic = tf_topic
         self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
@@ -778,7 +776,7 @@ class QPController(object):
                self.np_ubA[bA_filter]
 
     @profile
-    def get_cmd(self, substitutions, world):
+    def get_cmd(self, substitutions):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:

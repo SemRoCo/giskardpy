@@ -26,7 +26,6 @@ class GeneralConfig:
     control_mode: ControlModes = ControlModes.open_loop
     action_server_name: str = '~command'
     path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
-    joint_state_topic = '/joint_states'
     map_frame: str = 'map'
     test_mode: bool = False
     debug: bool = False
@@ -234,6 +233,7 @@ class BehaviorTreeConfig:
 
 
 class RobotInterfaceConfig:
+    joint_state_topic = '/joint_states'
     drive_interface: Optional[DriveInterface] = None
     follow_joint_trajectory_interfaces: List[FollowJointTrajectoryInterface] = []
 

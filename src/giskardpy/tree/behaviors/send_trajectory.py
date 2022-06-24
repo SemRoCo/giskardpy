@@ -30,9 +30,6 @@ from giskardpy.utils.logging import loginfo
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
-    min_deadline: rospy.Time
-    max_deadline: rospy.Time
-    controlled_joints: List[OneDofJoint] = []
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
@@ -48,15 +45,18 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     @profile
     def __init__(self, name, namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
         GiskardBehavior.__init__(self, name)
+        self.min_deadline: rospy.Time
+        self.max_deadline: rospy.Time
+        self.controlled_joints: List[OneDofJoint] = []
         self.action_namespace = namespace
         self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
-        loginfo('Waiting for action server \'{}\' to appear.'.format(self.action_namespace))
+        loginfo(f'Waiting for action server \'{self.action_namespace}\' to appear.')
         action_msg_type = None
         while not action_msg_type and not rospy.is_shutdown():
             try:
-                action_msg_type, _, _ = rostopic.get_topic_class('{}/goal'.format(self.action_namespace))
+                action_msg_type, _, _ = rostopic.get_topic_class(f'{self.action_namespace}/goal')
                 if action_msg_type is None:
                     raise ROSTopicException()
                 try:

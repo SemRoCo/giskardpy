@@ -1,6 +1,5 @@
 import keyword
 from collections import defaultdict
-from copy import copy
 from multiprocessing import Queue
 from time import time
 from typing import Tuple, Optional
@@ -19,7 +18,7 @@ from numpy import pi
 from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
-from std_srvs.srv import Trigger, TriggerRequest
+from std_srvs.srv import Trigger
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
 from visualization_msgs.msg import Marker
@@ -28,7 +27,6 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
-from giskardpy.configs.default_config import Giskard
 from giskardpy.configs.pr2 import PR2
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
@@ -36,11 +34,9 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
-
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -296,7 +292,7 @@ class JointGoalChecker(GoalChecker):
         """
         :rtype: JointState
         """
-        return rospy.wait_for_message('joint_states', JointState)
+        return rospy.wait_for_message(self.god_map.unsafe_get_data(identifier.joint_state_topic), JointState)
 
     def __call__(self):
         current_joint_state = JointStates.from_msg(self.get_current_joint_state())
@@ -560,12 +556,12 @@ class GiskardTestWrapper(GiskardWrapper):
                              **kwargs):
         if root_link is None:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_translation_goal(goal_point=goal_point,
-                                                             tip_link=tip_link,
-                                                             root_link=root_link,
-                                                             max_velocity=max_velocity,
-                                                             weight=weight,
-                                                             **kwargs)
+        super().set_translation_goal(goal_point=goal_point,
+                                     tip_link=tip_link,
+                                     root_link=root_link,
+                                     max_velocity=max_velocity,
+                                     weight=weight,
+                                     **kwargs)
         if check:
             self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_point))
 
@@ -573,9 +569,9 @@ class GiskardTestWrapper(GiskardWrapper):
                                       **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link,
-                                                                      max_velocity=max_velocity, weight=weight,
-                                                                      **kwargs)
+        super().set_straight_translation_goal(goal_pose, tip_link, root_link,
+                                              max_velocity=max_velocity, weight=weight,
+                                              **kwargs)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
                       angular_velocity=None, check=True):
@@ -692,7 +688,7 @@ class GiskardTestWrapper(GiskardWrapper):
                     for goal_checker in self.goal_checks[len(r.error_codes) - 1]:
                         goal_checker()
                 except:
-                    logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
+                    logging.logerr(f'Goal #{cmd_id} did\'t pass test.')
                     raise
             # self.are_joint_limits_violated()
         finally:
@@ -1175,7 +1171,6 @@ class TestPR2CloseLoop(TestPR2):
         self.reset_base()
 
 
-
 class BaseBot(GiskardTestWrapper):
     default_pose = {
         'joint_x': 0.0,
@@ -1279,46 +1274,6 @@ class BoxyCloseLoop(Boxy):
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
         self.move_base(p)
-
-    def reset(self):
-        self.clear_world()
-        self.reset_base()
-
-
-class TiagoDual(GiskardTestWrapper):
-    default_pose = {
-        'torso_lift_joint': 2.220446049250313e-16,
-        'head_1_joint': 0.0,
-        'head_2_joint': 0.0,
-        'arm_left_1_joint': 0.0,
-        'arm_left_2_joint': 0.0,
-        'arm_left_3_joint': 0.0,
-        'arm_left_4_joint': 0.0,
-        'arm_left_5_joint': 0.0,
-        'arm_left_6_joint': 0.0,
-        'arm_left_7_joint': 0.0,
-        'arm_right_1_joint': 0.0,
-        'arm_right_2_joint': 0.0,
-        'arm_right_3_joint': 0.0,
-        'arm_right_4_joint': 0.0,
-        'arm_right_5_joint': 0.0,
-        'arm_right_6_joint': 0.0,
-        'arm_right_7_joint': 0.0,
-        # 'odom_rot_joint': 0.0,
-        # 'odom_trans_joint': 0.0,
-    }
-
-    def __init__(self):
-        super(TiagoDual, self).__init__('package://giskardpy/config/tiago_dual.yaml')
-        self.base_reset = rospy.ServiceProxy('/diff_drive_vel_integrator/reset', Trigger)
-
-    def move_base(self, goal_pose):
-        self.allow_all_collisions()
-        self.set_cart_goal(goal_pose, 'base_footprint', 'odom')
-        self.plan_and_execute()
-
-    def reset_base(self):
-        self.base_reset.call(TriggerRequest())
 
     def reset(self):
         self.clear_world()

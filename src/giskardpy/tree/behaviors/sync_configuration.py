@@ -21,14 +21,14 @@ class SyncConfiguration(GiskardBehavior):
     """
 
     @profile
-    def __init__(self, name, group_name, joint_state_topic='joint_states', tf_root_link_name=None):
+    def __init__(self, name, group_name, tf_root_link_name=None):
         """
         :type js_identifier: str
         """
-        super(SyncConfiguration, self).__init__(name)
+        super().__init__(name)
         self.mjs = None
         self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
-        self.joint_state_topic = joint_state_topic
+        self.joint_state_topic = self.god_map.get_data(identifier.joint_state_topic)
         self.group_name = group_name
         self.group = self.world.groups[self.group_name]  # type: SubWorldTree
         if tf_root_link_name is None:

@@ -132,8 +132,10 @@ ignored_self_collisions = collision_avoidance_config + ['_ignored_self_collision
 external_collision_avoidance = collision_avoidance_config + ['_external_collision_avoidance']
 
 # robot interface
-robot_interface = giskard + ['robot_interface_config', 'follow_joint_trajectory_interfaces']
-robot_base_drive = giskard + ['robot_interface_config', 'drive_interface']
+robot_interface_config = giskard + ['robot_interface_config']
+robot_interface = robot_interface_config + ['follow_joint_trajectory_interfaces']
+robot_base_drive = robot_interface_config + ['drive_interface']
+joint_state_topic = robot_interface_config + ['joint_state_topic']
 
 # rnd stuff
 timer_collector = ['timer_collector']

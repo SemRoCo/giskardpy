@@ -660,7 +660,7 @@ class OpenLoop(TreeManager):
                                                                       identifier.PublishDebugExpressions)))
         for follow_joint_trajectory_config in action_servers:
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
-        base_drive = self.config.drive_interface
+        base_drive = self.config.robot_interface_config.drive_interface
         if base_drive is not None:
             self.add_real_time_tracking = True
             real_time_tracking.add_plugin(base_drive.make_plugin())

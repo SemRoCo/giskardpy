@@ -28,7 +28,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
-from giskardpy.configs.default_config import GiskardConfig
+from giskardpy.configs.default_config import Giskard
 from giskardpy.configs.pr2 import PR2
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException

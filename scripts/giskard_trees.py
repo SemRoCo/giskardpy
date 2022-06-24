@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 
-from giskardpy.configs.default_config import GiskardConfig
+from giskardpy.configs.default_config import Giskard
 from giskardpy.configs.drives import OmniDriveCmdVelInterface
 from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
 from giskardpy.configs.pr2 import PR2

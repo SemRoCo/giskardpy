@@ -41,36 +41,35 @@ giskard = ['giskard']
 
 # config file
 # general options
-action_server_name = giskard + ['action_server_name']
-gui = giskard + ['enable_gui']
-data_folder = giskard + ['path_to_data_folder']
-sample_period = giskard + ['sample_period']
-map_frame = giskard + ['map_frame']
-debug = giskard + ['debug']
-fill_velocity_values = giskard + ['fill_velocity_values']
-test_mode = giskard + ['test_mode']
+general_options = giskard + ['general_config']
+action_server_name = general_options + ['action_server_name']
+data_folder = general_options + ['path_to_data_folder']
+map_frame = general_options + ['map_frame']
+debug = general_options + ['debug']
+test_mode = general_options + ['test_mode']
 
-joint_limits = giskard + ['joint_limits']
+joint_limits = general_options + ['joint_limits']
 
-joint_acceleration_linear_limit = giskard + ['joint_limits', 'acceleration']
-joint_acceleration_angular_limit = giskard + ['joint_limits', 'acceleration']
+joint_acceleration_linear_limit = general_options + ['joint_limits', 'acceleration']
+joint_acceleration_angular_limit = general_options + ['joint_limits', 'acceleration']
 
-joint_jerk_linear_limit = giskard + ['joint_limits', 'jerk']
-joint_jerk_angular_limit = giskard + ['joint_limits', 'jerk']
+joint_jerk_linear_limit = general_options + ['joint_limits', 'jerk']
+joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk']
 
-joint_weights = giskard + ['joint_weights']
 
 # qp solver
+qp_solver_config = giskard + ['qp_solver_config']
+sample_period = qp_solver_config + ['sample_period']
 qp_controller = giskard + ['qp_controller']
-qp_solver = giskard + ['qp_solver_config']
-qp_solver_name = qp_solver + ['qp_solver']
-prediction_horizon = giskard + ['prediction_horizon']
-retries_with_relaxed_constraints = qp_solver + ['retries_with_relaxed_constraints']
-retry_added_slack = qp_solver + ['added_slack']
-retry_weight_factor = qp_solver + ['weight_factor']
+joint_weights = qp_solver_config + ['joint_weights']
+qp_solver_name = qp_solver_config + ['qp_solver']
+prediction_horizon = qp_solver_config + ['prediction_horizon']
+retries_with_relaxed_constraints = qp_solver_config + ['retries_with_relaxed_constraints']
+retry_added_slack = qp_solver_config + ['added_slack']
+retry_weight_factor = qp_solver_config + ['weight_factor']
 
 # tree
-plugins = giskard + ['plugin_config']
+plugins = giskard + ['behavior_tree_config', 'plugin_config']
 enable_VisualizationBehavior = plugins + ['VisualizationBehavior', 'enabled']
 VisualizationBehavior_in_planning_loop = plugins + ['VisualizationBehavior', 'in_planning_loop']
 enable_WorldVisualizationBehavior = plugins + ['WorldVisualizationBehavior', 'enabled']
@@ -115,26 +114,26 @@ rc_other_velocity = reachability_check + ['other_velocity']
 
 # behavior tree
 tree_manager = giskard + ['_tree']
-tree_tick_rate = giskard + ['tree_tick_rate']
+tree_tick_rate = giskard + ['behavior_tree_config', 'tree_tick_rate']
 
 # collision avoidance
+collision_avoidance_config = giskard + ['collision_avoidance_config']
 collision_scene = ['collision_scene']
 collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
-collision_avoidance = giskard + ['collision_avoidance']
-collision_checker = giskard + ['collision_checker']
+collision_checker = collision_avoidance_config + ['collision_checker']
 
-self_collision_avoidance = giskard + ['self_collision_avoidance']
-added_self_collisions = giskard + ['add_self_collisions']
-ignored_self_collisions = giskard + ['ignored_self_collisions']
+self_collision_avoidance = collision_avoidance_config + ['_self_collision_avoidance']
+added_self_collisions = collision_avoidance_config + ['_add_self_collisions']
+ignored_self_collisions = collision_avoidance_config + ['_ignored_self_collisions']
 
-external_collision_avoidance = giskard + ['external_collision_avoidance']
+external_collision_avoidance = collision_avoidance_config + ['_external_collision_avoidance']
 
 # robot interface
-robot_interface = giskard + ['follow_joint_trajectory_interfaces']
-robot_base_drive = giskard + ['drive_interface']
+robot_interface = giskard + ['robot_interface_config', 'follow_joint_trajectory_interfaces']
+robot_base_drive = giskard + ['robot_interface_config', 'drive_interface']
 
 # rnd stuff
 timer_collector = ['timer_collector']

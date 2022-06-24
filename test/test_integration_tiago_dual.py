@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion
@@ -57,9 +58,9 @@ class TestCartGoals(object):
         goal = PoseStamped()
         goal.header.frame_id = 'map'
         goal.pose.position.x = 1
-        # goal.pose.position.y = 1
-        goal.pose.orientation.w = 1
-        # goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
+        goal.pose.position.y = 1
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/4, [0, 0, 1]))
         zero_pose.move_base(goal)
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()

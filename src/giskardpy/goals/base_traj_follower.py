@@ -43,7 +43,10 @@ class BaseTrajFollower(Goal):
 
     def make_odom_T_base_footprint_goal(self, t: float, derivative: int = 0):
         x = self.current_traj_point(self.joint.x_name, t, derivative)
-        y = self.current_traj_point(self.joint.y_name, t, derivative)
+        if isinstance(self.joint, OmniDrive):
+            y = self.current_traj_point(self.joint.y_name, t, derivative)
+        else:
+            y = 0
         rot = self.current_traj_point(self.joint.rot_name, t, derivative)
         odom_T_base_footprint_goal = w.frame_from_x_y_rot(x, y, rot)
         return odom_T_base_footprint_goal
@@ -92,7 +95,10 @@ class BaseTrajFollower(Goal):
             # errors_x.append(w.position_of(base_footprint_T_base_footprint_goal)[0])
             # errors_y.append(w.position_of(base_footprint_T_base_footprint_goal)[1])
             x = self.current_traj_point(self.joint.x_vel_name, t * self.get_sampling_period_symbol(), 1)
-            y = self.current_traj_point(self.joint.y_vel_name, t * self.get_sampling_period_symbol(), 1)
+            if isinstance(self.joint, OmniDrive):
+                y = self.current_traj_point(self.joint.y_vel_name, t * self.get_sampling_period_symbol(), 1)
+            else:
+                y = 0
             base_footprint_P_vel = w.vector3(x, y, 0)
             map_P_vel = w.dot(map_T_base_footprint, base_footprint_P_vel)
             if t == 0:
@@ -130,15 +136,16 @@ class BaseTrajFollower(Goal):
                                      # lower_slack_limit=lower_slack_limits,
                                      # upper_slack_limit=upper_slack_limits,
                                      name_suffix='/vel x')
-        self.add_velocity_constraint(lower_velocity_limit=lba_y,
-                                     upper_velocity_limit=uba_y,
-                                     weight=weight_vel,
-                                     # expression=self.joint.y_vel.get_symbol(0),
-                                     expression=w.position_of(map_T_base_footprint)[1],
-                                     velocity_limit=0.5,
-                                     # lower_slack_limit=lower_slack_limits,
-                                     # upper_slack_limit=upper_slack_limits,
-                                     name_suffix='/vel y')
+        if isinstance(self.joint, OmniDrive):
+            self.add_velocity_constraint(lower_velocity_limit=lba_y,
+                                         upper_velocity_limit=uba_y,
+                                         weight=weight_vel,
+                                         # expression=self.joint.y_vel.get_symbol(0),
+                                         expression=w.position_of(map_T_base_footprint)[1],
+                                         velocity_limit=0.5,
+                                         # lower_slack_limit=lower_slack_limits,
+                                         # upper_slack_limit=upper_slack_limits,
+                                         name_suffix='/vel y')
         # actual_error_x, actual_error_y = self.trans_error_at(0)
         # self.add_constraint(reference_velocity=0.5,
         #                     lower_error=actual_error_x,

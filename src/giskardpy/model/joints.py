@@ -572,3 +572,153 @@ class OmniDrive(Joint):
 
     def _all_symbols(self) -> List[FreeVariable]:
         return self.free_variable_list + [self.x, self.y, self.rot]
+
+
+class DiffDrive(Joint):
+    x: FreeVariable
+    y: FreeVariable
+    rot: FreeVariable
+    x_vel: FreeVariable
+    rot_vel: FreeVariable
+
+    def __init__(self,
+                 god_map: GodMap,
+                 parent_link_name: my_string,
+                 child_link_name: my_string,
+                 name: Optional[my_string] = 'brumbrum',
+                 translation_velocity_limit: Optional[float] = 0.5,
+                 rotation_velocity_limit: Optional[float] = 0.6,
+                 translation_acceleration_limit: Optional[float] = None,
+                 rotation_acceleration_limit: Optional[float] = None,
+                 translation_jerk_limit: Optional[float] = 5,
+                 rotation_jerk_limit: Optional[float] = 10,
+                 x_name: Optional[str] = 'odom_x',
+                 y_name: Optional[str] = 'odom_y',
+                 rot_name: Optional[str] = 'odom_rot',
+                 x_vel_name: Optional[str] = 'base_footprint_x_vel',
+                 rot_vel_name: Optional[str] = 'base_footprint_rot_vel',
+                 **kwargs):
+        self.translation_velocity_limit = translation_velocity_limit
+        self.rotation_velocity_limit = rotation_velocity_limit
+        self.translation_acceleration_limit = translation_acceleration_limit
+        self.rotation_acceleration_limit = rotation_acceleration_limit
+        self.translation_jerk_limit = translation_jerk_limit
+        self.rotation_jerk_limit = rotation_jerk_limit
+        self.x_name = x_name
+        self.y_name = y_name
+        self.rot_name = rot_name
+        self.x_vel_name = x_vel_name
+        self.rot_vel_name = rot_vel_name
+        super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
+
+    def create_free_variables(self):
+        translation_upper_limits = {}
+        if self.translation_velocity_limit is not None:
+            translation_upper_limits[1] = self.translation_velocity_limit
+        if self.translation_acceleration_limit is not None:
+            translation_upper_limits[2] = self.translation_acceleration_limit
+        if self.translation_jerk_limit is not None:
+            translation_upper_limits[3] = self.translation_jerk_limit
+        translation_lower_limits = {k: -v for k, v in translation_upper_limits.items()}
+
+        rotation_upper_limits = {}
+        if self.rotation_velocity_limit is not None:
+            rotation_upper_limits[1] = self.rotation_velocity_limit
+        if self.rotation_acceleration_limit is not None:
+            rotation_upper_limits[2] = self.rotation_acceleration_limit
+        if self.rotation_jerk_limit is not None:
+            rotation_upper_limits[3] = self.rotation_jerk_limit
+        rotation_lower_limits = {k: -v for k, v in rotation_upper_limits.items()}
+
+        self.x = self.create_free_variable(self.x_name,
+                                           translation_lower_limits,
+                                           translation_upper_limits)
+        self.y = self.create_free_variable(self.y_name,
+                                           translation_lower_limits,
+                                           translation_upper_limits)
+        self.rot = self.create_free_variable(self.rot_name,
+                                             rotation_lower_limits,
+                                             rotation_upper_limits)
+        self.x_vel = self.create_free_variable(self.x_vel_name,
+                                               translation_lower_limits,
+                                               translation_upper_limits)
+        self.rot_vel = self.create_free_variable(self.rot_vel_name,
+                                                 rotation_lower_limits,
+                                                 rotation_upper_limits)
+
+    def apply_joint_effect(self):
+        odom_T_base_footprint = w.frame_from_x_y_rot(self.x.get_symbol(0),
+                                                     self.y.get_symbol(0),
+                                                     self.rot.get_symbol(0))
+        base_footprint_T_base_footprint_vel = w.frame_from_x_y_rot(self.x_vel.get_symbol(0),
+                                                                   0,
+                                                                   self.rot_vel.get_symbol(0))
+        self.parent_T_child = w.dot(self.parent_T_child, odom_T_base_footprint, base_footprint_T_base_footprint_vel)
+
+    def update_state(self, new_cmds: derivative_joint_map, dt: float):
+        world = self.god_map.unsafe_get_data(identifier.world)
+        for free_variable in self.free_variable_list:
+            try:
+                vel = new_cmds[0][free_variable.position_name]
+            except KeyError as e:
+                # joint is currently not part of the optimization problem
+                continue
+            world.state[free_variable.name].velocity = vel
+            if len(new_cmds) >= 2:
+                acc = new_cmds[1][free_variable.position_name]
+                world.state[free_variable.name].acceleration = acc
+            if len(new_cmds) >= 3:
+                jerk = new_cmds[2][free_variable.position_name]
+                world.state[free_variable.name].jerk = jerk
+        x = world.state[self.x_vel_name].velocity
+        rot = world.state[self.rot_vel_name].velocity
+        delta = world.state[self.rot_name].position
+        world.state[self.x_name].velocity = (np.cos(delta) * x)
+        world.state[self.x_name].position += world.state[self.x_name].velocity * dt
+        world.state[self.y_name].velocity = (np.sin(delta) * x)
+        world.state[self.y_name].position += world.state[self.y_name].velocity * dt
+        world.state[self.rot_name].velocity = rot
+        world.state[self.rot_name].position += rot * dt
+
+    def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
+        for free_variable in self._all_symbols():
+            free_variable.lower_limits = {}
+            free_variable.upper_limits = {}
+
+        for order, linear_limit in linear_limits.items():
+            # self.x.set_upper_limit(order, linear_limit[self.x_name])
+            # self.y.set_upper_limit(order, linear_limit[self.y_name])
+            self.x_vel.set_upper_limit(order, linear_limit[self.x_vel_name])
+
+            # self.x.set_lower_limit(order, -linear_limit[self.x_name])
+            # self.y.set_lower_limit(order, -linear_limit[self.y_name])
+            self.x_vel.set_lower_limit(order, -linear_limit[self.x_vel_name])
+
+        for order, angular_limit in angular_limits.items():
+            # self.rot.set_upper_limit(order, angular_limit[self.rot_name])
+            # self.rot.set_lower_limit(order, -angular_limit[self.rot_name])
+            self.rot_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
+            self.rot_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
+
+    def update_weights(self, weights: derivative_joint_map):
+        # self.delete_weights()
+        for order, weight in weights.items():
+            try:
+                for free_variable in self._all_symbols():
+                    free_variable.quadratic_weights[order] = weight[self.name]
+            except KeyError:
+                # can't do if in, because the dict may be a defaultdict
+                pass
+
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+        pass
+
+    def has_free_variables(self) -> bool:
+        return True
+
+    @property
+    def free_variable_list(self) -> List[FreeVariable]:
+        return [self.x_vel, self.rot_vel]
+
+    def _all_symbols(self) -> List[FreeVariable]:
+        return self.free_variable_list + [self.x, self.y, self.rot]

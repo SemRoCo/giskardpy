@@ -7,7 +7,7 @@ from py_trees import Blackboard
 
 from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib
-from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface
+from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface, DiffDriveCmdVelInterface
 from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
@@ -247,6 +247,11 @@ class RobotInterfaceConfig:
                                                         parent_link_name=parent_link_name,
                                                         child_link_name=child_link_name)
 
+    def add_diff_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name):
+        self.drive_interface = DiffDriveCmdVelInterface(cmd_vel_topic=cmd_vel_topic,
+                                                        parent_link_name=parent_link_name,
+                                                        child_link_name=child_link_name)
+
 
 class Giskard:
     general_config: GeneralConfig = GeneralConfig()
@@ -278,6 +283,11 @@ class Giskard:
 
     def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name):
         self.robot_interface_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
+                                                             parent_link_name=parent_link_name,
+                                                             child_link_name=child_link_name)
+
+    def add_diff_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name):
+        self.robot_interface_config.add_diff_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                              parent_link_name=parent_link_name,
                                                              child_link_name=child_link_name)
 

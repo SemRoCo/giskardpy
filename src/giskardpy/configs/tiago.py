@@ -16,7 +16,7 @@ class Tiago(Giskard):
                                                 state_topic='/tiago/head_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/tiago/torso_controller/follow_joint_trajectory',
                                                 state_topic='/tiago/torso_controller/state')
-        self.add_omni_drive_interface(cmd_vel_topic='/tiago/cmd_vel',
+        self.add_diff_drive_interface(cmd_vel_topic='/tiago/cmd_vel',
                                       parent_link_name='odom',
                                       child_link_name='base_footprint')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('ur5_forearm_link', 'ur5_wrist_3_link')

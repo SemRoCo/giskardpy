@@ -14,7 +14,7 @@ import giskardpy.identifier as identifier
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.model.joints import OmniDrive
+from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
@@ -72,7 +72,7 @@ class OmniDriveCmdVel(SendTrajectoryClosedLoop):
             rospy.sleep(1)
 
         for joint in self.world.joints.values():
-            if isinstance(joint, OmniDrive):
+            if isinstance(joint, OmniDrive) or isinstance(joint, DiffDrive):
                 # FIXME can only handle one drive
                 self.controlled_joints = [joint]
                 self.joint = joint

@@ -7,7 +7,7 @@ from tf.transformations import rotation_from_matrix, quaternion_matrix
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.tfwrapper import transform_pose, init
 
-
+#fixme 
 def call_back(pose_stamped):
     """
     :type pose_stamped: PoseStamped

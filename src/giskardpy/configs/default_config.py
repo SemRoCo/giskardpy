@@ -1,5 +1,6 @@
 import inspect
 from collections import defaultdict
+from copy import deepcopy
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
 
@@ -293,15 +294,11 @@ class Giskard:
 
     def reset_config(self):
         for parameter, value in self._backup.items():
-            setattr(self, parameter, value)
+            setattr(self, parameter, deepcopy(value))
 
     def create_parameter_backup(self):
-        self._backup = {}
-        for parameter in dir(self):
-            if not parameter.startswith('_'):
-                value = getattr(self, parameter)
-                if not inspect.ismethod(value):
-                    self._backup[parameter] = value
+        self._backup = {'qp_solver_config': deepcopy(self.qp_solver_config),
+                        'general_config': deepcopy(self.general_config)}
 
     def grow(self):
         self.create_parameter_backup()

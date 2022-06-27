@@ -14,7 +14,6 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
-from giskardpy.model.world import WorldTree
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
@@ -36,7 +35,6 @@ from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.plugin_if import IF
-from giskardpy.tree.behaviors.print_text import PrintText
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin

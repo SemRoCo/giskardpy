@@ -5,6 +5,7 @@ import os
 import random
 import sys
 import threading
+import time
 from collections import namedtuple
 from random import uniform
 from time import sleep
@@ -32,7 +33,9 @@ import giskardpy.model.pybullet_wrapper as pw
 from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded, GetPreGraspRequest, GetPreGrasp, \
     GetPreGraspOrientation, GetAttachedObjects, GetAttachedObjectsRequest
 from giskardpy import RobotName
-from giskardpy.exceptions import GlobalPlanningException
+from giskardpy.data_types import PrefixName
+from giskardpy.exceptions import GlobalPlanningException, InfeasibleGlobalPlanningException, \
+    FeasibleGlobalPlanningException, ReplanningException
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.get_goal import GetGoal
@@ -722,7 +725,7 @@ class PyBulletEnv(object):
         self.environment_description = environment_description
         self.environment_objects = environment_objects
         self.environment_object_ids = list()
-        self.init_js = init_js
+        self.init_js = deepcopy(init_js)
         self.gui = gui
         if ignore_objects_ids is None:
             self.ignore_object_ids = list()
@@ -740,8 +743,8 @@ class PyBulletEnv(object):
                                                                client_id=self.client_id)
         if self.environment_objects is not None:
             for env_obj in self.environment_objects:
-                self.environment_object_ids = pbw.load_urdf_string_into_bullet(env_obj,
-                                                                               client_id=self.client_id)
+                self.environment_object_ids.append(pbw.load_urdf_string_into_bullet(env_obj,
+                                                                                    client_id=self.client_id))
         self.update(self.init_js)
 
     def update(self, js):
@@ -750,16 +753,17 @@ class PyBulletEnv(object):
             for joint_id in range(0, pbw.p.getNumJoints(self.environment_id, physicsClientId=self.client_id)):
                 joint_name = pbw.p.getJointInfo(self.environment_id, joint_id, physicsClientId=self.client_id)[
                     1].decode()
-                joint_state = js[joint_name].position
+                joint_state = js[PrefixName(joint_name, None)].position
                 pbw.p.resetJointState(self.environment_id, joint_id, joint_state, physicsClientId=self.client_id)
-            # Recalculate collision stuff
-            pbw.p.stepSimulation(
-                physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
+            # Recalculate collision stuff not needed. Thus, below not needed.
+            # Further, stepSimulation will break collision checking
+            # pbw.p.stepSimulation(
+            #    physicsClientId=self.client_id)  # todo: actually only collision stuff needs to be calculated
 
     def close_pybullet(self):
         pbw.stop_pybullet(client_id=self.client_id)
 
-    def __del__(self):
+    def clear(self):
         self.close_pybullet()
 
 
@@ -775,9 +779,6 @@ class PyBulletRayTester(PyBulletEnv):
         self.collision_free_id = -1
         self.collisionFilterGroup = 0x1
         self.noCollisionFilterGroup = 0x0
-
-    def __del__(self):
-        self.close_pybullet()
 
     def pre_ray_test(self):
         bodies_num = p.getNumBodies(physicsClientId=self.client_id)
@@ -832,7 +833,7 @@ class SimpleRayMotionValidator(AbstractMotionValidator):
         AbstractMotionValidator.__init__(self, tip_link, god_map, ignore_state_validator=ignore_state_validator)
         self.hitting = {}
         self.debug = debug
-        self.js = js
+        self.js = deepcopy(js)
         self.raytester_lock = threading.Lock()
         if raytester is None:
             environment_objects = get_simple_environment_objects(self.god_map)
@@ -840,8 +841,8 @@ class SimpleRayMotionValidator(AbstractMotionValidator):
         else:
             self.raytester = raytester
 
-    def __del__(self):
-        del self.raytester
+    def clear(self):
+        self.raytester.clear()
 
     def check_motion(self, s1, s2):
         with self.raytester_lock:
@@ -885,16 +886,30 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         # if so return false, else true.
         get_points = self.collision_points.get_points_from_poses
         all_js = self.collision_scene.world.state
-        old_js = self.object_in_motion.state
+        old_js = deepcopy(self.object_in_motion.state)
         state_ik = self.state_validator.ik.get_ik(old_js, s1)
-        all_js.update(state_ik)
+        #s = 0.
+        #for j_n, v in state_ik.items():
+        #    v2 = self.state_validator.ik.get_ik(old_js, s1)[j_n].position
+        #    n = abs(v.position - v2)
+        #    if n != 0:
+        #        rospy.logerr(f'joint_name: {j_n}: first: {v.position}, second: {v2}, diff: {n}')
+        #    s += n
+        update_joint_state(all_js, state_ik)
         self.object_in_motion.state = all_js
         query_b = get_points()
         state_ik = self.state_validator.ik.get_ik(old_js, s2)
-        all_js.update(state_ik)
+        #s = 0.
+        #for j_n, v in state_ik.items():
+        #    v2 = self.state_validator.ik.get_ik(old_js, s2)[j_n].position
+        #    n = abs(v.position - v2)
+        #    if n != 0:
+        #        rospy.logerr(f'joint_name: {j_n}: first: {v.position}, second: {v2}, diff: {n}')
+        #    s += n
+        update_joint_state(all_js, state_ik)
         self.object_in_motion.state = all_js
         query_e = get_points()
-        all_js.update(old_js)
+        update_joint_state(all_js, old_js)
         self.object_in_motion.state = all_js
         collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(self.js, query_b, query_e)
         return collision_free, coll_links, dists, min(fractions)
@@ -912,31 +927,31 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
                                           self.collision_scene, environment_objects=environment_objects, js=js)
         self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
 
-    def __del__(self):
-        del self.box_space
+    def clear(self):
+        self.box_space.clear()
 
     @profile
     def check_motion(self, s1, s2):
         all_js = self.collision_scene.world.state
-        old_js = self.object_in_motion.state
+        old_js = deepcopy(self.object_in_motion.state)
         for collision_object in self.collision_points.collision_objects:
             state_ik = self.state_validator.ik.get_ik(old_js, s1)
-            all_js.update(state_ik)
+            update_joint_state(all_js, state_ik)
             self.object_in_motion.state = all_js
             self.collision_scene.sync()
             query_b = pose_stamped_to_np(self.collision_scene.get_pose(collision_object.link))
             state_ik = self.state_validator.ik.get_ik(old_js, s2)
-            all_js.update(state_ik)
+            update_joint_state(all_js, state_ik)
             self.object_in_motion.state = all_js
             self.collision_scene.sync()
             query_e = pose_stamped_to_np(self.collision_scene.get_pose(collision_object.link))
             start_and_end_positions = [query_b[0], query_e[0]]
             min_size = np.max(np.abs(np.array(collision_object.d) - np.array(collision_object.u)))
             if self.box_space.is_colliding(min_size, start_and_end_positions):
-                all_js.update(old_js)
+                update_joint_state(all_js, old_js)
                 self.object_in_motion.state = all_js
                 return False
-        all_js.update(old_js)
+        update_joint_state(all_js, old_js)
         self.object_in_motion.state = all_js
         return True
 
@@ -972,10 +987,10 @@ class KDLIK(IK):
         new_js = deepcopy(js)
         js_dict_position = {}
         for k, v in js.items():
-            js_dict_position[k] = v.position
+            js_dict_position[str(k)] = v.position
         joint_array = self._kdl_robot.ik(js_dict_position, pose_to_kdl(pose))
         for i, joint_name in enumerate(self._kdl_robot.joints):
-            new_js[joint_name].position = joint_array[i]
+            new_js[PrefixName(joint_name, None)].position = joint_array[i]
         return new_js
 
 
@@ -993,7 +1008,7 @@ class PyBulletIK(IK):
         self.joint_uppers = list()
         self.setup()
 
-    def __del__(self):
+    def clear(self):
         pbw.p.disconnect(physicsClientId=self.client_id)
 
     def setup(self):
@@ -1030,13 +1045,13 @@ class PyBulletIK(IK):
                                                 pose[0], pose[1], self.joint_lowers, self.joint_uppers,
                                                 physicsClientId=self.client_id)
         for joint_name, joint_state in zip(self.pybullet_joints, state_ik):
-            new_js[joint_name].position = joint_state
+            new_js[PrefixName(joint_name, None)].position = joint_state
         return new_js
 
     def update_pybullet(self, js):
         for joint_id in range(0, pbw.p.getNumJoints(self.robot_id, physicsClientId=self.client_id)):
             joint_name = pbw.p.getJointInfo(self.robot_id, joint_id, physicsClientId=self.client_id)[1].decode()
-            joint_state = js[joint_name].position
+            joint_state = js[PrefixName(joint_name, None)].position
             pbw.p.resetJointState(self.robot_id, joint_id, joint_state, physicsClientId=self.client_id)
         # pbw.p.stepSimulation(physicsClientId=self.client_id)
 
@@ -1056,6 +1071,9 @@ class RobotBulletCollisionChecker(GiskardBehavior):
         self.is_3D = is_3D
         self.tip_link = tip_link
         self.setup_pybullet()
+
+    def clear(self):
+        self.ik.clear()
 
     def setup_pybullet(self):
         for i in range(0, 100):
@@ -1127,17 +1145,20 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
             self.publisher = VisualizationBehavior('motion planning object publisher', ensure_publish=False)
             self.publisher.setup(10)
 
+    def clear(self):
+        self.ik.clear()
+
     def is_collision_free(self, pose):
         with self.get_god_map().get_data(identifier.rosparam + ['state_validator_lock']):
             # Get current joint states
-            all_js = self.collision_scene.world.state
-            old_js = self.collision_scene.robot.state
+            all_js = self.collision_scene.robot.state
+            old_js = deepcopy(all_js)
             # Calc IK for navigating to given state and ...
             results = []
             for i in range(0, self.ik_sampling):
-                state_ik = self.ik.get_ik(old_js, pose)
+                state_ik = self.ik.get_ik(deepcopy(self.collision_scene.robot.state), pose)
                 # override on current joint states.
-                all_js.update(state_ik)
+                update_joint_state(all_js, state_ik)
                 self.robot.state = all_js
                 # Check if kitchen is colliding with robot
                 if self.ignore_orientation:
@@ -1153,7 +1174,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                 # Reset joint state
                 if any(results):
                     self.publish_robot_state()
-                all_js.update(old_js)
+                update_joint_state(all_js, old_js)
                 self.robot.state = all_js
             return any(results)
 
@@ -1164,32 +1185,32 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
     def get_furthest_normal(self, pose):
         # Get current joint states
         all_js = self.collision_scene.world.state
-        old_js = self.collision_scene.robot.state
+        old_js = deepcopy(self.collision_scene.robot.state)
         # Calc IK for navigating to given state and ...
         state_ik = self.ik.get_ik(old_js, pose)
         # override on current joint states.
-        all_js.update(state_ik)
+        update_joint_state(all_js, state_ik)
         self.robot.state = all_js
         # Check if kitchen is colliding with robot
         result = self.collision_scene.get_furthest_normal(self.collision_link_names)
         # Reset joint state
-        all_js.update(old_js)
+        update_joint_state(all_js, old_js)
         self.robot.state = all_js
         return result
 
     def get_closest_collision_distance(self, pose, link_names):
         # Get current joint states
         all_js = self.collision_scene.world.state
-        old_js = self.collision_scene.robot.state
+        old_js = deepcopy(self.collision_scene.robot.state)
         # Calc IK for navigating to given state and ...
         state_ik = self.ik.get_ik(old_js, pose)
         # override on current joint states.
-        all_js.update(state_ik)
+        update_joint_state(all_js, state_ik)
         self.robot.state = all_js
         # Check if kitchen is colliding with robot
         collision = self.collision_scene.get_furthest_collision(link_names)[0]
         # Reset joint state
-        all_js.update(old_js)
+        update_joint_state(all_js, old_js)
         self.robot.state = all_js
         return collision.contact_distance
 
@@ -1473,11 +1494,12 @@ class CompoundBoxSpace(PyBulletEnv):
                 # if self.publish_collision_boxes:
                 #    self.pub_marker(collision_box_name_i)
                 self.update(self.js)
-                p.stepSimulation(physicsClientId=self.client_id)
-                contact_points = p.getContactPoints(self.environment_id, coll_id,
+                #p.stepSimulation(physicsClientId=self.client_id) # needed because of getContactPoints
+                contact_points = p.getClosestPoints(self.environment_id, coll_id,
+                                                    0.1,
                                                     physicsClientId=self.client_id)
                 for obj_id in self.environment_object_ids:
-                    contact_points += p.getContactPoints(obj_id, coll_id, physicsClientId=self.client_id)
+                    contact_points += p.getClosestPoints(obj_id, coll_id, 0.1, physicsClientId=self.client_id)
                 # if self.publish_collision_boxes:
                 #    self.del_marker(collision_box_name_i)
                 # self.world.remove_object(collision_box_name_i)
@@ -1585,6 +1607,12 @@ def verify_ompl_navigation_solution(setup, debug=False):
     if debug:
         rospy.loginfo(u'Num Invalid States: {}, Num Valid States: {}, Rate FP: {}'.format(t, f, f / t))
     return f / t
+
+
+def update_joint_state(js, new_js):
+    if any(map(lambda e: type(e) != PrefixName, new_js)):
+        raise Exception('oi, there are no PrefixNames in yer new_js >:(!')
+    js.update((k, new_js[k]) for k in js.keys() & new_js.keys())
 
 
 def allocGiskardValidStateSample(si):
@@ -1827,8 +1855,8 @@ class PreGraspSampler(GiskardBehavior):
         ps.header.frame_id = 'map'
         ps.pose = p
 
-        del self.state_validator
-        del self.motion_validator
+        self.state_validator.clear()
+        self.motion_validator.clear()
 
         return ps
 
@@ -1873,7 +1901,7 @@ class PreGraspSampler(GiskardBehavior):
                     if self.motion_validator.checkMotion(n_g, sampled_goal):
                         next_goals.append([motion_cost(n_g, sampled_goal), n_g, sampled_goal])
                 tip_link_grs.valid_samples = list()
-            del s_m
+            s_m.clear()
             try_i += 1
         if len(next_goals) != 0:
             return sorted(next_goals, key=lambda e: e[0])[0][1], sorted(next_goals, key=lambda e: e[0])[0][2]
@@ -2025,7 +2053,7 @@ class GlobalPlanner(GetGoal):
                 return self._get_movement_planner
 
     def _plan(self, planner_names, motion_validator_types, range, time,
-              navigation=False, movement=False, narrow=False):
+              navigation=False, movement=False, narrow=False, interpolate=True):
         for motion_validator_type in motion_validator_types:
             for planner_name in planner_names:
                 rospy.loginfo(f'Starting search with Global Planner {planner_name}/{motion_validator_type} ...')
@@ -2035,12 +2063,11 @@ class GlobalPlanner(GetGoal):
                 try:
                     trajectory = planner.setup_and_plan(js)
                     if len(trajectory) != 0:
+                        if self.god_map.get_data(identifier.path_interpolation):
+                            trajectory = planner.interpolate_solution()
                         return trajectory, planner_name, motion_validator_type
-                except GlobalPlanningException:
-                    self.raise_to_blackboard(GlobalPlanningException())
-                    return Status.FAILURE
                 finally:
-                    del planner
+                    planner.clear()
                 rospy.loginfo(f'Global Planner {planner_name}/{motion_validator_type} did not found a solution. '
                               f'Trying other planner config...')
         return None, None, None
@@ -2063,13 +2090,20 @@ class GlobalPlanner(GetGoal):
 
         motion_validator_types = planner_config['motion_validator']
         planner_names = planner_config['planner']
-        range = planner_config['range']
+        planner_range = planner_config['range']
         time = planner_config['time']
+        trajectory = None
 
-        trajectory, planner_name, _ = self._plan(planner_names, motion_validator_types, range, time,
-                                                 navigation=navigation, movement=movement, narrow=narrow)
+        for _ in range(0, int(self.god_map.get_data(identifier.path_replanning_max_retries))):
+            try:
+                trajectory, planner_name, _ = self._plan(planner_names, motion_validator_types, planner_range, time,
+                                                         navigation=navigation, movement=movement, narrow=narrow)
+                break
+            except ReplanningException:
+                pass
+
         if trajectory is None:
-            raise GlobalPlanningException('No solution found with current config.')
+            raise FeasibleGlobalPlanningException('No solution found with current config.')
 
         if navigation:
             predict_f = 10.0
@@ -2106,7 +2140,11 @@ class GlobalPlanner(GetGoal):
         seem_simple_trivial = self.seem_trivial()
         seem_trivial = self.seem_trivial(simple=False)
         narrow = seem_simple_trivial and not seem_trivial
-        trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=narrow)
+        try:
+            trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=narrow)
+        except FeasibleGlobalPlanningException:
+            self.raise_to_blackboard(GlobalPlanningException())
+            return Status.FAILURE
         poses = []
         for i, point in enumerate(trajectory):
             if i == 0:
@@ -2292,8 +2330,8 @@ class OMPLPlanner(object):
         }
         self.init_setup()
 
-    def __del__(self):
-        del self.motion_validator
+    def clear(self):
+        self.setup.clear()
 
     def get_planner(self, si):
         # rays do not hit the object:
@@ -2515,6 +2553,11 @@ class MovementPlanner(OMPLPlanner):
                                               pose_goal, map_frame, config, god_map,
                                               verify_solution_f=verify_solution_f, dist=dist)
 
+    def clear(self):
+        super().clear()
+        self.motion_validator.clear()
+        self.collision_checker.clear()
+
     def get_planner(self, si):
         # rays do not hit the object:
         # RRTConnect w/ 0.05
@@ -2573,7 +2616,7 @@ class MovementPlanner(OMPLPlanner):
 
         if not si.isValid(self.start()):
             rospy.logerr('Start is not valid')
-            raise GlobalPlanningException()
+            raise InfeasibleGlobalPlanningException()
 
         self.setup.setStartAndGoalStates(self.start, self.goal)
 
@@ -2595,6 +2638,25 @@ class MovementPlanner(OMPLPlanner):
     def plan(self):
         return self.solve()
 
+    def interpolate_solution(self):
+        path = self.setup.getSolutionPath()
+        path_cost = path.cost(self.optimization_objective).value()
+        if self.is_3D:
+            if self.motion_validator_class is None:
+                path.interpolate(int(path_cost / 0.01))
+            else:
+                path.interpolate(int(path_cost / 0.05))
+        else:
+            path.interpolate(int(path_cost / 0.1))
+        data = ompl_states_matrix_to_np(path.printAsMatrix()) # [x y z xw yw zw w]
+        if self.verify_solution_f is not None:
+            if self.verify_solution_f(self.setup, debug=True) != 0:
+                rospy.loginfo('Interpolated path is invalid. Going to re-plan...')
+                raise ReplanningException('Interpolated Path is invalid.')
+        else:
+            rospy.logwarn('Interpolated path returned is not validated.')
+        return data
+
     def get_solution(self, planner_status, plot=True):
         # og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
         # og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
@@ -2604,20 +2666,10 @@ class MovementPlanner(OMPLPlanner):
             # self.movement_setup.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # Make sure enough subpaths are available for Path Following
             path = self.setup.getSolutionPath()
-            # self.shorten_path(path, goal)
-            path_cost = path.cost(self.optimization_objective).value()
-            if self.motion_validator_class is None:
-                path.interpolate(int(path_cost / 0.01))
-            else:
-                if self.is_3D:
-                    path.interpolate(int(path_cost/0.05))
-                else:
-                    path.interpolate(int(path_cost/0.1))
-            data = ompl_states_matrix_to_np(path.printAsMatrix())  # [x y z xw yw zw w]
+            data = ompl_states_matrix_to_np(path.printAsMatrix())
             # print the simplified path
             if plot:
                 self.plot_solution(data)
-        self.setup.clear()
         return data
 
     def plot_solution(self, data, debug=True):

@@ -100,6 +100,8 @@ global_planner_needed = plugins + [u'GlobalPlannerNeeded', u'global_planner_need
 global_planner = plugins + [u'global_planner']
 gp_narrow = global_planner + [u'narrow']
 gp_normal = global_planner + [u'normal']
+path_interpolation = global_planner + [u'path_interpolation']
+path_replanning_max_retries = global_planner + [u'max_replanning_retries']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']

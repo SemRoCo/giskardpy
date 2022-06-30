@@ -24,7 +24,7 @@ Install one of the following QP solver. The solvers are ordered by how fast they
  - QPOases 
    - Install noetic branch of https://github.com/SemRoCo/qpOASES
 
-Finally, you will need to set the ```qp_solver``` name in the config file, you are loading. E.g. here: https://github.com/SemRoCo/giskardpy/blob/mpc/config/default.yaml.
+Finally, you will need to set the ```qp_solver``` name in the config file, you are loading. E.g. here: https://github.com/SemRoCo/giskardpy/blob/devel/config/default.yaml.
 
 Now create the workspace
 ```
@@ -34,7 +34,7 @@ cd ~/giskardpy_ws                           # go to workspace directory
 catkin init                                 # init workspace, you might have to pip install catkin-tools
 cd src                                      # go to source directory of workspace
 wstool init                                 # init rosinstall
-wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/devel/rosinstall/<ros-version>.rosinstall
+wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/new_interface/rosinstall/<ros-version>.rosinstall
                                             # update rosinstall file
 wstool update                               # pull source repositories
 rosdep install --ignore-src --from-paths .  # install dependencies available through apt

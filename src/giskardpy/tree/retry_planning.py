@@ -38,7 +38,7 @@ class RetryPlanning(GiskardBehavior):
             return Status.RUNNING
         elif self.cartesian_path_planning_failed():
             self.must_replan(PlanningException())
-            logging.loginfo(u'CartesianPath did not traverse the whole planned path.')
+            logging.loginfo(u'CartesianPath did not traverse the planned path.')
             logging.loginfo(u'Replanning a new path.')
             self.get_god_map().set_data(identifier.global_planner_needed, True)
             return Status.RUNNING

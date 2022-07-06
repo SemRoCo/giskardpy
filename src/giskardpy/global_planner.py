@@ -2,13 +2,11 @@
 
 import json
 import os
-import random
 import sys
 import threading
-import time
 from collections import namedtuple
 from random import uniform
-from time import sleep
+from datetime import datetime
 import urdf_parser_py.urdf as up
 
 import numpy as np
@@ -49,6 +47,7 @@ import numpy
 import matplotlib.pyplot as plt
 from ompl import base as ob
 from ompl import geometric as og
+from ompl import tools as ot
 
 # todo: put below in ros params
 SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve_time max_initial_iterations '
@@ -1151,8 +1150,8 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
     def is_collision_free(self, pose):
         with self.get_god_map().get_data(identifier.rosparam + ['state_validator_lock']):
             # Get current joint states
-            all_js = self.collision_scene.robot.state
-            old_js = deepcopy(all_js)
+            all_js = self.collision_scene.world.state
+            old_js = deepcopy(self.collision_scene.robot.state)
             # Calc IK for navigating to given state and ...
             results = []
             for i in range(0, self.ik_sampling):
@@ -1535,11 +1534,11 @@ class CompoundBoxSpace(PyBulletEnv):
         self.pub_collision_marker.publish(ma)
 
 
-def verify_ompl_movement_solution(setup, debug=False):
+def verify_ompl_movement_solution(setup, path, debug=False):
     rbc = setup.getStateValidityChecker().collision_checker
     t = 0
     f = 0
-    tj = ompl_states_matrix_to_np(setup.getSolutionPath().printAsMatrix())
+    tj = ompl_states_matrix_to_np(path.printAsMatrix())
     for i in range(0, len(tj)):
         trans = tf.transformations.translation_matrix(np.array([tj[i][0], tj[i][1], tj[i][2]]))
         rot = tf.transformations.quaternion_matrix(np.array([tj[i][3], tj[i][4], tj[i][5], tj[i][6]]))
@@ -1554,12 +1553,12 @@ def verify_ompl_movement_solution(setup, debug=False):
     return f / t
 
 
-def verify_ompl_navigation_solution(setup, debug=False):
+def verify_ompl_navigation_solution(setup, path, debug=False):
     rbc = setup.getStateValidityChecker().collision_checker
     si = setup.getSpaceInformation()
     t = 0
     f = 0
-    tj = ompl_states_matrix_to_np(setup.getSolutionPath().printAsMatrix())
+    tj = ompl_states_matrix_to_np(path.printAsMatrix())
     for i in range(0, len(tj)):
         trans = tf.transformations.translation_matrix(np.array([tj[i][0], tj[i][1], 0]))
         rot = tf.transformations.quaternion_matrix(p.getQuaternionFromEuler([0, 0, tj[i][2]]))
@@ -2052,16 +2051,17 @@ class GlobalPlanner(GetGoal):
             else:
                 return self._get_movement_planner
 
-    def _plan(self, planner_names, motion_validator_types, range, time,
+    def _plan(self, planner_names, motion_validator_types, planner_range, time,
               navigation=False, movement=False, narrow=False, interpolate=True):
         for motion_validator_type in motion_validator_types:
             for planner_name in planner_names:
-                rospy.loginfo(f'Starting search with Global Planner {planner_name}/{motion_validator_type} ...')
+                rospy.loginfo(f'Starting planning with Global Planner {planner_name}/{motion_validator_type} ...')
                 planner_f = self.get_planner_handle(navigation=navigation, movement=movement, narrow=narrow)
-                planner = planner_f(planner_name, motion_validator_type, range, time)
+                planner = planner_f(planner_name, motion_validator_type, planner_range, time)
                 js = self.get_god_map().get_data(identifier.joint_states)
                 try:
                     trajectory = planner.setup_and_plan(js)
+                    rospy.logerr(f"Found solution:{len(trajectory) != 0}")
                     if len(trajectory) != 0:
                         if self.god_map.get_data(identifier.path_interpolation):
                             trajectory = planner.interpolate_solution()
@@ -2071,6 +2071,18 @@ class GlobalPlanner(GetGoal):
                 rospy.loginfo(f'Global Planner {planner_name}/{motion_validator_type} did not found a solution. '
                               f'Trying other planner config...')
         return None, None, None
+
+    def _benchmark(self, planner_names, motion_validator_types, planner_range, time,
+                   navigation=False, movement=False, narrow=False, interpolate=True):
+        for motion_validator_type in motion_validator_types:
+            rospy.loginfo(f'Starting benchmark with Global Planner {motion_validator_type} ...')
+            planner_f = self.get_planner_handle(navigation=navigation, movement=movement, narrow=narrow)
+            planner = planner_f(None, motion_validator_type, planner_range, time)
+            js = self.get_god_map().get_data(identifier.joint_states)
+            try:
+                planner.setup_and_benchmark(js, planner_names)
+            finally:
+                planner.clear()
 
     def plan(self, navigation=False, movement=False, narrow=False):
         if not navigation and not movement:
@@ -2094,13 +2106,17 @@ class GlobalPlanner(GetGoal):
         time = planner_config['time']
         trajectory = None
 
-        for _ in range(0, int(self.god_map.get_data(identifier.path_replanning_max_retries))):
-            try:
-                trajectory, planner_name, _ = self._plan(planner_names, motion_validator_types, planner_range, time,
-                                                         navigation=navigation, movement=movement, narrow=narrow)
-                break
-            except ReplanningException:
-                pass
+        if self.god_map.get_data(identifier.path_benchmark):
+            self._benchmark(planner_names, motion_validator_types, planner_range, time,
+                            navigation=navigation, movement=movement, narrow=narrow)
+        else:
+            for _ in range(0, int(self.god_map.get_data(identifier.path_replanning_max_retries))):
+                try:
+                    trajectory, planner_name, _ = self._plan(planner_names, motion_validator_types, planner_range, time,
+                                                             navigation=navigation, movement=movement, narrow=narrow)
+                    break
+                except ReplanningException:
+                    pass
 
         if trajectory is None:
             raise FeasibleGlobalPlanningException('No solution found with current config.')
@@ -2328,7 +2344,6 @@ class OMPLPlanner(object):
             'fast_with_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
                                                 max_refine_iterations=5, min_refine_thresh=0.5)
         }
-        self.init_setup()
 
     def clear(self):
         self.setup.clear()
@@ -2496,25 +2511,57 @@ class OMPLPlanner(object):
                 including_last_i = i + 2 if i + 2 <= path.getStateCount() else path.getStateCount() - 1
                 path.keepBefore(path.getState(including_last_i))
 
-    def solve(self, debug_factor=1., discrete_factor=1.):
+    def _configure_benchmark_planner(self, planner: ob.Planner):
+        """
+        This function is called to configure a NEW planner object for benchmarking.
+        Thus, it is first tried to be configured and then the problem definition is
+        copied from the setup.
+        """
+        try:
+            planner.setRange(self.range)
+        except AttributeError:
+            pass
+        planner.setProblemDefinition(self.setup.getProblemDefinition().clone()) # allows planners to mess with problem definition ;)
+
+    def benchmark(self, planner_names):
+        e = datetime.now()
+        n = f"test_ease_cereal_with_planner_1-"\
+            f"date:={e.day}/{e.month}/{e.year}-" \
+            f"time:={e.hour}:{e.minute}:{e.second}-" \
+            f"validation type: = {str(self.motion_validator_class)}"
+        b = ot.Benchmark(self.setup, n)
+        for planner_name in planner_names:
+            self.planner_name = planner_name
+            b.addPlanner(self.get_planner(self.setup.getSpaceInformation()))
+        b.setPreRunEvent(ot.PreSetupEvent(self._configure_benchmark_planner))
+        req = ot.Benchmark.Request()
+        req.maxTime = self.max_time
+        req.maxMem = 100.0
+        req.runCount = 5
+        req.displayProgress = True
+        req.simplify = False
+        b.benchmark(req)
+        b.saveResultsToFile()
+
+    def solve(self):
         # Get solve parameters
         planner_name = self.setup.getPlanner().getName()
-        discrete_checking = self.motion_validator_class is None
+        #discrete_checking = self.motion_validator_class is None
         if planner_name not in self._planner_solve_params:
             solve_params = self._planner_solve_params[None][self.config]
         else:
             solve_params = self._planner_solve_params[planner_name][self.config]
-        debugging = sys.gettrace() is not None
-        initial_solve_time = solve_params.initial_solve_time if not debugging else solve_params.initial_solve_time * debug_factor
-        initial_solve_time = initial_solve_time * discrete_factor if discrete_checking else initial_solve_time
-        initial_solve_time = min(initial_solve_time, self.max_time)
-        refine_solve_time = solve_params.refine_solve_time if not debugging else solve_params.refine_solve_time * debug_factor
-        refine_solve_time = refine_solve_time * discrete_factor if discrete_checking else refine_solve_time
+        #debugging = sys.gettrace() is not None
+        #initial_solve_time = solve_params.initial_solve_time if not debugging else solve_params.initial_solve_time * debug_factor
+        #initial_solve_time = initial_solve_time * discrete_factor if discrete_checking else initial_solve_time
+        initial_solve_time = self.max_time # min(initial_solve_time, self.max_time)
+        #refine_solve_time = solve_params.refine_solve_time if not debugging else solve_params.refine_solve_time * debug_factor
+        #refine_solve_time = refine_solve_time * discrete_factor if discrete_checking else refine_solve_time
         max_initial_iterations = solve_params.max_initial_iterations
-        max_refine_iterations = solve_params.max_refine_iterations
-        min_refine_thresh = solve_params.min_refine_thresh
+        #max_refine_iterations = solve_params.max_refine_iterations
+        #min_refine_thresh = solve_params.min_refine_thresh
         max_initial_solve_time = min(initial_solve_time * max_initial_iterations, self.max_time)
-        max_refine_solve_time = refine_solve_time * max_refine_iterations
+        #max_refine_solve_time = refine_solve_time * max_refine_iterations
 
         planner_status = ob.PlannerStatus(ob.PlannerStatus.UNKNOWN)
         num_try = 0
@@ -2542,6 +2589,13 @@ class OMPLPlanner(object):
         #        refine_iteration += 1
         return planner_status.getStatus()
 
+    def get_solution_path(self):
+        try:
+            path = self.setup.getSolutionPath()
+        except RuntimeError:
+            raise Exception('Problem Definition in Setup may have changed..')
+        return path
+
 
 class MovementPlanner(OMPLPlanner):
 
@@ -2555,7 +2609,10 @@ class MovementPlanner(OMPLPlanner):
 
     def clear(self):
         super().clear()
-        self.motion_validator.clear()
+        try:
+            self.motion_validator.clear()
+        except AttributeError:
+            pass
         self.collision_checker.clear()
 
     def get_planner(self, si):
@@ -2586,7 +2643,8 @@ class MovementPlanner(OMPLPlanner):
         # planner.setup()
         return planner
 
-    def setup_and_plan(self, js):
+    def setup_problem(self, js):
+        self.init_setup()
         si = self.setup.getSpaceInformation()
 
         # si.getStateSpace().setStateSamplerAllocator()
@@ -2632,14 +2690,21 @@ class MovementPlanner(OMPLPlanner):
         self.setup.setOptimizationObjective(self.optimization_objective)
 
         self.setup.setup()
-        planner_status = self.plan()
-        return self.get_solution(planner_status)
 
     def plan(self):
         return self.solve()
 
+    def setup_and_plan(self, js):
+        self.setup_problem(js)
+        planner_status = self.plan()
+        return self.get_solution(planner_status)
+
+    def setup_and_benchmark(self, js, planner_names):
+        self.setup_problem(js)
+        self.benchmark(planner_names)
+
     def interpolate_solution(self):
-        path = self.setup.getSolutionPath()
+        path = self.get_solution_path()
         path_cost = path.cost(self.optimization_objective).value()
         if self.is_3D:
             if self.motion_validator_class is None:
@@ -2650,7 +2715,7 @@ class MovementPlanner(OMPLPlanner):
             path.interpolate(int(path_cost / 0.1))
         data = ompl_states_matrix_to_np(path.printAsMatrix()) # [x y z xw yw zw w]
         if self.verify_solution_f is not None:
-            if self.verify_solution_f(self.setup, debug=True) != 0:
+            if self.verify_solution_f(self.setup, self.get_solution_path(), debug=True) != 0:
                 rospy.loginfo('Interpolated path is invalid. Going to re-plan...')
                 raise ReplanningException('Interpolated Path is invalid.')
         else:
@@ -2658,14 +2723,14 @@ class MovementPlanner(OMPLPlanner):
         return data
 
     def get_solution(self, planner_status, plot=True):
-        # og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
-        # og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
+        # og.PathSimplifier(si).smoothBSpline(self.get_solution_path()) # takes around 20-30 secs with RTTConnect(0.1)
+        # og.PathSimplifier(si).reduceVertices(self.get_solution_path())
         data = numpy.array([])
         if planner_status in [ob.PlannerStatus.EXACT_SOLUTION]:
             # try to shorten the path
             # self.movement_setup.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # Make sure enough subpaths are available for Path Following
-            path = self.setup.getSolutionPath()
+            path = self.get_solution_path()
             data = ompl_states_matrix_to_np(path.printAsMatrix())
             # print the simplified path
             if plot:
@@ -2677,7 +2742,7 @@ class MovementPlanner(OMPLPlanner):
         dim = '3D' if self.is_3D else '2D'
         if self.verify_solution_f is not None:
             verify = ' - FP: {}, Time: {}s'.format(
-                   self.verify_solution_f(self.setup, debug=debug),
+                   self.verify_solution_f(self.setup, self.get_solution_path(), debug=debug),
                    self.setup.getLastPlanComputationTime())
         else:
             verify = ''
@@ -2702,8 +2767,16 @@ class NarrowMovementPlanner(MovementPlanner):
                                                     verify_solution_f=verify_solution_f)
         self.sampling_goal_axis = sampling_goal_axis
         self.reversed_start_and_goal = False
+        self.directional_planner = [
+            'RRT', 'TRRT', 'LazyRRT',
+            #'EST','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT',
+            'STRIDE', 'BITstar', 'ABITstar', 'kBITstar', 'kABITstar', 'RRTstar', 'LBTRRT',
+            #'SST',
+            'RRTXstatic', 'RRTsharp', 'RRT#', 'InformedRRTstar',
+            #'SORRTstar'
+            ]
 
-    def recompute_start_and_goal(self, start, goal):
+    def recompute_start_and_goal(self, planner, start, goal):
         si = self.setup.getSpaceInformation()
         st = ob.State(self.space)
         goal_space_n = 0
@@ -2719,7 +2792,8 @@ class NarrowMovementPlanner(MovementPlanner):
             if si.isValid(st()):
                 start_space_n += 1
         # Set Goal Space instead of goal state
-        goal_state = self.setup.getGoal().getState()
+        prob_def = planner.getProblemDefinition()
+        goal_state = prob_def.getGoal().getState()
         if start_space_n > goal_space_n:
             self.reversed_start_and_goal = True
             self.setup.setStartState(goal)
@@ -2729,7 +2803,7 @@ class NarrowMovementPlanner(MovementPlanner):
             goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, start(), goal_state,
                                            sampling_axis=self.sampling_goal_axis)
         goal_space.setThreshold(0.01)
-        self.setup.setGoal(goal_space)
+        prob_def.setGoal(goal_space)
 
     def create_goal_specific_space(self, padding=0.2):
 
@@ -2767,11 +2841,22 @@ class NarrowMovementPlanner(MovementPlanner):
             data = data if not self.reversed_start_and_goal else np.flip(data, axis=0)
         return data
 
-    def plan(self):
+    def _configure_benchmark_planner(self, planner: ob.Planner):
+        super(NarrowMovementPlanner, self)._configure_benchmark_planner(planner)
+        self._configure_planner(planner)
+
+    def _configure_planner(self, planner: ob.Planner):
+        prob_def = planner.getProblemDefinition()
+        prob_def.setStartAndGoalStates(self.start, self.goal)
+        if planner.getName() in self.directional_planner:
+            self.recompute_start_and_goal(planner, self.start, self.goal)
+
+    def setup_problem(self, js):
+        super(NarrowMovementPlanner, self).setup_problem(js)
         self.create_goal_specific_space()
-        self.recompute_start_and_goal(self.start, self.goal)
+        self._configure_planner(self.setup.getPlanner())
         self.setup.setup()
-        return super().plan()
+
 
 def is_3D(space):
     return type(space) == type(ob.SE3StateSpace())

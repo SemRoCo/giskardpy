@@ -2516,6 +2516,9 @@ class OMPLPlanner(object):
             planner.setRange(self.range)
         except AttributeError:
             pass
+        # vvvvvvv hack for PRM benchmark: idk why tho vvvvvvvvv
+        # planner.setProblemDefinition(self.setup.getProblemDefinition().clone())
+        # ^^^^^^^ hack for PRM benchmark: idk why tho ^^^^^^^^
 
     def benchmark(self, planner_names):
         e = datetime.now()
@@ -2840,6 +2843,7 @@ class NarrowMovementPlanner(MovementPlanner):
         return data
 
     def _configure_planner(self, planner: ob.Planner):
+        super(NarrowMovementPlanner, self)._configure_planner(planner)
         prob_def = planner.getProblemDefinition()
         try:
             prob_def.getGoal().getState()

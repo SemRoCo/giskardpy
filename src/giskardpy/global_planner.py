@@ -2516,9 +2516,6 @@ class OMPLPlanner(object):
             planner.setRange(self.range)
         except AttributeError:
             pass
-        # vvvvvvv hack for PRM benchmark: idk why tho vvvvvvvvv
-        # planner.setProblemDefinition(self.setup.getProblemDefinition().clone())
-        # ^^^^^^^ hack for PRM benchmark: idk why tho ^^^^^^^^
 
     def benchmark(self, planner_names):
         e = datetime.now()

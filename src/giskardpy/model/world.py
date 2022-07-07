@@ -717,13 +717,14 @@ class WorldTree(object):
     @profile
     def compute_all_fks(self):
         tfs = self.compute_all_fks_matrix()
-        result = {}
+        result = dict()
         for i, link in enumerate(self.link_names_with_collisions):
-            fk = tfs[i*4:i*4 + 4]
-            position = fk[:, 3]
-            q = kdl_to_quaternion(np_to_kdl(fk))
-            orientation = [q.x, q.y, q.z, q.w]
-            result[link] = np.append(position, orientation)
+            if link != self.root_link_name:
+                fk = tfs[i*4:i*4 + 4]
+                position = fk[:, 3]
+                q = kdl_to_quaternion(np_to_kdl(fk))
+                orientation = [q.x, q.y, q.z, q.w]
+                result[link] = np.append(position, orientation)
         return result
 
     @profile

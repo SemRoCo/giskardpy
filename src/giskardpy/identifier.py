@@ -98,6 +98,7 @@ TFPublisher = plugins + [u'TFPublisher']
 
 global_planner_needed = plugins + [u'GlobalPlannerNeeded', u'global_planner_needed']
 global_planner = plugins + [u'global_planner']
+path_benchmark = global_planner + [u'benchmark']
 gp_narrow = global_planner + [u'narrow']
 gp_normal = global_planner + [u'normal']
 path_interpolation = global_planner + [u'path_interpolation']

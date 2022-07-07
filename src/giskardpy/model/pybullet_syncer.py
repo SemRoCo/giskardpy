@@ -67,12 +67,21 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(link_a_id, link_b_id,
                                                                       distance+buffer)]
             if len(contacts) > 0:
-                for contact in contacts:  # type: ContactIcnfo
+                for contact in contacts:  # type: ContactInfo
+                    map_P_pa = np.array(contact.position_on_b) # okay wtf
+                    map_P_pa = np.append(map_P_pa, 1.0).reshape(-1, 1)
+                    map_P_pb = np.array(contact.position_on_a) # okay wtf numero 2
+                    map_P_pb = np.append(map_P_pb, 1.0).reshape(-1, 1)
+                    # using the normals from pybullet may break stuff, wtf pybullet
+                    # map_V_n = np.array(contact.contact_normal_on_b)
+                    # map_V_n = np.append(map_V_n, 0.0).reshape(-1, 1)
+                    b_V_a = map_P_pa - map_P_pb
+                    map_V_n = b_V_a / np.linalg.norm(b_V_a)
                     collision = Collision(link_a=link_a,
                                           link_b=link_b,
-                                          map_P_pa=np.array(contact.position_on_a),
-                                          map_P_pb=np.array(contact.position_on_b),
-                                          map_V_n=-1.0 * np.array(contact.contact_normal_on_b),
+                                          map_P_pa=map_P_pa,
+                                          map_P_pb=map_P_pb,
+                                          map_V_n=map_V_n,
                                           contact_distance=contact.contact_distance)
                     collisions.add(collision)
         return collisions

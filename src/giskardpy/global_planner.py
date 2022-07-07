@@ -2511,17 +2511,11 @@ class OMPLPlanner(object):
                 including_last_i = i + 2 if i + 2 <= path.getStateCount() else path.getStateCount() - 1
                 path.keepBefore(path.getState(including_last_i))
 
-    def _configure_benchmark_planner(self, planner: ob.Planner):
-        """
-        This function is called to configure a NEW planner object for benchmarking.
-        Thus, it is first tried to be configured and then the problem definition is
-        copied from the setup.
-        """
+    def _configure_planner(self, planner: ob.Planner):
         try:
             planner.setRange(self.range)
         except AttributeError:
             pass
-        planner.setProblemDefinition(self.setup.getProblemDefinition().clone()) # allows planners to mess with problem definition ;)
 
     def benchmark(self, planner_names):
         e = datetime.now()
@@ -2533,7 +2527,7 @@ class OMPLPlanner(object):
         for planner_name in planner_names:
             self.planner_name = planner_name
             b.addPlanner(self.get_planner(self.setup.getSpaceInformation()))
-        b.setPreRunEvent(ot.PreSetupEvent(self._configure_benchmark_planner))
+        b.setPreRunEvent(ot.PreSetupEvent(self._configure_planner))
         req = ot.Benchmark.Request()
         req.maxTime = self.max_time
         req.maxMem = 100.0
@@ -2654,10 +2648,11 @@ class MovementPlanner(OMPLPlanner):
 
         if self.motion_validator_class is None:
             si.setStateValidityCheckingResolution(1. / ((self.space.getMaximumExtent() * 3) / self.range))
-            rospy.loginfo('MovementPlanner: Using DiscreteMotionValidator with max cost of {} and'
+            rospy.loginfo('{}: Using DiscreteMotionValidator with max cost of {} and'
                           ' validity checking resolution of {} where the maximum distance is {}'
                           ' achieving a validity checking distance of {}.'
-                          ''.format(self.range,
+                          ''.format(str(self.__class__),
+                                    self.range,
                                     si.getStateValidityCheckingResolution(),
                                     self.space.getMaximumExtent(),
                                     self.space.getMaximumExtent() * si.getStateValidityCheckingResolution()))
@@ -2696,6 +2691,7 @@ class MovementPlanner(OMPLPlanner):
 
     def setup_and_plan(self, js):
         self.setup_problem(js)
+        self._configure_planner(self.setup.getPlanner())
         planner_status = self.plan()
         return self.get_solution(planner_status)
 
@@ -2770,7 +2766,9 @@ class NarrowMovementPlanner(MovementPlanner):
         self.directional_planner = [
             'RRT', 'TRRT', 'LazyRRT',
             #'EST','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT',
-            'STRIDE', 'BITstar', 'ABITstar', 'kBITstar', 'kABITstar', 'RRTstar', 'LBTRRT',
+            #'STRIDE',
+            #'BITstar', 'ABITstar', 'kBITstar', 'kABITstar',
+            'RRTstar', 'LBTRRT',
             #'SST',
             'RRTXstatic', 'RRTsharp', 'RRT#', 'InformedRRTstar',
             #'SORRTstar'
@@ -2796,7 +2794,7 @@ class NarrowMovementPlanner(MovementPlanner):
         goal_state = prob_def.getGoal().getState()
         if start_space_n > goal_space_n:
             self.reversed_start_and_goal = True
-            self.setup.setStartState(goal)
+            prob_def.setStartState(goal)
             goal_space = GrowingGoalStates(si, self.robot, self.root_link, self.tip_link, goal_state, start(),
                                            sampling_axis=self.sampling_goal_axis)
         else:
@@ -2841,20 +2839,18 @@ class NarrowMovementPlanner(MovementPlanner):
             data = data if not self.reversed_start_and_goal else np.flip(data, axis=0)
         return data
 
-    def _configure_benchmark_planner(self, planner: ob.Planner):
-        super(NarrowMovementPlanner, self)._configure_benchmark_planner(planner)
-        self._configure_planner(planner)
-
     def _configure_planner(self, planner: ob.Planner):
         prob_def = planner.getProblemDefinition()
-        prob_def.setStartAndGoalStates(self.start, self.goal)
+        try:
+            prob_def.getGoal().getState()
+        except Exception:
+            prob_def.setStartAndGoalStates(self.start, self.goal)
         if planner.getName() in self.directional_planner:
             self.recompute_start_and_goal(planner, self.start, self.goal)
 
     def setup_problem(self, js):
         super(NarrowMovementPlanner, self).setup_problem(js)
         self.create_goal_specific_space()
-        self._configure_planner(self.setup.getPlanner())
         self.setup.setup()
 
 

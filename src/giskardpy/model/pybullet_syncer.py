@@ -203,12 +203,18 @@ class PyBulletRayTesterEnv():
             for l_n in self.collision_scene.world.groups[o_g].link_names_with_collisions:
                 # TODO: Check if robot wants to collide with obj id, if add in self.ignore_ids else in env_obj_ids
                 self.environment_object_ids.append(self.collision_scene.object_name_to_bullet_id[l_n])
-        #self.collision_scene.world.notify_state_change()
-        #pbw.p.stepSimulation(physicsClientId=self.client_id)
 
     def ignore_id(self, id):
         return id in self.ignore_object_ids or (
                 id not in self.environment_object_ids and id not in self.environment_ids and id != -1)
+
+    # TODO
+    def are_ids_collision_free(self):
+        pass
+
+    # TODO
+    def is_id_collision_free(self):
+        pass
 
     def close_pybullet(self):
         pass

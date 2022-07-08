@@ -2426,7 +2426,7 @@ class TestCartesianPath(object):
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         goal_c = base_pose
 
-        kitchen_setup_avoid_collisions.set_json_goal(u'SetPredictionHorizon', prediction_horizon=1)
+        #kitchen_setup_avoid_collisions.set_json_goal(u'SetPredictionHorizon', prediction_horizon=1)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      tip_link=tip_link,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
@@ -3071,7 +3071,28 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
 
-    def test_ease_cereal_with_planner(self, kitchen_setup_avoid_collisions):
+    def publish_frame(self, name, pose_stamped):
+        from giskardpy.utils.tfwrapper import normalize_quaternion_msg
+        from tf2_msgs.msg import TFMessage
+        from geometry_msgs.msg import TransformStamped
+
+        def make_transform(parent_frame, child_frame, pose):
+            tf = TransformStamped()
+            tf.header.frame_id = parent_frame
+            tf.header.stamp = rospy.get_rostime()
+            tf.child_frame_id = child_frame
+            tf.transform.translation.x = pose.position.x
+            tf.transform.translation.y = pose.position.y
+            tf.transform.translation.z = pose.position.z
+            tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
+            return tf
+
+        pub = rospy.Publisher('/tf', TFMessage)
+        msg = TFMessage()
+        msg.transforms.append(make_transform(pose_stamped.header.frame_id, name, pose_stamped.pose))
+        pub.publish(msg)
+
+    def test_ease_cereal_with_planner_1(self, kitchen_setup_avoid_collisions):
         # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
@@ -3171,10 +3192,11 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
 
-    def test_ease_cereal_different_drawers(self, kitchen_setup_avoid_collisions):
+    def test_ease_cereal_with_planner_2(self, kitchen_setup_avoid_collisions):
+        from tf.transformations import quaternion_about_axis
         # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
-        drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_3_link'
+        drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
 
         # take milk out of fridge
         kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
@@ -3183,8 +3205,8 @@ class TestCartesianPath(object):
 
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = drawer_frame_id
-        cereal_pose.pose.position = Point(0.123, 0.0, 0.13)
-        cereal_pose.pose.orientation = Quaternion(0.0087786, 0.005395, -0.838767, -0.544393)
+        cereal_pose.pose.position = Point(-0.08, 0.0, 0.15)
+        cereal_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2 - np.pi / 6, [0, 0, 1]))
         kitchen_setup_avoid_collisions.add_box(cereal_name, [0.1028, 0.0634, 0.20894], cereal_pose)
 
         drawer_T_box = tf.msg_to_kdl(cereal_pose)
@@ -3193,16 +3215,17 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.open_l_gripper()
         grasp_pose = PoseStamped()
         grasp_pose.header.frame_id = cereal_name
-        grasp_pose.pose.position = Point(0.13, 0, 0.05)
+        grasp_pose.pose.position = Point(0.03, 0, 0.05)
         grasp_pose.pose.orientation = Quaternion(0, 0, 1, 0)
         box_T_r_goal = tf.msg_to_kdl(grasp_pose)
         box_T_r_goal_pre = deepcopy(box_T_r_goal)
-        box_T_r_goal_pre.p[0] += 0.1
+        box_T_r_goal_pre.p[0] += 0.2
 
         pre_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
 
         box_T_r_goal_post = deepcopy(box_T_r_goal)
-        box_T_r_goal_post.p[0] += 0.3
+        box_T_r_goal_post.p[0] += 0.4
+        box_T_r_goal_post.p[1] += 0.15
         post_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_post, drawer_frame_id)
 
         kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)
@@ -3239,6 +3262,111 @@ class TestCartesianPath(object):
         # kitchen_setup.align_planes('milk', z, root_normal=z_map)
         # kitchen_setup.keep_orientation(u'milk')
         # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
+        kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], False)
+        decrease_external_collision_avoidance(kitchen_setup_avoid_collisions)
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip,
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     goal=post_grasp_pose,
+                                                     goal_sampling_axis=[True, False, False])
+        kitchen_setup_avoid_collisions.plan_and_execute()
+        #kitchen_setup.set_joint_goal(gaya_pose)
+
+        # place milk back
+
+        # kitchen_setup.add_json_goal(u'BasePointingForward')
+        # milk_goal = PoseStamped()
+        # milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        # milk_goal.pose.position = Point(.1, -.2, .13)
+        # milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip,
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     goal=grasp_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+        kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
+
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup_avoid_collisions.open_l_gripper()
+        kitchen_setup_avoid_collisions.detach_object(cereal_name)
+
+        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+    def test_ease_cereal_different_drawers(self, kitchen_setup_avoid_collisions):
+        # FIXME collision avoidance needs soft_threshholds at 0
+        cereal_name = u'cereal'
+        drawer_frame_id = 'iai_kitchen/oven_area_area_right_drawer_board_1_link'
+
+        # take milk out of fridge
+        kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
+
+        # spawn milk
+
+        cereal_pose = PoseStamped()
+        cereal_pose.header.frame_id = drawer_frame_id
+        cereal_pose.pose.position = Point(0.123, 0.0, 0.13)
+        cereal_pose.pose.orientation = Quaternion(0.0087786, 0.005395, -0.838767, -0.544393)
+        kitchen_setup_avoid_collisions.add_box(cereal_name, [0.1028, 0.0634, 0.20894], cereal_pose)
+
+        drawer_T_box = tf.msg_to_kdl(cereal_pose)
+
+        # grasp milk
+        kitchen_setup_avoid_collisions.open_l_gripper()
+        grasp_pose = PoseStamped()
+        grasp_pose.header.frame_id = cereal_name
+        grasp_pose.pose.position = Point(0.13, 0, 0.05)
+        grasp_pose.pose.orientation = Quaternion(0, 0, 1, 0)
+        box_T_r_goal = tf.msg_to_kdl(grasp_pose)
+        box_T_r_goal_pre = deepcopy(box_T_r_goal)
+        box_T_r_goal_pre.p[0] += 0.1
+
+        pre_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
+
+        box_T_r_goal_post = deepcopy(box_T_r_goal)
+        box_T_r_goal_post.p[0] += 0.4
+        if drawer_frame_id == 'iai_kitchen/oven_area_area_right_drawer_board_1_link':
+            box_T_r_goal_post.p[1] -= 0.15
+            box_T_r_goal_post.p[2] += 0.2
+        post_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_post, drawer_frame_id)
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip,
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     goal=pre_grasp_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup_avoid_collisions.set_cart_goal(grasp_pose,
+                                                     tip_link=kitchen_setup_avoid_collisions.r_tip)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        kitchen_setup_avoid_collisions.attach_object(cereal_name, kitchen_setup_avoid_collisions.r_tip)
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup_avoid_collisions.close_l_gripper()
+
+        # x = Vector3Stamped()
+        # x.header.frame_id = 'milk'
+        # x.vector.x = 1
+        # x_map = Vector3Stamped()
+        # x_map.header.frame_id = 'iai_kitchen/iai_fridge_door'
+        # x_map.vector.x = 1
+        # z = Vector3Stamped()
+        # z.header.frame_id = 'milk'
+        # z.vector.z = 1
+        # z_map = Vector3Stamped()
+        # z_map.header.frame_id = 'map'
+        # z_map.vector.z = 1
+        # kitchen_setup.align_planes('milk', x, root_normal=x_map)
+        # kitchen_setup.align_planes('milk', z, root_normal=z_map)
+        # kitchen_setup.keep_orientation(u'milk')
+        # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
+        kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], False)
+        decrease_external_collision_avoidance(kitchen_setup_avoid_collisions)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      tip_link=kitchen_setup_avoid_collisions.r_tip,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
@@ -3275,6 +3403,7 @@ class TestCartesianPath(object):
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=grasp_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
+        kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup_avoid_collisions.open_l_gripper()

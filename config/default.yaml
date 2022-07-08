@@ -65,7 +65,7 @@ plugins:
     global_planner_needed: False
   # Planners
   # no python support: SPARS, SPARStwo, pRRT, VFRRT, TSRRT
-  # does not work: PDST
+  # does not work: PDST, SORRTstar
   # not supported yet: CForest and AnytimePathShortening and QRRT
   # multi-query:
   #   suboptimal:  ['PRM', 'LazyPRM']
@@ -77,15 +77,23 @@ plugins:
   #                 'FMT', 'BFMT',
   #                 'STRIDE']
   #   asymp. opt:  ['BITstar', 'ABITstar'
-  #                 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
+  #                 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp', 'InformedRRTstar', 'SORRTstar'
   #                 'AITstar']
+  # ['PRM', 'LazyPRM', 'PRMstar', 'LazyPRMstar', 'RRT', 'RRTConnect', 'TRRT', 'LazyRRT','EST',
+  #  'SBL','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT', 'BFMT',
+  #  'STRIDE', 'BITstar', 'ABITstar', 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
+  #  'InformedRRTstar']
   global_planner:
+    benchmark: False
     path_interpolation: True
     max_replanning_retries: 10
     normal:
       navigation:
-        planner: ['RRTConnect'] # sublist of above planners
-        motion_validator: ['rays', 'discrete'] # sublist of ['rays', 'box', 'discrete']
+        planner: ['PRM', 'LazyPRM', 'PRMstar', 'LazyPRMstar', 'RRT', 'RRTConnect', 'TRRT', 'LazyRRT','EST',
+                  'SBL','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT', 'BFMT',
+                  'STRIDE', 'BITstar', 'ABITstar', 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
+                  'InformedRRTstar'] # sublist of above planners
+        motion_validator: ['rays'] # sublist of ['rays', 'box', 'discrete']
         time: 15
         range: 1.0
       movement:
@@ -95,9 +103,12 @@ plugins:
         range: 0.05
     narrow:
       movement:
-        planner: ['EST', 'InformedRRTstar', 'RRTConnect', 'ABITstar'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
-        motion_validator: ['discrete', 'rays'] # sublist of ['rays', 'box', 'discrete']
-        time: 15
+        planner: ['RRTConnect', 'EST', 'KPIECE1', 'RRT',
+                  'TRRT', 'STRIDE', 'RRTstar', 'BITstar',
+                  'ABITstar', 'LBTRRT', 'RRTXstatic',
+                  'RRTsharp', 'InformedRRTstar'] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        motion_validator: ['discrete'] # sublist of ['rays', 'box', 'discrete']
+        time: 30
         range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True

@@ -74,8 +74,8 @@ class GlobalPlannerNeeded(GetGoal):
                                              js=self.get_god_map().get_data(identifier.joint_states))
                 start = np_to_pose(self.get_robot().get_fk(root_link, tip_link))
                 result = not m.check_motion(start, pose_goal)
-                del collision_checker
-                del m
+                collision_checker.clear()
+                m.clear()
                 return result
 
     def __is_global_path_needed(self, root_link, tip_link, pose_goal, coll_body_ids):

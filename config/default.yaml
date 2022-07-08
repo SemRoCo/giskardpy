@@ -80,6 +80,8 @@ plugins:
   #                 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
   #                 'AITstar']
   global_planner:
+    path_interpolation: True
+    max_replanning_retries: 10
     normal:
       navigation:
         planner: ['RRTConnect'] # sublist of above planners
@@ -99,7 +101,7 @@ plugins:
         range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
-    history: 5 # will save the x last plots
+    history: 10 # will save the x last plots
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     scaling: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     normalize_position: False # centers the joint positions around 0 on the y axis
@@ -118,8 +120,8 @@ plugins:
     publish_world_objects: False
     tf_topic: /tf
   MaxTrajectoryLength:
-    enabled: False
-    length: 30 # will abort planning if the trajectory becomes longer than this many seconds
+    enabled: True
+    length: 100 # will abort planning if the trajectory becomes longer than this many seconds
 reachability_check:
   sample_period: 0.5
   prismatic_velocity: 2.0

@@ -212,6 +212,9 @@ class PyBulletRayTester():
         self.collisionFilterGroup = 0x1
         self.noCollisionFilterGroup = 0x0
 
+    def clear(self):
+        self.pybulletenv.close_pybullet()
+
     def pre_ray_test(self):
         bodies_num = pbw.p.getNumBodies(physicsClientId=self.pybulletenv.client_id)
         if bodies_num > 1:

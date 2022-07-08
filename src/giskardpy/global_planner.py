@@ -2,13 +2,11 @@
 
 import json
 import os
-import random
 import sys
 import threading
 import time
 from collections import namedtuple
 from random import uniform
-from time import sleep
 import urdf_parser_py.urdf as up
 
 import numpy as np
@@ -29,15 +27,13 @@ import giskardpy.model.pybullet_wrapper as pbw
 from copy import deepcopy
 
 import giskardpy.identifier as identifier
-import giskardpy.model.pybullet_wrapper as pw
 from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded, GetPreGraspRequest, GetPreGrasp, \
-    GetPreGraspOrientation, GetAttachedObjects, GetAttachedObjectsRequest
+    GetAttachedObjects, GetAttachedObjectsRequest
 from giskardpy import RobotName
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GlobalPlanningException, InfeasibleGlobalPlanningException, \
     FeasibleGlobalPlanningException, ReplanningException
 from giskardpy.model.pybullet_syncer import PyBulletRayTester, PyBulletRayTesterEnv
-from giskardpy.model.utils import make_world_body_box
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.get_goal import GetGoal
 from giskardpy.tree.visualization import VisualizationBehavior
@@ -55,8 +51,7 @@ from ompl import geometric as og
 SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve_time max_initial_iterations '
                                                 'max_refine_iterations min_refine_thresh')
 
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp, \
-    resolve_ros_iris_in_urdf
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp
 
 
 class CollisionCheckerInterface(GiskardBehavior):

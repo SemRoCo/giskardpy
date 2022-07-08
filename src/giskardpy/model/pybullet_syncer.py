@@ -80,6 +80,14 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
                                           map_P_pb=contact.position_on_b,
                                           map_V_n=contact.contact_normal_on_b,
                                           contact_distance=contact.contact_distance)
+                    if self.__should_flip_collision(contact.position_on_a, robot_link):
+                        collision = Collision(link_a=robot_link,
+                                              body_b=body_b,
+                                              link_b=link_b,
+                                              map_P_pa=contact.position_on_b,
+                                              map_P_pb=contact.position_on_a,
+                                              map_V_n=tuple([-x for x in contact.contact_normal_on_b]),
+                                              contact_distance=contact.contact_distance)
                     collisions.add(collision)
         return collisions
 
@@ -143,7 +151,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         position = [pose.position.x, pose.position.y, pose.position.z]
         orientation = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
         pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[self.hack_name],
-                                            position, orientation, client_id=self.client_id)
+                                            position, orientation, physicsClientId=self.client_id)
 
     def __should_flip_collision(self, position_on_a_in_map, link_a):
         """
@@ -193,13 +201,20 @@ class PyBulletRayTesterEnv():
         self.environment_object_ids = list()
         for o_g in self.environment_object_groups:
             for l_n in self.collision_scene.world.groups[o_g].link_names_with_collisions:
+                # TODO: Check if robot wants to collide with obj id, if add in self.ignore_ids else in env_obj_ids
                 self.environment_object_ids.append(self.collision_scene.object_name_to_bullet_id[l_n])
         #self.collision_scene.world.notify_state_change()
-        pbw.p.stepSimulation(physicsClientId=self.client_id)
+        #pbw.p.stepSimulation(physicsClientId=self.client_id)
 
     def ignore_id(self, id):
         return id in self.ignore_object_ids or (
                 id not in self.environment_object_ids and id not in self.environment_ids and id != -1)
+
+    def close_pybullet(self):
+        pass
+
+    def clear(self):
+        pass
 
 
 class PyBulletRayTester():

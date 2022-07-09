@@ -3,18 +3,17 @@ import random
 import string
 from collections import namedtuple
 
-import numpy as np
 import pybullet as p
 from pybullet import resetJointState, getNumJoints, resetBasePositionAndOrientation, getBasePositionAndOrientation, \
     removeBody, getClosestPoints
-from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
+from geometry_msgs.msg import Pose, PoseStamped
+import urdf_parser_py.urdf as up
 
 import giskardpy
 from giskardpy import DEBUG
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
@@ -30,6 +29,7 @@ ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', 
 
 render = True
 
+
 def getJointInfo(pybullet_id, joint_index):
     result = p.getJointInfo(pybullet_id, joint_index)
     result2 = []
@@ -39,6 +39,7 @@ def getJointInfo(pybullet_id, joint_index):
         else:
             result2.append(r)
     return result2
+
 
 def random_string(size=6):
     """
@@ -68,9 +69,9 @@ def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientat
         position = [pose.position.x, pose.position.y, pose.position.z]
         orientation = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
     if position is None:
-        position = [0,0,0]
+        position = [0, 0, 0]
     if orientation is None:
-        orientation = [0,0,0,1]
+        orientation = [0, 0, 0, 1]
     object_name = robot_name_from_urdf_string(urdf_string)
     if object_name in get_body_names(client_id=client_id):
         raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))
@@ -109,11 +110,41 @@ def start_pybullet(gui, gravity=0, client_id=0):
         return server_id
 
 
-def create_box(depth, width, height, position, orientation):
-    return createCollisionShape(shapeType=p.GEOM_BOX,
-                                halfExtents=[depth, width, height],
-                                collisionFramePosition=position,
-                                collisionFrameOrientation=orientation)
+# def create_box(depth, width, height, position, orientation):
+#    return createCollisionShape(shapeType=p.GEOM_BOX,
+#                                halfExtents=[depth, width, height],
+#                                collisionFramePosition=position,
+#                                collisionFrameOrientation=orientation)
+
+def create_collision_box_with_files(pose, length, width, heigth, i, client_id=0, name_prefix=u'box'):
+    name = u'{}_{}_{}'.format(name_prefix, random_string(), str(i))
+    box_urdf = up.URDF(name=name)
+    box_link = up.Link(name=name)
+    box = up.Box([length, width, heigth])
+    box_link.visual = up.Visual(geometry=box)
+    box_link.collision = up.Collision(geometry=box)
+    box_link.inertial = up.Inertial()
+    box_link.inertial.mass = 0.01
+    box_link.inertial.inertia = up.Inertia(ixx=0.0, ixy=0.0, ixz=0.0, iyy=0.0, iyz=0.0, izz=0.0)
+    box_urdf.add_link(box_link)
+    return load_urdf_string_into_bullet(box_urdf.to_xml_string(), position=pose[0],
+                                        orientation=pose[1], client_id=client_id)
+
+
+def create_collision_box(pose, length, width, heigth, client_id=0):
+    visualShapeId = p.createVisualShape(shapeType=p.GEOM_BOX,
+                                        halfExtents=[length / 2., width / 2., heigth / 2.],
+                                        physicsClientId=client_id)
+    collisionShapeId = p.createCollisionShape(shapeType=p.GEOM_BOX,
+                                              halfExtents=[length / 2., width / 2., heigth / 2.],
+                                              physicsClientId=client_id)
+    id = p.createMultiBody(baseMass=1,
+                           baseCollisionShapeIndex=collisionShapeId,
+                           baseVisualShapeIndex=visualShapeId,
+                           basePosition=pose[0],
+                           baseOrientation=pose[1],
+                           physicsClientId=client_id)
+    return id
 
 
 def createCollisionShape(shapeType, radius=None, halfExtents=None, height=None, fileName=None, meshScale=None,
@@ -136,6 +167,7 @@ def createCollisionShape(shapeType, radius=None, halfExtents=None, height=None, 
     if collisionFrameOrientation is not None:
         kwargs['collisionFrameOrientation'] = collisionFrameOrientation
     return p.createCollisionShape(**kwargs)
+
 
 def msg_to_pybullet_pose(msg):
     """

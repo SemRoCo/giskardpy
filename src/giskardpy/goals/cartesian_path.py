@@ -12,7 +12,7 @@ class CartesianPathCarrot(Goal):
 
     def __init__(self, root_link, tip_link, goal, goals=None, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, ignore_trajectory_orientation=False, predict_f = 1.0, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, predict_f = 1.0, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -33,7 +33,6 @@ class CartesianPathCarrot(Goal):
         self.max_angular_velocity = max_angular_velocity
         self.max_linear_acceleration = max_linear_acceleration
         self.max_angular_acceleration = max_angular_acceleration
-        self.ignore_trajectory_orientation = ignore_trajectory_orientation
         self.predict_f = predict_f
 
         if goals is not None and len(goals) != 0:
@@ -61,38 +60,25 @@ class CartesianPathCarrot(Goal):
         # todo: clean the mess below
         # Translation Calculation
         # Calculate the normals and normal times with the current robot position and ...
-        curr_normals, curr_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings,
-                                                           w.position_of(self.get_fk(self.root_link, self.tip_link)))
-        curr_normal_dists = self.get_normal_dists(curr_normals)
+        current_P = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        curr_normals, curr_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings, current_P)
+        curr_normal_dists = self.get_normal_dists(curr_normals, current_P)
         # ... choose the closest normal with its estimated normal time.
         zero_one_mapping = self.zero_one_mapping_if_equal(curr_normal_dists, self.trajectory_length, w.ca.mmin(curr_normal_dists))
         curr_normal_time = self.select(curr_normal_times, zero_one_mapping)
         # Calculate the normals and normal times with the predicted robot position and ...
-        next_normals, next_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings, self.predict())
+        next_P = self.predict()
+        next_normals, next_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings, next_P)
         # ... filter the normals out which have a smaller normal time than curr_normal_time.
         zero_one_mapping_n = self.zero_one_mapping_if_greater(next_normal_times, self.trajectory_length, curr_normal_time)
         next_normals_closer_to_goal = next_normals * zero_one_mapping_n
         # After that get the closest normal point relative to the predicted robot position.
-        next_normal_dists = self.get_normal_dists(next_normals_closer_to_goal)
+        next_normal_dists = self.get_normal_dists(next_normals_closer_to_goal, next_P)
         zero_one_mapping_one = self.zero_one_mapping_if_equal(next_normal_dists, self.trajectory_length,
                                                               w.ca.mmin(next_normal_dists))
         next_normal = self.select(next_normals_closer_to_goal, zero_one_mapping_one)
         # Orientation Calculation
-        if not self.ignore_trajectory_orientation:
-            decimal_of_curr_normal_time = curr_normal_time - w.round_down(curr_normal_time, 0)
-            line_starts = []
-            line_ends = []
-            for i in range(0, self.trajectory_length):
-                line_s_q = w.quaternion_from_matrix(w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[i]])))
-                line_starts.append(line_s_q)
-                line_e_q = w.quaternion_from_matrix(w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.next_goal_strings[i]])))
-                line_ends.append(line_e_q)
-            line_start_q = self.select(w.Matrix(line_starts), zero_one_mapping)
-            line_end_q = self.select(w.Matrix(line_ends), zero_one_mapping)
-            current_rotation = w.quaternion_slerp(line_start_q, line_end_q, decimal_of_curr_normal_time)
-            next_rotation = w.rotation_matrix_from_quaternion(current_rotation[0], current_rotation[1], current_rotation[2], current_rotation[3])
-        else:
-            next_rotation = w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[-1]]))
+        next_rotation = w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[-1]]))
         return next_normal, next_rotation
 
     def predict(self):
@@ -147,14 +133,13 @@ class CartesianPathCarrot(Goal):
 
         return w.Matrix(normals), w.Matrix(normal_times)
 
-    def get_normal_dists(self, normals):
+    def get_normal_dists(self, normals, pos):
 
         trajectory_len = self.trajectory_length
-        next_pos = self.predict()
         normal_dist_funs = []
 
         for i in range(0, trajectory_len):
-            normal_dist_funs.append(w.norm(w.ca.transpose(normals[i,:]) - next_pos))
+            normal_dist_funs.append(w.norm(w.ca.transpose(normals[i,:]) - pos))
 
         return w.Matrix(normal_dist_funs)
 

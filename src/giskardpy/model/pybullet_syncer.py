@@ -1,17 +1,16 @@
-import traceback
-
 import numpy as np
 import rospy
 from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
+from tf.transformations import quaternion_from_euler
+from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy import identifier, RobotName
+from giskardpy import RobotName
 from giskardpy.data_types import BiDict, Collisions, Collision, CollisionAABB
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_wrapper import ContactInfo
-from giskardpy.model.world import WorldTree
-from giskardpy.utils import logging
-from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy.utils.tfwrapper import pose_to_np
+from giskardpy.utils.utils import resolve_ros_iris, write_to_tmp
 
 
 class PyBulletSyncer(CollisionWorldSynchronizer):
@@ -177,44 +176,65 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             return True
 
 
-class PyBulletRayTesterEnv():
+class PyBulletMotionValidationIDs():
 
-    def __init__(self, collision_scene, environment_name='kitchen', environment_object_names=None,
-                 ignore_objects_ids=None):
+    def __init__(self, collision_scene, environment_name='kitchen', environment_object_names=None, moving_links=None):
         self.collision_scene = collision_scene
         self.client_id = collision_scene.client_id
-        if ignore_objects_ids is None:
-            self.ignore_object_ids = list()
-        else:
-            self.ignore_object_ids = ignore_objects_ids
+
+        # Save objects for with collision should be checked from ...
+        # ... the environment.
+        self.environment_ids = list()
+        self.environment_group = environment_name
+
+        # ... other objects.
+        self.environment_object_ids = list()
         if environment_object_names is None:
             self.environment_object_groups = list()
         else:
             self.environment_object_groups = environment_object_names
-        self.environment_group = environment_name
+
+        # Ignore collisions with these objects
+        self.ignore_object_ids = list()
+        if moving_links is None:
+            self.moving_links = list()
+        else:
+            self.moving_links = moving_links
+
         self.setup()
 
     def setup(self):
         self.environment_ids = list()
-        for l_n in self.collision_scene.world.groups[self.environment_group].link_names_with_collisions:
-            self.environment_ids.append(self.collision_scene.object_name_to_bullet_id[l_n])
+        for e_l_n in self.collision_scene.world.groups[self.environment_group].link_names_with_collisions:
+            self.environment_ids.append(self.collision_scene.object_name_to_bullet_id[e_l_n])
         self.environment_object_ids = list()
+        self.ignore_object_ids = list()
         for o_g in self.environment_object_groups:
-            for l_n in self.collision_scene.world.groups[o_g].link_names_with_collisions:
-                # TODO: Check if robot wants to collide with obj id, if add in self.ignore_ids else in env_obj_ids
-                self.environment_object_ids.append(self.collision_scene.object_name_to_bullet_id[l_n])
+            for o_l_n in self.collision_scene.world.groups[o_g].link_names_with_collisions:
+                if o_l_n in self.moving_links:
+                    continue
+                ignore_object_link = True
+                for r_link in self.moving_links:
+                    if self.should_ignore_collision(o_l_n, r_link):
+                        ignore_object_link = False
+                        break
+                o_l_id = self.collision_scene.object_name_to_bullet_id[o_l_n]
+                if ignore_object_link:
+                    self.ignore_object_ids.append(o_l_id)
+                else:
+                    self.environment_object_ids.append(o_l_id)
 
     def ignore_id(self, id):
         return id in self.ignore_object_ids or (
                 id not in self.environment_object_ids and id not in self.environment_ids and id != -1)
 
-    # TODO
-    def are_ids_collision_free(self):
-        pass
-
-    # TODO
-    def is_id_collision_free(self):
-        pass
+    def should_ignore_collision(self, link1, link2):
+        for (robot_link, _, link_b), _ in self.collision_scene.collision_matrix.items():
+            if robot_link == link1 and link_b == link2:
+                return False
+            elif link_b == link1 and robot_link == link2:
+                return False
+        return True
 
     def close_pybullet(self):
         pass
@@ -282,3 +302,162 @@ class PyBulletRayTester():
                 for link_id in range(self.link_id_start, links_num):
                     pbw.p.setCollisionFilterGroupMask(id, link_id, self.collisionFilterGroup, self.collisionFilterGroup,
                                                       physicsClientId=self.pybulletenv.client_id)
+
+
+class PyBulletBoxSpace():
+
+    def __init__(self, world, robot, map_frame, pybullet_env, publish_collision_boxes=True):
+        self.pybullet_env = pybullet_env
+        self.world = world
+        self.robot = robot
+        self.map_frame = map_frame
+        self.publish_collision_boxes = publish_collision_boxes
+
+        if self.publish_collision_boxes:
+            self.collision_box_name_prefix = 'collision_box_name_prefix'
+            self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
+
+    def _get_pitch(self, pos_b):
+        pos_a = np.zeros(3)
+        dx = pos_b[0] - pos_a[0]
+        dy = pos_b[1] - pos_a[1]
+        dz = pos_b[2] - pos_a[2]
+        pos_c = pos_a + np.array([dx, dy, 0])
+        a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_a)) ** 2))
+        return np.arctan2(dz, a)
+
+    def get_pitch(self, pos_b):
+        l_a = self._get_pitch(pos_b)
+        if pos_b[0] >= 0:
+            return -l_a
+        else:
+            return np.pi - l_a
+
+    def _get_yaw(self, pos_b):
+        pos_a = np.zeros(3)
+        dx = pos_b[0] - pos_a[0]
+        dz = pos_b[2] - pos_a[2]
+        pos_c = pos_a + np.array([0, 0, dz])
+        pos_d = pos_c + np.array([dx, 0, 0])
+        g = np.sqrt(np.sum((np.array(pos_b) - np.array(pos_d)) ** 2))
+        a = np.sqrt(np.sum((np.array(pos_c) - np.array(pos_d)) ** 2))
+        return np.arctan2(g, a)
+
+    def get_yaw(self, pos_b):
+        l_a = self._get_yaw(pos_b)
+        if pos_b[0] >= 0 and pos_b[1] >= 0:
+            return l_a
+        elif pos_b[0] >= 0 and pos_b[1] <= 0:
+            return -l_a
+        elif pos_b[0] <= 0 and pos_b[1] >= 0:
+            return np.pi - l_a
+        else:
+            return np.pi + l_a
+
+    def compute_pose_of_box(self, pos_a, pos_b):
+        b_to_a = np.array(pos_a) - np.array(pos_b)
+        c = np.array(pos_b) + b_to_a / 2.
+        # Compute the pitch and yaw based on the pybullet box and map coordinates
+        # https://i.stack.imgur.com/f190Q.png, https://stackoverflow.com/questions/58469297/how-do-i-calculate-the-yaw-pitch-and-roll-of-a-point-in-3d/58469298#58469298
+        q = quaternion_from_euler(0, self.get_pitch(pos_b - c), self.get_yaw(pos_b - c))
+        # rospy.logerr(u'pitch: {}, yaw: {}'.format(self._get_pitch(pos_a, pos_b), self._get_yaw(pos_a, pos_b)))
+        return Pose(Point(c[0], c[1], c[2]), Quaternion(q[0], q[1], q[2], q[3]))
+
+    def is_colliding(self, min_sizes, start_positions, end_positions):
+        if self.robot:
+            for i, (pos_a, pos_b) in enumerate(zip(start_positions, end_positions)):
+                if np.all(pos_a == pos_b):
+                    continue
+                contact_points = self._check_for_collisions(i, pos_a, pos_b, min_sizes[i])
+                if self._is_colliding(contact_points):
+                    return True
+        return False
+
+    def is_colliding_timed1(self, min_sizes, start_positions, end_positions, s1, s2):
+        ret = False
+        fs = list()
+        if self.robot:
+            for i, (pos_a, pos_b) in enumerate(zip(start_positions, end_positions)):
+                if np.all(pos_a == pos_b):
+                    continue
+                contact_points = self._check_for_collisions(i, pos_a, pos_b, min_sizes[i])
+                ret, f = self._is_colliding_timed(s1, s2, contact_points)
+                fs.append(f)
+        return ret, max(fs) if fs else 0.99
+
+    def _check_for_collisions(self, i, pos_a, pos_b, min_size, max_dist=0.1):
+        contact_points = tuple()
+        # create box
+        pose = self.compute_pose_of_box(pos_a, pos_b)
+        length = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
+        width = min_size
+        height = min_size
+        coll_id = pbw.create_collision_box(pose_to_np(pose), length, width, height,
+                                           client_id=self.pybullet_env.client_id)
+        if self.publish_collision_boxes:
+            name = '{}_{}'.format(self.collision_box_name_prefix, str(i))
+            self.pub_marker(length, width, height, pose, name)
+        for environment_id in self.pybullet_env.environment_ids:
+            contact_points += pbw.getClosestPoints(environment_id, coll_id, max_dist,
+                                                   physicsClientId=self.pybullet_env.client_id)
+        for obj_id in self.pybullet_env.environment_object_ids:
+            contact_points += pbw.getClosestPoints(obj_id, coll_id, max_dist,
+                                                   physicsClientId=self.pybullet_env.client_id)
+        if self.publish_collision_boxes:
+            self.del_marker(name)
+        pbw.removeBody(coll_id, physicsClientId=self.pybullet_env.client_id)
+        return contact_points
+
+    def _is_colliding(self, contact_points):
+        for c in contact_points:
+            if c[8] < 0.0:
+                return True
+
+    def get_normal(self, p, a, b):
+        ap = p - a
+        ab = b - a
+        ab = ab / np.linalg.norm(ab)
+        ab = ab * (np.dot(ap.T, ab))
+        normal = a + ab
+        if normal[0] < min([a[0], b[0]]) or normal[0] > max([a[0], b[0]]):
+            return b - a
+        else:
+            return ab
+
+    def _is_colliding_timed(self, s1, s2, contact_points):
+        fs = list()
+        dist = np.linalg.norm(s1-s2) + 0.001
+        for c in contact_points:
+            if c[8] < 0.0:
+                a = c[5]
+                b = c[6]
+                f_a = np.linalg.norm(self.get_normal(a, s1, s2))/dist
+                f_b = np.linalg.norm(self.get_normal(b, s1, s2))/dist
+                fs.append(min([f_a, f_b]))
+        return len(fs) != 0, min(fs) if fs else 0.99
+
+    def pub_marker(self, d, w, h, p, name):
+        ma = MarkerArray()
+        marker = Marker()
+        marker.color.a = 0.5
+        marker.color.r = 1.0
+        marker.color.g = 1.0
+        marker.color.b = 1.0
+        marker.pose = p
+        marker.type = Marker.CUBE
+        marker.scale.x = d
+        marker.scale.y = w
+        marker.scale.z = h
+        marker.header.frame_id = self.map_frame
+        marker.ns = u'world' + name
+        ma.markers.append(marker)
+        self.pub_collision_marker.publish(ma)
+
+    def del_marker(self, name):
+        ma = MarkerArray()
+        marker = Marker()
+        marker.action = Marker.DELETE
+        marker.header.frame_id = self.map_frame
+        marker.ns = u'world' + name
+        ma.markers.append(marker)
+        self.pub_collision_marker.publish(ma)

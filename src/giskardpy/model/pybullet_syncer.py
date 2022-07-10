@@ -373,7 +373,7 @@ class PyBulletBoxSpace():
                     return True
         return False
 
-    def is_colliding_timed1(self, min_sizes, start_positions, end_positions, s1, s2):
+    def is_colliding_timed(self, min_sizes, start_positions, end_positions, s1, s2):
         ret = False
         fs = list()
         if self.robot:
@@ -381,15 +381,16 @@ class PyBulletBoxSpace():
                 if np.all(pos_a == pos_b):
                     continue
                 contact_points = self._check_for_collisions(i, pos_a, pos_b, min_sizes[i])
-                ret, f = self._is_colliding_timed(s1, s2, contact_points)
+                r, f = self._is_colliding_timed(s1, s2, contact_points)
+                ret = ret or r
                 fs.append(f)
-        return ret, max(fs) if fs else 0.99
+        return ret, min(fs) if fs else 0.99
 
     def _check_for_collisions(self, i, pos_a, pos_b, min_size, max_dist=0.1):
         contact_points = tuple()
         # create box
         pose = self.compute_pose_of_box(pos_a, pos_b)
-        length = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2))
+        length = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2)) + min_size
         width = min_size
         height = min_size
         coll_id = pbw.create_collision_box(pose_to_np(pose), length, width, height,
@@ -413,13 +414,15 @@ class PyBulletBoxSpace():
             if c[8] < 0.0:
                 return True
 
-    def get_normal(self, p, a, b):
+    def get_normal_v(self, p, a, b):
         ap = p - a
         ab = b - a
         ab = ab / np.linalg.norm(ab)
         ab = ab * (np.dot(ap.T, ab))
         normal = a + ab
-        if normal[0] < min([a[0], b[0]]) or normal[0] > max([a[0], b[0]]):
+        if np.all(normal < np.min([a, b], axis=0)):
+            return np.array([0, 0, 0])
+        elif np.all(normal >= np.max([a, b], axis=0)):
             return b - a
         else:
             return ab
@@ -431,8 +434,8 @@ class PyBulletBoxSpace():
             if c[8] < 0.0:
                 a = c[5]
                 b = c[6]
-                f_a = np.linalg.norm(self.get_normal(a, s1, s2))/dist
-                f_b = np.linalg.norm(self.get_normal(b, s1, s2))/dist
+                f_a = np.linalg.norm(self.get_normal_v(a, s1, s2))/dist
+                f_b = np.linalg.norm(self.get_normal_v(b, s1, s2))/dist
                 fs.append(min([f_a, f_b]))
         return len(fs) != 0, min(fs) if fs else 0.99
 

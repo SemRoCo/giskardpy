@@ -476,8 +476,9 @@ class OMPLMotionValidator(ob.MotionValidator):
                 return self.motion_validator.checkMotion(s1_pose, s2_pose)
             elif len(args) == 3:
                 ret, last_valid_pose, time = self.motion_validator.checkMotionTimed(s1_pose, s2_pose)
-                valid_state = pose_to_ompl_state(self.si.getStateSpace(), last_valid_pose, self.is_3D)
-                last_valid = (valid_state, time)
+                if not ret:
+                    valid_state = pose_to_ompl_state(self.si.getStateSpace(), last_valid_pose, self.is_3D)
+                    last_valid = (valid_state, time)
                 return ret
             else:
                 raise Exception('Invalid input arguments.')
@@ -527,10 +528,10 @@ class AbstractMotionValidator():
         with self.god_map.get_data(identifier.rosparam + ['motion_validator_lock']):
             c1, f1 = self.check_motion_timed(s1, s2)
             if not self.ignore_state_validator:
-                c1 &= self.state_validator.is_collision_free(s1)
+                c1 = c1 and self.state_validator.is_collision_free(s1)
             c2, f2 = self.check_motion_timed(s2, s1)
             if not self.ignore_state_validator:
-                c2 &= self.state_validator.is_collision_free(s2)
+                c2 = c2 and self.state_validator.is_collision_free(s2)
             if not c1:
                 time = max(0, f1 - 0.01)
                 last_valid = self.get_last_valid(s1, s2, time)
@@ -2170,7 +2171,7 @@ class OMPLPlanner(object):
         req = ot.Benchmark.Request()
         req.maxTime = self.max_time
         req.maxMem = 100.0
-        req.runCount = 5
+        req.runCount = 1
         req.displayProgress = True
         req.simplify = False
         b.benchmark(req)

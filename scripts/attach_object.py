@@ -8,7 +8,7 @@ if __name__ == '__main__':
     giskard = GiskardWrapper()
     try:
         name = rospy.get_param('~name')
-        result = giskard.attach_object(name=name, link_frame_id=rospy.get_param('~link'))
+        result = giskard.update_parent_link_of_group(name=name, link_frame_id=rospy.get_param('~link'))
         if result.error_codes == result.SUCCESS:
             logging.loginfo('existing object \'{}\' attached'.format(name))
         else:

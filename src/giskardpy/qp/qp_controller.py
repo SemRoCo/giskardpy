@@ -14,6 +14,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
+from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import memoize, create_path
 
 
@@ -21,11 +22,11 @@ def save_pandas(dfs, names, path):
     folder_name = '{}/pandas_{}/'.format(path, datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss'))
     create_path(folder_name)
     for df, name in zip(dfs, names):
-        csv_string = u'name\n'
+        csv_string = 'name\n'
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
-                    csv_string += column.add_prefix(column_name + u'||').to_csv(float_format='%.4f')
+                    csv_string += column.add_prefix(column_name + '||').to_csv(float_format='%.4f')
             else:
                 csv_string += df.to_csv(float_format='%.4f')
         file_name2 = '{}{}.csv'.format(folder_name, name)
@@ -34,7 +35,10 @@ def save_pandas(dfs, names, path):
 
 
 class Parent(object):
-    def __init__(self, sample_period, prediction_horizon, order):
+    time_collector: TimeCollector
+
+    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
+        self.time_collector = time_collector
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.order = order
@@ -90,7 +94,7 @@ class H(Parent):
     def number_of_free_variables_with_horizon(self):
         h = 0
         for v in self.free_variables:
-            h += (v.order - 1) * self.prediction_horizon
+            h += (min(v.order, self.order) - 1) * self.prediction_horizon
         return h
 
     def number_of_constraint_vel_variables(self):
@@ -102,14 +106,14 @@ class H(Parent):
     def number_of_contraint_error_variables(self):
         return len(self.constraints)
 
+    @profile
     def weights(self):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, v.order):
+                for o in range(1, min(v.order, self.order)):
                     weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o,
                                                                                            self.prediction_horizon)
-
         slack_weights = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:  # type: VelocityConstraint
@@ -176,8 +180,8 @@ class B(Parent):
         ub = defaultdict(dict)
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < v.order - 1 and self.prediction_horizon > 2:  # and False:
+                for o in range(1, min(v.order, self.order)):  # start with velocity
+                    if t == self.prediction_horizon - 1 and o < min(v.order, self.order) - 1 and self.prediction_horizon > 2:  # and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:
@@ -195,10 +199,8 @@ class B(Parent):
         ub_params.append(self.get_upper_slack_limits())
         ub_params.append(self.get_upper_error_slack_limits())
 
-        return self._sorter(*lb_params)[0], self._sorter(*ub_params)[0], self._sorter(*lb_params)[1]
-
-    def names(self):
-        return self()[2]
+        lb, self.names = self._sorter(*lb_params)
+        return lb, self._sorter(*ub_params)[0]
 
 
 class BA(Parent):
@@ -240,7 +242,7 @@ class BA(Parent):
                                                c.velocity_limit * self.sample_period * c.control_horizon)
                 for c in self.constraints}
 
-    def __call__(self):
+    def __call__(self) -> tuple:
         lb = {}
         ub = {}
         # position limits
@@ -255,14 +257,14 @@ class BA(Parent):
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
-            for o in range(1, v.order - 1):
+            for o in range(1, min(v.order, self.order) - 1):
                 l_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_up(v.get_symbol(o), self.round_to)
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
-                for o in range(1, v.order - 1):
+                for o in range(1, min(v.order, self.order) - 1):
                     derivative_link[o]['t{:03d}/{}/{}/link'.format(t, o, v.name)] = 0
 
         lb_params = [lb]
@@ -277,15 +279,13 @@ class BA(Parent):
         ub_params.append(self.get_upper_constraint_velocities())
         ub_params.append(self.get_upper_constraint_error())
 
-        return self._sorter(*lb_params)[0], self._sorter(*ub_params)[0], self._sorter(*lb_params)[1]
-
-    def names(self):
-        return self()[2]
+        lbA, self.names = self._sorter(*lb_params)
+        return lbA, self._sorter(*ub_params)[0]
 
 
 class A(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order):
-        super(A, self).__init__(sample_period, prediction_horizon, order)
+    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order, time_collector):
+        super(A, self).__init__(sample_period, prediction_horizon, order, time_collector)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
@@ -384,7 +384,7 @@ class A(Parent):
         #         |   sp   |   sp   |   sp   |   sp   |
         #         |      sp|      sp|      sp|      sp|
         #         |===================================|
-        # TODO possible speed improvement by creating blocks and stiching them together
+        # TODO possible speed improvement by creating blocks and stitching them together
         number_of_joints = self.number_of_joints
         A_soft = w.zeros(
             self.prediction_horizon * number_of_joints +  # joint position constraints
@@ -400,9 +400,11 @@ class A(Parent):
         J_err = w.jacobian(w.Matrix(self.get_constraint_expressions()), self.get_free_variable_symbols(), order=1)
         J_vel *= self.sample_period
         J_err *= self.sample_period
-        logging.loginfo(u'computed Jacobian in {:.5f}s'.format(time() - t))
+        jac_time = time() - t
+        logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
-        # logging.loginfo(u'computed Jacobian dot in {:.5f}s'.format(time() - t))
+        # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
+        self.time_collector.jacobians.append(jac_time)
 
         # position limits
         vertical_offset = number_of_joints * self.prediction_horizon
@@ -413,8 +415,8 @@ class A(Parent):
             A_soft[start:vertical_offset, :matrix_size] += I
 
         # derivative links
-        I = w.eye(number_of_joints * (self.order - 2) * self.prediction_horizon)
         block_size = number_of_joints * (self.order - 2) * self.prediction_horizon
+        I = w.eye(block_size)
         A_soft[vertical_offset:vertical_offset + block_size, :block_size] += I
         h_offset = number_of_joints * self.prediction_horizon
         A_soft[vertical_offset:vertical_offset + block_size, h_offset:h_offset + block_size] += -I * self.sample_period
@@ -527,10 +529,12 @@ class QPController(object):
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
+    time_collector: TimeCollector
 
     def __init__(self, sample_period, prediction_horizon, solver_name,
                  free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
-                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100):
+                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100, time_collector=None):
+        self.time_collector = time_collector
         self.free_variables = []  # type: list[FreeVariable]
         self.constraints = []  # type: list[Constraint]
         self.velocity_constraints = []  # type: list[VelocityConstraint]
@@ -550,27 +554,28 @@ class QPController(object):
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        if solver_name == u'gurobi':
+        if solver_name == 'gurobi':
             from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
             self.qp_solver = QPSolverGurobi()
-        elif solver_name == u'qpoases':
+        elif solver_name == 'qpoases':
             from giskardpy.qp.qp_solver import QPSolver
             self.qp_solver = QPSolver()
-        elif solver_name == u'cplex':
+        elif solver_name == 'cplex':
             from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             self.qp_solver = QPSolverCplex()
         else:
-            raise KeyError(u'Solver \'{}\' not supported'.format(solver_name))
-        logging.loginfo(u'Using QP Solver \'{}\''.format(solver_name))
+            raise KeyError('Solver \'{}\' not supported'.format(solver_name))
+        logging.loginfo('Using QP Solver \'{}\''.format(solver_name))
 
     def add_free_variables(self, free_variables):
         """
         :type free_variables: list
         """
+        # TODO check for empty goals
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.name)))
         l = [x.name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = max(v.order for v in self.free_variables)
+        self.order = min(self.prediction_horizon + 1, max(v.order for v in self.free_variables))
         assert duplicates == set(), 'there are free variables with the same name: {}'.format(duplicates)
 
     def get_free_variable(self, name):
@@ -581,7 +586,7 @@ class QPController(object):
         for v in self.free_variables:
             if v.name == name:
                 return v
-        raise KeyError(u'No free variable with name: {}'.format(name))
+        raise KeyError('No free variable with name: {}'.format(name))
 
     def add_constraints(self, constraints):
         """
@@ -613,10 +618,10 @@ class QPController(object):
                              '1 <= control horizon <= prediction horizon'.format(constraint.name,
                                                                                  constraint.control_horizon))
         elif constraint.control_horizon > self.prediction_horizon:
-            logging.logwarn(u'Specified control horizon of {} is bigger than prediction horizon.'
-                            u'Reducing control horizon of {} to prediction horizon of {}'.format(constraint.name,
-                                                                                                 constraint.control_horizon,
-                                                                                                 self.prediction_horizon))
+            logging.logwarn('Specified control horizon of {} is bigger than prediction horizon.'
+                            'Reducing control horizon of {} to prediction horizon of {}'.format(constraint.name,
+                                                                                                constraint.control_horizon,
+                                                                                                self.prediction_horizon))
 
     def add_debug_expressions(self, debug_expressions):
         """
@@ -625,6 +630,7 @@ class QPController(object):
         # TODO check duplicates
         self.debug_expressions.update(debug_expressions)
 
+    @profile
     def compile(self):
         self._construct_big_ass_M()
         self._compile_big_ass_M()
@@ -642,17 +648,18 @@ class QPController(object):
         free_symbols = list(free_symbols)
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              free_symbols)
-
-        logging.loginfo(u'Compiled symbolic controller in {:.5f}s'.format(time() - t))
+        compilation_time = time() - t
+        logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(compilation_time))
+        self.time_collector.compilations.append(compilation_time)
         # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
     def _are_joint_limits_violated(self, error_message):
         violations = (self.p_ub - self.p_lb)[self.p_lb.data > self.p_ub.data]
         if len(violations) > 0:
-            error_message += u'\nThe following joints are outside of their limits: \n {}'.format(violations)
+            error_message += '\nThe following joints are outside of their limits: \n {}'.format(violations)
             raise OutOfJointLimitsException(error_message)
-        logging.loginfo(u'All joints are within limits')
+        logging.loginfo('All joints are within limits')
         return False
 
     def _is_close_to_joint_limits(self):
@@ -668,13 +675,15 @@ class QPController(object):
         result = False
         if len(lbA_danger) > 0:
             logging.logwarn(
-                u'The following joints ended up closer than {}% to their lower position limits {}'.format(percentage,
-                                                                                                          list(lbA_danger.index)))
+                'The following joints ended up closer than {}% to their lower position limits {}'.format(percentage,
+                                                                                                         list(
+                                                                                                             lbA_danger.index)))
             result = True
         if len(ubA_danger) > 0:
             logging.logwarn(
-                u'The following joints ended up closer than {}% to their upper position limits {}'.format(percentage,
-                                                                                                          list(ubA_danger.index)))
+                'The following joints ended up closer than {}% to their upper position limits {}'.format(percentage,
+                                                                                                         list(
+                                                                                                             ubA_danger.index)))
             result = True
         return result
 
@@ -683,20 +692,20 @@ class QPController(object):
             save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
                          self.p_xdot],
                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
-                        u'../tmp_data')
+                        '../tmp_data')
         else:
             save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
-                        u'../tmp_data')
+                        '../tmp_data')
 
     def __is_nan_in_array(self, name, p_array):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
         p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
         if len(p_filtered) > 0:
-            logging.logerr(u'{} has the following nans:'.format(name))
+            logging.logerr('{} has the following nans:'.format(name))
             self.__print_pandas_array(p_filtered)
             return True
-        logging.loginfo(u'{} has no nans'.format(name))
+        logging.loginfo('{} has no nans'.format(name))
         return False
 
     def __print_pandas_array(self, array):
@@ -749,19 +758,23 @@ class QPController(object):
         self.bA = BA(self.free_variables, self.constraints, self.velocity_constraints, self.sample_period,
                      self.prediction_horizon, self.order)
         self.A = A(self.free_variables, self.constraints, self.velocity_constraints, self.sample_period,
-                   self.prediction_horizon, self.order)
+                   self.prediction_horizon, self.order, self.time_collector)
 
-        logging.loginfo(u'Constructing new controller with {} constraints and {} free variables...'.format(
+        logging.loginfo('Constructing new controller with {} constraints and {} free variables...'.format(
             self.A.height, self.A.width))
+        self.time_collector.constraints.append(self.A.height)
+        self.time_collector.variables.append(self.A.width)
 
         self._init_big_ass_M()
 
         self._set_weights(w.Matrix(self.H.weights()))
         self._set_A_soft(self.A.A())
-        self._set_lbA(w.Matrix(self.bA()[0]))
-        self._set_ubA(w.Matrix(self.bA()[1]))
-        self._set_lb(w.Matrix(self.b()[0]))
-        self._set_ub(w.Matrix(self.b()[1]))
+        lbA, ubA = self.bA()
+        self._set_lbA(w.Matrix(lbA))
+        self._set_ubA(w.Matrix(ubA))
+        lb, ub = self.b()
+        self._set_lb(w.Matrix(lb))
+        self._set_ub(w.Matrix(ub))
         self.np_g = np.zeros(self.H.width)
         self.debug_names = list(sorted(self.debug_expressions.keys()))
         self.debug_v = w.Matrix([self.debug_expressions[name] for name in self.debug_names])
@@ -821,26 +834,26 @@ class QPController(object):
         except Exception as e_original:
             if self.retries_with_relaxed_constraints:
                 try:
-                    logging.logwarn(u'Failed to solve QP, retrying with relaxed hard constraints.')
+                    logging.logwarn('Failed to solve QP, retrying with relaxed hard constraints.')
                     self.get_cmd_relaxed_hard_constraints(*filtered_stuff)
                     self.retries_with_relaxed_constraints -= 1
                     return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
                 except Exception as e_relaxed:
-                    logging.logerr(u'Relaxing hard constraints failed.')
+                    logging.logerr('Relaxing hard constraints failed.')
             else:
-                logging.logwarn(u'Ran out of allowed retries with relaxed hard constraints.')
+                logging.logwarn('Ran out of allowed retries with relaxed hard constraints.')
             self._create_debug_pandas(substitutions) # FIXME: may throw ValueError: Shape of passed values is (569, 1), indices imply (570, 1)
             self._are_joint_limits_violated(str(e_original))
             self._is_close_to_joint_limits()
             self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
             # if isinstance(e, QPSolverException):
             # FIXME
-            #     arrays = [(p_weights, u'H'),
-            #               (p_A, u'A'),
-            #               (p_lbA, u'lbA'),
-            #               (p_ubA, u'ubA'),
-            #               (p_lb, u'lb'),
-            #               (p_ub, u'ub')]
+            #     arrays = [(p_weights, 'H'),
+            #               (p_A, 'A'),
+            #               (p_lbA, 'lbA'),
+            #               (p_ubA, 'ubA'),
+            #               (p_lb, 'lb'),
+            #               (p_ub, 'ub')]
             #     any_nan = False
             #     for a, name in arrays:
             #         any_nan |= self.__is_nan_in_array(name, a)
@@ -854,7 +867,7 @@ class QPController(object):
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order-1)
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
         num_of_slack = len(lb) - num_non_slack
         lb[-num_of_slack:] = -100
         ub[-num_of_slack:] = 100
@@ -867,19 +880,19 @@ class QPController(object):
             upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]
             lower_violations = self.p_xdot[self.p_lb.data > self.p_xdot.data]
             if len(upper_violations) > 0 or len(lower_violations) > 0:
-                error_message += u'\n'
+                error_message += '\n'
                 if len(upper_violations) > 0:
-                    error_message += u'upper slack bounds of following constraints might be too low: {}\n'.format(
+                    error_message += 'upper slack bounds of following constraints might be too low: {}\n'.format(
                         list(upper_violations.index))
                 if len(lower_violations) > 0:
-                    error_message += u'lower slack bounds of following constraints might be too high: {}'.format(
+                    error_message += 'lower slack bounds of following constraints might be too high: {}'.format(
                         list(lower_violations.index))
                 raise HardConstraintsViolatedException(error_message)
-        logging.loginfo(u'No slack limit violation detected.')
+        logging.loginfo('No slack limit violation detected.')
         return False
 
     def get_cmd_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order-1)
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
         num_of_slack = len(lb) - num_non_slack
         lb_relaxed = lb.copy()
         ub_relaxed = ub.copy()
@@ -903,10 +916,10 @@ class QPController(object):
         return split
 
     def b_names(self):
-        return self.b.names()
+        return self.b.names
 
     def bA_names(self):
-        return self.bA.names()
+        return self.bA.names
 
     def _viz_mpc(self, joint_name):
         def pad(a, desired_length):
@@ -951,7 +964,7 @@ class QPController(object):
         plt.tight_layout()
         path, dirs, files = next(os.walk('tmp_data/mpc'))
         file_count = len(files)
-        plt.savefig(u'tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
+        plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
     def _create_debug_pandas(self, substitutions):
@@ -971,32 +984,32 @@ class QPController(object):
         debug_exprs = self._eval_debug_exprs(substitutions)
         self.p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
 
-        self.p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float)
-        self.p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float)
-        # self.p_g = pd.DataFrame(g, filtered_b_names, [u'data'], dtype=float)
-        self.p_lbA_raw = pd.DataFrame(lbA, filtered_bA_names, [u'data'], dtype=float)
+        self.p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)
+        # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
+        self.p_lbA_raw = pd.DataFrame(lbA, filtered_bA_names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
-        self.p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, [u'data'], dtype=float)
+        self.p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
         # remove sample period factor
         self.p_lbA[-num_of_slack:] /= sample_period
         self.p_ubA[-num_of_slack:] /= sample_period
-        self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, [u'data'],
+        self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, ['data'],
                                       dtype=float)
         self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
         if self.xdot_full is not None:
-            self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, [u'data'], dtype=float)
+            self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
             xH = np.dot((self.xdot_full ** 2).T, H)
-            self.p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
+            self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 
             self.p_pure_xdot = deepcopy(self.p_xdot)
             self.p_pure_xdot[num_non_slack:] = 0
-            self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, [u'data'], dtype=float)
-            self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, [u'data'],
-                                                   dtype=float)
+            self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
+            self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
+                                                       dtype=float)
             self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
             self.p_Ax_without_slack[-num_of_slack:] /= sample_period
 

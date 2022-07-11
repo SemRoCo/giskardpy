@@ -4,7 +4,7 @@ import pickle
 
 import casadi as ca
 import numpy as np
-from casadi import sign, cos, sin, sqrt, atan2, acos
+from casadi import sign, cos, sin, sqrt, atan2, acos, substitute
 from numpy import pi
 
 from giskardpy.utils import logging
@@ -110,7 +110,7 @@ def Matrix(data):
     try:
         return ca.SX(data)
     except NotImplementedError:
-        if hasattr(data, u'shape'):
+        if hasattr(data, 'shape'):
             m = ca.SX(*data.shape)
         else:
             x = len(data)
@@ -266,18 +266,18 @@ def safe_compiled_function(f, file_name):
                 raise
     with open(file_name, 'w') as file:
         pickle.dump(f, file)
-        logging.loginfo(u'saved {}'.format(file_name))
+        logging.loginfo('saved {}'.format(file_name))
 
 
 def load_compiled_function(file_name):
     if os.path.isfile(file_name):
         try:
-            with open(file_name, u'r') as file:
+            with open(file_name, 'r') as file:
                 fast_f = pickle.load(file)
                 return fast_f
         except EOFError as e:
             os.remove(file_name)
-            logging.logerr(u'{} deleted because it was corrupted'.format(file_name))
+            logging.logerr('{} deleted because it was corrupted'.format(file_name))
 
 
 class CompiledFunction(object):
@@ -306,7 +306,7 @@ class CompiledFunction(object):
         return self.out
 
 
-def speed_up(function, parameters, backend=u'clang'):
+def speed_up(function, parameters, backend='clang') -> CompiledFunction:
     str_params = [str(x) for x in parameters]
     try:
         f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])

@@ -34,7 +34,11 @@ class PhysicsWorldException(GiskardException):
 
 
 # int64 UNKNOWN_OBJECT=6
-class UnknownBodyException(PhysicsWorldException, KeyError):
+class UnknownGroupException(PhysicsWorldException, KeyError):
+    pass
+
+
+class UnknownLinkException(PhysicsWorldException, KeyError):
     pass
 
 
@@ -114,7 +118,39 @@ class ExecutionException(GiskardException):
     pass
 
 
+class FollowJointTrajectory_INVALID_GOAL(ExecutionException):
+    pass
+
+
+class FollowJointTrajectory_INVALID_JOINTS(ExecutionException):
+    pass
+
+
+class FollowJointTrajectory_OLD_HEADER_TIMESTAMP(ExecutionException):
+    pass
+
+
+class FollowJointTrajectory_PATH_TOLERANCE_VIOLATED(ExecutionException):
+    pass
+
+
+class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(ExecutionException):
+    pass
+
+
 class PreemptedException(ExecutionException):
+    pass
+
+
+class ExecutionPreemptedException(ExecutionException):
+    pass
+
+
+class ExecutionTimeoutException(ExecutionException):
+    pass
+
+
+class ExecutionSucceededPrematurely(ExecutionException):
     pass
 
 

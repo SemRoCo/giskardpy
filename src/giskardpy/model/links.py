@@ -3,6 +3,7 @@ import os
 import numpy as np
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose
+from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -15,6 +16,7 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 class LinkGeometry(object):
     def __init__(self, link_T_geometry):
+        self.color = ColorRGBA(1.0, 1.0, 1.0, 0.5)
         self.link_T_geometry = link_T_geometry
 
     @classmethod
@@ -60,19 +62,16 @@ class LinkGeometry(object):
                 geometry = SphereGeometry(np.eye(4),
                                           radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS])
             else:
-                raise CorruptShapeException('World body type {} not supported'.format(msg.type))
+                raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
         elif msg.type == msg.MESH_BODY:
             geometry = MeshGeometry(np.eye(4), msg.mesh)
         else:
-            raise CorruptShapeException('World body type {} not supported'.format(msg.type))
+            raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
     def as_visualization_marker(self):
         marker = Marker()
-        marker.color.a = 0.5
-        marker.color.r = 1.0
-        marker.color.g = 1.0
-        marker.color.b = 1.0
+        marker.color = self.color
 
         marker.pose = Pose()
         marker.pose = np_to_pose(self.link_T_geometry)
@@ -194,17 +193,22 @@ class Link(object):
         return link
 
     @classmethod
-    def from_world_body(cls, msg):
+    def from_world_body(cls, prefix, msg):
         """
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
         :type pose: Pose
         """
-        link_name = PrefixName(msg.name, None)
+        link_name = PrefixName(prefix, None)
         link = cls(link_name)
         geometry = LinkGeometry.from_world_body(msg)
         link.collisions.append(geometry)
         link.visuals.append(geometry)
         return link
+
+    def dye_collisions(self, color: ColorRGBA):
+        if self.has_collisions():
+            for collision in self.collisions:
+                collision.color = color
 
     def collision_visualization_markers(self):
         markers = MarkerArray()
@@ -215,11 +219,11 @@ class Link(object):
 
     def as_urdf(self):
         r = up.Robot(self.name)
-        r.version = u'1.0'
+        r.version = '1.0'
         link = up.Link(self.name)
         # if self.visuals:
-        #     link.add_aggregate(u'visual', up.Visual(self.visuals[0].as_urdf()))
-        link.add_aggregate(u'collision', up.Collision(self.collisions[0].as_urdf()))
+        #     link.add_aggregate('visual', up.Visual(self.visuals[0].as_urdf()))
+        link.add_aggregate('collision', up.Collision(self.collisions[0].as_urdf()))
         r.add_link(link)
         return r.to_xml_string()
 

@@ -22,7 +22,7 @@ class Open(Goal):
 
         self.add_constraints_of_goal(CartesianPose(root_link=self.handle_link,
                                                    tip_link=self.tip_link,
-                                                   goal=self.handle_T_tip,
+                                                   goal_pose=self.handle_T_tip,
                                                    weight=self.weight, **kwargs))
         self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name,
                                                    goal=goal_joint_state,
@@ -30,7 +30,7 @@ class Open(Goal):
                                                    **kwargs))
 
     def __str__(self):
-        return u'{}/{}'.format(super(Open, self).__str__(), self.tip_link, self.handle_link)
+        return '{}/{}'.format(super(Open, self).__str__(), self.tip_link, self.handle_link)
 
 
 class Close(Goal):

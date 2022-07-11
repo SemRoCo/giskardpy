@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-DebugConstraint = namedtuple(u'debug', [u'expr'])
+DebugConstraint = namedtuple('debug', ['expr'])
 
 class Constraint(object):
     lower_error = -1e4

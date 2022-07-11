@@ -22,10 +22,9 @@ def hacky_urdf_parser_fix(urdf_str):
             fixed_urdf += line + '\n'
     return fixed_urdf
 
-def make_world_body_box(name=u'box', x_length=1, y_length=1, z_length=1):
+def make_world_body_box(x_length=1, y_length=1, z_length=1):
     box = WorldBody()
     box.type = WorldBody.PRIMITIVE_BODY
-    box.name = str(name)
     box.shape.type = SolidPrimitive.BOX
     box.shape.dimensions.append(x_length)
     box.shape.dimensions.append(y_length)
@@ -33,19 +32,17 @@ def make_world_body_box(name=u'box', x_length=1, y_length=1, z_length=1):
     return box
 
 
-def make_world_body_sphere(name=u'sphere', radius=1):
+def make_world_body_sphere(radius=1):
     sphere = WorldBody()
     sphere.type = WorldBody.PRIMITIVE_BODY
-    sphere.name = str(name)
     sphere.shape.type = SolidPrimitive.SPHERE
     sphere.shape.dimensions.append(radius)
     return sphere
 
 
-def make_world_body_cylinder(name=u'cylinder', height=1, radius=1):
+def make_world_body_cylinder(height=1, radius=1):
     cylinder = WorldBody()
     cylinder.type = WorldBody.PRIMITIVE_BODY
-    cylinder.name = str(name)
     cylinder.shape.type = SolidPrimitive.CYLINDER
     cylinder.shape.dimensions = [0, 0]
     cylinder.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
@@ -55,7 +52,6 @@ def make_world_body_cylinder(name=u'cylinder', height=1, radius=1):
 
 def make_urdf_world_body(name, urdf):
     wb = WorldBody()
-    wb.name = name
     wb.type = wb.URDF_BODY
     wb.urdf = urdf
     return wb

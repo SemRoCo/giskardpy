@@ -9,8 +9,10 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 rospack = rospkg.RosPack()
 
+
 def get_ros_pkg_path(ros_pkg):
     return rospack.get_path(ros_pkg)
+
 
 class Loader(yaml.SafeLoader):
     """YAML Loader with `!include` constructor."""
@@ -23,8 +25,8 @@ class Loader(yaml.SafeLoader):
 
         try:
             self.config_root = os.path.split(stream.name)[0]
-            self.ros_package_keywords = [u'ros://', u'package://']
-            self.giskardpy_root = get_ros_pkg_path(u'giskardpy')
+            self.ros_package_keywords = ['ros://', 'package://']
+            self.giskardpy_root = get_ros_pkg_path('giskardpy')
         except AttributeError:
             self.config_root = os.path.curdir
 
@@ -43,13 +45,16 @@ def find_parent_of_key(key, value, keys):
     :rtype: tuple(dict, list(str))
     :returns: tuple containing a dict and the key-chain in a list
     """
-    if key in value:
-        yield value, keys
+    if key in value and key not in value[key]:
+        return value, keys
     else:
         for k, v in value.items():
             if type(v) == dict:
-                keys.append(k)
-                yield find_parent_of_key(key, v, keys)
+                new_keys = deepcopy(keys)
+                new_keys.append(k)
+                ret = find_parent_of_key(key, v, new_keys)
+                if ret is not None:
+                    return ret
 
 
 def nested_update(dic, keys, value):
@@ -87,27 +92,27 @@ def update_nested_dicts(d, u):
             d[k] = v
     return d
 
-def update_parents(d, merge_key='parent'):
+
+def update_parents(d, merge_key):
     """
-    Will merge the dict containing the given key merge_key with the value in d[merge_key].
+    Will recursively merge the dict containing the given key merge_key with the value in d[merge_key].
 
     :type d: dict
     :returns: dict
     """
-    if 'parent' not in d:
-        return d
     root_data = deepcopy(d)
-    gen = find_parent_of_key(merge_key, root_data, [])
     while True:
-        try:
-            data, keys = next(gen)
-        except (StopIteration, ValueError):
+        data_keys_tuple = find_parent_of_key(merge_key, root_data, [])
+        if data_keys_tuple is not None:
+            data, keys = data_keys_tuple
+        else:
             break
         parent_data = data[merge_key]
         data.pop(merge_key)
         updated = update_nested_dicts(parent_data, data)
         nested_update(root_data, keys, updated)
     return root_data
+
 
 def get_filename(loader, node, root):
     """Returns file name referenced at given node by using the given loader."""
@@ -116,7 +121,7 @@ def get_filename(loader, node, root):
     indices = [i for i, x in enumerate(loader.ros_package_keywords) if x in file_or_ros_path_str]
     if indices:
         if len(indices) != 1:
-            raise SyntaxError(u'Invalid ros package path: please use ros:// or package:// as path prefix.')
+            raise SyntaxError('Invalid ros package path: please use ros:// or package:// as path prefix.')
         removed_key_word = file_or_ros_path_str.replace(loader.ros_package_keywords[indices[0]], '')
         path_split = removed_key_word.split('/')
         package_path = get_ros_pkg_path(path_split[0])
@@ -144,10 +149,10 @@ def construct_find(loader, node):
     return get_filename(loader, node, loader.giskardpy_root)
 
 
-def load_robot_yaml(path):
+def load_robot_yaml(path, merge_key='parent'):
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
-        updated = update_parents(data)
+        updated = update_parents(data, merge_key)
         return cast_values_in_nested_dict(updated, float)
 
 
@@ -164,10 +169,12 @@ def cast_values_in_nested_dict(d, constructor):
         elif isinstance(v, list):
             v_new = []
             for w in v:
-                if isinstance(w, str) or isinstance(w, list):
+                if isinstance(w, (list, str, int, float)):
                     tmp = {None: w}
                     cast_values_in_nested_dict(tmp, constructor)
                     v_new.append(tmp[None])
+                else:
+                    raise Exception('Unknown type {} for value {}'.format(type(v), v))
             d.update({k: v_new})
         else:
             if isinstance(d[k], str):
@@ -182,14 +189,23 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     config = load_robot_yaml(resolve_ros_iris(config_file))
     if test:
         config = update_nested_dicts(deepcopy(config),
-                                     load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/test.yaml'))
+                                     load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/test.yaml'))
     if config and not rospy.is_shutdown():
         if old_data is None:
             old_data = {}
         old_data.update(config)
         rospy.set_param('~', old_data)
-        return True
-    return False
+    return old_data
+
+
+def upload_config_file_to_paramserver():
+    old_params = rospy.get_param('~')
+    if rospy.has_param('~test'):
+        test = rospy.get_param('~test')
+    else:
+        test = False
+    config_file_name = rospy.get_param('~{}'.format('config'))
+    ros_load_robot_config(config_file_name, old_data=old_params, test=test)
 
 
 yaml.add_constructor('!include', construct_include, Loader)

@@ -5,14 +5,17 @@ from copy import copy, deepcopy
 from multiprocessing import Lock
 
 import numpy as np
-from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
+from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
+    Quaternion
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict
+from giskardpy.model.utils import robot_name_from_urdf_string
+from giskardpy.utils.config_loader import upload_config_file_to_paramserver
 
 
 def set_default_in_override_block(block_identifier, god_map):
-    default_value = god_map.get_data(block_identifier[:-1] + [u'default'])
+    default_value = god_map.get_data(block_identifier[:-1] + ['default'])
     override = god_map.get_data(block_identifier)
     d = defaultdict(lambda: default_value)
     if isinstance(override, dict):
@@ -24,6 +27,7 @@ def set_default_in_override_block(block_identifier, god_map):
         d.update(override)
     god_map.set_data(block_identifier, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
+
 
 def get_member(identifier, member):
     """
@@ -185,7 +189,7 @@ class GodMap(object):
 
     def __init__(self):
         self._data = {}
-        self.expr_separator = u'_'
+        self.expr_separator = '_'
         self.key_to_expr = {}
         self.expr_to_key = {}
         self.last_expr_values = {}
@@ -193,45 +197,37 @@ class GodMap(object):
         self.lock = Lock()
 
     @classmethod
-    def init_from_paramserver(cls, node_name):
+    @profile
+    def init_from_paramserver(cls, node_name, upload_config=True):
         import rospy
-        from control_msgs.msg import JointTrajectoryControllerState
-        from rospy import ROSException
-        from giskardpy.utils import logging
         from giskardpy.data_types import order_map
+
+        if upload_config:
+            upload_config_file_to_paramserver()
 
         self = cls()
         self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        self.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+        robot_urdf = rospy.get_param('robot_description')
+        self.set_data(identifier.robot_description, robot_urdf)
+        self.set_data(identifier.robot_group_name, robot_name_from_urdf_string(robot_urdf))
+
+
         path_to_data_folder = self.get_data(identifier.data_folder)
         # fix path to data folder
-        if not path_to_data_folder.endswith(u'/'):
-            path_to_data_folder += u'/'
+        if not path_to_data_folder.endswith('/'):
+            path_to_data_folder += '/'
         self.set_data(identifier.data_folder, path_to_data_folder)
-
-        while not rospy.is_shutdown():
-            try:
-                controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
-                                                           JointTrajectoryControllerState,
-                                                           timeout=5.0).joint_names
-                self.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
-            except ROSException as e:
-                logging.logerr(u'state topic not available')
-                logging.logerr(str(e))
-            else:
-                break
-            rospy.sleep(0.5)
 
         set_default_in_override_block(identifier.external_collision_avoidance, self)
         set_default_in_override_block(identifier.self_collision_avoidance, self)
         # weights
         for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
-            set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], self)
+            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self)
 
         # limits
         for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], self)
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], self)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self)
+            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self)
 
         return self
 
@@ -270,7 +266,7 @@ class GodMap(object):
                 return result
             return self.shortcuts[identifier].c(self._data)
         except Exception as e:
-            e2 = type(e)(u'{}; path: {}'.format(e, identifier))
+            e2 = type(e)('{}; path: {}'.format(e, identifier))
             raise e2
 
     def get_data(self, identifier):
@@ -295,7 +291,7 @@ class GodMap(object):
         if identifier not in self.key_to_expr:
             expr = w.Symbol(self.expr_separator.join([str(x) for x in identifier]))
             if expr in self.expr_to_key:
-                raise Exception(u'{} not allowed in key'.format(self.expr_separator))
+                raise Exception('{} not allowed in key'.format(self.expr_separator))
             self.key_to_expr[identifier] = expr
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
@@ -320,10 +316,14 @@ class GodMap(object):
             return self.vector_msg_to_vector3(identifier + ['vector'])
         elif isinstance(data, list):
             return self.list_to_symbol_matrix(identifier, data)
+        elif isinstance(data, Quaternion):
+            return self.quaternion_msg_to_rotation(identifier)
+        elif isinstance(data, QuaternionStamped):
+            return self.quaternion_msg_to_rotation(identifier + ['quaternion'])
         elif isinstance(data, np.ndarray):
             return self.list_to_symbol_matrix(identifier, data)
         else:
-            raise NotImplementedError(u'to_expr not implemented for type {}.'.format(type(data)))
+            raise NotImplementedError('to_expr not implemented for type {}.'.format(type(data)))
 
     def list_to_symbol_matrix(self, identifier, data):
         def replace_nested_list(l, f, start_index=None):
@@ -337,6 +337,7 @@ class GodMap(object):
                 else:
                     result.append(f(index))
             return result
+
         return w.Matrix(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
     def list_to_point3(self, identifier):
@@ -398,6 +399,14 @@ class GodMap(object):
             qw=self.to_symbol(identifier + ['orientation', 'w']),
         )
 
+    def quaternion_msg_to_rotation(self, identifier):
+        return w.rotation_matrix_from_quaternion(
+            x=self.to_symbol(identifier + ['x']),
+            y=self.to_symbol(identifier + ['y']),
+            z=self.to_symbol(identifier + ['z']),
+            w=self.to_symbol(identifier + ['w']),
+        )
+
     def point_msg_to_point3(self, identifier):
         return w.point3(
             x=self.to_symbol(identifier + ['x']),
@@ -454,11 +463,11 @@ class GodMap(object):
         :type value: object
         """
         if len(identifier) == 0:
-            raise ValueError(u'key is empty')
+            raise ValueError('key is empty')
         namespace = identifier[0]
         if namespace not in self._data:
             if len(identifier) > 1:
-                raise KeyError(u'Can not access member of unknown namespace: {}'.format(identifier))
+                raise KeyError('Can not access member of unknown namespace: {}'.format(identifier))
             else:
                 self._data[namespace] = value
         else:

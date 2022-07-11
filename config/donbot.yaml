@@ -1,4 +1,49 @@
 parent: !include default.yaml
+general_options:
+  path_to_data_folder: !find data # or 'find ros://giskardpy/data'
+  enable_gui: False
+  sample_period: 0.05 # time[s] between points of generated joint trajectory
+  map_frame: map
+  test_mode: False
+  debug: False # enables debug prints and prints the behavior tree state in the terminal
+  fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
+  joint_weights:
+    # the planner prefers low weight joints to achieve solutions
+    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
+    velocity:
+      default: 0.001
+      override: {}
+    acceleration:
+      default: 0
+      override: {}
+    jerk:
+      default: 0.001
+      override: {}
+  joint_limits: # giskard will use the min of this number and limits from the urdf
+    velocity:
+      linear: # m/s
+        default: 0.5
+        override:
+          odom_x_joint: 0.1
+          odom_y_joint: 0.1
+      angular: # rad/s
+        default: 0.5
+        override:
+          odom_z_joint: 0.05
+    acceleration:
+      linear: # m/s**2
+        default: 1e3
+        override: {}
+      angular: # rad/s**2
+        default: 1e3
+        override: {}
+    jerk:
+      linear: # m/s**3
+        default: 15
+        override: {}
+      angular: # rad/s**3
+        default: 15
+        override: {}
 collision_avoidance:
   external_collision_avoidance:
     override:
@@ -28,3 +73,12 @@ collision_avoidance:
       - [ur5_base_link, ur5_upper_arm_link]
     add: # list pairs of links that should be added to the self collision matrix
       - [plate, ur5_upper_arm_link]
+robot_interface:
+  base:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+  body:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/body/follow_joint_trajectory
+    state_topic: /whole_body_controller/body/state

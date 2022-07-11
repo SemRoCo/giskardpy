@@ -45,7 +45,7 @@ def get_full_frame_name(frame_name):
                 return tf_frame
         except ValueError:
             continue
-    raise KeyError(u'Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
+    raise KeyError('Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
 
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
@@ -60,6 +60,8 @@ def transform_msg(target_frame, msg, timeout=5):
         return transform_point(target_frame, msg, timeout)
     elif isinstance(msg, Vector3Stamped):
         return transform_vector(target_frame, msg, timeout)
+    elif isinstance(msg, QuaternionStamped):
+        return transform_quaternion(target_frame, msg, timeout)
     else:
         raise NotImplementedError('tf transform message of type \'{}\''.format(type(msg)))
 
@@ -104,6 +106,21 @@ def transform_vector(target_frame, vector, timeout=5):
     transform = lookup_transform(target_frame, vector.header.frame_id, vector.header.stamp, timeout)
     new_pose = do_transform_vector3(vector, transform)
     return new_pose
+
+
+def transform_quaternion(target_frame: str, quaternion: QuaternionStamped, timeout: float = 5) -> QuaternionStamped:
+    """
+    Transforms a pose stamped into a different target frame.
+    :return: Transformed pose of None on loop failure
+    """
+    p = PoseStamped()
+    p.header = quaternion.header
+    p.pose.orientation = quaternion.quaternion
+    new_pose = transform_pose(target_frame, p, timeout)
+    new_quaternion = QuaternionStamped()
+    new_quaternion.header = new_pose.header
+    new_quaternion.quaternion = new_pose.pose.orientation
+    return new_quaternion
 
 
 def transform_point(target_frame, point, timeout=5):
@@ -234,7 +251,7 @@ def msg_to_kdl(msg):
     elif isinstance(msg, Vector3):
         return point_to_kdl(msg)
     else:
-        raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
+        raise TypeError('can\'t convert {} to kdl'.format(type(msg)))
 
 
 def normalize(msg):
@@ -349,22 +366,6 @@ def kdl_to_np(kdl_thing):
                          [0, 0, 0, 1]])
 
 
-def angle_between_vector(v1, v2):
-    if isinstance(v1, PyKDL.Vector):
-        v1 = kdl_to_np(v1)
-    if isinstance(v2, PyKDL.Vector):
-        v2 = kdl_to_np(v2)
-    return np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
-
-
-def np_vector(x, y, z):
-    return np.array([x, y, z, 0])
-
-
-def np_point(x, y, z):
-    return np.array([x, y, z, 1])
-
-
 def np_to_pose(matrix):
     """
     :type matrix: np.ndarray
@@ -383,90 +384,78 @@ def np_to_pose_stamped(matrix, frame_id):
     return p
 
 
-# Code copied from user jarvisschultz from ROS answers
-# https://answers.ros.org/question/332407/transformstamped-to-transformation-matrix-python/
 def pose_to_np(msg):
-    """Convert a C{geometry_msgs/Pose} into position/quaternion np arrays
-
-    :param msg: ROS message to be converted
-    :return:
-      - p: position as a np.array
-      - q: quaternion as a numpy array (order = [x,y,z,w])
-    """
     p = np.array([msg.position.x, msg.position.y, msg.position.z])
     q = np.array([msg.orientation.x, msg.orientation.y,
                   msg.orientation.z, msg.orientation.w])
-    return p, q
+    T = quaternion_matrix(q)
+    T[0:3, -1] = p
+    return T
 
 
 def pose_stamped_to_np(msg):
-    """Convert a C{geometry_msgs/PoseStamped} into position/quaternion np arrays
-
-    :param msg: ROS message to be converted
-    :return:
-        - p: position as a np.array
-        - q: quaternion as a numpy array (order = [x,y,z,w])
-    """
     return pose_to_np(msg.pose)
 
 
 def transform_to_np(msg):
-    """Convert a C{geometry_msgs/Transform} into position/quaternion np arrays
-
-    :param msg: ROS message to be converted
-    :return:
-      - p: position as a np.array
-      - q: quaternion as a numpy array (order = [x,y,z,w])
-    """
-    p = np.array([msg.translation.x, msg.translation.y, msg.translation.z])
-    q = np.array([msg.rotation.x, msg.rotation.y,
-                  msg.rotation.z, msg.rotation.w])
-    return p, q
+    p = Pose()
+    p.position = msg.translation
+    p.orientation = msg.rotation
+    return pose_to_np(p)
 
 
 def transform_stamped_to_np(msg):
-    """Convert a C{geometry_msgs/TransformStamped} into position/quaternion np arrays
-
-    :param msg: ROS message to be converted
-    :return:
-      - p: position as a np.array
-      - q: quaternion as a numpy array (order = [x,y,z,w])
-
-    """
     return transform_to_np(msg.transform)
 
 
 def msg_to_homogeneous_matrix(msg):
-    """Conversion from geometric ROS messages into SE(3)
-
-    :param msg: Message to transform. Acceptable types - C{geometry_msgs/Pose}, C{geometry_msgs/PoseStamped},
-    C{geometry_msgs/Transform}, or C{geometry_msgs/TransformStamped}
-    :return: a 4x4 SE(3) matrix as a numpy array
-    @note: Throws TypeError if we receive an incorrect type.
-    """
     if isinstance(msg, Pose):
-        p, q = pose_to_np(msg)
+        return pose_to_np(msg)
     elif isinstance(msg, PoseStamped):
-        p, q = pose_stamped_to_np(msg)
+        return pose_stamped_to_np(msg)
     elif isinstance(msg, Transform):
-        p, q = transform_to_np(msg)
+        return transform_to_np(msg)
     elif isinstance(msg, TransformStamped):
-        p, q = transform_stamped_to_np(msg)
+        return transform_stamped_to_np(msg)
+    elif isinstance(msg, Point):
+        return point_to_np(msg)
+    elif isinstance(msg, PointStamped):
+        return point_stamped_to_np(msg)
+    elif isinstance(msg, Vector3):
+        return vector_to_np(msg)
+    elif isinstance(msg, Vector3Stamped):
+        return vector_stamped_to_np(msg)
     else:
         raise TypeError("Invalid type for conversion to SE(3)")
-    norm = np.linalg.norm(q)
-    if np.abs(norm - 1.0) > 1e-3:
-        raise ValueError(
-            "Received un-normalized quaternion (q = {0:s} ||q|| = {1:3.6f})".format(
-                str(q), np.linalg.norm(q)))
-    elif np.abs(norm - 1.0) > 1e-6:
-        q = q / norm
-    g = quaternion_matrix(q)
-    g[0:3, -1] = p
-    return g
 
 
-# end of copied code
+def point_to_np(msg):
+    """
+    :type msg: Point
+    :return:
+    """
+    return np.array([msg.x, msg.y, msg.z, 1])
+
+
+def point_stamped_to_np(msg):
+    """
+    :type msg: PointStamped
+    :return:
+    """
+    return point_to_np(msg.point)
+
+
+def vector_to_np(msg):
+    """
+    :type msg: Vector3
+    :return:
+    """
+    return np.array([msg.x, msg.y, msg.z, 0])
+
+
+def vector_stamped_to_np(msg):
+    return vector_to_np(msg.vector)
+
 
 def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     """
@@ -477,7 +466,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     ma = MarkerArray()
     x = Marker()
     x.action = x.ADD
-    x.ns = u'debug'
+    x.ns = 'debug'
     x.id = id_
     x.type = x.CUBE
     x.header.frame_id = pose_stamped.header.frame_id
@@ -497,7 +486,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     ma.markers.append(x)
     y = Marker()
     y.action = y.ADD
-    y.ns = u'debug'
+    y.ns = 'debug'
     y.id = id_ + 1
     y.type = y.CUBE
     y.header.frame_id = pose_stamped.header.frame_id
@@ -517,7 +506,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     ma.markers.append(y)
     z = Marker()
     z.action = z.ADD
-    z.ns = u'debug'
+    z.ns = 'debug'
     z.id = id_ + 2
     z.type = z.CUBE
     z.header.frame_id = pose_stamped.header.frame_id

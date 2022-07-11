@@ -55,7 +55,7 @@ def urdf_inertial_to_kdl_rbi(i):
     return origin.M * rbi
 
 def kdl_tree_from_urdf_model(urdf):
-    root = urdf.get_root()
+    root = urdf.get_robot_root_link()
     tree = kdl.Tree(root)
     def add_children_to_tree(parent):
         if parent in urdf.child_map:
@@ -156,8 +156,8 @@ class KDL(object):
             return theta_out
 
     def __init__(self, urdf):
-        if urdf.endswith(u'.urdfs'):
-            with open(urdf, u'r') as file:
+        if urdf.endswith('.urdfs'):
+            with open(urdf, 'r') as file:
                 urdf = file.read()
         self.urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
         self.tree = kdl_tree_from_urdf_model(self.urdf)

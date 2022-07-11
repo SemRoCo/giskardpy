@@ -59,19 +59,19 @@ class QPSolverCplex(QPSolver):
 
     def print_debug(self):
         # Print QP problem stats
-        logging.logwarn(u'Problem Definition:')
-        logging.logwarn(u'Problem Type: {}'.format(self.qpProblem.problem_type[self.qpProblem.get_problem_type()]))
+        logging.logwarn('Problem Definition:')
+        logging.logwarn('Problem Type: {}'.format(self.qpProblem.problem_type[self.qpProblem.get_problem_type()]))
         logging.logwarn(str(self.qpProblem.get_stats()))
         # Print solution type and stats if solution exists
-        logging.logwarn(u'Solving method: {}'.format(self.qpProblem.solution.method[self.qpProblem.solution.get_method()]))
-        logging.logwarn(u'Solution status: {}'.format(self.qpProblem.solution.get_status_string()))
+        logging.logwarn('Solving method: {}'.format(self.qpProblem.solution.method[self.qpProblem.solution.get_method()]))
+        logging.logwarn('Solution status: {}'.format(self.qpProblem.solution.get_status_string()))
         if self.qpProblem.solution.get_status() not in infeasible:
             m = self.qpProblem.solution.quality_metric
             arr = self.qpProblem.solution.get_float_quality([m.max_x, m.max_dual_infeasibility])
             if len(arr) == 0:
                 arr = self.qpProblem.solution.get_integer_quality([m.max_x, m.max_dual_infeasibility])
-            logging.logwarn(u'Solution quality [max, max_dual_infeasibility]: {}'.format(str(arr)))
-            logging.logwarn(u'Solution objective value'.format(str(self.qpProblem.solution.get_objective_value())))
+            logging.logwarn('Solution quality [max, max_dual_infeasibility]: {}'.format(str(arr)))
+            logging.logwarn('Solution objective value'.format(str(self.qpProblem.solution.get_objective_value())))
         # Write QP problem in prob.lp and solution in solution.lp
         #self.qpProblem.write("prob.lp")
         #self.qpProblem.solution.write("solution.lp")
@@ -110,12 +110,12 @@ class QPSolverCplex(QPSolver):
             success = self.qpProblem.solution.get_status()
             if success in optimal or success in feasible:
                 if success in feasible:
-                    logging.logwarn(u'Solution may be suboptimal!')
+                    logging.logwarn('Solution may be suboptimal!')
                 self.xdot_full = np.array(self.qpProblem.solution.get_values())
                 break
             elif i < tries - 1:
                 self.print_debug()
-                logging.logwarn(u'Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
+                logging.logwarn('Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
                     self.qpProblem.solution.get_status_string(),
                     decimal_places
                 ))
@@ -128,13 +128,13 @@ class QPSolverCplex(QPSolver):
         else:
             self.print_debug()
             if success == cplex.SolutionInterface.status.optimal_infeasible:
-                error_message = u'{}: problem is optimally infeasible'.format(self.qpProblem.solution.get_status_string())
+                error_message = '{}: problem is optimally infeasible'.format(self.qpProblem.solution.get_status_string())
                 raise InfeasibleException(error_message)
             elif success in infeasible:
-                error_message = u'{}: problem is infeasible'.format(self.qpProblem.solution.get_status_string())
+                error_message = '{}: problem is infeasible'.format(self.qpProblem.solution.get_status_string())
                 raise InfeasibleException(error_message)
             elif success in limit_infeasible:
-                error_message = u'{}: problem is due to limits infeasible'.format(self.qpProblem.solution.get_status_string())
+                error_message = '{}: problem is due to limits infeasible'.format(self.qpProblem.solution.get_status_string())
                 raise InfeasibleException(error_message)
-            raise QPSolverException(u'{}'.format(self.qpProblem.solution.get_status_string()))
+            raise QPSolverException('{}'.format(self.qpProblem.solution.get_status_string()))
         return self.xdot_full

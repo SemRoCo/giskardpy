@@ -1,23 +1,26 @@
 from collections import defaultdict
 
 import betterpybullet as bpb
+from betterpybullet import ClosestPair
+from betterpybullet import ContactPoint
 from geometry_msgs.msg import PoseStamped, Quaternion
 from sortedcontainers import SortedDict
 
-from giskardpy import RobotName
-from giskardpy.data_types import BiDict, Collisions, Collision
+from giskardpy import identifier
+from giskardpy.data_types import BiDict
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.utils import logging
 
+
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world):
-        super(BetterPyBulletSyncer, self).__init__(world)
         self.kw = bpb.KineverseWorld()
         self.object_name_to_id = BiDict()
         self.query = None
+        super(BetterPyBulletSyncer, self).__init__(world)
 
     @profile
     def add_object(self, link):
@@ -53,11 +56,14 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 pass
 
     @profile
-    def cut_off_distances_to_query(self, cut_off_distances):
+    def cut_off_distances_to_query(self, cut_off_distances, buffer=0.05):
         if self.query is None:
             self.query = defaultdict(set)
-            for (link_a, _, link_b), dist in cut_off_distances.items():
-                self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist))
+            for (link_a, link_b), dist in cut_off_distances.items():
+                try:
+                    self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist+buffer))
+                except:
+                    pass
         return self.query
 
     @profile
@@ -88,17 +94,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             link_a = obj_a.name
             for contact in contacts:  # type: ClosestPair
                 map_T_b = contact.obj_b.np_transform
-                try:
-                    link_b = contact.obj_b.name
-                except Exception as e:
-                    result_list = []
-                    pass
+                link_b = contact.obj_b.name
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a)
                     map_P_b = map_T_b.dot(p.point_b)
-                    body_b = RobotName if link_b in self.robot.link_names else ''
                     c = Collision(link_a=link_a,
-                                  body_b=body_b,
                                   link_b=link_b,
                                   contact_distance=p.distance,
                                   map_V_n=p.normal_world_b,
@@ -115,7 +115,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def bpb_result_to_collisions(self, result, collision_list_size=15):
-        collisions = Collisions(self.world, collision_list_size)
+        collisions = Collisions(self.god_map, collision_list_size)
         for c in self.bpb_result_to_list(result):
             collisions.add(c)
         return collisions
@@ -173,9 +173,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def sync(self):
-        """
-        :type world: giskardpy.model.world.WorldTree
-        """
         if self.has_world_changed():
             self.reset_cache()
             logging.logdebug('hard sync')
@@ -183,20 +180,13 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 self.kw.remove_collision_object(o)
             self.object_name_to_id = BiDict()
 
-            for link_name, link in self.world.links.items():
-                if link.has_collisions():
-                    self.add_object(link)
-            self.objects_in_order = [self.object_name_to_id[link.name] for link in self.world.links.values() if
-                                     link.has_collisions()]
-            self.fks = self.world.compute_all_fks_matrix()
-            bpb.batch_set_transforms(self.objects_in_order, self.fks())
-            self.init_collision_matrix(RobotName)
-        try:
-            bpb.batch_set_transforms(self.objects_in_order, self.fks())
-        except Exception as e:
-            logging.logerr('needed to recompute all matrices')
-            self.fks = self.world.compute_all_fks_matrix()
-            bpb.batch_set_transforms(self.objects_in_order, self.fks())
+            for link_name in self.world.link_names_with_collisions:
+                link = self.world.links[link_name]
+                self.add_object(link)
+            self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
+            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
+            # self.update_collision_blacklist()
+        bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
 
     def get_pose(self, link_name):
         collision_object = self.object_name_to_id[link_name]

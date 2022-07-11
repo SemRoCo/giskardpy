@@ -1,4 +1,15 @@
 parent: !include default.yaml
+robot_interface:
+  base:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+    fill_velocity_values: True
+  body:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/body/follow_joint_trajectory
+    state_topic: /whole_body_controller/body/state
+    fill_velocity_values: False
 general_options:
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
@@ -53,6 +64,9 @@ general_options:
 #      angular: # rad/s**3
 #        default: 250
 #        override: { }
+plugins:
+  LoopDetector:
+    precision: 4 # decimal places
 collision_avoidance:
   external_collision_avoidance:
     default:

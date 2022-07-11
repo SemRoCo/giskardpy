@@ -1,5 +1,5 @@
 import shutil
-from collections import defaultdict
+from itertools import combinations
 
 import pytest
 import urdf_parser_py.urdf as up
@@ -13,11 +13,12 @@ from giskardpy.exceptions import DuplicateNameException
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.utils.utils import suppress_stderr
 from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, rnd_joint_state, hsr_urdf
 
 
-@pytest.fixture(scope=u'module')
+@pytest.fixture(scope='module')
 def module_setup(request):
     pass
 
@@ -32,13 +33,13 @@ def test_folder(request):
     """
     :rtype: str
     """
-    folder_name = u'tmp_data/'
+    folder_name = 'tmp_data/'
 
     def delete_test_folder():
         try:
             shutil.rmtree(folder_name)
         except OSError:
-            print(u'couldn\'t delete test folder')
+            print('couldn\'t delete test folder')
 
     request.addfinalizer(delete_test_folder)
     return folder_name
@@ -49,7 +50,7 @@ def delete_test_folder(request):
     """
     :rtype: World
     """
-    folder_name = u'tmp_data/'
+    folder_name = 'tmp_data/'
     try:
         shutil.rmtree(folder_name)
     except:
@@ -59,7 +60,7 @@ def delete_test_folder(request):
         try:
             shutil.rmtree(folder_name)
         except OSError:
-            print(u'couldn\'t delete test folder')
+            print('couldn\'t delete test folder')
 
     request.addfinalizer(delete_test_folder)
 
@@ -69,55 +70,23 @@ def delete_test_folder(request):
 def allow_all_entry():
     ce = CollisionEntry()
     ce.type = CollisionEntry.ALLOW_COLLISION
-    ce.robot_links = [CollisionEntry.ALL]
-    ce.body_b = CollisionEntry.ALL
-    ce.link_bs = [CollisionEntry.ALL]
-    ce.min_dist = 0.0
+    ce.group1 = CollisionEntry.ALL
+    ce.group2 = CollisionEntry.ALL
     return ce
 
 
 def avoid_all_entry(min_dist):
     ce = CollisionEntry()
     ce.type = CollisionEntry.AVOID_COLLISION
-    ce.robot_links = [CollisionEntry.ALL]
-    ce.body_b = CollisionEntry.ALL
-    ce.link_bs = [CollisionEntry.ALL]
-    ce.min_dist = min_dist
+    ce.group1 = CollisionEntry.ALL
+    ce.group2 = CollisionEntry.ALL
+    ce.distance = min_dist
     return ce
 
 
-def world_with_robot(urdf, prefix):
+def world_with_robot(urdf, prefix, config='package://giskardpy/config/default.yaml'):
     god_map = GodMap()
-    default_limits = {
-        'linear':
-            {
-                'override': defaultdict(lambda: 1000)
-            },
-        'angular':
-            {
-                'override': defaultdict(lambda: 1000)
-            }
-    }
-    god_map.set_data(identifier.rosparam,
-                     {
-                         'general_options':
-                             {
-                                 'joint_limits':
-                                     {
-                                         'velocity': default_limits,
-                                         'acceleration': default_limits,
-                                         'jerk': default_limits,
-                                     },
-                                 'joint_weights':
-                                     {
-                                         'velocity': {'override': defaultdict(float)},
-                                         'acceleration': {'override': defaultdict(float)},
-                                         'jerk': {'override': defaultdict(float)},
-                                     }
-                             }
-                     })
-    god_map.set_data(identifier.map_frame, 'map')
-    god_map.set_data(identifier.order, 3)
+    god_map.set_data(identifier.rosparam, ros_load_robot_config(config))
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.add_urdf(urdf, prefix=prefix, group_name=RobotName)
@@ -128,41 +97,41 @@ def create_world_with_pr2(prefix=None):
     """
     :rtype: WorldTree
     """
-    world = world_with_robot(pr2_urdf(), prefix=prefix)
-    world.god_map.set_data(identifier.controlled_joints, [u'torso_lift_joint',
-                                                          u'r_upper_arm_roll_joint',
-                                                          u'r_shoulder_pan_joint',
-                                                          u'r_shoulder_lift_joint',
-                                                          u'r_forearm_roll_joint',
-                                                          u'r_elbow_flex_joint',
-                                                          u'r_wrist_flex_joint',
-                                                          u'r_wrist_roll_joint',
-                                                          u'l_upper_arm_roll_joint',
-                                                          u'l_shoulder_pan_joint',
-                                                          u'l_shoulder_lift_joint',
-                                                          u'l_forearm_roll_joint',
-                                                          u'l_elbow_flex_joint',
-                                                          u'l_wrist_flex_joint',
-                                                          u'l_wrist_roll_joint',
-                                                          u'head_pan_joint',
-                                                          u'head_tilt_joint',
-                                                          u'odom_x_joint',
-                                                          u'odom_y_joint',
-                                                          u'odom_z_joint'])
+    world = world_with_robot(pr2_urdf(), prefix=prefix, config='package://giskardpy/config/pr2.yaml')
+    world.god_map.set_data(identifier.controlled_joints, ['torso_lift_joint',
+                                                          'r_upper_arm_roll_joint',
+                                                          'r_shoulder_pan_joint',
+                                                          'r_shoulder_lift_joint',
+                                                          'r_forearm_roll_joint',
+                                                          'r_elbow_flex_joint',
+                                                          'r_wrist_flex_joint',
+                                                          'r_wrist_roll_joint',
+                                                          'l_upper_arm_roll_joint',
+                                                          'l_shoulder_pan_joint',
+                                                          'l_shoulder_lift_joint',
+                                                          'l_forearm_roll_joint',
+                                                          'l_elbow_flex_joint',
+                                                          'l_wrist_flex_joint',
+                                                          'l_wrist_roll_joint',
+                                                          'head_pan_joint',
+                                                          'head_tilt_joint',
+                                                          'odom_x_joint',
+                                                          'odom_y_joint',
+                                                          'odom_z_joint'])
     return world
 
 
 def create_world_with_donbot(prefix=None):
     world = world_with_robot(donbot_urdf(), prefix=prefix)
-    world.god_map.set_data(identifier.controlled_joints, [u'ur5_elbow_joint',
-                                                          u'ur5_shoulder_lift_joint',
-                                                          u'ur5_shoulder_pan_joint',
-                                                          u'ur5_wrist_1_joint',
-                                                          u'ur5_wrist_2_joint',
-                                                          u'ur5_wrist_3_joint',
-                                                          u'odom_x_joint',
-                                                          u'odom_y_joint',
-                                                          u'odom_z_joint'])
+    world.god_map.set_data(identifier.controlled_joints, ['ur5_elbow_joint',
+                                                          'ur5_shoulder_lift_joint',
+                                                          'ur5_shoulder_pan_joint',
+                                                          'ur5_wrist_1_joint',
+                                                          'ur5_wrist_2_joint',
+                                                          'ur5_wrist_3_joint',
+                                                          'odom_x_joint',
+                                                          'odom_y_joint',
+                                                          'odom_z_joint'])
     return world
 
 
@@ -389,33 +358,33 @@ class TestWorldTree(object):
 
     def test_search_branch(self):
         world = create_world_with_pr2()
-        result = world.search_branch(u'odom_x_joint',
+        result = world.search_branch('odom_x_frame',
                                      stop_at_joint_when=lambda _: False,
                                      stop_at_link_when=lambda _: False)
         assert result == ([], [])
-        result = world.search_branch(u'odom_y_joint',
+        result = world.search_branch('odom_y_frame',
                                      stop_at_joint_when=world.is_joint_controlled,
                                      stop_at_link_when=lambda _: False,
                                      collect_link_when=world.has_link_collisions)
         assert result == ([], [])
-        result = world.search_branch(u'odom_z_joint',
+        result = world.search_branch('base_footprint',
                                      stop_at_joint_when=world.is_joint_controlled,
                                      collect_link_when=world.has_link_collisions)
-        assert set(result[0]) == {u'base_bellow_link',
-                                  u'fl_caster_l_wheel_link',
-                                  u'fl_caster_r_wheel_link',
-                                  u'fl_caster_rotation_link',
-                                  u'fr_caster_l_wheel_link',
-                                  u'fr_caster_r_wheel_link',
-                                  u'fr_caster_rotation_link',
-                                  u'bl_caster_l_wheel_link',
-                                  u'bl_caster_r_wheel_link',
-                                  u'bl_caster_rotation_link',
-                                  u'br_caster_l_wheel_link',
-                                  u'br_caster_r_wheel_link',
-                                  u'br_caster_rotation_link',
-                                  u'base_link'}
-        result = world.search_branch(u'l_elbow_flex_joint',
+        assert set(result[0]) == {'base_bellow_link',
+                                  'fl_caster_l_wheel_link',
+                                  'fl_caster_r_wheel_link',
+                                  'fl_caster_rotation_link',
+                                  'fr_caster_l_wheel_link',
+                                  'fr_caster_r_wheel_link',
+                                  'fr_caster_rotation_link',
+                                  'bl_caster_l_wheel_link',
+                                  'bl_caster_r_wheel_link',
+                                  'bl_caster_rotation_link',
+                                  'br_caster_l_wheel_link',
+                                  'br_caster_r_wheel_link',
+                                  'br_caster_rotation_link',
+                                  'base_link'}
+        result = world.search_branch('l_elbow_flex_link',
                                      collect_joint_when=world.is_joint_fixed)
         assert set(result[0]) == set()
         assert set(result[1]) == {'l_force_torque_adapter_joint',
@@ -427,16 +396,16 @@ class TestWorldTree(object):
                                   'l_gripper_motor_accelerometer_joint',
                                   'l_gripper_palm_joint',
                                   'l_gripper_tool_joint'}
-        links, joints = world.search_branch(u'r_wrist_roll_joint',
+        links, joints = world.search_branch('r_wrist_roll_link',
                                             stop_at_joint_when=world.is_joint_controlled,
                                             collect_link_when=world.has_link_collisions,
                                             collect_joint_when=lambda _: True)
-        assert set(links) == {u'r_gripper_l_finger_tip_link',
-                              u'r_gripper_l_finger_link',
-                              u'r_gripper_r_finger_tip_link',
-                              u'r_gripper_r_finger_link',
-                              u'r_gripper_palm_link',
-                              u'r_wrist_roll_link'}
+        assert set(links) == {'r_gripper_l_finger_tip_link',
+                              'r_gripper_l_finger_link',
+                              'r_gripper_r_finger_tip_link',
+                              'r_gripper_r_finger_link',
+                              'r_gripper_palm_link',
+                              'r_wrist_roll_link'}
         assert set(joints) == {'r_gripper_palm_joint',
                                'r_gripper_led_joint',
                                'r_gripper_motor_accelerometer_joint',
@@ -448,7 +417,7 @@ class TestWorldTree(object):
                                'r_gripper_r_finger_joint',
                                'r_gripper_r_finger_tip_joint',
                                'r_gripper_joint'}
-        links, joints = world.search_branch(u'br_caster_l_wheel_joint',
+        links, joints = world.search_branch('br_caster_l_wheel_link',
                                             collect_link_when=lambda _: True,
                                             collect_joint_when=lambda _: True)
         assert links == ['br_caster_l_wheel_link']
@@ -456,17 +425,17 @@ class TestWorldTree(object):
 
     def test_get_siblings_with_collisions(self):
         world = create_world_with_pr2()
-        result = world.get_siblings_with_collisions(u'odom_x_joint')
+        result = world.get_siblings_with_collisions('odom_x_joint')
         assert result == []
-        result = world.get_siblings_with_collisions(u'odom_y_joint')
+        result = world.get_siblings_with_collisions('odom_y_joint')
         assert result == []
-        result = world.get_siblings_with_collisions(u'odom_z_joint')
+        result = world.get_siblings_with_collisions('odom_z_joint')
         assert result == []
-        result = world.get_siblings_with_collisions(u'l_elbow_flex_joint')
+        result = world.get_siblings_with_collisions('l_elbow_flex_joint')
         assert set(result) == {'l_upper_arm_roll_link', 'l_upper_arm_link'}
-        result = world.get_siblings_with_collisions(u'r_wrist_roll_joint')
-        assert result == [u'r_wrist_flex_link']
-        result = world.get_siblings_with_collisions(u'br_caster_l_wheel_joint')
+        result = world.get_siblings_with_collisions('r_wrist_roll_joint')
+        assert result == ['r_wrist_flex_link']
+        result = world.get_siblings_with_collisions('br_caster_l_wheel_joint')
         assert set(result) == {'base_bellow_link',
                                'fl_caster_l_wheel_link',
                                'fl_caster_r_wheel_link',
@@ -558,14 +527,22 @@ class TestWorldTree(object):
                                                                           'r_gripper_r_finger_joint': (0.0, 0.548),
                                                                           'r_gripper_r_finger_tip_joint': (0.0, 0.548)}
 
+    def test_possible_collision_combinations(self):
+        world = create_world_with_pr2()
+        result = world.possible_collision_combinations('robot')
+        reference = {world.sort_links(link_a, link_b) for link_a, link_b in
+                     combinations(world.groups['robot'].link_names_with_collisions, 2) if
+                     not world.groups['robot'].are_linked(link_a, link_b)}
+        assert result == reference
+
     @given(rnd_joint_state(pr2_joint_limits))
     def test_pr2_fk1(self, js):
         """
         :type js:
         """
         world = create_world_with_pr2()
-        root = u'odom_combined'
-        tips = [u'l_gripper_tool_frame', u'r_gripper_tool_frame']
+        root = 'odom_combined'
+        tips = ['l_gripper_tool_frame', 'r_gripper_tool_frame']
         for tip in tips:
             mjs = JointStates()
             for joint_name, position in js.items():
@@ -590,3 +567,4 @@ class TestWorldTree(object):
         world = create_world_with_pr2()
         with pytest.raises(KeyError):
             world.compute_chain_reduced_to_controlled_joints('l_wrist_roll_link', 'l_gripper_r_finger_link')
+

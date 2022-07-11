@@ -12,7 +12,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import Constraint, MoveGoal, MoveAction
 from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded
 from giskardpy.exceptions import PlanningException
-from giskardpy.tree.plugin import GiskardBehavior
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, msg_to_list
 

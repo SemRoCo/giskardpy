@@ -5,9 +5,8 @@ from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy import RobotName
-from giskardpy.data_types import BiDict, Collisions, Collision, CollisionAABB
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.data_types import BiDict, CollisionAABB
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions, Collision
 from giskardpy.model.pybullet_wrapper import ContactInfo
 from giskardpy.utils.tfwrapper import pose_to_np
 from giskardpy.utils.utils import resolve_ros_iris, write_to_tmp
@@ -69,7 +68,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             link_b_id = self.object_name_to_bullet_id[link_b]
             link_a_id = self.object_name_to_bullet_id[link_a]
             contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(link_a_id, link_b_id,
-                                                                      distance+buffer, physicsClientId=self.client_id))]
+                                                                      distance+buffer, physicsClientId=self.client_id)]
             if len(contacts) > 0:
                 for contact in contacts:  # type: ContactInfo
                     map_P_pa = contact.position_on_a

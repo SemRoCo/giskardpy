@@ -491,6 +491,7 @@ class OpenLoop(TreeManager):
         root.add_child(self.grow_wait_for_goal())
         root.add_child(CleanUp('cleanup'))
         root.add_child(self.grow_process_goal())
+        self.global_planner_needed.solver = self.planning_4
         root.add_child(self.grow_follow_joint_trajectory_execution())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
@@ -517,16 +518,16 @@ class OpenLoop(TreeManager):
 
     def grow_process_goal(self):
         process_move_cmd = Selector('Process move commands')
-        process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
+        process_move_cmd.add_child(success_is_failure(SetCmd)('set move cmd', self.action_server_name))
         process_move_cmd.add_child(self.grow_planning())
         process_move_cmd.add_child(success_is_failure(RetryPlanning)(u'done planning?'))
-        process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
+        process_move_cmd.add_child(success_is_failure(SetErrorCode)('set error code', 'Planning'))
         process_move_goal = failure_is_success(Selector)('Process goal')
         process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                         self.action_server_name,
                                                                         MoveFeedback.PLANNING))
         process_move_goal.add_child(process_move_cmd)
-        process_move_goal.add_child(ExceptionToExecute('clear exception'))
+        process_move_goal.add_child(success_is_failure(ExceptionToExecute)('clear exception')) # todo: fix me, will be ignored
         process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
         return process_move_goal
 
@@ -535,8 +536,9 @@ class OpenLoop(TreeManager):
         planning.add_child(IF('command set?', identifier.next_move_goal))
         global_planning = Sequence(u'global planning')
         global_planning.add_child(PreGraspSampler())
-        global_planning.add_child(running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded',
-                                                                          self.action_server_name))
+        self.global_planner_needed = running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded',
+                                                                          self.action_server_name)
+        global_planning.add_child(self.global_planner_needed)
         if self.god_map.get_data(identifier.enable_VisualizationBehavior):
             global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
         global_planning.add_child(GlobalPlanner(u'global planner', self.action_server_name))
@@ -573,7 +575,8 @@ class OpenLoop(TreeManager):
 
     def grow_planning3(self):
         planning_3 = Sequence('planning III', sleep=0)
-        planning_3.add_child(self.grow_planning4())
+        self.planning_4 = self.grow_planning4()
+        planning_3.add_child(self.planning_4)
         planning_3.add_child(running_is_success(TimePlugin)('time for zero velocity'))
         planning_3.add_child(AppendZeroVelocity('append zero velocity'))
         planning_3.add_child(running_is_success(LogTrajPlugin)('log zero velocity'))

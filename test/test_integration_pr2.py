@@ -16,7 +16,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis, qu
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
-from giskardpy import identifier, RobotName
+from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
@@ -160,14 +160,15 @@ def fake_table_setup(pocky_pose_setup: PR2) -> PR2:
     pocky_pose_setup.add_box(name='box', size=(1, 1, 1), pose=p)
     return pocky_pose_setup
 
+
 @pytest.fixture()
 def kitchen_setup_avoid_collisions(resetted_giskard):
     """
     :type resetted_giskard: GiskardTestWrapper
     :return:
     """
-    resetted_giskard.avoid_all_collisions(distance=0.0)
-    resetted_giskard.set_joint_goal(gaya_pose)
+    resetted_giskard.avoid_all_collisions(0.0)
+    resetted_giskard.set_joint_goal(resetted_giskard.better_pose)
     resetted_giskard.plan_and_execute()
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),

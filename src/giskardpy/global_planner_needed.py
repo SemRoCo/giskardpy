@@ -26,7 +26,7 @@ class GlobalPlannerNeeded(GetGoal):
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.global_path_needed_lock = threading.Lock()
         self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot', 'CartesianPreGrasp']
-        self.solver = self.god_map.get_data(identifier.tree_manager).get_node('planning IIII')
+        self.solver = None
         
     def setup(self, timeout=5.0):
         self.srv_path_needed = rospy.Service(u'~is_global_path_needed', GlobalPathNeeded, self.is_global_path_needed_cb)

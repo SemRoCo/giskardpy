@@ -3,6 +3,7 @@
 import json
 import sys
 import threading
+import time
 from collections import namedtuple
 from random import uniform
 from datetime import datetime
@@ -30,9 +31,9 @@ from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GlobalPlanningException, InfeasibleGlobalPlanningException, \
     FeasibleGlobalPlanningException, ReplanningException
 from giskardpy.model.pybullet_syncer import PyBulletRayTester, PyBulletMotionValidationIDs, PyBulletBoxSpace
-from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.tree.get_goal import GetGoal
-from giskardpy.tree.visualization import VisualizationBehavior
+from giskardpy.tree.behaviors.get_goal import GetGoal
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.utils.kdl_parser import KDL
 from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, list_to_kdl, pose_to_np, \
     pose_to_kdl, np_to_pose, pose_stamped_to_np

@@ -8,24 +8,25 @@ import yaml
 import pybullet as p
 from py_trees import Status
 
-from giskardpy import identifier, RobotName
+from giskardpy import identifier
 from giskard_msgs.srv import GlobalPathNeeded, GlobalPathNeededResponse, GetAttachedObjects, GetAttachedObjectsRequest
-from giskardpy.data_types import Trajectory, Collisions
+from giskardpy.data_types import Trajectory
 from giskardpy.global_planner import ObjectRayMotionValidator, GiskardRobotBulletCollisionChecker
-from giskardpy.tree.get_goal import GetGoal
+from giskardpy.model.collision_world_syncer import Collisions
+from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils.tfwrapper import np_to_pose_stamped, transform_pose, pose_stamped_to_np, np_to_pose
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
 
 
 class GlobalPlannerNeeded(GetGoal):
 
-    def __init__(self, name, as_name, solver):
+    def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
 
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.global_path_needed_lock = threading.Lock()
         self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot', 'CartesianPreGrasp']
-        self.solver = solver
+        self.solver = self.god_map.get_data(identifier.tree_manager).get_node('planning IIII')
         
     def setup(self, timeout=5.0):
         self.srv_path_needed = rospy.Service(u'~is_global_path_needed', GlobalPathNeeded, self.is_global_path_needed_cb)
@@ -135,16 +136,16 @@ class GlobalPlannerNeeded(GetGoal):
             raise Exception(u'Root_link {} is no known link of the robot.'.format(root_link))
         if tip_link not in link_names:
             raise Exception(u'Tip_link {} is no known link of the robot.'.format(tip_link))
-        if not self.get_robot().are_linked(root_link, tip_link):
-            raise Exception(u'Did not found link chain of the robot from'
-                            u' root_link {} to tip_link {}.'.format(root_link, tip_link))
+        #if not self.get_robot().are_linked(root_link, tip_link):
+        #    raise Exception(u'Did not found link chain of the robot from'
+        #                    u' root_link {} to tip_link {}.'.format(root_link, tip_link))
 
         return root_link, tip_link, pose_goal
 
     def clear_trajectory(self):
         self.world.fast_all_fks = None
         self.collision_scene.reset_cache()
-        self.get_god_map().set_data(identifier.closest_point, Collisions(self.world, 1))
+        self.get_god_map().set_data(identifier.closest_point, Collisions(self.god_map, 1))
         self.get_god_map().set_data(identifier.time, 1)
         current_js = deepcopy(self.get_god_map().get_data(identifier.joint_states))
         trajectory = Trajectory()
@@ -157,7 +158,7 @@ class GlobalPlannerNeeded(GetGoal):
         start_joint_states = deepcopy(self.god_map.get_data(identifier.old_joint_states))
         self.get_world().state.update(start_joint_states)
         start_map_T_base = deepcopy(self.god_map.get_data(identifier.old_map_T_base))
-        self.world.update_joint_parent_T_child(self.world.groups[RobotName].attachment_joint_name, start_map_T_base)
+        self.world.update_joint_parent_T_child(self.world.groups['robot'].attachment_joint_name, start_map_T_base)
 
     def reset(self):
         self.clear_trajectory()

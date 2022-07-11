@@ -26,7 +26,6 @@ from copy import deepcopy
 import giskardpy.identifier as identifier
 from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded, GetPreGraspRequest, GetPreGrasp, \
     GetAttachedObjects, GetAttachedObjectsRequest
-from giskardpy import RobotName
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GlobalPlanningException, InfeasibleGlobalPlanningException, \
     FeasibleGlobalPlanningException, ReplanningException
@@ -554,19 +553,19 @@ class AbstractMotionValidator():
         raise Exception('Please overwrite me')
 
 
-def get_simple_environment_objects_as_urdf(god_map, env_name='kitchen', robot_name=RobotName):
-    world = god_map.get_data(identifier.world)
-    environment_objects = list()
-    for g_n in world.group_names:
-        if env_name == g_n or robot_name == g_n:
-            continue
-        else:
-            if len(world.groups[g_n].links) == 1:
-                environment_objects.append(world.groups[g_n].links[g_n].as_urdf())
-    return environment_objects
+# def get_simple_environment_objects_as_urdf(god_map, env_name='kitchen', robot_name):
+#     world = god_map.get_data(identifier.world)
+#     environment_objects = list()
+#     for g_n in world.group_names:
+#         if env_name == g_n or robot_name == g_n:
+#             continue
+#         else:
+#             if len(world.groups[g_n].links) == 1:
+#                 environment_objects.append(world.groups[g_n].links[g_n].as_urdf())
+#     return environment_objects
 
 
-def get_simple_environment_object_names(god_map, env_name='kitchen', robot_name=RobotName):
+def get_simple_environment_object_names(god_map, robot_name, env_name='kitchen'):
     world = god_map.get_data(identifier.world)
     environment_objects = list()
     for g_n in world.group_names:
@@ -685,7 +684,7 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
         self.collision_scene = collision_scene
         self.state_validator = state_validator
         self.object_in_motion = object_in_motion
-        environment_object_names = get_simple_environment_object_names(self.god_map)
+        environment_object_names = get_simple_environment_object_names(self.god_map, self.god_map.get_data(identifier.robot_group_name))
         self.collision_link_names = self.collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
         pybulletenv = PyBulletMotionValidationIDs(self.god_map.get_data(identifier.collision_scene),
                                                   environment_object_names=environment_object_names,
@@ -1428,9 +1427,9 @@ class PreGraspSampler(GiskardBehavior):
             raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
         if self.tip_link not in link_names:
             raise Exception(u'Tip_link {} is no known link of the robot.'.format(self.tip_link))
-        if not self.robot.are_linked(self.root_link, self.tip_link):
-            raise Exception(u'Did not found link chain of the robot from'
-                            u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
+        #if not self.robot.are_linked(self.root_link, self.tip_link):
+        #    raise Exception(u'Did not found link chain of the robot from'
+        #                    u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
 
         return goal, pregrasp_pos, dist
 
@@ -1482,7 +1481,7 @@ class PreGraspSampler(GiskardBehavior):
 
     def get_pregrasp_cb(self, goal, root_link, tip_link, dist=0.00):
         collision_scene = self.god_map.unsafe_get_data(identifier.collision_scene)
-        robot = collision_scene.world.groups[RobotName]
+        robot = collision_scene.robot
         js = self.god_map.unsafe_get_data(identifier.joint_states)
         self.state_validator = GiskardRobotBulletCollisionChecker(self.is_3D, root_link, tip_link,
                                                                   collision_scene, dist=dist)
@@ -1616,9 +1615,9 @@ class GlobalPlanner(GetGoal):
             raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
         if self.tip_link not in link_names:
             raise Exception(u'Tip_link {} is no known link of the robot.'.format(self.tip_link))
-        if not self.robot.are_linked(self.root_link, self.tip_link):
-            raise Exception(u'Did not found link chain of the robot from'
-                            u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
+        #if not self.robot.are_linked(self.root_link, self.tip_link):
+        #    raise Exception(u'Did not found link chain of the robot from'
+        #                    u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
 
     def seem_trivial(self, simple=True):
         rospy.wait_for_service('~is_global_path_needed', timeout=5.0)

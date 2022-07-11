@@ -485,42 +485,55 @@ class CollisionWorldSynchronizer(object):
             default_distance = max(default_distance, value[parameter_name])
         return default_distance
 
-    def update_collision_environment(self):
-        self.sync()
-        collision_goals = self.god_map.get_data(identifier.collision_goal)
+    def collision_entries_to_collision_matrix(self, collision_entries: List[CollisionEntry]):
+        # t = time()
+        self.collision_scene.sync()
+        max_distances = self.make_max_distances()
+        collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
+                                                                                    max_distances)
+        # t2 = time() - t
+        # self.get_blackboard().runtime += t2
+        return collision_matrix
+
+    def _cal_max_param(self, parameter_name):
+        external_distances = self.god_map.get_data(identifier.external_collision_avoidance)
+        self_distances = self.god_map.get_data(identifier.self_collision_avoidance)
+        default_distance = max(external_distances.default_factory()[parameter_name],
+                               self_distances.default_factory()[parameter_name])
+        for value in external_distances.values():
+            default_distance = max(default_distance, value[parameter_name])
+        for value in self_distances.values():
+            default_distance = max(default_distance, value[parameter_name])
+        return default_distance
+
+    def make_max_distances(self):
         external_distances = self.god_map.get_data(identifier.external_collision_avoidance)
         self_distances = self.god_map.get_data(identifier.self_collision_avoidance)
         # FIXME check all dict entries
-        default_distance = self._cal_max_param(u'soft_threshold')
+        default_distance = self._cal_max_param('soft_threshold')
 
         max_distances = defaultdict(lambda: default_distance)
         # override max distances based on external distances dict
         for link_name in self.robot.link_names_with_collisions:
             controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link_name)
-            distance = external_distances[controlled_parent_joint][u'soft_threshold']
-            for child_link_name in self.robot.get_directly_controlled_child_links_with_collisions(controlled_parent_joint):
+            distance = external_distances[controlled_parent_joint]['soft_threshold']
+            for child_link_name in self.robot.get_directly_controlled_child_links_with_collisions(
+                    controlled_parent_joint):
                 max_distances[child_link_name] = distance
 
         for link_name in self_distances:
-            distance = self_distances[link_name][u'soft_threshold']
+            distance = self_distances[link_name]['soft_threshold']
             if link_name in max_distances:
                 max_distances[link_name] = max(distance, max_distances[link_name])
             else:
                 max_distances[link_name] = distance
 
-        added_checks = self.god_map.get_data(identifier.added_collision_checks)
-        for link_name, distance in added_checks.items():
-            if link_name in max_distances:
-                max_distances[link_name] = max(distance, max_distances[link_name])
-            else:
-                max_distances[link_name] = distance
-
-        self.collision_matrix = self.collision_goals_to_collision_matrix(deepcopy(collision_goals), max_distances)
-        self.collision_list_size = self._cal_max_param(u'number_of_repeller')
+        return max_distances
 
     def update_collision_checker(self):
         self.sync()
-        collisions = self.check_collisions(self.collision_matrix, self.collision_list_size)
+        collisions = self.check_collisions(self.god_map.get_data(identifier.collision_matrix),
+                                           self._cal_max_param('number_of_repeller'))
         self.god_map.set_data(identifier.closest_point, collisions)
 
     def get_aabb_info(self, link_name: str) -> Tuple[str, float, float]:

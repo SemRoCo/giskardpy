@@ -73,8 +73,8 @@ class GoalToConstraints(GetGoal):
                 self.parse_collision_entries(move_cmd.collisions)
 
             self.get_god_map().set_data(identifier.constraints, self.soft_constraints)
-        self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
-        self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
+            self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
+            self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
 
             if self.get_god_map().get_data(identifier.check_reachability):
                 self.raise_to_blackboard(NotImplementedError('reachability check is not implemented'))
@@ -170,7 +170,7 @@ class GoalToConstraints(GetGoal):
         Adds a constraint for each link that pushed it away from its closest point.
         """
         # FIXME this only catches the most obvious cases
-        collision_matrix = self.collision_entries_to_collision_matrix(collision_entries)
+        collision_matrix = self.collision_scene.collision_entries_to_collision_matrix(collision_entries)
         self.god_map.set_data(identifier.collision_matrix, collision_matrix)
         soft_threshold = None
         for collision_cmd in collision_entries:
@@ -182,51 +182,6 @@ class GoalToConstraints(GetGoal):
         if not collision_entries or (not self.collision_scene.is_allow_all_collision(collision_entries[-1]) and
                                      not self.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
-
-    def collision_entries_to_collision_matrix(self, collision_entries: List[CollisionEntry]):
-        # t = time()
-        self.collision_scene.sync()
-        max_distances = self.make_max_distances()
-        collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                    max_distances)
-        # t2 = time() - t
-        # self.get_blackboard().runtime += t2
-        return collision_matrix
-
-    def _cal_max_param(self, parameter_name):
-        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        default_distance = max(external_distances.default_factory()[parameter_name],
-                               self_distances.default_factory()[parameter_name])
-        for value in external_distances.values():
-            default_distance = max(default_distance, value[parameter_name])
-        for value in self_distances.values():
-            default_distance = max(default_distance, value[parameter_name])
-        return default_distance
-
-    def make_max_distances(self):
-        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        # FIXME check all dict entries
-        default_distance = self._cal_max_param('soft_threshold')
-
-        max_distances = defaultdict(lambda: default_distance)
-        # override max distances based on external distances dict
-        for link_name in self.robot.link_names_with_collisions:
-            controlled_parent_joint = self.get_robot().get_controlled_parent_joint_of_link(link_name)
-            distance = external_distances[controlled_parent_joint]['soft_threshold']
-            for child_link_name in self.get_robot().get_directly_controlled_child_links_with_collisions(
-                    controlled_parent_joint):
-                max_distances[child_link_name] = distance
-
-        for link_name in self_distances:
-            distance = self_distances[link_name]['soft_threshold']
-            if link_name in max_distances:
-                max_distances[link_name] = max(distance, max_distances[link_name])
-            else:
-                max_distances[link_name] = distance
-
-        return max_distances
 
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):

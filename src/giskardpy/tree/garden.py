@@ -12,6 +12,8 @@ import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.data_types import order_map
+from giskardpy.global_planner import PreGraspSampler, GlobalPlanner
+from giskardpy.global_planner_needed import GlobalPlannerNeeded
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.behaviors.append_zero_velocity import AppendZeroVelocity
@@ -36,7 +38,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.plugin_if import IF
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.send_result import SendResult
-from giskardpy.tree.behaviors.set_cmd import SetCmd
+from giskardpy.tree.behaviors.set_cmd import SetCmd, SetCollisionGoal
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.shaking_detector import WiggleCancel
 from giskardpy.tree.behaviors.start_timer import StartTimer
@@ -50,6 +52,7 @@ from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import PluginBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
+from giskardpy.tree.retry_planning import RetryPlanning
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.time_collector import TimeCollector
@@ -513,9 +516,10 @@ class OpenLoop(TreeManager):
         return sync
 
     def grow_process_goal(self):
-        process_move_cmd = success_is_failure(Sequence)('Process move commands')
+        process_move_cmd = Selector('Process move commands')
         process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
         process_move_cmd.add_child(self.grow_planning())
+        process_move_cmd.add_child(success_is_failure(RetryPlanning)(u'done planning?'))
         process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
         process_move_goal = failure_is_success(Selector)('Process goal')
         process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback',
@@ -527,8 +531,17 @@ class OpenLoop(TreeManager):
         return process_move_goal
 
     def grow_planning(self):
-        planning = failure_is_success(Sequence)('planning')
+        planning = success_is_failure(Sequence)('planning')
         planning.add_child(IF('command set?', identifier.next_move_goal))
+        global_planning = Sequence(u'global planning')
+        global_planning.add_child(PreGraspSampler())
+        global_planning.add_child(running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded',
+                                                                          self.action_server_name))
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+            global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
+        global_planning.add_child(GlobalPlanner(u'global planner', self.action_server_name))
+        planning.add_child(SetCollisionGoal(u'set collision goal', self.action_server_name))
+        planning.add_child(global_planning)
         planning.add_child(GoalToConstraints('update constraints', self.action_server_name))
         planning.add_child(self.grow_planning2())
         # planning.add_child(planning_1)
@@ -542,7 +555,7 @@ class OpenLoop(TreeManager):
         return planning
 
     def grow_planning2(self):
-        planning_2 = failure_is_success(Selector)('planning II')
+        planning_2 = Selector('planning II')
         planning_2.add_child(GoalCanceled('goal canceled', self.action_server_name))
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                  self.action_server_name,

@@ -64,6 +64,7 @@ plugins:
     in_planning_loop: False
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: False
+    in_planning_loop: False
   GlobalPlannerNeeded:
     global_planner_needed: False
   # Planners
@@ -114,7 +115,6 @@ plugins:
         motion_validator: [ 'discrete' ] # sublist of ['rays', 'box', 'discrete']
         time: 30
         range: 0.1
-    in_planning_loop: False
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
     path_enabled: True #will plot planned path and executed trajectory if computed

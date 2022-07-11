@@ -2404,7 +2404,7 @@ class TestCartesianPath(object):
         #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
-    @pytest.mark.repeat(10)
+    @pytest.mark.repeat(1)
     def test_pathAroundKitchenIsland_with_global_planner(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartesianPath::test_pathAroundKitchenIsland_with_global_planner
         """
@@ -2627,7 +2627,7 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.plan_and_execute()
 
-    @pytest.mark.repeat(10)
+    @pytest.mark.repeat(1)
     def test_pathAroundKitchenIsland_with_global_planner_and_box(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
@@ -2670,6 +2670,87 @@ class TestCartesianPath(object):
         #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
+    @pytest.mark.repeat(1)
+    def test_pathAroundKitchenIsland_with_open_stuff(self, kitchen_setup_avoid_collisions):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
+        """
+        :type kitchen_setup_avoid_collisions: PR2
+        """
+        tip_link = u'base_footprint'
+        kitchen_setup_avoid_collisions.set_kitchen_js({'kitchen_island_left_upper_drawer_main_joint': 0.48})
+        kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.28})
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = 0.5
+        base_pose.pose.position.y = 2.1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0, 0, 1]))
+        kitchen_setup_avoid_collisions.teleport_base(base_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = -2.5
+        base_pose.pose.position.y = 1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        goal_c = base_pose
+
+        try:
+            kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                         tip_link=tip_link,
+                                                         root_link=kitchen_setup_avoid_collisions.default_root,
+                                                         goal=goal_c)
+            kitchen_setup_avoid_collisions.plan_and_execute()
+        except Exception:
+            pass
+        #kitchen_setup_avoid_collisions.send_goal()
+        #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
+        #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
+    @pytest.mark.repeat(1)
+    def test_pathAroundKitchenIsland_with_open_stuff_and_box(self, kitchen_setup_avoid_collisions):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
+        """
+        :type kitchen_setup_avoid_collisions: PR2
+        """
+        tip_link = u'base_footprint'
+        kitchen_setup_avoid_collisions.set_kitchen_js({'kitchen_island_left_upper_drawer_main_joint': 0.48})
+        kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.28})
+
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = tip_link
+        box_pose.pose.position.x = -2.5
+        box_pose.pose.position.y = 0
+        box_pose.pose.position.z = 0
+        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup_avoid_collisions.add_box('box1', [0.5, 0.5, 1], pose=box_pose)
+        box_pose.pose.position.x = -0.5
+        kitchen_setup_avoid_collisions.add_box('box2', [0.5, 0.5, 1], pose=box_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 2.1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/8, [0, 0, 1]))
+        kitchen_setup_avoid_collisions.teleport_base(base_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = -2.5
+        base_pose.pose.position.y = 1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        goal_c = base_pose
+
+        try:
+            kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                         tip_link=tip_link,
+                                                         root_link=kitchen_setup_avoid_collisions.default_root,
+                                                         goal=goal_c)
+            kitchen_setup_avoid_collisions.plan_and_execute()
+        except Exception:
+            pass
+        #kitchen_setup_avoid_collisions.send_goal()
+        #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
+        #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
     def test_ease_fridge_with_cart_goals_lifting_and_global_planner(self, kitchen_setup_avoid_collisions):
         rospy.sleep(10.0)#0.5
@@ -2716,6 +2797,7 @@ class TestCartesianPath(object):
         else:
             raise Exception('Wrong tip link')
 
+        kitchen_setup_avoid_collisions.allow_collision(body_b=milk_name)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      tip_link=tip_link,
@@ -2731,6 +2813,113 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.plan_and_execute()
 
         # grasp milk
+        kitchen_setup_avoid_collisions.attach_object(milk_name, tip_link)
+
+        if tip_link == kitchen_setup_avoid_collisions.l_tip:
+            kitchen_setup_avoid_collisions.close_l_gripper()
+        elif tip_link == kitchen_setup_avoid_collisions.r_tip:
+            kitchen_setup_avoid_collisions.close_r_gripper()
+        else:
+            raise Exception('Wrong tip link')
+
+        kitchen_setup_avoid_collisions.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup_avoid_collisions.default_root)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        # dont allow robot to move
+        js = kitchen_setup_avoid_collisions.god_map.get_data(identifier.joint_states)
+        odom_joints = ['odom_x_joint', 'odom_y_joint', 'odom_z_joint']
+        kitchen_setup_avoid_collisions.set_joint_goal({j_n: js[j_n].position for j_n in odom_joints})
+
+        # place milk back
+        kitchen_setup_avoid_collisions.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup_avoid_collisions.default_root)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        kitchen_setup_avoid_collisions.set_cart_goal(milk_pose, milk_name, kitchen_setup_avoid_collisions.default_root)
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        # kitchen_setup.keep_position(kitchen_setup_avoid_collisions.r_tip)
+        if tip_link == kitchen_setup_avoid_collisions.l_tip:
+            kitchen_setup_avoid_collisions.open_l_gripper()
+        elif tip_link == kitchen_setup_avoid_collisions.r_tip:
+            kitchen_setup_avoid_collisions.open_r_gripper()
+        else:
+            raise Exception('Wrong tip link')
+
+        kitchen_setup_avoid_collisions.detach_object(milk_name)
+
+        #kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+        #                                             root_link=kitchen_setup_avoid_collisions.default_root,
+        #                                             tip_link=tip_link,
+        #                                             goal=milk_grasp_pre_pose)
+        # kitchen_setup_avoid_collisions.send_and_check_goal()
+
+        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
+
+    def test_ease_fridge_with_cart_goals_placing_global_planner(self, kitchen_setup_avoid_collisions):
+        rospy.sleep(10.0)#0.5
+
+        tip_link = kitchen_setup_avoid_collisions.r_tip
+        milk_name = u'milk'
+
+        # take milk out of fridge
+        kitchen_setup_avoid_collisions.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.0
+        base_goal.pose.position.y = -1.05
+        base_goal.pose.orientation.x = 0
+        base_goal.pose.orientation.y = 0
+        base_goal.pose.orientation.z = 0
+        base_goal.pose.orientation.w = 1
+        kitchen_setup_avoid_collisions.teleport_base(base_goal)
+
+        # spawn milk
+        milk_pose = PoseStamped()
+        milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_pose.pose.position = Point(0, 0, 0.12)
+        milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        milk_lift_pre_pose = PoseStamped()
+        milk_lift_pre_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_lift_pre_pose.pose.position = Point(0, 0, 0.22)
+        milk_lift_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        #milk_grasp_pre_pose = PoseStamped()
+        #milk_grasp_pre_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        #milk_grasp_pre_pose.pose.position = Point(-0.2, 0, 0.12)
+        #milk_grasp_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup_avoid_collisions.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
+
+        # move arm towards milk
+        if tip_link == kitchen_setup_avoid_collisions.l_tip:
+            kitchen_setup_avoid_collisions.open_l_gripper()
+        elif tip_link == kitchen_setup_avoid_collisions.r_tip:
+            kitchen_setup_avoid_collisions.open_r_gripper()
+        else:
+            raise Exception('Wrong tip link')
+
+        # Pregrasp
+        kitchen_setup_avoid_collisions.allow_collision(body_b=milk_name)
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     goal=milk_pose)
+
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        # Grasp
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     tip_link=tip_link,
+                                                     goal=milk_pose)
+
+        kitchen_setup_avoid_collisions.plan_and_execute()
+
+        # attach milk
         kitchen_setup_avoid_collisions.attach_object(milk_name, tip_link)
 
         if tip_link == kitchen_setup_avoid_collisions.l_tip:
@@ -3183,7 +3372,7 @@ class TestCartesianPath(object):
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=grasp_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
-        kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
+        #kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup_avoid_collisions.open_l_gripper()
@@ -3262,8 +3451,8 @@ class TestCartesianPath(object):
         # kitchen_setup.align_planes('milk', z, root_normal=z_map)
         # kitchen_setup.keep_orientation(u'milk')
         # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
-        kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], False)
-        decrease_external_collision_avoidance(kitchen_setup_avoid_collisions)
+        #kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], False)
+        #decrease_external_collision_avoidance(kitchen_setup_avoid_collisions)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      tip_link=kitchen_setup_avoid_collisions.r_tip,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
@@ -3285,7 +3474,7 @@ class TestCartesianPath(object):
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=grasp_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
-        kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
+        #kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup_avoid_collisions.open_l_gripper()

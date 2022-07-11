@@ -23,7 +23,8 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, kdl_to_quaternion, \
+    np_to_kdl
 from giskardpy.utils.utils import suppress_stderr, memoize
 
 
@@ -51,7 +52,6 @@ class WorldTree(object):
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
-        self.fast_all_fks = None
         self._state_version = 0
         self._model_version = 0
         self._clear()
@@ -469,7 +469,6 @@ class WorldTree(object):
     def delete_all_but_robot(self):
         self._clear()
         self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=None, prefix=None)
-        self.fast_all_fks = None
         self.notify_model_change()
 
     def _set_joint_limits(self, linear_limits, angular_limits, order):
@@ -759,28 +758,15 @@ class WorldTree(object):
 
     @profile
     def compute_all_fks(self):
-        if self.fast_all_fks is None:
-            fks = []
-            self.fk_idx = {}
-            i = 0
-            for link in self.links.values():
-                if link.name == self.root_link_name:
-                    continue
-                if link.has_collisions():
-                    fk = self.compose_fk_expression(self.root_link_name, link.name)
-                    fk = w.dot(fk, link.collisions[0].link_T_geometry)
-                    position = w.position_of(fk)
-                    orientation = w.quaternion_from_matrix(fk)
-                    fks.append(w.vstack([position, orientation]).T)
-                    self.fk_idx[link.name] = i
-                    i += 1
-            fks = w.vstack(fks)
-            self.fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
-
-        fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-        result = {}
-        for link in self.link_names_with_collisions:
-            result[link] = fks_evaluated[self.fk_idx[link], :]
+        tfs = self.compute_all_fks_matrix()
+        result = dict()
+        for i, link in enumerate(self.link_names_with_collisions):
+            if link != self.root_link_name:
+                fk = tfs[i*4:i*4 + 4]
+                position = fk[:, 3]
+                q = kdl_to_quaternion(np_to_kdl(fk))
+                orientation = [q.x, q.y, q.z, q.w]
+                result[link] = np.append(position, orientation)
         return result
 
     @profile

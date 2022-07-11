@@ -53,7 +53,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         return in_collision
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
+    def check_collisions(self, cut_off_distances, collision_list_size=15, buffer=0.05):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
@@ -64,28 +64,29 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        collisions = Collisions(self.world, collision_list_size)
-        for (robot_link, body_b, link_b), distance in cut_off_distances.items():
+        collisions = Collisions(self.world.god_map, collision_list_size)
+        for (link_a, link_b), distance in cut_off_distances.items():
             link_b_id = self.object_name_to_bullet_id[link_b]
-            robot_link_id = self.object_name_to_bullet_id[robot_link]
-            contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
-                                                                      distance * 1.1, physicsClientId=self.client_id)]
+            link_a_id = self.object_name_to_bullet_id[link_a]
+            contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(link_a_id, link_b_id,
+                                                                      distance+buffer, physicsClientId=self.client_id))]
             if len(contacts) > 0:
                 for contact in contacts:  # type: ContactInfo
-                    collision = Collision(link_a=robot_link,
-                                          body_b=body_b,
+                    map_P_pa = contact.position_on_a
+                    map_P_pb = contact.position_on_b
+                    map_V_n = contact.contact_normal_on_b
+                    collision = Collision(link_a=link_a,
                                           link_b=link_b,
-                                          map_P_pa=contact.position_on_a,
-                                          map_P_pb=contact.position_on_b,
-                                          map_V_n=contact.contact_normal_on_b,
+                                          map_P_pa=map_P_pa,
+                                          map_P_pb=map_P_pb,
+                                          map_V_n=map_V_n,
                                           contact_distance=contact.contact_distance)
-                    if self.__should_flip_collision(contact.position_on_a, robot_link):
-                        collision = Collision(link_a=robot_link,
-                                              body_b=body_b,
+                    if self.__should_flip_collision(map_P_pa, link_a):
+                        collision = Collision(link_a=link_a,
                                               link_b=link_b,
-                                              map_P_pa=contact.position_on_b,
-                                              map_P_pb=contact.position_on_a,
-                                              map_V_n=tuple([-x for x in contact.contact_normal_on_b]),
+                                              map_P_pa=map_P_pb,
+                                              map_P_pb=map_P_pa,
+                                              map_V_n=tuple([-x for x in map_V_n]),
                                               contact_distance=contact.contact_distance)
                     collisions.add(collision)
         return collisions
@@ -106,20 +107,14 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         if self.has_world_changed():
             self.object_name_to_bullet_id = BiDict()
             pbw.clear_pybullet(client_id=self.client_id)
-            self.world.fast_all_fks = None
             self.fks = self.world.compute_all_fks()
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.add_object(link)
-            self.init_collision_matrix(RobotName)
             # logging.logwarn('synced world')
         else:
             # logging.logwarn('updated world')
-            try:
-                self.fks = self.world.compute_all_fks()
-            except:
-                self.world.fast_all_fks = None
-                self.fks = self.world.compute_all_fks()
+            self.fks = self.world.compute_all_fks()
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.update_pose(link)

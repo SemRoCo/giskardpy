@@ -692,7 +692,7 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
                                                   moving_links=self.collision_link_names)
         raytester = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map,
                                              ignore_state_validator=True,js=js)
-        self.box_space = PyBulletBoxSpace(self.collision_scene.world, self.object_in_motion, 'map', pybulletenv, raytester)
+        self.box_space = PyBulletBoxSpace(self.collision_scene.world, self.object_in_motion, 'map', pybulletenv)
         # self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
 
     def clear(self):
@@ -1695,19 +1695,19 @@ class GlobalPlanner(GetGoal):
               navigation=False, movement=False, narrow=False, interpolate=True):
         for motion_validator_type in motion_validator_types:
             for planner_name in planner_names:
-                while True:
-                    rospy.loginfo(f'Starting planning with Global Planner {planner_name}/{motion_validator_type} ...')
-                    planner_f = self.get_planner_handle(navigation=navigation, movement=movement, narrow=narrow)
-                    planner = planner_f(planner_name, motion_validator_type, planner_range, time)
-                    js = self.get_god_map().get_data(identifier.joint_states)
-                    try:
-                        trajectory = planner.setup_and_plan(js)
-                        rospy.logerr(f"Found solution:{len(trajectory) != 0}")
-                        if len(trajectory) != 0:
-                            if self.god_map.get_data(identifier.path_interpolation):
-                                trajectory = planner.interpolate_solution()
-                    finally:
-                        planner.clear()
+                rospy.loginfo(f'Starting planning with Global Planner {planner_name}/{motion_validator_type} ...')
+                planner_f = self.get_planner_handle(navigation=navigation, movement=movement, narrow=narrow)
+                planner = planner_f(planner_name, motion_validator_type, planner_range, time)
+                js = self.get_god_map().get_data(identifier.joint_states)
+                try:
+                    trajectory = planner.setup_and_plan(js)
+                    rospy.logerr(f"Found solution:{len(trajectory) != 0}")
+                    if len(trajectory) != 0:
+                        if self.god_map.get_data(identifier.path_interpolation):
+                            trajectory = planner.interpolate_solution()
+                        return trajectory, planner_name, motion_validator_type
+                finally:
+                    planner.clear()
                 rospy.loginfo(f'Global Planner {planner_name}/{motion_validator_type} did not found a solution. '
                               f'Trying other planner config...')
         return None, None, None
@@ -2159,7 +2159,7 @@ class OMPLPlanner(object):
 
     def benchmark(self, planner_names):
         e = datetime.now()
-        n = f"test_ease_cereal_with_planner_1-"\
+        n = f"test_pathAroundKitchenIsland_with_global_planner_and_box-"\
             f"date:={e.day}/{e.month}/{e.year}-" \
             f"time:={e.hour}:{e.minute}:{e.second}-" \
             f"validation type: = {str(self.motion_validator_class)}"
@@ -2170,8 +2170,8 @@ class OMPLPlanner(object):
         b.setPreRunEvent(ot.PreSetupEvent(self._configure_planner))
         req = ot.Benchmark.Request()
         req.maxTime = self.max_time
-        req.maxMem = 100.0
-        req.runCount = 1
+        #req.maxMem = 100.0
+        req.runCount = 5
         req.displayProgress = True
         req.simplify = False
         b.benchmark(req)
@@ -2348,7 +2348,7 @@ class MovementPlanner(OMPLPlanner):
             else:
                 path.interpolate(int(path_cost / 0.05))
         else:
-            path.interpolate(int(path_cost / 0.1))
+            path.interpolate(int(path_cost / 0.2))
         data = ompl_states_matrix_to_np(path.printAsMatrix()) # [x y z xw yw zw w]
         if self.verify_solution_f is not None:
             if self.verify_solution_f(self.setup, self.get_solution_path(), debug=True) != 0:

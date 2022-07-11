@@ -306,7 +306,7 @@ class PyBulletRayTester():
 
 class PyBulletBoxSpace():
 
-    def __init__(self, world, robot, map_frame, pybullet_env, publish_collision_boxes=True):
+    def __init__(self, world, robot, map_frame, pybullet_env, publish_collision_boxes=False):
         self.pybullet_env = pybullet_env
         self.world = world
         self.robot = robot

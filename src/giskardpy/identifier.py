@@ -79,6 +79,7 @@ enable_CPIMarker = plugins + [u'CPIMarker', u'enabled']
 
 PlotTrajectory = plugins + [u'PlotTrajectory']
 PlotTrajectory_enabled = PlotTrajectory + [u'enabled']
+PlotTrajectory_path_enabled = PlotTrajectory + [u'path_enabled']
 
 PlotDebugTrajectory = plugins + [u'PlotDebugTrajectory']
 PlotDebugTrajectory_enabled = PlotDebugTrajectory + [u'enabled']

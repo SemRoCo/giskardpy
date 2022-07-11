@@ -170,7 +170,7 @@ class GoalToConstraints(GetGoal):
         Adds a constraint for each link that pushed it away from its closest point.
         """
         # FIXME this only catches the most obvious cases
-        collision_matrix = self.collision_scene.collision_entries_to_collision_matrix(collision_entries)
+        collision_matrix = self.collision_scene.update_collision_environment(collision_entries)
         self.god_map.set_data(identifier.collision_matrix, collision_matrix)
         soft_threshold = None
         for collision_cmd in collision_entries:

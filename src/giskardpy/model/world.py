@@ -111,7 +111,7 @@ class WorldTree(object):
         self._clear_memo(self.get_controlled_parent_joint_of_link)
         self._clear_memo(self.get_controlled_parent_joint_of_joint)
         self._clear_memo(self.compute_split_chain)
-        self._clear_memo(self.are_static_linked)
+        self._clear_memo(self.are_linked)
         self._clear_memo(self.compose_fk_expression)
         self._clear_memo(self.compute_chain)
         self._clear_memo(self.is_link_controlled)
@@ -837,14 +837,14 @@ class WorldTree(object):
     def get_fk(self, root, tip):
         return self._fk_computer.get_fk(root, tip)
 
-    def are_linked(self, link_a, link_b):
-        chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=False, links=True, fixed=True,
-                                                              non_controlled=True)
-        return connection and chain2
+    #def are_linked(self, link_a, link_b):
+    #    chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=False, links=True, fixed=True,
+    #                                                          non_controlled=True)
+    #    return connection and chain2
 
     @memoize
     @profile
-    def are_static_linked(self, link_a, link_b, non_controlled=False, fixed=False):
+    def are_linked(self, link_a, link_b, non_controlled=False, fixed=False):
         """
         Return True if all joints between link_a and link_b are fixed.
         """

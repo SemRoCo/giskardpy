@@ -165,7 +165,7 @@ class GlobalPlannerNeeded(GetGoal):
         self.reset_robot_state_and_pose()
 
     def is_qp_solving_running(self):
-        return self.solver.my_status == Status.RUNNING
+        return self.solver is None or self.solver.my_status == Status.RUNNING
 
     def get_cartesian_move_constraint(self):
 

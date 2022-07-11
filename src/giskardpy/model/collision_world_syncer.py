@@ -485,12 +485,13 @@ class CollisionWorldSynchronizer(object):
             default_distance = max(default_distance, value[parameter_name])
         return default_distance
 
-    def collision_entries_to_collision_matrix(self, collision_entries: List[CollisionEntry]):
+    def update_collision_environment(self, collision_entries: List[CollisionEntry] = None):
         # t = time()
-        self.collision_scene.sync()
+        if collision_entries is None:
+            collision_entries = self.god_map.get_data(identifier.collision_goal)
+        self.sync()
         max_distances = self.make_max_distances()
-        collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                    max_distances)
+        collision_matrix = self.collision_goals_to_collision_matrix(deepcopy(collision_entries), max_distances)
         # t2 = time() - t
         # self.get_blackboard().runtime += t2
         return collision_matrix
@@ -517,8 +518,7 @@ class CollisionWorldSynchronizer(object):
         for link_name in self.robot.link_names_with_collisions:
             controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link_name)
             distance = external_distances[controlled_parent_joint]['soft_threshold']
-            for child_link_name in self.robot.get_directly_controlled_child_links_with_collisions(
-                    controlled_parent_joint):
+            for child_link_name in self.robot.get_directly_controlled_child_links_with_collisions(controlled_parent_joint):
                 max_distances[child_link_name] = distance
 
         for link_name in self_distances:

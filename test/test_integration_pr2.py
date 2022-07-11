@@ -162,21 +162,12 @@ def fake_table_setup(pocky_pose_setup: PR2) -> PR2:
 
 
 @pytest.fixture()
-def kitchen_setup_avoid_collisions(resetted_giskard):
+def kitchen_setup_avoid_collisions(kitchen_setup):
     """
     :type resetted_giskard: GiskardTestWrapper
     :return:
     """
-    resetted_giskard.avoid_all_collisions(0.0)
-    resetted_giskard.set_joint_goal(resetted_giskard.better_pose)
-    resetted_giskard.plan_and_execute()
-    object_name = u'kitchen'
-    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
-                              set_js_topic=u'/kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
-    resetted_giskard.set_kitchen_js(js)
-    return resetted_giskard
+    return kitchen_setup
 
 
 def decrease_external_collision_avoidance(kitchen_setup_avoid_collisions):
@@ -2041,11 +2032,10 @@ class TestCartesianPath(object):
         goal_c = base_pose
 
         #kitchen_setup_avoid_collisions.set_json_goal(u'SetPredictionHorizon', prediction_horizon=1)
-        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      tip_link=tip_link,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
-                                                     goal=goal_c
-                                                     )
+                                                     goal=goal_c)
 
         kitchen_setup_avoid_collisions.plan_and_execute()
         #kitchen_setup_avoid_collisions.send_goal()

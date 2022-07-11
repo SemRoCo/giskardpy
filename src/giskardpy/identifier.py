@@ -34,7 +34,7 @@ cmd_id = ['cmd_id']
 post_processing = ['post_processing']
 soft_constraints = post_processing + ['soft_constraints']
 result_message = ['result_message']
-
+collision_goal = [u'collision_goal']
 # stuff from rosparam
 robot_description = ['robot_description']
 

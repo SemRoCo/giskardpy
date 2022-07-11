@@ -1,10 +1,9 @@
 world = ['world']
-robot = world + ['groups', 'robot']
+robot_group_name = ['robot_name']
 fk_pose = world + ['compute_fk_pose']
 fk_np = world + ['compute_fk_np']
 joint_states = world + ['state']
 controlled_joints = ['controlled_joints']
-collision_scene = ['collision_scene']
 
 # goal_params = ['goal_params']
 trajectory = ['traj']
@@ -12,10 +11,8 @@ debug_trajectory = ['lbA_traj']
 time = ['time']
 qp_solver_solution = ['qp_solver_solution']
 # last_cmd = ['last_cmd']
-closest_point = ['cpi']
 # collisions = ['collisions']
 goal_msg = ['goal_msg']
-collision_goal = ['collision_goal']
 goals = ['goals']
 constraints = ['constraints']
 vel_constraints = ['vel_constraints']
@@ -74,8 +71,10 @@ retry_weight_factor = qp_solver + ['hard_constraint_handling', 'weight_factor']
 # tree
 plugins = rosparam + ['plugins']
 enable_VisualizationBehavior = plugins + ['VisualizationBehavior', 'enabled']
+VisualizationBehavior_in_planning_loop = plugins + ['VisualizationBehavior', 'in_planning_loop']
 enable_WorldVisualizationBehavior = plugins + ['WorldVisualizationBehavior', 'enabled']
 enable_CPIMarker = plugins + ['CPIMarker', 'enabled']
+CPIMarker_in_planning_loop = plugins + ['CPIMarker', 'in_planning_loop']
 
 PlotTrajectory = plugins + ['PlotTrajectory']
 PlotTrajectory_enabled = PlotTrajectory + ['enabled']
@@ -90,6 +89,8 @@ fft_duration = plugins + ['WiggleCancel', 'fft_duration']
 amplitude_threshold = plugins + ['WiggleCancel', 'amplitude_threshold']
 num_samples_in_fft = plugins + ['WiggleCancel', 'window_size']
 frequency_range = plugins + ['WiggleCancel', 'frequency_range']
+
+LoopDetector_precision = plugins + [u'LoopDetector', u'precision']
 
 joint_convergence_threshold = plugins + ['GoalReached', 'joint_convergence_threshold']
 GoalReached_window_size = plugins + ['GoalReached', 'window_size']
@@ -110,9 +111,13 @@ behavior_tree = rosparam + ['behavior_tree']
 tree_tick_rate = behavior_tree + ['tree_tick_rate']
 
 # collision avoidance
+collision_scene = ['collision_scene']
+collision_matrix = ['collision_matrix']
+closest_point = ['cpi']
+added_collision_checks = ['added_collision_checks']
+
 collision_avoidance = rosparam + ['collision_avoidance']
 collision_checker = collision_avoidance + ['collision_checker']
-added_collision_checks = ['added_collision_checks']
 
 self_collision_avoidance = collision_avoidance + ['self_collision_avoidance', 'override']
 ignored_self_collisions = self_collision_avoidance[:-1] + ['ignore']
@@ -125,4 +130,3 @@ robot_interface = rosparam + ['robot_interface']
 
 # rnd stuff
 timer_collector = ['timer_collector']
-

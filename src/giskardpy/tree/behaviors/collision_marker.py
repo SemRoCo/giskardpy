@@ -6,7 +6,7 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import Collision, Collisions
+from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 

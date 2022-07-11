@@ -2,7 +2,7 @@ from time import time
 
 from py_trees import Behaviour, Blackboard
 
-from giskardpy import identifier, RobotName
+from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.time_collector import TimeCollector
@@ -53,7 +53,7 @@ class GiskardBehavior(Behaviour):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.world.groups[RobotName]
+        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
     def get_world(self):
         """

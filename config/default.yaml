@@ -56,12 +56,14 @@ plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
     window_size: 21 # in sample points, should be identical to WiggleCancel window_size
+  LoopDetector:
+    precision: 3 # decimal places
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
-  WorldVisualizationBehavior: # planning world visualization through markers, slows planning down a little bit
-    enabled: False
+    in_planning_loop: False
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: False
+    in_planning_loop: False
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
     history: 5 # will save the x last plots

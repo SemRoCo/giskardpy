@@ -62,8 +62,8 @@ class SetErrorCode(GiskardBehavior):
         # world exceptions
         elif isinstance(exception, PhysicsWorldException):
             error_code = MoveResult.WORLD_ERROR
-            if isinstance(exception, UnknownBodyException):
-                error_code = MoveResult.UNKNOWN_OBJECT
+            if isinstance(exception, UnknownGroupException):
+                error_code = MoveResult.UNKNOWN_GROUP
         # problem building exceptions
         elif isinstance(exception, ConstraintException):
             error_code = MoveResult.CONSTRAINT_ERROR

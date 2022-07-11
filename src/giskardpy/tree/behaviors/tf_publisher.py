@@ -4,7 +4,6 @@ from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
 import giskardpy.identifier as identifier
-from giskardpy import RobotName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg
 
@@ -51,7 +50,7 @@ class TFPublisher(GiskardBehavior):
                             tf_msg.transforms.append(tf)
                 if self.publish_world_objects:
                     for group_name, group in self.world.groups.items():
-                        if group_name == RobotName:
+                        if group_name == self.god_map.unsafe_get_data(identifier.robot_group_name):
                             # robot frames will exist for sure
                             continue
                         if len(group.joins) > 0:

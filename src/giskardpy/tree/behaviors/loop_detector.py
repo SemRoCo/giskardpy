@@ -9,9 +9,9 @@ class LoopDetector(GiskardBehavior):
     past_joint_states: set
 
     def __init__(self, name):
-        self.precision = 4
-        self.window_size = 21
         super(LoopDetector, self).__init__(name)
+        self.precision = self.get_god_map().get_data(identifier.LoopDetector_precision)
+        self.window_size = 21
 
     @profile
     def initialise(self):

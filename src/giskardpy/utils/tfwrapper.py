@@ -60,6 +60,8 @@ def transform_msg(target_frame, msg, timeout=5):
         return transform_point(target_frame, msg, timeout)
     elif isinstance(msg, Vector3Stamped):
         return transform_vector(target_frame, msg, timeout)
+    elif isinstance(msg, QuaternionStamped):
+        return transform_quaternion(target_frame, msg, timeout)
     else:
         raise NotImplementedError('tf transform message of type \'{}\''.format(type(msg)))
 
@@ -104,6 +106,21 @@ def transform_vector(target_frame, vector, timeout=5):
     transform = lookup_transform(target_frame, vector.header.frame_id, vector.header.stamp, timeout)
     new_pose = do_transform_vector3(vector, transform)
     return new_pose
+
+
+def transform_quaternion(target_frame: str, quaternion: QuaternionStamped, timeout: float = 5) -> QuaternionStamped:
+    """
+    Transforms a pose stamped into a different target frame.
+    :return: Transformed pose of None on loop failure
+    """
+    p = PoseStamped()
+    p.header = quaternion.header
+    p.pose.orientation = quaternion.quaternion
+    new_pose = transform_pose(target_frame, p, timeout)
+    new_quaternion = QuaternionStamped()
+    new_quaternion.header = new_pose.header
+    new_quaternion.quaternion = new_pose.pose.orientation
+    return new_quaternion
 
 
 def transform_point(target_frame, point, timeout=5):

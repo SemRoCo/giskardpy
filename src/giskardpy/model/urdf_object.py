@@ -8,7 +8,7 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from visualization_msgs.msg import Marker
 
-from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
+from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, CorruptShapeException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
     hacky_urdf_parser_fix
 from giskardpy.utils.tfwrapper import normalize
@@ -547,7 +547,7 @@ class URDFObject(object):
             raise DuplicateNameException(
                 '\'{}\' already has joint with name \'{}\'.'.format(self.get_name(), urdf_object.get_name()))
         if parent_link not in self.get_link_names():
-            raise UnknownBodyException(
+            raise UnknownGroupException(
                 'can not attach \'{}\' to non existent parent link \'{}\' of \'{}\''.format(urdf_object.get_name(),
                                                                                              parent_link,
                                                                                              self.get_name()))

@@ -64,6 +64,9 @@ general_options:
 #      angular: # rad/s**3
 #        default: 250
 #        override: { }
+plugins:
+  LoopDetector:
+    precision: 4 # decimal places
 collision_avoidance:
   external_collision_avoidance:
     default:

@@ -78,7 +78,23 @@ class CartesianPathCarrot(Goal):
                                                               w.ca.mmin(next_normal_dists))
         next_normal = self.select(next_normals_closer_to_goal, zero_one_mapping_one)
         # Orientation Calculation
-        next_rotation = w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[-1]]))
+        decimal_of_curr_normal_time = curr_normal_time - w.round_down(curr_normal_time, 0)
+        line_starts = []
+        line_ends = []
+        for i in range(0, self.trajectory_length):
+            line_s_q = w.quaternion_from_matrix(
+                w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[i]])))
+            line_starts.append(line_s_q)
+            line_e_q = w.quaternion_from_matrix(
+                w.rotation_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.next_goal_strings[i]])))
+            line_ends.append(line_e_q)
+        line_start_q = self.select(w.Matrix(line_starts), zero_one_mapping)
+        line_end_q = self.select(w.Matrix(line_ends), zero_one_mapping)
+        current_rotation = w.quaternion_slerp(line_start_q, line_end_q, decimal_of_curr_normal_time)
+        next_rotation = w.rotation_matrix_from_quaternion(current_rotation[0],
+                                                          current_rotation[1],
+                                                          current_rotation[2],
+                                                          current_rotation[3])
         return next_normal, next_rotation
 
     def predict(self):

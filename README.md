@@ -5,14 +5,7 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 Do this:
 ```
-sudo pip3 install pybullet
-sudo pip3 install scipy
-sudo pip3 install casadi
-sudo pip3 install sortedcontainers
-sudo pip3 install hypothesis
-sudo pip3 install pandas
-sudo pip3 install numpy
-sudo apt install python3-dev 
+sudo pip3 install pybullet scipy casadi sortedcontainers hypothesis pandas numpy python3-dev 
 ```
 Install one of the following QP solver. The solvers are ordered by how fast they can solve the problem constructed by Giskard. QPOases is the fastest opensource solver for my usecase, that I have found. However, it is still significantly slower than the other two options:
  - Gurobi:

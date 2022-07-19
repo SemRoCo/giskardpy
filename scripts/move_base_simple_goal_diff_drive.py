@@ -4,10 +4,12 @@ from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped
 
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.tfwrapper import init
+import giskardpy.utils.tfwrapper as tf
 
 
 def call_back(goal: PoseStamped):
     rospy.loginfo('received simple move base goal')
+    goal = tf.transform_pose('map', goal)
     tip_link = 'base_footprint'
     root_link = 'map'
     pointing_axis = Vector3Stamped()

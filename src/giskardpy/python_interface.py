@@ -6,7 +6,7 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from rospy import ServiceException
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped
-from giskard_msgs.srv import DyeGroupRequest, DyeGroup
+from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
@@ -533,6 +533,9 @@ class GiskardWrapper(object):
         """
         self._client.cancel_goal()
 
+    def cancel_all_goals(self):
+        self._client.cancel_all_goals()
+
     def get_result(self, timeout: rospy.Duration = rospy.Duration()) -> MoveResult:
         """
         Waits for giskardpy result and returns it. Only used when plan_and_execute was called with wait=False
@@ -762,7 +765,9 @@ class GiskardWrapper(object):
         """
         returns the joint state, joint state topic and pose of the object with the given name
         """
-        return self._get_group_info_srv(group_name)
+        req = GetGroupInfoRequest()
+        req.group_name = group_name
+        return self._get_group_info_srv.call(req)
 
     def get_controlled_joints(self, name: Optional[str] = None):
         if name is None:

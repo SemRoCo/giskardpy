@@ -32,6 +32,7 @@ class BaseTrajFollower(Goal):
 
     def current_traj_point(self, free_variable_name: str, start_t: float, derivative: int = 0) -> expr_symbol:
         time = self.god_map.to_expr(identifier.time)
+        # self.add_debug_expr('time', time)
         b_result_cases = []
         for t in range(self.trajectory_length):
             b = t * self.get_sampling_period_symbol()
@@ -43,12 +44,13 @@ class BaseTrajFollower(Goal):
 
     def make_odom_T_base_footprint_goal(self, t: float, derivative: int = 0):
         x = self.current_traj_point(self.joint.x_name, t, derivative)
-        if isinstance(self.joint, OmniDrive):
+        if isinstance(self.joint, OmniDrive) or derivative == 0:
             y = self.current_traj_point(self.joint.y_name, t, derivative)
         else:
             y = 0
         rot = self.current_traj_point(self.joint.rot_name, t, derivative)
         odom_T_base_footprint_goal = w.frame_from_x_y_rot(x, y, rot)
+        # self.add_debug_expr('x goal in odom', x)
         return odom_T_base_footprint_goal
 
     def trans_error_at(self, t: float):
@@ -61,6 +63,7 @@ class BaseTrajFollower(Goal):
         # self.add_debug_expr('rot', rot)
         # self.add_debug_expr('x current', map_T_base_footprint_current[0,3])
         # self.add_debug_expr('y current', map_T_base_footprint_current[1,3])
+        # self.add_debug_expr('y norm', w.norm(map_T_base_footprint_current[:,3]))
 
         frame_P_goal = w.position_of(map_T_base_footprint_goal)
         frame_P_current = w.position_of(map_T_base_footprint_current)
@@ -108,8 +111,8 @@ class BaseTrajFollower(Goal):
             else:
                 errors_x.append(map_P_vel[0])
                 errors_y.append(map_P_vel[1])
-            if t == 0:
-                asdf = w.norm(map_P_vel[:2])
+            # if t == 0:
+            #     asdf = w.norm(map_P_vel[:2])
                 # self.add_debug_expr('lower tube x', asdf-tube_size)
                 # self.add_debug_expr('upper tube x', asdf+tube_size)
             # errors_y.append(self.current_traj_point(self.joint.y_vel_name, t * self.get_sampling_period_symbol(), 1))
@@ -186,6 +189,8 @@ class BaseTrajFollower(Goal):
         rotation_goal = self.current_traj_point(self.joint.rot_name, t)
         rotation_current = self.joint.rot.get_symbol(0)
         error = w.shortest_angular_distance(rotation_current, rotation_goal) / self.get_sampling_period_symbol()
+        # self.add_debug_expr('rot goal', rotation_goal)
+        # self.add_debug_expr('rot current', rotation_current)
         return error
 
     def add_rot_constraints(self):

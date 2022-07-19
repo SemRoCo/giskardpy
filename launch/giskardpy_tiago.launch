@@ -12,6 +12,6 @@
         </rosparam>
     </node>
 
-    <node pkg="giskardpy" type="move_base_simple_goal_diff_drive.py" name="move_base" output="screen" />
+    <node pkg="giskardpy" type="move_base_simple_goal_diff_drive.py" name="my_move_base" output="screen" />
 
 </launch>

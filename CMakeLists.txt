@@ -162,6 +162,7 @@ include_directories(
 
 catkin_install_python(PROGRAMS 
 	scripts/giskard_pr2.py
+	scripts/giskard_tiago.py
 	scripts/interactive_marker.py
 	scripts/add_box.py
 	scripts/add_cylinder.py
@@ -174,6 +175,7 @@ catkin_install_python(PROGRAMS
 	scripts/print_joint_state.py
 	scripts/remove_object.py
 	scripts/fake_servers.py
+	scripts/move_base_simple_goal_diff_drive.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

@@ -4,6 +4,7 @@ from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.god_map import GodMap
 
 
 class CartesianPosition(Goal):
@@ -158,6 +159,13 @@ class CartesianPose(Goal):
                                                           max_velocity=max_angular_velocity,
                                                           weight=weight,
                                                           **kwargs))
+
+
+class DiffDriveBaseGoal(CartesianPose):
+
+    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
+                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, **kwargs):
+        super().__init__(root_link, tip_link, goal_pose, max_linear_velocity, max_angular_velocity, weight, **kwargs)
 
 
 class CartesianPoseStraight(Goal):

@@ -1,9 +1,10 @@
 from __future__ import division
 
-from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
+from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped, Vector3Stamped
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.pointing import PointingDiffDrive
 from giskardpy.god_map import GodMap
 
 
@@ -164,8 +165,22 @@ class CartesianPose(Goal):
 class DiffDriveBaseGoal(CartesianPose):
 
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
-                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, **kwargs):
+                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None, **kwargs):
         super().__init__(root_link, tip_link, goal_pose, max_linear_velocity, max_angular_velocity, weight, **kwargs)
+        goal_point = PointStamped()
+        goal_point.header = goal_pose.header
+        goal_point.point = goal_pose.pose.position
+        if pointing_axis is None:
+            pointing_axis = Vector3Stamped()
+            pointing_axis.header.frame_id = tip_link
+            pointing_axis.vector.x = 1
+        #TODO handle weights properly
+        self.add_constraints_of_goal(PointingDiffDrive(tip_link=tip_link,
+                                                       root_link=root_link,
+                                                       goal_point=goal_point,
+                                                       pointing_axis=pointing_axis,
+                                                       max_velocity=max_angular_velocity,
+                                                       **kwargs))
 
 
 class CartesianPoseStraight(Goal):

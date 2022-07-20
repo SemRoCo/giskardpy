@@ -10,6 +10,7 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib
 from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface, DiffDriveCmdVelInterface
 from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
+from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.garden import OpenLoop, ClosedLoop
@@ -269,10 +270,6 @@ class Giskard:
         blackboard.god_map = self._god_map
         self._backup = {}
 
-    def set_goal_reached_parameters(self, joint_convergence_threshold=0.01, window_size=21):
-        self.behavior_tree_config.set_goal_reached_parameters(joint_convergence_threshold,
-                                                              window_size)
-
     def add_sync_tf_frame(self, parent_link, child_link):
         self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link)
 
@@ -296,12 +293,12 @@ class Giskard:
         for parameter, value in self._backup.items():
             setattr(self, parameter, deepcopy(value))
 
-    def create_parameter_backup(self):
+    def _create_parameter_backup(self):
         self._backup = {'qp_solver_config': deepcopy(self.qp_solver_config),
                         'general_config': deepcopy(self.general_config)}
 
     def grow(self):
-        self.create_parameter_backup()
+        self._create_parameter_backup()
         world = WorldTree(self._god_map)
         world.delete_all_but_robot()
 
@@ -328,6 +325,17 @@ class Giskard:
             self._tree = ClosedLoop(self._god_map)
         else:
             raise KeyError(f'Robot interface mode \'{self.general_config.control_mode}\' is not supported.')
+        self._controlled_joints_sanity_check()
+
+    def _controlled_joints_sanity_check(self):
+        world = self._god_map.get_data(identifier.world)
+        non_controlled_joints = set(world.movable_joints).difference(set(world.controlled_joints))
+        if len(world.controlled_joints) == 0:
+            raise GiskardException('No joints are flagged as controlled.')
+        logging.loginfo(f'The following joints are non-fixed according to the urdf, '
+                        f'but not flagged as controlled: {non_controlled_joints}.')
+        if self.robot_interface_config.drive_interface is None:
+            logging.loginfo('No cmd_vel topic has been registered.')
 
     def live(self):
         self.grow()

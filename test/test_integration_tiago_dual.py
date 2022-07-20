@@ -39,7 +39,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
     }
 
     def __init__(self):
-        self.mujoco_reset = rospy.ServiceProxy('tiago/reset', Trigger)
+        self.mujoco_reset = rospy.ServiceProxy('reset', Trigger)
         super().__init__(Tiago)
 
     def move_base(self, goal_pose):

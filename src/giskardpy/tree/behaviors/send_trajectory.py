@@ -71,9 +71,9 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 rospy.sleep(1)
 
         ActionClient.__init__(self, name, action_msg_type, None, self.action_namespace)
-        loginfo('Successfully connected to \'{}\'.'.format(self.action_namespace))
+        loginfo(f'Successfully connected to \'{self.action_namespace}\'.')
 
-        loginfo('Waiting for state topic \'{}\' to appear.'.format(state_topic))
+        # loginfo(f'Waiting for state topic \'{state_topic}\' to appear.')
         msg = None
         controlled_joint_names = []
         while not msg and not rospy.is_shutdown():
@@ -100,10 +100,12 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)
         if len(self.controlled_joints) != len(controlled_joint_names):
-            raise ValueError(f'Unable to link {set(controlled_joint_names).difference(self.controlled_joints)} '
-                             f'to joints in the world.')
+            joints_not_in_urdf = set(controlled_joint_names).difference(self.controlled_joints)
+            raise ValueError(f'{state_topic} provides the following joints '
+                             f'that are not in the urdf: {joints_not_in_urdf}')
         self.world.register_controlled_joints(self.controlled_joints)
-        loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
+        loginfo(f'Successfully connected to \'{state_topic}\'.')
+        loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
 
     @profile
     def initialise(self):

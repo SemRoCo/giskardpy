@@ -411,7 +411,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
         super(GiskardTestWrapper, self).__init__(node_name='tests')
         self.results = Queue(100)
-        self.default_root = self.world.root_link_name.long_name
+        self.default_root = tf.get_tf_root()
         self.map = 'map'
         self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
         self.goal_checks = defaultdict(list)

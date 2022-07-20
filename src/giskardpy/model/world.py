@@ -26,7 +26,7 @@ from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize
-
+import giskardpy.utils.tfwrapper as tf
 
 class TravelCompanion(object):
     def link_call(self, link_name: Union[PrefixName, str]) -> bool:
@@ -435,10 +435,7 @@ class WorldTree:
 
     def _clear(self):
         self.state = JointStates()
-        if self.god_map is not None:
-            self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
-        else:
-            self.root_link_name = 'map'
+        self.root_link_name = PrefixName('world', 'giskard')
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
         self.groups = {}
@@ -447,21 +444,32 @@ class WorldTree:
     def delete_all_but_robot(self):
         self._clear()
         frames_to_sync = self.god_map.unsafe_get_data(identifier.SyncTfFrames_frames)
-        self._add_tf_links(frames_to_sync)
+        self._add_tf_links([x[:2] for x in frames_to_sync if not x[2]], create_parents=True)
         base_drive = self.god_map.unsafe_get_data(identifier.robot_base_drive)
-        drive_joint = base_drive.make_joint(self.god_map)
-        self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
-                      group_name=None,
-                      prefix=None,
-                      parent_link_name=drive_joint.parent_link_name)
-        self._replace_joint(drive_joint)
+        if base_drive is not None:
+            drive_joint = base_drive.make_joint(self.god_map)
+            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
+                          group_name=None,
+                          prefix=None,
+                          parent_link_name=drive_joint.parent_link_name)
+            self._replace_joint(drive_joint)
+        else:
+            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
+                          group_name=None,
+                          prefix=None,
+                          parent_link_name=self.root_link_name)
+        self._add_tf_links([x[:2] for x in frames_to_sync if x[2]], create_parents=False)
         self.fast_all_fks = None
         self.notify_model_change()
 
-    def _add_tf_links(self, frames):
+    def _add_tf_links(self, frames, create_parents=False):
         for parent_link_name, child_link_name in frames:
-            if parent_link_name not in self.links:
+            if parent_link_name not in self.links and not create_parents:
                 raise PhysicsWorldException(f'Parent link name {parent_link_name} does not exist.')
+            else:
+                parent_link = Link(parent_link_name)
+                self._add_link(parent_link)
+                self._add_fixed_joint(self.root_link, parent_link)
             if child_link_name in self.links:
                 raise DuplicateNameException(f'Child link name {child_link_name} already exist.')
             child_link = Link(child_link_name)

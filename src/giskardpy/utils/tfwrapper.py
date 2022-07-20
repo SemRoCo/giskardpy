@@ -3,6 +3,7 @@ from copy import copy
 import PyKDL
 import numpy as np
 import rospy
+import yaml
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped, QuaternionStamped, Transform
 from std_msgs.msg import ColorRGBA
@@ -27,6 +28,24 @@ def init(tf_buffer_size=15):
     tfBuffer = Buffer(rospy.Duration(tf_buffer_size))
     tf_listener = TransformListener(tfBuffer)
     rospy.sleep(5.0)
+    get_tf_root()
+
+
+def get_tf_buffer():
+    global tfBuffer
+    if tfBuffer is None:
+        init()
+    return tfBuffer
+
+
+def get_tf_root() -> str:
+    tfBuffer = get_tf_buffer()
+    frames = yaml.safe_load(tfBuffer.all_frames_as_yaml())
+    frames_with_parent = set(frames.keys())
+    frame_parents = set(x['parent'] for x in frames.values())
+    tf_roots = frame_parents.difference(frames_with_parent)
+    assert len(tf_roots) == 1, f'There are more than one tf tree: {tf_roots}.'
+    return tf_roots.pop()
 
 
 def get_full_frame_name(frame_name):
@@ -45,7 +64,7 @@ def get_full_frame_name(frame_name):
                 return tf_frame
         except ValueError:
             continue
-    raise KeyError('Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
+    raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
 
 
 def wait_for_transform(target_frame, source_frame, time, timeout):

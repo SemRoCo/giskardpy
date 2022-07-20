@@ -34,7 +34,7 @@ class SyncTfFrames(GiskardBehavior):
     @catch_and_raise_to_blackboard
     def update(self):
         with self.god_map:
-            for parent_link, child_link in self.frames:
+            for parent_link, child_link, _ in self.frames:
                 parent_T_child = lookup_pose(parent_link, child_link)
                 parent_T_child = msg_to_homogeneous_matrix(parent_T_child)
                 chain = self.world.compute_chain(parent_link, child_link, joints=True, links=False, fixed=True,

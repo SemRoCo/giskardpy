@@ -225,8 +225,9 @@ class BehaviorTreeConfig:
             'window_size': window_size
         }
 
-    def add_sync_tf_frame(self, parent_link, child_link):
-        self.plugin_config['SyncTfFrames']['frames'].append([parent_link, child_link])
+    def add_sync_tf_frame(self, parent_link, child_link, add_after_robot=False):
+        # TODO make data structure
+        self.plugin_config['SyncTfFrames']['frames'].append([parent_link, child_link, add_after_robot])
 
     def set_odometry_topic(self, odometry_topic):
         self.plugin_config['SyncOdometry'] = {
@@ -270,8 +271,8 @@ class Giskard:
         blackboard.god_map = self._god_map
         self._backup = {}
 
-    def add_sync_tf_frame(self, parent_link, child_link):
-        self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link)
+    def add_sync_tf_frame(self, parent_link, child_link, add_after_robot=False):
+        self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link, add_after_robot)
 
     def set_odometry_topic(self, odometry_topic):
         self.behavior_tree_config.set_odometry_topic(odometry_topic)

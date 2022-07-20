@@ -1,7 +1,7 @@
 import py_trees
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
-
+import giskardpy.utils.tfwrapper as tf
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
@@ -10,6 +10,7 @@ class VisualizationBehavior(GiskardBehavior):
         super(VisualizationBehavior, self).__init__(name)
         self.ensure_publish = ensure_publish
         self.marker_ids = {}
+        self.tf_root = tf.get_tf_root()
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
@@ -23,7 +24,8 @@ class VisualizationBehavior(GiskardBehavior):
         links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
             for marker in self.world.links[link_name].collision_visualization_markers().markers:
-                marker.header.frame_id = str(self.world.root_link_name)
+                # marker.header.frame_id = str(self.world.root_link_name)
+                marker.header.frame_id = self.tf_root
                 marker.action = Marker.ADD
                 if link_name not in self.marker_ids:
                     self.marker_ids[link_name] = len(self.marker_ids)

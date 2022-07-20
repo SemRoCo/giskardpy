@@ -484,7 +484,7 @@ def generate_pydot_graph(root, visibility_level, profile=None):
 
 
 class OpenLoop(TreeManager):
-    add_real_time_tracking = True
+    add_real_time_tracking = False
 
     def grow_giskard(self):
         root = Sequence('Giskard')
@@ -510,8 +510,11 @@ class OpenLoop(TreeManager):
                                                              self.god_map.unsafe_get_data(identifier.robot_group_name)))
         sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        sync.add_child(running_is_success(SyncOdometry)('sync odometry',
-                                                        **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
+        try:
+            sync.add_child(running_is_success(SyncOdometry)('sync odometry',
+                                                            **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
+        except KeyError:
+            pass
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -643,22 +646,24 @@ class OpenLoop(TreeManager):
         execution_action_server = Parallel('move robots',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         action_servers = self.god_map.get_data(identifier.robot_interface)
-        real_time_tracking = PluginBehavior('base sequence')
-        real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
-                                                                       **self.god_map.unsafe_get_data(
-                                                                           identifier.SyncTfFrames)))
-        real_time_tracking.add_plugin(SyncOdometry('sync odometry',
-                                                   **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
-        real_time_tracking.add_plugin(RosTime('time'))
-        real_time_tracking.add_plugin(ControllerPlugin('base controller'))
-        real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
-        if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
-            real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
-                                                                  **self.god_map.unsafe_get_data(
-                                                                      identifier.PublishDebugExpressions)))
+        base_drive = self.config.robot_interface_config.drive_interface
+        if base_drive is not None:
+            real_time_tracking = PluginBehavior('base sequence')
+            real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
+                                                                           **self.god_map.unsafe_get_data(
+                                                                               identifier.SyncTfFrames)))
+            real_time_tracking.add_plugin(SyncOdometry('sync odometry',
+                                                       **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
+            real_time_tracking.add_plugin(RosTime('time'))
+            real_time_tracking.add_plugin(ControllerPlugin('base controller'))
+            real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
+            if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
+                real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
+                                                                      **self.god_map.unsafe_get_data(
+                                                                          identifier.PublishDebugExpressions)))
         for follow_joint_trajectory_config in action_servers:
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
-        base_drive = self.config.robot_interface_config.drive_interface
+
         if base_drive is not None:
             self.add_real_time_tracking = True
             real_time_tracking.add_plugin(base_drive.make_plugin())

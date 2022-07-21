@@ -5,7 +5,7 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStam
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis
 
-from giskardpy.configs.tiago import Tiago
+from giskardpy.configs.tiago import TiagoMujoco
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from utils_for_tests import GiskardTestWrapper
 
@@ -40,7 +40,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
 
     def __init__(self):
         self.mujoco_reset = rospy.ServiceProxy('reset', Trigger)
-        super().__init__(Tiago)
+        super().__init__(TiagoMujoco)
 
     def move_base(self, goal_pose):
         tip_link = 'base_footprint'

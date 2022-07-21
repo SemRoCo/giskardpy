@@ -46,7 +46,7 @@ from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTim
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
-from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
+from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin

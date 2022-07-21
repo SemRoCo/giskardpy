@@ -20,7 +20,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_localization import SyncTfFrames
+from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
 

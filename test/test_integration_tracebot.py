@@ -6,8 +6,8 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStam
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis
 
-from giskardpy.configs.tiago import Tiago
-from giskardpy.configs.tracebot import Tracebot
+from giskardpy.configs.tiago import TiagoMujoco
+from giskardpy.configs.tracebot import TracebotMujoco
 from utils_for_tests import GiskardTestWrapper
 
 
@@ -37,7 +37,7 @@ class TracebotTestWrapper(GiskardTestWrapper):
     def __init__(self):
         tf.init()
         self.mujoco_reset = rospy.ServiceProxy('tracebot/reset', Trigger)
-        super().__init__(Tracebot)
+        super().__init__(TracebotMujoco)
 
     def reset(self):
         self.mujoco_reset()

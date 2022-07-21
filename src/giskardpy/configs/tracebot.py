@@ -1,7 +1,7 @@
 from giskardpy.configs.default_config import Giskard
 
 
-class Tracebot(Giskard):
+class TracebotMujoco(Giskard):
     def __init__(self):
         super().__init__()
         self.robot_interface_config.joint_state_topic = 'tracebot/joint_states'

@@ -270,6 +270,9 @@ class Giskard:
         blackboard.god_map = self._god_map
         self._backup = {}
 
+    def set_joint_states_topic(self, topic_name: str):
+        self.robot_interface_config.joint_state_topic = topic_name
+
     def add_sync_tf_frame(self, parent_link, child_link, add_after_robot=False):
         self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link, add_after_robot)
 

@@ -1,5 +1,5 @@
 from __future__ import division
-
+import giskardpy.utils.tfwrapper as tf
 import errno
 import inspect
 import json
@@ -427,7 +427,7 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
     if pose is None:
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id) if frame_id is not None else 'map'
+        pose.header.frame_id = str(frame_id) if frame_id is not None else tf.get_tf_root()
         pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
         pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
     return pose

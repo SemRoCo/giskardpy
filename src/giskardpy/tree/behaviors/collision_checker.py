@@ -5,13 +5,13 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard
-
+import giskardpy.utils.tfwrapper as tf
 
 class CollisionChecker(GiskardBehavior):
     @profile
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
-        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
+        self.map_frame = tf.get_tf_root()
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects

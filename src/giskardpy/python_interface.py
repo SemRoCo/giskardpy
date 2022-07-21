@@ -1,6 +1,6 @@
 import json
 from typing import Dict, Tuple, Optional, Union, List
-
+import giskardpy.utils.tfwrapper as tf
 import rospy
 from actionlib import SimpleActionClient
 from genpy import Message
@@ -234,7 +234,7 @@ class GiskardWrapper(object):
         """
         if root_normal is None:
             root_normal = Vector3Stamped()
-            root_normal.header.frame_id = 'map'
+            root_normal.header.frame_id = tf.get_tf_root()
             root_normal.vector.z = 1
 
         self.set_json_goal(constraint_type='AlignPlanes',

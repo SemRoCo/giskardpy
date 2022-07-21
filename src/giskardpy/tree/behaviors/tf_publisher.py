@@ -4,6 +4,7 @@ from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
 import giskardpy.identifier as identifier
+import giskardpy.utils.tfwrapper as tf
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg
 
@@ -20,7 +21,6 @@ class TFPublisher(GiskardBehavior):
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.publish_attached_objects = publish_attached_objects
         self.publish_world_objects = publish_world_objects
-        self.map_frame = self.god_map.unsafe_get_data(identifier.map_frame)
 
     def make_transform(self, parent_frame, child_frame, pose):
         tf = TransformStamped()

@@ -8,7 +8,7 @@ from py_trees import Status
 from py_trees.meta import running_is_success
 from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
-
+import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
@@ -69,7 +69,7 @@ class WorldUpdater(GiskardBehavior):
     def __init__(self, name: str):
         self.added_plugin_names = []
         super(WorldUpdater, self).__init__(name)
-        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
+        self.map_frame = tf.get_tf_root()
         self.original_link_names = self.robot.link_names
         self.service_in_use = Queue(maxsize=1)
         self.work_permit = Queue(maxsize=1)
@@ -124,7 +124,7 @@ class WorldUpdater(GiskardBehavior):
             # if node_name in tree.tree_nodes:
             #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = str(self.get_god_map().get_data(identifier.map_frame))
+            res.root_link_pose.header.frame_id = tf.get_tf_root()
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)

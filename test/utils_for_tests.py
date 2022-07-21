@@ -1026,7 +1026,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def reset_base(self):
         p = PoseStamped()
-        p.header.frame_id = self.map
+        p.header.frame_id = tf.get_tf_root()
         p.pose.orientation.w = 1
         self.set_localization(p)
         self.wait_heartbeats()

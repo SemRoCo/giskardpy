@@ -7,7 +7,7 @@ from py_trees import Status
 from pybullet import getAxisAngleFromQuaternion
 from rospy import ROSException
 
-import giskardpy.identifier as identifier
+import giskardpy.utils.tfwrapper as tf
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import GiskardException
 from giskardpy.model.joints import OmniDrive
@@ -25,7 +25,7 @@ class SyncOdometry(GiskardBehavior):
     @profile
     def __init__(self, name, odometry_topic: str):
         super().__init__(name)
-        self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
+        self.map_frame = tf.get_tf_root()
         self.odometry_topic = odometry_topic
         self.last_msg = None
         self.lock = Queue(maxsize=1)

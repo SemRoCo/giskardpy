@@ -28,7 +28,6 @@ class GeneralConfig:
     control_mode: ControlModes = ControlModes.open_loop
     action_server_name: str = '~command'
     path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
-    map_frame: str = 'map'
     test_mode: bool = False
     debug: bool = False
     joint_limits: Dict[int, Dict[str, float]] = {

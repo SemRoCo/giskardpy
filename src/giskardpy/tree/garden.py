@@ -485,8 +485,6 @@ def generate_pydot_graph(root, visibility_level, profile=None):
 
 
 class OpenLoop(TreeManager):
-    add_real_time_tracking = False
-
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
@@ -644,13 +642,18 @@ class OpenLoop(TreeManager):
         execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
         return execute_canceled
 
+    @property
+    def add_real_time_tracking(self):
+        return self.config.robot_interface_config.drive_interface is not None
+
     def grow_move_robots(self):
-        self.add_real_time_tracking = False
         execution_action_server = Parallel('move robots',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         action_servers = self.god_map.get_data(identifier.robot_interface)
+        for follow_joint_trajectory_config in action_servers:
+            execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
         base_drive = self.config.robot_interface_config.drive_interface
-        if base_drive is not None:
+        if self.add_real_time_tracking:
             real_time_tracking = PluginBehavior('base sequence')
             real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
                                                                            **self.god_map.unsafe_get_data(
@@ -664,13 +667,8 @@ class OpenLoop(TreeManager):
                 real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
                                                                       **self.god_map.unsafe_get_data(
                                                                           identifier.PublishDebugExpressions)))
-        for follow_joint_trajectory_config in action_servers:
-            execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
-
-        if base_drive is not None:
-            self.add_real_time_tracking = True
             real_time_tracking.add_plugin(base_drive.make_plugin())
-        if self.add_real_time_tracking:
+
             execution_action_server.add_child(real_time_tracking)
         return execution_action_server
 

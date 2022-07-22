@@ -4,7 +4,7 @@ from geometry_msgs.msg import Point, Vector3
 from py_trees import Status
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
-
+import giskardpy.utils.tfwrapper as tf
 import giskardpy.identifier as identifier
 from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -35,7 +35,7 @@ class CollisionMarker(GiskardBehavior):
         :type collisions: Collisions
         """
         m = Marker()
-        m.header.frame_id = str(self.world.root_link_name)
+        m.header.frame_id = tf.get_tf_root()
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337

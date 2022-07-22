@@ -1,9 +1,10 @@
 from __future__ import division
 
+import numpy as np
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped, Vector3Stamped
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import PointingDiffDrive
 from giskardpy.god_map import GodMap
 
@@ -87,8 +88,8 @@ class CartesianOrientation(Goal):
 
 
 class CartesianPositionStraight(Goal):
-    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link: str, tip_link: str, goal_point: PointStamped, reference_velocity: float = None,
+                 max_velocity: float = 0.2, weight: float = WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPositionStraight, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
@@ -97,31 +98,52 @@ class CartesianPositionStraight(Goal):
         self.weight = weight
         self.root_link = root_link
         self.tip_link = tip_link
-        self.goal_pose = self.transform_msg(self.root_link, goal)
-
-        self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)
+        self.goal_point = self.transform_msg(self.root_link, goal_point)
 
     def make_constraints(self):
-        root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal_pose'))
+        root_P_goal = self.get_parameter_as_symbolic_expression('goal_point')
         root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
-        root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start'))
+        t_T_r = self.get_fk(self.tip_link, self.root_link)
+        tip_P_goal = w.dot(t_T_r, root_P_goal)
 
-        # Constraint to go to goal pos
-        self.add_point_goal_constraints(frame_P_current=root_P_tip,
-                                        frame_P_goal=root_P_goal,
-                                        reference_velocity=self.reference_velocity,
-                                        weight=self.weight,
-                                        name_suffix='goal')
+        # Create rotation matrix, which rotates the tip link frame
+        # such that its x-axis shows towards the goal position.
+        # The goal frame is called 'a'.
+        # Thus, the rotation matrix is called t_R_a.
+        tip_P_error = tip_P_goal[:3]
+        trans_error = w.norm(tip_P_error)
+        # x-axis
+        tip_P_intermediate_error = w.save_division(tip_P_error, trans_error)[:3]
+        # y- and z-axis
+        tip_P_intermediate_y = w.scale(w.Matrix(np.random.random((3,))), 1)
+        y = w.cross(tip_P_intermediate_error, tip_P_intermediate_y)
+        z = w.cross(tip_P_intermediate_error, y)
+        t_R_a = w.Matrix([[tip_P_intermediate_error[0], -z[0], y[0], 0],
+                          [tip_P_intermediate_error[1], -z[1], y[1], 0],
+                          [tip_P_intermediate_error[2], -z[2], y[2], 0],
+                          [0, 0, 0, 1]])
+        t_R_a = w.normalize_rotation_matrix(t_R_a)
 
-        dist, nearest = w.distance_point_to_line_segment(root_P_tip,
-                                                         root_V_start,
-                                                         root_P_goal)
-        # Constraint to stick to the line
-        self.add_point_goal_constraints(frame_P_goal=nearest,
-                                        frame_P_current=root_P_tip,
-                                        reference_velocity=self.reference_velocity,
-                                        name_suffix='line',
-                                        weight=self.weight * 2)
+        # Apply rotation matrix on the fk of the tip link
+        a_T_t = w.dot(w.inverse_frame(t_R_a) ,
+                      self.get_fk_evaluated(self.tip_link, self.root_link),
+                      self.get_fk(self.root_link, self.tip_link))
+        expr_p = w.position_of(a_T_t)
+        dist = w.norm(root_P_goal - root_P_tip)
+
+        #self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
+        #self.add_debug_matrix(self.tip_link + '_R_frame', t_R_a)
+        #self.add_debug_matrix(self.tip_link + '_T_a', w.inverse_frame(a_T_t))
+        #self.add_debug_expr('error', dist)
+
+        self.add_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
+                                   lower_errors=[dist, 0, 0],
+                                   upper_errors=[dist, 0, 0],
+                                   weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
+                                   expressions=expr_p[:3],
+                                   name_suffixes=['{}/x'.format('line'),
+                                                  '{}/y'.format('line'),
+                                                  '{}/z'.format('line')])
 
         if self.max_velocity is not None:
             self.add_translational_velocity_limit(frame_P_current=root_P_tip,
@@ -184,18 +206,24 @@ class DiffDriveBaseGoal(CartesianPose):
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, root_link, tip_link, goal_pose, max_linear_velocity=0.1, max_angular_velocity=0.5,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity : float = 0.1,
+                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPoseStraight, self).__init__(**kwargs)
+        goal_point = PointStamped()
+        goal_point.header = goal_pose.header
+        goal_point.point = goal_pose.pose.position
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
                                                                tip_link=tip_link,
-                                                               goal=goal_pose,
+                                                               goal_point=goal_point,
                                                                max_velocity=max_linear_velocity,
                                                                weight=weight,
                                                                **kwargs))
+        goal_orientation = QuaternionStamped()
+        goal_orientation.header = goal_pose.header
+        goal_orientation.quaternion = goal_pose.pose.orientation
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
-                                                          goal_orientation=goal_pose,
+                                                          goal_orientation=goal_orientation,
                                                           max_velocity=max_angular_velocity,
                                                           weight=weight,
                                                           **kwargs))

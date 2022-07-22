@@ -747,11 +747,11 @@ class WorldTree:
         return p
 
     @memoize
-    def compute_fk_pose_with_collision_offset(self, root, tip):
+    def compute_fk_pose_with_collision_offset(self, root, tip, collision_id):
         try:
             root_T_tip = self.compute_fk_np(root, tip)
             tip_link = self.links[tip]
-            root_T_tip = w.dot(root_T_tip, tip_link.collisions[0].link_T_geometry)
+            root_T_tip = w.dot(root_T_tip, tip_link.collisions[collision_id].link_T_geometry)
             p = PoseStamped()
             p.header.frame_id = str(root)
             p.pose = homo_matrix_to_pose(root_T_tip)
@@ -816,11 +816,18 @@ class WorldTree:
             @profile
             def compile_fks(self):
                 all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names])
+                collision_fks = []
+                collision_ids = []
                 for link_name in self.world.link_names_with_collisions:
+                    if link_name == self.world.root_link_name:
+                        continue
                     link = self.world.links[link_name]
-                    self.fks[link_name] = w.dot(self.fks[link_name], link.collisions[0].link_T_geometry)
-                collision_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_with_collisions if
-                                          link_name != self.world.root_link_name])
+                    for collision_id, geometry in enumerate(link.collisions):
+                        link_name_with_id = link.name_with_collision_id(collision_id)
+                        collision_fks.append(w.dot(self.fks[link_name], geometry.link_T_geometry))
+                        collision_ids.append(link_name_with_id)
+                collision_fks = w.vstack(collision_fks)
+                self.collision_link_order = list(collision_ids)
                 self.fast_all_fks = w.speed_up(all_fks, w.free_symbols(all_fks))
                 self.fast_collision_fks = w.speed_up(collision_fks, w.free_symbols(collision_fks))
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names)}

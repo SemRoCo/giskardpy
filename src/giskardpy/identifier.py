@@ -81,6 +81,9 @@ PlotTrajectory_enabled = PlotTrajectory + ['enabled']
 PlotDebugTrajectory = plugins + ['PlotDebugExpressions']
 PlotDebugTrajectory_enabled = PlotDebugTrajectory + ['enabled']
 
+PlotDebugTF = plugins + ['PlotDebugTF']
+PlotDebugTF_enabled = PlotDebugTF + ['enabled']
+
 MaxTrajectoryLength = plugins + ['MaxTrajectoryLength']
 MaxTrajectoryLength_enabled = MaxTrajectoryLength + ['enabled']
 

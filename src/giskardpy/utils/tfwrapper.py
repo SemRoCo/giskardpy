@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, Transfo
 from std_msgs.msg import ColorRGBA
 from tf.transformations import quaternion_from_matrix, quaternion_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
-from tf2_kdl import transform_to_kdl
+from tf2_kdl import transform_to_kdl as transform_stamped_to_kdl
 from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
@@ -186,6 +186,12 @@ def lookup_point(target_frame, source_frame, time=None):
     return p
 
 
+def transform_to_kdl(transform):
+    ts = TransformStamped()
+    ts.transform = transform
+    return transform_stamped_to_kdl(ts)
+
+
 def pose_to_kdl(pose):
     """Convert a geometry_msgs Transform message to a PyKDL Frame.
 
@@ -238,6 +244,8 @@ def twist_to_kdl(twist):
 
 def msg_to_kdl(msg):
     if isinstance(msg, TransformStamped):
+        return transform_stamped_to_kdl(msg)
+    elif isinstance(msg, Transform):
         return transform_to_kdl(msg)
     elif isinstance(msg, PoseStamped):
         return pose_to_kdl(msg.pose)
@@ -277,6 +285,24 @@ def normalize(msg):
                         msg.z])
         tmp = tmp / np.linalg.norm(tmp)
         return Vector3(*tmp)
+
+
+def kdl_to_transform(frame):
+    t = Transform()
+    t.translation.x = frame.p[0]
+    t.translation.y = frame.p[1]
+    t.translation.z = frame.p[2]
+    t.rotation = normalize(Quaternion(*frame.M.GetQuaternion()))
+    return t
+
+
+def kdl_to_transform_stamped(frame, frame_id, child_frame_id):
+    t = TransformStamped()
+    t.header.frame_id = frame_id
+    t.header.stamp = rospy.get_rostime()
+    t.child_frame_id = child_frame_id
+    t.transform = kdl_to_transform(frame)
+    return t
 
 
 def kdl_to_pose(frame):

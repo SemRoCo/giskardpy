@@ -109,7 +109,7 @@ class JointStates(defaultdict):
 class BiDict(dict):
     # TODO test me
     def __init__(self, *args, **kwargs):
-        super(BiDict, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.inverse = {}
         for key, value in self.items():
             self.inverse[value] = key
@@ -117,14 +117,14 @@ class BiDict(dict):
     def __setitem__(self, key, value):
         if key in self:
             self.inverse[self[key]].remove(key)
-        super(BiDict, self).__setitem__(key, value)
+        super().__setitem__(key, value)
         self.inverse[value] = key
 
     def __delitem__(self, key):
         self.inverse.setdefault(self[key], []).remove(key)
         if self[key] in self.inverse and not self.inverse[self[key]]:
             del self.inverse[self[key]]
-        super(BiDict, self).__delitem__(key)
+        super().__delitem__(key)
 
 
 class PrefixName(object):

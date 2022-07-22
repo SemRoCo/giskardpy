@@ -12,7 +12,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 class CollisionMarker(GiskardBehavior):
     def setup(self, timeout=10.0, name_space='pybullet_collisions'):
-        super(CollisionMarker, self).setup(timeout)
+        super().setup(timeout)
         self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.name_space = name_space
         return True

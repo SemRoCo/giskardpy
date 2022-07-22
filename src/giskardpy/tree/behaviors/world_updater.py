@@ -212,7 +212,7 @@ class WorldUpdater(GiskardBehavior):
         # assumes that parent has god map lock
         req = self.handle_convention(req)
         world_body = req.body
-        global_pose = transform_pose(self.world.root_link_name, req.pose)
+        global_pose = transform_pose(tf.get_tf_root(), req.pose)
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,

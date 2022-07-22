@@ -79,6 +79,8 @@ plugins:
     height_per_derivative: 6
     order: 2
     tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
+  PlotDebugTF:
+    enabled: False
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
     amplitude_threshold: 0.55 # must be in the range [0,1]. The amplitude of a frequency must exceed this threshold to be detected as wiggling.
     window_size: 21 # size of the moving window of sample points

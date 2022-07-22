@@ -14,6 +14,7 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
+from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
@@ -584,6 +585,8 @@ class OpenLoop(TreeManager):
         planning_4.add_plugin(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
             planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
+        if self.god_map.get_data(identifier.PlotDebugTF_enabled):
+            planning_4.add_plugin(DebugTFPublisher('debug tf publisher'))
         # planning_4.add_plugin(WiggleCancel('wiggle'))
         planning_4.add_plugin(LoopDetector('loop detector'))
         planning_4.add_plugin(GoalReached('goal reached'))

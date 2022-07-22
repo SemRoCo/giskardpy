@@ -4,39 +4,41 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 
 class MyCollisionObject(pb.CollisionObject):
-    def __init__(self, name):
-        super(MyCollisionObject, self).__init__()
+    def __init__(self, name, collision_id):
+        super().__init__()
         self.name = name
+        self.collision_id = collision_id
+        self.identifier = f'{self.name}/{self.collision_id}'
 
     def __repr__(self):
-        return str(self.name)
+        return str(self.identifier)
 
     def __str__(self):
-        return str(self.name)
+        return str(self.identifier)
 
     def __hash__(self):
-        return self.name.__hash__()
+        return self.identifier.__hash__()
 
     def __eq__(self, other):
-        return self.name.__eq__(other.__str__())
+        return self.identifier.__eq__(other.__str__())
 
     def __ne__(self, other):
-        return self.name.__ne__(other.__str__())
+        return self.identifier.__ne__(other.__str__())
 
     def __le__(self, other):
-        return self.name.__le__(other.__str__())
+        return self.identifier.__le__(other.__str__())
 
     def __ge__(self, other):
-        return self.name.__ge__(other.__str__())
+        return self.identifier.__ge__(other.__str__())
 
     def __gt__(self, other):
-        return self.name.__gt__(other.__str__())
+        return self.identifier.__gt__(other.__str__())
 
     def __lt__(self, other):
-        return self.name.__lt__(other.__str__())
+        return self.identifier.__lt__(other.__str__())
 
     def __contains__(self, item):
-        return self.name.__contains__(item.__str__())
+        return self.identifier.__contains__(item.__str__())
 
 
 def create_cube_shape(extents):
@@ -70,8 +72,8 @@ def load_convex_mesh_shape(pkg_filename, single_shape=False, scale=[1, 1, 1]):
                                 single_shape=single_shape, 
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
 
-def create_object(name, shape, transform=pb.Transform.identity()):
-    out = MyCollisionObject(name)
+def create_object(name, shape, transform=pb.Transform.identity(), collision_id=0):
+    out = MyCollisionObject(name, collision_id)
     out.collision_shape = shape
     out.collision_flags = pb.CollisionObject.KinematicObject
     out.transform = transform

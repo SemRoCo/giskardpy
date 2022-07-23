@@ -1060,6 +1060,15 @@ def sum_column(matrix):
     return ca.sum2(matrix)
 
 
+def normalize_rotation_matrix(R: Matrix) -> Matrix:
+    """Scales each of the axes to the length of one."""
+    scale_v = 1.0
+    R[:3, 0] = scale(R[:3, 0], scale_v)
+    R[:3, 1] = scale(R[:3, 1], scale_v)
+    R[:3, 2] = scale(R[:3, 2], scale_v)
+    return R
+
+
 def distance_point_to_line_segment(point, line_start, line_end):
     """
     :param point: current position of an object (i. e.) gripper tip

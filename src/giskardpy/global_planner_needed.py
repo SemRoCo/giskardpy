@@ -24,7 +24,7 @@ class GlobalPlannerNeeded(GetGoal):
 
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.global_path_needed_lock = threading.Lock()
-        self.supported_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPathCarrot', 'CartesianPreGrasp']
+        self.supported_cart_goals = ['CartesianPathCarrot']
         self.solver = solver
         
     def setup(self, timeout=5.0):
@@ -125,6 +125,9 @@ class GlobalPlannerNeeded(GetGoal):
 
         __goal_dict = yaml.load(cart_c.parameter_value_pair)
         ros_pose = convert_dictionary_to_ros_message(__goal_dict[u'goal'])
+        pose_goals = list()
+        if 'goals' in __goal_dict:
+            pose_goals = list(map(convert_dictionary_to_ros_message, __goal_dict[u'goals']))
         pose_goal = transform_pose(self.map_frame, ros_pose).pose
 
         root_link = __goal_dict[u'root_link']
@@ -139,7 +142,7 @@ class GlobalPlannerNeeded(GetGoal):
             raise Exception(u'Did not found link chain of the robot from'
                             u' root_link {} to tip_link {}.'.format(root_link, tip_link))
 
-        return root_link, tip_link, pose_goal
+        return root_link, tip_link, pose_goal, pose_goals
 
     def clear_trajectory(self):
         self.world.fast_all_fks = None
@@ -180,8 +183,15 @@ class GlobalPlannerNeeded(GetGoal):
         if cartesian_constraint.type == 'CartesianPathCarrot':
             return True
         else:
-            r, t, p = self.parse_cart_goal(cartesian_constraint)
+            r, t, p, gs = self.parse_cart_goal(cartesian_constraint)
             return self.is_global_path_needed(r, t, p, True)
+
+    def is_unplanned(self, cartesian_constraint):
+        if cartesian_constraint.type == 'CartesianPathCarrot':
+            r, t, p, gs = self.parse_cart_goal(cartesian_constraint)
+            return len(gs) == 0
+        else:
+            raise Exception('no path constraint')
 
     def update(self):
 
@@ -200,11 +210,15 @@ class GlobalPlannerNeeded(GetGoal):
             self.get_god_map().set_data(identifier.global_planner_needed, False)
             return Status.RUNNING
 
-        # Else check if cartesian goal is nontrivial
-        if self.is_cartesian_constraint_nontrivial(cart_c):
+        if self.is_unplanned(cart_c):
             self.reset()
-            self.get_god_map().set_data(identifier.global_planner_needed, True)
-        else:
-            self.get_god_map().set_data(identifier.global_planner_needed, False)
+            self.god_map.set_data(identifier.global_planner_needed, True)
+
+        # Else check if cartesian goal is nontrivial
+        #if self.is_cartesian_constraint_nontrivial(cart_c):
+        #    self.reset()
+        #    self.get_god_map().set_data(identifier.global_planner_needed, True)
+        #else:
+        #    self.get_god_map().set_data(identifier.global_planner_needed, False)
 
         return Status.RUNNING

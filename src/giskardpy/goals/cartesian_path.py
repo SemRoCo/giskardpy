@@ -12,7 +12,7 @@ class CartesianPathCarrot(Goal):
 
     def __init__(self, root_link, tip_link, goal, goals=None, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, predict_f = 1.0, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, predict_f = 1.0, start=None, path_length=None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -34,6 +34,8 @@ class CartesianPathCarrot(Goal):
         self.max_linear_acceleration = max_linear_acceleration
         self.max_angular_acceleration = max_angular_acceleration
         self.predict_f = predict_f
+        self.arriving_thresh = 0.1
+        self.min_v = self.god_map.get_data(identifier.joint_convergence_threshold)
 
         if goals is not None and len(goals) != 0:
             self.trajectory_length = len(goals)
@@ -236,29 +238,29 @@ class CartesianPathCarrot(Goal):
         traj_point = self.get_closest_traj_point() + 1
         return traj_point/self.trajectory_length
 
-    def get_terminal_goal_weight_mult(self):
+    def get_terminal_goal_velocity(self):
         """
-        behaves pretty shitty
-
-        0 means the goal is far away, 1 means the goal is close
         :rtype: float
         :returns: float in range(0,1)
         """
         terminal_goal = self.get_parameter_as_symbolic_expression(u'terminal_goal')
         dis_to_goal = w.norm(w.position_of(self.get_fk(self.root_link, self.tip_link) - terminal_goal))
-        distance_thresh = 1.0
-        return w.if_less(dis_to_goal, distance_thresh,
-                         0.5 * (distance_thresh - dis_to_goal) + 0.5, # add 0.5 as starting point from below:
-                         distance_thresh / (2 * dis_to_goal)) # if dis_to_goal == distance_thresh, then
-                                                              # distance_thresh / 2 * dis_to_goal == 0.5.
+        distance_thresh = self.arriving_thresh
+        v = w.if_less(dis_to_goal, distance_thresh,
+                      self.max_linear_velocity * dis_to_goal/distance_thresh,
+                      self.max_linear_velocity)
+        return v
 
     def minimize_position(self, goal, weight):
-        max_velocity = self.max_linear_velocity
+        max_velocity = self.get_terminal_goal_velocity()
 
-        self.add_point_goal_constraints(frame_P_current=w.position_of(self.get_fk(self.root_link, self.tip_link)),
+        self.add_frame_point_goal_constraints(frame_P_current=w.position_of(self.get_fk(self.root_link, self.tip_link)),
                                         frame_P_goal=goal,
                                         reference_velocity=max_velocity,
-                                        weight=weight, name_suffix=u'goal_pos')
+                                        weight=weight,
+                                        tip_link=self.tip_link,
+                                        root_link=self.root_link,
+                                        name_suffix=u'goal_pos')
 
     def minimize_rotation(self, goal, weight):
         max_velocity = self.max_angular_velocity

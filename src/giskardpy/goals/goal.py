@@ -2,12 +2,15 @@ from __future__ import division
 
 from collections import OrderedDict
 
+import numpy as np
+
 from giskard_msgs.msg import Constraint as Constraint_msg
 from tf2_py import LookupException
 
 import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
+from giskardpy.casadi_wrapper import scale, Matrix
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.world import WorldTree
@@ -271,7 +274,65 @@ class Goal(object):
                             expression=expr_current,
                             name_suffix=name_suffix)
 
-    def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=u''):
+    def add_frame_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, tip_link=None, root_link=None, name_suffix=None):
+        t_T_r = self.get_fk(tip_link, root_link)
+        tip_P_goal = w.dot(t_T_r, frame_P_goal)
+
+        # Create rotation matrix, which rotates the tip link frame
+        # such that its x-axis shows towards the goal position.
+        # The goal frame is called 'a'.
+        # Thus, the rotation matrix is called t_R_a.
+        tip_P_error = tip_P_goal[:3]
+        trans_error = w.norm(tip_P_error)
+        # x-axis
+        tip_P_intermediate_error = w.save_division(tip_P_error, trans_error)[:3]
+        # y- and z-axis
+        tip_P_intermediate_y = w.scale(w.Matrix(np.random.random((3,))), 1)
+        y = w.cross(tip_P_intermediate_error, tip_P_intermediate_y)
+        z = w.cross(tip_P_intermediate_error, y)
+        t_R_a = w.Matrix([[tip_P_intermediate_error[0], -z[0], y[0], 0],
+                          [tip_P_intermediate_error[1], -z[1], y[1], 0],
+                          [tip_P_intermediate_error[2], -z[2], y[2], 0],
+                          [0, 0, 0, 1]])
+        t_R_a = w.normalize_rotation_matrix(t_R_a)
+
+        # Apply rotation matrix on the fk of the tip link
+        a_T_t = w.dot(w.inverse_frame(t_R_a) ,
+                      self.get_fk_evaluated(tip_link, root_link),
+                      self.get_fk(root_link, tip_link))
+        expr_p = w.position_of(a_T_t)
+        dist = w.norm(frame_P_goal - frame_P_current)
+
+        #self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
+        #self.add_debug_matrix(self.tip_link + '_R_frame', t_R_a)
+        #self.add_debug_matrix(self.tip_link + '_T_a', w.inverse_frame(a_T_t))
+        #self.add_debug_expr('error', dist)
+
+        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                   lower_errors=[dist, 0, 0],
+                                   upper_errors=[dist, 0, 0],
+                                   weights=[weight, weight * 2, weight * 2],
+                                   expressions=expr_p[:3],
+                                   name_suffixes=['{}/x'.format('line'),
+                                                  '{}/y'.format('line'),
+                                                  '{}/z'.format('line')])
+
+    def add_norm_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix='', **kwargs):
+        r_P_error = frame_P_goal[:3] - frame_P_current[:3]
+        trans_error = w.norm(r_P_error)
+        #trans_scale = self.get_sampling_period_symbol() * reference_velocity
+        r_P_intermediate_error = w.save_division(r_P_error, trans_error) #* trans_scale
+        # self.add_debug_expr('error', w.norm(r_P_intermediate_error))
+        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                   lower_errors=r_P_intermediate_error[:3],
+                                   upper_errors=r_P_intermediate_error[:3],
+                                   weights=[weight] * 3,
+                                   expressions=frame_P_current[:3],
+                                   name_suffixes=['{}/x'.format(name_suffix),
+                                                  '{}/y'.format(name_suffix),
+                                                  '{}/z'.format(name_suffix)])
+
+    def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=u'', **kwargs):
         error = frame_P_goal[:3] - frame_P_current[:3]
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],

@@ -36,7 +36,7 @@ from giskardpy.tree.get_goal import GetGoal
 from giskardpy.tree.visualization import VisualizationBehavior
 from giskardpy.utils.kdl_parser import KDL
 from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, list_to_kdl, pose_to_np, \
-    pose_to_kdl, np_to_pose, pose_stamped_to_np
+    pose_to_kdl, np_to_pose, pose_stamped_to_np, pose_diff, interpolate_pose
 
 from mpl_toolkits.mplot3d import Axes3D
 import numpy
@@ -499,19 +499,7 @@ class AbstractMotionValidator():
         self.ignore_state_validator = ignore_state_validator
 
     def get_last_valid(self, s1, s2, f):
-        np1 = pose_to_np(s1)
-        np2 = pose_to_np(s2)
-        np3_trans = np1[0] + (np2[0] - np1[0]) * f
-        key_rots = R.from_quat([np1[1], np2[1]])
-        key_times = [0, 1]
-        slerp = Slerp(key_times, key_rots)
-        times = [f]
-        interp_rots = slerp(times)
-        np3_rot = interp_rots.as_quat()[0]
-        f_trans_m = tf.transformations.translation_matrix(np3_trans)
-        f_rot_m = tf.transformations.quaternion_matrix(np3_rot)
-        f_m = tf.transformations.concatenate_matrices(f_trans_m, f_rot_m)
-        return np_to_pose(f_m)
+        return interpolate_pose(s1, s2, f)
 
     def checkMotion(self, s1, s2):
         with self.god_map.get_data(identifier.rosparam + ['motion_validator_lock']):
@@ -1475,16 +1463,7 @@ class PreGraspSampler(GiskardBehavior):
     def sample(self, js, tip_link, goal, tries=1000, d=0.5):
 
         def compute_diff(a, b):
-            a_t, a_r = pose_to_np(a)
-            b_t, b_r = pose_to_np(b)
-            a_m = tf.transformations.concatenate_matrices(tf.transformations.translation_matrix(a_t),
-                                                          tf.transformations.quaternion_matrix(a_r))
-            b_m = tf.transformations.concatenate_matrices(tf.transformations.translation_matrix(b_t),
-                                                          tf.transformations.quaternion_matrix(b_r))
-            diff = tf.transformations.concatenate_matrices(a_m, tf.transformations.inverse_matrix(b_m))
-            r_diff = np.arccos(2*(np.sum(tf.transformations.quaternion_from_matrix(diff))**2)-1)
-            t_diff = np.linalg.norm(tf.transformations.translation_from_matrix(diff))
-            return t_diff + r_diff
+            return pose_diff(a, b)
 
         valid_fun = self.state_validator.is_collision_free
         try_i = 0
@@ -1668,7 +1647,7 @@ class GlobalPlanner(GetGoal):
                 return self._get_movement_planner
 
     def _plan(self, planner_names, motion_validator_types, planner_range, time,
-              navigation=False, movement=False, narrow=False, interpolate=True):
+              navigation=False, movement=False, narrow=False):
         for motion_validator_type in motion_validator_types:
             for planner_name in planner_names:
                 rospy.loginfo(f'Starting planning with Global Planner {planner_name}/{motion_validator_type} ...')
@@ -1678,9 +1657,10 @@ class GlobalPlanner(GetGoal):
                 try:
                     trajectory = planner.setup_and_plan(js)
                     rospy.logerr(f"Found solution:{len(trajectory) != 0}")
-                    if False and len(trajectory) != 0:
+                    if len(trajectory) != 0:
                         if self.god_map.get_data(identifier.path_interpolation):
-                            trajectory = planner.interpolate_solution()
+                            planner.interpolate_solution()
+                            trajectory = planner.get_solution(ob.PlannerStatus.EXACT_SOLUTION)
                         return trajectory, planner_name, motion_validator_type
                 finally:
                     planner.clear()
@@ -1738,10 +1718,10 @@ class GlobalPlanner(GetGoal):
             raise FeasibleGlobalPlanningException('No solution found with current config.')
 
         if navigation:
-            predict_f = 10.0
+            predict_f = 5.0
         else:
             if narrow:
-                predict_f = 1.0
+                predict_f = 2.0
             else:
                 predict_f = 5.0
         rospy.logerr(predict_f)
@@ -2329,19 +2309,17 @@ class MovementPlanner(OMPLPlanner):
         path_cost = path.cost(self.optimization_objective).value()
         if self.is_3D:
             if self.motion_validator_class is None:
-                path.interpolate(int(path_cost / 0.01))
+                path.interpolate(int(path_cost / 0.025))
             else:
                 path.interpolate(int(path_cost / 0.05))
         else:
             path.interpolate(int(path_cost / 0.2))
-        data = ompl_states_matrix_to_np(path.printAsMatrix()) # [x y z xw yw zw w]
         if self.verify_solution_f is not None:
             if self.verify_solution_f(self.setup, self.get_solution_path(), debug=True) != 0:
                 rospy.loginfo('Interpolated path is invalid. Going to re-plan...')
                 raise ReplanningException('Interpolated Path is invalid.')
         else:
             rospy.logwarn('Interpolated path returned is not validated.')
-        return data
 
     def get_solution(self, planner_status, plot=True):
         # og.PathSimplifier(si).smoothBSpline(self.get_solution_path()) # takes around 20-30 secs with RTTConnect(0.1)
@@ -2369,6 +2347,7 @@ class MovementPlanner(OMPLPlanner):
             verify = ''
         path = self.setup.getSolutionPath()
         path_cost = path.cost(self.optimization_objective).value()
+        self.god_map.set_data(identifier.rosparam + ['path_cost'], path_cost)
         cost = '- Cost: {}'.format(str(round(path_cost, 5)))
         title = u'{} Path from {} in map\n{} {}'.format(dim, self.setup.getPlanner().getName(), verify, cost)
         fig, ax = plt.subplots()
@@ -2434,7 +2413,7 @@ class NarrowMovementPlanner(MovementPlanner):
         goal_space.setThreshold(0.01)
         prob_def.setGoal(goal_space)
 
-    def create_goal_specific_space(self, padding=1):
+    def create_goal_specific_space(self, padding=0.2):
 
         if self.pose_goal is not None:
             bounds = ob.RealVectorBounds(3)
@@ -2460,7 +2439,27 @@ class NarrowMovementPlanner(MovementPlanner):
 
     def get_solution(self, planner_status, plot=True):
         data = super().get_solution(planner_status, plot=plot)
-        if len(data) > 0:
+        if len(data) > 0 and self.planner_name in self.directional_planner:
+
+            if not self.reversed_start_and_goal:
+                end_i = self.pose_goal
+            else:
+                end_i = ompl_se3_state_to_pose(self.start())
+            begin_i = Pose()
+            begin_i.position.x = data[-1][0]
+            begin_i.position.y = data[-1][1]
+            begin_i.position.z = data[-1][2]
+            begin_i.orientation.x = data[-1][3]
+            begin_i.orientation.y = data[-1][4]
+            begin_i.orientation.z = data[-1][5]
+            begin_i.orientation.w = data[-1][6]
+            diff = pose_diff(begin_i, end_i)
+            segments = diff / self.range
+            rospy.logerr(segments)
+            for i in range(1, int(segments)):
+                p = pose_to_np(interpolate_pose(begin_i, end_i, i*(1/segments)))
+                data = np.append(data, [np.append(p[0], p[1])], axis=0)
+
             if not self.reversed_start_and_goal:
                 data = np.append(data, [np.append(pose_to_np(self.pose_goal)[0], pose_to_np(self.pose_goal)[1])],
                                  axis=0)
@@ -2468,6 +2467,7 @@ class NarrowMovementPlanner(MovementPlanner):
                 data = np.append(data, [np.append(pose_to_np(ompl_se3_state_to_pose(self.start()))[0],
                                                   pose_to_np(ompl_se3_state_to_pose(self.start()))[1])], axis=0)
             data = data if not self.reversed_start_and_goal else np.flip(data, axis=0)
+
         return data
 
     def _configure_planner(self, planner: ob.Planner):

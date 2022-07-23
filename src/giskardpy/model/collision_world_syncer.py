@@ -10,7 +10,7 @@ import numpy as np
 from giskard_msgs.msg import CollisionEntry
 
 from giskardpy import RobotName, identifier
-from giskardpy.data_types import Collisions, JointStates, AABBCollision
+from giskardpy.data_types import Collisions, JointStates, AABBCollision, CollisionAABB
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
@@ -312,7 +312,7 @@ class CollisionWorldSynchronizer(object):
         collisions = self.check_collisions(self.collision_matrix, self.collision_list_size)
         self.god_map.set_data(identifier.closest_point, collisions)
 
-    def get_aabb_info(self, link_name: str) -> Tuple[str, float, float]:
+    def get_aabb_info(self, link_name: str) -> CollisionAABB:
         raise Exception('Implement me.')
 
     def get_aabb_collisions(self, link_names: List[str], sync=True) -> AABBCollision:

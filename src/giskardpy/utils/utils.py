@@ -1,4 +1,7 @@
 from __future__ import division
+
+import subprocess
+
 import giskardpy.utils.tfwrapper as tf
 import errno
 import inspect
@@ -385,6 +388,17 @@ def write_to_tmp(filename, urdf_string):
     with open(new_path, 'w') as o:
         o.write(urdf_string)
     return new_path
+
+
+def convert_to_stl_and_save_in_tmp(file_name: str):
+    resolved_old_path = resolve_ros_iris(file_name)
+    short_file_name = file_name.split('/')[-1][:-3]
+    tmp_path = f'/tmp/giskardpy/{short_file_name}stl'
+    if not os.path.exists(tmp_path):
+        logging.loginfo(f'converting {file_name} to stl and saving in {tmp_path}')
+        subprocess.check_output(['ctmconv', resolved_old_path, tmp_path])
+    return tmp_path
+
 
 
 def memoize(function):

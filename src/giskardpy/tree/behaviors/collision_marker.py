@@ -2,6 +2,7 @@ from typing import List, Set, Union
 
 import numpy as np
 import rospy
+from colour import Color
 from geometry_msgs.msg import Point, Vector3
 from py_trees import Status
 from std_msgs.msg import ColorRGBA
@@ -63,12 +64,12 @@ class CollisionMarker(GiskardBehavior):
                     m.points.append(Point(*map_P_pa[:3]))
                     m.points.append(Point(*map_P_pb[:3]))
                     m.colors.append(self.red)
-                    m.colors.append(self.green)
+                    m.colors.append(self.red)
                 if contact_distance < yellow_threshold:
-                    m.colors[-2] = self.red
-                    m.colors[-1] = self.green
+                    m.colors[-2] = self.yellow
+                    m.colors[-1] = self.yellow
                 if contact_distance < red_threshold:
-                    m.colors[-2] = self.red
+                    m.colors[-2] = self.green
                     m.colors[-1] = self.green
         return m
 

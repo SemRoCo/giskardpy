@@ -572,12 +572,12 @@ class OpenLoop(TreeManager):
 
     def grow_closed_loop_control(self):
         planning_4 = PluginBehavior('closed loop control')
+        if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+            planning_4.add_plugin(VisualizationBehavior('visualization'))
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_plugin(CollisionChecker('collision checker'))
             if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
                 planning_4.add_plugin(CollisionMarker('cpi marker'))
-        if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            planning_4.add_plugin(VisualizationBehavior('visualization'))
         planning_4.add_plugin(ControllerPlugin('controller'))
         planning_4.add_plugin(KinSimPlugin('kin sim'))
         planning_4.add_plugin(LogTrajPlugin('log'))

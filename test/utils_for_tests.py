@@ -906,6 +906,7 @@ class GiskardTestWrapper(GiskardWrapper):
                  pose: PoseStamped = None,
                  parent_link: str = '',
                  parent_link_group: str = '',
+                 scale: Tuple[float, float, float] = (1, 1, 1),
                  timeout: float = TimeOut,
                  expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
         response = super().add_mesh(name=name,
@@ -913,6 +914,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                     pose=pose,
                                     parent_link=parent_link,
                                     parent_link_group=parent_link_group,
+                                    scale=scale,
                                     timeout=timeout)
         pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
                                           position=pose.pose.position, orientation=pose.pose.orientation)

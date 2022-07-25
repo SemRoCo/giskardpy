@@ -7,6 +7,7 @@ from tf.transformations import quaternion_about_axis
 
 from giskardpy.configs.tiago import TiagoMujoco
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA
+from giskardpy.utils.utils import resolve_ros_iris
 from utils_for_tests import GiskardTestWrapper
 
 
@@ -65,7 +66,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
         self.reset_base()
 
 
-class TestCartGoals(object):
+class TestCartGoals:
     def test_drive(self, zero_pose: TiagoTestWrapper):
 
         goal = PoseStamped()
@@ -92,3 +93,48 @@ class TestCartGoals(object):
         goal.pose.position = Point(-0.026,  0.569, 0.000)
         goal.pose.orientation = Quaternion(0,0,0.916530200374776,0.3999654882623912)
         zero_pose.move_base(goal)
+
+
+class TestCollisionAvoidance:
+    def test_left_arm(self, zero_pose: TiagoTestWrapper):
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'arm_left_3_link'
+        box_pose.pose.position.z = 0.07
+        box_pose.pose.position.x = 0.1
+        box_pose.pose.orientation.w = 1
+        # zero_pose.add_box('box',
+        #                   size=(0.05,0.05,0.05),
+        #                   pose=box_pose)
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'arm_left_5_link'
+        box_pose.pose.position.z = 0.07
+        box_pose.pose.position.y = -0.1
+        box_pose.pose.orientation.w = 1
+        # zero_pose.add_box('box2',
+        #                   size=(0.05,0.05,0.05),
+        #                   pose=box_pose)
+        # zero_pose.allow_self_collision()
+        zero_pose.plan_and_execute()
+
+
+    def test_load_negative_scale(self, zero_pose: TiagoTestWrapper):
+        mesh_path = 'package://tiago_description/meshes/arm/arm_3_collision.dae'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'base_link'
+        box_pose.pose.position.x = 0.3
+        box_pose.pose.orientation.w = 1
+        zero_pose.add_mesh('meshy',
+                           mesh=mesh_path,
+                           pose=box_pose,
+                           scale=(1, 1, -1),
+                           )
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'base_link'
+        box_pose.pose.position.x = 0.6
+        box_pose.pose.orientation.w = 1
+        zero_pose.add_mesh('meshy2',
+                           mesh=mesh_path,
+                           pose=box_pose,
+                           scale=(1, 1, 1),
+                           )
+        zero_pose.plan_and_execute()

@@ -1,4 +1,5 @@
 import betterpybullet as pb
+from collada import Collada
 
 from giskardpy.utils.utils import resolve_ros_iris
 
@@ -67,10 +68,15 @@ def create_compound_shape(shapes_poses=[]):
 
 # Technically the tracker is not required here, 
 # since the loader keeps references to the loaded shapes.
-def load_convex_mesh_shape(pkg_filename, single_shape=False, scale=[1, 1, 1]):
-    return pb.load_convex_shape(resolve_ros_iris(pkg_filename),
-                                single_shape=single_shape, 
-                                scaling=pb.Vector3(scale[0], scale[1], scale[2]))
+def load_convex_mesh_shape(pkg_filename, single_shape=False, scale=(1, 1, 1)):
+    # resolved_path = resolve_ros_iris(pkg_filename)
+    # dae = Collada(resolved_path)
+    try:
+        return pb.load_convex_shape(resolve_ros_iris(pkg_filename),
+                                    single_shape=single_shape,
+                                    scaling=pb.Vector3(scale[0], scale[1], scale[2]))
+    except Exception as e:
+        pass
 
 def create_object(name, shape, transform=pb.Transform.identity(), collision_id=0):
     out = MyCollisionObject(name, collision_id)

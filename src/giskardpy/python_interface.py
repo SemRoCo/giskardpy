@@ -624,6 +624,7 @@ class GiskardWrapper(object):
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
+                 scale: Tuple[float, float, float] = (1, 1, 1),
                  timeout: float = 0) -> UpdateWorldResponse:
         """
         If pose is used, frame_id, position and orientation are ignored.
@@ -638,6 +639,9 @@ class GiskardWrapper(object):
         req.timeout = timeout
         req.body = object
         req.pose = pose
+        req.body.scale.x = scale[0]
+        req.body.scale.y = scale[1]
+        req.body.scale.z = scale[2]
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
         return self._update_world_srv.call(req)

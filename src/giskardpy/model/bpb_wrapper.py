@@ -72,12 +72,6 @@ def create_compound_shape(shapes_poses=[]):
 def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1)):
     if pkg_filename.endswith('.dae'):
         pkg_filename = convert_to_stl_and_save_in_tmp(pkg_filename)
-        # new_pkg_filename = f'{pkg_filename[:-3]}stl'
-        # path1 = resolve_ros_iris(pkg_filename)
-        # path2 = resolve_ros_iris(new_pkg_filename)
-        # logging.loginfo(f'converting {pkg_filename} for {new_pkg_filename}')
-        # subprocess.check_output(['ctmconv', path1, path2])
-        # pkg_filename = new_pkg_filename
     return pb.load_convex_shape(resolve_ros_iris(pkg_filename),
                                 single_shape=single_shape,
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))

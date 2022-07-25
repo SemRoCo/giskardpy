@@ -63,14 +63,14 @@ class CollisionMarker(GiskardBehavior):
                 if contact_distance < green_threshold:
                     m.points.append(Point(*map_P_pa[:3]))
                     m.points.append(Point(*map_P_pb[:3]))
-                    m.colors.append(self.red)
-                    m.colors.append(self.red)
+                    m.colors.append(self.green)
+                    m.colors.append(self.green)
                 if contact_distance < yellow_threshold:
                     m.colors[-2] = self.yellow
                     m.colors[-1] = self.yellow
                 if contact_distance < red_threshold:
-                    m.colors[-2] = self.green
-                    m.colors[-1] = self.green
+                    m.colors[-2] = self.red
+                    m.colors[-1] = self.red
         return m
 
     def publish_cpi_markers(self, collisions: Collisions):

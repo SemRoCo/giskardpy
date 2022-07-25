@@ -495,6 +495,9 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_kitchen_js(self, joint_state, object_name='kitchen'):
         self.set_object_joint_state(object_name, joint_state)
 
+    def set_apartment_js(self, joint_state, object_name='apartment'):
+        self.set_object_joint_state(object_name, joint_state)
+
     def compare_joint_state(self, current_js, goal_js, decimal=2):
         """
         :type current_js: dict

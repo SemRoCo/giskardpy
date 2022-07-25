@@ -21,14 +21,17 @@ class SyncConfiguration(GiskardBehavior):
     """
 
     @profile
-    def __init__(self, name, group_name, tf_root_link_name=None):
+    def __init__(self, name, group_name, tf_root_link_name=None, joint_state_topic=None):
         """
         :type js_identifier: str
         """
         super().__init__(name)
         self.mjs = None
         self.map_frame = tf.get_tf_root()
-        self.joint_state_topic = self.god_map.get_data(identifier.joint_state_topic)
+        if joint_state_topic is None:
+            self.joint_state_topic = self.god_map.get_data(identifier.joint_state_topic)
+        else:
+            self.joint_state_topic = joint_state_topic
         self.group_name = group_name
         self.group = self.world.groups[self.group_name]  # type: SubWorldTree
         if tf_root_link_name is None:
@@ -45,9 +48,9 @@ class SyncConfiguration(GiskardBehavior):
                 msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
                 self.lock.put(msg)
             except ROSException as e:
-                logging.logwarn('Waiting for topic \'/{}\' to appear.'.format(self.joint_state_topic))
+                logging.logwarn(f'Waiting for topic \'/{self.joint_state_topic}\' to appear.')
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
-        return super(SyncConfiguration, self).setup(timeout)
+        return super().setup(timeout)
 
     def cb(self, data):
         try:

@@ -4,10 +4,8 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped, Point
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis
-
+import giskardpy.utils.tfwrapper as tf
 from giskardpy.configs.tiago import TiagoMujoco
-from giskardpy.goals.goal import WEIGHT_ABOVE_CA
-from giskardpy.utils.utils import resolve_ros_iris
 from utils_for_tests import GiskardTestWrapper
 
 
@@ -39,25 +37,34 @@ class TiagoTestWrapper(GiskardTestWrapper):
         'arm_right_7_joint': 0.0,
     }
 
+    better_pose = {
+        'arm_left_1_joint': - 1.0,
+        'arm_left_2_joint': 0.0,
+        'arm_left_3_joint': 1.5,
+        'arm_left_4_joint': 2.2,
+        'arm_left_5_joint': - 1.5,
+        'arm_left_6_joint': 0.5,
+        'arm_left_7_joint': 0.0,
+        'arm_right_1_joint': - 1.0,
+        'arm_right_2_joint': 0.0,
+        'arm_right_3_joint': 1.5,
+        'arm_right_4_joint': 2.2,
+        'arm_right_5_joint': - 1.5,
+        'arm_right_6_joint': 0.5,
+        'arm_right_7_joint': 0.0,
+    }
+
     def __init__(self):
         self.mujoco_reset = rospy.ServiceProxy('reset', Trigger)
         super().__init__(TiagoMujoco)
 
     def move_base(self, goal_pose):
         tip_link = 'base_footprint'
-        root_link = 'map'
-        pointing_axis = Vector3Stamped()
-        pointing_axis.header.frame_id = tip_link
-        pointing_axis.vector.x = 1
-        goal_point = PointStamped()
-        goal_point.header.frame_id = 'map'
-        goal_point.point = goal_pose.pose.position
-        self.set_json_goal(constraint_type='PointingDiffDrive',
-                                tip_link=tip_link, root_link=root_link,
-                                pointing_axis=pointing_axis,
-                                goal_point=goal_point)
-        self.set_cart_goal(goal_pose=goal_pose, tip_link=tip_link, root_link=root_link)
-        self.allow_all_collisions()
+        root_link = tf.get_tf_root()
+        self.set_json_goal(constraint_type='DiffDriveBaseGoal',
+                           tip_link=tip_link, root_link=root_link,
+                           goal_pose=goal_pose)
+        # self.allow_all_collisions()
         self.plan_and_execute()
 
     def reset(self):
@@ -68,7 +75,6 @@ class TiagoTestWrapper(GiskardTestWrapper):
 
 class TestCartGoals:
     def test_drive(self, zero_pose: TiagoTestWrapper):
-
         goal = PoseStamped()
         goal.header.frame_id = 'map'
         goal.pose.position.x = 1
@@ -81,7 +87,6 @@ class TestCartGoals:
         # zero_pose.plan_and_execute()
 
     def test_drive2(self, zero_pose: TiagoTestWrapper):
-
         goal = PoseStamped()
         goal.header.frame_id = 'map'
         goal.pose.position = Point(0.489, -0.598, 0.000)
@@ -90,8 +95,8 @@ class TestCartGoals:
 
         goal = PoseStamped()
         goal.header.frame_id = 'map'
-        goal.pose.position = Point(-0.026,  0.569, 0.000)
-        goal.pose.orientation = Quaternion(0,0,0.916530200374776,0.3999654882623912)
+        goal.pose.position = Point(-0.026, 0.569, 0.000)
+        goal.pose.orientation = Quaternion(0, 0, 0.916530200374776, 0.3999654882623912)
         zero_pose.move_base(goal)
 
 
@@ -116,7 +121,6 @@ class TestCollisionAvoidance:
         # zero_pose.allow_self_collision()
         zero_pose.plan_and_execute()
 
-
     def test_load_negative_scale(self, zero_pose: TiagoTestWrapper):
         mesh_path = 'package://tiago_description/meshes/arm/arm_3_collision.dae'
         box_pose = PoseStamped()
@@ -135,7 +139,7 @@ class TestCollisionAvoidance:
         box_pose.pose.position.z = -0.1
         box_pose.pose.orientation.w = 1
         zero_pose.add_box('box1',
-                          size=(0.1,0.1,0.01),
+                          size=(0.1, 0.1, 0.01),
                           pose=box_pose,
                           parent_link='base_link',
                           parent_link_group=zero_pose.get_robot_name())
@@ -146,7 +150,7 @@ class TestCollisionAvoidance:
         box_pose.pose.position.z = 0.05
         box_pose.pose.orientation.w = 1
         zero_pose.add_box('box2',
-                          size=(0.1,0.01,0.1),
+                          size=(0.1, 0.01, 0.1),
                           pose=box_pose,
                           parent_link='base_link',
                           parent_link_group=zero_pose.get_robot_name())
@@ -157,7 +161,7 @@ class TestCollisionAvoidance:
         box_pose.pose.position.z = 0.05
         box_pose.pose.orientation.w = 1
         zero_pose.add_box('box3',
-                          size=(0.1,0.01,0.1),
+                          size=(0.1, 0.01, 0.1),
                           pose=box_pose,
                           parent_link='base_link',
                           parent_link_group=zero_pose.get_robot_name())
@@ -171,3 +175,13 @@ class TestCollisionAvoidance:
         #                    scale=(1, 1, 1),
         #                    )
         zero_pose.plan_and_execute()
+
+    def test_drive_into_kitchen(self, apartment_setup: TiagoTestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'base_footprint'
+        base_goal.pose.position.x = 2
+        base_goal.pose.orientation.w = 1
+        apartment_setup.move_base(base_goal)
+
+    def test_open_cabinet(self, apartment_setup: TiagoTestWrapper):
+        apartment_setup.plan_and_execute()

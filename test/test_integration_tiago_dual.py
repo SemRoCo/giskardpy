@@ -121,7 +121,8 @@ class TestCollisionAvoidance:
         mesh_path = 'package://tiago_description/meshes/arm/arm_3_collision.dae'
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'base_link'
-        box_pose.pose.position.x = 0.3
+        box_pose.pose.position.x = 0.6
+        box_pose.pose.position.z = 0.0
         box_pose.pose.orientation.w = 1
         zero_pose.add_mesh('meshy',
                            mesh=mesh_path,
@@ -131,10 +132,42 @@ class TestCollisionAvoidance:
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'base_link'
         box_pose.pose.position.x = 0.6
+        box_pose.pose.position.z = -0.1
         box_pose.pose.orientation.w = 1
-        zero_pose.add_mesh('meshy2',
-                           mesh=mesh_path,
-                           pose=box_pose,
-                           scale=(1, 1, 1),
-                           )
+        zero_pose.add_box('box1',
+                          size=(0.1,0.1,0.01),
+                          pose=box_pose,
+                          parent_link='base_link',
+                          parent_link_group=zero_pose.get_robot_name())
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'base_link'
+        box_pose.pose.position.x = 0.6
+        box_pose.pose.position.y = 0.1
+        box_pose.pose.position.z = 0.05
+        box_pose.pose.orientation.w = 1
+        zero_pose.add_box('box2',
+                          size=(0.1,0.01,0.1),
+                          pose=box_pose,
+                          parent_link='base_link',
+                          parent_link_group=zero_pose.get_robot_name())
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'base_link'
+        box_pose.pose.position.x = 0.6
+        box_pose.pose.position.y = -0.1
+        box_pose.pose.position.z = 0.05
+        box_pose.pose.orientation.w = 1
+        zero_pose.add_box('box3',
+                          size=(0.1,0.01,0.1),
+                          pose=box_pose,
+                          parent_link='base_link',
+                          parent_link_group=zero_pose.get_robot_name())
+        # box_pose = PoseStamped()
+        # box_pose.header.frame_id = 'base_link'
+        # box_pose.pose.position.x = 0.6
+        # box_pose.pose.orientation.w = 1
+        # zero_pose.add_mesh('meshy2',
+        #                    mesh=mesh_path,
+        #                    pose=box_pose,
+        #                    scale=(1, 1, 1),
+        #                    )
         zero_pose.plan_and_execute()

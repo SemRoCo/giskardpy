@@ -188,7 +188,7 @@ class WorldUpdater(GiskardBehavior):
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
         logging.loginfo('Added object \'{}\' at \'{}\'.'.format(req.body.name, req.parent_link))
-        if world_body.joint_state_topic:
+        if world_body.joint_state_topic and len(self.world.groups[req.body.name].movable_joints) != 0:
             plugin_name = str(PrefixName(world_body.name, 'js'))
             plugin = SyncConfiguration(plugin_name, group_name=world_body.name,
                                        joint_state_topic=world_body.joint_state_topic)

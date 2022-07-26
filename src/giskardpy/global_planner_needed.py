@@ -11,7 +11,8 @@ from py_trees import Status
 from giskardpy import identifier, RobotName
 from giskard_msgs.srv import GlobalPathNeeded, GlobalPathNeededResponse, GetAttachedObjects, GetAttachedObjectsRequest
 from giskardpy.data_types import Trajectory, Collisions
-from giskardpy.global_planner import ObjectRayMotionValidator, GiskardRobotBulletCollisionChecker
+from giskardpy.global_planner import ObjectRayMotionValidator, GiskardRobotBulletCollisionChecker, \
+    SimpleRayMotionValidator
 from giskardpy.tree.get_goal import GetGoal
 from giskardpy.utils.tfwrapper import np_to_pose_stamped, transform_pose, pose_stamped_to_np, np_to_pose
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
@@ -61,22 +62,26 @@ class GlobalPlannerNeeded(GetGoal):
             # fixme: two sync calls - what the fuck
             self.collision_scene.sync()
             self.collision_scene.sync()
+            #if simple:
+            #    ids = self.get_collision_ids(env_group)
+            #    return self.__is_global_path_needed(root_link, tip_link, pose_goal, ids)
+            #else:
+            get_attached_objects = rospy.ServiceProxy('~get_attached_objects', GetAttachedObjects)
+            if tip_link in get_attached_objects(GetAttachedObjectsRequest()).object_names:
+                tip_link = self.get_robot().get_parent_link_of_link(tip_link)
+            collision_checker = GiskardRobotBulletCollisionChecker(tip_link != 'base_footprint', root_link,
+                                                                   tip_link, self.collision_scene)
             if simple:
-                ids = self.get_collision_ids(env_group)
-                return self.__is_global_path_needed(root_link, tip_link, pose_goal, ids)
+                m = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map,
+                                             js=self.get_god_map().get_data(identifier.joint_states))
             else:
-                get_attached_objects = rospy.ServiceProxy('~get_attached_objects', GetAttachedObjects)
-                if tip_link in get_attached_objects(GetAttachedObjectsRequest()).object_names:
-                    tip_link = self.get_robot().get_parent_link_of_link(tip_link)
-                collision_checker = GiskardRobotBulletCollisionChecker(tip_link!='base_footprint', root_link,
-                                                                       tip_link, self.collision_scene)
                 m = ObjectRayMotionValidator(self.collision_scene, tip_link, self.robot, collision_checker, self.god_map,
                                              js=self.get_god_map().get_data(identifier.joint_states))
-                start = np_to_pose(self.get_robot().get_fk(root_link, tip_link))
-                result = not m.check_motion(start, pose_goal)
-                collision_checker.clear()
-                m.clear()
-                return result
+            start = np_to_pose(self.get_robot().get_fk(root_link, tip_link))
+            result = not m.check_motion(start, pose_goal)
+            collision_checker.clear()
+            m.clear()
+            return result
 
     def __is_global_path_needed(self, root_link, tip_link, pose_goal, coll_body_ids):
         """

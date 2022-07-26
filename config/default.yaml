@@ -91,20 +91,24 @@ plugins:
     normal:
       navigation:
         planner: ['RRTConnect'] # sublist of above planners
-        motion_validator: ['discrete'] # sublist of ['rays', 'box', 'discrete']
-        time: 60
-        range: 0.2
+        motion_validator: ['box'] # sublist of ['rays', 'box', 'discrete']
+        time: 15
+        range: 2.0
       movement:
-        planner: ['BITstar',
-                  'ABITstar'] # sublist of above planners
-        motion_validator: ['discrete'] # sublist of ['rays', 'box', 'discrete']
+        planner: ['RRTConnect'] # sublist of above planners
+        motion_validator: ['box'] # sublist of ['rays', 'box', 'discrete']
         time: 10
         range: 0.15
     narrow:
+      navigation:
+        planner: [ 'InformedRRTstar' ] # sublist of above planners
+        motion_validator: ['box'] # sublist of ['rays', 'box', 'discrete']
+        time: 30
+        range: 0.2
       movement:
-        planner: ['InformedRRTstar']
-        motion_validator: [ 'discrete', 'discrete', 'discrete', 'discrete', 'discrete' ] # sublist of ['rays', 'box', 'discrete']
-        time: 60
+        planner: ['RRT']
+        motion_validator: ['discrete'] # sublist of ['rays', 'box', 'discrete']
+        time: 30
         range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True

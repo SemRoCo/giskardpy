@@ -105,17 +105,24 @@ class PlotTrajectory(GiskardBehavior):
         self.log_path_trajectory(max_dist, summed_dist)
         plt.show()
 
-    def log_path_trajectory(self, max_dev, summed_dev, filepath='/home/thomas/path_follow_3d_norm.txt'):
-        path_cost = ''
+    def log_path_trajectory(self, max_dev, summed_dev, filepath='/home/thomas/sample_goal_axis_on.txt'):
+        try:
+            path_cost = self.god_map.get_data(identifier.rosparam + ['path_cost'])
+        except KeyError:
+            path_cost = None
+        try:
+            path_time = self.god_map.get_data(identifier.rosparam + ['path_time'])
+        except KeyError:
+            path_time = None
         planning_time = self.get_god_map().get_data(identifier.time)
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         length = planning_time * sample_period
         solve_time = self.get_runtime()
-        vs = [path_cost, length, solve_time, max_dev, summed_dev]
+        vs = [path_time, path_cost, length, solve_time, max_dev, summed_dev]
         with open(filepath) as fp:
             lines = fp.read().splitlines()
         if len(lines) == 0:
-            lines = ['PathLength:1.6,1.4,1.5,1.5,1.9,1.7:', 'TrajectoryLength:', 'TrajectorySolvingTime:', 'PathMaxDev:', 'PathSummedDev:']
+            lines = ['PathTime:', 'PathLength:', 'TrajectoryLength:', 'TrajectorySolvingTime:', 'PathMaxDev:', 'PathSummedDev:']
         with open(filepath, "w") as fp:
             for line, v in zip(lines, vs):
                 print(str(line) + str(v) + ',', file=fp)

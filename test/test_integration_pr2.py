@@ -299,6 +299,22 @@ def kitchen_setup_avoid_collisions(resetted_giskard):
 
 
 @pytest.fixture()
+def refills_lab(resetted_giskard):
+    """
+    :type resetted_giskard: GiskardTestWrapper
+    :return:
+    """
+    resetted_giskard.avoid_all_collisions(distance=0.0)
+    resetted_giskard.set_joint_goal(gaya_pose)
+    resetted_giskard.plan_and_execute()
+    object_name = u'kitchen'
+    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                              tf.lookup_pose(u'map', u'iai_kitchen/room_link'), u'/kitchen/joint_states',
+                              set_js_topic=u'/kitchen/cram_joint_states')
+    return resetted_giskard
+
+
+@pytest.fixture()
 def kitchen_setup(resetted_giskard):
     """
     :type resetted_giskard: PR2
@@ -2372,6 +2388,7 @@ class TestWayPoints(object):
 
 class TestCartesianPath(object):
 
+
     def test_pathAroundKitchenIsland_without_global_planner(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
@@ -2405,7 +2422,7 @@ class TestCartesianPath(object):
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
     @pytest.mark.repeat(20)
-    def test_pathAroundKitchenIsland_with_global_planner(self, kitchen_setup_avoid_collisions):
+    def test_navi_1(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartesianPath::test_pathAroundKitchenIsland_with_global_planner
         """
         :type kitchen_setup_avoid_collisions: PR2
@@ -2428,11 +2445,47 @@ class TestCartesianPath(object):
 
         #kitchen_setup_avoid_collisions.set_json_goal(u'SetPredictionHorizon', prediction_horizon=1)
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
-                                                     tip_link=tip_link,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
-                                                     goal=goal_c)
-
+                                                     tip_link=tip_link,
+                                                     goal=goal_c,
+                                                     predict_f=10.0)
         kitchen_setup_avoid_collisions.plan_and_execute()
+
+        #kitchen_setup_avoid_collisions.send_goal()
+        #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
+        #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
+    @pytest.mark.repeat(5)
+    def test_navi_refills_lab(self, refills_lab):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartesianPath::test_pathAroundKitchenIsland_with_global_planner
+        """
+        :type kitchen_setup_avoid_collisions: PR2
+        """
+        tip_link = u'base_footprint'
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = 2.0
+        base_pose.pose.position.y = 3.0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        refills_lab.teleport_base(base_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = -3.1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0, 0, 1]))
+        goal_c = base_pose
+
+        #kitchen_setup_avoid_collisions.set_json_goal(u'SetPredictionHorizon', prediction_horizon=1)
+        refills_lab.allow_all_collisions()
+        refills_lab.set_json_goal(u'CartesianPathCarrot',
+                                  root_link=refills_lab.default_root,
+                                  tip_link=tip_link,
+                                  goal=goal_c,
+                                  predict_f=10.0)
+
+        refills_lab.plan_and_execute()
         #kitchen_setup_avoid_collisions.send_goal()
         #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
@@ -2627,8 +2680,133 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.plan_and_execute()
 
-    @pytest.mark.repeat(5)
-    def test_pathAroundKitchenIsland_with_global_planner_and_box(self, kitchen_setup_avoid_collisions):
+    @pytest.mark.repeat(15)
+    def test_navi_3_stuck(self, kitchen_setup_avoid_collisions):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
+        """
+        :type kitchen_setup_avoid_collisions: PR2
+        """
+        tj_a = [[-0.00000e+00, 2.00000e+00, 1.92195e-06],
+                [-1.14698e-01, 1.87903e+00, 6.65996e-02],
+                [-5.02469e-02, 1.71219e+00, 2.43104e-02],
+                [-4.67477e-02, 1.54885e+00, 9.75557e-02],
+                [-1.14831e-01, 1.42465e+00, 2.14280e-01],
+                [-4.36070e-02, 1.32318e+00, 6.22169e-02],
+                [2.82440e-02, 1.15371e+00, 9.40615e-02],
+                [-3.22373e-02, 1.00175e+00, 2.11726e-02],
+                [-8.99319e-02, 8.17358e-01, 3.47652e-02],
+                [-1.10718e-02, 6.44228e-01, 1.52542e-02],
+                [1.03955e-01, 5.21862e-01, 7.93707e-02],
+                [1.02730e-01, 3.83932e-01, -4.47585e-02],
+                [2.32972e-01, 2.38108e-01, -5.37212e-02],
+                [3.39305e-01, 2.52551e-01, -2.39103e-01],
+                [2.10944e-01, 1.39223e-01, -2.96644e-01],
+                [2.20303e-01, 4.25983e-02, -5.02490e-01],
+                [2.34666e-01, 4.40739e-02, -8.73614e-01],
+                [3.13372e-01, 1.36479e-02, -1.10485e+00],
+                [1.93062e-01, -1.00863e-02, -1.25959e+00],
+                [2.46916e-01, -1.77602e-01, -1.30767e+00],
+                [2.24101e-01, -3.50326e-01, -1.35923e+00],
+                [1.06686e-01, -3.99275e-01, -1.50481e+00],
+                [1.16489e-01, -5.56927e-01, -1.58889e+00],
+                [3.73072e-02, -6.76895e-01, -1.70141e+00],
+                [4.95714e-02, -7.13035e-01, -2.02508e+00],
+                [6.61559e-02, -7.72211e-01, -2.30217e+00],
+                [-8.14138e-02, -8.04503e-01, -2.40005e+00],
+                [-2.34866e-01, -8.81529e-01, -2.34344e+00],
+                [-4.24074e-01, -9.02666e-01, -2.32421e+00],
+                [-6.09024e-01, -8.88678e-01, -2.29517e+00],
+                [-7.66748e-01, -7.73141e-01, -2.30414e+00],
+                [-9.61292e-01, -7.92777e-01, -2.31308e+00],
+                [-1.02139e+00, -8.36017e-01, -2.56501e+00],
+                [-1.02169e+00, -7.83873e-01, -2.34957e+00],
+                [-1.02208e+00, -7.18637e-01, -2.08004e+00],
+                [-1.02246e+00, -6.53401e-01, -1.81052e+00],
+                [-1.02284e+00, -5.88166e-01, -1.54099e+00],
+                [-1.02322e+00, -5.22930e-01, -1.27146e+00],
+                [-1.02360e+00, -4.57694e-01, -1.00194e+00],
+                [-1.09022e+00, -3.88439e-01, -7.94128e-01],
+                [-1.17315e+00, -3.24424e-01, -6.03651e-01],
+                [-1.25608e+00, -2.60409e-01, -4.13173e-01],
+                [-1.42628e+00, -2.95172e-01, -3.60604e-01],
+                [-1.59648e+00, -3.29936e-01, -3.08034e-01],
+                [-1.76668e+00, -3.64699e-01, -2.55465e-01],
+                [-1.72377e+00, -2.63582e-01, -7.51521e-02],
+                [-1.83889e+00, -1.62515e-01, 1.84722e-02],
+                [-1.95034e+00, -3.27492e-02, 7.63583e-02],
+                [-1.93177e+00, 1.04183e-01, 1.99985e-01],
+                [-1.85549e+00, 2.05511e-01, 3.46335e-01],
+                [-1.95529e+00, 3.68291e-01, 3.64465e-01],
+                [-1.89617e+00, 4.94312e-01, 4.86068e-01],
+                [-1.94512e+00, 6.49940e-01, 4.12359e-01],
+                [-2.01484e+00, 7.22352e-01, 2.13394e-01],
+                [-2.02206e+00, 8.59219e-01, 8.75088e-02],
+                [-1.93045e+00, 1.03341e+00, 9.38936e-02],
+                [-2.07202e+00, 1.13460e+00, 1.45849e-01],
+                [-2.06596e+00, 1.25141e+00, 3.11908e-01],
+                [-2.02112e+00, 1.39071e+00, 2.04576e-01],
+                [-1.99934e+00, 1.53781e+00, 1.01990e-01],
+                [-2.02851e+00, 1.66977e+00, -2.77325e-02],
+                [-2.07125e+00, 1.83245e+00, 3.58616e-02],
+                [-2.00000e+00, 2.00000e+00, 1.92195e-06]]
+        poses = []
+        for i, point in enumerate(tj_a):
+            base_pose = PoseStamped()
+            base_pose.header.frame_id = 'map'
+            base_pose.pose.position.x = point[0]
+            base_pose.pose.position.y = point[1]
+            base_pose.pose.position.z = point[2] if len(point) > 3 else 0
+            if len(point) > 3:
+                base_pose.pose.orientation = Quaternion(point[3], point[4], point[5], point[6])
+            else:
+                arr = quaternion_from_euler(0, 0, point[2])
+                base_pose.pose.orientation = Quaternion(arr[0], arr[1], arr[2], arr[3])
+            if i == 0:
+                # important assumption for constraint:
+                # we do not to reach the first pose, since it is the start pose
+                continue
+            else:
+                poses.append(base_pose)
+        tip_link = u'base_footprint'
+
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = tip_link
+        box_pose.pose.position.x = -0.5
+        box_pose.pose.position.y = 0
+        box_pose.pose.position.z = 0
+        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup_avoid_collisions.add_box('box', [0.5, 0.5, 1], pose=box_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 2.0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup_avoid_collisions.teleport_base(base_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = -2
+        base_pose.pose.position.y = 0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        goal_c = base_pose
+
+        try:
+            kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
+                                                         tip_link=tip_link,
+                                                         root_link=kitchen_setup_avoid_collisions.default_root,
+                                                         goal=goal_c,
+                                                         goals=poses,
+                                                         predict_f=10.0)
+            kitchen_setup_avoid_collisions.plan_and_execute()
+        except Exception:
+            pass
+        #kitchen_setup_avoid_collisions.send_goal()
+        #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
+        #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
+    @pytest.mark.repeat(15)
+    def test_navi_3(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
         :type kitchen_setup_avoid_collisions: PR2
@@ -2658,11 +2836,11 @@ class TestCartesianPath(object):
         goal_c = base_pose
 
         try:
-            kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+            kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                          tip_link=tip_link,
                                                          root_link=kitchen_setup_avoid_collisions.default_root,
-                                                         goal=goal_c
-                                                         )
+                                                         goal=goal_c,
+                                                         predict_f=10.0)
             kitchen_setup_avoid_collisions.plan_and_execute()
         except Exception:
             pass
@@ -2671,7 +2849,7 @@ class TestCartesianPath(object):
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
     @pytest.mark.repeat(5)
-    def test_pathAroundKitchenIsland_with_open_stuff(self, kitchen_setup_avoid_collisions):
+    def test_navi_4(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
         :type kitchen_setup_avoid_collisions: PR2
@@ -2695,10 +2873,11 @@ class TestCartesianPath(object):
         goal_c = base_pose
 
         try:
-            kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
-                                                         tip_link=tip_link,
+            kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                          root_link=kitchen_setup_avoid_collisions.default_root,
-                                                         goal=goal_c)
+                                                         tip_link=tip_link,
+                                                         goal=goal_c,
+                                                         predict_f=10.0)
             kitchen_setup_avoid_collisions.plan_and_execute()
         except Exception:
             pass
@@ -2706,323 +2885,12 @@ class TestCartesianPath(object):
         #kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
-    #@pytest.mark.repeat(5)
-    def test_pathAroundKitchenIsland_with_open_stuff_and_box(self, kitchen_setup_avoid_collisions):
-        tj_a = [[-0.        ,  2.1       ,  0.392705  ], # cost 12.11348
-       [-0.0802661 ,  1.96285   ,  0.310531  ],
-       [-0.232431  ,  1.92845   ,  0.39852   ],
-       [-0.266267  ,  1.74423   ,  0.423928  ],
-       [-0.297121  ,  1.59974   ,  0.319424  ],
-       [-0.243799  ,  1.61411   ,  0.0298742 ],
-       [-0.218986  ,  1.6151    , -0.320462  ],
-       [-0.0769564 ,  1.56538   , -0.419501  ],
-       [ 0.041516  ,  1.53989   , -0.577133  ],
-       [ 0.135408  ,  1.41418   , -0.663335  ],
-       [ 0.132241  ,  1.2957    , -0.500389  ],
-       [ 0.246383  ,  1.16907   , -0.441349  ],
-       [ 0.192859  ,  1.06091   , -0.600004  ],
-       [ 0.194196  ,  0.916292  , -0.48926   ],
-       [ 0.254225  ,  0.731022  , -0.478763  ],
-       [ 0.126667  ,  0.595153  , -0.45149   ],
-       [ 0.207964  ,  0.434421  , -0.411734  ],
-       [ 0.235332  ,  0.285364  , -0.508637  ],
-       [ 0.235267  ,  0.131167  , -0.417033  ],
-       [ 0.161633  , -0.0253799 , -0.363032  ],
-       [ 0.26869   , -0.107964  , -0.233449  ],
-       [ 0.377213  , -0.2157    , -0.139287  ],
-       [ 0.320443  , -0.369975  , -0.0680656 ],
-       [ 0.263673  , -0.524251  ,  0.00315595],
-       [ 0.206903  , -0.678526  ,  0.0743775 ],
-       [ 0.150133  , -0.832802  ,  0.145599  ],
-       [ 0.093363  , -0.987078  ,  0.216821  ],
-       [ 0.0365929 , -1.14135   ,  0.288042  ],
-       [ 0.00438163, -1.22889   ,  0.328453  ],
-       [-0.040047  , -1.09063   ,  0.218901  ],
-       [-0.166175  , -1.08318   ,  0.0715956 ],
-       [-0.304505  , -1.01639   , -0.0211831 ],
-       [-0.416302  , -1.10381   ,  0.0949787 ],
-       [-0.584223  , -0.995921  ,  0.0957923 ],
-       [-0.63015   , -0.965385  ,  0.385489  ],
-       [-0.67664   , -0.827247  ,  0.493986  ],
-       [-0.826078  , -0.819651  ,  0.594724  ],
-       [-0.936039  , -0.755494  ,  0.740106  ],
-       [-1.03406   , -0.583549  ,  0.744263  ],
-       [-1.05712   , -0.459216  ,  0.891357  ],
-       [-1.19344   , -0.358359  ,  0.9522    ],
-       [-1.269     , -0.457331  ,  1.10316   ],
-       [-1.42486   , -0.436468  ,  1.18866   ],
-       [-1.55751   , -0.493249  ,  1.30009   ],
-       [-1.69183   , -0.373243  ,  1.33984   ],
-       [-1.81488   , -0.313819  ,  1.46656   ],
-       [-1.80537   , -0.203449  ,  1.645     ],
-       [-1.79732   , -0.0631315 ,  1.7639    ],
-       [-1.78322   ,  0.0674739 ,  1.90117   ],
-       [-1.82952   ,  0.209675  ,  2.00208   ],
-       [-1.91443   ,  0.367467  ,  2.04371   ],
-       [-1.89544   ,  0.561629  ,  2.05353   ],
-       [-2.05176   ,  0.622268  ,  2.11819   ],
-       [-1.97649   ,  0.798679  ,  2.13459   ],
-       [-1.94454   ,  0.916244  ,  2.29093   ],
-       [-1.91639   ,  1.07168   ,  2.375     ],
-       [-1.89805   ,  1.23953   ,  2.43731   ],
-       [-2.01844   ,  1.19162   ,  2.57817   ],
-       [-2.13883   ,  1.14372   ,  2.71902   ],
-       [-2.25922   ,  1.09581   ,  2.85988   ],
-       [-2.37961   ,  1.04791   ,  3.00074   ],
-       [-2.5       ,  1.        , -3.14159   ]]
-        tj_b = [[-0.        ,  2.1       ,  0.392701  ], # cost: 9.85511
-       [ 0.00467793,  1.95786   ,  0.277136  ],
-       [-0.0254839 ,  1.76226   ,  0.272961  ],
-       [ 0.0593704 ,  1.64567   ,  0.384568  ],
-       [ 0.144519  ,  1.47528   ,  0.403598  ],
-       [ 0.24026   ,  1.40588   ,  0.240088  ],
-       [ 0.32897   ,  1.29505   ,  0.124016  ],
-       [ 0.233237  ,  1.2132    , -0.0240789 ],
-       [ 0.185689  ,  1.07631   ,  0.0860996 ],
-       [ 0.218911  ,  0.920867  ,  0.00401163],
-       [ 0.297386  ,  0.745154  ,  0.0191308 ],
-       [ 0.354747  ,  0.557326  ,  0.0119145 ],
-       [ 0.274374  ,  0.413704  , -0.0589234 ],
-       [ 0.250227  ,  0.248627  ,  0.00740821],
-       [ 0.173682  ,  0.141097  , -0.128609  ],
-       [ 0.190416  ,  0.0151832 ,  0.0173499 ],
-       [ 0.177986  , -0.127474  , -0.0962549 ],
-       [ 0.144721  , -0.222212  , -0.295437  ],
-       [ 0.283602  , -0.27488   , -0.398371  ],
-       [ 0.194931  , -0.406516  , -0.480941  ],
-       [ 0.0850136 , -0.514325  , -0.573015  ],
-       [-0.00466381, -0.608402  , -0.713072  ],
-       [ 0.0158795 , -0.791212  , -0.74515   ],
-       [-0.16418   , -0.828904  , -0.777226  ],
-       [-0.328351  , -0.736285  , -0.800236  ],
-       [-0.426551  , -0.701317  , -0.991756  ],
-       [-0.524751  , -0.666349  , -1.18327   ],
-       [-0.701068  , -0.739115  , -1.20179   ],
-       [-0.723341  , -0.725232  , -1.25952   ],
-       [-0.804176  , -0.674848  , -1.46901   ],
-       [-0.885011  , -0.624463  , -1.67851   ],
-       [-0.965846  , -0.574078  , -1.888     ],
-       [-1.04668   , -0.523693  , -2.0975    ],
-       [-1.12752   , -0.473309  , -2.307     ],
-       [-1.20835   , -0.422924  , -2.51649   ],
-       [-1.26138   , -0.246933  , -2.48411   ],
-       [-1.35992   , -0.1759    , -2.64116   ],
-       [-1.45846   , -0.104867  , -2.79821   ],
-       [-1.557     , -0.0338334 , -2.95527   ],
-       [-1.65554   ,  0.0371998 , -3.11232   ],
-       [-1.75408   ,  0.108233  ,  3.01381   ],
-       [-1.85262   ,  0.179266  ,  2.85676   ],
-       [-1.80791   ,  0.296471  ,  2.70764   ],
-       [-1.84295   ,  0.407824  ,  2.54112   ],
-       [-1.90793   ,  0.532592  ,  2.65978   ],
-       [-2.03086   ,  0.67301   ,  2.68653   ],
-       [-2.05935   ,  0.812553  ,  2.80168   ],
-       [-2.12985   ,  0.968706  ,  2.85902   ],
-       [-2.26689   ,  1.11357   ,  2.8602    ],
-       [-2.38344   ,  1.05678   ,  3.0009    ],
-       [-2.5       ,  1.        , -3.14159   ]]
-        tj_c = [[-0.00000e+00,  2.10000e+00,  3.92701e-01], # 10.90804
-       [ 1.03621e-03,  2.14905e+00,  9.08181e-02],
-       [ 1.10533e-01,  2.29301e+00,  5.25616e-02],
-       [ 2.11731e-01,  2.26691e+00, -1.38418e-01],
-       [ 3.69641e-01,  2.20312e+00, -7.90313e-02],
-       [ 4.26120e-01,  2.12237e+00, -2.81950e-01],
-       [ 4.94427e-01,  1.94130e+00, -2.94895e-01],
-       [ 4.60001e-01,  1.75638e+00, -3.18703e-01],
-       [ 3.72188e-01,  1.61177e+00, -3.80336e-01],
-       [ 3.09346e-01,  1.48267e+00, -4.93166e-01],
-       [ 3.20707e-01,  1.32623e+00, -5.79467e-01],
-       [ 2.28102e-01,  1.22140e+00, -6.99721e-01],
-       [ 1.67046e-01,  1.08949e+00, -8.09000e-01],
-       [ 1.98143e-01,  8.93903e-01, -8.12920e-01],
-       [ 1.77782e-01,  6.95968e-01, -8.14960e-01],
-       [ 2.19842e-01,  5.47219e-01, -9.05798e-01],
-       [ 3.39845e-01,  3.99106e-01, -8.87050e-01],
-       [ 5.14364e-01,  3.68445e-01, -8.41433e-01],
-       [ 5.60645e-01,  2.37766e-01, -7.18698e-01],
-       [ 6.03366e-01,  7.07443e-02, -7.73901e-01],
-       [ 6.95048e-01, -9.26733e-02, -7.99144e-01],
-       [ 6.07192e-01, -2.57417e-01, -8.25732e-01],
-       [ 5.16146e-01, -3.06489e-01, -1.01888e+00],
-       [ 4.25100e-01, -3.55560e-01, -1.21202e+00],
-       [ 3.34054e-01, -4.04632e-01, -1.40516e+00],
-       [ 2.43008e-01, -4.53704e-01, -1.59831e+00],
-       [ 1.51962e-01, -5.02776e-01, -1.79145e+00],
-       [ 6.09160e-02, -5.51847e-01, -1.98459e+00],
-       [-3.01300e-02, -6.00919e-01, -2.17774e+00],
-       [-1.21176e-01, -6.49991e-01, -2.37088e+00],
-       [-2.12222e-01, -6.99063e-01, -2.56402e+00],
-       [-3.03268e-01, -7.48134e-01, -2.75717e+00],
-       [-3.94314e-01, -7.97206e-01, -2.95031e+00],
-       [-4.85360e-01, -8.46278e-01,  3.13973e+00],
-       [-5.34543e-01, -8.72786e-01,  3.03540e+00],
-       [-6.62254e-01, -9.22624e-01, -3.12197e+00],
-       [-8.50192e-01, -8.64544e-01, -3.11538e+00],
-       [-1.04266e+00, -9.17213e-01, -3.11446e+00],
-       [-1.09378e+00, -8.83666e-01, -2.83676e+00],
-       [-1.23260e+00, -7.68052e-01, -2.79807e+00],
-       [-1.27442e+00, -6.62199e-01, -2.62570e+00],
-       [-1.26521e+00, -4.69011e-01, -2.63889e+00],
-       [-1.42527e+00, -3.66965e-01, -2.65925e+00],
-       [-1.44458e+00, -2.56842e-01, -2.83565e+00],
-       [-1.46256e+00, -1.08439e-01, -2.73462e+00],
-       [-1.60793e+00, -4.36694e-02, -2.65292e+00],
-       [-1.78401e+00,  4.23054e-02, -2.64481e+00],
-       [-1.78416e+00,  2.20887e-01, -2.68765e+00],
-       [-1.79546e+00,  3.62032e-01, -2.80445e+00],
-       [-1.88684e+00,  5.16376e-01, -2.76318e+00],
-       [-1.89678e+00,  6.52217e-01, -2.89078e+00],
-       [-2.01680e+00,  7.44677e-01, -2.98777e+00],
-       [-2.17626e+00,  6.97958e-01, -3.05544e+00],
-       [-2.35331e+00,  7.17207e-01, -3.09926e+00],
-       [-2.36643e+00,  9.02993e-01, -3.07176e+00],
-       [-2.50000e+00,  1.00000e+00, -3.14159e+00]]
-        tj_d = [[-0.        ,  2.1       ,  0.392701  ], # 12.48887
-       [ 0.139569  ,  2.08543   ,  0.273356  ],
-       [ 0.227537  ,  1.98913   ,  0.134224  ],
-       [ 0.229875  ,  1.83587   ,  0.0407701 ],
-       [ 0.323961  ,  1.70722   , -0.0404562 ],
-       [ 0.465547  ,  1.60167   ,  0.00634619],
-       [ 0.482292  ,  1.41878   ,  0.0390481 ],
-       [ 0.446123  ,  1.24544   , -0.00680645],
-       [ 0.495396  ,  1.1319    ,  0.14565   ],
-       [ 0.512665  ,  0.972999  ,  0.22597   ],
-       [ 0.572157  ,  0.795254  ,  0.251097  ],
-       [ 0.614694  ,  0.649204  ,  0.155335  ],
-       [ 0.615436  ,  0.493344  ,  0.0670587 ],
-       [ 0.623793  ,  0.308478  ,  0.037168  ],
-       [ 0.463789  ,  0.235456  , -0.0110722 ],
-       [ 0.348092  ,  0.0848329 , -0.0312141 ],
-       [ 0.267299  , -0.0880793 , -0.012927  ],
-       [ 0.338009  , -0.207769  , -0.134895  ],
-       [ 0.42238   , -0.387306  , -0.138147  ],
-       [ 0.443422  , -0.47824   ,  0.0751795 ],
-       [ 0.378783  , -0.599233  ,  0.200826  ],
-       [ 0.215894  , -0.68623   ,  0.231495  ],
-       [ 0.0440172 , -0.787697  ,  0.23068   ],
-       [ 0.0774157 , -0.984575  ,  0.230062  ],
-       [ 0.0232548 , -1.07376   ,  0.42138   ],
-       [-0.0293856 , -1.05316   ,  0.486056  ],
-       [-0.147857  , -1.00679   ,  0.631614  ],
-       [-0.266329  , -0.960429  ,  0.777172  ],
-       [-0.3848    , -0.914064  ,  0.92273   ],
-       [-0.503272  , -0.8677    ,  1.06829   ],
-       [-0.621743  , -0.821336  ,  1.21385   ],
-       [-0.740215  , -0.774971  ,  1.3594    ],
-       [-0.793995  , -0.63376   ,  1.26162   ],
-       [-0.947701  , -0.666206  ,  1.1758    ],
-       [-0.905737  , -0.554368  ,  1.01471   ],
-       [-0.992933  , -0.54829   ,  0.789522  ],
-       [-1.14496   , -0.46919   ,  0.732262  ],
-       [-1.30162   , -0.378942  ,  0.693857  ],
-       [-1.27722   , -0.256353  ,  0.543843  ],
-       [-1.19517   , -0.0937672 ,  0.579605  ],
-       [-1.30792   , -0.0300795 ,  0.720609  ],
-       [-1.42068   ,  0.0336081 ,  0.861613  ],
-       [-1.44436   ,  0.220015  ,  0.885801  ],
-       [-1.59205   ,  0.348168  ,  0.894721  ],
-       [-1.70986   ,  0.41645   ,  1.02239   ],
-       [-1.86617   ,  0.494108  ,  1.07332   ],
-       [-2.02248   ,  0.571766  ,  1.12424   ],
-       [-1.94818   ,  0.692789  ,  1.24022   ],
-       [-2.09447   ,  0.774015  ,  1.30557   ],
-       [-2.20166   ,  0.922504  ,  1.3393    ],
-       [-2.08703   ,  1.04677   ,  1.40118   ],
-       [-1.94289   ,  1.08284   ,  1.50401   ],
-       [-1.93897   ,  1.2627    ,  1.5442    ],
-       [-1.93374   ,  1.45926   ,  1.55093   ],
-       [-1.88461   ,  1.45611   ,  1.85247   ],
-       [-2.02921   ,  1.45839   ,  1.96325   ],
-       [-2.0768    ,  1.41755   ,  2.23782   ],
-       [-1.96365   ,  1.38859   ,  2.40424   ],
-       [-1.86944   ,  1.28708   ,  2.52726   ],
-       [-1.99555   ,  1.22966   ,  2.65013   ],
-       [-2.12167   ,  1.17225   ,  2.77299   ],
-       [-2.24778   ,  1.11483   ,  2.89586   ],
-       [-2.37389   ,  1.05742   ,  3.01873   ],
-       [-2.5       ,  1.        , -3.14159   ]]
-        tj_e = [[-0.       ,  2.1      ,  0.392701 ], # 11.44077
-       [-0.0962288,  1.97623  ,  0.479153 ],
-       [-0.065071 ,  1.83039  ,  0.377432 ],
-       [-0.0208806,  1.68173  ,  0.287606 ],
-       [ 0.0219156,  1.50957  ,  0.242402 ],
-       [ 0.195807 ,  1.52915  ,  0.192383 ],
-       [ 0.254148 ,  1.39435  ,  0.298611 ],
-       [ 0.333058 ,  1.36579  ,  0.530771 ],
-       [ 0.312525 ,  1.21316  ,  0.622776 ],
-       [ 0.230496 ,  1.09709  ,  0.738514 ],
-       [ 0.190517 ,  0.950689 ,  0.834985 ],
-       [ 0.199867 ,  0.784739 ,  0.767413 ],
-       [ 0.151796 ,  0.622718 ,  0.82941  ],
-       [ 0.217371 ,  0.536659 ,  1.01302  ],
-       [ 0.276327 ,  0.430404 ,  0.856051 ],
-       [ 0.440119 ,  0.426643 ,  0.783721 ],
-       [ 0.458402 ,  0.306025 ,  0.627713 ],
-       [ 0.478758 ,  0.15728  ,  0.527975 ],
-       [ 0.464033 ,  0.128491 ,  0.544846 ],
-       [ 0.391803 , -0.0127291,  0.627605 ],
-       [ 0.319572 , -0.15395  ,  0.710364 ],
-       [ 0.247342 , -0.29517  ,  0.793123 ],
-       [ 0.175112 , -0.436391 ,  0.875882 ],
-       [ 0.102881 , -0.577611 ,  0.958641 ],
-       [ 0.030651 , -0.718832 ,  1.0414   ],
-       [-0.0415793, -0.860053 ,  1.12416  ],
-       [-0.11381  , -1.00127  ,  1.20692  ],
-       [-0.18604  , -1.14249  ,  1.28968  ],
-       [-0.25827  , -1.28371  ,  1.37244  ],
-       [-0.330501 , -1.42493  ,  1.45519  ],
-       [-0.388852 , -1.31916  ,  1.6136   ],
-       [-0.542595 , -1.36854  ,  1.69064  ],
-       [-0.512172 , -1.30173  ,  1.94381  ],
-       [-0.631762 , -1.24959  ,  2.08288  ],
-       [-0.721006 , -1.16256  ,  1.93218  ],
-       [-0.746526 , -1.03269  ,  1.79688  ],
-       [-0.822826 , -0.904442 ,  1.89841  ],
-       [-0.955289 , -0.777773 ,  1.93185  ],
-       [-0.92488  , -0.669029 ,  2.10602  ],
-       [-1.04587  , -0.591118 ,  2.2182   ],
-       [-1.19017  , -0.483003 ,  2.17882  ],
-       [-1.16233  , -0.384816 ,  1.98293  ],
-       [-1.27521  , -0.26142  ,  1.91741  ],
-       [-1.35986  , -0.14339  ,  2.02692  ],
-       [-1.55561  , -0.184117 ,  2.02702  ],
-       [-1.69383  , -0.0835249,  2.08512  ],
-       [-1.82101  ,  0.051435 ,  2.056    ],
-       [-1.71645  ,  0.202719 ,  2.0882   ],
-       [-1.82239  ,  0.326574 ,  2.16222  ],
-       [-1.91847  ,  0.397925 ,  2.32288  ],
-       [-1.95058  ,  0.594845 ,  2.32192  ],
-       [-1.92461  ,  0.731331 ,  2.44405  ],
-       [-1.89778  ,  0.874189 ,  2.55334  ],
-       [-1.88217  ,  1.04831  ,  2.60371  ],
-       [-2.01014  ,  1.19894  ,  2.59902  ],
-       [-2.13261  ,  1.14921  ,  2.73466  ],
-       [-2.25507  ,  1.09947  ,  2.87031  ],
-       [-2.37754  ,  1.04974  ,  3.00595  ],
-       [-2.5      ,  1.       , -3.14159  ]]
-
+    @pytest.mark.repeat(5)
+    def test_navi_5(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
         :type kitchen_setup_avoid_collisions: PR2
         """
-        poses = []
-        for i, point in enumerate(tj_e):
-            base_pose = PoseStamped()
-            base_pose.header.frame_id = 'map'
-            base_pose.pose.position.x = point[0]
-            base_pose.pose.position.y = point[1]
-            base_pose.pose.position.z = point[2] if len(point) > 3 else 0
-            if len(point) > 3:
-                base_pose.pose.orientation = Quaternion(point[3], point[4], point[5], point[6])
-            else:
-                arr = quaternion_from_euler(0, 0, point[2])
-                base_pose.pose.orientation = Quaternion(arr[0], arr[1], arr[2], arr[3])
-            if i == 0:
-                # important assumption for constraint:
-                # we do not to reach the first pose, since it is the start pose
-                pass
-            else:
-                poses.append(base_pose)
         tip_link = u'base_footprint'
         kitchen_setup_avoid_collisions.set_kitchen_js({'kitchen_island_left_upper_drawer_main_joint': 0.48})
         kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.28})
@@ -3050,13 +2918,12 @@ class TestCartesianPath(object):
         base_pose.pose.position.y = 1
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         goal_c = base_pose
-        kitchen_setup_avoid_collisions.allow_all_collisions()
+        #kitchen_setup_avoid_collisions.allow_all_collisions()
         try:
             kitchen_setup_avoid_collisions.set_json_goal('CartesianPathCarrot',
                                                          tip_link=tip_link,
                                                          root_link=kitchen_setup_avoid_collisions.default_root,
                                                          goal=goal_c,
-                                                         goals=poses,
                                                          predict_f=10.0)
             kitchen_setup_avoid_collisions.plan_and_execute()
         except Exception:
@@ -3172,7 +3039,8 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
 
-    def test_ease_fridge_picking_1(self, kitchen_setup_avoid_collisions):
+    @pytest.mark.repeat(5)
+    def test_milk_1(self, kitchen_setup_avoid_collisions):
         rospy.sleep(10.0)#0.5
 
         tip_link = kitchen_setup_avoid_collisions.l_tip
@@ -3225,6 +3093,8 @@ class TestCartesianPath(object):
         # pick up
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      tip_link=tip_link,
+                                                     predict_f=2.0,
+                                                     narrow=True,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=milk_pre_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
@@ -3239,39 +3109,8 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
 
-        # dont allow robot to move
-        js = kitchen_setup_avoid_collisions.god_map.get_data(identifier.joint_states)
-        odom_joints = ['odom_x_joint', 'odom_y_joint', 'odom_z_joint']
-        kitchen_setup_avoid_collisions.set_joint_goal({j_n: js[j_n].position for j_n in odom_joints})
-
-        # place milk back
-        # pregrasping
-        kitchen_setup_avoid_collisions.allow_collision(body_b=milk_name)
-        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
-                                                     root_link=kitchen_setup_avoid_collisions.default_root,
-                                                     tip_link=tip_link,
-                                                     goal=milk_pose)
-        kitchen_setup_avoid_collisions.plan_and_execute()
-
-        # kitchen_setup.keep_position(kitchen_setup_avoid_collisions.r_tip)
-        if tip_link == kitchen_setup_avoid_collisions.l_tip:
-            kitchen_setup_avoid_collisions.open_l_gripper()
-        elif tip_link == kitchen_setup_avoid_collisions.r_tip:
-            kitchen_setup_avoid_collisions.open_r_gripper()
-        else:
-            raise Exception('Wrong tip link')
-
-        kitchen_setup_avoid_collisions.detach_object(milk_name)
-
-        #kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
-        #                                             root_link=kitchen_setup_avoid_collisions.default_root,
-        #                                             tip_link=tip_link,
-        #                                             goal=milk_grasp_pre_pose)
-        # kitchen_setup_avoid_collisions.send_and_check_goal()
-
-        kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
-
-    def test_ease_fridge_placing_global_planner(self, kitchen_setup_avoid_collisions):
+    @pytest.mark.repeat(5)
+    def test_milk_2(self, kitchen_setup_avoid_collisions):
         rospy.sleep(10.0)#0.5
 
         tip_link = kitchen_setup_avoid_collisions.l_tip
@@ -3359,6 +3198,8 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      tip_link=tip_link,
+                                                     predict_f=2.0,
+                                                     narrow=True,
                                                      goal=milk_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
 
@@ -3497,8 +3338,9 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
 
+    # ease_fridge_pregrasp_1
     @pytest.mark.repeat(5)
-    def test_ease_fridge_pregrasp_1(self, kitchen_setup_avoid_collisions):
+    def test_milk_3(self, kitchen_setup_avoid_collisions):
         rospy.sleep(10.0)
 
         tip_link = kitchen_setup_avoid_collisions.r_tip
@@ -3541,6 +3383,7 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      tip_link=tip_link,
+                                                     predict_f=5.0,
                                                      goal=milk_pre_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
 
@@ -3861,7 +3704,8 @@ class TestCartesianPath(object):
         msg.transforms.append(make_transform(pose_stamped.header.frame_id, name, pose_stamped.pose))
         pub.publish(msg)
 
-    def test_ease_cereal_with_planner_placing(self, kitchen_setup_avoid_collisions):
+    @pytest.mark.repeat(5)
+    def test_cereal_2(self, kitchen_setup_avoid_collisions):
         # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
@@ -3901,6 +3745,8 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPathCarrot',
                                                      tip_link=kitchen_setup_avoid_collisions.r_tip,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
+                                                     predict_f=2.0,
+                                                     narrow=True,
                                                      goal=grasp_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
         #kitchen_setup_avoid_collisions.god_map.set_data(identifier.rosparam + ['reset_god_map'], True)
@@ -3912,760 +3758,13 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_joint_goal(gaya_pose)
         kitchen_setup_avoid_collisions.plan_and_execute()
 
-    #@pytest.mark.repeat(10)
-    def test_ease_cereal_with_planner_1_pick(self, kitchen_setup_avoid_collisions):
-        tj_a = [[0.926, 1.453, 1.09, 0.00873676, 0.00537855,
-          0.839261, 0.543633],
-         [0.924767, 1.43488, 1.08704, -0.0197094, -0.00763073,
-          0.795805, 0.605183],
-         [0.939336, 1.41977, 1.09107, -0.0718906, -0.059543,
-          0.775747, 0.624102],
-         [0.95405, 1.42687, 1.08886, -0.134803, -0.11318,
-          0.765101, 0.619385],
-         [0.973875, 1.41395, 1.09299, -0.137585, -0.185483,
-          0.743478, 0.62762],
-         [0.962465, 1.40553, 1.09279, -0.167463, -0.222918,
-          0.687045, 0.670994],
-         [0.980964, 1.42372, 1.07323, -0.2151, -0.2247,
-          0.64663, 0.6965],
-         [0.997692, 1.42536, 1.06782, -0.171931, -0.220107,
-          0.600615, 0.749169],
-         [1.02751, 1.44197, 1.0798, -0.184796, -0.274952,
-          0.570708, 0.751362],
-         [1.01039, 1.44075, 1.06623, -0.238538, -0.278445,
-          0.518295, 0.772618],
-         [0.995644, 1.43728, 1.07101, -0.187906, -0.296294,
-          0.466775, 0.811802],
-         [0.982401, 1.44527, 1.08122, -0.226686, -0.360485,
-          0.448531, 0.785802],
-         [0.988509, 1.42962, 1.07476, -0.190508, -0.422415,
-          0.408842, 0.786206],
-         [0.992892, 1.40333, 1.07564, -0.249291, -0.445875,
-          0.373852, 0.774135],
-         [0.998308, 1.41604, 1.08756, -0.310081, -0.429826,
-          0.322618, 0.78423],
-         [1.00619, 1.40645, 1.08215, -0.3877, -0.437372,
-          0.315053, 0.747754],
-         [1.02766, 1.36858, 1.08451, -0.40264, -0.47731,
-          0.322155, 0.711528],
-         [1.03031726, 1.35620905, 1.08458356, -0.38882257, -0.46118023,
-          0.35331032, 0.71505358],
-         [1.03297451, 1.34383809, 1.08465712, -0.37444745, -0.44438898,
-          0.38395889, 0.71755356],
-         [1.03563177, 1.33146714, 1.08473067, -0.35953531, -0.4269604,
-          0.4140568, 0.71902444],
-         [1.03828903, 1.31909619, 1.08480423, -0.34410753, -0.40891949,
-          0.44356088, 0.71946411],
-         [1.04094628, 1.30672523, 1.08487779, -0.32818624, -0.39029211,
-          0.47242881, 0.71887195],
-         [1.04360354, 1.29435428, 1.08495135, -0.31179427, -0.37110499,
-          0.5006192, 0.71724879],
-         [1.0462608, 1.28198333, 1.08502491, -0.29495514, -0.35138564,
-          0.52809161, 0.71459698],
-         [1.04891805, 1.26961237, 1.08509847, -0.27769299, -0.33116234,
-          0.55480665, 0.71092031],
-         [1.05157531, 1.25724142, 1.08517202, -0.26003258, -0.31046409,
-          0.580726, 0.70622406],
-         [1.05423256, 1.24487047, 1.08524558, -0.24199923, -0.28932059,
-          0.60581248, 0.70051496],
-         [1.05688982, 1.23249951, 1.08531914, -0.22361882, -0.26776215,
-          0.63003013, 0.69380119],
-         [1.05954708, 1.22012856, 1.0853927, -0.2049177, -0.24581969,
-          0.6533442, 0.6860924],
-         [1.06220433, 1.20775761, 1.08546626, -0.18592269, -0.22352468,
-          0.67572126, 0.67739962],
-         [1.06486159, 1.19538665, 1.08553982, -0.16666103, -0.2009091,
-          0.69712922, 0.66773534],
-         [1.06751885, 1.1830157, 1.08561337, -0.14716036, -0.17800538,
-          0.71753737, 0.65711341],
-         [1.0701761, 1.17064474, 1.08568693, -0.12744863, -0.15484637,
-          0.73691645, 0.64554907],
-         [1.07283336, 1.15827379, 1.08576049, -0.10755412, -0.13146528,
-          0.75523866, 0.63305889],
-         [1.07549062, 1.14590284, 1.08583405, -0.08750535, -0.10789565,
-          0.77247773, 0.6196608],
-         [1.07814787, 1.13353188, 1.08590761, -0.06733109, -0.08417128,
-          0.78860893, 0.605374],
-         [1.08080513, 1.12116093, 1.08598117, -0.04706026, -0.06032619,
-          0.80360912, 0.59021899],
-         [1.08346239, 1.10878998, 1.08605472, -0.02672194, -0.03639458,
-          0.8174568, 0.57421751],
-         [1.08809093, 1.08724164, 1.08618285, 0.0087786, 0.005395,
-          0.83876701, 0.544393]]
-        tj_b =  [[0.926, 1.452, 1.09, 0.00874084, 0.00537131,
-          0.838827, 0.544301],
-         [0.922181, 1.45679, 1.09301, 0.0143654, -0.0535375,
-          0.874501, 0.481845],
-         [0.951395, 1.4434, 1.08215, -0.0115004, -0.112476,
-          0.863365, 0.49175],
-         [0.93573, 1.40442, 1.07948, -0.0233309, -0.167639,
-          0.851312, 0.496609],
-         [0.943229, 1.40641, 1.07352, -0.0735979, -0.238196,
-          0.845482, 0.472235],
-         [0.956869, 1.39425, 1.08902, -0.0965844, -0.264701,
-          0.868083, 0.4087],
-         [0.97617, 1.37671, 1.08455, -0.0740051, -0.311388,
-          0.877389, 0.357421],
-         [0.993055, 1.36458, 1.08085, -0.0254254, -0.351056,
-          0.883197, 0.309962],
-         [1.00169, 1.35857, 1.07208, -0.00371679, -0.418711,
-          0.84294, 0.337815],
-         [0.999879, 1.36393, 1.07157, 0.0553312, -0.445256,
-          0.802545, 0.393201],
-         [0.994198, 1.31988, 1.07208, 0.103172, -0.418372,
-          0.810936, 0.395857],
-         [0.997454, 1.29001, 1.08911, 0.1648, -0.422639,
-          0.808764, 0.374323],
-         [1.00528, 1.27962, 1.07887, 0.223283, -0.452137,
-          0.800751, 0.323286],
-         [1.00382, 1.26705, 1.08957, 0.281059, -0.454713,
-          0.760745, 0.368116],
-         [1.00861, 1.23581, 1.09965, 0.290085, -0.45249,
-          0.727988, 0.425603],
-         [1.01104175, 1.2312645, 1.09923797, 0.28242901, -0.43993104,
-          0.73516316, 0.43154334],
-         [1.0134735, 1.22671899, 1.09882594, 0.27468755, -0.42723895,
-          0.74211583, 0.43735308],
-         [1.01590525, 1.22217349, 1.0984139, 0.26686283, -0.41441736,
-          0.74884356, 0.44303026],
-         [1.01833699, 1.21762798, 1.09800187, 0.25895721, -0.40147015,
-          0.7553443, 0.44857314],
-         [1.02076874, 1.21308248, 1.09758984, 0.25097311, -0.38840126,
-          0.76161609, 0.45398006],
-         [1.02320049, 1.20853698, 1.09717781, 0.24291293, -0.37521463,
-          0.76765702, 0.45924937],
-         [1.02563224, 1.20399147, 1.09676577, 0.23477913, -0.36191427,
-          0.77346527, 0.46437948],
-         [1.02806399, 1.19944597, 1.09635374, 0.22657415, -0.34850421,
-          0.77903907, 0.46936882],
-         [1.03049574, 1.19490046, 1.09594171, 0.2183005, -0.33498852,
-          0.78437674, 0.4742159],
-         [1.03292748, 1.19035496, 1.09552968, 0.20996069, -0.32137128,
-          0.78947665, 0.47891923],
-         [1.03535923, 1.18580946, 1.09511764, 0.20155723, -0.30765664,
-          0.79433726, 0.4834774],
-         [1.03779098, 1.18126395, 1.09470561, 0.19309267, -0.29384874,
-          0.79895709, 0.48788903],
-         [1.04022273, 1.17671845, 1.09429358, 0.18456959, -0.27995177,
-          0.80333476, 0.49215276],
-         [1.04265448, 1.17217294, 1.09388155, 0.17599056, -0.26596994,
-          0.80746892, 0.49626732],
-         [1.04508623, 1.16762744, 1.09346951, 0.16735819, -0.2519075,
-          0.81135833, 0.50023145],
-         [1.04751797, 1.16308194, 1.09305748, 0.15867508, -0.2377687,
-          0.81500181, 0.50404396],
-         [1.04994972, 1.15853643, 1.09264545, 0.14994389, -0.22355783,
-          0.81839825, 0.50770369],
-         [1.05238147, 1.15399093, 1.09223342, 0.14116724, -0.20927919,
-          0.82154662, 0.51120952],
-         [1.05481322, 1.14944543, 1.09182138, 0.1323478, -0.19493712,
-          0.82444598, 0.51456041],
-         [1.05724497, 1.14489992, 1.09140935, 0.12348825, -0.18053597,
-          0.82709543, 0.51775532],
-         [1.05967672, 1.14035442, 1.09099732, 0.11459126, -0.16608009,
-          0.82949418, 0.52079329],
-         [1.06210846, 1.13580891, 1.09058529, 0.10565954, -0.15157387,
-          0.8316415, 0.52367341],
-         [1.06454021, 1.13126341, 1.09017325, 0.0966958, -0.1370217,
-          0.83353674, 0.52639479],
-         [1.06697196, 1.12671791, 1.08976122, 0.08770274, -0.122428,
-          0.83517933, 0.52895662],
-         [1.06940371, 1.1221724, 1.08934919, 0.07868311, -0.1077972,
-          0.83656876, 0.53135811],
-         [1.07183546, 1.1176269, 1.08893716, 0.06963962, -0.09313372,
-          0.83770462, 0.53359854],
-         [1.07426721, 1.11308139, 1.08852512, 0.06057502, -0.07844201,
-          0.83858656, 0.53567723],
-         [1.07669895, 1.10853589, 1.08811309, 0.05149206, -0.06372652,
-          0.83921431, 0.53759356],
-         [1.0791307, 1.10399039, 1.08770106, 0.0423935, -0.04899171,
-          0.83958769, 0.53934693],
-         [1.08156245, 1.09944488, 1.08728903, 0.03328208, -0.03424206,
-          0.83970658, 0.54093682],
-         [1.0839942, 1.09489938, 1.08687699, 0.02416058, -0.01948202,
-          0.83957095, 0.54236274],
-         [1.08809093, 1.08724164, 1.08618285, 0.0087786, 0.005395,
-          0.83876701, 0.544393]]
-        tj_c = [[9.26000000e-01, 1.45300000e+00, 1.09000000e+00,
-          8.73823000e-03, 5.37644000e-03, 8.39126000e-01,
-          5.43841000e-01],
-         [9.33996000e-01, 1.45459000e+00, 1.09255000e+00,
-          1.29798000e-03, -4.94932000e-02, 7.96408000e-01,
-          6.02730000e-01],
-         [9.52261000e-01, 1.43676000e+00, 1.08412000e+00,
-          7.52382000e-03, -1.21925000e-01, 7.88763000e-01,
-          6.02437000e-01],
-         [9.38384000e-01, 1.40772000e+00, 1.08275000e+00,
-          -4.78447000e-02, -1.59622000e-01, 7.78723000e-01,
-          6.04833000e-01],
-         [9.33168000e-01, 1.40032000e+00, 1.07677000e+00,
-          -1.19013000e-01, -2.01572000e-01, 7.86004000e-01,
-          5.72190000e-01],
-         [9.50019000e-01, 1.41200000e+00, 1.06858000e+00,
-          -1.68142000e-01, -2.57843000e-01, 7.64800000e-01,
-          5.65974000e-01],
-         [9.69627000e-01, 1.41291000e+00, 1.08167000e+00,
-          -2.16568000e-01, -2.99559000e-01, 7.67177000e-01,
-          5.24216000e-01],
-         [9.87996000e-01, 1.40710000e+00, 1.07740000e+00,
-          -2.93443000e-01, -3.03316000e-01, 7.47262000e-01,
-          5.13313000e-01],
-         [1.00875000e+00, 1.41683000e+00, 1.05868000e+00,
-          -2.94492000e-01, -3.60788000e-01, 7.48109000e-01,
-          4.72693000e-01],
-         [9.97204000e-01, 1.42263000e+00, 1.05931000e+00,
-          -3.57943000e-01, -3.97640000e-01, 7.01333000e-01,
-          4.71054000e-01],
-         [9.77645000e-01, 1.38039000e+00, 1.05451000e+00,
-          -3.69143000e-01, -4.19075000e-01, 7.12392000e-01,
-          4.24978000e-01],
-         [9.79995000e-01, 1.35957000e+00, 1.06629000e+00,
-          -3.59625000e-01, -4.83372000e-01, 6.73279000e-01,
-          4.28622000e-01],
-         [9.64143000e-01, 1.37410000e+00, 1.08057000e+00,
-          -3.37398000e-01, -5.30613000e-01, 6.28983000e-01,
-          4.57157000e-01],
-         [9.59996000e-01, 1.35213000e+00, 1.07564000e+00,
-          -3.34656000e-01, -5.87335000e-01, 5.76868000e-01,
-          4.58548000e-01],
-         [9.67521000e-01, 1.33524000e+00, 1.07541000e+00,
-          -2.98902000e-01, -6.36156000e-01, 5.26145000e-01,
-          4.78680000e-01],
-         [9.59806000e-01, 1.31795000e+00, 1.07156000e+00,
-          -3.59865000e-01, -6.30564000e-01, 4.76502000e-01,
-          4.95815000e-01],
-         [9.64603738e-01, 1.30932172e+00, 1.07210688e+00,
-          -3.49231721e-01, -6.12354122e-01, 4.98355819e-01,
-          5.04679217e-01],
-         [9.69401477e-01, 1.30069344e+00, 1.07265376e+00,
-          -3.38249001e-01, -5.93531523e-01, 5.19710974e-01,
-          5.13038447e-01],
-         [9.74199215e-01, 1.29206516e+00, 1.07320064e+00,
-          -3.26927751e-01, -5.74114899e-01, 5.40545988e-01,
-          5.20884213e-01],
-         [9.78996954e-01, 1.28343688e+00, 1.07374752e+00,
-          -3.15279302e-01, -5.54123684e-01, 5.60840007e-01,
-          5.28208662e-01],
-         [9.83794692e-01, 1.27480860e+00, 1.07429441e+00,
-          -3.03315312e-01, -5.33577886e-01, 5.80572720e-01,
-          5.35004465e-01],
-         [9.88592431e-01, 1.26618032e+00, 1.07484129e+00,
-          -2.91047755e-01, -5.12498067e-01, 5.99724380e-01,
-          5.41264819e-01],
-         [9.93390169e-01, 1.25755203e+00, 1.07538817e+00,
-          -2.78488909e-01, -4.90905325e-01, 6.18275817e-01,
-          5.46983459e-01],
-         [9.98187908e-01, 1.24892375e+00, 1.07593505e+00,
-          -2.65651342e-01, -4.68821270e-01, 6.36208465e-01,
-          5.52154662e-01],
-         [1.00298565e+00, 1.24029547e+00, 1.07648193e+00,
-          -2.52547904e-01, -4.46268005e-01, 6.53504377e-01,
-          5.56773251e-01],
-         [1.00778338e+00, 1.23166719e+00, 1.07702881e+00,
-          -2.39191709e-01, -4.23268101e-01, 6.70146242e-01,
-          5.60834606e-01],
-         [1.01258112e+00, 1.22303891e+00, 1.07757569e+00,
-          -2.25596123e-01, -3.99844578e-01, 6.86117405e-01,
-          5.64334661e-01],
-         [1.01737886e+00, 1.21441063e+00, 1.07812257e+00,
-          -2.11774754e-01, -3.76020879e-01, 7.01401881e-01,
-          5.67269912e-01],
-         [1.02217660e+00, 1.20578235e+00, 1.07866946e+00,
-          -1.97741435e-01, -3.51820847e-01, 7.15984373e-01,
-          5.69637423e-01],
-         [1.02697434e+00, 1.19715407e+00, 1.07921634e+00,
-          -1.83510210e-01, -3.27268702e-01, 7.29850287e-01,
-          5.71434824e-01],
-         [1.03177208e+00, 1.18852579e+00, 1.07976322e+00,
-          -1.69095323e-01, -3.02389017e-01, 7.42985745e-01,
-          5.72660316e-01],
-         [1.03656982e+00, 1.17989751e+00, 1.08031010e+00,
-          -1.54511200e-01, -2.77206692e-01, 7.55377600e-01,
-          5.73312673e-01],
-         [1.04136755e+00, 1.17126923e+00, 1.08085698e+00,
-          -1.39772437e-01, -2.51746930e-01, 7.67013451e-01,
-          5.73391241e-01],
-         [1.04616529e+00, 1.16264095e+00, 1.08140386e+00,
-          -1.24893786e-01, -2.26035212e-01, 7.77881652e-01,
-          5.72895942e-01],
-         [1.05096303e+00, 1.15401267e+00, 1.08195074e+00,
-          -1.09890138e-01, -2.00097272e-01, 7.87971326e-01,
-          5.71827271e-01],
-         [1.05576077e+00, 1.14538438e+00, 1.08249762e+00,
-          -9.47765082e-02, -1.73959068e-01, 7.97272375e-01,
-          5.70186299e-01],
-         [1.06055851e+00, 1.13675610e+00, 1.08304451e+00,
-          -7.95680233e-02, -1.47646761e-01, 8.05775490e-01,
-          5.67974667e-01],
-         [1.06535625e+00, 1.12812782e+00, 1.08359139e+00,
-          -6.42799045e-02, -1.21186685e-01, 8.13472161e-01,
-          5.65194590e-01],
-         [1.07015398e+00, 1.11949954e+00, 1.08413827e+00,
-          -4.89274524e-02, -9.46053209e-02, 8.20354685e-01,
-          5.61848849e-01],
-         [1.07495172e+00, 1.11087126e+00, 1.08468515e+00,
-          -3.35260322e-02, -6.79292734e-02, 8.26416173e-01,
-          5.57940793e-01],
-         [1.07974946e+00, 1.10224298e+00, 1.08523203e+00,
-          -1.80910582e-02, -4.11852402e-02, 8.31650559e-01,
-          5.53474333e-01],
-         [1.08809093e+00, 1.08724164e+00, 1.08618285e+00,
-          8.77860003e-03, 5.39500002e-03, 8.38767006e-01,
-          5.44393002e-01]]
-        tj_d = [[0.926, 1.452, 1.09, 0.00874023, 0.00537267,
-          0.838907, 0.544179],
-         [0.934417, 1.42573, 1.091, -0.0131335, -0.0635549,
-          0.835977, 0.544913],
-         [0.954224, 1.40735, 1.08852, -0.0567584, -0.119802,
-          0.822665, 0.552854],
-         [0.952468, 1.42154, 1.08114, -0.123649, -0.165218,
-          0.822171, 0.530518],
-         [0.94678, 1.42172, 1.08695, -0.177465, -0.201655,
-          0.773756, 0.57371],
-         [0.954886, 1.40678, 1.08267, -0.198966, -0.244486,
-          0.721802, 0.61615],
-         [0.976322, 1.40998, 1.07852, -0.148351, -0.284487,
-          0.691303, 0.647425],
-         [0.97628, 1.39776, 1.069, -0.130073, -0.36323,
-          0.673449, 0.630564],
-         [0.991388, 1.36989, 1.05834, -0.0815189, -0.401022,
-          0.650042, 0.640298],
-         [1.0013, 1.34869, 1.06703, -0.0100392, -0.411914,
-          0.634998, 0.653455],
-         [0.995316, 1.34314, 1.05683, 0.0447232, -0.384631,
-          0.597312, 0.702337],
-         [0.980561, 1.34417, 1.07223, 0.112821, -0.403662,
-          0.611584, 0.671039],
-         [0.992509, 1.32086, 1.07081, 0.183947, -0.410352,
-          0.60958, 0.65283],
-         [0.993872, 1.29281, 1.05919, 0.207569, -0.466283,
-          0.58175, 0.633294],
-         [0.987282, 1.25994, 1.07442, 0.226461, -0.514081,
-          0.547369, 0.620341],
-         [1.00324, 1.24732, 1.08055, 0.244992, -0.556498,
-          0.484288, 0.62909],
-         [1.0057933, 1.24250299, 1.0807195, 0.23919388, -0.54249395,
-          0.49985485, 0.6313729],
-         [1.00834659, 1.23768599, 1.080889, 0.23328162, -0.52823103,
-          0.51518318, 0.63335453],
-         [1.01089989, 1.23286898, 1.0810585, 0.22725803, -0.51371601,
-          0.53026562, 0.63503387],
-         [1.01345318, 1.22805198, 1.081228, 0.22112597, -0.4989558,
-          0.54509499, 0.63641013],
-         [1.01600648, 1.22323497, 1.08139751, 0.21488838, -0.48395746,
-          0.5596642, 0.63748266],
-         [1.01855977, 1.21841797, 1.08156701, 0.20854822, -0.46872814,
-          0.5739663, 0.63825093],
-         [1.02111307, 1.21360096, 1.08173651, 0.20210854, -0.45327512,
-          0.58799447, 0.63871458],
-         [1.02366637, 1.20878396, 1.08190601, 0.19557239, -0.43760575,
-          0.601742, 0.6388734],
-         [1.02621966, 1.20396695, 1.08207551, 0.1889429, -0.42172753,
-          0.61520233, 0.63872729],
-         [1.02877296, 1.19914995, 1.08224501, 0.18222323, -0.40564803,
-          0.62836905, 0.63827635],
-         [1.03132625, 1.19433294, 1.08241451, 0.1754166, -0.38937493,
-          0.64123587, 0.63752077],
-         [1.03387955, 1.18951593, 1.08258401, 0.16852624, -0.37291599,
-          0.65379665, 0.63646093],
-         [1.03643284, 1.18469893, 1.08275352, 0.16155545, -0.35627907,
-          0.66604539, 0.63509732],
-         [1.03898614, 1.17988192, 1.08292302, 0.15450756, -0.33947211,
-          0.67797624, 0.63343059],
-         [1.04153944, 1.17506492, 1.08309252, 0.14738592, -0.32250313,
-          0.68958352, 0.63146155],
-         [1.04409273, 1.17024791, 1.08326202, 0.14019394, -0.30538023,
-          0.70086168, 0.62919114],
-         [1.04664603, 1.16543091, 1.08343152, 0.13293505, -0.28811158,
-          0.71180533, 0.62662042],
-         [1.04919932, 1.1606139, 1.08360102, 0.12561272, -0.27070542,
-          0.72240927, 0.62375065],
-         [1.05175262, 1.1557969, 1.08377052, 0.11823043, -0.25317006,
-          0.73266842, 0.62058317],
-         [1.05430591, 1.15097989, 1.08394002, 0.11079172, -0.23551387,
-          0.74257789, 0.61711951],
-         [1.05685921, 1.14616288, 1.08410953, 0.10330012, -0.21774528,
-          0.75213295, 0.61336131],
-         [1.0594125, 1.14134588, 1.08427903, 0.09575923, -0.19987277,
-          0.76132904, 0.60931038],
-         [1.0619658, 1.13652887, 1.08444853, 0.08817263, -0.18190486,
-          0.77016177, 0.60496864],
-         [1.0645191, 1.13171187, 1.08461803, 0.08054395, -0.16385013,
-          0.77862693, 0.60033817],
-         [1.06707239, 1.12689486, 1.08478753, 0.07287683, -0.1457172,
-          0.78672047, 0.59542117],
-         [1.06962569, 1.12207786, 1.08495703, 0.06517493, -0.12751473,
-          0.79443853, 0.59022],
-         [1.07217898, 1.11726085, 1.08512653, 0.05744192, -0.1092514,
-          0.80177743, 0.58473713],
-         [1.07473228, 1.11244385, 1.08529603, 0.0496815, -0.09093592,
-          0.80873367, 0.57897519],
-         [1.07728557, 1.10762684, 1.08546553, 0.04189736, -0.07257705,
-          0.81530392, 0.57293691],
-         [1.07983887, 1.10280984, 1.08563504, 0.03409323, -0.05418353,
-          0.82148505, 0.5666252],
-         [1.08239217, 1.09799283, 1.08580454, 0.02627283, -0.03576416,
-          0.82727411, 0.56004304],
-         [1.08494546, 1.09317582, 1.08597404, 0.01843988, -0.01732771,
-          0.83266834, 0.5531936],
-         [1.08809093, 1.08724164, 1.08618285, 0.0087786, 0.005395,
-          0.83876701, 0.544393]]
-        tj_e =  [[9.25000000e-01, 1.45200000e+00, 1.09000000e+00,
-          8.73908000e-03, 5.37519000e-03, 8.39040000e-01,
-          5.43974000e-01],
-         [9.45218000e-01, 1.44351000e+00, 1.09350000e+00,
-          1.38044000e-03, 1.04140000e-02, 8.78532000e-01,
-          4.77569000e-01],
-         [9.34512000e-01, 1.42300000e+00, 1.09642000e+00,
-          -3.64166000e-02, -4.60855000e-02, 8.93404000e-01,
-          4.45397000e-01],
-         [9.79882000e-01, 1.42267000e+00, 1.09173000e+00,
-          -6.15065000e-02, -8.01426000e-02, 9.04997000e-01,
-          4.13248000e-01],
-         [9.90893000e-01, 1.43586000e+00, 1.08069000e+00,
-          -4.96424000e-02, -1.57931000e-01, 9.00299000e-01,
-          4.02562000e-01],
-         [9.76139000e-01, 1.41524000e+00, 1.09356000e+00,
-          -9.04090000e-02, -1.98394000e-01, 9.06951000e-01,
-          3.60424000e-01],
-         [9.88547000e-01, 1.41948000e+00, 1.08228000e+00,
-          -8.42892000e-02, -1.89064000e-01, 9.36238000e-01,
-          2.83918000e-01],
-         [1.00604000e+00, 1.40300000e+00, 1.08842000e+00,
-          -1.38538000e-01, -2.08858000e-01, 9.38913000e-01,
-          2.35855000e-01],
-         [1.02868000e+00, 1.39075000e+00, 1.09280000e+00,
-          -9.33327000e-02, -2.18361000e-01, 9.54505000e-01,
-          1.80354000e-01],
-         [1.01027000e+00, 1.40117000e+00, 1.08323000e+00,
-          -4.82024000e-02, -2.12637000e-01, 9.68520000e-01,
-          1.20131000e-01],
-         [1.01310000e+00, 1.37655000e+00, 1.09170000e+00,
-          1.65175000e-02, -2.22059000e-01, 9.71089000e-01,
-          8.60425000e-02],
-         [1.02789000e+00, 1.37835000e+00, 1.09802000e+00,
-          -9.56434000e-03, -2.89088000e-01, 9.56161000e-01,
-          4.57408000e-02],
-         [1.02980000e+00, 1.35273000e+00, 1.09862000e+00,
-          -4.71633000e-02, -3.37578000e-01, 9.40089000e-01,
-          7.07758000e-03],
-         [1.03874000e+00, 1.33091000e+00, 1.07752000e+00,
-          -3.32602000e-02, -3.95407000e-01, 9.17348000e-01,
-          3.19133000e-02],
-         [1.04011000e+00, 1.31970000e+00, 1.07103000e+00,
-          1.50725000e-03, -4.39105000e-01, 8.97871000e-01,
-          -3.18188000e-02],
-         [1.01677000e+00, 1.35936000e+00, 1.04596000e+00,
-          4.31263000e-02, -4.55203000e-01, 8.88192000e-01,
-          -4.52367000e-02],
-         [1.00530000e+00, 1.35244000e+00, 1.05503000e+00,
-          9.96332000e-02, -4.80630000e-01, 8.65825000e-01,
-          -9.70284000e-02],
-         [1.00007000e+00, 1.29824000e+00, 1.07180000e+00,
-          8.55418000e-02, -5.15200000e-01, 8.46230000e-01,
-          -1.05576000e-01],
-         [1.02846000e+00, 1.27150000e+00, 1.09373000e+00,
-          5.70754000e-02, -5.35239000e-01, 8.30142000e-01,
-          -1.45347000e-01],
-         [1.01010000e+00, 1.27794000e+00, 1.10640000e+00,
-          8.14397000e-02, -5.12199000e-01, 8.27690000e-01,
-          -2.14357000e-01],
-         [1.01214316e+00, 1.27294420e+00, 1.10587036e+00,
-          8.02457991e-02, -5.02831287e-01, 8.38546158e-01,
-          -1.93808282e-01],
-         [1.01418631e+00, 1.26794841e+00, 1.10534073e+00,
-          7.90013966e-02, -4.93147123e-01, 8.48874589e-01,
-          -1.73137592e-01],
-         [1.01622947e+00, 1.26295261e+00, 1.10481109e+00,
-          7.77072796e-02, -4.83152630e-01, 8.58668836e-01,
-          -1.52357949e-01],
-         [1.01827263e+00, 1.25795682e+00, 1.10428146e+00,
-          7.63642626e-02, -4.72854095e-01, 8.67922735e-01,
-          -1.31482429e-01],
-         [1.02031579e+00, 1.25296102e+00, 1.10375182e+00,
-          7.49731907e-02, -4.62258001e-01, 8.76630463e-01,
-          -1.10524170e-01],
-         [1.02235894e+00, 1.24796523e+00, 1.10322218e+00,
-          7.35349393e-02, -4.51371013e-01, 8.84786541e-01,
-          -8.94963593e-02],
-         [1.02440210e+00, 1.24296943e+00, 1.10269255e+00,
-          7.20504133e-02, -4.40199985e-01, 8.92385835e-01,
-          -6.84122299e-02],
-         [1.02644526e+00, 1.23797364e+00, 1.10216291e+00,
-          7.05205471e-02, -4.28751946e-01, 8.99423563e-01,
-          -4.72850496e-02],
-         [1.02848841e+00, 1.23297784e+00, 1.10163327e+00,
-          6.89463034e-02, -4.17034099e-01, 9.05895297e-01,
-          -2.61281135e-02],
-         [1.03053157e+00, 1.22798205e+00, 1.10110364e+00,
-          6.73286727e-02, -4.05053818e-01, 9.11796965e-01,
-          -4.95473537e-03],
-         [1.03257473e+00, 1.22298625e+00, 1.10057400e+00,
-          6.56686731e-02, -3.92818643e-01, 9.17124852e-01,
-          1.62217607e-02],
-         [1.03461788e+00, 1.21799046e+00, 1.10004437e+00,
-          6.39673491e-02, -3.80336273e-01, 9.21875605e-01,
-          3.73880486e-02],
-         [1.03666104e+00, 1.21299466e+00, 1.09951473e+00,
-          6.22257714e-02, -3.67614563e-01, 9.26046236e-01,
-          5.85308088e-02],
-         [1.03870420e+00, 1.20799887e+00, 1.09898509e+00,
-          6.04450359e-02, -3.54661518e-01, 9.29634119e-01,
-          7.96367364e-02],
-         [1.04074736e+00, 1.20300307e+00, 1.09845546e+00,
-          5.86262633e-02, -3.41485290e-01, 9.32636997e-01,
-          1.00692550e-01],
-         [1.04279051e+00, 1.19800728e+00, 1.09792582e+00,
-          5.67705980e-02, -3.28094170e-01, 9.35052980e-01,
-          1.21684999e-01],
-         [1.04483367e+00, 1.19301148e+00, 1.09739619e+00,
-          5.48792078e-02, -3.14496585e-01, 9.36880548e-01,
-          1.42600873e-01],
-         [1.04687683e+00, 1.18801569e+00, 1.09686655e+00,
-          5.29532829e-02, -3.00701093e-01, 9.38118551e-01,
-          1.63427011e-01],
-         [1.04891998e+00, 1.18301989e+00, 1.09633691e+00,
-          5.09940352e-02, -2.86716373e-01, 9.38766209e-01,
-          1.84150306e-01],
-         [1.05096314e+00, 1.17802410e+00, 1.09580728e+00,
-          4.90026978e-02, -2.72551227e-01, 9.38823115e-01,
-          2.04757719e-01],
-         [1.05300630e+00, 1.17302830e+00, 1.09527764e+00,
-          4.69805236e-02, -2.58214568e-01, 9.38289233e-01,
-          2.25236280e-01],
-         [1.05504946e+00, 1.16803250e+00, 1.09474801e+00,
-          4.49287854e-02, -2.43715419e-01, 9.37164900e-01,
-          2.45573104e-01],
-         [1.05709261e+00, 1.16303671e+00, 1.09421837e+00,
-          4.28487740e-02, -2.29062903e-01, 9.35450822e-01,
-          2.65755391e-01],
-         [1.05913577e+00, 1.15804091e+00, 1.09368873e+00,
-          4.07417986e-02, -2.14266241e-01, 9.33148079e-01,
-          2.85770443e-01],
-         [1.06117893e+00, 1.15304512e+00, 1.09315910e+00,
-          3.86091849e-02, -1.99334745e-01, 9.30258119e-01,
-          3.05605664e-01],
-         [1.06322208e+00, 1.14804932e+00, 1.09262946e+00,
-          3.64522751e-02, -1.84277810e-01, 9.26782762e-01,
-          3.25248571e-01],
-         [1.06526524e+00, 1.14305353e+00, 1.09209982e+00,
-          3.42724264e-02, -1.69104912e-01, 9.22724193e-01,
-          3.44686804e-01],
-         [1.06730840e+00, 1.13805773e+00, 1.09157019e+00,
-          3.20710105e-02, -1.53825598e-01, 9.18084968e-01,
-          3.63908131e-01],
-         [1.06935155e+00, 1.13306194e+00, 1.09104055e+00,
-          2.98494128e-02, -1.38449485e-01, 9.12868004e-01,
-          3.82900456e-01],
-         [1.07139471e+00, 1.12806614e+00, 1.09051092e+00,
-          2.76090313e-02, -1.22986247e-01, 9.07076587e-01,
-          4.01651827e-01],
-         [1.07343787e+00, 1.12307035e+00, 1.08998128e+00,
-          2.53512758e-02, -1.07445615e-01, 9.00714359e-01,
-          4.20150444e-01],
-         [1.07548103e+00, 1.11807455e+00, 1.08945164e+00,
-          2.30775671e-02, -9.18373697e-02, 8.93785325e-01,
-          4.38384667e-01],
-         [1.07752418e+00, 1.11307876e+00, 1.08892201e+00,
-          2.07893361e-02, -7.61713324e-02, 8.86293845e-01,
-          4.56343021e-01],
-         [1.07956734e+00, 1.10808296e+00, 1.08839237e+00,
-          1.84880227e-02, -6.04573616e-02, 8.78244632e-01,
-          4.74014205e-01],
-         [1.08161050e+00, 1.10308717e+00, 1.08786274e+00,
-          1.61750750e-02, -4.47053458e-02, 8.69642754e-01,
-          4.91387098e-01],
-         [1.08365365e+00, 1.09809137e+00, 1.08733310e+00,
-          1.38519485e-02, -2.89251976e-02, 8.60493621e-01,
-          5.08450769e-01],
-         [1.08569681e+00, 1.09309558e+00, 1.08680346e+00,
-          1.15201052e-02, -1.31268472e-02, 8.50802993e-01,
-          5.25194479e-01],
-         [1.08809093e+00, 1.08724164e+00, 1.08618285e+00,
-          8.77860003e-03, 5.39500002e-03, 8.38767006e-01,
-          5.44393002e-01]]
-        # tj_f
-        tj_f = [[9.26000000e-01, 1.45200000e+00, 1.09000000e+00,
-          8.74282000e-03, 5.36897000e-03, 8.38665000e-01,
-          5.44552000e-01],
-         [9.42919000e-01, 1.43145000e+00, 1.09072000e+00,
-          2.99493000e-02, -5.37885000e-02, 8.15961000e-01,
-          5.74820000e-01],
-         [9.34537000e-01, 1.40521000e+00, 1.08192000e+00,
-          6.44541000e-02, -1.05795000e-01, 8.29984000e-01,
-          5.43857000e-01],
-         [9.39226000e-01, 1.40183000e+00, 1.08127000e+00,
-          2.37045000e-02, -1.39873000e-01, 8.67920000e-01,
-          4.76012000e-01],
-         [9.38080000e-01, 1.40384000e+00, 1.07867000e+00,
-          1.43779000e-03, -2.13522000e-01, 8.82240000e-01,
-          4.19594000e-01],
-         [9.57440000e-01, 1.39960000e+00, 1.08492000e+00,
-          -5.73969000e-02, -2.60613000e-01, 8.78854000e-01,
-          3.95477000e-01],
-         [9.66622000e-01, 1.41092000e+00, 1.09350000e+00,
-          -1.14171000e-01, -2.85110000e-01, 8.88532000e-01,
-          3.40863000e-01],
-         [9.58925000e-01, 1.39686000e+00, 1.09456000e+00,
-          -8.37916000e-02, -3.38186000e-01, 8.93405000e-01,
-          2.83614000e-01],
-         [9.67917000e-01, 1.41247000e+00, 1.08663000e+00,
-          -2.14284000e-02, -3.85116000e-01, 8.82836000e-01,
-          2.68004000e-01],
-         [9.93246000e-01, 1.40149000e+00, 1.07521000e+00,
-          4.84630000e-02, -3.89723000e-01, 8.79865000e-01,
-          2.67592000e-01],
-         [9.88162000e-01, 1.38028000e+00, 1.07719000e+00,
-          1.20172000e-01, -3.98090000e-01, 8.77766000e-01,
-          2.37928000e-01],
-         [9.75234000e-01, 1.35021000e+00, 1.08274000e+00,
-          1.30775000e-01, -3.50880000e-01, 9.05204000e-01,
-          2.00964000e-01],
-         [9.92500000e-01, 1.33536000e+00, 1.08402000e+00,
-          1.03926000e-01, -3.90452000e-01, 9.03899000e-01,
-          1.40407000e-01],
-         [9.84972000e-01, 1.30399000e+00, 1.09613000e+00,
-          7.90666000e-02, -3.89318000e-01, 9.14152000e-01,
-          8.06636000e-02],
-         [9.75530000e-01, 1.28186000e+00, 1.08583000e+00,
-          1.22748000e-01, -4.30319000e-01, 8.93261000e-01,
-          4.29423000e-02],
-         [9.88813000e-01, 1.27538000e+00, 1.09300000e+00,
-          1.51026000e-01, -4.48783000e-01, 8.80192000e-01,
-          -3.23512000e-02],
-         [9.75873000e-01, 1.24634000e+00, 1.09606000e+00,
-          9.14500000e-02, -4.41835000e-01, 8.90204000e-01,
-          -6.28873000e-02],
-         [9.91458000e-01, 1.20413000e+00, 1.11909000e+00,
-          5.00678000e-02, -4.21383000e-01, 9.04020000e-01,
-          -5.17506000e-02],
-         [9.94225898e-01, 1.20078192e+00, 1.11814743e+00,
-          4.91825225e-02, -4.11430678e-01, 9.09501102e-01,
-          -3.33709673e-02],
-         [9.96993796e-01, 1.19743383e+00, 1.11720485e+00,
-          4.82742607e-02, -4.01286084e-01, 9.14557161e-01,
-          -1.49757457e-02],
-         [9.99761694e-01, 1.19408575e+00, 1.11626228e+00,
-          4.73434217e-02, -3.90953814e-01, 9.19185495e-01,
-          3.42647981e-03],
-         [1.00252959e+00, 1.19073767e+00, 1.11531971e+00,
-          4.63904408e-02, -3.80438701e-01, 9.23383939e-01,
-          2.18271028e-02],
-         [1.00529749e+00, 1.18738958e+00, 1.11437713e+00,
-          4.54157638e-02, -3.69745662e-01, 9.27150530e-01,
-          4.02175176e-02],
-         [1.00806539e+00, 1.18404150e+00, 1.11343456e+00,
-          4.44198465e-02, -3.58879698e-01, 9.30483505e-01,
-          5.85891233e-02],
-         [1.01083329e+00, 1.18069342e+00, 1.11249199e+00,
-          4.34031547e-02, -3.47845892e-01, 9.33381307e-01,
-          7.69333277e-02],
-         [1.01360118e+00, 1.17734534e+00, 1.11154941e+00,
-          4.23661639e-02, -3.36649403e-01, 9.35842580e-01,
-          9.52415514e-02],
-         [1.01636908e+00, 1.17399725e+00, 1.11060684e+00,
-          4.13093590e-02, -3.25295467e-01, 9.37866173e-01,
-          1.13505232e-01],
-         [1.01913698e+00, 1.17064917e+00, 1.10966426e+00,
-          4.02332343e-02, -3.13789396e-01, 9.39451139e-01,
-          1.31715828e-01],
-         [1.02190488e+00, 1.16730109e+00, 1.10872169e+00,
-          3.91382931e-02, -3.02136570e-01, 9.40596737e-01,
-          1.49864822e-01],
-         [1.02467278e+00, 1.16395300e+00, 1.10777912e+00,
-          3.80250474e-02, -2.90342439e-01, 9.41302432e-01,
-          1.67943727e-01],
-         [1.02744068e+00, 1.16060492e+00, 1.10683654e+00,
-          3.68940181e-02, -2.78412519e-01, 9.41567893e-01,
-          1.85944087e-01],
-         [1.03020857e+00, 1.15725684e+00, 1.10589397e+00,
-          3.57457339e-02, -2.66352390e-01, 9.41392996e-01,
-          2.03857483e-01],
-         [1.03297647e+00, 1.15390875e+00, 1.10495140e+00,
-          3.45807319e-02, -2.54167691e-01, 9.40777824e-01,
-          2.21675538e-01],
-         [1.03574437e+00, 1.15056067e+00, 1.10400882e+00,
-          3.33995570e-02, -2.41864122e-01, 9.39722663e-01,
-          2.39389919e-01],
-         [1.03851227e+00, 1.14721259e+00, 1.10306625e+00,
-          3.22027617e-02, -2.29447436e-01, 9.38228007e-01,
-          2.56992340e-01],
-         [1.04128017e+00, 1.14386451e+00, 1.10212368e+00,
-          3.09909056e-02, -2.16923441e-01, 9.36294556e-01,
-          2.74474570e-01],
-         [1.04404806e+00, 1.14051642e+00, 1.10118110e+00,
-          2.97645554e-02, -2.04297994e-01, 9.33923213e-01,
-          2.91828432e-01],
-         [1.04681596e+00, 1.13716834e+00, 1.10023853e+00,
-          2.85242848e-02, -1.91577000e-01, 9.31115087e-01,
-          3.09045810e-01],
-         [1.04958386e+00, 1.13382026e+00, 1.09929596e+00,
-          2.72706739e-02, -1.78766408e-01, 9.27871492e-01,
-          3.26118652e-01],
-         [1.05235176e+00, 1.13047217e+00, 1.09835338e+00,
-          2.60043088e-02, -1.65872210e-01, 9.24193946e-01,
-          3.43038973e-01],
-         [1.05511966e+00, 1.12712409e+00, 1.09741081e+00,
-          2.47257818e-02, -1.52900435e-01, 9.20084167e-01,
-          3.59798859e-01],
-         [1.05788755e+00, 1.12377601e+00, 1.09646824e+00,
-          2.34356910e-02, -1.39857151e-01, 9.15544077e-01,
-          3.76390473e-01],
-         [1.06065545e+00, 1.12042792e+00, 1.09552566e+00,
-          2.21346397e-02, -1.26748458e-01, 9.10575801e-01,
-          3.92806054e-01],
-         [1.06342335e+00, 1.11707984e+00, 1.09458309e+00,
-          2.08232362e-02, -1.13580487e-01, 9.05181662e-01,
-          4.09037926e-01],
-         [1.06619125e+00, 1.11373176e+00, 1.09364051e+00,
-          1.95020941e-02, -1.00359395e-01, 8.99364182e-01,
-          4.25078496e-01],
-         [1.06895915e+00, 1.11038367e+00, 1.09269794e+00,
-          1.81718311e-02, -8.70913673e-02, 8.93126083e-01,
-          4.40920263e-01],
-         [1.07172705e+00, 1.10703559e+00, 1.09175537e+00,
-          1.68330694e-02, -7.37826079e-02, 8.86470281e-01,
-          4.56555818e-01],
-         [1.07449494e+00, 1.10368751e+00, 1.09081279e+00,
-          1.54864351e-02, -6.04393414e-02, 8.79399890e-01,
-          4.71977849e-01],
-         [1.07726284e+00, 1.10033943e+00, 1.08987022e+00,
-          1.41325581e-02, -4.70678082e-02, 8.71918216e-01,
-          4.87179142e-01],
-         [1.08003074e+00, 1.09699134e+00, 1.08892765e+00,
-          1.27720714e-02, -3.36742622e-02, 8.64028759e-01,
-          5.02152588e-01],
-         [1.08279864e+00, 1.09364326e+00, 1.08798507e+00,
-          1.14056115e-02, -2.02649672e-02, 8.55735208e-01,
-          5.16891185e-01],
-         [1.08809093e+00, 1.08724164e+00, 1.08618285e+00,
-          8.77860003e-03, 5.39500002e-03, 8.38767006e-01,
-          5.44393002e-01]]
-        poses = []
-        for i, point in enumerate(tj_a):
-            base_pose = PoseStamped()
-            base_pose.header.frame_id = 'map'
-            base_pose.pose.position.x = point[0]
-            base_pose.pose.position.y = point[1]
-            base_pose.pose.position.z = point[2] if len(point) > 3 else 0
-            if len(point) > 3:
-                base_pose.pose.orientation = Quaternion(point[3], point[4], point[5], point[6])
-            else:
-                arr = quaternion_from_euler(0, 0, point[2])
-                base_pose.pose.orientation = Quaternion(arr[0], arr[1], arr[2], arr[3])
-            if i == 0:
-                # important assumption for constraint:
-                # we do not to reach the first pose, since it is the start pose
-                pass
-            else:
-                poses.append(base_pose)
+    @pytest.mark.repeat(20)
+    def test_cereal_1(self, kitchen_setup_avoid_collisions):
         # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
-
         # take milk out of fridge
         kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
-
         # spawn milk
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = drawer_frame_id
@@ -4707,7 +3806,7 @@ class TestCartesianPath(object):
 
         kitchen_setup_avoid_collisions.attach_object(cereal_name, kitchen_setup_avoid_collisions.r_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
-        kitchen_setup_avoid_collisions.close_l_gripper()
+        # kitchen_setup_avoid_collisions.close_r_gripper()
 
         # x = Vector3Stamped()
         # x.header.frame_id = 'milk'
@@ -4732,9 +3831,9 @@ class TestCartesianPath(object):
                                                      tip_link=kitchen_setup_avoid_collisions.r_tip,
                                                      root_link=kitchen_setup_avoid_collisions.default_root,
                                                      goal=post_grasp_pose,
-                                                     goals=poses,
+                                                     narrow=True,
                                                      predict_f=2.0)
-        kitchen_setup_avoid_collisions.plan_and_execute()
+        kitchen_setup_avoid_collisions.plan()
         #kitchen_setup.set_joint_goal(gaya_pose)
 
         # place milk back
@@ -4745,7 +3844,7 @@ class TestCartesianPath(object):
         # milk_goal.pose.position = Point(.1, -.2, .13)
         # milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
 
-    def test_ease_cereal_with_planner_1(self, kitchen_setup_avoid_collisions):
+    def test_ease_cereal_pick_and_place(self, kitchen_setup_avoid_collisions):
         # FIXME collision avoidance needs soft_threshholds at 0
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
@@ -4853,7 +3952,6 @@ class TestCartesianPath(object):
         kitchen_setup_avoid_collisions.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
 
         # spawn milk
-
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = drawer_frame_id
         cereal_pose.pose.position = Point(-0.08, 0.0, 0.15)

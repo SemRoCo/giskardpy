@@ -141,9 +141,8 @@ class RetryPlanning(GiskardBehavior):
                     n_c = Constraint()
                     n_c.type = self.path_constraint_name
                     d = yaml.load(c.parameter_value_pair)
-                    #goal = d['goals'][-1]
-                    d.pop('goals')
-                    #d['goal'] = goal
+                    if 'goals' in d:
+                        d.pop('goals')
                     n_c.parameter_value_pair = yaml.dump(d)
                     global_move_cmd.constraints.append(n_c)
                     self.get_god_map().set_data(identifier.global_planner_needed, True)

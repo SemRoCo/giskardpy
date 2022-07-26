@@ -35,7 +35,7 @@ class CartesianPathCarrot(Goal):
         self.max_linear_acceleration = max_linear_acceleration
         self.max_angular_acceleration = max_angular_acceleration
         self.predict_f = predict_f
-        self.arriving_thresh = 0.1
+        self.arriving_thresh = 0.2
         self.min_v = self.god_map.get_data(identifier.joint_convergence_threshold)
 
         if goals is not None and len(goals) != 0:
@@ -102,13 +102,13 @@ class CartesianPathCarrot(Goal):
 
     def predict(self):
         v = self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
-        v_p = w.save_division(v, w.norm(v), 0) * self.max_linear_velocity * self.predict_f
+        v_p = w.save_division(v, w.norm(v), 0) * self.get_velocity() * self.predict_f
         p = w.position_of(self.get_fk(self.root_link, self.tip_link))
         s = self.get_sampling_period_symbol()
         n_p = p[0:3] + v_p * s
         return w.point3(n_p[0], n_p[1], n_p[2])
 
-    def get_normal_time(self, n, a, b):
+    def get_normal_time(self, n, a, b, ps):
         """
         Will return the normal time for a given normal point n between the start point a and b.
         First the normal time depends on the place in the trajectory. If a (the start point of the given
@@ -117,9 +117,6 @@ class CartesianPathCarrot(Goal):
         be added on the normal time. This results in the following formulation:
         normal_time = trajectory[a].index() + norm(n-a)/norm(b-a)
         """
-        ps = []
-        for i in range(0, self.trajectory_length):
-            ps.append(w.position_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[i]])))
         m = self.zero_one_mapping_if_equal(w.Matrix(ps), self.trajectory_length, w.ca.transpose(a))
         g_i = self.select(w.Matrix([i for i in range(0, self.trajectory_length)]), m)
         n_t = w.save_division(w.norm(n - a), w.norm(b - a))
@@ -139,14 +136,18 @@ class CartesianPathCarrot(Goal):
     def get_normals(self, goal_strings, next_goal_strings, pos):
 
         trajectory_len = self.trajectory_length
+
+        ps = []
+        for i in range(0, self.trajectory_length):
+            ps.append(w.position_of(self.get_parameter_as_symbolic_expression([u'params_goals', self.goal_strings[i]])))
+
         normals = []
         normal_times = []
-
         for i in range(0, trajectory_len):
             a = w.position_of(self.get_parameter_as_symbolic_expression([u'params_goals', goal_strings[i]]))
             b = w.position_of(self.get_parameter_as_symbolic_expression([u'params_goals', next_goal_strings[i]]))
             n = self.get_normal(pos, a, b)
-            n_t = self.get_normal_time(n, a, b)
+            n_t = self.get_normal_time(n, a, b, ps)
             normals.append(n)
             normal_times.append(n_t)
 
@@ -158,7 +159,7 @@ class CartesianPathCarrot(Goal):
         normal_dist_funs = []
 
         for i in range(0, trajectory_len):
-            normal_dist_funs.append(w.sum(w.abs(w.ca.transpose(normals[i,:]) - pos)))
+            normal_dist_funs.append(w.manhattan_norm(w.ca.transpose(normals[i,:]), pos))
 
         return w.Matrix(normal_dist_funs)
 
@@ -239,7 +240,7 @@ class CartesianPathCarrot(Goal):
         traj_point = self.get_closest_traj_point() + 1
         return traj_point/self.trajectory_length
 
-    def get_terminal_goal_velocity(self):
+    def get_velocity(self):
         """
         :rtype: float
         :returns: float in range(0,1)
@@ -253,7 +254,7 @@ class CartesianPathCarrot(Goal):
         return v
 
     def minimize_position(self, goal, weight):
-        max_velocity = self.get_terminal_goal_velocity()
+        max_velocity = self.get_velocity()
 
         self.add_point_goal_constraints(frame_P_current=w.position_of(self.get_fk(self.root_link, self.tip_link)),
                                         frame_P_goal=goal,

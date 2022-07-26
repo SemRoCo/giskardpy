@@ -91,7 +91,7 @@ class RetryPlanning(GiskardBehavior):
                         req.tip_link = d['tip_link']
                         req.env_group = 'kitchen'
                         req.pose_goal = goal_pose
-                        req.simple = True
+                        req.simple = False
                         return not is_global_path_needed(req).needed
                     else:
                         return False

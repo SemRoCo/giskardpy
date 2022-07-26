@@ -359,6 +359,10 @@ def norm(v):
     return ca.norm_2(v)
 
 
+def manhattan_norm(a, b):
+    return sum(abs(a-b))
+
+
 def scale(v, a):
     """
     :type v: Matrix

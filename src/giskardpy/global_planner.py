@@ -678,8 +678,6 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
         pybulletenv = PyBulletMotionValidationIDs(self.god_map.get_data(identifier.collision_scene),
                                                   environment_object_names=environment_object_names,
                                                   moving_links=self.collision_link_names)
-        raytester = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map,
-                                             ignore_state_validator=True,js=js)
         self.box_space = PyBulletBoxSpace(self.collision_scene.world, self.object_in_motion, 'map', pybulletenv)
         # self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
 
@@ -1556,6 +1554,16 @@ class GlobalPlanner(GetGoal):
     def save_cart_goal(self, cart_c):
 
         self.__goal_dict = yaml.load(cart_c.parameter_value_pair)
+
+        self.narrow = self.__goal_dict[u'narrow'] if 'narrow' in self.__goal_dict else False
+        if self.narrow:
+            try:
+                self.narrow_padding = self.__goal_dict[u'narrow_padding']
+                if self.narrow_padding < 0:
+                    raise Exception('The padding value must be positive.')
+            except KeyError:
+                raise Exception('Please specify a narrow padding value.')
+
         ros_pose = convert_dictionary_to_ros_message(self.__goal_dict[u'goal'])
         self.goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)  # type: PoseStamped
 
@@ -1631,7 +1639,7 @@ class GlobalPlanner(GetGoal):
         planner = NarrowMovementPlanner(planner_name, state_validator_class, motion_validator_class, range, time,
                                         self.kitchen_space, self.collision_scene,
                                         self.robot, self.root_link, self.tip_link, self.goal.pose, map_frame,
-                                        self.god_map, config=self.movement_config, dist=dist,
+                                        self.god_map, config=self.movement_config, dist=dist, narrow_padding=self.narrow_padding,
                                         sampling_goal_axis=sampling_goal_axis, verify_solution_f=verify_solution_f)
         return planner
 
@@ -1661,6 +1669,7 @@ class GlobalPlanner(GetGoal):
                         if self.god_map.get_data(identifier.path_interpolation):
                             planner.interpolate_solution()
                             trajectory = planner.get_solution(ob.PlannerStatus.EXACT_SOLUTION)
+                        rospy.logerr(trajectory)
                         return trajectory, planner_name, motion_validator_type
                 finally:
                     planner.clear()
@@ -1724,7 +1733,6 @@ class GlobalPlanner(GetGoal):
                 predict_f = 2.0
             else:
                 predict_f = 5.0
-        rospy.logerr(predict_f)
         return trajectory, predict_f
 
     @profile
@@ -1749,11 +1757,8 @@ class GlobalPlanner(GetGoal):
         # self.collision_scene.update_collision_environment()
         navigation = global_planner_needed and self.is_global_navigation_needed()
         movement = not navigation
-        seem_simple_trivial = self.seem_trivial()
-        seem_trivial = self.seem_trivial(simple=False)
-        narrow = seem_simple_trivial and not seem_trivial
         try:
-            trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=narrow)
+            trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=self.narrow)
         except FeasibleGlobalPlanningException:
             self.raise_to_blackboard(GlobalPlanningException())
             return Status.FAILURE
@@ -1783,7 +1788,7 @@ class GlobalPlanner(GetGoal):
         self.get_god_map().set_data(identifier.global_planner_needed, False)
         return Status.SUCCESS
 
-    def get_cartesian_path_constraints(self, start, poses, predict_f, ignore_trajectory_orientation=False):
+    def get_cartesian_path_constraints(self, start, poses, predict_f):
 
         d = dict()
         d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
@@ -1795,8 +1800,8 @@ class GlobalPlanner(GetGoal):
         c_d[u'parameter_value_pair'][u'start'] = convert_ros_message_to_dictionary(start)
         c_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(goal)
         c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
-        c_d[u'parameter_value_pair'][u'predict_f'] = predict_f
-        c_d[u'parameter_value_pair'][u'ignore_trajectory_orientation'] = ignore_trajectory_orientation
+        if 'predict_f' not in c_d[u'parameter_value_pair']:
+            c_d[u'parameter_value_pair'][u'predict_f'] = predict_f
 
         c = Constraint()
         c.type = u'CartesianPathCarrot'
@@ -1838,6 +1843,12 @@ class GlobalPlanner(GetGoal):
 
         # set lower and upper bounds
         bounds = ob.RealVectorBounds(2)
+        # refills lab
+        #bounds.setLow(0, -3)
+        #bounds.setHigh(0, 5)
+        #bounds.setLow(1, -4)
+        #bounds.setHigh(1, 5)
+        # kitchen
         bounds.setLow(0, -4)
         bounds.setHigh(0, 2)
         bounds.setLow(1, -3)
@@ -2347,6 +2358,7 @@ class MovementPlanner(OMPLPlanner):
             verify = ''
         path = self.setup.getSolutionPath()
         path_cost = path.cost(self.optimization_objective).value()
+        self.god_map.set_data(identifier.rosparam + ['path_time'], self.setup.getLastPlanComputationTime())
         self.god_map.set_data(identifier.rosparam + ['path_cost'], path_cost)
         cost = '- Cost: {}'.format(str(round(path_cost, 5)))
         title = u'{} Path from {} in map\n{} {}'.format(dim, self.setup.getPlanner().getName(), verify, cost)
@@ -2357,21 +2369,22 @@ class MovementPlanner(OMPLPlanner):
                title=title)
         # ax = fig.gca(projection='2d')
         # ax.plot(data[:, 0], data[:, 1], '.-')
-        plt.savefig('/home/thomas/master_thesis/benchmarking_data/'
-                    'path_following/box/navi_5/{}_path_planner.png'.format(rospy.get_time()))
+        #plt.savefig('/home/thomas/master_thesis/benchmarking_data/'
+        #            'path_following/box/navi_5/{}_path_planner.png'.format(rospy.get_time()))
         plt.show()
 
 
 class NarrowMovementPlanner(MovementPlanner):
     def __init__(self, planner_name, state_validator_class, motion_validator_class, range, time, kitchen_space,
                  collision_scene, robot, root_link, tip_link, pose_goal, map_frame, god_map,
-                 config='slow_without_refine', dist=0.1, sampling_goal_axis=None, verify_solution_f=None):
+                 config='slow_without_refine', dist=0.1, narrow_padding=1.0, sampling_goal_axis=None, verify_solution_f=None):
         super(NarrowMovementPlanner, self).__init__(True, planner_name, state_validator_class,
                                                     motion_validator_class, range, time, kitchen_space,
                                                     collision_scene, robot, root_link, tip_link,
                                                     pose_goal, map_frame, god_map, config=config, dist=dist,
                                                     verify_solution_f=verify_solution_f)
         self.sampling_goal_axis = sampling_goal_axis
+        self.narrow_padding = narrow_padding
         self.reversed_start_and_goal = False
         self.directional_planner = [
             'RRT', 'TRRT', 'LazyRRT',
@@ -2413,7 +2426,7 @@ class NarrowMovementPlanner(MovementPlanner):
         goal_space.setThreshold(0.01)
         prob_def.setGoal(goal_space)
 
-    def create_goal_specific_space(self, padding=0.2):
+    def create_goal_specific_space(self):
 
         if self.pose_goal is not None:
             bounds = ob.RealVectorBounds(3)
@@ -2427,12 +2440,13 @@ class NarrowMovementPlanner(MovementPlanner):
             g_z = goal_p.z
 
             # smaller cereal search space
-            bounds.setLow(0, min(s_x, g_x) - padding)
-            bounds.setHigh(0, max(s_x, g_x) + padding)
-            bounds.setLow(1, min(s_y, g_y) - padding)
-            bounds.setHigh(1, max(s_y, g_y) + padding)
-            bounds.setLow(2, min(s_z, g_z) - padding)
-            bounds.setHigh(2, max(s_z, g_z) + padding)
+            bounds.setLow(0, min(s_x, g_x) - self.narrow_padding)
+            bounds.setHigh(0, max(s_x, g_x) + self.narrow_padding)
+            bounds.setLow(1, min(s_y, g_y) - self.narrow_padding)
+            bounds.setHigh(1, max(s_y, g_y) + self.narrow_padding)
+            if is_3D(self.space):
+                bounds.setLow(2, min(s_z, g_z) - self.narrow_padding)
+                bounds.setHigh(2, max(s_z, g_z) + self.narrow_padding)
 
             # Save it
             self.space.setBounds(bounds)

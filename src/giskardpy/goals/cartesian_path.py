@@ -12,7 +12,8 @@ class CartesianPathCarrot(Goal):
 
     def __init__(self, root_link, tip_link, goal, goals=None, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, predict_f = 1.0, start=None, path_length=None, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, predict_f = 1.0, start=None, path_length=None,
+                 narrow=False, narrow_padding=1.0, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -157,7 +158,7 @@ class CartesianPathCarrot(Goal):
         normal_dist_funs = []
 
         for i in range(0, trajectory_len):
-            normal_dist_funs.append(w.norm(w.ca.transpose(normals[i,:]) - pos))
+            normal_dist_funs.append(w.sum(w.abs(w.ca.transpose(normals[i,:]) - pos)))
 
         return w.Matrix(normal_dist_funs)
 
@@ -254,7 +255,7 @@ class CartesianPathCarrot(Goal):
     def minimize_position(self, goal, weight):
         max_velocity = self.get_terminal_goal_velocity()
 
-        self.add_frame_point_goal_constraints(frame_P_current=w.position_of(self.get_fk(self.root_link, self.tip_link)),
+        self.add_point_goal_constraints(frame_P_current=w.position_of(self.get_fk(self.root_link, self.tip_link)),
                                         frame_P_goal=goal,
                                         reference_velocity=max_velocity,
                                         weight=weight,

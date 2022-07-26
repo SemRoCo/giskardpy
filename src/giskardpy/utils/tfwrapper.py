@@ -412,12 +412,15 @@ def norm_rotation_matrix(r):
 def pose_diff(a, b):
     a_t, a_r = pose_to_np(a)
     b_t, b_r = pose_to_np(b)
-    a_m = concatenate_matrices(translation_matrix(a_t),quaternion_matrix(a_r))
-    b_m = concatenate_matrices(translation_matrix(b_t),quaternion_matrix(b_r))
-    diff = concatenate_matrices(a_m, inverse_matrix(b_m))
-    diff = norm_rotation_matrix(diff)
-    r_diff = np.sum(quaternion_from_matrix(diff)) ** 2 #np.arccos(2 * (np.sum(quaternion_from_matrix(diff)) ** 2) - 1)
-    t_diff = np.linalg.norm(translation_from_matrix(diff))
+    m_P_a = translation_matrix(a_t)
+    m_P_b = translation_matrix(b_t)
+    b_P_a = concatenate_matrices(m_P_a, inverse_matrix(m_P_b))
+    angle = np.sum(a_r * b_r)
+    if angle > 1.0 - 1e-9:
+        r_diff = 0.0
+    else:
+        r_diff = np.arccos(angle)
+    t_diff = np.linalg.norm(translation_from_matrix(b_P_a))
     return t_diff + r_diff
 
 # Code copied from user jarvisschultz from ROS answers

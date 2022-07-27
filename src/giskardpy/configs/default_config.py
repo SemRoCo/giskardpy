@@ -168,7 +168,7 @@ class BehaviorTreeConfig:
         },
         'VisualizationBehavior': {
             'enabled': True,
-            'in_planning_loop': True
+            'in_planning_loop': False
         },
         'PublishDebugExpressions': {
             'enabled': False,
@@ -176,7 +176,7 @@ class BehaviorTreeConfig:
         },
         'CollisionMarker': {
             'enabled': True,
-            'in_planning_loop': True
+            'in_planning_loop': False
         },
         'PlotTrajectory': {
             'enabled': True,

@@ -15,7 +15,7 @@ from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import CollisionEntry, MoveResult, WorldBody, MoveGoal
+from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.configs.pr2 import PR2_Mujoco
@@ -120,6 +120,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('pr2/reset', Trigger)
+        self.odom_root = 'odom_combined'
         super().__init__(PR2_Mujoco)
 
     def move_base(self, goal_pose):
@@ -601,7 +602,6 @@ class TestConstraints(object):
         goal.pose.position.x -= 0.4
         better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
         better_pose.plan_and_execute()
-
 
     def test_CartesianVelocityLimit(self, zero_pose: PR2TestWrapper):
         base_linear_velocity = 0.1
@@ -1332,7 +1332,7 @@ class TestCartGoals(object):
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi/4, [0, 0, 1]))
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -1406,7 +1406,7 @@ class TestCartGoals(object):
     def test_base_driving1a(self, zero_pose):
         p = PoseStamped()
         p.header.frame_id = 'map'
-        p.pose.orientation = Quaternion(*quaternion_about_axis(1/2, [0, 0, 1]))
+        p.pose.orientation = Quaternion(*quaternion_about_axis(1 / 2, [0, 0, 1]))
         zero_pose.set_straight_cart_goal(p, 'base_footprint')
         zero_pose.plan_and_execute()
 
@@ -1423,7 +1423,7 @@ class TestCartGoals(object):
     def test_base_driving1b(self, zero_pose):
         p = PoseStamped()
         p.header.frame_id = 'map'
-        p.pose.orientation = Quaternion(*quaternion_about_axis(1/2, [0, 0, 1]))
+        p.pose.orientation = Quaternion(*quaternion_about_axis(1 / 2, [0, 0, 1]))
         zero_pose.set_straight_cart_goal(p, 'base_footprint')
         zero_pose.plan_and_execute()
 
@@ -2254,9 +2254,9 @@ class TestShaking(object):
 class TestWorldManipulation(object):
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
-        kitchen_setup.dye_group(kitchen_setup.get_robot_name(), (1,0,0,1))
-        kitchen_setup.dye_group('kitchen', (0,1,0,1))
-        kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0,0,1,1))
+        kitchen_setup.dye_group(kitchen_setup.get_robot_name(), (1, 0, 0, 1))
+        kitchen_setup.dye_group('kitchen', (0, 1, 0, 1))
+        kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0, 0, 1, 1))
         kitchen_setup.set_joint_goal(kitchen_setup.default_pose)
         kitchen_setup.plan_and_execute()
 
@@ -2519,7 +2519,49 @@ class TestWorldManipulation(object):
         assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
 
 
-class TestCollisionAvoidanceGoals(object):
+class TestCollisionAvoidanceGoals:
+
+    def test_cram_reset(self, kitchen_setup: PR2TestWrapper):
+        kitchen_setup.set_joint_goal(kitchen_setup.default_pose)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_limit_cartesian_velocity_goal(root_link='odom_combined',
+                                                        tip_link='l_wrist_roll_link',
+                                                        max_linear_velocity=0.1,
+                                                        max_angular_velocity=0.5,
+                                                        hard=False)
+        kitchen_setup.set_limit_cartesian_velocity_goal(root_link='odom_combined',
+                                                        tip_link='r_wrist_roll_link',
+                                                        max_linear_velocity=0.1,
+                                                        max_angular_velocity=0.5,
+                                                        hard=False)
+        cart_goal = PoseStamped()
+        cart_goal.header.frame_id = 'base_footprint'
+        cart_goal.pose.orientation.w = 1
+        kitchen_setup.set_cart_goal(goal_pose=cart_goal,
+                                    tip_link='base_footprint',
+                                    root_link='odom_combined',
+                                    linear_velocity=0.4,
+                                    weight=2500)
+        js1 = {'l_shoulder_pan_joint': 1.9652919379395388,
+               'l_shoulder_lift_joint': -0.26499816732737785,
+               'l_upper_arm_roll_joint': 1.3837617139225473,
+               'l_elbow_flex_joint': -2.1224566064321584,
+               'l_forearm_roll_joint': 16.99646118944817,
+               'l_wrist_flex_joint': -0.07350789589924167,
+               'l_wrist_roll_joint': 0.0}
+        kitchen_setup.set_joint_goal(js1)
+        js2 = {
+            'r_shoulder_pan_joint': -1.712587449591307,
+            'r_shoulder_lift_joint': -0.2567290370386635,
+            'r_upper_arm_roll_joint': -1.4633501125737374,
+            'r_elbow_flex_joint': -2.1221670650093913,
+            'r_forearm_roll_joint': 1.7663253481913623,
+            'r_wrist_flex_joint': -0.07942669250968948,
+            'r_wrist_roll_joint': 0.05106258161229582
+        }
+        kitchen_setup.set_joint_goal(js2)
+        kitchen_setup.avoid_all_collisions(0.1)
+        kitchen_setup.plan_and_execute()
 
     def test_handover(self, kitchen_setup: PR2TestWrapper):
         js = {

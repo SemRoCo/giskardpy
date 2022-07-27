@@ -501,7 +501,8 @@ class JointPositionList(Goal):
         :param weight: default is the default of the added joint goals
         :param max_velocity: default is the default of the added joint goals
         """
-        super(JointPositionList, self).__init__(**kwargs)
+        super().__init__(**kwargs)
+        self.joint_names = list(goal_state.keys())
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for joint_name, goal_position in goal_state.items():
@@ -517,11 +518,16 @@ class JointPositionList(Goal):
             params['hard'] = hard
             self.add_constraints_of_goal(JointPosition(**params))
 
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.joint_names}'
+
 
 class JointPosition(Goal):
     def __init__(self, joint_name: str, goal: float, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 100,
                  **kwargs):
-        super(JointPosition, self).__init__(**kwargs)
+        super().__init__(**kwargs)
+        self.joint_name = joint_name
         if self.world.is_joint_continuous(joint_name):
             C = JointPositionContinuous
         elif self.world.is_joint_revolute(joint_name):
@@ -536,6 +542,9 @@ class JointPosition(Goal):
                                        max_velocity=max_velocity,
                                        **kwargs))
 
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.joint_name}'
 
 class AvoidJointLimits(Goal):
     def __init__(self, percentage=15, weight=WEIGHT_BELOW_CA, **kwargs):

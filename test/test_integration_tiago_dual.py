@@ -236,3 +236,27 @@ class TestCollisionAvoidance:
                                       check=False)
         apartment_setup.plan_and_execute()
 
+
+class TestJointGoals:
+    def test_joint_goals(self, zero_pose: TiagoTestWrapper):
+        js1 = {
+            'arm_left_1_joint': - 1.0,
+            'arm_left_2_joint': 0.0,
+            'arm_left_3_joint': 1.5,
+            'arm_left_4_joint': 2.2,
+            'arm_left_5_joint': - 1.5,
+            'arm_left_6_joint': 0.5,
+            'arm_left_7_joint': 0.0,
+        }
+        js2 = {
+            'arm_right_1_joint': - 1.0,
+            'arm_right_2_joint': 0.0,
+            'arm_right_3_joint': 1.5,
+            'arm_right_4_joint': 2.2,
+            'arm_right_5_joint': - 1.5,
+            'arm_right_6_joint': 0.5,
+            'arm_right_7_joint': 0.0,
+        }
+        zero_pose.set_joint_goal(js1)
+        zero_pose.set_joint_goal(js2)
+        zero_pose.plan_and_execute()

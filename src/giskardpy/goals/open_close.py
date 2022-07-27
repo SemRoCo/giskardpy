@@ -7,7 +7,7 @@ from giskardpy.goals.joint_goals import JointPosition
 
 class Open(Goal):
     def __init__(self, tip_link, environment_link, goal_joint_state=None, weight=WEIGHT_ABOVE_CA, **kwargs):
-        super(Open, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.weight = weight
         self.tip_link = tip_link
         self.handle_link = environment_link
@@ -30,7 +30,7 @@ class Open(Goal):
                                                    **kwargs))
 
     def __str__(self):
-        return '{}/{}'.format(super(Open, self).__str__(), self.tip_link, self.handle_link)
+        return f'{super().__str__()}/{self.tip_link}/{self.handle_link}'
 
 
 class Close(Goal):

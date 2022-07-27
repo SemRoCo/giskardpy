@@ -391,6 +391,7 @@ class GiskardTestWrapper(GiskardWrapper):
     god_map: GodMap
     default_pose = {}
     better_pose = {}
+    odom_root = 'odom'
 
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
@@ -434,7 +435,7 @@ class GiskardTestWrapper(GiskardWrapper):
         req.transform.rotation = map_T_odom.pose.orientation
         assert self.set_localization_srv(req).success
         self.wait_heartbeats(15)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.robot.root_link_name)
+        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
         compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):

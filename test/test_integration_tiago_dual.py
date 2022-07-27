@@ -1,9 +1,10 @@
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped, Point
+from geometry_msgs.msg import PoseStamped, Quaternion, Point
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_about_axis
+from tf.transformations import quaternion_about_axis, quaternion_from_matrix
+
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.configs.tiago import TiagoMujoco
 from utils_for_tests import GiskardTestWrapper
@@ -184,4 +185,54 @@ class TestCollisionAvoidance:
         apartment_setup.move_base(base_goal)
 
     def test_open_cabinet(self, apartment_setup: TiagoTestWrapper):
+        tcp = 'gripper_left_grasping_frame'
+        handle_name = 'cabinet1_handle_top'
+        handle_name_frame = 'iai_apartment/cabinet1_handle_top'
+        joint_name = 'cabinet1_door_top_left_joint'
+        goal_angle = - np.pi / 2
+        left_pose = PoseStamped()
+        left_pose.header.frame_id = handle_name_frame
+        left_pose.pose.position.x = 0.1
+        left_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                         [0, 0, -1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        apartment_setup.set_cart_goal(left_pose,
+                                      tip_link=tcp,
+                                      root_link=tf.get_tf_root(),
+                                      check=False)
+        apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
+
+        apartment_setup.set_json_goal('Open',
+                                      tip_link=tcp,
+                                      environment_link=handle_name,
+                                      goal_joint_state=goal_angle)
+        apartment_setup.allow_all_collisions()
+        apartment_setup.plan_and_execute()
+        apartment_setup.set_apartment_js({joint_name: goal_angle})
+
+        apartment_setup.set_json_goal('Open',
+                                      tip_link=tcp,
+                                      environment_link=handle_name,
+                                      goal_joint_state=0)
+        apartment_setup.allow_all_collisions()
+        apartment_setup.plan_and_execute()
+        apartment_setup.set_apartment_js({joint_name: 0})
+
+    def test_hand_in_cabinet(self, apartment_setup: TiagoTestWrapper):
+        tcp = 'gripper_left_grasping_frame'
+        handle_name_frame = 'iai_apartment/cabinet1'
+        left_pose = PoseStamped()
+        left_pose.header.frame_id = handle_name_frame
+        # left_pose.pose.position.x = 0.1
+        left_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                         [0, 0, -1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        apartment_setup.set_cart_goal(left_pose,
+                                      tip_link=tcp,
+                                      root_link=tf.get_tf_root(),
+                                      check=False)
+        apartment_setup.plan_and_execute()
+

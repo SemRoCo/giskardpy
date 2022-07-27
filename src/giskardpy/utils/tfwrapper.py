@@ -14,6 +14,8 @@ from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
+from giskardpy.utils.utils import memoize
+
 tfBuffer: Buffer = None
 tf_listener: TransformListener = None
 
@@ -38,6 +40,7 @@ def get_tf_buffer():
     return tfBuffer
 
 
+@memoize
 def get_tf_root() -> str:
     tfBuffer = get_tf_buffer()
     frames = yaml.safe_load(tfBuffer.all_frames_as_yaml())

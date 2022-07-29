@@ -69,7 +69,7 @@ class LinkGeometry(object):
 
     def as_visualization_marker(self):
         marker = Marker()
-        marker.color.a = 0.5
+        marker.color.a = 1.0
         marker.color.r = 1.0
         marker.color.g = 1.0
         marker.color.b = 1.0

@@ -1669,7 +1669,7 @@ class GlobalPlanner(GetGoal):
                         if self.god_map.get_data(identifier.path_interpolation):
                             planner.interpolate_solution()
                             trajectory = planner.get_solution(ob.PlannerStatus.EXACT_SOLUTION)
-                        rospy.logerr(trajectory)
+                        rospy.logerr(trajectory.tolist())
                         return trajectory, planner_name, motion_validator_type
                 finally:
                     planner.clear()

@@ -20,16 +20,17 @@ class VisualizationBehavior(GiskardBehavior):
         time_stamp = rospy.Time()
         links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
-            for marker in self.world.links[link_name].collision_visualization_markers().markers:
-                marker.header.frame_id = str(self.world.root_link_name)
-                marker.action = Marker.ADD
-                if link_name not in self.marker_ids:
-                    self.marker_ids[link_name] = len(self.marker_ids)
-                marker.id = self.marker_ids[link_name]
-                marker.ns = u'planning_visualization'
-                marker.header.stamp = time_stamp
-                marker.pose = self.collision_scene.get_pose(link_name).pose
-                markers.append(marker)
+            if link_name not in self.world.groups['robot'].link_names:
+                for marker in self.world.links[link_name].collision_visualization_markers().markers:
+                    marker.header.frame_id = str(self.world.root_link_name)
+                    marker.action = Marker.ADD
+                    if link_name not in self.marker_ids:
+                        self.marker_ids[link_name] = len(self.marker_ids)
+                    marker.id = self.marker_ids[link_name]
+                    marker.ns = u'planning_visualization'
+                    marker.header.stamp = time_stamp
+                    marker.pose = self.collision_scene.get_pose(link_name).pose
+                    markers.append(marker)
 
         self.publisher.publish(markers)
         if self.ensure_publish:

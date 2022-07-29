@@ -105,7 +105,7 @@ class PlotTrajectory(GiskardBehavior):
         self.log_path_trajectory(max_dist, summed_dist)
         plt.show()
 
-    def log_path_trajectory(self, max_dev, summed_dev, filepath='/home/thomas/sample_goal_axis_on.txt'):
+    def log_path_trajectory(self, max_dev, summed_dev, filepath='/home/thomas/2d_axis.txt'):
         try:
             path_cost = self.god_map.get_data(identifier.rosparam + ['path_cost'])
         except KeyError:

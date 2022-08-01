@@ -90,7 +90,6 @@ def deactivate_rendering():
 
 
 def activate_rendering():
-    p.vhacd()
     if render:
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 

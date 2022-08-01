@@ -7,6 +7,15 @@ from sensor_msgs.msg import JointState
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
+from giskardpy.god_map import GodMap
+
+
+class SetSeedConfiguration(Goal):
+    #FIXME deal with prefix
+    def __init__(self, seed_configuration: Dict[str, float], **kwargs):
+        super().__init__(**kwargs)
+        for joint_name, initial_joint_value in seed_configuration.items():
+            self.world.state[joint_name].position = initial_joint_value
 
 
 class JointPositionContinuous(Goal):
@@ -25,7 +34,7 @@ class JointPositionContinuous(Goal):
         self.weight = weight
         self.max_velocity = max_velocity
         self.hard = hard
-        super(JointPositionContinuous, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if not self.world.is_joint_continuous(joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')

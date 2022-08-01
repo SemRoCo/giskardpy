@@ -2522,7 +2522,26 @@ class TestWorldManipulation(object):
 class TestCollisionAvoidanceGoals:
 
     def test_cram_reset(self, kitchen_setup: PR2TestWrapper):
-        kitchen_setup.set_joint_goal(kitchen_setup.default_pose)
+        js = {
+            'torso_lift_joint': 0.011505660600960255,
+            'r_upper_arm_roll_joint': 1.4073297904815263e-07,
+            'r_shoulder_pan_joint': 1.6493133898620727e-06,
+            'r_shoulder_lift_joint': 1.1900528988917358e-05,
+            'r_forearm_roll_joint': -1.299561915857339e-07,
+            'r_elbow_flex_joint': -0.14999248087406158,
+            'r_wrist_flex_joint': -0.10000340640544891,
+            'r_wrist_roll_joint': -2.0980905901524238e-10,
+            'l_upper_arm_roll_joint': 1.763919925679147e-07,
+            'l_shoulder_pan_joint': -1.997101435335935e-07,
+            'l_shoulder_lift_joint': 1.5421014722960535e-06,
+            'l_forearm_roll_joint': -2.038720481323253e-08,
+            'l_elbow_flex_joint': -0.14998672902584076,
+            'l_wrist_flex_joint': -0.1000063493847847,
+            'l_wrist_roll_joint': 6.953541742404923e-08,
+            'head_pan_joint': -5.877892590433476e-07,
+            'head_tilt_joint': 5.255556243355386e-05,
+        }
+        kitchen_setup.set_joint_goal(js)
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_limit_cartesian_velocity_goal(root_link='odom_combined',
                                                         tip_link='l_wrist_roll_link',

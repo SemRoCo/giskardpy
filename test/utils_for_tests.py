@@ -526,7 +526,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         :type goal: dict
         """
-        super(GiskardTestWrapper, self).set_joint_goal(goal, weight=weight, hard=hard)
+        super().set_joint_goal(goal, weight=weight, hard=hard)
         if check:
             self.add_goal_check(JointGoalChecker(self.god_map, goal, decimal))
 
@@ -651,6 +651,9 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def plan_and_execute(self, expected_error_codes=None, stop_after=None, wait=True):
         return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
+
+    def plan(self, expected_error_codes=None, wait: bool = True) -> MoveResult:
+        return self.send_goal(expected_error_codes, MoveGoal.PLAN_ONLY, wait)
 
     def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None,
                   wait=True):

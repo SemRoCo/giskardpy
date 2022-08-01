@@ -260,3 +260,9 @@ class TestJointGoals:
         zero_pose.set_joint_goal(js1)
         zero_pose.set_joint_goal(js2)
         zero_pose.plan_and_execute()
+
+    def test_SetSeedConfiguration(self, zero_pose: TiagoTestWrapper):
+        zero_pose.set_json_goal('SetSeedConfiguration',
+                                seed_configuration=zero_pose.better_pose)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan()

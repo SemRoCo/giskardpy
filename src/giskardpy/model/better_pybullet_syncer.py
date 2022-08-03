@@ -36,6 +36,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
             elif isinstance(geometry, MeshGeometry):
                 shape = load_convex_mesh_shape(geometry.file_name, scale=geometry.scale)
+                geometry.file_name = 'file://' + shape.file_path
             else:
                 raise NotImplementedError()
             map_T_o = bpb.Transform()

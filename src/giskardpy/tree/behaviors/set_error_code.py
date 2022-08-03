@@ -13,7 +13,7 @@ class SetErrorCode(GiskardBehavior):
         self.reachability_threshold = 0.001
         self.print = print
         self.context = context
-        super(SetErrorCode, self).__init__(name)
+        super().__init__(name)
 
     @profile
     def update(self):

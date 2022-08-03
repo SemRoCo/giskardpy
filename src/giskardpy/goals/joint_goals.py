@@ -14,6 +14,8 @@ class SetSeedConfiguration(Goal):
     #FIXME deal with prefix
     def __init__(self, seed_configuration: Dict[str, float], **kwargs):
         super().__init__(**kwargs)
+        if self.god_map.get_data(identifier.execute):
+            raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
             self.world.state[joint_name].position = initial_joint_value
 

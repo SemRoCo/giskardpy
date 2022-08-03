@@ -14,12 +14,13 @@ from contextlib import contextmanager
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
-
+import pybullet
 import matplotlib.colors as mcolors
 import numpy as np
 import pylab as plt
 import rospkg
 import rospy
+import trimesh
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import Status, Blackboard
@@ -372,21 +373,31 @@ def resolve_ros_iris(path):
         return path
 
 
-def write_to_tmp(filename, urdf_string):
+def write_to_tmp(file_name: str, file_str: str) -> str:
     """
     Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
-    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
-    :type filename: str
-    :param urdf_string: URDF as an XML string that shall be written to disc.
-    :type urdf_string: str
+    :param file_name: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
+    :param file_str: URDF as an XML string that shall be written to disc.
     :return: Complete path to where the urdfs was written, e.g. '/tmp/pr2.urdfs'
-    :rtype: str
     """
-    new_path = '/tmp/giskardpy/{}'.format(filename)
+    new_path = to_tmp_path(file_name)
     create_path(new_path)
-    with open(new_path, 'w') as o:
-        o.write(urdf_string)
+    with open(new_path, 'w') as f:
+        f.write(file_str)
     return new_path
+
+
+def to_tmp_path(file_name: str) -> str:
+    return f'/tmp/giskardpy/{file_name}'
+
+
+def load_from_tmp(file_name: str):
+    new_path = to_tmp_path(file_name)
+    create_path(new_path)
+    with open(new_path, 'r') as f:
+        loaded_file = f.read()
+    return loaded_file
+
 
 
 def convert_to_stl_and_save_in_tmp(file_name: str):
@@ -394,9 +405,46 @@ def convert_to_stl_and_save_in_tmp(file_name: str):
     short_file_name = file_name.split('/')[-1][:-3]
     tmp_path = f'/tmp/giskardpy/{short_file_name}stl'
     if not os.path.exists(tmp_path):
-        logging.loginfo(f'converting {file_name} to stl and saving in {tmp_path}')
+        logging.loginfo(f'Converting {file_name} to stl and saving in {tmp_path}.')
         subprocess.check_output(['ctmconv', resolved_old_path, tmp_path])
+    else:
+        logging.loginfo(f'Found converted file in {tmp_path}.')
     return tmp_path
+
+
+def fix_obj(file_name):
+    logging.loginfo(f'Attempting to fix {file_name}.')
+    with open(file_name, 'r') as f:
+        lines = f.readlines()
+        fixed_obj = ''
+        for line in lines:
+            if line.startswith('f '):
+                new_line = 'f '
+                for part in line.split(' ')[1:]:
+                    f_number = part.split('//')[0]
+                    new_part = '//'.join([f_number, f_number])
+                    new_line += ' ' + new_part
+                fixed_obj += new_line + '\n'
+            else:
+                fixed_obj += line
+        with open(file_name, 'w') as f:
+            f.write(fixed_obj)
+
+
+def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path = '/tmp/giskardpy/vhacd.log'):
+    resolved_old_path = resolve_ros_iris(file_name)
+    short_file_name = file_name.split('/')[-1][:-3]
+    decomposed_obj_file_name = f'{short_file_name}obj'
+    new_path = to_tmp_path(decomposed_obj_file_name)
+    if not os.path.exists(new_path):
+        mesh = trimesh.load(resolved_old_path, force='mesh')
+        obj_str = trimesh.exchange.obj.export_obj(mesh)
+        write_to_tmp(decomposed_obj_file_name, obj_str)
+        logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
+        if not trimesh.convex.is_convex(mesh):
+            pybullet.vhacd(new_path, new_path, log_path)
+
+    return new_path
 
 
 

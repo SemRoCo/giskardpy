@@ -1,9 +1,7 @@
 import betterpybullet as pb
-from collada import Collada
 
-from giskardpy.utils import logging
-from giskardpy.utils.utils import resolve_ros_iris, convert_to_stl_and_save_in_tmp
-import subprocess
+from giskardpy.utils.utils import resolve_ros_iris, convert_to_decomposed_obj_and_save_in_tmp
+
 
 class MyCollisionObject(pb.CollisionObject):
     def __init__(self, name, collision_id):
@@ -44,22 +42,26 @@ class MyCollisionObject(pb.CollisionObject):
 
 
 def create_cube_shape(extents):
-    out = pb.BoxShape(pb.Vector3(*[extents[x] * 0.5 for x in range(3)])) if type(extents) is not pb.Vector3 else pb.BoxShape(extents)
+    out = pb.BoxShape(pb.Vector3(*[extents[x] * 0.5 for x in range(3)])) if type(
+        extents) is not pb.Vector3 else pb.BoxShape(extents)
     out.margin = 0.001
     return out
+
 
 def create_cylinder_shape(diameter, height):
     # out = pb.CylinderShapeZ(pb.Vector3(0.5 * diameter, 0.5 * diameter, height * 0.5))
     # out.margin = 0.001
     # Weird thing: The default URDF loader in bullet instantiates convex meshes. Idk why.
     return load_convex_mesh_shape(resolve_ros_iris('package://giskardpy/test/urdfs/meshes/cylinder.obj'),
-                                  single_shape=True, 
+                                  single_shape=True,
                                   scale=[diameter, diameter, height])
+
 
 def create_sphere_shape(diameter):
     out = pb.SphereShape(0.5 * diameter)
     out.margin = 0.001
     return out
+
 
 def create_compound_shape(shapes_poses=[]):
     out = pb.CompoundShape()
@@ -67,14 +69,30 @@ def create_compound_shape(shapes_poses=[]):
         out.add_child(t, s)
     return out
 
-# Technically the tracker is not required here, 
+
+# Technically the tracker is not required here,
 # since the loader keeps references to the loaded shapes.
 def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1)):
-    if pkg_filename.endswith('.dae'):
-        pkg_filename = convert_to_stl_and_save_in_tmp(pkg_filename)
-    return pb.load_convex_shape(resolve_ros_iris(pkg_filename),
+    if pkg_filename.startswith('file://'):
+        pkg_filename = pkg_filename.split('file://')[1]
+    if not pkg_filename.endswith('.obj'):
+        obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(pkg_filename)
+    else:
+        obj_pkg_filename = pkg_filename
+    # try:
+    # logging.loginfo(f'loading {obj_pkg_filename}')
+    return pb.load_convex_shape(resolve_ros_iris(obj_pkg_filename),
                                 single_shape=single_shape,
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
+    # except Exception as e:
+    #     logging.logwarn(f'Can not load {obj_pkg_filename}: {e}')
+    #     fix_obj(obj_pkg_filename)
+    #     result = pb.load_convex_shape(resolve_ros_iris(obj_pkg_filename),
+    #                                 single_shape=single_shape,
+    #                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
+    #     logging.loginfo(f'Fixed {obj_pkg_filename} could be loaded.')
+    #     return result
+
 
 def create_object(name, shape, transform=pb.Transform.identity(), collision_id=0):
     out = MyCollisionObject(name, collision_id)
@@ -83,36 +101,46 @@ def create_object(name, shape, transform=pb.Transform.identity(), collision_id=0
     out.transform = transform
     return out
 
+
 def create_cube(extents, transform=pb.Transform.identity()):
     return create_object(create_cube_shape(extents), transform)
+
 
 def create_sphere(diameter, transform=pb.Transform.identity()):
     return create_object(create_sphere_shape(diameter), transform)
 
+
 def create_cylinder(diameter, height, transform=pb.Transform.identity()):
     return create_object(create_cylinder_shape(diameter, height), transform)
+
 
 def create_compund_object(shapes_transforms, transform=pb.Transform.identity()):
     return create_object(create_compound_shape(shapes_transforms), transform)
 
+
 def create_convex_mesh(pkg_filename, transform=pb.Transform.identity()):
     return create_object(load_convex_mesh_shape(pkg_filename), transform)
+
 
 def vector_to_cpp_code(vector):
     return 'btVector3({:.6f}, {:.6f}, {:.6f})'.format(vector.x, vector.y, vector.z)
 
+
 def quaternion_to_cpp_code(quat):
     return 'btQuaternion({:.6f}, {:.6f}, {:.6f}, {:.6f})'.format(quat.x, quat.y, quat.z, quat.w)
 
+
 def transform_to_cpp_code(transform):
-    return 'btTransform({}, {})'.format(quaternion_to_cpp_code(transform.rotation), 
-                                            vector_to_cpp_code(transform.origin))
+    return 'btTransform({}, {})'.format(quaternion_to_cpp_code(transform.rotation),
+                                        vector_to_cpp_code(transform.origin))
+
 
 BOX = 0
 SPHERE = 1
 CYLINDER = 2
 COMPOUND = 3
 CONVEX = 4
+
 
 def shape_to_cpp_code(s, shape_names, shape_type_names):
     buf = ''
@@ -127,12 +155,13 @@ def shape_to_cpp_code(s, shape_names, shape_type_names):
         buf += 'auto {} = std::make_shared<btSphereShape>({:.3f});\n'.format(s_name, s.radius)
         shape_type_names[SPHERE] += 1
     elif isinstance(s, pb.CylinderShape):
-        height   = s.height
+        height = s.height
         diameter = s.radius * 2
         s_name = 'shape_cylinder_{}'.format(shape_type_names[CYLINDER])
         shape_names[s] = s_name
 
-        buf += 'auto {} = std::make_shared<btCylinderShapeZ>({});\n'.format(s_name, vector_to_cpp_code(pb.Vector3(diameter, diameter, height)))
+        buf += 'auto {} = std::make_shared<btCylinderShapeZ>({});\n'.format(s_name, vector_to_cpp_code(
+            pb.Vector3(diameter, diameter, height)))
         shape_type_names[CYLINDER] += 1
     elif isinstance(s, pb.CompoundShape):
         if s.file_path != '':
@@ -148,7 +177,8 @@ def shape_to_cpp_code(s, shape_names, shape_type_names):
             for x in range(s.nchildren):
                 ss = s.get_child(x)
                 buf += shape_to_cpp_code(ss, shape_names, shape_type_names)
-                buf += '{}->addChildShape({}, {});\n'.format(s_name, transform_to_cpp_code(s.get_child_transform(x)), shape_names[ss])
+                buf += '{}->addChildShape({}, {});\n'.format(s_name, transform_to_cpp_code(s.get_child_transform(x)),
+                                                             shape_names[ss])
     elif isinstance(s, pb.ConvexHullShape):
         if s.file_path != '':
             s_name = 'shape_convex_{}'.format(shape_type_names[CONVEX])
@@ -167,11 +197,12 @@ def world_to_cpp_code(subworld):
     buf = 'KineverseWorld world;\n\n'
     buf += '\n'.join(shape_to_cpp_code(s, shape_names, shape_type_names) for s in shapes)
 
-    obj_names = [] # store the c++ names
+    obj_names = []  # store the c++ names
     for name, obj in sorted(subworld.named_objects.items()):
         o_name = '_'.join(name)
         obj_names.append(o_name)
-        buf += 'auto {o_name} = std::make_shared<KineverseCollisionObject>();\n{o_name}->setWorldTransform({transform});\n{o_name}->setCollisionShape({shape});\n\n'.format(o_name=o_name, transform=transform_to_cpp_code(obj.transform), shape=shape_names[obj.collision_shape])
+        buf += 'auto {o_name} = std::make_shared<KineverseCollisionObject>();\n{o_name}->setWorldTransform({transform});\n{o_name}->setCollisionShape({shape});\n\n'.format(
+            o_name=o_name, transform=transform_to_cpp_code(obj.transform), shape=shape_names[obj.collision_shape])
 
     buf += '\n'.join('world.addCollisionObject({});'.format(n) for n in obj_names)
 

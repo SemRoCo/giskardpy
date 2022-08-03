@@ -6,6 +6,7 @@ from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
+from giskard_msgs.msg import MoveResult
 from giskardpy.configs.tiago import TiagoMujoco
 from utils_for_tests import GiskardTestWrapper
 
@@ -266,3 +267,9 @@ class TestJointGoals:
                                 seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan()
+
+    def test_SetSeedConfiguration2(self, zero_pose: TiagoTestWrapper):
+        zero_pose.set_json_goal('SetSeedConfiguration',
+                                seed_configuration=zero_pose.better_pose)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])

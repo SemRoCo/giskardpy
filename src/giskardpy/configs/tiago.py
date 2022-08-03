@@ -30,6 +30,10 @@ class IAI_Tiago(Giskard):
                                                 state_topic='/arm_left_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/arm_right_controller/follow_joint_trajectory',
                                                 state_topic='/arm_right_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/gripper_left_controller/follow_joint_trajectory',
+                                                state_topic='/gripper_left_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/gripper_right_controller/follow_joint_trajectory',
+                                                state_topic='/gripper_right_controller/state')
         # self.add_follow_joint_trajectory_server(namespace='/head_controller/follow_joint_trajectory',
         # state_topic='/head_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',

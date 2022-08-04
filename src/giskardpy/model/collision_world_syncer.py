@@ -531,7 +531,7 @@ class CollisionWorldSynchronizer(object):
         return max_distances
 
     def update_collision_checker(self):
-        self.sync()
+        #self.sync()
         collisions = self.check_collisions(self.god_map.get_data(identifier.collision_matrix),
                                            self._cal_max_param('number_of_repeller'))
         self.god_map.set_data(identifier.closest_point, collisions)
@@ -539,9 +539,7 @@ class CollisionWorldSynchronizer(object):
     def get_aabb_info(self, link_name: str) -> CollisionAABB:
         raise Exception('Implement me.')
 
-    def get_aabb_collisions(self, link_names: List[str], sync=True) -> AABBCollision:
-        if sync:
-            self.sync()
+    def get_aabb_collisions(self, link_names: List[str]) -> AABBCollision:
         c = AABBCollision()
         #obj = self.world.groups[group_name]
         #link_names = obj.get_children_with_collisions_from_link(link_name)

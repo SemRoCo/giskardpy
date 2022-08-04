@@ -8,13 +8,9 @@ import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy.data_types import BiDict, CollisionAABB
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions, Collision
 from giskardpy.model.pybullet_wrapper import ContactInfo
+from giskardpy.utils.tfwrapper import pose_to_list
 from giskardpy.utils.utils import resolve_ros_iris, write_to_tmp
 
-def pose_to_np(msg):
-    p = np.array([msg.position.x, msg.position.y, msg.position.z])
-    q = np.array([msg.orientation.x, msg.orientation.y,
-                  msg.orientation.z, msg.orientation.w])
-    return p, q
 
 class PyBulletSyncer(CollisionWorldSynchronizer):
     hack_name = 'hack'
@@ -391,7 +387,7 @@ class PyBulletBoxSpace():
         length = np.sqrt(np.sum((np.array(pos_a) - np.array(pos_b)) ** 2)) + min_size
         width = min_size
         height = min_size
-        coll_id = pbw.create_collision_box(pose_to_np(pose), length, width, height,
+        coll_id = pbw.create_collision_box(pose_to_list(pose), length, width, height,
                                            client_id=self.pybullet_env.client_id)
         if self.publish_collision_boxes:
             name = '{}_{}'.format(self.collision_box_name_prefix, str(i))

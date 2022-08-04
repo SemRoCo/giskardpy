@@ -35,8 +35,8 @@ from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.utils.kdl_parser import KDL
-from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, list_to_kdl, \
-    pose_to_kdl, np_to_pose, pose_stamped_to_np, pose_diff, interpolate_pose
+from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, \
+    pose_to_kdl, np_to_pose, pose_diff, interpolate_pose, pose_to_list, pose_stamped_to_list
 
 from mpl_toolkits.mplot3d import Axes3D
 import numpy
@@ -51,12 +51,6 @@ SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve
 
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp
 
-
-def pose_to_np(msg):
-    p = np.array([msg.position.x, msg.position.y, msg.position.z])
-    q = np.array([msg.orientation.x, msg.orientation.y,
-                  msg.orientation.z, msg.orientation.w])
-    return p, q
 
 class CollisionCheckerInterface(GiskardBehavior):
 
@@ -125,7 +119,7 @@ class ReducedOrientationGoalOptimizationObjective(ob.PathLengthOptimizationObjec
                                                                 ignore_state_validator=True, js=env_js)
 
     # def get_euclidian(self, s1, s2):
-    #    return sum((pose_to_np(ompl_se3_state_to_pose(s1))[0] - pose_to_np(ompl_se3_state_to_pose(s2))[0]) ** 2)
+    #    return sum((pose_to_list(ompl_se3_state_to_pose(s1))[0] - pose_to_list(ompl_se3_state_to_pose(s2))[0]) ** 2)
 
     def get_orientation_reduced_cost(self, s1, s2):
         object_c_free = self.object_motion_validator.checkMotion(s1, s2)
@@ -253,7 +247,7 @@ class DynamicSE3GoalSpace(ob.GoalState):
             # u = [bounds.high[0], bounds.high[1], bounds.high[2]]
             # points = self.aabb_to_3d_points(d, u)
             # min_dist = 10e10
-            # state_pose = pose_to_np(ompl_se3_state_to_pose(state))
+            # state_pose = pose_to_list(ompl_se3_state_to_pose(state))
             # for point in points:
             #    dist = np.sqrt(np.sum((np.array(point) - state_pose[0]) ** 2))
             #    if dist < min_dist:
@@ -642,7 +636,6 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
     def _check_motion(self, s1, s2):
         # Shoot ray from start to end pose and check if it intersects with the kitchen,
         # if so return false, else true.
-        all_js = self.collision_scene.world.state
         old_js = deepcopy(self.object_in_motion.state)
         state1 = self.state_validator.ik.get_ik(old_js, s1)
         #s = 0.
@@ -652,8 +645,7 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         #    if n != 0:
         #        rospy.logerr(f'joint_name: {j_n}: first: {v.position}, second: {v2}, diff: {n}')
         #    s += n
-        update_joint_state(all_js, state1)
-        self.object_in_motion.state = all_js
+        update_robot_state(self.collision_scene, state1)
         query_b = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
         state2 = self.state_validator.ik.get_ik(old_js, s2)
         #s = 0.
@@ -663,11 +655,9 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         #    if n != 0:
         #        rospy.logerr(f'joint_name: {j_n}: first: {v.position}, second: {v2}, diff: {n}')
         #    s += n
-        update_joint_state(all_js, state2)
-        self.object_in_motion.state = all_js
+        update_robot_state(self.collision_scene, state2)
         query_e = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
-        update_joint_state(all_js, old_js)
-        self.object_in_motion.state = all_js
+        update_robot_state(self.collision_scene, old_js)
         collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(query_b, query_e)
         return collision_free, coll_links, dists, min(fractions)
 
@@ -692,56 +682,44 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
 
     @profile
     def check_motion_old(self, s1, s2):
-        all_js = self.collision_scene.world.state
         old_js = deepcopy(self.object_in_motion.state)
         ret = True
         for collision_link_name in self.collision_link_names:
             state_ik = self.state_validator.ik.get_ik(old_js, s1)
-            update_joint_state(all_js, state_ik)
-            self.object_in_motion.state = all_js
-            self.collision_scene.sync()
-            query_b = pose_stamped_to_np(self.collision_scene.get_pose(collision_link_name))
+            update_robot_state(self.collision_scene, state_ik)
+            query_b = pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))
             state_ik = self.state_validator.ik.get_ik(old_js, s2)
-            update_joint_state(all_js, state_ik)
-            self.object_in_motion.state = all_js
-            self.collision_scene.sync()
-            query_e = pose_stamped_to_np(self.collision_scene.get_pose(collision_link_name))
+            update_robot_state(self.collision_scene, state_ik)
+            query_e = pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))
             start_positions = [query_b[0]]
             end_positions = [query_e[0]]
             collision_object = self.collision_scene.get_aabb_info(collision_link_name)
             min_size = np.max(np.abs(np.array(collision_object.d) - np.array(collision_object.u)))
             if self.box_space.is_colliding([min_size], start_positions, end_positions):
-                self.object_in_motion.state = all_js
+                #self.object_in_motion.state = self.collision_scene.world.state
                 ret = False
                 break
-        update_joint_state(all_js, old_js)
-        self.object_in_motion.state = all_js
+        update_robot_state(self.collision_scene, old_js)
         return ret
 
     @profile
     def get_box_params(self, s1, s2):
-        all_js = self.collision_scene.world.state
         old_js = deepcopy(self.object_in_motion.state)
         state_ik = self.state_validator.ik.get_ik(old_js, s1)
-        update_joint_state(all_js, state_ik)
-        self.object_in_motion.state = all_js
-        self.collision_scene.sync()
+        update_robot_state(self.collision_scene, state_ik)
         start_positions = list()
         end_positions = list()
         min_sizes = list()
         for collision_link_name in self.collision_link_names:
-            start_positions.append(pose_stamped_to_np(self.collision_scene.get_pose(collision_link_name))[0])
+            start_positions.append(pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))[0])
         state_ik = self.state_validator.ik.get_ik(old_js, s2)
-        update_joint_state(all_js, state_ik)
-        self.object_in_motion.state = all_js
-        self.collision_scene.sync()
+        update_robot_state(self.collision_scene, state_ik)
         for collision_link_name in self.collision_link_names:
-            end_positions.append(pose_stamped_to_np(self.collision_scene.get_pose(collision_link_name))[0])
+            end_positions.append(pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))[0])
             collision_object = self.collision_scene.get_aabb_info(collision_link_name)
             min_size = np.max(np.abs(np.array(collision_object.d) - np.array(collision_object.u)))
             min_sizes.append(min_size)
-        update_joint_state(all_js, old_js)
-        self.object_in_motion.state = all_js
+        update_robot_state(self.collision_scene, old_js)
         return min_sizes, start_positions, end_positions
 
     @profile
@@ -751,7 +729,7 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
     @profile
     def check_motion_timed(self, s1, s2):
         m, s, e = self.get_box_params(s1, s2)
-        c, f = self.box_space.is_colliding_timed(m, s, e, pose_to_np(s1)[0], pose_to_np(s2)[0])
+        c, f = self.box_space.is_colliding_timed(m, s, e, pose_to_list(s1)[0], pose_to_list(s2)[0])
         return not c, f
 
 
@@ -816,7 +794,7 @@ class PyBulletIK(IK):
                 self.client_id = i
                 break
         pbw.start_pybullet(False, client_id=self.client_id)
-        pos, q = pose_to_np(lookup_pose('map', self.root_link).pose)
+        pos, q = pose_to_list(lookup_pose('map', self.root_link).pose)
         self.robot_id = pbw.load_urdf_string_into_bullet(self.robot_description, position=pos,
                                                          orientation=q, client_id=self.client_id)
         for i in range(0, pbw.p.getNumJoints(self.robot_id, physicsClientId=self.client_id)):
@@ -838,7 +816,7 @@ class PyBulletIK(IK):
             self.update_pybullet(js)
             self.once = True
         new_js = deepcopy(js)
-        pose = pose_to_np(pose)
+        pose = pose_to_list(pose)
         # rospy.logerr(pose[1])
         state_ik = p.calculateInverseKinematics(self.robot_id, self.pybullet_tip_link_id,
                                                 pose[0], pose[1], self.joint_lowers, self.joint_uppers,
@@ -889,7 +867,6 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
     def is_collision_free(self, pose):
         with self.get_god_map().get_data(identifier.rosparam + ['state_validator_lock']):
             # Get current joint states
-            all_js = self.collision_scene.world.state
             old_js = deepcopy(self.collision_scene.robot.state)
             # Calc IK for navigating to given state and ...
             results = []
@@ -898,8 +875,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                     s_s = current_milli_time()
                 state_ik = self.ik.get_ik(deepcopy(self.collision_scene.robot.state), pose)
                 # override on current joint states.
-                update_joint_state(all_js, state_ik)
-                self.robot.state = all_js
+                update_robot_state(self.collision_scene, state_ik)
                 if self.debug:
                     s_c = current_milli_time()
                 results.append(
@@ -909,8 +885,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                     e_c = current_milli_time()
                 # Reset joint state
                 self.publish_robot_state()
-                update_joint_state(all_js, old_js)
-                self.robot.state = all_js
+                update_robot_state(self.collision_scene, old_js)
                 if self.debug:
                     e_s = current_milli_time()
                     self.debug_times_cc.append(e_c - s_c)
@@ -926,34 +901,28 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
 
     def get_furthest_normal(self, pose):
         # Get current joint states
-        all_js = self.collision_scene.world.state
         old_js = deepcopy(self.collision_scene.robot.state)
         # Calc IK for navigating to given state and ...
         state_ik = self.ik.get_ik(old_js, pose)
         # override on current joint states.
-        update_joint_state(all_js, state_ik)
-        self.robot.state = all_js
+        update_robot_state(self.collision_scene, state_ik)
         # Check if kitchen is colliding with robot
         result = self.collision_scene.get_furthest_normal(self.collision_link_names)
         # Reset joint state
-        update_joint_state(all_js, old_js)
-        self.robot.state = all_js
+        update_robot_state(self.collision_scene, old_js)
         return result
 
     def get_closest_collision_distance(self, pose, link_names):
         # Get current joint states
-        all_js = self.collision_scene.world.state
         old_js = deepcopy(self.collision_scene.robot.state)
         # Calc IK for navigating to given state and ...
         state_ik = self.ik.get_ik(old_js, pose)
         # override on current joint states.
-        update_joint_state(all_js, state_ik)
-        self.robot.state = all_js
+        update_robot_state(self.collision_scene, state_ik)
         # Check if kitchen is colliding with robot
         collision = self.collision_scene.get_furthest_collision(link_names)[0]
         # Reset joint state
-        update_joint_state(all_js, old_js)
-        self.robot.state = all_js
+        update_robot_state(self.collision_scene, old_js)
         return collision.contact_distance
 
     def is_collision_free_ompl(self, state):
@@ -1177,7 +1146,13 @@ def verify_ompl_navigation_solution(setup, path, debug=False):
 def update_joint_state(js, new_js):
     if any(map(lambda e: type(e) != PrefixName, new_js)):
         raise Exception('oi, there are no PrefixNames in yer new_js >:(!')
-    js.update((k, new_js[k]) for k in js.keys() & new_js.keys())
+    js.update((k, new_js[k]) for k in js.keys() and new_js.keys())
+
+
+def update_robot_state(collision_scene, state):
+    update_joint_state(collision_scene.world.state, state)
+    collision_scene.world.notify_state_change()
+    collision_scene.sync()
 
 
 def allocGiskardValidStateSample(si):
@@ -1219,7 +1194,7 @@ class GoalRegionSampler:
         self.valid_samples = list()
         self.samples = list()
         self.goal_orientation = goal_orientation
-        self.goal_list = pose_to_np(goal)[0]
+        self.goal_list = pose_to_list(goal)[0]
 
     def _get_pitch(self, pos_b):
         pos_a = np.zeros(3)
@@ -2477,15 +2452,15 @@ class NarrowMovementPlanner(MovementPlanner):
             segments = diff / self.range
             rospy.logerr(segments)
             for i in range(1, int(segments)):
-                p = pose_to_np(interpolate_pose(begin_i, end_i, i*(1/segments)))
+                p = pose_to_list(interpolate_pose(begin_i, end_i, i*(1/segments)))
                 data = np.append(data, [np.append(p[0], p[1])], axis=0)
 
             if not self.reversed_start_and_goal:
-                data = np.append(data, [np.append(pose_to_np(self.pose_goal)[0], pose_to_np(self.pose_goal)[1])],
+                data = np.append(data, [np.append(pose_to_list(self.pose_goal)[0], pose_to_list(self.pose_goal)[1])],
                                  axis=0)
             else:
-                data = np.append(data, [np.append(pose_to_np(ompl_se3_state_to_pose(self.start()))[0],
-                                                  pose_to_np(ompl_se3_state_to_pose(self.start()))[1])], axis=0)
+                data = np.append(data, [np.append(pose_to_list(ompl_se3_state_to_pose(self.start()))[0],
+                                                  pose_to_list(ompl_se3_state_to_pose(self.start()))[1])], axis=0)
             data = data if not self.reversed_start_and_goal else np.flip(data, axis=0)
 
         return data

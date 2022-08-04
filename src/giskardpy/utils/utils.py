@@ -441,8 +441,8 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path = '/tmp/g
         obj_str = trimesh.exchange.obj.export_obj(mesh)
         write_to_tmp(decomposed_obj_file_name, obj_str)
         logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
-        if not trimesh.convex.is_convex(mesh):
-            pybullet.vhacd(new_path, new_path, log_path)
+        # if not trimesh.convex.is_convex(mesh):
+        #     pybullet.vhacd(new_path, new_path, log_path)
 
     return new_path
 

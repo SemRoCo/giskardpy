@@ -94,38 +94,37 @@ plugins:
     max_replanning_retries: 10
     normal:
       navigation:
-        planner: [ 'PRM', 'LazyPRM', 'PRMstar', 'LazyPRMstar', 'RRT', 'RRTConnect', 'TRRT', 'LazyRRT','EST',
-                   'SBL','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT', 'BFMT',
-                   'STRIDE', 'BITstar', 'ABITstar', 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
-                   'InformedRRTstar' ] # sublist of above planners
-        motion_validator: [ 'rays' ] # sublist of ['rays', 'box', 'discrete']
+        planner: [ 'RRTConnect' ] # sublist of above planners
+        motion_validator: [ 'box' ] # sublist of ['rays', 'box', 'discrete']
+        time: 15
+        range: 2.0
+      movement:
+        planner: [ 'RRTConnect' ] # sublist of above planners
+        motion_validator: [ 'box'] # sublist of ['rays', 'box', 'discrete' ]
+        time: 10
+        range: 0.15
+    narrow:
+      navigation:
+        planner: [ 'InformedRRTstar' ] # sublist of above planners
+        motion_validator: ['box'] # sublist of ['rays', 'box', 'discrete']
         time: 30
         range: 0.2
       movement:
-        planner: [ 'RRTConnect' ] # sublist of above planners
-        motion_validator: [ 'rays', 'discrete' ] # sublist of ['rays', 'box', 'discrete']
-        time: 30
-        range: 0.05
-    narrow:
-      movement:
-        planner: [ 'RRTConnect', 'EST', 'KPIECE1', 'RRT',
-                   'TRRT', 'STRIDE', 'RRTstar', 'BITstar',
-                   'ABITstar', 'LBTRRT', 'RRTXstatic',
-                   'RRTsharp', 'InformedRRTstar' ] # sublist of ['InformedRRTstar', 'RRTConnect', 'ABITstar']
+        planner: [ 'RRT']
         motion_validator: [ 'discrete' ] # sublist of ['rays', 'box', 'discrete']
         time: 30
         range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
     path_enabled: True #will plot planned path and executed trajectory if computed
-    history: 10 # will save the x last plots
+    history: 20 # will save the x last plots
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     cm_per_second: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     height_per_derivative: 6
     normalize_position: False # centers the joint positions around 0 on the y axis
     tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
   PlotDebugTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-    enabled: True
+    enabled: False
     history: 5
     cm_per_second: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     height_per_derivative: 6

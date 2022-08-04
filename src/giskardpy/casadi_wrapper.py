@@ -359,6 +359,10 @@ def norm(v):
     return ca.norm_2(v)
 
 
+def manhattan_norm(a, b):
+    return sum(abs(a-b))
+
+
 def scale(v, a):
     """
     :type v: Matrix
@@ -1058,6 +1062,15 @@ def sum_column(matrix):
     the equivalent to np.sum(matrix, axis=1)
     """
     return ca.sum2(matrix)
+
+
+def normalize_rotation_matrix(R: Matrix) -> Matrix:
+    """Scales each of the axes to the length of one."""
+    scale_v = 1.0
+    R[:3, 0] = scale(R[:3, 0], scale_v)
+    R[:3, 1] = scale(R[:3, 1], scale_v)
+    R[:3, 2] = scale(R[:3, 2], scale_v)
+    return R
 
 
 def distance_point_to_line_segment(point, line_start, line_end):

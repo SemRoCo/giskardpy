@@ -9,7 +9,7 @@ from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
-from giskardpy.data_types import JointStates, AABBCollision
+from giskardpy.data_types import JointStates, AABBCollision, CollisionAABB
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import SubWorldTree
@@ -536,7 +536,7 @@ class CollisionWorldSynchronizer(object):
                                            self._cal_max_param('number_of_repeller'))
         self.god_map.set_data(identifier.closest_point, collisions)
 
-    def get_aabb_info(self, link_name: str) -> Tuple[str, float, float]:
+    def get_aabb_info(self, link_name: str) -> CollisionAABB:
         raise Exception('Implement me.')
 
     def get_aabb_collisions(self, link_names: List[str], sync=True) -> AABBCollision:

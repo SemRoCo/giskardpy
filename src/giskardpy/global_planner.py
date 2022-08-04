@@ -36,7 +36,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.utils.kdl_parser import KDL
 from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, list_to_kdl, \
-    pose_to_kdl, np_to_pose, pose_stamped_to_np
+    pose_to_kdl, np_to_pose, pose_stamped_to_np, pose_diff, interpolate_pose
 
 from mpl_toolkits.mplot3d import Axes3D
 import numpy
@@ -505,19 +505,7 @@ class AbstractMotionValidator():
         self.ignore_state_validator = ignore_state_validator
 
     def get_last_valid(self, s1, s2, f):
-        np1 = pose_to_np(s1)
-        np2 = pose_to_np(s2)
-        np3_trans = np1[0] + (np2[0] - np1[0]) * f
-        key_rots = R.from_quat([np1[1], np2[1]])
-        key_times = [0, 1]
-        slerp = Slerp(key_times, key_rots)
-        times = [f]
-        interp_rots = slerp(times)
-        np3_rot = interp_rots.as_quat()[0]
-        f_trans_m = tf.transformations.translation_matrix(np3_trans)
-        f_rot_m = tf.transformations.quaternion_matrix(np3_rot)
-        f_m = tf.transformations.concatenate_matrices(f_trans_m, f_rot_m)
-        return np_to_pose(f_m)
+        return interpolate_pose(s1, s2, f)
 
     def checkMotion(self, s1, s2):
         with self.god_map.get_data(identifier.rosparam + ['motion_validator_lock']):
@@ -696,8 +684,6 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
         pybulletenv = PyBulletMotionValidationIDs(self.god_map.get_data(identifier.collision_scene),
                                                   environment_object_names=environment_object_names,
                                                   moving_links=self.collision_link_names)
-        raytester = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map,
-                                             ignore_state_validator=True,js=js)
         self.box_space = PyBulletBoxSpace(self.collision_scene.world, self.object_in_motion, 'map', pybulletenv)
         # self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
 
@@ -872,75 +858,10 @@ class PyBulletIK(IK):
         pbw.stop_pybullet(client_id=self.client_id)
 
 
-class RobotBulletCollisionChecker(GiskardBehavior):
-
-    def __init__(self, is_3D, root_link, tip_link, name='RobotBulletCollisionChecker', ik=None):
-        super(RobotBulletCollisionChecker, self).__init__(name)
-        self.pybullet_lock = threading.Lock()
-        if ik is None:
-            self.ik = PyBulletIK(root_link, tip_link)
-        else:
-            self.ik = ik(root_link, tip_link)
-        self.is_3D = is_3D
-        self.tip_link = tip_link
-        self.setup_pybullet()
-
-    def clear(self):
-        self.ik.clear()
-
-    def setup_pybullet(self):
-        for i in range(0, 100):
-            if not pbw.p.isConnected(physicsClientId=i):
-                self.client_id = i
-                break
-        pbw.start_pybullet(False, client_id=self.client_id)
-        self.robot_id = pbw.load_urdf_string_into_bullet(rospy.get_param('robot_description'), client_id=self.client_id)
-        self.kitchen_id = pbw.load_urdf_string_into_bullet(rospy.get_param('kitchen_description'),
-                                                           client_id=self.client_id)
-        self.pybullet_joints_id = dict()
-        for i in range(0, p.getNumJoints(self.robot_id, physicsClientId=self.client_id)):
-            j = p.getJointInfo(self.robot_id, i, physicsClientId=self.client_id)
-            if j[2] != p.JOINT_FIXED:
-                self.pybullet_joints_id[j[1].decode('UTF-8')] = i
-
-    @profile
-    def is_collision_free(self, pose):
-        with self.pybullet_lock:
-            # Get current joint states
-            current_js = self.get_god_map().get_data(identifier.joint_states)
-            # Calc IK for navigating to given state and ...
-            results = []
-            state_ik = self.ik.get_ik(current_js, pose)
-            # override on current joint states.
-            for joint_name, id in self.pybullet_joints_id.items():
-                if joint_name not in ['odom_x_joint', 'odom_y_joint', 'odom_z_joint']:
-                    pbw.p.resetJointState(self.robot_id, id, state_ik[joint_name].position,
-                                          physicsClientId=self.client_id)
-            pbw.p.resetBasePositionAndOrientation(self.robot_id,
-                                                  [state_ik['odom_x_joint'].position,
-                                                   state_ik['odom_y_joint'].position,
-                                                   0],
-                                                  p.getQuaternionFromEuler([0, 0, state_ik['odom_z_joint'].position]),
-                                                  physicsClientId=self.client_id)
-            # pbw.p.stepSimulation(physicsClientId=self.client_id)
-            # Check if kitchen is colliding with robot
-            for i in range(0, pbw.p.getNumJoints(self.robot_id, physicsClientId=self.client_id)):
-                aabb = pbw.p.getAABB(self.robot_id, i, physicsClientId=self.client_id)
-                aabb = [[v - 0.1 for v in aabb[0]], [v + 0.1 for v in aabb[0]]]
-                objs = pbw.p.getOverlappingObjects(aabb[0], aabb[1], physicsClientId=self.client_id)
-                results.extend(list(filter(lambda o: o[0] == self.kitchen_id, objs)))
-            return len(results) == 0
-
-    def is_collision_free_ompl(self, state):
-        if self.tip_link is None:
-            raise Exception(u'Please set tip_link for {}.'.format(str(self)))
-        return self.is_collision_free(ompl_state_to_pose(state, self.is_3D))
-
-
 class GiskardRobotBulletCollisionChecker(GiskardBehavior):
 
     def __init__(self, is_3D, root_link, tip_link, collision_scene, ik=None, ik_sampling=1, ignore_orientation=False,
-                 publish=True, dist=0.0):
+                 publish=False, dist=0.0):
         GiskardBehavior.__init__(self, str(self))
         self.giskard_lock = threading.Lock()
         if ik is None:
@@ -987,8 +908,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                 if self.debug:
                     e_c = current_milli_time()
                 # Reset joint state
-                if any(results):
-                    self.publish_robot_state()
+                self.publish_robot_state()
                 update_joint_state(all_js, old_js)
                 self.robot.state = all_js
                 if self.debug:
@@ -1195,7 +1115,7 @@ def verify_ompl_movement_solution(setup, path, debug=False):
         else:
             f += 1
     if debug:
-        rospy.loginfo(u'Num Invalid States: {}, Num Valid States: {}, Rate FP: {}'.format(t, f, f / t))
+        rospy.loginfo(u'Num Invalid States: {}, Num Valid States: {}, Rate FP: {}'.format(f, t, f / t))
     return f / t
 
 
@@ -1250,7 +1170,7 @@ def verify_ompl_navigation_solution(setup, path, debug=False):
                 log = u'c_b: {}, c_a: {}'.format(c_b, c_a) + log_b + log_a
                 rospy.logerr(log)
     if debug:
-        rospy.loginfo(u'Num Invalid States: {}, Num Valid States: {}, Rate FP: {}'.format(t, f, f / t))
+        rospy.loginfo(u'Num Invalid States: {}, Num Valid States: {}, Rate FP: {}'.format(f, t, f / t))
     return f / t
 
 
@@ -1290,7 +1210,7 @@ class GiskardValidStateSample(ob.ValidStateSampler):
 
 
 class GoalRegionSampler:
-    def __init__(self, is_3D, goal, validation_fun, heuristic_fun, precision=5):
+    def __init__(self, is_3D, goal, validation_fun, heuristic_fun, goal_orientation=None, precision=5):
         self.goal = goal
         self.is_3D = is_3D
         self.precision = precision
@@ -1298,6 +1218,7 @@ class GoalRegionSampler:
         self.h = heuristic_fun
         self.valid_samples = list()
         self.samples = list()
+        self.goal_orientation = goal_orientation
         self.goal_list = pose_to_np(goal)[0]
 
     def _get_pitch(self, pos_b):
@@ -1337,11 +1258,17 @@ class GoalRegionSampler:
             return -np.pi + l_a  # todo: -np.pi + l_a
 
     def valid_sample(self, d=0.5, max_samples=100):
+        if type(d) == list:
+            x, y, z = d
+        elif type(d) == float:
+            x, y, z = [d]*3
+        else:
+            raise Exception('ffffffffffffff')
         i = 0
         while i < max_samples:
             valid = False
             while not valid and i < max_samples:
-                s = self._sample(i * d / max_samples)
+                s = self._sample(i * x / max_samples, i * y / max_samples, i * z / max_samples)
                 valid = self.validation_fun(s)
                 i += 1
             self.valid_samples.append([self.h(s), s])
@@ -1350,14 +1277,25 @@ class GoalRegionSampler:
 
     def sample(self, d, samples=100):
         i = 0
+        if type(d) == list and len(d) == 3:
+            x, y, z = d
+        elif type(d) == float:
+            x, y, z = [d]*3
+        else:
+            raise Exception(f'The given parameter d must either be a list of 3 floats or one float, however it is {d}.')
         while i < samples:
-            s = self._sample(i * d / samples)
+            s = self._sample(i * x / samples, i * y / samples, i * z / samples)
             self.samples.append([self.h(s), s])
             i += 1
         self.samples = sorted(self.samples, key=lambda e: e[0])
         return self.samples[0][1]
 
     def get_orientation(self, p):
+        if self.goal_orientation is not None:
+            return [self.goal_orientation.x,
+                    self.goal_orientation.y,
+                    self.goal_orientation.z,
+                    self.goal_orientation.w]
         if self.is_3D:
             diff = [self.goal.position.x - p.position.x,
                     self.goal.position.y - p.position.y,
@@ -1372,17 +1310,17 @@ class GoalRegionSampler:
             yaw = self.get_yaw(diff)
             return tf.transformations.quaternion_from_euler(0, 0, yaw)
 
-    def _sample(self, d):
+    def _sample(self, x, y, z):
         s = Pose()
         s.orientation.w = 1
 
-        x = round(uniform(self.goal.position.x - d, self.goal.position.x + d), self.precision)
-        y = round(uniform(self.goal.position.y - d, self.goal.position.y + d), self.precision)
+        x = round(uniform(self.goal.position.x - x, self.goal.position.x + x), self.precision)
+        y = round(uniform(self.goal.position.y - y, self.goal.position.y + y), self.precision)
         s.position.x = x
         s.position.y = y
 
         if self.is_3D:
-            z = round(uniform(self.goal.position.z - d, self.goal.position.z + d), self.precision)
+            z = round(uniform(self.goal.position.z - z, self.goal.position.z + z), self.precision)
             s.position.z = z
             q = self.get_orientation(s)
             s.orientation.x = q[0]
@@ -1420,7 +1358,13 @@ class PreGraspSampler(GiskardBehavior):
         if 'dist' in self.__goal_dict:
             dist = self.__goal_dict['dist']
         ros_pose = convert_dictionary_to_ros_message(self.__goal_dict[u'grasping_goal'])
+        self.grasping_object_name = None
+        if 'grasping_object' in self.__goal_dict:
+            self.grasping_object_name = self.__goal_dict['grasping_object']
         goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)  # type: PoseStamped
+        self.goal_orientation = None
+        if 'grasping_orientation' in self.__goal_dict:
+            self.goal_orientation = convert_dictionary_to_ros_message(self.__goal_dict[u'grasping_orientation'])
 
         self.root_link = self.__goal_dict[u'root_link']
         tip_link = self.__goal_dict[u'tip_link']
@@ -1517,17 +1461,27 @@ class PreGraspSampler(GiskardBehavior):
         return ps
 
     def get_orientation(self, curr, goal):
-        return GoalRegionSampler(self.is_3D, goal, lambda _: True, lambda _: 0).get_orientation(curr)
+        return GoalRegionSampler(self.is_3D, goal, lambda _: True, lambda _: 0,
+                                 goal_orientation=self.goal_orientation).get_orientation(curr)
 
-    def sample(self, js, tip_link, goal, tries=1000):
+    def sample(self, js, tip_link, goal, tries=1000, d=0.5):
+
+        def compute_diff(a, b):
+            return pose_diff(a, b)
+
         valid_fun = self.state_validator.is_collision_free
         try_i = 0
         next_goals = list()
+        if self.grasping_object_name is not None:
+            c = self.collision_scene.get_aabb_info(self.grasping_object_name)
+            xyz = np.abs(np.array(c.d) - np.array(c.u)).tolist()
+        else:
+            xyz = d
         while try_i < tries and len(next_goals) == 0:
-            goal_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
+            goal_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0, goal_orientation=self.goal_orientation)
             s_m = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map, ignore_state_validator=True, js=js)
             # Sample goal points which are e.g. in the aabb of the object to pick up
-            goal_grs.sample(.5)  # todo d is max aabb size of object
+            goal_grs.sample(xyz)
             goals = list()
             next_goals = list()
             for s in goal_grs.samples:
@@ -1535,8 +1489,7 @@ class PreGraspSampler(GiskardBehavior):
                 if s_m.checkMotion(o_g, goal):
                     goals.append(o_g)
             # Find valid goal poses which allow motion towards the sampled goal points above
-            tip_link_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0)
-            motion_cost = lambda a, b: np.sqrt(np.sum((pose_to_np(a)[0] - pose_to_np(b)[0]) ** 2))
+            tip_link_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0, goal_orientation=self.goal_orientation)
             for sampled_goal in goals:
                 if len(next_goals) > 0:
                     break
@@ -1544,7 +1497,7 @@ class PreGraspSampler(GiskardBehavior):
                 for s in tip_link_grs.valid_samples:
                     n_g = s[1]
                     if self.motion_validator.checkMotion(n_g, sampled_goal):
-                        next_goals.append([motion_cost(n_g, sampled_goal), n_g, sampled_goal])
+                        next_goals.append([compute_diff(n_g, sampled_goal), n_g, sampled_goal])
                 tip_link_grs.valid_samples = list()
             s_m.clear()
             try_i += 1
@@ -1607,6 +1560,16 @@ class GlobalPlanner(GetGoal):
     def save_cart_goal(self, cart_c):
 
         self.__goal_dict = yaml.load(cart_c.parameter_value_pair)
+
+        self.narrow = self.__goal_dict[u'narrow'] if 'narrow' in self.__goal_dict else False
+        if self.narrow:
+            try:
+                self.narrow_padding = self.__goal_dict[u'narrow_padding']
+                if self.narrow_padding < 0:
+                    raise Exception('The padding value must be positive.')
+            except KeyError:
+                raise Exception('Please specify a narrow padding value.')
+
         ros_pose = convert_dictionary_to_ros_message(self.__goal_dict[u'goal'])
         self.goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)  # type: PoseStamped
 
@@ -1682,7 +1645,7 @@ class GlobalPlanner(GetGoal):
         planner = NarrowMovementPlanner(planner_name, state_validator_class, motion_validator_class, range, time,
                                         self.kitchen_space, self.collision_scene,
                                         self.robot, self.root_link, self.tip_link, self.goal.pose, map_frame,
-                                        self.god_map, config=self.movement_config, dist=dist,
+                                        self.god_map, config=self.movement_config, dist=dist, narrow_padding=self.narrow_padding,
                                         sampling_goal_axis=sampling_goal_axis, verify_solution_f=verify_solution_f)
         return planner
 
@@ -1698,7 +1661,7 @@ class GlobalPlanner(GetGoal):
                 return self._get_movement_planner
 
     def _plan(self, planner_names, motion_validator_types, planner_range, time,
-              navigation=False, movement=False, narrow=False, interpolate=True):
+              navigation=False, movement=False, narrow=False):
         for motion_validator_type in motion_validator_types:
             for planner_name in planner_names:
                 rospy.loginfo(f'Starting planning with Global Planner {planner_name}/{motion_validator_type} ...')
@@ -1710,7 +1673,9 @@ class GlobalPlanner(GetGoal):
                     rospy.logerr(f"Found solution:{len(trajectory) != 0}")
                     if len(trajectory) != 0:
                         if self.god_map.get_data(identifier.path_interpolation):
-                            trajectory = planner.interpolate_solution()
+                            planner.interpolate_solution()
+                            trajectory = planner.get_solution(ob.PlannerStatus.EXACT_SOLUTION)
+                        rospy.logerr(trajectory.tolist())
                         return trajectory, planner_name, motion_validator_type
                 finally:
                     planner.clear()
@@ -1768,13 +1733,12 @@ class GlobalPlanner(GetGoal):
             raise FeasibleGlobalPlanningException('No solution found with current config.')
 
         if navigation:
-            predict_f = 10.0
+            predict_f = 5.0
         else:
             if narrow:
-                predict_f = 1.0
+                predict_f = 2.0
             else:
                 predict_f = 5.0
-        rospy.logerr(predict_f)
         return trajectory, predict_f
 
     @profile
@@ -1799,19 +1763,14 @@ class GlobalPlanner(GetGoal):
         # self.collision_scene.update_collision_environment()
         navigation = global_planner_needed and self.is_global_navigation_needed()
         movement = not navigation
-        seem_simple_trivial = self.seem_trivial()
-        seem_trivial = self.seem_trivial(simple=False)
-        narrow = seem_simple_trivial and not seem_trivial
         try:
-            trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=narrow)
+            trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=self.narrow)
         except FeasibleGlobalPlanningException:
             self.raise_to_blackboard(GlobalPlanningException())
             return Status.FAILURE
         poses = []
+        start = None
         for i, point in enumerate(trajectory):
-            if i == 0:
-                continue  # important assumption for constraint:
-                # we do not to reach the first pose, since it is the start pose
             base_pose = PoseStamped()
             base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
             base_pose.pose.position.x = point[0]
@@ -1822,15 +1781,20 @@ class GlobalPlanner(GetGoal):
             else:
                 arr = tf.transformations.quaternion_from_euler(0, 0, point[2])
                 base_pose.pose.orientation = Quaternion(arr[0], arr[1], arr[2], arr[3])
-            poses.append(base_pose)
+            if i == 0:
+                # important assumption for constraint:
+                # we do not to reach the first pose, since it is the start pose
+                start = base_pose
+            else:
+                poses.append(base_pose)
         # poses[-1].pose.orientation = self.goal.pose.orientation
         move_cmd.constraints.remove(cart_c)
-        move_cmd.constraints.append(self.get_cartesian_path_constraints(poses, predict_f))
+        move_cmd.constraints.append(self.get_cartesian_path_constraints(start, poses, predict_f))
         self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
         self.get_god_map().set_data(identifier.global_planner_needed, False)
         return Status.SUCCESS
 
-    def get_cartesian_path_constraints(self, poses, predict_f, ignore_trajectory_orientation=False):
+    def get_cartesian_path_constraints(self, start, poses, predict_f):
 
         d = dict()
         d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
@@ -1839,10 +1803,11 @@ class GlobalPlanner(GetGoal):
         goal.header.stamp = rospy.Time(0)
 
         c_d = deepcopy(d)
+        c_d[u'parameter_value_pair'][u'start'] = convert_ros_message_to_dictionary(start)
         c_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(goal)
         c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
-        c_d[u'parameter_value_pair'][u'predict_f'] = predict_f
-        c_d[u'parameter_value_pair'][u'ignore_trajectory_orientation'] = ignore_trajectory_orientation
+        if 'predict_f' not in c_d[u'parameter_value_pair']:
+            c_d[u'parameter_value_pair'][u'predict_f'] = predict_f
 
         c = Constraint()
         c.type = u'CartesianPathCarrot'
@@ -1858,8 +1823,10 @@ class GlobalPlanner(GetGoal):
         bounds = ob.RealVectorBounds(3)
 
         # Normal
-        bounds.setLow(-4)
-        bounds.setHigh(4)
+        bounds.setLow(0, -4)
+        bounds.setHigh(0, 2)
+        bounds.setLow(1, -3)
+        bounds.setHigh(1, 4)
         bounds.setLow(2, 0)
         bounds.setHigh(2, 2)
 
@@ -1882,8 +1849,16 @@ class GlobalPlanner(GetGoal):
 
         # set lower and upper bounds
         bounds = ob.RealVectorBounds(2)
-        bounds.setLow(-4)
-        bounds.setHigh(4)
+        # refills lab
+        #bounds.setLow(0, -3)
+        #bounds.setHigh(0, 5)
+        #bounds.setLow(1, -4)
+        #bounds.setHigh(1, 5)
+        # kitchen
+        bounds.setLow(0, -4)
+        bounds.setHigh(0, 2)
+        bounds.setLow(1, -3)
+        bounds.setHigh(1, 4)
         space.setBounds(bounds)
 
         return space
@@ -2165,7 +2140,7 @@ class OMPLPlanner(object):
 
     def benchmark(self, planner_names):
         e = datetime.now()
-        n = f"test_pathAroundKitchenIsland_with_global_planner_and_box-"\
+        n = f"test_ease_fridge_pregrasp_1-"\
             f"date:={e.day}/{e.month}/{e.year}-" \
             f"time:={e.hour}:{e.minute}:{e.second}-" \
             f"validation type: = {str(self.motion_validator_class)}"
@@ -2232,6 +2207,7 @@ class OMPLPlanner(object):
     def get_solution_path(self):
         try:
             path = self.setup.getSolutionPath()
+            #self.shorten_path(path, self.goal)
         except RuntimeError:
             raise Exception('Problem Definition in Setup may have changed..')
         return path
@@ -2350,19 +2326,17 @@ class MovementPlanner(OMPLPlanner):
         path_cost = path.cost(self.optimization_objective).value()
         if self.is_3D:
             if self.motion_validator_class is None:
-                path.interpolate(int(path_cost / 0.01))
+                path.interpolate(int(path_cost / 0.025))
             else:
                 path.interpolate(int(path_cost / 0.05))
         else:
             path.interpolate(int(path_cost / 0.2))
-        data = ompl_states_matrix_to_np(path.printAsMatrix()) # [x y z xw yw zw w]
         if self.verify_solution_f is not None:
             if self.verify_solution_f(self.setup, self.get_solution_path(), debug=True) != 0:
                 rospy.loginfo('Interpolated path is invalid. Going to re-plan...')
                 raise ReplanningException('Interpolated Path is invalid.')
         else:
             rospy.logwarn('Interpolated path returned is not validated.')
-        return data
 
     def get_solution(self, planner_status, plot=True):
         # og.PathSimplifier(si).smoothBSpline(self.get_solution_path()) # takes around 20-30 secs with RTTConnect(0.1)
@@ -2382,14 +2356,16 @@ class MovementPlanner(OMPLPlanner):
     def plot_solution(self, data, debug=True):
         plt.close()
         dim = '3D' if self.is_3D else '2D'
+        if debug:
+            self.verify_solution_f(self.setup, self.get_solution_path(), debug=debug)
         if self.verify_solution_f is not None:
-            verify = ' - FP: {}, Time: {}s'.format(
-                   self.verify_solution_f(self.setup, self.get_solution_path(), debug=debug),
-                   self.setup.getLastPlanComputationTime())
+            verify = ' Time: {}s'.format(self.setup.getLastPlanComputationTime())
         else:
             verify = ''
         path = self.setup.getSolutionPath()
         path_cost = path.cost(self.optimization_objective).value()
+        self.god_map.set_data(identifier.rosparam + ['path_time'], self.setup.getLastPlanComputationTime())
+        self.god_map.set_data(identifier.rosparam + ['path_cost'], path_cost)
         cost = '- Cost: {}'.format(str(round(path_cost, 5)))
         title = u'{} Path from {} in map\n{} {}'.format(dim, self.setup.getPlanner().getName(), verify, cost)
         fig, ax = plt.subplots()
@@ -2399,19 +2375,22 @@ class MovementPlanner(OMPLPlanner):
                title=title)
         # ax = fig.gca(projection='2d')
         # ax.plot(data[:, 0], data[:, 1], '.-')
+        #plt.savefig('/home/thomas/master_thesis/benchmarking_data/'
+        #            'path_following/box/navi_5/{}_path_planner.png'.format(rospy.get_time()))
         plt.show()
 
 
 class NarrowMovementPlanner(MovementPlanner):
     def __init__(self, planner_name, state_validator_class, motion_validator_class, range, time, kitchen_space,
                  collision_scene, robot, root_link, tip_link, pose_goal, map_frame, god_map,
-                 config='slow_without_refine', dist=0.1, sampling_goal_axis=None, verify_solution_f=None):
+                 config='slow_without_refine', dist=0.1, narrow_padding=1.0, sampling_goal_axis=None, verify_solution_f=None):
         super(NarrowMovementPlanner, self).__init__(True, planner_name, state_validator_class,
                                                     motion_validator_class, range, time, kitchen_space,
                                                     collision_scene, robot, root_link, tip_link,
                                                     pose_goal, map_frame, god_map, config=config, dist=dist,
                                                     verify_solution_f=verify_solution_f)
         self.sampling_goal_axis = sampling_goal_axis
+        self.narrow_padding = narrow_padding
         self.reversed_start_and_goal = False
         self.directional_planner = [
             'RRT', 'TRRT', 'LazyRRT',
@@ -2453,7 +2432,7 @@ class NarrowMovementPlanner(MovementPlanner):
         goal_space.setThreshold(0.01)
         prob_def.setGoal(goal_space)
 
-    def create_goal_specific_space(self, padding=0.2):
+    def create_goal_specific_space(self):
 
         if self.pose_goal is not None:
             bounds = ob.RealVectorBounds(3)
@@ -2467,19 +2446,40 @@ class NarrowMovementPlanner(MovementPlanner):
             g_z = goal_p.z
 
             # smaller cereal search space
-            bounds.setLow(0, min(s_x, g_x) - padding)
-            bounds.setHigh(0, max(s_x, g_x) + padding)
-            bounds.setLow(1, min(s_y, g_y) - padding)
-            bounds.setHigh(1, max(s_y, g_y) + padding)
-            bounds.setLow(2, min(s_z, g_z) - padding)
-            bounds.setHigh(2, max(s_z, g_z) + padding)
+            bounds.setLow(0, min(s_x, g_x) - self.narrow_padding)
+            bounds.setHigh(0, max(s_x, g_x) + self.narrow_padding)
+            bounds.setLow(1, min(s_y, g_y) - self.narrow_padding)
+            bounds.setHigh(1, max(s_y, g_y) + self.narrow_padding)
+            if is_3D(self.space):
+                bounds.setLow(2, min(s_z, g_z) - self.narrow_padding)
+                bounds.setHigh(2, max(s_z, g_z) + self.narrow_padding)
 
             # Save it
             self.space.setBounds(bounds)
 
     def get_solution(self, planner_status, plot=True):
         data = super().get_solution(planner_status, plot=plot)
-        if len(data) > 0:
+        if len(data) > 0 and self.planner_name in self.directional_planner:
+
+            if not self.reversed_start_and_goal:
+                end_i = self.pose_goal
+            else:
+                end_i = ompl_se3_state_to_pose(self.start())
+            begin_i = Pose()
+            begin_i.position.x = data[-1][0]
+            begin_i.position.y = data[-1][1]
+            begin_i.position.z = data[-1][2]
+            begin_i.orientation.x = data[-1][3]
+            begin_i.orientation.y = data[-1][4]
+            begin_i.orientation.z = data[-1][5]
+            begin_i.orientation.w = data[-1][6]
+            diff = pose_diff(begin_i, end_i)
+            segments = diff / self.range
+            rospy.logerr(segments)
+            for i in range(1, int(segments)):
+                p = pose_to_np(interpolate_pose(begin_i, end_i, i*(1/segments)))
+                data = np.append(data, [np.append(p[0], p[1])], axis=0)
+
             if not self.reversed_start_and_goal:
                 data = np.append(data, [np.append(pose_to_np(self.pose_goal)[0], pose_to_np(self.pose_goal)[1])],
                                  axis=0)
@@ -2487,6 +2487,7 @@ class NarrowMovementPlanner(MovementPlanner):
                 data = np.append(data, [np.append(pose_to_np(ompl_se3_state_to_pose(self.start()))[0],
                                                   pose_to_np(ompl_se3_state_to_pose(self.start()))[1])], axis=0)
             data = data if not self.reversed_start_and_goal else np.flip(data, axis=0)
+
         return data
 
     def _configure_planner(self, planner: ob.Planner):

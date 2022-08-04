@@ -21,24 +21,24 @@ class RetryPlanning(GiskardBehavior):
 
     def __init__(self, name):
         super(RetryPlanning, self).__init__(name)
-        self.valid = np.array([0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05])
+        self.path_constraint_name = 'CartesianPathCarrot'
+        self.valid = np.array([0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05])
 
     @profile
     def update(self):
-
         e = self.get_blackboard_exception()
         if e and self.must_replan(e):
             self.clear_blackboard_exception()
             self.get_god_map().set_data(identifier.global_planner_needed, True)
             return Status.RUNNING
         elif self.is_reaching_goal_pose_trivial():
-            logging.loginfo(u'CartesianPath terminated early, but goal can be reached trivially.')
+            logging.loginfo(f'{self.path_constraint_name} terminated early, but goal can be reached trivially.')
             logging.loginfo(u'Solving rest with CartesianPose.')
             self.send_trivial_cartesian_pose_goal()
             return Status.RUNNING
         elif self.cartesian_path_planning_failed():
             self.must_replan(PlanningException())
-            logging.loginfo(u'CartesianPath did not traverse the planned path.')
+            logging.loginfo(f'{self.path_constraint_name} did not traverse the planned path.')
             logging.loginfo(u'Replanning a new path.')
             self.get_god_map().set_data(identifier.global_planner_needed, True)
             return Status.RUNNING
@@ -46,7 +46,7 @@ class RetryPlanning(GiskardBehavior):
             return Status.SUCCESS
 
     def send_trivial_cartesian_pose_goal(self):
-        c, nc = self.move_parameter_value_pair_to_constraint('CartesianPathCarrot', 'CartesianPose',
+        c, nc = self.move_parameter_value_pair_to_constraint(self.path_constraint_name, 'CartesianPose',
                                                              parameters=['root_link', 'tip_link', 'goal'])
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
         m = MoveGoal()
@@ -76,11 +76,11 @@ class RetryPlanning(GiskardBehavior):
 
     def is_reaching_goal_pose_trivial(self):
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
-        if any([c.type in ['CartesianPathCarrot'] for c in move_cmd.constraints]):
+        if any([c.type in [self.path_constraint_name] for c in move_cmd.constraints]):
             global_move_cmd = deepcopy(move_cmd)
             global_move_cmd.constraints = list()
             for c in move_cmd.constraints:
-                if c.type == 'CartesianPathCarrot':
+                if c.type == self.path_constraint_name:
                     d = yaml.load(c.parameter_value_pair)
                     if 'goals' in d:
                         goal_pose = convert_dictionary_to_ros_message(d['goal']).pose
@@ -91,7 +91,7 @@ class RetryPlanning(GiskardBehavior):
                         req.tip_link = d['tip_link']
                         req.env_group = 'kitchen'
                         req.pose_goal = goal_pose
-                        req.simple = True
+                        req.simple = False
                         return not is_global_path_needed(req).needed
                     else:
                         return False
@@ -101,11 +101,11 @@ class RetryPlanning(GiskardBehavior):
         # Check if the robot reached the intended goal
         ret = False
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
-        if any([c.type in ['CartesianPathCarrot'] for c in move_cmd.constraints]):
+        if any([c.type in [self.path_constraint_name] for c in move_cmd.constraints]):
             global_move_cmd = deepcopy(move_cmd)
             global_move_cmd.constraints = list()
             for c in move_cmd.constraints:
-                if c.type == 'CartesianPathCarrot':
+                if c.type == self.path_constraint_name:
                     d = yaml.load(c.parameter_value_pair)
                     if 'goals' in d:
                         goal_pose = convert_dictionary_to_ros_message(d['goals'][-1]).pose
@@ -125,40 +125,38 @@ class RetryPlanning(GiskardBehavior):
         """
 
         if isinstance(exception, PlanningException):
-            supported_global_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPreGrasp']
+            #supported_global_cart_goals = ['CartesianPose', 'CartesianPosition', 'CartesianPreGrasp']
             failed_move_cmd = self.god_map.get_data(identifier.next_move_goal) # type: MoveCmd
-            if any([c.type in supported_global_cart_goals for c in failed_move_cmd.constraints]):
-                global_move_cmd = deepcopy(failed_move_cmd)
-                global_move_cmd.constraints = list()
-                for c in failed_move_cmd.constraints:
-                    if c.type in supported_global_cart_goals:
-                        logging.loginfo(u'Replanning a new path for CartesianPose.')
-                        n_c = Constraint()
-                        n_c.type = 'CartesianPose'
-                        n_c.parameter_value_pair = c.parameter_value_pair
-                        global_move_cmd.constraints.append(n_c)
-                    elif c.type == 'CartesianPathCarrot':
-                        logging.loginfo(u'Replanning a new path for CartesianPathCarrot.')
-                        n_c = Constraint()
-                        n_c.type = 'CartesianPathCarrot'
-                        d = yaml.load(c.parameter_value_pair)
-                        goal = d['goals'][-1]
+            global_move_cmd = deepcopy(failed_move_cmd)
+            global_move_cmd.constraints = list()
+            for c in failed_move_cmd.constraints:
+                #if c.type in supported_global_cart_goals:
+                #    logging.loginfo(u'Replanning a new path for CartesianPose.')
+                #    n_c = Constraint()
+                #    n_c.type = 'CartesianPose'
+                #    n_c.parameter_value_pair = c.parameter_value_pair
+                #    global_move_cmd.constraints.append(n_c)
+                if c.type == self.path_constraint_name:
+                    logging.loginfo(f'Replanning a new path for {self.path_constraint_name}.')
+                    n_c = Constraint()
+                    n_c.type = self.path_constraint_name
+                    d = yaml.load(c.parameter_value_pair)
+                    if 'goals' in d:
                         d.pop('goals')
-                        d['goal'] = goal
-                        n_c.parameter_value_pair = yaml.dump(d)
-                        global_move_cmd.constraints.append(n_c)
-                    elif c.type == 'CartesianPreGrasp':
-                        logging.loginfo(u'Resampling a new PreGrasp pose.')
-                        n_c = Constraint()
-                        n_c.type = 'CartesianPreGrasp'
-                        d = yaml.load(c.parameter_value_pair)
-                        d.pop('goal')
-                        n_c.parameter_value_pair = yaml.dump(d)
-                        global_move_cmd.constraints.append(n_c)
-                    else:
-                        global_move_cmd.constraints.append(c)
-                self.get_god_map().set_data(identifier.next_move_goal, global_move_cmd)
-                self.get_god_map().set_data(identifier.global_planner_needed, True)
+                    n_c.parameter_value_pair = yaml.dump(d)
+                    global_move_cmd.constraints.append(n_c)
+                    self.get_god_map().set_data(identifier.global_planner_needed, True)
+                elif c.type == 'CartesianPreGrasp':
+                    logging.loginfo(u'Resampling a new PreGrasp pose.')
+                    n_c = Constraint()
+                    n_c.type = 'CartesianPreGrasp'
+                    d = yaml.load(c.parameter_value_pair)
+                    d.pop('goal')
+                    n_c.parameter_value_pair = yaml.dump(d)
+                    global_move_cmd.constraints.append(n_c)
+                else:
+                    global_move_cmd.constraints.append(c)
+            self.get_god_map().set_data(identifier.next_move_goal, global_move_cmd)
             return True
         else:
             return False

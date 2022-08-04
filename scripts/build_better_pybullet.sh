@@ -32,5 +32,5 @@ if [ ! -d "bullet3" ]; then
         ./build_cmake_pybullet_2.7_double.sh Release
     fi
 
-    echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/build_cmake/examples/pybullet" >> ~/.bashrc
+    echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
 fi

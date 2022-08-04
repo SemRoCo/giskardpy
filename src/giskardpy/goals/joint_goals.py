@@ -513,7 +513,6 @@ class JointPositionList(Goal):
         :param max_velocity: default is the default of the added joint goals
         """
         super().__init__(**kwargs)
-        self.get_fk_velocity('odom_combined', 'torso_lift_link')
         self.joint_names = list(goal_state.keys())
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')

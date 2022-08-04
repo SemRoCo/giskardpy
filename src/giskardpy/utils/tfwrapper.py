@@ -425,6 +425,17 @@ def pose_diff(a, b):
     return t_diff + r_diff
 
 
+def pose_to_list(msg):
+    p = [msg.position.x, msg.position.y, msg.position.z]
+    q = [msg.orientation.x, msg.orientation.y,
+         msg.orientation.z, msg.orientation.w]
+    return [p, q]
+
+
+def pose_stamped_to_list(msg):
+    return pose_to_list(msg.pose)
+
+
 def pose_to_np(msg):
     p = np.array([msg.position.x, msg.position.y, msg.position.z])
     q = np.array([msg.orientation.x, msg.orientation.y,

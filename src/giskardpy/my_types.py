@@ -4,5 +4,5 @@ import genpy
 
 from giskardpy.data_types import PrefixName
 
-goal_parameter = Union[str, float, bool, genpy.Message, dict]
+goal_parameter = Union[str, float, bool, genpy.Message, dict, list]
 my_string = Union[str, PrefixName]

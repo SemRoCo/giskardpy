@@ -160,40 +160,6 @@ def fake_table_setup(pocky_pose_setup: PR2) -> PR2:
     return pocky_pose_setup
 
 
-@pytest.fixture()
-def kitchen_setup(kitchen_setup):
-    """
-    :type resetted_giskard: GiskardTestWrapper
-    :return:
-    """
-    resetted_giskard.avoid_all_collisions(distance=0.0)
-    resetted_giskard.set_joint_goal(gaya_pose)
-    resetted_giskard.plan_and_execute()
-    object_name = u'kitchen'
-    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
-                              set_js_topic=u'/kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
-    resetted_giskard.set_kitchen_js(js)
-    return resetted_giskard
-
-
-@pytest.fixture()
-def refills_lab(resetted_giskard):
-    """
-    :type resetted_giskard: GiskardTestWrapper
-    :return:
-    """
-    resetted_giskard.avoid_all_collisions(distance=0.0)
-    resetted_giskard.set_joint_goal(gaya_pose)
-    resetted_giskard.plan_and_execute()
-    object_name = u'kitchen'
-    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              tf.lookup_pose(u'map', u'iai_kitchen/room_link'), u'/kitchen/joint_states',
-                              set_js_topic=u'/kitchen/cram_joint_states')
-    return resetted_giskard
-
-
 class TestFk(object):
     def test_fk(self, zero_pose: PR2):
         for root, tip in itertools.product(zero_pose.robot.link_names, repeat=2):
@@ -2411,7 +2377,7 @@ class TestCartesianPath(object):
                    tj_13, tj_14, tj_15, tj_16, tj_17, tj_18, tj_19, tj_20, tj_21, tj_22, tj_23,
                    tj_24, tj_25]:
             poses = []
-            for i, point in enumerate(tj_22):
+            for i, point in enumerate(tj):
                 base_pose = PoseStamped()
                 base_pose.header.frame_id = 'map'
                 base_pose.pose.position.x = point[0]

@@ -72,7 +72,8 @@ class GlobalPlannerNeeded(GetGoal):
             if tip_link not in links:
                 raise Exception('wa')
                 collision_checker = GiskardRobotBulletCollisionChecker(tip_link != 'base_footprint', root_link,
-                                                                       tip_link, self.collision_scene)if simple:
+                                                                       tip_link, self.collision_scene)
+            if simple:
                 m = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map,
                                              js=self.get_god_map().get_data(identifier.joint_states))
             else:

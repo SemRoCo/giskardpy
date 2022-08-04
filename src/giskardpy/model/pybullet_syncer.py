@@ -8,9 +8,13 @@ import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy.data_types import BiDict, CollisionAABB
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions, Collision
 from giskardpy.model.pybullet_wrapper import ContactInfo
-from giskardpy.utils.tfwrapper import pose_to_np
 from giskardpy.utils.utils import resolve_ros_iris, write_to_tmp
 
+def pose_to_np(msg):
+    p = np.array([msg.position.x, msg.position.y, msg.position.z])
+    q = np.array([msg.orientation.x, msg.orientation.y,
+                  msg.orientation.z, msg.orientation.w])
+    return p, q
 
 class PyBulletSyncer(CollisionWorldSynchronizer):
     hack_name = 'hack'

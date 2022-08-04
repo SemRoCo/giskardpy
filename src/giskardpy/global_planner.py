@@ -26,7 +26,7 @@ from copy import deepcopy
 
 import giskardpy.identifier as identifier
 from giskard_msgs.srv import GlobalPathNeededRequest, GlobalPathNeeded, GetPreGraspRequest, GetPreGrasp, \
-    GetAttachedObjects, GetAttachedObjectsRequest
+    GetAttachedObjects, GetAttachedObjectsRequest, GetGroupInfoRequest, GetGroupInfo
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GlobalPlanningException, InfeasibleGlobalPlanningException, \
     FeasibleGlobalPlanningException, ReplanningException
@@ -35,7 +35,7 @@ from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.utils.kdl_parser import KDL
-from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, list_to_kdl, pose_to_np, \
+from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose_stamped, list_to_kdl, \
     pose_to_kdl, np_to_pose, pose_stamped_to_np
 
 from mpl_toolkits.mplot3d import Axes3D
@@ -51,6 +51,12 @@ SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve
 
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp
 
+
+def pose_to_np(msg):
+    p = np.array([msg.position.x, msg.position.y, msg.position.z])
+    q = np.array([msg.orientation.x, msg.orientation.y,
+                  msg.orientation.z, msg.orientation.w])
+    return p, q
 
 class CollisionCheckerInterface(GiskardBehavior):
 
@@ -590,7 +596,7 @@ class SimpleRayMotionValidator(AbstractMotionValidator):
         self.js = deepcopy(js)
         self.debug_times = list()
         self.raytester_lock = threading.Lock()
-        environment_object_names = get_simple_environment_object_names(self.god_map)
+        environment_object_names = get_simple_environment_object_names(self.god_map, collision_scene.robot.name)
         self.collision_scene = collision_scene
         self.collision_link_names = self.collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
         pybulletenv = PyBulletMotionValidationIDs(self.god_map.get_data(identifier.collision_scene),
@@ -1606,9 +1612,9 @@ class GlobalPlanner(GetGoal):
 
         self.root_link = self.__goal_dict[u'root_link']
         tip_link = self.__goal_dict[u'tip_link']
-        get_attached_objects = rospy.ServiceProxy('~get_attached_objects', GetAttachedObjects)
-        if tip_link in get_attached_objects(GetAttachedObjectsRequest()).object_names:
-            tip_link = self.get_robot().get_parent_link_of_link(tip_link)
+        links = self.world.groups[self.robot.name].link_names
+        if tip_link not in links:
+            raise Exception('wa')
         self.tip_link = tip_link
         link_names = self.robot.link_names
 

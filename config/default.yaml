@@ -60,7 +60,7 @@ plugins:
     precision: 3 # decimal places
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
-    in_planning_loop: False
+    in_planning_loop: True
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: False
     in_planning_loop: False
@@ -91,7 +91,7 @@ plugins:
     tf_topic: /tf
   MaxTrajectoryLength:
     enabled: True
-    length: 30 # will abort planning if the trajectory becomes longer than this many seconds
+    length: 100 # will abort planning if the trajectory becomes longer than this many seconds
   SyncTfFrames:
     frames: []
 reachability_check:

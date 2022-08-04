@@ -128,9 +128,12 @@ class Goal:
         :type name: str
         :return: w.Symbol
         """
-        if not hasattr(self, name):
-            raise AttributeError('{} doesn\'t have attribute {}'.format(self.__class__.__name__, name))
-        return self.god_map.to_expr(self._get_identifier() + [name])
+        if isinstance(name, str) and not hasattr(self, name):
+            raise AttributeError(u'{} doesn\'t have attribute {}'.format(self.__class__.__name__, name))
+        if isinstance(name, str):
+            return self.god_map.to_expr(self._get_identifier() + [name])
+        else:
+            return self.god_map.to_expr(self._get_identifier() + name)
 
     def get_expr_velocity(self, expr):
         return w.total_derivative(expr,
@@ -290,7 +293,7 @@ class Goal:
                             expression=expr_current,
                             name_suffix=name_suffix)
 
-    def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
+    def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix='', **kwargs):
         error = frame_P_goal[:3] - frame_P_current[:3]
         # self.add_debug_expr('error', w.norm(error))
         self.add_debug_vector('goal', frame_P_goal[:3])

@@ -3,6 +3,7 @@ from __future__ import division
 import numpy as np
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped, Vector3Stamped
 
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import PointingDiffDrive

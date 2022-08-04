@@ -51,6 +51,10 @@ def jacobian(expressions, symbols, order=1):
         raise NotImplementedError('jacobian only supports order 1 and 2')
 
 
+def manhattan_norm(a, b):
+    return sum(abs(a-b))
+
+
 def equivalent(expression1, expression2):
     return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
 
@@ -112,12 +116,14 @@ def Matrix(data):
     try:
         return ca.SX(data)
     except NotImplementedError:
-        if hasattr(data, 'shape'):
+        if hasattr(data, u'shape'):
             m = ca.SX(*data.shape)
         else:
             x = len(data)
             if isinstance(data[0], list) or isinstance(data[0], tuple):
                 y = len(data[0])
+            elif isinstance(data[0], ca.SX):
+                y = data[0].shape[0] if data[0].shape[0] > data[0].shape[1] else data[0].shape[1]
             else:
                 y = 1
             m = ca.SX(x, y)

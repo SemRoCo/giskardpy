@@ -18,6 +18,7 @@ from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy import identifier
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
@@ -370,21 +371,31 @@ class GiskardWrapper(object):
                            weight=weight,
                            **kwargs)
 
-    def set_json_goal(self,
-                      constraint_type: str,
-                      **kwargs: goal_parameter):
+    def set_json_goal(self, constraint_type, **kwargs):
         """
         Set a goal for any of the goals defined in Constraints.py
         :param constraint_type: Name of the Goal
-        :param kwargs: maps constraint parameter names to values. Values should be float, str or ros messages.
+        :type constraint_type: str
+        :param **kwargs: maps constraint parameter names to values. Values should be float, str or ros messages
+                       or a list containing values of the types mentioned.
+        :type **kwargs: dict
         """
         constraint = Constraint()
         constraint.type = constraint_type
         for k, v in kwargs.copy().items():
             if v is None:
                 del kwargs[k]
+            if isinstance(v, list):
+                kwargs[k] = []
+                for i in v:
+                    try:
+                        kwargs[k].append(convert_ros_message_to_dictionary(i))
+                    except AttributeError:
+                        kwargs[k].append(i)
             if isinstance(v, Message):
                 kwargs[k] = convert_ros_message_to_dictionary(v)
+            if isinstance(v, PrefixName):
+                kwargs[k] = str(v)
         constraint.parameter_value_pair = json.dumps(kwargs)
         self.cmd_seq[-1].constraints.append(constraint)
 

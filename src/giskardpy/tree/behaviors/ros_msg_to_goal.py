@@ -95,9 +95,20 @@ class RosMsgToGoal(GetGoal):
                 raise e
 
     def replace_jsons_with_ros_messages(self, d):
-        for key, value in d.items():
-            if isinstance(value, dict) and 'message_type' in value:
-                d[key] = convert_dictionary_to_ros_message(value)
+        # TODO find message type
+        if isinstance(d, list):
+            result = list()
+            for i, element in enumerate(d):
+                result.append(self.replace_jsons_with_ros_messages(element))
+            return result
+        elif isinstance(d, dict):
+            if 'message_type' in d:
+                return convert_dictionary_to_ros_message(d)
+            else:
+                result = {}
+                for key, value in d.items():
+                    result[key] = self.replace_jsons_with_ros_messages(value)
+                return result
         return d
 
     @profile

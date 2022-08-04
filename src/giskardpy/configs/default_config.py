@@ -39,7 +39,7 @@ class GeneralConfig:
 
 class QPSolverConfig:
     def __init__(self,
-                 qp_solver: SupportedQPSolver = SupportedQPSolver.qp_oases,
+                 qp_solver: SupportedQPSolver = SupportedQPSolver.gurobi,
                  prediction_horizon: int = 9,
                  retries_with_relaxed_constraints: int = 5,
                  added_slack: float = 100,

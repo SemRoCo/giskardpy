@@ -79,19 +79,9 @@ def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(pkg_filename)
     else:
         obj_pkg_filename = pkg_filename
-    # try:
-    # logging.loginfo(f'loading {obj_pkg_filename}')
     return pb.load_convex_shape(resolve_ros_iris(obj_pkg_filename),
                                 single_shape=single_shape,
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
-    # except Exception as e:
-    #     logging.logwarn(f'Can not load {obj_pkg_filename}: {e}')
-    #     fix_obj(obj_pkg_filename)
-    #     result = pb.load_convex_shape(resolve_ros_iris(obj_pkg_filename),
-    #                                 single_shape=single_shape,
-    #                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
-    #     logging.loginfo(f'Fixed {obj_pkg_filename} could be loaded.')
-    #     return result
 
 
 def create_object(name, shape, transform=pb.Transform.identity(), collision_id=0):

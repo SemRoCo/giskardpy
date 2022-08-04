@@ -140,13 +140,16 @@ class Goal:
     @property
     def joint_position_symbols(self):
         position_symbols = []
-        for joint in self.world.movable_joints:
+        for joint in self.world.controlled_joints:
             position_symbols.extend(self.world.joints[joint].free_variable_list)
-        return position_symbols
+        return [x.get_symbol(0) for x in position_symbols]
 
     @property
     def joint_velocity_symbols(self):
-        return [self.get_joint_velocity_symbols(j) for j in self.world.joints if self.world.is_joint_movable(j)]
+        position_symbols = []
+        for joint in self.world.controlled_joints:
+            position_symbols.extend(self.world.joints[joint].free_variable_list)
+        return [x.get_symbol(1) for x in position_symbols]
 
     def get_fk_velocity(self, root, tip):
         r_T_t = self.get_fk(root, tip)

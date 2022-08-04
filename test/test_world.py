@@ -86,7 +86,7 @@ def avoid_all_entry(min_dist):
 
 def world_with_robot(urdf, prefix, config='package://giskardpy/config/default.yaml'):
     god_map = GodMap()
-    god_map.set_data(identifier.rosparam, ros_load_robot_config(config))
+    god_map.set_data(identifier.giskard, ros_load_robot_config(config))
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.add_urdf(urdf, prefix=prefix, group_name=RobotName)
@@ -197,25 +197,25 @@ class TestWorldTree(object):
     def test_add_box(self):
         world = create_world_with_pr2()
         box = make_world_body_box()
-        box_name = box.name
+        box_name = box.position_name
         pose = Pose()
         pose.orientation.w = 1
         world.add_world_body(box, pose)
-        assert box.name in world.groups
+        assert box.position_name in world.groups
         assert box_name in world.links
         assert PrefixName(box_name, world.connection_prefix) in world.joints
 
     def test_attach_box(self):
         world = create_world_with_pr2()
         box = make_world_body_box()
-        box_name = PrefixName(box.name, None)
+        box_name = PrefixName(box.position_name, None)
         pose = Pose()
         pose.orientation.w = 1
         world.add_world_body(box, pose)
         new_parent_link_name = PrefixName('r_gripper_tool_frame', RobotPrefix)
         old_fk = world.compute_fk_pose(world.root_link_name, box_name)
 
-        world.move_group(box.name, new_parent_link_name)
+        world.move_group(box.position_name, new_parent_link_name)
 
         new_fk = world.compute_fk_pose(world.root_link_name, box_name)
         assert box_name in world.groups[RobotName].link_names
@@ -231,7 +231,7 @@ class TestWorldTree(object):
         parsed_urdf = self.parsed_hsr_urdf()
         assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
         assert set(world.joint_names) == set(
-            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.name, world.connection_prefix)])
+            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.position_name, world.connection_prefix)])
 
     def test_group_pr2_hand(self):
         world = create_world_with_pr2()

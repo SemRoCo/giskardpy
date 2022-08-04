@@ -1,3 +1,5 @@
+from typing import List
+
 import control_msgs
 from rospy import ROSException
 from rostopic import ROSTopicException
@@ -7,6 +9,8 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
+from giskardpy.model.joints import OneDofJoint
+from giskardpy.utils.utils import raise_to_blackboard
 
 try:
     import pr2_controllers_msgs.msg
@@ -26,8 +30,6 @@ from giskardpy.utils.logging import loginfo
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
-    min_deadline: rospy.Time
-    max_deadline: rospy.Time
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
                          isinstance(value, int)}
 
@@ -43,15 +45,18 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     @profile
     def __init__(self, name, namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
         GiskardBehavior.__init__(self, name)
+        self.min_deadline: rospy.Time
+        self.max_deadline: rospy.Time
+        self.controlled_joints: List[OneDofJoint] = []
         self.action_namespace = namespace
         self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
-        loginfo('Waiting for action server \'{}\' to appear.'.format(self.action_namespace))
+        loginfo(f'Waiting for action server \'{self.action_namespace}\' to appear.')
         action_msg_type = None
         while not action_msg_type and not rospy.is_shutdown():
             try:
-                action_msg_type, _, _ = rostopic.get_topic_class('{}/goal'.format(self.action_namespace))
+                action_msg_type, _, _ = rostopic.get_topic_class(f'{self.action_namespace}/goal')
                 if action_msg_type is None:
                     raise ROSTopicException()
                 try:
@@ -66,10 +71,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 rospy.sleep(1)
 
         ActionClient.__init__(self, name, action_msg_type, None, self.action_namespace)
-        loginfo('Successfully connected to \'{}\'.'.format(self.action_namespace))
+        loginfo(f'Successfully connected to \'{self.action_namespace}\'.')
 
-        loginfo('Waiting for state topic \'{}\' to appear.'.format(state_topic))
+        # loginfo(f'Waiting for state topic \'{state_topic}\' to appear.')
         msg = None
+        controlled_joint_names = []
         while not msg and not rospy.is_shutdown():
             try:
                 status_msg_type, _, _ = rostopic.get_topic_class(state_topic)
@@ -80,23 +86,36 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                                     'Must be one of: {}'.format(status_msg_type, self.supported_state_types))
                 msg = rospy.wait_for_message(state_topic, status_msg_type, timeout=2.0)
                 if isinstance(msg, JointState):
-                    self.controlled_joints = msg.name
+                    controlled_joint_names = msg.name
                 elif isinstance(msg, control_msgs.msg.JointTrajectoryControllerState) \
                         or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
-                    self.controlled_joints = msg.joint_names
+                    controlled_joint_names = msg.joint_names
             except ROSException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
                 rospy.sleep(1)
+        if len(controlled_joint_names) == 0:
+            raise ValueError(f'\'{state_topic}\' has no joints')
+        for joint in self.world.joints.values():
+            if isinstance(joint, OneDofJoint):
+                if joint.free_variable.name in controlled_joint_names:
+                    self.controlled_joints.append(joint)
+        if len(self.controlled_joints) != len(controlled_joint_names):
+            joints_not_in_urdf = set(controlled_joint_names).difference(self.controlled_joints)
+            raise ValueError(f'{state_topic} provides the following joints '
+                             f'that are not in the urdf: {joints_not_in_urdf}')
         self.world.register_controlled_joints(self.controlled_joints)
-        loginfo('Received controlled joints from \'{}\'.'.format(state_topic))
+        loginfo(f'Successfully connected to \'{state_topic}\'.')
+        loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
 
     @profile
     def initialise(self):
-        super(SendFollowJointTrajectory, self).initialise()
+        super().initialise()
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        goal.trajectory = trajectory.to_msg(sample_period, self.controlled_joints, self.fill_velocity_values)
+        start_time = self.god_map.get_data(identifier.tracking_start_time)
+        goal.trajectory = trajectory.to_msg(sample_period, start_time, self.controlled_joints,
+                                            self.fill_velocity_values)
         self.action_goal = goal
         deadline = self.action_goal.trajectory.header.stamp + \
                    self.action_goal.trajectory.points[-1].time_from_start + \
@@ -144,16 +163,16 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 e = FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(msg)
             else:
                 e = ExecutionException(msg)
-            self.raise_to_blackboard(e)
+            raise_to_blackboard(e)
             return py_trees.Status.FAILURE
         if self.action_client.get_state() in [GoalStatus.PREEMPTED, GoalStatus.PREEMPTING]:
             if rospy.get_rostime() > self.max_deadline:
                 msg = '\'{}\' preempted, ' \
                       'probably because it took to long to execute the goal.'.format(self.action_namespace)
-                self.raise_to_blackboard(ExecutionTimeoutException(msg))
+                raise_to_blackboard(ExecutionTimeoutException(msg))
             else:
                 msg = '\'{}\' preempted. Stopping execution.'.format(self.action_namespace)
-                self.raise_to_blackboard(ExecutionPreemptedException(msg))
+                raise_to_blackboard(ExecutionPreemptedException(msg))
             logging.logerr(msg)
             return py_trees.Status.FAILURE
 
@@ -162,7 +181,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             if current_time < self.min_deadline:
                 msg = '\'{}\' executed too quickly, stopping execution.'.format(self.action_namespace)
                 e = ExecutionSucceededPrematurely(msg)
-                self.raise_to_blackboard(e)
+                raise_to_blackboard(e)
                 return py_trees.Status.FAILURE
             self.feedback_message = "goal reached"
             logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
@@ -175,7 +194,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             self.cancel_tries += 1
             if self.cancel_tries > 5:
                 logging.logwarn('\'{}\' didn\'t cancel execution after 5 tries.'.format(self.action_namespace))
-                self.raise_to_blackboard(ExecutionTimeoutException(msg))
+                raise_to_blackboard(ExecutionTimeoutException(msg))
                 return py_trees.Status.FAILURE
             return py_trees.Status.RUNNING
 

@@ -7,6 +7,17 @@ from sensor_msgs.msg import JointState
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
+from giskardpy.god_map import GodMap
+
+
+class SetSeedConfiguration(Goal):
+    #FIXME deal with prefix
+    def __init__(self, seed_configuration: Dict[str, float], **kwargs):
+        super().__init__(**kwargs)
+        if self.god_map.get_data(identifier.execute):
+            raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
+        for joint_name, initial_joint_value in seed_configuration.items():
+            self.world.state[joint_name].position = initial_joint_value
 
 
 class JointPositionContinuous(Goal):
@@ -25,7 +36,7 @@ class JointPositionContinuous(Goal):
         self.weight = weight
         self.max_velocity = max_velocity
         self.hard = hard
-        super(JointPositionContinuous, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if not self.world.is_joint_continuous(joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
@@ -135,6 +146,63 @@ class JointPositionPrismatic(Goal):
 
     def __str__(self):
         s = super(JointPositionPrismatic, self).__str__()
+        return f'{s}/{self.joint_name}'
+
+
+class JointVelocityRevolute(Goal):
+    def __init__(self, joint_name: str, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 1,
+                 hard: bool = False, **kwargs):
+        """
+        This goal will move a prismatic joint to the goal position
+        :param weight: default WEIGHT_BELOW_CA
+        :param max_velocity: m/s, default 4535, meaning the urdf/config limits are active
+        """
+        self.joint_name = joint_name
+        self.weight = weight
+        self.max_velocity = max_velocity
+        self.hard = hard
+        super().__init__(**kwargs)
+        if not self.world.is_joint_revolute(joint_name):
+            raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
+
+    def make_constraints(self):
+        current_joint = self.get_joint_position_symbol(self.joint_name)
+
+        # joint_goal = self.get_parameter_as_symbolic_expression('goal')
+        # weight = self.get_parameter_as_symbolic_expression('weight')
+
+        try:
+            # if self.world.is_joint_mimic(self.joint_name):
+            #     mimed_joint_name = self.world.joints[self.joint_name].mimed_joint_name
+            #     mimed_joint_symbol = self.get_joint_position_symbol(mimed_joint_name)
+            #     mimied_limit = self.world.joint_limit_expr(self.joint_name, 1)[1]
+            #     limit_expr = w.substitute(current_joint, mimed_joint_symbol, mimied_limit)
+            # else:
+            limit_expr = self.world.joint_limit_expr(self.joint_name, 1)[1]
+            max_velocity = w.min(self.get_parameter_as_symbolic_expression('max_velocity'),
+                                 limit_expr)
+        except IndexError:
+            max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
+
+        # error = joint_goal - current_joint
+
+        if self.hard:
+            self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
+                                         upper_velocity_limit=max_velocity,
+                                         weight=self.weight,
+                                         expression=current_joint,
+                                         velocity_limit=max_velocity,
+                                         lower_slack_limit=0,
+                                         upper_slack_limit=0)
+        else:
+            self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
+                                         upper_velocity_limit=max_velocity,
+                                         weight=self.weight,
+                                         expression=current_joint,
+                                         velocity_limit=max_velocity)
+
+    def __str__(self):
+        s = super().__str__()
         return f'{s}/{self.joint_name}'
 
 
@@ -444,7 +512,8 @@ class JointPositionList(Goal):
         :param weight: default is the default of the added joint goals
         :param max_velocity: default is the default of the added joint goals
         """
-        super(JointPositionList, self).__init__(**kwargs)
+        super().__init__(**kwargs)
+        self.joint_names = list(goal_state.keys())
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for joint_name, goal_position in goal_state.items():
@@ -460,11 +529,16 @@ class JointPositionList(Goal):
             params['hard'] = hard
             self.add_constraints_of_goal(JointPosition(**params))
 
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.joint_names}'
+
 
 class JointPosition(Goal):
     def __init__(self, joint_name: str, goal: float, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 100,
                  **kwargs):
-        super(JointPosition, self).__init__(**kwargs)
+        super().__init__(**kwargs)
+        self.joint_name = joint_name
         if self.world.is_joint_continuous(joint_name):
             C = JointPositionContinuous
         elif self.world.is_joint_revolute(joint_name):
@@ -479,6 +553,9 @@ class JointPosition(Goal):
                                        max_velocity=max_velocity,
                                        **kwargs))
 
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.joint_name}'
 
 class AvoidJointLimits(Goal):
     def __init__(self, percentage=15, weight=WEIGHT_BELOW_CA, **kwargs):

@@ -11,41 +11,40 @@ from giskardpy.data_types import BiDict
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
-from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
+from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry, Link
 from giskardpy.utils import logging
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world):
         self.kw = bpb.KineverseWorld()
-        self.object_name_to_id = BiDict()
+        self.object_name_to_id = defaultdict(list)
         self.query = None
-        super(BetterPyBulletSyncer, self).__init__(world)
+        super().__init__(world)
+
 
     @profile
-    def add_object(self, link):
-        """
-        :type link: giskardpy.model.world.Link
-        """
+    def add_object(self, link: Link):
         if not link.has_collisions():
             return False
-        geometry = link.collisions[0]
-        if isinstance(geometry, BoxGeometry):
-            shape = create_cube_shape([geometry.depth, geometry.width, geometry.height])
-        elif isinstance(geometry, SphereGeometry):
-            shape = create_sphere_shape(geometry.radius * 2)
-        elif isinstance(geometry, CylinderGeometry):
-            shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
-        elif isinstance(geometry, MeshGeometry):
-            shape = load_convex_mesh_shape(geometry.file_name, scale=geometry.scale)
-        else:
-            raise NotImplementedError()
-        map_T_o = bpb.Transform()
-        map_T_o.origin = bpb.Vector3(0, 0, 0)
-        map_T_o.rotation = bpb.Quaternion(0, 0, 0, 1)
-        o = create_object(link.name, shape, map_T_o)
-        self.kw.add_collision_object(o)
-        self.object_name_to_id[link.name] = o
+        for collision_id, geometry in enumerate(link.collisions):
+            if isinstance(geometry, BoxGeometry):
+                shape = create_cube_shape([geometry.depth, geometry.width, geometry.height])
+            elif isinstance(geometry, SphereGeometry):
+                shape = create_sphere_shape(geometry.radius * 2)
+            elif isinstance(geometry, CylinderGeometry):
+                shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
+            elif isinstance(geometry, MeshGeometry):
+                shape = load_convex_mesh_shape(geometry.file_name, scale=geometry.scale)
+                geometry.file_name = 'file://' + shape.file_path
+            else:
+                raise NotImplementedError()
+            map_T_o = bpb.Transform()
+            map_T_o.origin = bpb.Vector3(0, 0, 0)
+            map_T_o.rotation = bpb.Quaternion(0, 0, 0, 1)
+            o = create_object(link.name, shape, map_T_o, collision_id)
+            self.kw.add_collision_object(o)
+            self.object_name_to_id[link.name].append(o)
 
     def reset_cache(self):
         self.query = None
@@ -60,10 +59,9 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         if self.query is None:
             self.query = defaultdict(set)
             for (link_a, link_b), dist in cut_off_distances.items():
-                try:
-                    self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist+buffer))
-                except:
-                    pass
+                for collision_object_a in self.object_name_to_id[link_a]:
+                    for collision_object_b in self.object_name_to_id[link_b]:
+                        self.query[collision_object_a].add((collision_object_b, dist+buffer))
         return self.query
 
     @profile
@@ -166,10 +164,12 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def in_collision(self, link_a, link_b, distance):
-        link_id_a = self.object_name_to_id[link_a]
-        link_id_b = self.object_name_to_id[link_b]
-        result = self.kw.get_distance(link_id_a, link_id_b)
-        return len(result) > 0 and result[0].distance < distance
+        result = False
+        for link_id_a in self.object_name_to_id[link_a]:
+            for link_id_b in self.object_name_to_id[link_b]:
+                query_result = self.kw.get_distance(link_id_a, link_id_b)
+                result |= len(query_result) > 0 and query_result[0].distance < distance
+        return result
 
     @profile
     def sync(self):
@@ -178,18 +178,22 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             logging.logdebug('hard sync')
             for o in self.kw.collision_objects:
                 self.kw.remove_collision_object(o)
-            self.object_name_to_id = BiDict()
+            self.object_name_to_id = defaultdict(list)
 
             for link_name in self.world.link_names_with_collisions:
                 link = self.world.links[link_name]
                 self.add_object(link)
-            self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
+            self.objects_in_order = [x for link_name in self.world._fk_computer.collision_link_order for x in self.object_name_to_id[link_name]]
+            # self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
             bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
             # self.update_collision_blacklist()
         bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
 
-    def get_pose(self, link_name):
-        collision_object = self.object_name_to_id[link_name]
+    def get_pose(self, link_name, collision_id=0):
+        try:
+            collision_object = self.object_name_to_id[link_name][collision_id]
+        except Exception as e:
+            pass
         map_T_link = PoseStamped()
         map_T_link.header.frame_id = self.world.root_link_name
         map_T_link.pose.position.x = collision_object.transform.origin.x

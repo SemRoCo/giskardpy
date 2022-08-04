@@ -143,7 +143,7 @@ class JointGoalPublisher(object):
         self.giskard_wrapper.plan_and_execute(False)
 
     def cancel_goal(self):
-        self.giskard_wrapper.interrupt()
+        self.giskard_wrapper.cancel_all_goals()
 
 
     def __init__(self):

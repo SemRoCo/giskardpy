@@ -1,12 +1,12 @@
 import json
 from typing import Dict, Tuple, Optional, Union, List
-
+import giskardpy.utils.tfwrapper as tf
 import rospy
 from actionlib import SimpleActionClient
 from genpy import Message
 from rospy import ServiceException
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped
-from giskard_msgs.srv import DyeGroupRequest, DyeGroup
+from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
@@ -42,9 +42,9 @@ class GiskardWrapper(object):
             self.dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
             rospy.wait_for_service(f'{node_name}/update_world')
             self._client.wait_for_server()
-        self._god_map = GodMap.init_from_paramserver(node_name, upload_config=False)
-        self._world = WorldTree(self._god_map)
-        self._world.delete_all_but_robot()
+        self._god_map = GodMap.init_from_paramserver()
+        # self._world = WorldTree(self._god_map)
+        # self._world.delete_all_but_robot()
         self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
@@ -232,11 +232,9 @@ class GiskardWrapper(object):
         :param max_angular_velocity: rad/s, default 0.5
         :param weight: default WEIGHT_BELOW_CA
         """
-        if root_link is None:
-            root_link = self.get_robot_root_link()
         if root_normal is None:
             root_normal = Vector3Stamped()
-            root_normal.header.frame_id = self.get_robot_root_link()
+            root_normal.header.frame_id = tf.get_tf_root()
             root_normal.vector.z = 1
 
         self.set_json_goal(constraint_type='AlignPlanes',
@@ -248,7 +246,7 @@ class GiskardWrapper(object):
                            weight=weight,
                            **kwargs)
 
-    def set_prediction_horizon(self, prediction_horizon: float, **kwargs: goal_parameter):
+    def set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
         self.set_json_goal(constraint_type='SetPredictionHorizon',
                            prediction_horizon=prediction_horizon,
                            **kwargs)
@@ -364,8 +362,6 @@ class GiskardWrapper(object):
         :param pointing_axis: default is z axis, this axis will point towards the goal_point
         :param weight: default WEIGHT_BELOW_CA
         """
-        if root_link is None:
-            root_link = self.get_robot_root_link()
         self.set_json_goal(constraint_type='Pointing',
                            tip_link=tip_link,
                            goal_point=goal_point,
@@ -537,6 +533,9 @@ class GiskardWrapper(object):
         """
         self._client.cancel_goal()
 
+    def cancel_all_goals(self):
+        self._client.cancel_all_goals()
+
     def get_result(self, timeout: rospy.Duration = rospy.Duration()) -> MoveResult:
         """
         Waits for giskardpy result and returns it. Only used when plan_and_execute was called with wait=False
@@ -625,6 +624,7 @@ class GiskardWrapper(object):
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
+                 scale: Tuple[float, float, float] = (1, 1, 1),
                  timeout: float = 0) -> UpdateWorldResponse:
         """
         If pose is used, frame_id, position and orientation are ignored.
@@ -639,6 +639,9 @@ class GiskardWrapper(object):
         req.timeout = timeout
         req.body = object
         req.pose = pose
+        req.body.scale.x = scale[0]
+        req.body.scale.y = scale[1]
+        req.body.scale.z = scale[2]
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
         return self._update_world_srv.call(req)
@@ -766,7 +769,9 @@ class GiskardWrapper(object):
         """
         returns the joint state, joint state topic and pose of the object with the given name
         """
-        return self._get_group_info_srv(group_name)
+        req = GetGroupInfoRequest()
+        req.group_name = group_name
+        return self._get_group_info_srv.call(req)
 
     def get_controlled_joints(self, name: Optional[str] = None):
         if name is None:

@@ -13,7 +13,7 @@ class SetErrorCode(GiskardBehavior):
         self.reachability_threshold = 0.001
         self.print = print
         self.context = context
-        super(SetErrorCode, self).__init__(name)
+        super().__init__(name)
 
     @profile
     def update(self):
@@ -29,13 +29,13 @@ class SetErrorCode(GiskardBehavior):
             for i in range(len(result.error_codes) - cmd_id):
                 result.error_codes[cmd_id + i] = error_code
                 result.error_messages[cmd_id + i] = error_message
-            logging.logwarn('Goal preempted: \'{}\'.'.format(error_message))
+            logging.logwarn(f'Goal preempted: \'{error_message}\'.')
         else:
             if self.print:
                 if error_code == MoveResult.SUCCESS:
-                    logging.loginfo('{} succeeded.'.format(self.context))
+                    logging.loginfo(f'{self.context} succeeded.')
                 else:
-                    logging.logwarn('{} failed: {}.'.format(self.context, error_message))
+                    logging.logwarn(f'{self.context} failed: {error_message}.')
         self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
 

@@ -7,7 +7,7 @@ from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from utils_for_tests import PR2, HSR, compare_poses
+from utils_for_tests import TestPR2, HSR, compare_poses
 
 
 @pytest.fixture(scope='module')
@@ -20,8 +20,8 @@ def giskard(request, ros):
 @pytest.fixture()
 def box_setup(zero_pose):
     """
-    :type pocky_pose_setup: PR2
-    :rtype: PR2
+    :type pocky_pose_setup: TestPR2
+    :rtype: TestPR2
     """
     p = PoseStamped()
     p.header.frame_id = 'map'
@@ -104,6 +104,20 @@ class TestJointGoals(object):
 
 
 class TestCartGoals(object):
+    def test_move_base(self, zero_pose: HSR):
+        map_T_odom = PoseStamped()
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
     def test_rotate_gripper(self, zero_pose):
         """

@@ -8,7 +8,7 @@ from py_trees import Status
 from py_trees.meta import running_is_success
 from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
-
+import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
@@ -20,7 +20,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_localization import SyncLocalization
+from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
 
@@ -69,7 +69,7 @@ class WorldUpdater(GiskardBehavior):
     def __init__(self, name: str):
         self.added_plugin_names = []
         super(WorldUpdater, self).__init__(name)
-        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
+        self.map_frame = tf.get_tf_root()
         self.original_link_names = self.robot.link_names
         self.service_in_use = Queue(maxsize=1)
         self.work_permit = Queue(maxsize=1)
@@ -116,15 +116,15 @@ class WorldUpdater(GiskardBehavior):
         res.error_codes = GetGroupInfoResponse.SUCCESS
         try:
             group = self.world.groups[req.group_name]  # type: SubWorldTree
-            res.controlled_joints = group.controlled_joints
+            res.controlled_joints = [str(j) for j in group.controlled_joints]
             res.links = list(sorted(str(x) for x in group.link_names))
-            res.child_groups = list(group.groups.keys())
+            res.child_groups = list(sorted(str(x) for x in group.groups.keys()))
             # tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             # node_name = str(PrefixName(req.group_name, 'js'))
             # if node_name in tree.tree_nodes:
             #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
+            res.root_link_pose.header.frame_id = tf.get_tf_root()
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
@@ -212,7 +212,7 @@ class WorldUpdater(GiskardBehavior):
         # assumes that parent has god map lock
         req = self.handle_convention(req)
         world_body = req.body
-        global_pose = transform_pose(self.world.root_link_name, req.pose)
+        global_pose = transform_pose(tf.get_tf_root(), req.pose)
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,
@@ -231,9 +231,9 @@ class WorldUpdater(GiskardBehavior):
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
             plugin_name = str(PrefixName(world_body.name, 'localization'))
-            plugin = SyncLocalization(plugin_name,
-                                      group_name=req.group_name,
-                                      tf_root_link_name=world_body.tf_root_link_name)
+            plugin = SyncTfFrames(plugin_name,
+                                  group_name=req.group_name,
+                                  tf_root_link_name=world_body.tf_root_link_name)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')

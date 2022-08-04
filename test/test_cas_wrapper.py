@@ -37,9 +37,9 @@ class TestCASWrapper(unittest.TestCase):
     def test_jacobian_order2(self):
         a = w.Symbol('a')
         b = w.Symbol('b')
-        m = w.Matrix([a + b, a ** 2 + b, a**3 + b ** 2])
+        m = w.Matrix([a + b, a ** 2 + b, a ** 3 + b ** 2])
         jac = w.jacobian(m, [a, b], order=2)
-        expected = w.Matrix([[0, 0], [2, 0], [6*a, 2]])
+        expected = w.Matrix([[0, 0], [2, 0], [6 * a, 2]])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
@@ -134,6 +134,45 @@ class TestCASWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(
             w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
             np.float(if_result if a == b else else_result)))
+
+    @given(float_no_nan_no_inf())
+    def test_if_eq_cases(self, a):
+        b_result_cases = [(1, 1),
+                          (3, 3),
+                          (4, 4),
+                          (-1, -1),
+                          (0.5, 0.5),
+                          (-0.5, -0.5)]
+
+        def reference(a, b_result_cases, else_result):
+            for b, if_result in b_result_cases:
+                if a == b:
+                    return if_result
+            return else_result
+
+        self.assertTrue(np.isclose(
+            w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
+            np.float(reference(a, b_result_cases, 0))))
+
+    @given(float_no_nan_no_inf())
+    def test_if_less_eq_cases(self, a):
+        b_result_cases = [
+            (-1, -1),
+            (-0.5, -0.5),
+            (0.5, 0.5),
+            (1, 1),
+            (3, 3),
+            (4, 4),
+        ]
+
+        def reference(a, b_result_cases, else_result):
+            for b, if_result in b_result_cases:
+                if a <= b:
+                    return if_result
+            return else_result
+
+        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq_cases, [a, b_result_cases, 0]),
+                               np.float(reference(a, b_result_cases, 0)))
 
     #
     # @given(limited_float(),
@@ -532,22 +571,22 @@ class TestCASWrapper(unittest.TestCase):
            quaternion())
     def test_slerp123(self, q1, q2):
         step = 0.1
-        q_d = w.compile_and_execute(w.quaternion_diff, [q1,q2])
+        q_d = w.compile_and_execute(w.quaternion_diff, [q1, q2])
         axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q_d)
         angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q_d)
         assume(angle != np.pi)
         if np.abs(angle) > np.pi:
-            angle = angle - np.pi*2
+            angle = angle - np.pi * 2
         elif np.abs(angle) < -np.pi:
-            angle = angle + np.pi*2
+            angle = angle + np.pi * 2
         r1s = []
         r2s = []
         for t in np.arange(0, 1.001, step):
             r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
-            r1 = w.compile_and_execute(w.quaternion_diff, [q1,r1])
+            r1 = w.compile_and_execute(w.quaternion_diff, [q1, r1])
             axis2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], r1)
             angle2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], r1)
-            r2 = w.compile_and_execute(w.quaternion_from_axis_angle, [axis,angle*t])
+            r2 = w.compile_and_execute(w.quaternion_from_axis_angle, [axis, angle * t])
             r1s.append(r1)
             r2s.append(r2)
         aa1 = []
@@ -564,13 +603,13 @@ class TestCASWrapper(unittest.TestCase):
         r1snp = np.array(r1s)
         r2snp = np.array(r2s)
         qds = []
-        for i in range(len(r1s)-1):
+        for i in range(len(r1s) - 1):
             q1t = r1s[i]
-            q2t = r1s[i+1]
-            qds.append(w.compile_and_execute(w.quaternion_diff, [q1t,q2t]))
+            q2t = r1s[i + 1]
+            qds.append(w.compile_and_execute(w.quaternion_diff, [q1t, q2t]))
         qds = np.array(qds)
         for r1, r2 in zip(r1s, r2s):
-            compare_orientations(r1,r2)
+            compare_orientations(r1, r2)
 
     # fails if numbers too big or too small
     @given(unit_vector(3),
@@ -643,7 +682,7 @@ class TestCASWrapper(unittest.TestCase):
         start_sign = np.sign(velocity)
         while (np.sign(velocity) == start_sign and i < 100000):
             position += velocity * step_size
-            velocity -= np.sign(desired_result-j) * acceleration * step_size
+            velocity -= np.sign(desired_result - j) * acceleration * step_size
             i += 1
         np.testing.assert_almost_equal(position, desired_result)
 
@@ -687,7 +726,7 @@ class TestCASWrapper(unittest.TestCase):
         assert distance == 1.4142135623730951
 
     def test_to_str(self):
-        expr = w.norm(w.quaternion_from_axis_angle(w.Matrix(w.create_symbols(['v1', 'v2','v3'])),
-                                                                          w.Symbol('alpha')))
-        assert w.to_str(expr) == 'sqrt((((sq((v1*sin((alpha/2))))+sq((v2*sin((alpha/2)))))+sq((v3*sin((alpha/2)))))+sq(cos((alpha/2)))))'
-
+        expr = w.norm(w.quaternion_from_axis_angle(w.Matrix(w.create_symbols(['v1', 'v2', 'v3'])),
+                                                   w.Symbol('alpha')))
+        assert w.to_str(
+            expr) == 'sqrt((((sq((v1*sin((alpha/2))))+sq((v2*sin((alpha/2)))))+sq((v3*sin((alpha/2)))))+sq(cos((alpha/2)))))'

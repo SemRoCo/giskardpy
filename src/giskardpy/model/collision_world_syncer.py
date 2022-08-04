@@ -11,6 +11,7 @@ from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
+from giskardpy.model.links import Link
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string
@@ -295,7 +296,7 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless collisions
         for link_a, link_b in link_combinations:
-            link_combination = group.sort_links(link_a, link_b)
+            link_combination = self.world.sort_links(link_a, link_b)
             if link_combination in self.black_list:
                 continue
             try:
@@ -348,7 +349,6 @@ class CollisionWorldSynchronizer(object):
                         sometimes.add(group.sort_links(link_a, link_b))
             never = set(subset_of_unknown).difference(sometimes)
             unknown = unknown.difference(never)
-            self.black_list.update(never)
             self.add_black_list_entries(never)
 
         logging.logdebug(f'Calculated self collision matrix in {time() - t:.3f}s')
@@ -388,8 +388,8 @@ class CollisionWorldSynchronizer(object):
             for link_a, link_b in product(group_a.link_names_with_collisions, group_b.link_names_with_collisions):
                 self.add_black_list_entry(*self.world.sort_links(link_a, link_b))
 
-    def get_pose(self, link_name):
-        return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name)
+    def get_pose(self, link_name, collision_id=0):
+        return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name, collision_id)
 
     def set_joint_state_to_zero(self):
         self.world.state = JointStates()
@@ -440,9 +440,9 @@ class CollisionWorldSynchronizer(object):
     def check_collisions2(self, link_combinations, distance):
         in_collision = set()
         self.sync()
-        for link_a, link_b in link_combinations:
-            if self.in_collision(link_a, link_b, distance):
-                in_collision.add((link_a, link_b))
+        for link_a_name, link_b_name in link_combinations:
+            if self.in_collision(link_a_name, link_b_name, distance):
+                in_collision.add((link_a_name, link_b_name))
         return in_collision
 
     def check_collisions(self, cut_off_distances, collision_list_size=15):
@@ -458,13 +458,7 @@ class CollisionWorldSynchronizer(object):
         """
         pass
 
-    def in_collision(self, link_a, link_b, distance):
-        """
-        :type link_a: str
-        :type link_b: str
-        :type distance: float
-        :rtype: bool
-        """
+    def in_collision(self, link_a: my_string, link_b: my_string, distance: float) -> bool:
         return False
 
     def sync(self):

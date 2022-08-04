@@ -79,9 +79,6 @@ class GiskardBehavior(Behaviour):
         """
         return self.robot
 
-    def raise_to_blackboard(self, exception):
-        Blackboard().set('exception', exception)
-
     def get_blackboard(self):
         return Blackboard()
 

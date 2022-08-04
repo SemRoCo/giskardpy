@@ -1,18 +1,25 @@
+from typing import List, Set, Union
+
 import numpy as np
 import rospy
+from colour import Color
 from geometry_msgs.msg import Point, Vector3
 from py_trees import Status
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
-
+import giskardpy.utils.tfwrapper as tf
 import giskardpy.identifier as identifier
-from giskardpy.model.collision_world_syncer import Collision
+from giskardpy.model.collision_world_syncer import Collision, Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class CollisionMarker(GiskardBehavior):
+    red = ColorRGBA(1, 0, 0, 1)
+    yellow = ColorRGBA(1, 1, 0, 1)
+    green = ColorRGBA(0, 1, 0, 1)
+
     def setup(self, timeout=10.0, name_space='pybullet_collisions'):
-        super(CollisionMarker, self).setup(timeout)
+        super().setup(timeout)
         self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.name_space = name_space
         return True
@@ -27,24 +34,18 @@ class CollisionMarker(GiskardBehavior):
             self.publish_cpi_markers(collisions)
         return Status.RUNNING
 
-    def publish_cpi_markers(self, collisions):
-        """
-        Publishes a string for each ClosestPointInfo in the dict. If the distance is below the threshold, the string
-        is colored red. If it is below threshold*2 it is yellow. If it is below threshold*3 it is green.
-        Otherwise no string will be published.
-        :type collisions: Collisions
-        """
+    def collision_to_marker(self, collisions: Union[Set[Collision], List[Collision]]) -> Marker:
         m = Marker()
-        m.header.frame_id = str(self.world.root_link_name)
+        m.header.frame_id = tf.get_tf_root()
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337
         m.ns = self.name_space
         m.scale = Vector3(0.003, 0, 0)
         m.pose.orientation.w = 1
-        if len(collisions.items()) > 0:
-            for collision in collisions.items():  # type: Collision
-                red_threshold = 0.05  # TODO don't hardcode this
+        red_threshold = 0.05  # TODO don't hardcode this
+        if len(collisions) > 0:
+            for collision in collisions:  # type: Collision
                 yellow_threshold = red_threshold * 2
                 green_threshold = yellow_threshold * 2
                 contact_distance = collision.contact_distance
@@ -62,14 +63,24 @@ class CollisionMarker(GiskardBehavior):
                 if contact_distance < green_threshold:
                     m.points.append(Point(*map_P_pa[:3]))
                     m.points.append(Point(*map_P_pb[:3]))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
+                    m.colors.append(self.green)
+                    m.colors.append(self.green)
                 if contact_distance < yellow_threshold:
-                    m.colors[-2] = ColorRGBA(1, 1, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 1, 0, 1)
+                    m.colors[-2] = self.yellow
+                    m.colors[-1] = self.yellow
                 if contact_distance < red_threshold:
-                    m.colors[-2] = ColorRGBA(1, 0, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 0, 0, 1)
+                    m.colors[-2] = self.red
+                    m.colors[-1] = self.red
+        return m
+
+    def publish_cpi_markers(self, collisions: Collisions):
+        """
+        Publishes a string for each ClosestPointInfo in the dict. If the distance is below the threshold, the string
+        is colored red. If it is below threshold*2 it is yellow. If it is below threshold*3 it is green.
+        Otherwise no string will be published.
+        :type collisions: Collisions
+        """
+        m = self.collision_to_marker(collisions.items())
         ma = MarkerArray()
         ma.markers.append(m)
         if len(ma.markers[0].points) > 0:

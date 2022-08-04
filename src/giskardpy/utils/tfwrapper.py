@@ -3,18 +3,21 @@ from copy import copy
 import PyKDL
 import numpy as np
 import rospy
+import yaml
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped, QuaternionStamped, Transform
 from std_msgs.msg import ColorRGBA
 from tf.transformations import quaternion_from_matrix, quaternion_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
-from tf2_kdl import transform_to_kdl
+from tf2_kdl import transform_to_kdl as transform_stamped_to_kdl
 from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
-tfBuffer = None  # type: Buffer
-tf_listener = None
+from giskardpy.utils.utils import memoize
+
+tfBuffer: Buffer = None
+tf_listener: TransformListener = None
 
 
 def init(tf_buffer_size=15):
@@ -27,6 +30,25 @@ def init(tf_buffer_size=15):
     tfBuffer = Buffer(rospy.Duration(tf_buffer_size))
     tf_listener = TransformListener(tfBuffer)
     rospy.sleep(5.0)
+    get_tf_root()
+
+
+def get_tf_buffer():
+    global tfBuffer
+    if tfBuffer is None:
+        init()
+    return tfBuffer
+
+
+@memoize
+def get_tf_root() -> str:
+    tfBuffer = get_tf_buffer()
+    frames = yaml.safe_load(tfBuffer.all_frames_as_yaml())
+    frames_with_parent = set(frames.keys())
+    frame_parents = set(x['parent'] for x in frames.values())
+    tf_roots = frame_parents.difference(frames_with_parent)
+    assert len(tf_roots) == 1, f'There are more than one tf tree: {tf_roots}.'
+    return tf_roots.pop()
 
 
 def get_full_frame_name(frame_name):
@@ -45,7 +67,7 @@ def get_full_frame_name(frame_name):
                 return tf_frame
         except ValueError:
             continue
-    raise KeyError('Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
+    raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
 
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
@@ -167,6 +189,12 @@ def lookup_point(target_frame, source_frame, time=None):
     return p
 
 
+def transform_to_kdl(transform):
+    ts = TransformStamped()
+    ts.transform = transform
+    return transform_stamped_to_kdl(ts)
+
+
 def pose_to_kdl(pose):
     """Convert a geometry_msgs Transform message to a PyKDL Frame.
 
@@ -219,6 +247,8 @@ def twist_to_kdl(twist):
 
 def msg_to_kdl(msg):
     if isinstance(msg, TransformStamped):
+        return transform_stamped_to_kdl(msg)
+    elif isinstance(msg, Transform):
         return transform_to_kdl(msg)
     elif isinstance(msg, PoseStamped):
         return pose_to_kdl(msg.pose)
@@ -260,6 +290,24 @@ def normalize(msg):
         return Vector3(*tmp)
 
 
+def kdl_to_transform(frame):
+    t = Transform()
+    t.translation.x = frame.p[0]
+    t.translation.y = frame.p[1]
+    t.translation.z = frame.p[2]
+    t.rotation = normalize(Quaternion(*frame.M.GetQuaternion()))
+    return t
+
+
+def kdl_to_transform_stamped(frame, frame_id, child_frame_id):
+    t = TransformStamped()
+    t.header.frame_id = frame_id
+    t.header.stamp = rospy.get_rostime()
+    t.child_frame_id = child_frame_id
+    t.transform = kdl_to_transform(frame)
+    return t
+
+
 def kdl_to_pose(frame):
     """
     :type frame: PyKDL.Frame
@@ -271,6 +319,15 @@ def kdl_to_pose(frame):
     p.position.z = frame.p[2]
     p.orientation = normalize(Quaternion(*frame.M.GetQuaternion()))
     return p
+
+
+def kdl_to_transform(frame: PyKDL.Frame) -> Transform:
+    t = Transform()
+    t.translation.x = frame.p[0]
+    t.translation.y = frame.p[1]
+    t.translation.z = frame.p[2]
+    t.rotation = normalize(Quaternion(*frame.M.GetQuaternion()))
+    return t
 
 
 def kdl_to_pose_stamped(frame, frame_id):
@@ -356,12 +413,12 @@ def kdl_to_np(kdl_thing):
                          [0, 0, 0, 1]])
 
 
-def np_to_pose(matrix):
-    """
-    :type matrix: np.ndarray
-    :rtype: Pose
-    """
+def np_to_pose(matrix: np.ndarray) -> Pose:
     return kdl_to_pose(np_to_kdl(matrix))
+
+
+def np_to_transform(matrix: np.ndarray) -> Transform:
+    return kdl_to_transform(np_to_kdl(matrix))
 
 
 def pose_to_np(msg):

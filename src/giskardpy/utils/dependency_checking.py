@@ -125,6 +125,5 @@ def check_dependencies():
         except pkg_resources.DistributionNotFound as e:
             rospkg_exists(d)
         except pkg_resources.VersionConflict as e:
-            logging.logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req),
-                                                                                           version_f=str(e.dist)))
+            logging.logwarn(f'found {str(e.dist)} but version {str(e.req)} is required')
 

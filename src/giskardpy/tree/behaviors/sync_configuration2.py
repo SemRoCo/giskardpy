@@ -9,7 +9,7 @@ from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-
+import giskardpy.utils.tfwrapper as tf
 
 class SyncConfiguration2(GiskardBehavior):
     """
@@ -23,7 +23,7 @@ class SyncConfiguration2(GiskardBehavior):
         """
         super().__init__(name)
         self.mjs = None
-        self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
+        self.map_frame = tf.get_tf_root()
         self.joint_state_topic = joint_state_topic
         self.group_name = group_name
         self.group = self.world.groups[self.group_name]  # type: SubWorldTree

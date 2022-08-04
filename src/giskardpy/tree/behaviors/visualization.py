@@ -1,35 +1,39 @@
 import py_trees
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
-
+import giskardpy.utils.tfwrapper as tf
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class VisualizationBehavior(GiskardBehavior):
     def __init__(self, name, ensure_publish=False):
-        super(VisualizationBehavior, self).__init__(name)
+        super().__init__(name)
         self.ensure_publish = ensure_publish
         self.marker_ids = {}
+        self.tf_root = tf.get_tf_root()
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
-        return super(VisualizationBehavior, self).setup(timeout)
+        return super().setup(timeout)
 
     @profile
+    @catch_and_raise_to_blackboard
     def update(self):
         markers = []
         time_stamp = rospy.Time()
         links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
-            for marker in self.world.links[link_name].collision_visualization_markers().markers:
-                marker.header.frame_id = str(self.world.root_link_name)
+            for j, marker in enumerate(self.world.links[link_name].collision_visualization_markers().markers):
+                marker.header.frame_id = self.tf_root
                 marker.action = Marker.ADD
-                if link_name not in self.marker_ids:
-                    self.marker_ids[link_name] = len(self.marker_ids)
-                marker.id = self.marker_ids[link_name]
+                link_id_key = f'{link_name}_{j}'
+                if link_id_key not in self.marker_ids:
+                    self.marker_ids[link_id_key] = len(self.marker_ids)
+                marker.id = self.marker_ids[link_id_key]
                 marker.ns = 'planning_visualization'
                 marker.header.stamp = time_stamp
-                marker.pose = self.collision_scene.get_pose(link_name).pose
+                marker.pose = self.collision_scene.get_pose(link_name, j).pose
                 markers.append(marker)
 
         self.publisher.publish(markers)

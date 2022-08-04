@@ -5,13 +5,13 @@ import giskardpy.identifier as identifier
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils import logging
+from giskardpy.utils.utils import raise_to_blackboard
 
 
 class SetCmd(GetGoal):
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.sample_period_backup = None
-        self.rc_sample_period = self.get_god_map().get_data(identifier.rc_sample_period)
 
     @property
     def goal(self):
@@ -37,7 +37,7 @@ class SetCmd(GetGoal):
             self.traj = []
             if len(self.goal.cmd_seq) == 0:
                 empty_result.error_codes = [MoveResult.INVALID_GOAL]
-                self.raise_to_blackboard(InvalidGoalException('goal empty'))
+                raise_to_blackboard(InvalidGoalException('goal empty'))
             self.get_god_map().set_data(identifier.result_message, empty_result)
             if self.is_plan(self.goal.type):
                 if self.sample_period_backup is not None:
@@ -47,7 +47,7 @@ class SetCmd(GetGoal):
                 error_message = 'Invalid move action goal type: {}'.format(self.goal.type)
                 logging.logwarn(error_message)
                 logging.logwarn('Goal rejected.')
-                self.raise_to_blackboard(InvalidGoalException(error_message))
+                raise_to_blackboard(InvalidGoalException(error_message))
             if self.is_check_reachability(self.goal.type):
                 self.sample_period_backup = self.get_god_map().get_data(identifier.sample_period)
                 self.get_god_map().set_data(identifier.sample_period, self.rc_sample_period)

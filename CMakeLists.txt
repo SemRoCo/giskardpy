@@ -161,24 +161,22 @@ include_directories(
 # )
 
 catkin_install_python(PROGRAMS 
-	scripts/giskard_trees.py 
+	scripts/giskard_pr2.py
+	scripts/giskard_pr2_real.py
+	scripts/giskard_tiago.py
 	scripts/interactive_marker.py
 	scripts/add_box.py
 	scripts/add_cylinder.py
 	scripts/add_sphere.py
 	scripts/add_urdf.py
 	scripts/attach_object.py
-	scripts/base_joint_state_publisher.py
 	scripts/clear_world.py
-	scripts/hsr_base_joint_state_publisher.py
 	scripts/joint_goal_publisher.py
 	scripts/move_base_simple_goal.py
 	scripts/print_joint_state.py
 	scripts/remove_object.py
-	scripts/tf_base_joint_state_publisher.py
-	scripts/traj_to_joint_states.py
-	scripts/urdf_merger.py
 	scripts/fake_servers.py
+	scripts/move_base_simple_goal_diff_drive.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

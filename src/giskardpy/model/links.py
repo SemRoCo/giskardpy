@@ -64,7 +64,7 @@ class LinkGeometry(object):
             else:
                 raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
         elif msg.type == msg.MESH_BODY:
-            geometry = MeshGeometry(np.eye(4), msg.mesh)
+            geometry = MeshGeometry(np.eye(4), msg.mesh, scale=[msg.scale.x, msg.scale.y, msg.scale.z])
         else:
             raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
@@ -83,7 +83,7 @@ class LinkGeometry(object):
 
 class MeshGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, file_name, scale=None):
-        super(MeshGeometry, self).__init__(link_T_geometry)
+        super().__init__(link_T_geometry)
         self.file_name = file_name
         if not os.path.isfile(resolve_ros_iris(file_name)):
             raise CorruptShapeException('Can\'t find file {}'.format(self.file_name))
@@ -93,12 +93,12 @@ class MeshGeometry(LinkGeometry):
             self.scale = scale
 
     def as_visualization_marker(self):
-        marker = super(MeshGeometry, self).as_visualization_marker()
+        marker = super().as_visualization_marker()
         marker.type = Marker.MESH_RESOURCE
         marker.mesh_resource = self.file_name
         marker.scale.x = self.scale[0]
-        marker.scale.z = self.scale[1]
-        marker.scale.y = self.scale[2]
+        marker.scale.y = self.scale[1]
+        marker.scale.z = self.scale[2]
         marker.mesh_use_embedded_materials = True
         return marker
 
@@ -174,13 +174,21 @@ class SphereGeometry(LinkGeometry):
         return sphere_volume(self.radius) > volume_threshold
 
 
-class Link(object):
+class Link:
     def __init__(self, name):
         self.name = name  # type: PrefixName
         self.visuals = []
         self.collisions = []
         self.parent_joint_name = None
         self.child_joint_names = []
+
+    def name_with_collision_id(self, collision_id):
+        if collision_id > len(self.collisions):
+            raise AttributeError(f'Link {self.name} only has {len(self.collisions)} collisions, '
+                                 f'asking for {collision_id}.')
+        if collision_id == 0:
+            return self.name
+        return f'{self.name}/\\{collision_id}'
 
     @classmethod
     def from_urdf(cls, urdf_link, prefix):

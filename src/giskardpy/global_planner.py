@@ -52,210 +52,8 @@ SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp
 
 
-class CollisionCheckerInterface(GiskardBehavior):
-
-    def __init__(self, name='CollisionCheckerInterface'):
-        super(CollisionCheckerInterface, self).__init__(name)
-
-    def get_collisions(self, link_name):
-        all_collisions = self.get_god_map().get_data(identifier.closest_point).items()
-        link_collisions = list()
-        for c in all_collisions:
-            if c.get_link_b() == link_name or c.get_link_a() == link_name:
-                link_collisions.append(c)
-        return link_collisions
-
-
-class ObjectGoalOptimizationObjective(ob.PathLengthOptimizationObjective):
-    def __init__(self, si, goal, object_name, collision_scene, env_js):
-        ob.PathLengthOptimizationObjective.__init__(self, si)
-        self.tresh = 0.1
-        self.simple_motion_validator = SimpleRayMotionValidator(collision_scene, self.getSpaceInformation(), True, object_name,
-                                                                js=env_js)
-        self.object_motion_validator = ObjectRayMotionValidator(self.getSpaceInformation(), True, collision_scene,
-                                                                object_name, collision_scene.robot, links=[object_name],
-                                                                ignore_state_validator=True, js=env_js)
-        self.goal = goal()
-
-    def stateCost(self, state):
-        return ob.Cost(self.getSpaceInformation().distance(state, self.goal))
-
-    def motionCost(self, s1, s2):
-        return self.motionCostHeuristic(s1, s2)
-
-    def motionCostHeuristic(self, s1, s2):
-
-        self.object_motion_validator.raytester.pre_ray_test()
-        object_c_free, _, ds, _ = self.object_motion_validator._ompl_check_motion(s1, s2)
-        self.object_motion_validator.raytester.post_ray_test()
-
-        self.simple_motion_validator.raytester.pre_ray_test()
-        simple_c_free, _, _, _ = self.simple_motion_validator._ompl_check_motion(s1, s2)
-        self.simple_motion_validator.raytester.post_ray_test()
-
-        rotation_cost = 0.0
-        if simple_c_free and not object_c_free:
-            i = 2. * 3.14 / len(ds)
-            for d in ds:
-                diff = self.tresh - d
-                if diff < 0:
-                    continue
-                else:
-                    rotation_cost += (diff / self.tresh) * i
-                    break
-
-        return ob.Cost(self.getSpaceInformation().distance(s1, s2) + rotation_cost)
-
-
-class ReducedOrientationGoalOptimizationObjective(ob.PathLengthOptimizationObjective):
-    def __init__(self, si, goal, object_name, collision_scene, env_js):
-        ob.PathLengthOptimizationObjective.__init__(self, si)
-        self.goal = goal()
-        self.percent = 0.9
-        self.simple_motion_validator = SimpleRayMotionValidator(collision_scene, self.getSpaceInformation(), True, object_name,
-                                                                js=env_js)
-        self.object_motion_validator = ObjectRayMotionValidator(self.getSpaceInformation(), True, collision_scene,
-                                                                object_name, collision_scene.robot, links=[object_name],
-                                                                ignore_state_validator=True, js=env_js)
-
-    # def get_euclidian(self, s1, s2):
-    #    return sum((pose_to_list(ompl_se3_state_to_pose(s1))[0] - pose_to_list(ompl_se3_state_to_pose(s2))[0]) ** 2)
-
-    def get_orientation_reduced_cost(self, s1, s2):
-        object_c_free = self.object_motion_validator.checkMotion(s1, s2)
-        simple_c_free = self.simple_motion_validator.checkMotion(s1, s2)
-        rotation_cost = ob.SO3StateSpace().distance(s1.rotation(), s2.rotation())
-
-        if object_c_free and simple_c_free:
-            if not self.object_motion_validator.checkMotion(s2, self.goal):
-                return ob.SE3StateSpace().distance(s1, s2) - rotation_cost * self.percent
-
-        return ob.SE3StateSpace().distance(s1, s2)
-
-    def motionCost(self, s1, s2):
-        return self.motionCostHeuristic(s1, s2)
-
-    def motionCostHeuristic(self, s1, s2):
-        return ob.Cost(self.get_orientation_reduced_cost(s1, s2))
-
-
 def allocPathLengthDirectInfSampler(probDefn, maxNumberCalls):
     return lambda: ob.PathLengthDirectInfSampler(probDefn, maxNumberCalls)
-
-
-class KindaGoalOptimizationObjective(ob.PathLengthOptimizationObjective):
-    def __init__(self, si, h_motion_valid):
-        ob.PathLengthOptimizationObjective.__init__(self, si)
-        self.h_motion_valid = h_motion_valid
-
-    def setCostToGoHeuristic(self, costToGo):
-        self.costToGoFn_ = self.costToGo
-
-    def hasCostToGoHeuristic(self):
-        return True
-
-    def costToGo(self, state, goal):
-        rospy.logerr('lul')
-        if self.h_motion_valid.checkMotion(state, goal):
-            return ob.Cost(0.0)
-        else:
-            return ob.Cost(self.getSpaceInformation().distance(state, goal))
-
-
-class DynamicSE3GoalSpace(ob.GoalState):
-
-    def __init__(self, si, goal, object_motion_validator, r=0.1, max_samples_in_a_row=5):
-        super(DynamicSE3GoalSpace, self).__init__(si)
-        self.goal_pose = deepcopy(ompl_se3_state_to_pose(goal))
-        self.object_motion_validator = object_motion_validator
-        self.max_samples_in_a_row = max_samples_in_a_row
-        self.init_goal_space(goal)
-        self.init_sampling_space(goal, r)
-        self.setState(goal)
-        self.setThreshold(0.2)
-
-    def init_goal_space(self, state, diff=0.01):
-        self.goal_space = ob.SE3StateSpace()
-        bounds = self.goal_space.getBounds()
-        bounds.setLow(0, state.getX() - diff)
-        bounds.setLow(1, state.getY() - diff)
-        bounds.setLow(2, state.getZ() - diff)
-        bounds.setHigh(0, state.getX() + diff)
-        bounds.setHigh(1, state.getY() + diff)
-        bounds.setHigh(2, state.getZ() + diff)
-        bounds.check()
-        self.goal_space.setBounds(bounds)
-
-    def init_sampling_space(self, state, diff):
-        self.sampling_space = ob.SE3StateSpace()
-        bounds = self.sampling_space.getBounds()
-        bounds.setLow(0, state.getX() - diff)
-        bounds.setLow(1, state.getY() - diff)
-        bounds.setLow(2, state.getZ() - diff)
-        bounds.setHigh(0, state.getX() + diff)
-        bounds.setHigh(1, state.getY() + diff)
-        bounds.setHigh(2, state.getZ() + diff)
-        bounds.check()
-        self.sampling_space.setBounds(bounds)
-        self.sampler = self.sampling_space.allocStateSampler()
-
-    def sampleGoal(self, state):
-        self.sampler.sampleUniform(state)
-        if self.object_motion_validator.checkMotionPose(ompl_se3_state_to_pose(state), self.goal_pose):
-            self.add_goal_state(state)
-
-    def maxSampleCount(self):
-        return self.max_samples_in_a_row
-
-    def aabb_to_2d_points(self, d, u):
-        d_l = [d[0], u[1], 0]
-        u_r = [u[0], d[1], 0]
-        return [d_l, d, u, u_r]
-
-    def aabb_to_3d_points(self, d, u):
-        d_new = [d[0], d[1], u[2]]
-        u_new = [u[0], u[1], d[2]]
-        bottom_cube_face = self.aabb_to_2d_points(d, u_new)
-        upper_cube_face = self.aabb_to_2d_points(d_new, u)
-        res = []
-        for p in bottom_cube_face:
-            res.append([p[0], p[1], d[2]])
-        for p in upper_cube_face:
-            res.append([p[0], p[1], u[2]])
-        return res
-
-    def add_goal_state(self, state):
-        bounds = self.goal_space.getBounds()
-        bounds.setLow(0, min(bounds.low[0], state.getX()))
-        bounds.setLow(1, min(bounds.low[1], state.getY()))
-        bounds.setLow(2, min(bounds.low[2], state.getZ()))
-        bounds.setHigh(0, max(bounds.high[0], state.getX()))
-        bounds.setHigh(1, max(bounds.high[1], state.getY()))
-        bounds.setHigh(2, max(bounds.high[2], state.getZ()))
-        self.goal_space.setBounds(bounds)
-
-    def distanceGoal(self, state):
-        if self.goal_space.satisfiesBounds(state):
-            return 0.0
-        if self.object_motion_validator.checkMotionPose(ompl_se3_state_to_pose(state), self.goal_pose):
-            self.add_goal_state(state)
-            return 0.0
-        else:
-            return self.getSpaceInformation().distance(state, self.getState())
-            # bounds = self.goal_space.getBounds()
-            # d = [bounds.low[0], bounds.low[1], bounds.low[2]]
-            # u = [bounds.high[0], bounds.high[1], bounds.high[2]]
-            # points = self.aabb_to_3d_points(d, u)
-            # min_dist = 10e10
-            # state_pose = pose_to_list(ompl_se3_state_to_pose(state))
-            # for point in points:
-            #    dist = np.sqrt(np.sum((np.array(point) - state_pose[0]) ** 2))
-            #    if dist < min_dist:
-            #        min_dist = dist
-            # return min_dist
-
-    # def isSatisfied(self, *args):
-    #    return self.goal_space.satisfiesBounds(args[0])
 
 
 class GrowingGoalStates(ob.GoalStates):
@@ -325,106 +123,6 @@ class GrowingGoalStates(ob.GoalStates):
         if self.getSpaceInformation().checkMotion(state, self.getGoal()):
             self.addState(state)
         return super(GrowingGoalStates, self).distanceGoal(state)
-
-
-class GrowingGoalStatesS(ob.GoalStates):
-
-    def __init__(self, si, robot, root_link, tip_link, start, goal, sampling_axis=None):
-        super(GrowingGoalStatesS, self).__init__(si)
-        self.sampling_axis = np.array(sampling_axis, dtype=bool) if sampling_axis is not None else None
-        self.start = start
-        self.goal = goal
-        self.robot = robot
-        self.root_link = root_link
-        self.tip_link = tip_link
-        self.addState(self.goal)
-
-    def getGoal(self):
-        return self.getState(0)
-
-    def sampleGoal(self, st):
-        while True:
-            # Calc vector from start to goal and roll random rotation around it.
-            w_T_gr = self.robot.get_fk(self.root_link, self.tip_link)
-            if self.sampling_axis is not None:
-                s_arr = np.array([np.random.uniform(low=0.0, high=np.pi)] * 3) * self.sampling_axis
-                q_sample = tuple(s_arr.tolist())
-            else:
-                q_sample = tuple([np.random.uniform(low=0.0, high=np.pi)] * 3)
-            gr_q_gr = tf.transformations.quaternion_from_euler(*q_sample)
-            w_T_g = tf.transformations.concatenate_matrices(
-                tf.transformations.translation_matrix(
-                    [self.getGoal().getX(), self.getGoal().getY(), self.getGoal().getZ()]),
-                tf.transformations.quaternion_matrix([self.getGoal().rotation().x, self.getGoal().rotation().y,
-                                                      self.getGoal().rotation().z, self.getGoal().rotation().w])
-            )
-            gr_T_goal = tf.transformations.concatenate_matrices(tf.transformations.inverse_matrix(w_T_gr), w_T_g)
-            gr_t_goal = tf.transformations.translation_matrix(tf.transformations.translation_from_matrix(gr_T_goal))
-            w_T_calc_g = tf.transformations.concatenate_matrices(
-                w_T_gr, tf.transformations.quaternion_matrix(gr_q_gr), gr_t_goal
-            )
-            q = tf.transformations.quaternion_from_matrix(w_T_calc_g)
-            # Apply random rotation around the axis on the goal position and ...
-            # state = ob.State(self.getSpaceInformation().getStateSpace())
-            st.setX(self.getGoal().getX())
-            st.setY(self.getGoal().getY())
-            st.setZ(self.getGoal().getZ())
-            st.rotation().x = q[0]
-            st.rotation().y = q[1]
-            st.rotation().z = q[2]
-            st.rotation().w = q[3]
-            # ... add it to the other goal states, if it is valid.
-            if self.getSpaceInformation().isValid(st):
-                self.addState(st)
-                break
-
-    #    def distanceGoal(self, state):
-    #        if self.getSpaceInformation().checkMotion(state, self.getGoal()):
-    #            self.addState(state)
-    #        return super(GrowingGoalStatesS, self).distanceGoal(state)
-
-    def isSatisfied(self, *args):
-        if len(args) == 1 or len(args) == 2:
-            return self.getSpaceInformation().checkMotion(args[0], self.getGoal())
-        else:
-            raise Exception('Unknown signature.')
-
-
-class CheckerGoalState(ob.GoalState):
-
-    def __init__(self, si, goal, object_motion_validator):
-        super(CheckerGoalState, self).__init__(si)
-        self.goal_pose = deepcopy(ompl_se3_state_to_pose(goal))
-        self.object_motion_validator = object_motion_validator
-        self.setState(goal)
-        self.setThreshold(0.0)
-
-    def isSatisfied(self, state):
-        return self.object_motion_validator.checkMotionPose(ompl_se3_state_to_pose(state), self.goal_pose)
-
-
-class CompoundStateSamplerChangingGoalSpace(ob.CompoundStateSampler):
-
-    def __init__(self, sampling_space, goal_state, goal_space, object_motion_validator):
-        super(CompoundStateSamplerChangingGoalSpace, self).__init__(sampling_space)
-        self.goal = goal_state
-        self.goal_space = goal_space
-        self.object_motion_validator = object_motion_validator
-
-    def sampleUniform(self, state):
-        super(CompoundStateSamplerChangingGoalSpace, self).sampleUniform(state)
-        if self.object_motion_validator.checkMotion(state, self.goal):
-            self.goal_space.add_goal_state(state)
-
-    def sampleUniformNear(self, state, near, distance):
-        super(CompoundStateSamplerChangingGoalSpace, self).sampleUniformNear(state, near, distance)
-        if self.object_motion_validator.checkMotion(state, self.goal):
-            self.goal_space.add_goal_state(state)
-
-    def sampleGaussian(self, state, mean, stdDev):
-        super(CompoundStateSamplerChangingGoalSpace, self).sampleGaussian(state, mean, stdDev)
-        if self.object_motion_validator.checkMotion(state, self.goal):
-            self.goal_space.add_goal_state(state)
 
 
 class PathLengthAndGoalOptimizationObjective(ob.PathLengthOptimizationObjective):
@@ -565,6 +263,7 @@ def get_simple_environment_object_names(god_map, robot_name, env_name='kitchen')
                 environment_objects.append(g_n)
     return environment_objects
 
+
 def current_milli_time():
     return round(time.time() * 1000)
 
@@ -638,8 +337,8 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         # if so return false, else true.
         old_js = deepcopy(self.object_in_motion.state)
         state1 = self.state_validator.ik.get_ik(old_js, s1)
-        #s = 0.
-        #for j_n, v in state1.items():
+        # s = 0.
+        # for j_n, v in state1.items():
         #    v2 = self.state_validator.ik.get_ik(old_js, s1)[j_n].position
         #    n = abs(v.position - v2)
         #    if n != 0:
@@ -648,8 +347,8 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         update_robot_state(self.collision_scene, state1)
         query_b = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
         state2 = self.state_validator.ik.get_ik(old_js, s2)
-        #s = 0.
-        #for j_n, v in state2.items():
+        # s = 0.
+        # for j_n, v in state2.items():
         #    v2 = self.state_validator.ik.get_ik(old_js, s2)[j_n].position
         #    n = abs(v.position - v2)
         #    if n != 0:
@@ -669,7 +368,8 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
         self.collision_scene = collision_scene
         self.state_validator = state_validator
         self.object_in_motion = object_in_motion
-        environment_object_names = get_simple_environment_object_names(self.god_map, self.god_map.get_data(identifier.robot_group_name))
+        environment_object_names = get_simple_environment_object_names(self.god_map, self.god_map.get_data(
+            identifier.robot_group_name))
         self.collision_link_names = self.collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
         pybulletenv = PyBulletMotionValidationIDs(self.god_map.get_data(identifier.collision_scene),
                                                   environment_object_names=environment_object_names,
@@ -696,7 +396,7 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
             collision_object = self.collision_scene.get_aabb_info(collision_link_name)
             min_size = np.max(np.abs(np.array(collision_object.d) - np.array(collision_object.u)))
             if self.box_space.is_colliding([min_size], start_positions, end_positions):
-                #self.object_in_motion.state = self.collision_scene.world.state
+                # self.object_in_motion.state = self.collision_scene.world.state
                 ret = False
                 break
         update_robot_state(self.collision_scene, old_js)
@@ -892,7 +592,7 @@ class GiskardRobotBulletCollisionChecker(GiskardBehavior):
                     self.debug_times.append(e_s - s_s)
                     rospy.loginfo(f'State Validator {self.__class__.__name__}: '
                                   f'CC time: {np.mean(np.array(self.debug_times_cc))} ms. '
-                                  f'State Update time: {np.mean(np.array(self.debug_times))-np.mean(np.array(self.debug_times_cc))} ms.')
+                                  f'State Update time: {np.mean(np.array(self.debug_times)) - np.mean(np.array(self.debug_times_cc))} ms.')
             return any(results)
 
     def publish_robot_state(self):
@@ -1236,7 +936,7 @@ class GoalRegionSampler:
         if type(d) == list:
             x, y, z = d
         elif type(d) == float:
-            x, y, z = [d]*3
+            x, y, z = [d] * 3
         else:
             raise Exception('ffffffffffffff')
         i = 0
@@ -1255,7 +955,7 @@ class GoalRegionSampler:
         if type(d) == list and len(d) == 3:
             x, y, z = d
         elif type(d) == float:
-            x, y, z = [d]*3
+            x, y, z = [d] * 3
         else:
             raise Exception(f'The given parameter d must either be a list of 3 floats or one float, however it is {d}.')
         while i < samples:
@@ -1353,7 +1053,7 @@ class PreGraspSampler(GiskardBehavior):
             raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
         if self.tip_link not in link_names:
             raise Exception(u'Tip_link {} is no known link of the robot.'.format(self.tip_link))
-        #if not self.robot.are_linked(self.root_link, self.tip_link):
+        # if not self.robot.are_linked(self.root_link, self.tip_link):
         #    raise Exception(u'Did not found link chain of the robot from'
         #                    u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
 
@@ -1453,8 +1153,10 @@ class PreGraspSampler(GiskardBehavior):
         else:
             xyz = d
         while try_i < tries and len(next_goals) == 0:
-            goal_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0, goal_orientation=self.goal_orientation)
-            s_m = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map, ignore_state_validator=True, js=js)
+            goal_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0,
+                                         goal_orientation=self.goal_orientation)
+            s_m = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map, ignore_state_validator=True,
+                                           js=js)
             # Sample goal points which are e.g. in the aabb of the object to pick up
             goal_grs.sample(xyz)
             goals = list()
@@ -1464,7 +1166,8 @@ class PreGraspSampler(GiskardBehavior):
                 if s_m.checkMotion(o_g, goal):
                     goals.append(o_g)
             # Find valid goal poses which allow motion towards the sampled goal points above
-            tip_link_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0, goal_orientation=self.goal_orientation)
+            tip_link_grs = GoalRegionSampler(self.is_3D, goal, valid_fun, lambda _: 0,
+                                             goal_orientation=self.goal_orientation)
             for sampled_goal in goals:
                 if len(next_goals) > 0:
                     break
@@ -1505,7 +1208,6 @@ class GlobalPlanner(GetGoal):
         self.movement_config = 'slow_without_refine'
 
         self.initialised_planners = False
-        self.collisionCheckerInterface = CollisionCheckerInterface()
 
     def _get_motion_validator_class(self, motion_validator_type, default=None):
         if default is None:
@@ -1560,7 +1262,7 @@ class GlobalPlanner(GetGoal):
             raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
         if self.tip_link not in link_names:
             raise Exception(u'Tip_link {} is no known link of the robot.'.format(self.tip_link))
-        #if not self.robot.are_linked(self.root_link, self.tip_link):
+        # if not self.robot.are_linked(self.root_link, self.tip_link):
         #    raise Exception(u'Did not found link chain of the robot from'
         #                    u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
 
@@ -1620,7 +1322,8 @@ class GlobalPlanner(GetGoal):
         planner = NarrowMovementPlanner(planner_name, state_validator_class, motion_validator_class, range, time,
                                         self.kitchen_space, self.collision_scene,
                                         self.robot, self.root_link, self.tip_link, self.goal.pose, map_frame,
-                                        self.god_map, config=self.movement_config, dist=dist, narrow_padding=self.narrow_padding,
+                                        self.god_map, config=self.movement_config, dist=dist,
+                                        narrow_padding=self.narrow_padding,
                                         sampling_goal_axis=sampling_goal_axis, verify_solution_f=verify_solution_f)
         return planner
 
@@ -1825,10 +1528,10 @@ class GlobalPlanner(GetGoal):
         # set lower and upper bounds
         bounds = ob.RealVectorBounds(2)
         # refills lab
-        #bounds.setLow(0, -3)
-        #bounds.setHigh(0, 5)
-        #bounds.setLow(1, -4)
-        #bounds.setHigh(1, 5)
+        # bounds.setLow(0, -3)
+        # bounds.setHigh(0, 5)
+        # bounds.setLow(1, -4)
+        # bounds.setHigh(1, 5)
         # kitchen
         bounds.setLow(0, -4)
         bounds.setHigh(0, 2)
@@ -2115,7 +1818,7 @@ class OMPLPlanner(object):
 
     def benchmark(self, planner_names):
         e = datetime.now()
-        n = f"test_ease_fridge_pregrasp_1-"\
+        n = f"test_ease_fridge_pregrasp_1-" \
             f"date:={e.day}/{e.month}/{e.year}-" \
             f"time:={e.hour}:{e.minute}:{e.second}-" \
             f"validation type: = {str(self.motion_validator_class)}"
@@ -2126,7 +1829,7 @@ class OMPLPlanner(object):
         b.setPreRunEvent(ot.PreSetupEvent(self._configure_planner))
         req = ot.Benchmark.Request()
         req.maxTime = self.max_time
-        #req.maxMem = 100.0
+        # req.maxMem = 100.0
         req.runCount = 5
         req.displayProgress = True
         req.simplify = False
@@ -2136,22 +1839,22 @@ class OMPLPlanner(object):
     def solve(self):
         # Get solve parameters
         planner_name = self.setup.getPlanner().getName()
-        #discrete_checking = self.motion_validator_class is None
+        # discrete_checking = self.motion_validator_class is None
         if planner_name not in self._planner_solve_params:
             solve_params = self._planner_solve_params[None][self.config]
         else:
             solve_params = self._planner_solve_params[planner_name][self.config]
-        #debugging = sys.gettrace() is not None
-        #initial_solve_time = solve_params.initial_solve_time if not debugging else solve_params.initial_solve_time * debug_factor
-        #initial_solve_time = initial_solve_time * discrete_factor if discrete_checking else initial_solve_time
-        initial_solve_time = self.max_time # min(initial_solve_time, self.max_time)
-        #refine_solve_time = solve_params.refine_solve_time if not debugging else solve_params.refine_solve_time * debug_factor
-        #refine_solve_time = refine_solve_time * discrete_factor if discrete_checking else refine_solve_time
+        # debugging = sys.gettrace() is not None
+        # initial_solve_time = solve_params.initial_solve_time if not debugging else solve_params.initial_solve_time * debug_factor
+        # initial_solve_time = initial_solve_time * discrete_factor if discrete_checking else initial_solve_time
+        initial_solve_time = self.max_time  # min(initial_solve_time, self.max_time)
+        # refine_solve_time = solve_params.refine_solve_time if not debugging else solve_params.refine_solve_time * debug_factor
+        # refine_solve_time = refine_solve_time * discrete_factor if discrete_checking else refine_solve_time
         max_initial_iterations = solve_params.max_initial_iterations
-        #max_refine_iterations = solve_params.max_refine_iterations
-        #min_refine_thresh = solve_params.min_refine_thresh
+        # max_refine_iterations = solve_params.max_refine_iterations
+        # min_refine_thresh = solve_params.min_refine_thresh
         max_initial_solve_time = min(initial_solve_time * max_initial_iterations, self.max_time)
-        #max_refine_solve_time = refine_solve_time * max_refine_iterations
+        # max_refine_solve_time = refine_solve_time * max_refine_iterations
 
         planner_status = ob.PlannerStatus(ob.PlannerStatus.UNKNOWN)
         num_try = 0
@@ -2182,7 +1885,7 @@ class OMPLPlanner(object):
     def get_solution_path(self):
         try:
             path = self.setup.getSolutionPath()
-            #self.shorten_path(path, self.goal)
+            # self.shorten_path(path, self.goal)
         except RuntimeError:
             raise Exception('Problem Definition in Setup may have changed..')
         return path
@@ -2258,7 +1961,7 @@ class MovementPlanner(OMPLPlanner):
             self.motion_validator = self.motion_validator_class(self.collision_scene, self.tip_link, self.robot,
                                                                 self.collision_checker, self.god_map, js=js)
             si.setMotionValidator(OMPLMotionValidator(si, self.is_3D, self.motion_validator))
-        #si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(allocGiskardValidStateSample))
+        # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(allocGiskardValidStateSample))
         si.setup()
 
         self.start = self.get_start_state(self.space)
@@ -2350,7 +2053,7 @@ class MovementPlanner(OMPLPlanner):
                title=title)
         # ax = fig.gca(projection='2d')
         # ax.plot(data[:, 0], data[:, 1], '.-')
-        #plt.savefig('/home/thomas/master_thesis/benchmarking_data/'
+        # plt.savefig('/home/thomas/master_thesis/benchmarking_data/'
         #            'path_following/box/navi_5/{}_path_planner.png'.format(rospy.get_time()))
         plt.show()
 
@@ -2358,7 +2061,8 @@ class MovementPlanner(OMPLPlanner):
 class NarrowMovementPlanner(MovementPlanner):
     def __init__(self, planner_name, state_validator_class, motion_validator_class, range, time, kitchen_space,
                  collision_scene, robot, root_link, tip_link, pose_goal, map_frame, god_map,
-                 config='slow_without_refine', dist=0.1, narrow_padding=1.0, sampling_goal_axis=None, verify_solution_f=None):
+                 config='slow_without_refine', dist=0.1, narrow_padding=1.0, sampling_goal_axis=None,
+                 verify_solution_f=None):
         super(NarrowMovementPlanner, self).__init__(True, planner_name, state_validator_class,
                                                     motion_validator_class, range, time, kitchen_space,
                                                     collision_scene, robot, root_link, tip_link,
@@ -2369,14 +2073,14 @@ class NarrowMovementPlanner(MovementPlanner):
         self.reversed_start_and_goal = False
         self.directional_planner = [
             'RRT', 'TRRT', 'LazyRRT',
-            #'EST','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT',
-            #'STRIDE',
-            #'BITstar', 'ABITstar', 'kBITstar', 'kABITstar',
+            # 'EST','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT',
+            # 'STRIDE',
+            # 'BITstar', 'ABITstar', 'kBITstar', 'kABITstar',
             'RRTstar', 'LBTRRT',
-            #'SST',
+            # 'SST',
             'RRTXstatic', 'RRTsharp', 'RRT#', 'InformedRRTstar',
-            #'SORRTstar'
-            ]
+            # 'SORRTstar'
+        ]
 
     def recompute_start_and_goal(self, planner, start, goal):
         si = self.setup.getSpaceInformation()
@@ -2452,7 +2156,7 @@ class NarrowMovementPlanner(MovementPlanner):
             segments = diff / self.range
             rospy.logerr(segments)
             for i in range(1, int(segments)):
-                p = pose_to_list(interpolate_pose(begin_i, end_i, i*(1/segments)))
+                p = pose_to_list(interpolate_pose(begin_i, end_i, i * (1 / segments)))
                 data = np.append(data, [np.append(p[0], p[1])], axis=0)
 
             if not self.reversed_start_and_goal:
@@ -2479,7 +2183,6 @@ class NarrowMovementPlanner(MovementPlanner):
         super(NarrowMovementPlanner, self).setup_problem(js)
         self.create_goal_specific_space()
         self.setup.setup()
-
 
 
 def is_3D(space):

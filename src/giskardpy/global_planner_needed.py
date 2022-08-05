@@ -9,12 +9,11 @@ import pybullet as p
 from py_trees import Status
 
 from giskardpy import identifier
-from giskard_msgs.srv import GlobalPathNeeded, GlobalPathNeededResponse, GetAttachedObjects, GetAttachedObjectsRequest, \
-    GetGroupInfo, GetGroupInfoRequest
+from giskard_msgs.srv import GlobalPathNeeded, GlobalPathNeededResponse
 from giskardpy.data_types import Trajectory
-from giskardpy.global_planner import ObjectRayMotionValidator, GiskardRobotBulletCollisionChecker, \
-    SimpleRayMotionValidator
 from giskardpy.model.collision_world_syncer import Collisions
+from giskardpy.path_planning.motion_validator import SimpleRayMotionValidator, ObjectRayMotionValidator
+from giskardpy.path_planning.state_validator import GiskardRobotBulletCollisionChecker
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils.tfwrapper import np_to_pose_stamped, transform_pose, pose_stamped_to_np, np_to_pose
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
@@ -72,7 +71,7 @@ class GlobalPlannerNeeded(GetGoal):
             if tip_link not in links:
                 raise Exception('wa')
             collision_checker = GiskardRobotBulletCollisionChecker(tip_link != 'base_footprint', root_link,
-                                                                   tip_link, self.collision_scene)
+                                                                   tip_link, self.collision_scene, self.get_god_map())
             if simple:
                 m = SimpleRayMotionValidator(self.collision_scene, tip_link, self.god_map,
                                              js=self.get_god_map().get_data(identifier.joint_states))

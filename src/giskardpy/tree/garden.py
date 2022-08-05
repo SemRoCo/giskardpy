@@ -12,10 +12,10 @@ import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.data_types import order_map
-from giskardpy.global_planner import PreGraspSampler, GlobalPlanner
 from giskardpy.global_planner_needed import GlobalPlannerNeeded
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
+from giskardpy.path_planning.global_planner import PreGraspSampler, GlobalPlanner
 from giskardpy.tree.behaviors.append_zero_velocity import AppendZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker

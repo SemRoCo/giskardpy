@@ -31,7 +31,7 @@
 
   <include file="$(find omni_pose_follower)/launch/omni_pose_follower_pr2.launch"/>
 
-  <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
+<!--   <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
     <rosparam param="state_topics">
       - /whole_body_controller/base/state 
       - /whole_body_controller/body/state
@@ -40,7 +40,7 @@
       - /whole_body_controller/base/follow_joint_trajectory
       - /whole_body_controller/body/follow_joint_trajectory
     </rosparam>
-  </node>
+  </node> -->
 
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
     <remap from="/joint_states" to="/giskard/joint_states"/>

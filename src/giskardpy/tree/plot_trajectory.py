@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from py_trees import Status
 
 from giskardpy import identifier
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.logging import logwarn
-from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.utils import plot_trajectory, convert_dictionary_to_ros_message
 
 
@@ -31,12 +31,11 @@ class PlotTrajectory(GiskardBehavior):
                 cmd = self.god_map.get_data(identifier.next_move_goal)
                 for c in cmd.constraints:
                     c_d = yaml.load(c.parameter_value_pair)
-                    if 'goals' in c_d and 'tip_link' in c_d:
+                    if self.god_map.get_data(identifier.plot_path) and 'goals' in c_d and 'tip_link' in c_d:
                         path = c_d['goals']
                         if 'start' in c_d and c_d['start'] is not None:
                             path.insert(0, c_d['start'])
                         self.plot_path(path, c_d['tip_link'])
-                        return Status.SUCCESS
             sample_period = self.get_god_map().get_data(identifier.sample_period)
             # controlled_joints = self.god_map.get_data(identifier.controlled_joints)
             controlled_joints = list(trajectory.get_exact(0).keys())

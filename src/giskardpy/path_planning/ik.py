@@ -8,17 +8,16 @@ from giskardpy.utils.tfwrapper import pose_to_kdl, pose_to_list, lookup_pose
 import giskardpy.model.pybullet_wrapper as pbw
 
 
-
 class IK(object):
 
     def __init__(self, root_link, tip_link):
         self.root_link = root_link
         self.tip_link = tip_link
 
-    def setup(self):
-        pass
-
     def get_ik(self, old_js, pose):
+        raise Exception('Implement me.')
+
+    def clear(self):
         pass
 
 
@@ -60,9 +59,6 @@ class PyBulletIK(IK):
         self.joint_lowers = list()
         self.joint_uppers = list()
         self.setup()
-
-    def clear(self):
-        pbw.p.disconnect(physicsClientId=self.client_id)
 
     def setup(self):
         for i in range(0, 100):
@@ -106,7 +102,6 @@ class PyBulletIK(IK):
             joint_name = pbw.p.getJointInfo(self.robot_id, joint_id, physicsClientId=self.client_id)[1].decode()
             joint_state = js[PrefixName(joint_name, None)].position
             pbw.p.resetJointState(self.robot_id, joint_id, joint_state, physicsClientId=self.client_id)
-        # pbw.p.stepSimulation(physicsClientId=self.client_id)
 
-    def close_pybullet(self):
+    def clear(self):
         pbw.stop_pybullet(client_id=self.client_id)

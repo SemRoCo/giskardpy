@@ -103,6 +103,7 @@ TFPublisher = plugins + ['TFPublisher']
 
 global_planner_needed = plugins + [u'GlobalPlannerNeeded', u'global_planner_needed']
 global_planner = plugins + [u'global_planner']
+plot_path = global_planner + ['plot']
 path_benchmark = global_planner + [u'benchmark']
 gp_narrow = global_planner + [u'narrow']
 gp_normal = global_planner + [u'normal']

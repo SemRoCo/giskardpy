@@ -105,6 +105,9 @@ class AbstractMotionValidator():
     def check_motion_timed(self, s1, s2):
         raise Exception('Please overwrite me')
 
+    def clear(self):
+        pass
+
 
 class SimpleRayMotionValidator(AbstractMotionValidator):
 
@@ -122,9 +125,6 @@ class SimpleRayMotionValidator(AbstractMotionValidator):
                                                   environment_object_names=environment_object_names,
                                                   moving_links=self.collision_link_names)
         self.raytester = PyBulletRayTester(pybulletenv=pybulletenv)
-
-    def clear(self):
-        pass
 
     def check_motion(self, s1, s2):
         with self.raytester_lock:
@@ -214,9 +214,6 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
                                                   moving_links=self.collision_link_names)
         self.box_space = PyBulletBoxSpace(self.collision_scene.world, self.object_in_motion, 'map', pybulletenv)
         # self.collision_points = GiskardPyBulletAABBCollision(object_in_motion, collision_scene, tip_link, links=links)
-
-    def clear(self):
-        pass
 
     @profile
     def check_motion_old(self, s1, s2):

@@ -939,6 +939,7 @@ class OMPLPlanner(object):
                  collision_scene, robot, root_link, tip_link, pose_goal, map_frame, config, god_map,
                  verify_solution_f=None, dist=0.0):
         self.setup = None
+        self.plot = god_map.get_data(identifier.plot_path)
         self.is_3D = is_3D
         self.space = space
         self.collision_scene = collision_scene
@@ -1293,10 +1294,7 @@ class MovementPlanner(OMPLPlanner):
 
     def clear(self):
         super().clear()
-        try:
-            self.motion_validator.clear()
-        except AttributeError:
-            pass
+        self.motion_validator.clear()
         self.collision_checker.clear()
 
     def get_planner(self, si):
@@ -1406,7 +1404,7 @@ class MovementPlanner(OMPLPlanner):
         else:
             rospy.logwarn('Interpolated path returned is not validated.')
 
-    def get_solution(self, planner_status, plot=True):
+    def get_solution(self, planner_status):
         # og.PathSimplifier(si).smoothBSpline(self.get_solution_path()) # takes around 20-30 secs with RTTConnect(0.1)
         # og.PathSimplifier(si).reduceVertices(self.get_solution_path())
         data = numpy.array([])
@@ -1417,7 +1415,7 @@ class MovementPlanner(OMPLPlanner):
             path = self.get_solution_path()
             data = ompl_states_matrix_to_np(path.printAsMatrix())
             # print the simplified path
-            if plot:
+            if self.plot:
                 self.plot_solution(data)
         return data
 
@@ -1526,8 +1524,8 @@ class NarrowMovementPlanner(MovementPlanner):
             # Save it
             self.space.setBounds(bounds)
 
-    def get_solution(self, planner_status, plot=True):
-        data = super().get_solution(planner_status, plot=plot)
+    def get_solution(self, planner_status):
+        data = super().get_solution(planner_status)
         if len(data) > 0 and self.planner_name in self.directional_planner:
 
             if not self.reversed_start_and_goal:

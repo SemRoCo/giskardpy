@@ -46,11 +46,14 @@ class AbstractStateValidator:
     def is_driveable(self, pose):
         raise Exception('Implement me.')
 
+    def clear(self):
+        pass
+
 
 class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
 
-    def __init__(self, is_3D, root_link, tip_link, collision_scene, god_map, ik=None, ik_sampling=1, ignore_orientation=False,
-                 publish=False, dist=0.0):
+    def __init__(self, is_3D, root_link, tip_link, collision_scene, god_map,
+                 ik=None, ik_sampling=1, publish=False, dist=0.0):
         super().__init__(is_3D)
         self.giskard_lock = threading.Lock()
         if ik is None:
@@ -65,8 +68,6 @@ class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
         self.god_map = god_map
         self.dist = dist
         self.ik_sampling = ik_sampling
-        self.ignore_orientation = ignore_orientation
-        # self.collision_objects = GiskardPyBulletAABBCollision(self.robot, collision_scene, tip_link)
         self.collision_link_names = collision_scene.world.get_children_with_collisions_from_link(self.tip_link)
         self.publisher = None
         self.init_map()

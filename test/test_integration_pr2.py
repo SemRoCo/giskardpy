@@ -2430,7 +2430,7 @@ class TestCartesianPath(object):
 
     @pytest.mark.repeat(5)
     def test_navi_1(self, kitchen_setup):
-        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartesianPath::test_pathAroundKitchenIsland_with_global_planner
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartesianPath::test_navi_1
         """
         :type kitchen_setup: PR2
         """

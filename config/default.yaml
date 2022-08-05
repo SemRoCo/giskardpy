@@ -89,6 +89,7 @@ plugins:
   #  'STRIDE', 'BITstar', 'ABITstar', 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
   #  'InformedRRTstar']
   global_planner:
+    plot: False
     benchmark: False
     path_interpolation: True
     max_replanning_retries: 10

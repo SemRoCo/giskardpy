@@ -14,4 +14,6 @@
 
     <node pkg="giskardpy" type="move_base_simple_goal_diff_drive.py" name="my_move_base" output="screen" />
 
+    <node pkg="iai_tiago_tools" type="giskard_e_stop.py" name="giskard_e_stop" output="screen" />
+
 </launch>

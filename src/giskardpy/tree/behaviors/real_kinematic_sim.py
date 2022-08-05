@@ -16,7 +16,7 @@ class RealKinSimPlugin(GiskardBehavior):
     @profile
     def update(self):
         next_time = self.god_map.get_data(identifier.time)
-        if next_time <= 0.0:
+        if next_time <= 0.0 or not hasattr(self, 'last_time'):
             self.last_time = next_time
             return Status.RUNNING
         # if self.last_time is None:

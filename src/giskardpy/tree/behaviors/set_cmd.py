@@ -95,3 +95,16 @@ class SetCmd(GetGoal):
             return Status.FAILURE
 
         return Status.SUCCESS
+
+
+class SetCollisionGoal(GetGoal):
+    def __init__(self, name, as_name):
+        GetGoal.__init__(self, name, as_name)
+
+    def initialise(self):
+        self.get_god_map().set_data(identifier.collision_goal, None)
+
+    def update(self):
+        move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
+        self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
+        return Status.SUCCESS

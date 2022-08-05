@@ -483,7 +483,23 @@ class GiskardTestWrapper(GiskardWrapper):
         logging.loginfo('total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo('stopping tree')
 
-    def set_object_joint_state(self, object_name, joint_state):
+#    def set_object_joint_state(self, object_name, joint_state, waiting_time=20, sleep_time=0.1):
+#        super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
+#        i = 0.0
+#        while not rospy.is_shutdown():
+#            current_js = self.world.groups[object_name].state
+#            #joint_names_without_prefix = set(j.short_name for j in current_js)
+#            #assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()
+#            for joint_name, state in current_js.items():
+#                if joint_name.short_name in joint_state:
+#                    assert i < waiting_time
+#                    if np.isclose(state.position, joint_state[joint_name.short_name], atol=0.01):
+#                        return
+#                    else:
+#                        i += sleep_time
+#                        rospy.sleep(sleep_time)
+
+    def set_object_joint_state(self, object_name, joint_state, waiting_time=20, sleep_time=0.1):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
         self.wait_heartbeats()
         current_js = self.world.groups[object_name].state
@@ -541,6 +557,7 @@ class GiskardTestWrapper(GiskardWrapper):
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         # self.set_base.call(goal)
+        self.wait_heartbeats()
         rospy.sleep(0.5)
 
     def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, weight=None, max_velocity=None, check=True,

@@ -12,7 +12,7 @@ import pandas as pd
 from giskardpy import casadi_wrapper as w
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import OutOfJointLimitsException, \
-    HardConstraintsViolatedException, QPSolverException
+    HardConstraintsViolatedException, QPSolverException, PlanningException
 from giskardpy.my_types import expr_symbol
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
@@ -506,6 +506,41 @@ class A(Parent):
         return self.construct_A()
 
 
+class Filter(object):
+    """
+    Filter for the QPController
+    """
+
+    def __init__(self, max_filter_size=20):
+        self.points = list()
+        self.filter_size = 0
+        self.max_filter_size = max_filter_size
+
+    def full(self):
+        return self.max_filter_size == self.filter_size
+
+    def _dominate(self, e1, e2):
+        return e1 < e2
+
+    def is_filtered(self, e1):
+        for e in self.points:
+            if self._dominate(e, e1):
+                return False
+        return True
+
+    def add(self, e):
+        if not self.is_filtered(e):
+            raise Exception('Please check if element gets filtered before adding.')
+        tmp = deepcopy(self.points)
+        self.points = []
+        for t in tmp:
+            if not self._dominate(e, t):
+                self.points.append(t)
+        if self.full():
+            self.points = self.points[1:]
+        self.points.append(e)
+
+
 class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
@@ -846,7 +881,7 @@ class QPController:
                     logging.logerr('Relaxing hard constraints failed.')
             else:
                 logging.logwarn('Ran out of allowed retries with relaxed hard constraints.')
-            self._create_debug_pandas()
+            self._create_debug_pandas() # FIXME: may throw ValueError: Shape of passed values is (569, 1), indices imply (570, 1)
             self._are_joint_limits_violated(str(e_original))
             self._is_close_to_joint_limits()
             self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
@@ -864,7 +899,7 @@ class QPController:
             #         any_nan |= self.__is_nan_in_array(name, a)
             #     if any_nan:
             #         raise e
-            raise
+            raise PlanningException()
         if self.xdot_full is None:
             return None
         # for debugging to might want to execute this line to create named panda matrices

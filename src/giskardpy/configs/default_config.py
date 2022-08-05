@@ -37,6 +37,48 @@ class GeneralConfig:
     }
 
 
+class PathPlanningConfig:
+    def __init__(self,
+                 plot: bool = False,
+                 benchmark: bool = False,
+                 path_interpolation: bool = True,
+                 max_replanning_retries: int = 10,
+                 planning_configs: Dict = None):
+        self.plot = plot
+        self.benchmark = benchmark
+        self.path_interpolation = path_interpolation
+        self.max_replanning_retries = max_replanning_retries
+        self.planner_configs = planning_configs
+        if self.planner_configs is None:
+            self.planner_configs = dict()
+            self.planner_configs['normal'] = {
+                'navigation': {
+                    'planner': ['RRTConnect'],  # sublist of above planners
+                    'motion_validator': ['box'],  # sublist of ['rays', 'box', 'discrete']
+                    'time': 15,
+                    'range': 2.0
+                },
+                'movement': {
+                    'planner': ['RRTConnect'],  # sublist of above planners
+                    'motion_validator': ['box'],  # sublist of ['rays', 'box', 'discrete' ]
+                    'time': 10,
+                    'range': 0.15
+                }}
+            self.planner_configs['narrow'] = {
+                'navigation': {
+                    'planner': ['InformedRRTstar'],  # sublist of above planners
+                    'motion_validator': ['box'],  # sublist of ['rays', 'box', 'discrete']
+                    'time': 30,
+                    'range': 0.2
+                },
+                'movement': {
+                    'planner': ['RRT'],
+                    'motion_validator': ['discrete'],  # sublist of ['rays', 'box', 'discrete']
+                    'time': 30,
+                    'range': 0.1
+                }}
+
+
 class QPSolverConfig:
     def __init__(self,
                  qp_solver: SupportedQPSolver = SupportedQPSolver.gurobi,
@@ -86,7 +128,7 @@ class CollisionAvoidanceConfig:
         def init_25mm(cls):
             return cls(soft_threshold=0.025, hard_threshold=0.0)
 
-    collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
+    collision_checker: CollisionCheckerLib = CollisionCheckerLib.pybullet
 
     _add_self_collisions: List[Tuple[str, str]] = []
     _ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
@@ -180,6 +222,7 @@ class BehaviorTreeConfig:
         },
         'PlotTrajectory': {
             'enabled': True,
+            'path_enabled': True,
             'history': 5,
             'velocity_threshold': 0.0,
             'cm_per_second': 2.5,
@@ -262,6 +305,7 @@ class Giskard:
     general_config: GeneralConfig = GeneralConfig()
     behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
     qp_solver_config: QPSolverConfig = QPSolverConfig()
+    path_planning: PathPlanningConfig = PathPlanningConfig()
     collision_avoidance_config: CollisionAvoidanceConfig = CollisionAvoidanceConfig()
     robot_interface_config: RobotInterfaceConfig = RobotInterfaceConfig()
 
@@ -325,6 +369,7 @@ class Giskard:
                            f'Collision avoidance is disabled')
         self._god_map.set_data(identifier.collision_checker, self.collision_avoidance_config.collision_checker)
         self._god_map.set_data(identifier.collision_scene, collision_scene)
+        self._god_map.set_data(identifier.global_planner, self.path_planning)
         if self.general_config.control_mode == ControlModes.open_loop:
             self._tree = OpenLoop(self._god_map)
         elif self.general_config.control_mode == ControlModes.close_loop:

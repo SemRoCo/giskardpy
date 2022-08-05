@@ -2,6 +2,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.qp.qp_controller import QPController
+from giskardpy.exceptions import PlanningException, HardConstraintsViolatedException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
@@ -19,9 +20,12 @@ class ControllerPlugin(GiskardBehavior):
     def update(self):
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)
-
-        next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
-        self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
-        self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
+        try:
+            next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
+            self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
+            self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
+        except (HardConstraintsViolatedException, PlanningException, ValueError):
+            self.raise_to_blackboard(PlanningException())
+            return Status.FAILURE
 
         return Status.RUNNING

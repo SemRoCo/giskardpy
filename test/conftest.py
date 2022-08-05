@@ -102,3 +102,17 @@ def apartment_setup(better_pose):
     base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
     better_pose.set_localization(base_pose)
     return better_pose
+
+@pytest.fixture()
+def refills_lab(resetted_giskard):
+    """
+    :type resetted_giskard: GiskardTestWrapper
+    :return:
+    """
+    resetted_giskard.set_joint_goal(resetted_giskard.better_pose)
+    resetted_giskard.plan_and_execute()
+    object_name = u'kitchen'
+    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                              tf.lookup_pose(u'map', u'iai_kitchen/room_link'), u'/kitchen/joint_states',
+                              set_js_topic=u'/kitchen/cram_joint_states')
+    return resetted_giskard

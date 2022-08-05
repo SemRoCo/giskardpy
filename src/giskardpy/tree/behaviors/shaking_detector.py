@@ -58,6 +58,7 @@ class WiggleCancel(GiskardBehavior):
 
     @profile
     def update(self):
+        return Status.RUNNING
         latest_points = self.get_god_map().get_data(identifier.joint_states)
 
         for i, key in enumerate(self.keys):

@@ -4,6 +4,9 @@ fk_pose = world + ['compute_fk_pose']
 fk_np = world + ['compute_fk_np']
 joint_states = world + ['state']
 controlled_joints = ['controlled_joints']
+collision_scene = ['collision_scene']
+old_joint_states = ['old_joint_states']
+old_map_T_base = ['old_map_T_base']
 
 # goal_params = ['goal_params']
 trajectory = ['traj']
@@ -32,6 +35,7 @@ cmd_id = ['cmd_id']
 post_processing = ['post_processing']
 soft_constraints = post_processing + ['soft_constraints']
 result_message = ['result_message']
+collision_goal = [u'collision_goal']
 tracking_start_time = ['tracking_start_time']
 
 # stuff from rosparam
@@ -77,6 +81,7 @@ CPIMarker_in_planning_loop = plugins + ['CollisionMarker', 'in_planning_loop']
 
 PlotTrajectory = plugins + ['PlotTrajectory']
 PlotTrajectory_enabled = PlotTrajectory + ['enabled']
+PlotTrajectory_path_enabled = PlotTrajectory + [u'path_enabled']
 
 PlotDebugTrajectory = plugins + ['PlotDebugExpressions']
 PlotDebugTrajectory_enabled = PlotDebugTrajectory + ['enabled']
@@ -105,6 +110,15 @@ SyncTfFrames = plugins + ['SyncTfFrames']
 SyncTfFrames_frames = SyncTfFrames + ['frames']
 
 PublishDebugExpressions = plugins + ['PublishDebugExpressions']
+
+global_planner_needed = plugins + [u'GlobalPlannerNeeded', u'global_planner_needed']
+global_planner = plugins + [u'global_planner']
+plot_path = global_planner + ['plot']
+path_benchmark = global_planner + [u'benchmark']
+gp_narrow = global_planner + [u'narrow']
+gp_normal = global_planner + [u'normal']
+path_interpolation = global_planner + [u'path_interpolation']
+path_replanning_max_retries = global_planner + [u'max_replanning_retries']
 
 # reachability check
 reachability_check = giskard + ['reachability_check']

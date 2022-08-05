@@ -1,3 +1,4 @@
+reset_god_map: True # will reset god_map in cleanup.py by loading rosparam values if true
 general_options:
   mode: OpenLoop # OpenLoop or ClosedLoop
   action_server_name: ~command
@@ -64,16 +65,67 @@ plugins:
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: False
     in_planning_loop: False
+  GlobalPlannerNeeded:
+    global_planner_needed: False
+  # Planners
+  # No Python support: SPARS, SPARStwo, pRRT, VFRRT, TSRRT
+  # Planners currently not working due to problems in OMPL: PDST, SORRTstar
+  # Benchmarking currently not work properly due to problems in OMPL: PRM, PRMstar, LazyPRMstar
+  # Not supported yet: CForest and AnytimePathShortening and QRRT
+  # multi-query:
+  #   suboptimal:  ['PRM', 'LazyPRM']
+  #   asymp. opt:  ['PRMstar', 'LazyPRMstar']
+  # single-query:
+  #   suboptimal:  ['RRT', 'RRTConnect', 'TRRT', 'LazyRRT',
+  #                 'EST', 'SBL',
+  #                 'KPIECE1', 'BKPIECE1', 'LBKPIECE1',
+  #                 'FMT', 'BFMT',
+  #                 'STRIDE']
+  #   asymp. opt:  ['BITstar', 'ABITstar'
+  #                 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp', 'InformedRRTstar', 'SORRTstar'
+  #                 'AITstar']
+  # ['PRM', 'LazyPRM', 'PRMstar', 'LazyPRMstar', 'RRT', 'RRTConnect', 'TRRT', 'LazyRRT','EST',
+  #  'SBL','KPIECE1', 'BKPIECE1', 'LBKPIECE1', 'FMT', 'BFMT',
+  #  'STRIDE', 'BITstar', 'ABITstar', 'RRTstar', 'LBTRRT', 'SST', 'RRTXstatic', 'RRTsharp',
+  #  'InformedRRTstar']
+  global_planner:
+    plot: False
+    benchmark: False
+    path_interpolation: True
+    max_replanning_retries: 10
+    normal:
+      navigation:
+        planner: [ 'RRTConnect' ] # sublist of above planners
+        motion_validator: [ 'box' ] # sublist of ['rays', 'box', 'discrete']
+        time: 15
+        range: 2.0
+      movement:
+        planner: [ 'RRTConnect' ] # sublist of above planners
+        motion_validator: [ 'box'] # sublist of ['rays', 'box', 'discrete' ]
+        time: 10
+        range: 0.15
+    narrow:
+      navigation:
+        planner: [ 'InformedRRTstar' ] # sublist of above planners
+        motion_validator: ['box'] # sublist of ['rays', 'box', 'discrete']
+        time: 30
+        range: 0.2
+      movement:
+        planner: [ 'RRT']
+        motion_validator: [ 'discrete' ] # sublist of ['rays', 'box', 'discrete']
+        time: 30
+        range: 0.1
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
-    history: 5 # will save the x last plots
+    path_enabled: True #will plot planned path and executed trajectory if computed
+    history: 20 # will save the x last plots
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     cm_per_second: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     height_per_derivative: 6
     normalize_position: True # centers the joint positions around 0 on the y axis
     tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
   PlotDebugTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-    enabled: True
+    enabled: False
     history: 5
     cm_per_second: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     height_per_derivative: 6
@@ -103,19 +155,19 @@ reachability_check:
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
-  collision_checker: bpb # one of [bpb, pybullet, disable]
+  collision_checker: pybullet # one of [bpb, pybullet, disable]
   external_collision_avoidance:
     default:
       number_of_repeller: 1
       hard_threshold: 0.0
-      soft_threshold: 0.05
+      soft_threshold: 0.0
       max_velocity: 0.2
     override: {}
   self_collision_avoidance:
     default:
       number_of_repeller: 1
       hard_threshold: 0.0
-      soft_threshold: 0.05
+      soft_threshold: 0.0
       max_velocity: 0.2
     override: {}
 #      - base_link # You can override all combinations with a specific link

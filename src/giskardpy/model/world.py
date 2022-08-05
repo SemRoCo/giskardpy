@@ -24,7 +24,8 @@ from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, kdl_to_quaternion, \
+    np_to_kdl
 from giskardpy.utils.utils import suppress_stderr, memoize
 import giskardpy.utils.tfwrapper as tf
 
@@ -52,7 +53,6 @@ class WorldTree:
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
-        self.fast_all_fks = None
         self._state_version = 0
         self._model_version = 0
         self._clear()
@@ -191,6 +191,47 @@ class WorldTree:
                                            stop_at_joint_when=self.is_joint_controlled,
                                            collect_link_when=self.has_link_collisions)
         return links
+
+    def get_direct_children_with_collisions(self, joint_name):
+        links, joints = self.search_branch(joint_name,
+                                           stop_at_link_when=self.has_link_collisions,
+                                           collect_link_when=self.has_link_collisions)
+        return links
+
+    def get_children_with_collisions_from_link(self, link_name):
+        child_links_with_collision, _ = self.search_branch(self.get_parent_link_of_link(link_name),
+                                                           collect_link_when=self.has_link_collisions)
+        return child_links_with_collision
+
+    def get_children_with_collisions_from_joint(self, joint_name):
+        def has_no_children(link_name):
+            return not self.links[link_name].has_children()
+        links, joints = self.search_branch(joint_name,
+                                           stop_at_link_when=has_no_children,
+                                           collect_link_when=self.has_link_collisions)
+        return links
+
+    def get_parent_link_with_collisions(self, joint_name):
+        """
+        :param joint_name:
+        :return:
+        """
+        def has_link_in_joint_collision(joint_name):
+            joint = self.joints[joint_name]
+            return self.links[joint.parent_link_name].has_collisions()
+        joint_name = self.search_for_parent_joint(joint_name, stop_when=has_link_in_joint_collision)
+        return self.joints[joint_name].parent_link_name
+
+    def get_parents_with_collisions(self, joint_name):
+        """
+        :param joint_name:
+        :return:
+        """
+        def is_root(joint_name):
+            return self.root_link == joint_name
+        joint_name = self.search_branch(joint_name, collect_link_when=self.has_link_collisions,
+                                        stop_at_joint_when=is_root)
+        return self.joints[joint_name].parent_link_name
 
     def get_siblings_with_collisions(self, joint_name):
         """
@@ -459,7 +500,6 @@ class WorldTree:
                           prefix=None,
                           parent_link_name=self.root_link_name)
         self._add_tf_links([x[:2] for x in frames_to_sync if x[2]], create_parents=False)
-        self.fast_all_fks = None
         self.notify_model_change()
 
     def _add_tf_links(self, frames, create_parents=False):
@@ -766,28 +806,15 @@ class WorldTree:
 
     @profile
     def compute_all_fks(self):
-        if self.fast_all_fks is None:
-            fks = []
-            self.fk_idx = {}
-            i = 0
-            for link in self.links.values():
-                if link.name == self.root_link_name:
-                    continue
-                if link.has_collisions():
-                    fk = self.compose_fk_expression(self.root_link_name, link.name)
-                    fk = w.dot(fk, link.collisions[0].link_T_geometry)
-                    position = w.position_of(fk)
-                    orientation = w.quaternion_from_matrix(fk)
-                    fks.append(w.vstack([position, orientation]).T)
-                    self.fk_idx[link.name] = i
-                    i += 1
-            fks = w.vstack(fks)
-            self.fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
-
-        fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-        result = {}
-        for link in self.link_names_with_collisions:
-            result[link] = fks_evaluated[self.fk_idx[link], :]
+        tfs = self.compute_all_fks_matrix()
+        result = dict()
+        for i, link in enumerate(self.link_names_with_collisions):
+            if link != self.root_link_name:
+                fk = tfs[i*4:i*4 + 4]
+                position = fk[:, 3]
+                q = kdl_to_quaternion(np_to_kdl(fk))
+                orientation = [q.x, q.y, q.z, q.w]
+                result[link] = np.append(position, orientation)
         return result
 
     @profile
@@ -865,6 +892,11 @@ class WorldTree:
     @profile
     def get_fk(self, root, tip):
         return self._fk_computer.get_fk(root, tip)
+
+    #def are_linked(self, link_a, link_b):
+    #    chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=False, links=True, fixed=True,
+    #                                                          non_controlled=True)
+    #    return connection and chain2
 
     @memoize
     @profile
@@ -953,6 +985,15 @@ class WorldTree:
         result.header.frame_id = target_frame
         result.vector = Vector3(*t_V_p[:3])
         return result
+
+    def get_random_joint_state(self, joint_name):
+        try:
+            lower_limit, upper_limit = self.get_joint_position_limits(joint_name)
+        except KeyError:
+            return np.random.random() * np.pi * 2
+        lower_limit = max(lower_limit, -10)
+        upper_limit = min(upper_limit, 10)
+        return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
 
     def compute_joint_limits(self, joint_name, order):
         try:

@@ -13,8 +13,10 @@ from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.data_types import order_map
+from giskardpy.global_planner_needed import GlobalPlannerNeeded
 from giskardpy.god_map import GodMap
 from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
+from giskardpy.path_planning.global_planner import PreGraspSampler, GlobalPlanner
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
@@ -41,7 +43,7 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
-from giskardpy.tree.behaviors.set_cmd import SetCmd
+from giskardpy.tree.behaviors.set_cmd import SetCmd, SetCollisionGoal
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
@@ -56,6 +58,7 @@ from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import PluginBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
+from giskardpy.tree.retry_planning import RetryPlanning
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
@@ -490,6 +493,7 @@ class OpenLoop(TreeManager):
         root.add_child(self.grow_wait_for_goal())
         root.add_child(CleanUp('cleanup'))
         root.add_child(self.grow_process_goal())
+        self.global_planner_needed.solver = self.planning_4
         root.add_child(self.grow_execution())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
@@ -525,20 +529,31 @@ class OpenLoop(TreeManager):
                                                                         self.action_server_name,
                                                                         MoveFeedback.PLANNING))
         process_move_goal.add_child(self.grow_process_move_commands())
-        process_move_goal.add_child(ExceptionToExecute('clear exception'))
+        process_move_goal.add_child(success_is_failure(ExceptionToExecute)('clear exception')) # todo: fix me, will be ignored
         process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
         return process_move_goal
 
     def grow_process_move_commands(self):
-        process_move_cmd = success_is_failure(Sequence)('Process move commands')
-        process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
+        process_move_cmd = Selector('Process move commands')
+        process_move_cmd.add_child(success_is_failure(SetCmd)('set move cmd', self.action_server_name))
         process_move_cmd.add_child(self.grow_planning())
+        process_move_cmd.add_child(success_is_failure(RetryPlanning)(u'done planning?'))
         process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
         return process_move_cmd
 
     def grow_planning(self):
-        planning = failure_is_success(Sequence)('planning')
+        planning = success_is_failure(Sequence)('planning')
         planning.add_child(IF('command set?', identifier.next_move_goal))
+        global_planning = Sequence(u'global planning')
+        global_planning.add_child(PreGraspSampler())
+        self.global_planner_needed = running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded',
+                                                                          self.action_server_name)
+        global_planning.add_child(self.global_planner_needed)
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+            global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
+        global_planning.add_child(GlobalPlanner(u'global planner', self.action_server_name))
+        planning.add_child(SetCollisionGoal(u'set collision goal', self.action_server_name))
+        planning.add_child(global_planning)
         planning.add_child(RosMsgToGoal('RosMsgToGoal', self.action_server_name))
         planning.add_child(InitQPController('InitQPController'))
         planning.add_child(self.grow_planning2())
@@ -547,7 +562,7 @@ class OpenLoop(TreeManager):
         return planning
 
     def grow_planning2(self):
-        planning_2 = failure_is_success(Selector)('planning II')
+        planning_2 = Selector('planning II')
         planning_2.add_child(GoalCanceled('goal canceled', self.action_server_name))
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                  self.action_server_name,
@@ -592,6 +607,7 @@ class OpenLoop(TreeManager):
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_plugin(MaxTrajectoryLength('traj length check', **kwargs))
+        self.planning_4 = planning_4
         return planning_4
 
     def grow_plan_postprocessing(self):

@@ -12,6 +12,7 @@ class PlotDebugExpressions(PlotTrajectory):
     def __init__(self, name, enabled, wait=False, **kwargs):
         super(PlotDebugExpressions, self).__init__(name=name,
                                                    enabled=enabled,
+                                                   path_enabled=False,
                                                    velocity_threshold=None,
                                                    normalize_position=False,
                                                    wait=wait,

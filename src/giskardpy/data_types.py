@@ -1,4 +1,4 @@
-from collections import defaultdict, deque
+from collections import defaultdict, deque, namedtuple
 from copy import deepcopy
 
 from sensor_msgs.msg import JointState
@@ -105,6 +105,67 @@ class JointStates(defaultdict):
     def to_position_dict(self):
         return {k: v.position for k, v in self.items()}
 
+CollisionAABB = namedtuple('CollisionAABB', 'link d u')
+
+
+class CollisionObjects(object):
+
+    def __init__(self):
+        self.collision_objects = list()
+
+    def update(self):
+        raise Exception('not implemented')
+
+    def add_collision(self, link_name):
+        raise Exception('not implemented')
+
+    def get_collision(self, link_name):
+        raise Exception('not implemented')
+
+
+class AABBCollision(CollisionObjects):
+
+    def __init__(self):
+        super(AABBCollision, self).__init__()
+
+    def get_link_names(self):
+        return list(map(lambda c: c.link, self.collision_objects))
+
+    def add_collision(self, collision_object: CollisionAABB):
+        link_names = self.get_link_names()
+        if collision_object.link in link_names:
+            i = link_names.index(collision_object.link)
+            self.collision_objects.remove(link_names[i])
+        self.collision_objects.append(collision_object)
+
+    def get_points(self, collision_objects=None):
+        if collision_objects is None:
+            collision_objects = self.collision_objects
+        return self._get_points(collision_objects)
+
+    def _get_points(self, collision_objects):
+        query = list()
+        for collision_info in collision_objects:
+            aabbs = self.aabb_to_3d_points(collision_info.d, collision_info.u)
+            query.extend(aabbs)
+        return query
+
+    def aabb_to_3d_points(self, d, u):
+        d_new = [d[0], d[1], u[2]]
+        u_new = [u[0], u[1], d[2]]
+        bottom_cube_face = self.aabb_to_2d_points(d, u_new)
+        upper_cube_face = self.aabb_to_2d_points(d_new, u)
+        res = []
+        for p in bottom_cube_face:
+            res.append([p[0], p[1], d[2]])
+        for p in upper_cube_face:
+            res.append([p[0], p[1], u[2]])
+        return res
+
+    def aabb_to_2d_points(self, d, u):
+        d_l = [d[0], u[1], 0]
+        u_r = [u[0], d[1], 0]
+        return [d_l, d, u, u_r]
 
 class BiDict(dict):
     # TODO test me

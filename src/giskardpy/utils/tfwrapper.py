@@ -2,12 +2,15 @@ from copy import copy
 
 import PyKDL
 import numpy as np
+from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Slerp
 import rospy
 import yaml
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped, QuaternionStamped, Transform
 from std_msgs.msg import ColorRGBA
-from tf.transformations import quaternion_from_matrix, quaternion_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_matrix, concatenate_matrices, translation_matrix, \
+    inverse_matrix, translation_from_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl as transform_stamped_to_kdl
 from tf2_py import InvalidArgumentException
@@ -193,6 +196,16 @@ def transform_to_kdl(transform):
     ts = TransformStamped()
     ts.transform = transform
     return transform_stamped_to_kdl(ts)
+
+
+def list_to_kdl(pose):
+    return PyKDL.Frame(PyKDL.Rotation.Quaternion(pose[1][0],
+                                                 pose[1][1],
+                                                 pose[1][2],
+                                                 pose[1][3]),
+                       PyKDL.Vector(pose[0][0],
+                                    pose[0][1],
+                                    pose[0][2]))
 
 
 def pose_to_kdl(pose):
@@ -415,6 +428,65 @@ def kdl_to_np(kdl_thing):
 
 def np_to_pose(matrix: np.ndarray) -> Pose:
     return kdl_to_pose(np_to_kdl(matrix))
+
+def np_to_pose_stamped(matrix, frame_id):
+    """
+    :type matrix: np.ndarray
+    :rtype: PoseStamped
+    """
+    p = PoseStamped()
+    p.header.frame_id = frame_id
+    p.pose = np_to_pose(matrix)
+    return p
+
+
+def interpolate_pose(s1, s2, f):
+    np1 = pose_to_np(s1)
+    np2 = pose_to_np(s2)
+    np3_trans = np1[0] + (np2[0] - np1[0]) * f
+    key_rots = R.from_quat([np1[1], np2[1]])
+    key_times = [0, 1]
+    slerp = Slerp(key_times, key_rots)
+    times = [f]
+    interp_rots = slerp(times)
+    np3_rot = interp_rots.as_quat()[0]
+    f_trans_m = translation_matrix(np3_trans)
+    f_rot_m = quaternion_matrix(np3_rot)
+    f_m = concatenate_matrices(f_trans_m, f_rot_m)
+    return np_to_pose(f_m)
+
+
+def norm_rotation_matrix(r):
+    r[:, 0] /= np.sum(np.abs(r[:, 0]))
+    r[:, 1] /= np.sum(np.abs(r[:, 1]))
+    r[:, 2] /= np.sum(np.abs(r[:, 2]))
+    return r
+
+
+def pose_diff(a, b):
+    a_t, a_r = pose_to_np(a)
+    b_t, b_r = pose_to_np(b)
+    m_P_a = translation_matrix(a_t)
+    m_P_b = translation_matrix(b_t)
+    b_P_a = concatenate_matrices(m_P_a, inverse_matrix(m_P_b))
+    angle = np.sum(a_r * b_r)
+    if angle > 1.0 - 1e-9:
+        r_diff = 0.0
+    else:
+        r_diff = np.arccos(angle)
+    t_diff = np.linalg.norm(translation_from_matrix(b_P_a))
+    return t_diff + r_diff
+
+
+def pose_to_list(msg):
+    p = [msg.position.x, msg.position.y, msg.position.z]
+    q = [msg.orientation.x, msg.orientation.y,
+         msg.orientation.z, msg.orientation.w]
+    return [p, q]
+
+
+def pose_stamped_to_list(msg):
+    return pose_to_list(msg.pose)
 
 
 def np_to_transform(matrix: np.ndarray) -> Transform:

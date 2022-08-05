@@ -8,6 +8,7 @@ from pybullet import getAxisAngleFromQuaternion
 from rospy import ROSException
 
 import giskardpy.utils.tfwrapper as tf
+from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import GiskardException
 from giskardpy.model.joints import OmniDrive
@@ -73,7 +74,7 @@ class SyncOdometry(GiskardBehavior):
             if axis[-1] < 0:
                 angle = -angle
             self.world.state[joint.rot_name].position = angle
-
+            self.get_god_map().set_data(identifier.old_map_T_base, tf.msg_to_homogeneous_matrix(pose))
         except Empty:
             pass
         # print(f'odometry: x:{self.world.state[joint.x_name].position} '

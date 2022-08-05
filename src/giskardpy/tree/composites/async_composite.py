@@ -87,7 +87,10 @@ class PluginBehavior(GiskardBehavior):
     def update(self):
         with self.status_lock:
             if not self.update_thread.is_alive():
-                return Status.SUCCESS
+                if self.my_status is Status.SUCCESS:
+                    return Status.SUCCESS
+                else:
+                    return Status.FAILURE
             return self.my_status
 
     def set_status(self, new_state):

@@ -8,6 +8,7 @@ from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import PointingDiffDrive
 from giskardpy.god_map import GodMap
+from giskardpy.exceptions import ConstraintException
 
 
 class CartesianPosition(Goal):
@@ -51,6 +52,75 @@ class CartesianPosition(Goal):
     def __str__(self):
         s = super(CartesianPosition, self).__str__()
         return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
+
+
+class ShakyCartesianPosition(Goal):
+    def __init__(self, root_link, tip_link, frequency, shaking_axis='z', noise_amplitude=0.2, weight=WEIGHT_ABOVE_CA,
+                 max_velocity=0.2, **kwargs):
+        """
+        This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given frequency.
+        :param joint_name: str
+        :param goal: float
+        :param frequency: float
+        :param noise_amplitude: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
+        """
+        self.root_link = root_link
+        self.tip_link = tip_link
+        super(ShakyCartesianPosition, self).__init__(**kwargs)
+        if not self.world.are_linked(root_link, tip_link):
+            raise ConstraintException(u'{} called with non linked links {} and {} '.format(self.__class__.__name__,
+                                                                                           root_link, tip_link))
+
+        self.frequency = frequency
+        self.noise_amplitude = noise_amplitude
+        self.weight = weight
+        self.max_velocity = max_velocity
+        if shaking_axis == 'x':
+            self.shaking_index = 0
+        elif shaking_axis == 'y':
+            self.shaking_index = 1
+        elif shaking_axis == 'z':
+            self.shaking_index = 2
+        else:
+            raise Exception('no')
+
+    def make_constraints(self):
+        """
+        example:
+        name='ShakyJointPositionRevoluteOrPrismatic'
+        parameter_value_pair='{
+            "joint_name": "r_wrist_flex_joint", #required
+            "goal_position": -1.0, #required
+            "frequency": 5.0, #required
+            "weight": 1, #optional
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        frequency = self.get_parameter_as_symbolic_expression(u'frequency')
+        noise_amplitude = self.get_parameter_as_symbolic_expression(u'noise_amplitude')
+        weight = self.get_parameter_as_symbolic_expression(u'weight')
+        r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
+
+        time = self.god_map.to_symbol(identifier.time)
+        time_in_secs = self.get_sampling_period_symbol() * time
+
+        fun_params = frequency * 2.0 * w.pi * time_in_secs
+        err = noise_amplitude * self.max_velocity * w.sin(fun_params)
+        capped_err = w.limit(err, -noise_amplitude * self.max_velocity, noise_amplitude * self.max_velocity)
+
+        self.add_constraint_vector(reference_velocities=[self.max_velocity] * 1,
+                                   lower_errors=capped_err,
+                                   upper_errors=capped_err,
+                                   weights=[weight] * 1,
+                                   expressions=r_P_c[self.shaking_index],
+                                   name_suffixes=['/z'])
+
+    def __str__(self):
+        s = super(ShakyCartesianPosition, self).__str__()
+        return u'{}/{}'.format(s, self.tip_link)
 
 
 class CartesianOrientation(Goal):
@@ -225,6 +295,31 @@ class CartesianPoseStraight(Goal):
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
                                                           goal_orientation=goal_orientation,
+                                                          max_velocity=max_angular_velocity,
+                                                          weight=weight,
+                                                          **kwargs))
+
+
+class CartesianPreGrasp(Goal):
+    def __init__(self, root_link, tip_link, grasping_goal, grasping_object, goal, goal_position=None, dist=0, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
+        super(CartesianPreGrasp, self).__init__(**kwargs)
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.goal = goal
+        self.grasping_goal = grasping_goal
+        self.grasping_object = grasping_object
+        self.goal_position = goal_position
+        self.dist = dist
+        self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
+                                                       tip_link=tip_link,
+                                                       goal=goal,
+                                                       max_velocity=max_linear_velocity,
+                                                       weight=weight,
+                                                       **kwargs))
+        self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          goal=goal,
                                                           max_velocity=max_angular_velocity,
                                                           weight=weight,
                                                           **kwargs))

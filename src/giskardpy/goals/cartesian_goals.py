@@ -21,7 +21,7 @@ class CartesianPosition(Goal):
         :param reference_velocity: m/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        super(CartesianPosition, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.root_link = root_link
@@ -48,8 +48,8 @@ class CartesianPosition(Goal):
                                         weight=self.weight)
 
     def __str__(self):
-        s = super(CartesianPosition, self).__str__()
-        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class CartesianOrientation(Goal):

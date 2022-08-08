@@ -684,11 +684,9 @@ class GiskardTestWrapper(GiskardWrapper):
                 else:
                     expected_error_code = expected_error_codes[cmd_id]
                 assert error_code == expected_error_code, \
-                    'in goal {}; got: {}, expected: {} | error_massage: {}'.format(cmd_id,
-                                                                                   move_result_error_code(error_code),
-                                                                                   move_result_error_code(
-                                                                                       expected_error_code),
-                                                                                   error_message)
+                    f'in goal {cmd_id}; ' \
+                    f'got: {move_result_error_code(error_code)}, ' \
+                    f'expected: {move_result_error_code(expected_error_code)} | error_massage: {error_message}'
             if error_code == MoveResult.SUCCESS:
                 try:
                     for goal_checker in self.goal_checks[len(r.error_codes) - 1]:

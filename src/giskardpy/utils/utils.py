@@ -326,7 +326,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
                 if i == 1:
                     previous_file_name = file_name
                 else:
-                    previous_file_name = file_name.replace('.pdf', f'{i-1}.pdf')
+                    previous_file_name = file_name.replace('.pdf', f'{i - 1}.pdf')
                 current_file_name = file_name.replace('.pdf', f'{i}.pdf')
                 try:
                     os.rename(previous_file_name, current_file_name)
@@ -399,7 +399,6 @@ def load_from_tmp(file_name: str):
     return loaded_file
 
 
-
 def convert_to_stl_and_save_in_tmp(file_name: str):
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
@@ -431,7 +430,7 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
-def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path = '/tmp/giskardpy/vhacd.log'):
+def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
     decomposed_obj_file_name = f'{short_file_name}obj'
@@ -445,7 +444,6 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path = '/tmp/g
         #     pybullet.vhacd(new_path, new_path, log_path)
 
     return new_path
-
 
 
 def memoize(function):
@@ -466,13 +464,31 @@ def memoize(function):
     return wrapper
 
 
+blackboard_exception_name = 'exception'
+
+
 def raise_to_blackboard(exception):
-    Blackboard().set('exception', exception)
+    Blackboard().set(blackboard_exception_name, exception)
+
+
+def has_blackboard_exception():
+    return hasattr(Blackboard(), blackboard_exception_name) \
+           and getattr(Blackboard(), blackboard_exception_name) is not None
+
+
+def get_blackboard_exception():
+    return Blackboard().get(blackboard_exception_name)
+
+
+def clear_blackboard_exception():
+    raise_to_blackboard(None)
 
 
 def catch_and_raise_to_blackboard(function):
     @wraps(function)
     def wrapper(*args, **kwargs):
+        if has_blackboard_exception():
+            return Status.FAILURE
         try:
             r = function(*args, **kwargs)
         except Exception as e:

@@ -384,12 +384,7 @@ def norm(v):
     return ca.norm_2(v)
 
 
-def scale(v, a):
-    """
-    :type v: Matrix
-    :type a: Union[float, Symbol]
-    :rtype: Matrix
-    """
+def scale(v: expr_matrix, a: Union[float, expr_symbol]) -> expr_matrix:
     return save_division(v, norm(v)) * a
 
 

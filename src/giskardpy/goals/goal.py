@@ -1,7 +1,10 @@
 from __future__ import division
 
+import traceback
 from collections import OrderedDict
 from typing import Optional, Tuple, Dict, List
+
+from tf2_py import LookupException
 
 from giskard_msgs.msg import Constraint as Constraint_msg
 
@@ -85,7 +88,7 @@ class Goal:
         returns a symbol that refers to the given joint
         """
         if not self.world.has_joint(joint_name):
-            raise KeyError('World doesn\'t have joint named: {}'.format(joint_name))
+            raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
         return self.world.joints[joint_name].position_expression
 
     def get_joint_velocity_symbols(self, joint_name):

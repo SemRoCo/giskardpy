@@ -6,6 +6,7 @@ from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.time_collector import TimeCollector
+from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
 
 
 class GiskardBehavior(Behaviour):
@@ -15,7 +16,7 @@ class GiskardBehavior(Behaviour):
         self.god_map = Blackboard().god_map  # type: GodMap
         self.time_collector = self.god_map.unsafe_get_data(identifier.timer_collector)
         self.world = self.get_god_map().unsafe_get_data(identifier.world)  # type: WorldTree
-        super(GiskardBehavior, self).__init__(name)
+        super().__init__(name)
 
     @property
     def traj_time_in_sec(self):
@@ -82,8 +83,11 @@ class GiskardBehavior(Behaviour):
     def get_blackboard(self):
         return Blackboard()
 
+    def has_blackboard_exception(self):
+        return has_blackboard_exception()
+
     def get_blackboard_exception(self):
-        return self.get_blackboard().get('exception')
+        return get_blackboard_exception()
 
     def clear_blackboard_exception(self):
-        self.get_blackboard().set('exception', None)
+        clear_blackboard_exception()

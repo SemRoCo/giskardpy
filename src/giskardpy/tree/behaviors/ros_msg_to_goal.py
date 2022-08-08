@@ -51,7 +51,7 @@ class RosMsgToGoal(GetGoal):
             return Status.SUCCESS
         except Exception as e:
             raise_to_blackboard(e)
-            traceback.print_exc()
+            # traceback.print_exc()
             return Status.SUCCESS
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             self.parse_collision_entries(move_cmd.collisions)
@@ -88,8 +88,9 @@ class RosMsgToGoal(GetGoal):
                 traceback.print_exc()
                 doc_string = C.__init__.__doc__
                 error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
-                if doc_string is not None:
-                    error_msg = error_msg + doc_string
+                # FIXME I don't like the doc string
+                # if doc_string is not None:
+                #     error_msg = error_msg + doc_string
                 if not isinstance(e, GiskardException):
                     raise ConstraintInitalizationException(error_msg)
                 raise e

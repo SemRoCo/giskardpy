@@ -1,5 +1,7 @@
 from __future__ import division
 
+from typing import Optional
+
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 from giskardpy import casadi_wrapper as w
@@ -11,14 +13,43 @@ from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
 class DiffDriveTangentialToPoint(Goal):
 
-    def __init__(self, goal_point: PointStamped, reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
+                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, **kwargs):
         super().__init__(**kwargs)
         self.goal_point = self.transform_msg(tf.get_tf_root(), goal_point)
         self.weight = weight
+        self.tip = 'base_footprint'
+        self.root = 'map'
+        if forward is not None:
+            self.tip_V_pointing_axis = tf.transform_vector(self.tip, forward)
+            self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
+        else:
+            self.tip_V_pointing_axis = Vector3Stamped()
+            self.tip_V_pointing_axis.header.frame_id = self.tip
+            self.tip_V_pointing_axis.vector.x = 1
+
 
     def make_constraints(self):
-        map_P_center = w.Matrix(self.goal_point)
-        pass
+        map_P_center = w.ros_msg_to_matrix(self.goal_point)
+        map_T_base = self.get_fk(self.root, self.tip)
+        map_P_base = w.position_of(map_T_base)
+        map_V_base_to_center = map_P_center - map_P_base
+        map_V_base_to_center = w.scale(map_V_base_to_center, 1)
+        map_V_up = w.Matrix([0,0,1,0])
+        map_V_tangent = w.cross(map_V_base_to_center, map_V_up)
+        tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
+        map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)
+        angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
+        self.add_debug_vector('map_V_tangent', map_V_tangent)
+        self.add_debug_vector('map_V_forward', map_V_forward)
+        self.add_debug_expr('angle', angle)
+        self.add_constraint(reference_velocity=0.5,
+                            lower_error=-angle,
+                            upper_error=-angle,
+                            weight=self.weight,
+                            expression=angle,
+                            name_suffix='/rot')
+
 
 
 class PointingDiffDrive(Goal):

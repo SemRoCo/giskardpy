@@ -10,6 +10,7 @@ from numpy import pi
 
 from giskardpy.my_types import expr_symbol, expr_matrix
 from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
 pathSeparator = '_'
 
@@ -62,6 +63,8 @@ def free_symbols(expression):
 def is_matrix(expression):
     return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
 
+def is_homo_vector(expression):
+    return is_matrix(expression) and expression.shape == (4, 1) and expression[-1] == 0
 
 def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
@@ -133,6 +136,10 @@ def Matrix(data):
         return m
 
 
+def ros_msg_to_matrix(msg):
+    return Matrix(msg_to_homogeneous_matrix(msg))
+
+
 def matrix_to_list(m):
     try:
         len(m)
@@ -149,12 +156,7 @@ def ones(x, y):
     return ca.SX.ones(x, y)
 
 
-def abs(x):
-    """
-    :type x: Union[float, Symbol]
-    :return: abs(x)
-    :rtype: Union[float, Symbol]
-    """
+def abs(x: Union[float, expr_symbol]) -> expr_symbol:
     return ca.fabs(x)
 
 
@@ -352,7 +354,15 @@ def cross(u, v):
     :return: 1d Matrix. If u and v have length 4, it ignores the last entry and adds a zero to the result.
     :rtype: Matrix
     """
-    return ca.cross(u, v)
+    if is_homo_vector(u):
+        u = u[:-1]
+    if is_homo_vector(v):
+        v = v[:-1]
+    result = ca.cross(u, v)
+    return Matrix([result[0],
+                   result[1],
+                   result[2],
+                   0])
 
 
 def vector3(x, y, z):

@@ -72,7 +72,8 @@ class TiagoTestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def reset(self):
-        self.mujoco_reset()
+        while not self.mujoco_reset().success:
+            rospy.sleep(0.5)
         self.clear_world()
         self.reset_base()
 
@@ -251,20 +252,24 @@ class TestCollisionAvoidance:
                                       root_link=tf.get_tf_root(),
                                       check=False)
         # apartment_setup.allow_all_collisions()
+        goal_point = PointStamped()
+        goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
+        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
+                                      goal_point=goal_point)
+        apartment_setup.avoid_joint_limits(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
                                       tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=goal_angle)
-        goal_point = PointStamped()
-        goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
-        # apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-        #                               goal_point=goal_point)
-        apartment_setup.set_json_goal('KeepHandInWorkspace',
-                                      map_frame='map',
-                                      base_footprint='base_footprint',
-                                      tip_link=tcp)
+        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
+                                      goal_point=goal_point)
+        apartment_setup.avoid_joint_limits(50)
+        # apartment_setup.set_json_goal('KeepHandInWorkspace',
+        #                               map_frame='map',
+        #                               base_footprint='base_footprint',
+        #                               tip_link=tcp)
         # apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
         # apartment_setup.set_apartment_js({joint_name: goal_angle})
@@ -273,10 +278,13 @@ class TestCollisionAvoidance:
                                       tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=0)
-        apartment_setup.set_json_goal('KeepHandInWorkspace',
-                                      map_frame='map',
-                                      base_footprint='base_footprint',
-                                      tip_link=tcp)
+        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
+                                      goal_point=goal_point)
+        apartment_setup.avoid_joint_limits(50)
+        # apartment_setup.set_json_goal('KeepHandInWorkspace',
+        #                               map_frame='map',
+        #                               base_footprint='base_footprint',
+        #                               tip_link=tcp)
         # apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
         # apartment_setup.set_apartment_js({joint_name: 0})

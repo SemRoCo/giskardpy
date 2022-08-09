@@ -78,7 +78,7 @@ class PluginBehavior(GiskardBehavior):
             # happens when a previous plugin fails
             logging.logwarn('terminate was called before init')
         self.stop_plugins()
-        super(PluginBehavior, self).terminate(new_status)
+        super().terminate(new_status)
 
     def stop_plugins(self):
         for plugin_name, plugin in self._plugins.items():

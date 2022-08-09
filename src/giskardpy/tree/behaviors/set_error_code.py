@@ -25,6 +25,10 @@ class SetErrorCode(GiskardBehavior):
         error_code, error_message = self.exception_to_error_code(e)
         result.error_codes[cmd_id] = error_code
         result.error_messages[cmd_id] = error_message
+        trajectory = self.god_map.get_data(identifier.trajectory)
+        joints = [self.world.joints[joint_name] for joint_name in self.world.movable_joints]
+        sample_period = self.god_map.get_data(identifier.sample_period)
+        result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if error_code == MoveResult.PREEMPTED:
             for i in range(len(result.error_codes) - cmd_id):
                 result.error_codes[cmd_id + i] = error_code

@@ -571,7 +571,7 @@ class OpenLoop(TreeManager):
         return planning_3
 
     def grow_closed_loop_control(self):
-        planning_4 = PluginBehavior('closed loop control')
+        planning_4 = failure_is_success(PluginBehavior)('closed loop control')
         if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_4.add_plugin(VisualizationBehavior('visualization'))
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:

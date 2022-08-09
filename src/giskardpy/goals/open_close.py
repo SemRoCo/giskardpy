@@ -23,7 +23,7 @@ class Open(Goal):
         self.add_constraints_of_goal(CartesianPose(root_link=self.handle_link,
                                                    tip_link=self.tip_link,
                                                    goal_pose=self.handle_T_tip,
-                                                   weight=self.weight, **kwargs))
+                                                   weight=self.weight*100, **kwargs))
         self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name,
                                                    goal=goal_joint_state,
                                                    weight=weight,

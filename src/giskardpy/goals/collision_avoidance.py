@@ -118,8 +118,8 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, self.num_repeller))
-        if self.link_name == 'base_footprint' and self.idx <= 1:
-            self.add_debug_expr('soft_threshold', soft_threshold)
+        # if self.link_name == 'base_footprint' and self.idx <= 1:
+        #     self.add_debug_expr('soft_threshold', soft_threshold)
         #     self.add_debug_expr('weight', weight)
         #     self.add_debug_expr('soft_threshold', soft_threshold)
         #     self.add_debug_expr('dist', dist)

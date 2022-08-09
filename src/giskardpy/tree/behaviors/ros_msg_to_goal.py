@@ -184,7 +184,7 @@ class RosMsgToGoal(GetGoal):
                                                             num_repeller=number_of_repeller)
                     constraint.save_self_on_god_map()
                     self.time_collector.collision_avoidance[-1] += 1
-        loginfo(f'Adding {self.time_collector.collision_avoidance[-1]} self collision avoidance constraints.')
+        loginfo(f'Adding {self.time_collector.collision_avoidance[-1]} external collision avoidance constraints.')
 
     @profile
     def add_self_collision_avoidance_constraints(self):

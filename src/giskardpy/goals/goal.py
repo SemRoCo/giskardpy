@@ -296,8 +296,8 @@ class Goal:
     def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
         error = frame_P_goal[:3] - frame_P_current[:3]
         # self.add_debug_expr('error', w.norm(error))
-        self.add_debug_vector('goal', frame_P_goal[:3])
-        self.add_debug_vector('current', frame_P_current[:3])
+        # self.add_debug_vector('goal', frame_P_goal[:3])
+        # self.add_debug_vector('current', frame_P_current[:3])
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],

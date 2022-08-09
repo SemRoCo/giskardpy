@@ -375,12 +375,7 @@ def point3(x, y, z):
     return Matrix([x, y, z, 1])
 
 
-def norm(v):
-    """
-    :type v: Matrix
-    :return: |v|_2
-    :rtype: Union[float, Symbol]
-    """
+def norm(v: expr_matrix) -> expr_symbol:
     return ca.norm_2(v)
 
 

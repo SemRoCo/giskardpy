@@ -423,8 +423,7 @@ def np_to_transform(matrix: np.ndarray) -> Transform:
 
 def pose_to_np(msg):
     p = np.array([msg.position.x, msg.position.y, msg.position.z])
-    q = np.array([msg.orientation.x, msg.orientation.y,
-                  msg.orientation.z, msg.orientation.w])
+    q = np.array([msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
     T = quaternion_matrix(q)
     T[0:3, -1] = p
     return T
@@ -432,6 +431,15 @@ def pose_to_np(msg):
 
 def pose_stamped_to_np(msg):
     return pose_to_np(msg.pose)
+
+
+def quaternion_to_np(msg: Quaternion) -> np.ndarray:
+    q = np.array([msg.x, msg.y, msg.z, msg.w])
+    return quaternion_matrix(q)
+
+
+def quaternion_stamped_to_np(msg: QuaternionStamped) -> np.ndarray:
+    return quaternion_to_np(msg.quaternion)
 
 
 def transform_to_np(msg):
@@ -462,6 +470,10 @@ def msg_to_homogeneous_matrix(msg):
         return vector_to_np(msg)
     elif isinstance(msg, Vector3Stamped):
         return vector_stamped_to_np(msg)
+    elif isinstance(msg, Quaternion):
+        return quaternion_to_np(msg)
+    elif isinstance(msg, QuaternionStamped):
+        return quaternion_stamped_to_np(msg)
     else:
         raise TypeError("Invalid type for conversion to SE(3)")
 

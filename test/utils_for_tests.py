@@ -484,7 +484,7 @@ class GiskardTestWrapper(GiskardWrapper):
         logging.loginfo('stopping tree')
 
     def set_object_joint_state(self, object_name, joint_state):
-        super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
+        super().set_object_joint_state(object_name, joint_state)
         self.wait_heartbeats()
         current_js = self.world.groups[object_name].state
         joint_names_without_prefix = set(j.short_name for j in current_js)
@@ -547,11 +547,11 @@ class GiskardTestWrapper(GiskardWrapper):
                           **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_rotation_goal(goal_orientation=goal_orientation,
-                                                          tip_link=tip_link,
-                                                          root_link=root_link,
-                                                          max_velocity=max_velocity,
-                                                          weight=weight, **kwargs)
+        super().set_rotation_goal(goal_orientation=goal_orientation,
+                                  tip_link=tip_link,
+                                  root_link=root_link,
+                                  max_velocity=max_velocity,
+                                  weight=weight, **kwargs)
         if check:
             self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_orientation))
 
@@ -577,7 +577,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                               **kwargs)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
-                      angular_velocity=None, check=True):
+                      angular_velocity=None, check=True, **kwargs):
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
         goal_point.point = goal_pose.pose.position
@@ -586,7 +586,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                   root_link=root_link,
                                   weight=weight,
                                   max_velocity=linear_velocity,
-                                  check=check)
+                                  check=check,
+                                  **kwargs)
         goal_orientation = QuaternionStamped()
         goal_orientation.header = goal_pose.header
         goal_orientation.quaternion = goal_pose.pose.orientation
@@ -595,15 +596,16 @@ class GiskardTestWrapper(GiskardWrapper):
                                root_link=root_link,
                                weight=weight,
                                max_velocity=angular_velocity,
-                               check=check)
+                               check=check,
+                               **kwargs)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None, check=True,
                           **kwargs: goal_parameter):
-        super(GiskardTestWrapper, self).set_pointing_goal(tip_link=tip_link,
-                                                          goal_point=goal_point,
-                                                          root_link=root_link,
-                                                          pointing_axis=pointing_axis,
-                                                          weight=weight)
+        super().set_pointing_goal(tip_link=tip_link,
+                                  goal_point=goal_point,
+                                  root_link=root_link,
+                                  pointing_axis=pointing_axis,
+                                  weight=weight)
         if check:
             self.add_goal_check(PointingGoalChecker(self.god_map,
                                                     tip_link=tip_link,
@@ -615,12 +617,12 @@ class GiskardTestWrapper(GiskardWrapper):
                               weight=None, check=True):
         if root_link is None:
             root_link = self.robot.root_link_name
-        super(GiskardTestWrapper, self).set_align_planes_goal(tip_link=str(tip_link),
-                                                              tip_normal=tip_normal,
-                                                              root_link=str(root_link),
-                                                              root_normal=root_normal,
-                                                              max_angular_velocity=max_angular_velocity,
-                                                              weight=weight)
+        super().set_align_planes_goal(tip_link=str(tip_link),
+                                      tip_normal=tip_normal,
+                                      root_link=str(root_link),
+                                      root_normal=root_normal,
+                                      max_angular_velocity=max_angular_velocity,
+                                      weight=weight)
         if check:
             self.add_goal_check(AlignPlanesGoalChecker(self.god_map, tip_link, tip_normal, root_link, root_normal))
 
@@ -631,9 +633,9 @@ class GiskardTestWrapper(GiskardWrapper):
                                angular_velocity=None, check=True):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight,
-                                                               max_linear_velocity=linear_velocity,
-                                                               max_angular_velocity=angular_velocity)
+        super().set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight,
+                                       max_linear_velocity=linear_velocity,
+                                       max_angular_velocity=angular_velocity)
 
         if check:
             goal_point = PointStamped()
@@ -660,16 +662,16 @@ class GiskardTestWrapper(GiskardWrapper):
         try:
             time_spend_giskarding = time()
             if stop_after is not None:
-                super(GiskardTestWrapper, self).send_goal(goal_type, wait=False)
+                super().send_goal(goal_type, wait=False)
                 rospy.sleep(stop_after)
                 self.interrupt()
                 rospy.sleep(1)
                 r = self.get_result(rospy.Duration(3))
             elif not wait:
-                super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
+                super().send_goal(goal_type, wait=wait)
                 return
             else:
-                r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=wait)
+                r = super().send_goal(goal_type, wait=wait)
             self.wait_heartbeats()
             diff = time() - time_spend_giskarding
             self.total_time_spend_giskarding += diff
@@ -697,7 +699,16 @@ class GiskardTestWrapper(GiskardWrapper):
             # self.are_joint_limits_violated()
         finally:
             self.goal_checks = defaultdict(list)
+            self.sync_world_with_trajectory()
         return r
+
+    def sync_world_with_trajectory(self):
+        t = self.god_map.get_data(identifier.trajectory)
+        whole_last_joint_state = t.get_last().to_position_dict()
+        for group_name in self._object_js_topics:
+            group_joints = self.get_group_info(group_name).joint_state.name
+            group_last_joint_state = {str(k): v for k, v in whole_last_joint_state.items() if k in group_joints}
+            self.set_object_joint_state(group_name, group_last_joint_state)
 
     def get_result_trajectory_position(self):
         trajectory = self.god_map.unsafe_get_data(identifier.trajectory)
@@ -1038,8 +1049,6 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_localization(p)
         self.wait_heartbeats()
         self.teleport_base(p)
-
-
 
 
 class BaseBot(GiskardTestWrapper):

@@ -7,11 +7,12 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import PointingDiffDrive
 from giskardpy.god_map import GodMap
+from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
 
 class CartesianPosition(Goal):
     def __init__(self, root_link: str, tip_link: str, goal_point: PointStamped, reference_velocity: float = None,
-                 max_velocity: float = 0.2, weight: float = WEIGHT_ABOVE_CA, **kwargs):
+                 max_velocity: float = 0.2, weight: float = WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link.
         :param root_link: root link of kinematic chain
@@ -22,11 +23,15 @@ class CartesianPosition(Goal):
         :param weight: default WEIGHT_ABOVE_CA
         """
         super().__init__(**kwargs)
+        self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.root_link = root_link
         self.tip_link = tip_link
-        self.goal_point = self.transform_msg(self.root_link, goal_point)
+        if self.root_link2 is not None:
+            self.goal_point = self.transform_msg(self.root_link2, goal_point)
+        else:
+            self.goal_point = self.transform_msg(self.root_link, goal_point)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -39,8 +44,12 @@ class CartesianPosition(Goal):
                                                                   **kwargs))
 
     def make_constraints(self):
-        r_P_g = self.get_parameter_as_symbolic_expression('goal_point')
+        # r_P_g = self.get_parameter_as_symbolic_expression('goal_point')
+        r_P_g = w.Matrix(msg_to_homogeneous_matrix(self.goal_point))
         r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        if self.root_link2 is not None:
+            root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
+            r_P_c = w.dot(root_link2_T_root_link, r_P_c)
         # self.add_debug_expr('trans', w.norm(r_P_c))
         self.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
@@ -54,13 +63,17 @@ class CartesianPosition(Goal):
 
 class CartesianOrientation(Goal):
     def __init__(self, root_link, tip_link, goal_orientation, reference_velocity=None, max_velocity=0.5,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
-        super(CartesianOrientation, self).__init__(**kwargs)
+                 weight=WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
+        super().__init__(**kwargs)
+        self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.root_link = root_link
         self.tip_link = tip_link
-        self.goal_orientation = self.transform_msg(self.root_link, goal_orientation)
+        if self.root_link2 is not None:
+            self.goal_orientation = self.transform_msg(self.root_link2, goal_orientation)
+        else:
+            self.goal_orientation = self.transform_msg(self.root_link, goal_orientation)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -73,9 +86,17 @@ class CartesianOrientation(Goal):
         #                                                        **kwargs))
 
     def make_constraints(self):
-        r_R_g = self.get_parameter_as_symbolic_expression('goal_orientation')
+        # r_R_g = self.get_parameter_as_symbolic_expression('goal_orientation')
+        r_R_g = w.Matrix(msg_to_homogeneous_matrix(self.goal_orientation))
         r_R_c = self.get_fk(self.root_link, self.tip_link)
-        c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link)
+        if self.root_link2 is not None:
+            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link2)
+            root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
+            # self.add_debug_matrix('root_link2_T_root_link', root_link2_T_root_link)
+            r_R_c = w.dot(root_link2_T_root_link, r_R_c)
+        else:
+            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link)
+        # self.add_debug_expr('trans', w.norm(r_P_c))
         self.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=r_R_g,
                                            current_R_frame_eval=c_R_r_eval,
@@ -83,8 +104,8 @@ class CartesianOrientation(Goal):
                                            weight=self.weight)
 
     def __str__(self):
-        s = super(CartesianOrientation, self).__str__()
-        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class CartesianPositionStraight(Goal):
@@ -153,7 +174,7 @@ class CartesianPositionStraight(Goal):
 
 class CartesianPose(Goal):
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
-                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, **kwargs):
+                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -163,7 +184,7 @@ class CartesianPose(Goal):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianPose, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
         goal_point.point = goal_pose.pose.position
@@ -172,6 +193,7 @@ class CartesianPose(Goal):
                                                        goal_point=goal_point,
                                                        max_velocity=max_linear_velocity,
                                                        weight=weight,
+                                                       root_link2=root_link2,
                                                        **kwargs))
         goal_orientation = QuaternionStamped()
         goal_orientation.header = goal_pose.header
@@ -181,6 +203,7 @@ class CartesianPose(Goal):
                                                           goal_orientation=goal_orientation,
                                                           max_velocity=max_angular_velocity,
                                                           weight=weight,
+                                                          root_link2=root_link2,
                                                           **kwargs))
 
 

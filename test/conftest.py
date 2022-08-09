@@ -91,13 +91,13 @@ def apartment_setup(better_pose):
                          urdf=rospy.get_param('apartment_description'),
                          pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
                          js_topic='/apartment_joint_states',
-                         set_js_topic='/iai_apartment/cram_joint_states')
+                         set_js_topic='/iai_kitchen/cram_joint_states')
     js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
     better_pose.set_apartment_js(js)
     base_pose = PoseStamped()
     base_pose.header.frame_id = 'iai_apartment/side_B'
     base_pose.pose.position.x = 1.5
-    base_pose.pose.position.y = 2.5
+    base_pose.pose.position.y = 2.7
     base_pose.pose.orientation.w = 1
     base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
     better_pose.set_localization(base_pose)

@@ -168,7 +168,7 @@ class BehaviorTreeConfig:
         },
         'VisualizationBehavior': {
             'enabled': True,
-            'in_planning_loop': False
+            'in_planning_loop': True
         },
         'PublishDebugExpressions': {
             'enabled': False,

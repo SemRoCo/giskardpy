@@ -867,7 +867,7 @@ class QPController:
             raise
         if self.xdot_full is None:
             return None
-        # for debugging to might want to execute this line to create named panda matrices
+        # for debugging to might want to exroot_link2_T_root_linkecute this line to create named panda matrices
         # self._create_debug_pandas()
         # logging.loginfo(self.p_debug)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)

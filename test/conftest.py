@@ -97,7 +97,7 @@ def apartment_setup(better_pose):
     base_pose = PoseStamped()
     base_pose.header.frame_id = 'iai_apartment/side_B'
     base_pose.pose.position.x = 1.5
-    base_pose.pose.position.y = 2.7
+    base_pose.pose.position.y = 2.5
     base_pose.pose.orientation.w = 1
     base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
     better_pose.set_localization(base_pose)

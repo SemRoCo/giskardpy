@@ -21,7 +21,7 @@ def giskard(request, ros):
 
 class TiagoTestWrapper(GiskardTestWrapper):
     default_pose = {
-        'torso_lift_joint': 2.220446049250313e-16,
+        'torso_lift_joint': 0,
         'head_1_joint': 0.0,
         'head_2_joint': 0.0,
         'arm_left_1_joint': 0.0,
@@ -38,6 +38,10 @@ class TiagoTestWrapper(GiskardTestWrapper):
         'arm_right_5_joint': 0.0,
         'arm_right_6_joint': 0.0,
         'arm_right_7_joint': 0.0,
+        'gripper_right_left_finger_joint': 0,
+        'gripper_right_right_finger_joint': 0,
+        'gripper_left_left_finger_joint': 0,
+        'gripper_left_right_finger_joint': 0,
     }
 
     better_pose = {
@@ -56,6 +60,10 @@ class TiagoTestWrapper(GiskardTestWrapper):
         'arm_right_6_joint': 0.5,
         'arm_right_7_joint': 0.0,
         'torso_lift_joint': 0.35,
+        'gripper_right_left_finger_joint': 0.045,
+        'gripper_right_right_finger_joint': 0.045,
+        'gripper_left_left_finger_joint': 0.045,
+        'gripper_left_right_finger_joint': 0.045,
     }
 
     def __init__(self):
@@ -69,6 +77,16 @@ class TiagoTestWrapper(GiskardTestWrapper):
                            tip_link=tip_link, root_link=root_link,
                            goal_pose=goal_pose)
         # self.allow_all_collisions()
+        self.plan_and_execute()
+
+    def open_right_gripper(self, goal: float = 0.45):
+        js = {
+            'gripper_right_left_finger_joint': goal,
+            'gripper_right_right_finger_joint': goal,
+            'gripper_left_left_finger_joint': goal,
+            'gripper_left_right_finger_joint': goal,
+        }
+        self.set_joint_goal(js)
         self.plan_and_execute()
 
     def reset(self):
@@ -234,11 +252,10 @@ class TestCollisionAvoidance:
         base_goal.pose.orientation.w = 1
         apartment_setup.move_base(base_goal)
 
-    def test_open_cabinet(self, apartment_setup: TiagoTestWrapper):
+    def test_open_cabinet_left(self, apartment_setup: TiagoTestWrapper):
         tcp = 'gripper_left_grasping_frame'
         handle_name = 'handle_cab1_top_door'
         handle_name_frame = 'iai_apartment/handle_cab1_top_door'
-        joint_name = 'cabinet1_door_top_left_joint'
         goal_angle = np.pi / 2
         left_pose = PoseStamped()
         left_pose.header.frame_id = handle_name_frame
@@ -251,7 +268,6 @@ class TestCollisionAvoidance:
                                       tip_link=tcp,
                                       root_link=tf.get_tf_root(),
                                       check=False)
-        # apartment_setup.allow_all_collisions()
         goal_point = PointStamped()
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
@@ -266,13 +282,7 @@ class TestCollisionAvoidance:
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
         apartment_setup.avoid_joint_limits(50)
-        # apartment_setup.set_json_goal('KeepHandInWorkspace',
-        #                               map_frame='map',
-        #                               base_footprint='base_footprint',
-        #                               tip_link=tcp)
-        # apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
-        # apartment_setup.set_apartment_js({joint_name: goal_angle})
 
         apartment_setup.set_json_goal('Open',
                                       tip_link=tcp,
@@ -281,19 +291,71 @@ class TestCollisionAvoidance:
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
         apartment_setup.avoid_joint_limits(50)
-        # apartment_setup.set_json_goal('KeepHandInWorkspace',
-        #                               map_frame='map',
-        #                               base_footprint='base_footprint',
-        #                               tip_link=tcp)
-        # apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
-        # apartment_setup.set_apartment_js({joint_name: 0})
+
+    def test_open_cabinet_right(self, apartment_setup: TiagoTestWrapper):
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'iai_apartment/side_B'
+        base_pose.pose.position.x = 1.6
+        base_pose.pose.position.y = 3.1
+        base_pose.pose.orientation.w = 1
+        base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
+        apartment_setup.set_localization(base_pose)
+        tcp = 'gripper_right_grasping_frame'
+        handle_name = 'handle_cab1_top_door'
+        handle_name_frame = 'iai_apartment/handle_cab1_top_door'
+        goal_angle = np.pi / 2
+        left_pose = PoseStamped()
+        left_pose.header.frame_id = handle_name_frame
+        left_pose.pose.position.x = -0.1
+        left_pose.pose.orientation.w = 1
+        apartment_setup.set_cart_goal(left_pose,
+                                      tip_link=tcp,
+                                      root_link=tf.get_tf_root(),
+                                      check=False)
+        apartment_setup.set_json_goal('KeepHandInWorkspace',
+                                      map_frame='map',
+                                      base_footprint='base_footprint',
+                                      tip_link=tcp)
+        goal_point = PointStamped()
+        goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
+        # apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
+        #                               goal_point=goal_point)
+        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.plan_and_execute()
+
+        apartment_setup.set_json_goal('Open',
+                                      tip_link=tcp,
+                                      environment_link=handle_name,
+                                      goal_joint_state=goal_angle)
+        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
+                                      goal_point=goal_point)
+        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.plan_and_execute()
+
+        apartment_setup.set_json_goal('Open',
+                                      tip_link=tcp,
+                                      environment_link=handle_name,
+                                      goal_joint_state=0)
+        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
+                                      goal_point=goal_point)
+        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.plan_and_execute()
 
     def test_dishwasher(self, apartment_setup: TiagoTestWrapper):
+        dishwasher_middle = 'iai_apartment/dishwasher_drawer_middle'
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = dishwasher_middle
+        base_pose.pose.position.x = -1
+        base_pose.pose.position.y = -0.25
+        base_pose.pose.orientation.w = 1
+        base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
+        base_pose.pose.position.z = 0
+        apartment_setup.set_localization(base_pose)
+
         tcp = 'gripper_left_grasping_frame'
         handle_name = 'handle_cab7'
         handle_name_frame = 'iai_apartment/handle_cab7'
-        joint_name = 'cabinet1_door_top_left_joint'
         goal_angle = np.pi / 2
         left_pose = PoseStamped()
         left_pose.header.frame_id = handle_name_frame
@@ -306,17 +368,16 @@ class TestCollisionAvoidance:
                                       tip_link=tcp,
                                       root_link=tf.get_tf_root(),
                                       check=False)
-        # apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
                                       tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=goal_angle)
-        apartment_setup.set_json_goal('KeepHandInWorkspace',
-                                      map_frame='map',
-                                      base_footprint='base_footprint',
-                                      tip_link=tcp)
+        # apartment_setup.set_json_goal('KeepHandInWorkspace',
+        #                               map_frame='map',
+        #                               base_footprint='base_footprint',
+        #                               tip_link=tcp)
         # apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
         # apartment_setup.set_apartment_js({joint_name: goal_angle})
@@ -325,10 +386,10 @@ class TestCollisionAvoidance:
                                       tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=0)
-        apartment_setup.set_json_goal('KeepHandInWorkspace',
-                                      map_frame='map',
-                                      base_footprint='base_footprint',
-                                      tip_link=tcp)
+        # apartment_setup.set_json_goal('KeepHandInWorkspace',
+        #                               map_frame='map',
+        #                               base_footprint='base_footprint',
+        #                               tip_link=tcp)
         # apartment_setup.allow_all_collisions()
         apartment_setup.plan_and_execute()
         # apartment_setup.set_apartment_js({joint_name: 0})
@@ -394,3 +455,13 @@ class TestJointGoals:
                                 seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
+
+    def test_get_out_of_joint_limits(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'head_1_joint': 1.3,
+            'head_2_joint': -1
+        }
+        zero_pose.set_json_goal('SetSeedConfiguration',
+                                seed_configuration=js)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan(expected_error_codes=[MoveResult.OUT_OF_JOINT_LIMITS])

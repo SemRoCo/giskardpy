@@ -8,6 +8,8 @@ from typing import List, Dict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import rospy
+from zope.interface import named
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.configs.data_types import SupportedQPSolver
@@ -645,37 +647,35 @@ class QPController:
         # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
-    def _are_joint_limits_violated(self, error_message):
-        violations = (self.p_ub - self.p_lb)[self.p_lb.data > self.p_ub.data]
-        if len(violations) > 0:
-            error_message += f'\nThe following joints are outside of their limits: \n {violations}'
-            raise OutOfJointLimitsException(error_message)
-        logging.loginfo('All joints are within limits')
-        return False
-
-    def _is_close_to_joint_limits(self):
+    def _is_close_to_joint_limits(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]
         num_joint_with_position_limits = len(joint_with_position_limits)
+        name_replacements = {}
+        for old_name in self.p_lbA_raw.index:
+            for free_variable in self.free_variables:
+                short_old_name = old_name.split('/')[1]
+                if short_old_name == free_variable.position_name:
+                    name_replacements[old_name] = str(free_variable.name)
         lbA = self.p_lbA_raw[:num_joint_with_position_limits]
         ubA = self.p_ubA_raw[:num_joint_with_position_limits]
+        lbA = lbA.rename(name_replacements)
+        ubA = ubA.rename(name_replacements)
         joint_range = ubA - lbA
-        percentage = 0.01
         joint_range *= percentage
         lbA_danger = lbA[lbA > -joint_range].dropna()
         ubA_danger = ubA[ubA < joint_range].dropna()
         result = False
+        msg = ''
         if len(lbA_danger) > 0:
-            logging.logwarn(
-                'The following joints ended up closer than {}% to their lower position limits {}'.format(percentage,
-                                                                                                         list(
-                                                                                                             lbA_danger.index)))
+            msg += f'The following joints are below their lower position limits by:\n{(-lbA_danger).to_string()}\n'
             result = True
         if len(ubA_danger) > 0:
-            logging.logwarn(
-                'The following joints ended up closer than {}% to their upper position limits {}'.format(percentage,
-                                                                                                         list(
-                                                                                                             ubA_danger.index)))
+            msg += f'The following joints are above their upper position limits by:\n{(-ubA_danger).to_string()}\n'
             result = True
+        if len(msg) > 0:
+            rospy.logwarn(msg)
+            if percentage == 0:
+                raise OutOfJointLimitsException(msg)
         return result
 
     def save_all_pandas(self):
@@ -847,7 +847,6 @@ class QPController:
             else:
                 logging.logwarn('Ran out of allowed retries with relaxed hard constraints.')
             self._create_debug_pandas()
-            self._are_joint_limits_violated(str(e_original))
             self._is_close_to_joint_limits()
             self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
             self._is_inf_in_data()

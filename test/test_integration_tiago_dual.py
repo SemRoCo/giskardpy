@@ -444,6 +444,18 @@ class TestJointGoals:
         zero_pose.set_joint_goal(js2)
         zero_pose.plan_and_execute()
 
+    def test_joint_goals_at_limits(self, zero_pose: TiagoTestWrapper):
+        js1 = {
+            'head_1_joint': 99,
+            'head_2_joint': 99
+        }
+        zero_pose.set_joint_goal(js1, check=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_SetSeedConfiguration(self, zero_pose: TiagoTestWrapper):
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=zero_pose.better_pose)
@@ -456,10 +468,20 @@ class TestJointGoals:
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
-    def test_get_out_of_joint_limits(self, zero_pose: TiagoTestWrapper):
+    def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {
             'head_1_joint': 1.3,
             'head_2_joint': -1
+        }
+        zero_pose.set_json_goal('SetSeedConfiguration',
+                                seed_configuration=js)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan()
+
+    def test_get_out_of_joint_limits(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'head_1_joint': 2,
+            'head_2_joint': -2
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)

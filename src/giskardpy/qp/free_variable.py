@@ -49,8 +49,8 @@ class FreeVariable:
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {order}')
 
-    def get_lower_limit(self, order: int) -> Union[expr_symbol, float]:
-        if order in self.default_lower_limits and order in self.lower_limits:
+    def get_lower_limit(self, order: int, default: bool = False) -> Union[expr_symbol, float]:
+        if not default and order in self.default_lower_limits and order in self.lower_limits:
             return w.max(self.default_lower_limits[order], self.lower_limits[order])
         if order in self.default_lower_limits:
             return self.default_lower_limits[order]
@@ -64,8 +64,8 @@ class FreeVariable:
     def set_upper_limit(self, order: int, limit: Union[expr_symbol, float]):
         self.upper_limits[order] = limit
 
-    def get_upper_limit(self, order: int) -> Union[expr_symbol, float]:
-        if order in self.default_upper_limits and order in self.upper_limits:
+    def get_upper_limit(self, order: int, default: bool = False) -> Union[expr_symbol, float]:
+        if not default and order in self.default_upper_limits and order in self.upper_limits:
             return w.min(self.default_upper_limits[order], self.upper_limits[order])
         if order in self.default_upper_limits:
             return self.default_upper_limits[order]

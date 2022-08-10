@@ -179,7 +179,23 @@ class URDFJoint(Joint, ABC):
 
         return joint_class(urdf_joint=urdf_joint, prefix=prefix, god_map=god_map)
 
-    def urdf_limits(self):
+    def urdf_hard_limits(self):
+        lower_limits = {}
+        upper_limits = {}
+        if not self.urdf_joint.type == 'continuous':
+            try:
+                lower_limits[0] = self.urdf_joint.limit.lower
+                upper_limits[0] = self.urdf_joint.limit.upper
+            except AttributeError:
+                pass
+        try:
+            lower_limits[1] = -self.urdf_joint.limit.velocity
+            upper_limits[1] = self.urdf_joint.limit.velocity
+        except AttributeError:
+            pass
+        return lower_limits, upper_limits
+
+    def urdf_soft_limits(self):
         lower_limits = {}
         upper_limits = {}
         if not self.urdf_joint.type == 'continuous':
@@ -192,11 +208,6 @@ class URDFJoint(Joint, ABC):
                     upper_limits[0] = self.urdf_joint.limit.upper
                 except AttributeError:
                     pass
-        try:
-            lower_limits[1] = -self.urdf_joint.limit.velocity
-            upper_limits[1] = self.urdf_joint.limit.velocity
-        except AttributeError:
-            pass
         return lower_limits, upper_limits
 
 
@@ -240,8 +251,9 @@ class OneDofJoint(Joint, ABC):
         return self.free_variable.get_symbol(0)
 
     def delete_limits(self):
-        self.free_variable.lower_limits = {}
-        self.free_variable.upper_limits = {}
+        for i in range(1, len(self.free_variable.lower_limits)):
+            del self.free_variable.lower_limits[i]
+            del self.free_variable.upper_limits[i]
 
     def update_weights(self, weights: derivative_joint_map):
         # self.delete_weights()
@@ -348,7 +360,7 @@ class OneDofURDFJoint(OneDofJoint, URDFJoint, ABC):
         except AttributeError:
             # to be expected, because the next init will set the attributes
             pass
-        lower_limits, upper_limits = self.urdf_limits()
+        lower_limits, upper_limits = self.urdf_hard_limits()
         OneDofJoint.__init__(self,
                              name=self.name,
                              parent_link_name=self.parent_link_name,
@@ -358,6 +370,11 @@ class OneDofURDFJoint(OneDofJoint, URDFJoint, ABC):
                              lower_limits=lower_limits,
                              upper_limits=upper_limits,
                              god_map=self.god_map)
+        soft_lower_limits, soft_upper_limits = self.urdf_soft_limits()
+        if 0 in soft_lower_limits:
+            self.free_variable.set_lower_limit(0, soft_lower_limits[0])
+        if 0 in soft_upper_limits:
+            self.free_variable.set_upper_limit(0, soft_upper_limits[0])
 
 
 class PrismaticURDFJoint(OneDofURDFJoint, PrismaticJoint):
@@ -379,7 +396,7 @@ class MimicURDFJoint(MimicJoint, OneDofURDFJoint, ABC):
         except AttributeError:
             # to be expected, because the next init will set the attributes
             pass
-        lower_limits, upper_limits = self.urdf_limits()
+        lower_limits, upper_limits = self.urdf_hard_limits()
         MimicJoint.__init__(self,
                             name=self.name,
                             parent_link_name=self.parent_link_name,

@@ -1,4 +1,5 @@
 from giskardpy.configs.default_config import Giskard, ControlModes
+from giskardpy.data_types import PrefixName
 
 
 class TiagoMujoco(Giskard):
@@ -51,7 +52,9 @@ class TiagoStandAlone(Giskard):
     def __init__(self):
         super().__init__()
         self.general_config.control_mode = ControlModes.stand_alone
-        self.add_frame(parent_link='map', child_link='odom')
+        self.add_fixed_joint(parent_link=PrefixName('world', 'giskard'), child_link='map')
+        self.add_fixed_joint(parent_link='map', child_link='odom')
+        self.add_robot_from_parameter_server('robot_description')
         self.register_controlled_joints(['torso_lift_joint', 'head_1_joint', 'head_2_joint'])
         self.register_controlled_joints(['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
                                          'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint'])

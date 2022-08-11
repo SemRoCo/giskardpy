@@ -104,16 +104,9 @@ SyncOdometry = plugins + ['SyncOdometry']
 
 SyncTfFrames = plugins + ['SyncTfFrames']
 frames_to_add = ['frames_to_add']
+joints_to_add = ['joints_to_add']
 
 PublishDebugExpressions = plugins + ['PublishDebugExpressions']
-
-# reachability check
-reachability_check = giskard + ['reachability_check']
-rc_sample_period = reachability_check + ['sample_period']
-rc_prismatic_velocity = reachability_check + ['prismatic_velocity']
-rc_continuous_velocity = reachability_check + ['continuous_velocity']
-rc_revolute_velocity = reachability_check + ['revolute_velocity']
-rc_other_velocity = reachability_check + ['other_velocity']
 
 # behavior tree
 tree_manager = giskard + ['_tree']
@@ -135,10 +128,7 @@ ignored_self_collisions = collision_avoidance_config + ['_ignored_self_collision
 external_collision_avoidance = collision_avoidance_config + ['_external_collision_avoidance']
 
 # robot interface
-robot_interface_config = giskard + ['robot_interface_config']
-robot_interface = robot_interface_config + ['follow_joint_trajectory_interfaces']
-robot_base_drive = robot_interface_config + ['drive_interface']
-joint_state_topic = robot_interface_config + ['joint_state_topic']
+robot_interface_configs = giskard + ['robot_interface_configs']
 
 # rnd stuff
 timer_collector = ['timer_collector']

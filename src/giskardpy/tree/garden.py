@@ -665,7 +665,7 @@ class OpenLoop(StandAlone):
 
     @property
     def add_real_time_tracking(self):
-        return self.config.robot_interface_config.drive_interface is not None
+        return self.config.robot_interface_configs.drive_interface is not None
 
     def grow_move_robots(self):
         execution_action_server = Parallel('move robots',
@@ -673,7 +673,7 @@ class OpenLoop(StandAlone):
         action_servers = self.god_map.get_data(identifier.robot_interface)
         for follow_joint_trajectory_config in action_servers:
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
-        base_drive = self.config.robot_interface_config.drive_interface
+        base_drive = self.config.robot_interface_configs.drive_interface
         if self.add_real_time_tracking:
             real_time_tracking = PluginBehavior('base sequence')
             real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',

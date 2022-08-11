@@ -243,12 +243,18 @@ class GodMap(object):
                 return result
             return self.shortcuts[identifier].c(self._data)
         except Exception as e:
-            e2 = type(e)('{}; path: {}'.format(e, identifier))
+            e2 = type(e)(f'{e}; path: {identifier}')
             raise e2
 
-    def get_data(self, identifier):
+    def get_data(self, identifier, default=None):
         with self.lock:
-            r = self.unsafe_get_data(identifier)
+            try:
+                r = self.unsafe_get_data(identifier)
+            except KeyError:
+                if default is not None:
+                    self.unsafe_set_data(identifier, default)
+                    return default
+                raise
         return r
 
     def clear_cache(self):

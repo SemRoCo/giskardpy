@@ -43,7 +43,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             rospy.sleep(1)
 
         for joint in self.world.joints.values():
-            if isinstance(joint, OmniDrive) or isinstance(joint, DiffDrive):
+            if isinstance(joint, (OmniDrive, DiffDrive)):
                 # FIXME can only handle one drive
                 self.controlled_joints = [joint]
                 self.joint = joint

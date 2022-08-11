@@ -18,6 +18,13 @@ class CollisionMarker(GiskardBehavior):
     yellow = ColorRGBA(1, 1, 0, 1)
     green = ColorRGBA(0, 1, 0, 1)
 
+    def __init__(self, name):
+        super().__init__(name)
+        try:
+            self.map_frame = tf.get_tf_root()
+        except AssertionError:
+            self.map_frame = str(self.world.root_link_name)
+
     def setup(self, timeout=10.0, name_space='pybullet_collisions'):
         super().setup(timeout)
         self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
@@ -36,7 +43,7 @@ class CollisionMarker(GiskardBehavior):
 
     def collision_to_marker(self, collisions: Union[Set[Collision], List[Collision]]) -> Marker:
         m = Marker()
-        m.header.frame_id = tf.get_tf_root()
+        m.header.frame_id = self.map_frame
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337

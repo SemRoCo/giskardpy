@@ -11,7 +11,10 @@ class VisualizationBehavior(GiskardBehavior):
         super().__init__(name)
         self.ensure_publish = ensure_publish
         self.marker_ids = {}
-        self.tf_root = tf.get_tf_root()
+        try:
+            self.tf_root = tf.get_tf_root()
+        except AssertionError:
+            self.tf_root = str(self.world.root_link_name)
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)

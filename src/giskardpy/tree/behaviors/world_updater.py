@@ -68,8 +68,7 @@ class WorldUpdater(GiskardBehavior):
     # TODO reject changes if plugin not active or something
     def __init__(self, name: str):
         self.added_plugin_names = []
-        super(WorldUpdater, self).__init__(name)
-        self.map_frame = tf.get_tf_root()
+        super().__init__(name)
         self.original_link_names = self.robot.link_names
         self.service_in_use = Queue(maxsize=1)
         self.work_permit = Queue(maxsize=1)

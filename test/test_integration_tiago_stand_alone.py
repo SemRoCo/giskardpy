@@ -71,7 +71,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
 
     def move_base(self, goal_pose):
         tip_link = 'base_footprint'
-        root_link = tf.get_tf_root()
+        root_link = self.default_root
         self.set_json_goal(constraint_type='DiffDriveBaseGoal',
                            tip_link=tip_link, root_link=root_link,
                            goal_pose=goal_pose)

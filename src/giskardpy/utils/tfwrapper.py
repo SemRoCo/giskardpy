@@ -14,6 +14,7 @@ from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
+from giskardpy.utils import logging
 from giskardpy.utils.utils import memoize
 
 tfBuffer: Buffer = None
@@ -30,7 +31,10 @@ def init(tf_buffer_size=15):
     tfBuffer = Buffer(rospy.Duration(tf_buffer_size))
     tf_listener = TransformListener(tfBuffer)
     rospy.sleep(5.0)
-    get_tf_root()
+    try:
+        get_tf_root()
+    except AssertionError as e:
+        logging.logwarn(e)
 
 
 def get_tf_buffer():
@@ -47,7 +51,8 @@ def get_tf_root() -> str:
     frames_with_parent = set(frames.keys())
     frame_parents = set(x['parent'] for x in frames.values())
     tf_roots = frame_parents.difference(frames_with_parent)
-    assert len(tf_roots) == 1, f'There are more than one tf tree: {tf_roots}.'
+    assert len(tf_roots) < 2, f'There are more than one tf tree: {tf_roots}.'
+    assert len(tf_roots) > 0, 'There is no tf tree.'
     return tf_roots.pop()
 
 

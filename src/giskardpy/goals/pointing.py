@@ -69,7 +69,7 @@ class PointingDiffDrive(Goal):
         self.max_velocity = max_velocity
         self.root = root_link
         self.tip = tip_link
-        self.root_P_goal_point = tf.transform_point(self.root, goal_point)
+        self.root_P_goal_point = self.transform_msg(self.root, goal_point)
 
         if pointing_axis is not None:
             self.tip_V_pointing_axis = tf.transform_vector(self.tip, pointing_axis)

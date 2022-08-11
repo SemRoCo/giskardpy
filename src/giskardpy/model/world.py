@@ -270,7 +270,7 @@ class WorldTree:
     def joint_names_as_set(self):
         return set(self.joints.keys())
 
-    def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None):
+    def add_urdf(self, urdf, prefix=None, group_name=None):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name is None:
@@ -278,16 +278,9 @@ class WorldTree:
         if group_name in self.groups:
             raise DuplicateNameException(
                 f'Failed to add group \'{group_name}\' because one with such a name already exists')
-        if parent_link_name is None:
-            parent_link = self.root_link
-        else:
-            parent_link = self.links[parent_link_name]
 
-        odom = Link.from_urdf(parsed_urdf.link_map[parsed_urdf.get_root()], None)
-        self._add_link(odom)
-        base_footprint = odom
-        self._add_fixed_joint(parent_link, odom,
-                              joint_name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix))
+        parent_link_name = parsed_urdf.link_map[parsed_urdf.get_root()].name
+        parent_link = self.links[parent_link_name]
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
@@ -305,10 +298,10 @@ class WorldTree:
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
 
-        helper(parsed_urdf, base_footprint)
+        helper(parsed_urdf, parent_link)
 
-        if group_name is not None:
-            self.register_group(group_name, odom.name)
+        #FIXME should root link be odom?
+        self.register_group(group_name, parent_link_name)
         if self.god_map is not None:
             self.sync_with_paramserver()
         self._set_free_variables_on_mimic_joints(group_name)
@@ -338,31 +331,6 @@ class WorldTree:
                 del self.links[link_or_joint]
 
         self._link_joint_to_links(new_joint)
-
-    def _add_diff_drive_joint(self, urdf, map_link, odom_link_name='odom', prefix=None):
-        # create odom and link to map with fixed joint
-        odom = Link(name=PrefixName(odom_link_name, prefix))
-        self._add_fixed_joint(parent_link=map_link,
-                              child_link=odom,
-                              joint_name=PrefixName(PrefixName(urdf.name, prefix), self.connection_prefix))
-
-        # create urdf root link and fix to odom with diff drive
-        base_footprint_name = urdf.get_robot_root_link()
-        base_footprint = Link.from_urdf(urdf.link_map[base_footprint_name], None)
-
-        trans_lower_limits = {1: -1}
-        trans_upper_limits = {1: 1}
-        rot_lower_limits = {1: -1}
-        rot_upper_limits = {1: 1}
-        # diff_drive_joint = DiffDriveJoint(name=PrefixName('diff_drive', None),
-        diff_drive_joint = DiffDriveWheelsJoint(name=PrefixName('diff_drive', None),
-                                                parent_link_name=odom_link_name,
-                                                child_link_name=base_footprint_name,
-                                                god_map=self.god_map)
-        diff_drive_joint.create_free_variables(identifier.joint_states, trans_lower_limits, trans_upper_limits,
-                                               rot_lower_limits, rot_upper_limits)
-        self._link_joint_to_links(diff_drive_joint, base_footprint)
-        return base_footprint, odom
 
     def _set_free_variables_on_mimic_joints(self, group_name):
         # TODO prevent this from happening twice
@@ -449,38 +417,23 @@ class WorldTree:
     @profile
     def delete_all_but_robot(self):
         self._clear()
-        frames_to_sync: List[FrameToAddToWorld] = self.god_map.unsafe_get_data(identifier.frames_to_add)
-        self._add_tf_links([x for x in frames_to_sync if not x.add_after_robot], create_parents=True)
-        base_drive = self.god_map.unsafe_get_data(identifier.robot_base_drive)
-        if base_drive is not None:
-            drive_joint = base_drive.make_joint(self.god_map)
-            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
+        joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
+        for joint in joints_to_add:
+            # todo handle if they are not in order
+            self._add_joint_and_create_child(joint)
+        for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
+            self.add_urdf(robot_config.urdf,
                           group_name=None,
-                          prefix=None,
-                          parent_link_name=drive_joint.parent_link_name)
-            self._replace_joint(drive_joint)
-        else:
-            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description),
-                          group_name=None,
-                          prefix=None,
-                          parent_link_name=self.root_link_name)
-        self._add_tf_links([x for x in frames_to_sync if x.add_after_robot], create_parents=False)
-        self.fast_all_fks = None
+                          prefix=None)
+        self.fast_all_fks = None # TODO unnecessary?
         self.notify_model_change()
 
-    def _add_tf_links(self, frames: List[FrameToAddToWorld], create_parents: bool = False):
-        for frame in frames:
-            if frame.child_link not in self.links and not create_parents:
-                raise PhysicsWorldException(f'Parent link name {frame.parent_link} does not exist.')
-            else:
-                parent_link = Link(frame.parent_link)
-                self._add_link(parent_link)
-                self._add_fixed_joint(self.root_link, parent_link)
-            if frame.child_link in self.links:
-                raise DuplicateNameException(f'Child link name {frame.child_link} already exist.')
-            child_link = Link(frame.child_link)
-            self._add_link(child_link)
-            self._add_fixed_joint(self.links[frame.parent_link], child_link)
+    def _add_joint_and_create_child(self, joint: Joint):
+        self._raise_if_joint_exists(joint.name)
+        self._raise_if_link_exists(joint.child_link_name)
+        child_link = Link(joint.child_link_name)
+        self._add_link(child_link)
+        self._link_joint_to_links(joint)
 
     def _set_joint_limits(self, linear_limits, angular_limits, order):
         for joint_name in self.movable_joints:  # type: OneDofJoint
@@ -544,16 +497,30 @@ class WorldTree:
         return joint_constraints
 
     def _link_joint_to_links(self, joint: Joint):
-        if joint.name in self.joints:
-            raise DuplicateNameException(f'Cannot add joint named \'{joint.name}\' because already exists')
+        self._raise_if_joint_exists(joint.name)
         child_link = self.links[joint.child_link_name]
-        if child_link.name not in self.links:
-            raise PhysicsWorldException(f'Link \'{child_link.name}\' does not exist.')
+        self._raise_if_link_does_not_exist(child_link.name)
         parent_link = self.links[joint.parent_link_name]
         self.joints[joint.name] = joint
         child_link.parent_joint_name = joint.name
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
+
+    def _raise_if_link_does_not_exist(self, link_name: my_string):
+        if link_name not in self.links:
+            raise PhysicsWorldException(f'Link \'{link_name}\' does not exist.')
+
+    def _raise_if_link_exists(self, link_name: my_string):
+        if link_name in self.links:
+            raise DuplicateNameException(f'Link \'{link_name}\' does already exist.')
+
+    def _raise_if_joint_does_not_exist(self, joint_name: my_string):
+        if joint_name not in self.joints:
+            raise PhysicsWorldException(f'Joint \'{joint_name}\' does not exist.')
+
+    def _raise_if_joint_exists(self, joint_name: my_string):
+        if joint_name in self.joints:
+            raise DuplicateNameException(f'Joint \'{joint_name}\' does already exist.')
 
     @profile
     def move_branch(self, joint_name, new_parent_link_name):
@@ -883,8 +850,7 @@ class WorldTree:
         return not chain1 and not connection and not chain2
 
     def _add_link(self, link: Link):
-        if link.name in self.links:
-            raise DuplicateNameException(f'Link with name \'{link.name}\' already exists.')
+        self._raise_if_link_exists(link.name)
         self.links[link.name] = link
 
     def _delete_joint_limits(self):

@@ -13,7 +13,7 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 class SyncTfFrames(GiskardBehavior):
     def __init__(self, name, frames: List[Tuple[str, str]]):
-        super(SyncTfFrames, self).__init__(name)
+        super().__init__(name)
         self.map_frame = self.world.root_link_name
         self.last_position = np.zeros(3)
         self.last_rotation = np.eye(4)

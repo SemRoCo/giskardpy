@@ -27,6 +27,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
+from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -283,7 +284,7 @@ class GoalChecker(object):
 
 class JointGoalChecker(GoalChecker):
     def __init__(self, god_map, goal_state, decimal=2):
-        super(JointGoalChecker, self).__init__(god_map)
+        super().__init__(god_map)
         self.goal_state = goal_state
         self.decimal = decimal
 
@@ -294,7 +295,10 @@ class JointGoalChecker(GoalChecker):
         return rospy.wait_for_message(self.god_map.unsafe_get_data(identifier.joint_state_topic), JointState)
 
     def __call__(self):
-        current_joint_state = JointStates.from_msg(self.get_current_joint_state())
+        if self.god_map.get_data(identifier.control_mode) == ControlModes.stand_alone:
+            current_joint_state = self.world.state
+        else:
+            current_joint_state = JointStates.from_msg(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
 
     def compare_joint_state(self, current_js, goal_js, decimal=2):

@@ -47,7 +47,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
                 # FIXME can only handle one drive
                 self.controlled_joints = [joint]
                 self.joint = joint
-        self.world.register_controlled_joints(self.controlled_joints)
+        self.world.register_controlled_joints([j.name for j in self.controlled_joints])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     @profile

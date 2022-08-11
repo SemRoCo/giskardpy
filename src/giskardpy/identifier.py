@@ -46,6 +46,7 @@ action_server_name = general_options + ['action_server_name']
 data_folder = general_options + ['path_to_data_folder']
 debug = general_options + ['debug']
 test_mode = general_options + ['test_mode']
+control_mode = general_options + ['control_mode']
 
 joint_limits = general_options + ['joint_limits']
 
@@ -102,7 +103,7 @@ TFPublisher = plugins + ['TFPublisher']
 SyncOdometry = plugins + ['SyncOdometry']
 
 SyncTfFrames = plugins + ['SyncTfFrames']
-SyncTfFrames_frames = SyncTfFrames + ['frames']
+frames_to_add = ['frames_to_add']
 
 PublishDebugExpressions = plugins + ['PublishDebugExpressions']
 

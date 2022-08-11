@@ -1,3 +1,5 @@
+from typing import Optional
+
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
 
@@ -8,9 +10,9 @@ class DriveInterface:
 
 class OmniDriveCmdVelInterface(DriveInterface):
     def __init__(self,
-                 cmd_vel_topic: str,
                  parent_link_name: str,
                  child_link_name: str,
+                 cmd_vel_topic: Optional[str] = None,
                  translation_velocity_limit: float = 1,
                  rotation_velocity_limit: float = 1,
                  **omni_drive_params):
@@ -35,9 +37,9 @@ class OmniDriveCmdVelInterface(DriveInterface):
 
 class DiffDriveCmdVelInterface(DriveInterface):
     def __init__(self,
-                 cmd_vel_topic: str,
                  parent_link_name: str,
                  child_link_name: str,
+                 cmd_vel_topic: Optional[str] = None,
                  translation_velocity_limit: float = 1,
                  rotation_velocity_limit: float = 1,
                  **diff_drive_params):

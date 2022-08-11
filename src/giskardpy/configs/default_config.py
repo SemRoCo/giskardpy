@@ -4,16 +4,17 @@ from copy import deepcopy
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
 
+import numpy as np
 from py_trees import Blackboard
 
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib
+from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib, FrameToAddToWorld
 from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface, DiffDriveCmdVelInterface
 from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.tree.garden import OpenLoop, ClosedLoop
+from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import resolve_ros_iris
@@ -22,6 +23,7 @@ from giskardpy.utils.utils import resolve_ros_iris
 class ControlModes(Enum):
     open_loop = 1
     close_loop = 2
+    stand_alone = 3
 
 
 class GeneralConfig:
@@ -269,9 +271,27 @@ class Giskard:
         self._god_map = GodMap.init_from_paramserver()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
+        self._controlled_joints = []
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self._backup = {}
+
+    def register_controlled_joints(self, joint_names: List[str]):
+        self._controlled_joints.extend(joint_names)
+
+    def add_frame(self, parent_link: str, child_link: str, homo_transform: Optional[np.ndarray] = None,
+                  add_after_robot: bool = False):
+        if homo_transform is None:
+            homo_transform = np.eye(4)
+        try:
+            frames = self._god_map.get_data(identifier.frames_to_add)
+        except KeyError:
+            frames = []
+        frames.append(FrameToAddToWorld(parent_link=parent_link,
+                                        child_link=child_link,
+                                        transform=homo_transform,
+                                        add_after_robot=add_after_robot))
+        self._god_map.set_data(identifier.frames_to_add, frames)
 
     def set_joint_states_topic(self, topic_name: str):
         self.robot_interface_config.joint_state_topic = topic_name
@@ -290,7 +310,7 @@ class Giskard:
                                                              parent_link_name=parent_link_name,
                                                              child_link_name=child_link_name)
 
-    def add_diff_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name):
+    def add_diff_drive_interface(self, parent_link_name: str, child_link_name: str, cmd_vel_topic: Optional[str] = None):
         self.robot_interface_config.add_diff_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                              parent_link_name=parent_link_name,
                                                              child_link_name=child_link_name)
@@ -307,6 +327,7 @@ class Giskard:
         self._create_parameter_backup()
         world = WorldTree(self._god_map)
         world.delete_all_but_robot()
+        world.register_controlled_joints(self._controlled_joints)
 
         if self.collision_avoidance_config.collision_checker == CollisionCheckerLib.bpb:
             logging.loginfo('Using bpb for collision checking.')
@@ -329,8 +350,11 @@ class Giskard:
             self._tree = OpenLoop(self._god_map)
         elif self.general_config.control_mode == ControlModes.close_loop:
             self._tree = ClosedLoop(self._god_map)
+        elif self.general_config.control_mode == ControlModes.stand_alone:
+            self._tree = StandAlone(self._god_map)
         else:
             raise KeyError(f'Robot interface mode \'{self.general_config.control_mode}\' is not supported.')
+
         self._controlled_joints_sanity_check()
 
     def _controlled_joints_sanity_check(self):

@@ -103,7 +103,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             joints_not_in_urdf = set(controlled_joint_names).difference(self.controlled_joints)
             raise ValueError(f'{state_topic} provides the following joints '
                              f'that are not in the urdf: {joints_not_in_urdf}')
-        self.world.register_controlled_joints(self.controlled_joints)
+        self.world.register_controlled_joints(controlled_joint_names)
         loginfo(f'Successfully connected to \'{state_topic}\'.')
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
 

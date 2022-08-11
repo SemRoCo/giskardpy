@@ -1,4 +1,4 @@
-from giskardpy.configs.default_config import Giskard
+from giskardpy.configs.default_config import Giskard, ControlModes
 
 
 class TiagoMujoco(Giskard):
@@ -44,4 +44,21 @@ class IAI_Tiago(Giskard):
                                                 state_topic='/torso_controller/state')
         self.add_diff_drive_interface(cmd_vel_topic='/mobile_base_controller/cmd_vel',
                                       parent_link_name='odom',
+                                      child_link_name='base_footprint')
+
+
+class TiagoStandAlone(Giskard):
+    def __init__(self):
+        super().__init__()
+        self.general_config.control_mode = ControlModes.stand_alone
+        self.add_frame(parent_link='map', child_link='odom')
+        self.register_controlled_joints(['torso_lift_joint', 'head_1_joint', 'head_2_joint'])
+        self.register_controlled_joints(['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
+                                         'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint'])
+        self.register_controlled_joints(['arm_right_1_joint', 'arm_right_2_joint', 'arm_right_3_joint',
+                                         'arm_right_4_joint', 'arm_right_5_joint', 'arm_right_6_joint',
+                                         'arm_right_7_joint'])
+        self.register_controlled_joints(['gripper_right_left_finger_joint', 'gripper_right_right_finger_joint',
+                                         'gripper_left_left_finger_joint', 'gripper_left_right_finger_joint'])
+        self.add_diff_drive_interface(parent_link_name='odom',
                                       child_link_name='base_footprint')

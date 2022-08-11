@@ -5,6 +5,7 @@ from typing import Union, Dict
 from sensor_msgs.msg import JointState
 
 from giskardpy import casadi_wrapper as w, identifier
+from giskardpy.configs.default_config import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
@@ -14,9 +15,12 @@ class SetSeedConfiguration(Goal):
     #FIXME deal with prefix
     def __init__(self, seed_configuration: Dict[str, float], **kwargs):
         super().__init__(**kwargs)
-        if self.god_map.get_data(identifier.execute):
+        if self.god_map.get_data(identifier.execute) \
+                and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
+            if joint_name not in self.world.state:
+                raise KeyError(f'world has no joint \'{joint_name}\'')
             self.world.state[joint_name].position = initial_joint_value
 
 

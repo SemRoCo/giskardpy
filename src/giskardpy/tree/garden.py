@@ -484,13 +484,12 @@ def generate_pydot_graph(root, visibility_level, profile=None):
     return graph
 
 
-class OpenLoop(TreeManager):
+class StandAlone(TreeManager):
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
         root.add_child(CleanUp('cleanup'))
         root.add_child(self.grow_process_goal())
-        root.add_child(self.grow_execution())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
 
@@ -505,15 +504,8 @@ class OpenLoop(TreeManager):
     def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
-                                                             self.god_map.unsafe_get_data(identifier.robot_group_name)))
         sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        try:
-            sync.add_child(running_is_success(SyncOdometry)('sync odometry',
-                                                            **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
-        except KeyError:
-            pass
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -614,6 +606,35 @@ class OpenLoop(TreeManager):
             plan_postprocessing.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))
         return plan_postprocessing
 
+
+
+class OpenLoop(StandAlone):
+    def grow_giskard(self):
+        root = Sequence('Giskard')
+        root.add_child(self.grow_wait_for_goal())
+        root.add_child(CleanUp('cleanup'))
+        root.add_child(self.grow_process_goal())
+        root.add_child(self.grow_execution())
+        root.add_child(SendResult('send result', self.action_server_name, MoveAction))
+        return root
+
+    def grow_Synchronize(self):
+        sync = Sequence('Synchronize')
+        sync.add_child(WorldUpdater('update world'))
+        sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
+                                                             self.god_map.unsafe_get_data(identifier.robot_group_name)))
+        sync.add_child(SyncTfFrames('sync tf frames',
+                                    **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
+        try:
+            sync.add_child(running_is_success(SyncOdometry)('sync odometry',
+                                                            **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
+        except KeyError:
+            pass
+        sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        sync.add_child(CollisionSceneUpdater('update collision scene'))
+        # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
+        return sync
+
     def grow_execution(self):
         execution = failure_is_success(Sequence)('execution')
         execution.add_child(IF('execute?', identifier.execute))
@@ -628,9 +649,9 @@ class OpenLoop(TreeManager):
     def grow_monitor_execution(self):
         monitor_execution = failure_is_success(Selector)('monitor execution')
         monitor_execution.add_child(success_is_failure(PublishFeedback)('publish feedback',
-                                                                     self.god_map.get_data(
-                                                                         identifier.action_server_name),
-                                                                     MoveFeedback.EXECUTION))
+                                                                        self.god_map.get_data(
+                                                                            identifier.action_server_name),
+                                                                        MoveFeedback.EXECUTION))
         monitor_execution.add_child(self.grow_execution_cancelled())
         monitor_execution.add_child(self.grow_move_robots())
         monitor_execution.add_child(SetErrorCode('set error code', 'Execution'))
@@ -671,9 +692,6 @@ class OpenLoop(TreeManager):
 
             execution_action_server.add_child(real_time_tracking)
         return execution_action_server
-
-
-
 
 class ClosedLoop(OpenLoop):
 

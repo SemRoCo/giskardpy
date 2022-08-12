@@ -149,12 +149,11 @@ class Collisions:
         return collision
 
     @profile
-    def transform_external_collision(self, collision):
-        """
-        :type collision: Collision
-        :rtype: Collision
-        """
-        movable_joint = self.world.get_controlled_parent_joint_of_link(collision.original_link_a)
+    def transform_external_collision(self, collision: Collision) -> Collision:
+        try:
+            movable_joint = self.world.get_controlled_parent_joint_of_link(collision.original_link_a)
+        except Exception as e:
+            pass
         new_a = self.world.joints[movable_joint].child_link_name
         collision.link_a = new_a
         if collision.map_P_pa is not None:
@@ -469,12 +468,10 @@ class CollisionWorldSynchronizer(object):
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
-                                            min_dist: dict,):
+                                            min_dist: dict) -> dict:
         """
         :param collision_goals: list of CollisionEntry
-        :type collision_goals: list
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
-        :rtype: dict
         """
         collision_goals = self.verify_collision_entries(collision_goals)
         min_allowed_distance = {}

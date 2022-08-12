@@ -97,7 +97,9 @@ class Giskard:
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name)
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
-        joints.append(self.hardware_config.drive_interface.make_joint(self._god_map))
+        brumbrum_joint = self.hardware_config.drive_interface.make_joint(self._god_map)
+        joints.append(brumbrum_joint)
+        self._controlled_joints.append(brumbrum_joint.name)
 
     def reset_config(self):
         for parameter, value in self._backup.items():

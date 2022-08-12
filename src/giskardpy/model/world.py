@@ -270,7 +270,7 @@ class WorldTree:
     def joint_names_as_set(self):
         return set(self.joints.keys())
 
-    def add_urdf(self, urdf, prefix=None, group_name=None):
+    def add_urdf(self, urdf, prefix=None, group_name=None, parent_link_name=None):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name is None:
@@ -279,8 +279,17 @@ class WorldTree:
             raise DuplicateNameException(
                 f'Failed to add group \'{group_name}\' because one with such a name already exists')
 
-        parent_link_name = parsed_urdf.link_map[parsed_urdf.get_root()].name
-        parent_link = self.links[parent_link_name]
+        urdf_root_link_name = parsed_urdf.link_map[parsed_urdf.get_root()].name
+        urdf_root_link_name = PrefixName(urdf_root_link_name, prefix)
+
+        if parent_link_name is not None:
+            parent_link = self.links[parent_link_name]
+            urdf_root_link = Link(urdf_root_link_name)
+            self._add_link(urdf_root_link)
+            self._add_fixed_joint(parent_link=parent_link,
+                                  child_link=urdf_root_link)
+        else:
+            urdf_root_link = self.links[urdf_root_link_name]
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
@@ -298,15 +307,17 @@ class WorldTree:
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
 
-        helper(parsed_urdf, parent_link)
+        helper(parsed_urdf, urdf_root_link)
 
         #FIXME should root link be odom?
-        self.register_group(group_name, parent_link_name)
+        self.register_group(group_name, urdf_root_link_name)
         if self.god_map is not None:
             self.sync_with_paramserver()
         self._set_free_variables_on_mimic_joints(group_name)
 
     def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None, transform=None):
+        self._raise_if_link_does_not_exist(parent_link.name)
+        self._raise_if_link_does_not_exist(child_link.name)
         if joint_name is None:
             joint_name = f'{parent_link.name}_{child_link.name}_fixed_joint'
         connecting_joint = FixedJoint(name=joint_name,
@@ -380,11 +391,13 @@ class WorldTree:
                        parent_link_name: Union[str, PrefixName]):
         if group_name in self.groups:
             raise DuplicateNameException(f'Group with name \'{group_name}\' already exists')
-
+        self._raise_if_link_does_not_exist(parent_link_name)
+        if isinstance(parent_link_name, str):
+            parent_link_name = PrefixName(parent_link_name, None)
         if msg.type == msg.URDF_BODY:
             self.add_urdf(urdf=msg.urdf,
-                          parent_link_name=parent_link_name,
                           group_name=group_name,
+                          parent_link_name=parent_link_name,
                           prefix=None)
         else:
             link = Link.from_world_body(prefix=group_name, msg=msg)
@@ -501,6 +514,7 @@ class WorldTree:
         child_link = self.links[joint.child_link_name]
         self._raise_if_link_does_not_exist(child_link.name)
         parent_link = self.links[joint.parent_link_name]
+        self._raise_if_link_does_not_exist(parent_link.name)
         self.joints[joint.name] = joint
         child_link.parent_joint_name = joint.name
         assert joint.name not in parent_link.child_joint_names
@@ -641,7 +655,7 @@ class WorldTree:
             while stop_when is not None and not stop_when(joint):
                 joint = self.search_for_parent_joint(joint)
         except KeyError as e:
-            raise KeyError('\'{}\' has no fitting parent joint'.format(joint_name))
+            raise KeyError(f'\'{joint_name}\' has no fitting parent joint.')
         return joint
 
     @profile
@@ -654,7 +668,7 @@ class WorldTree:
         link = self.links[tip_link_name]
         while link.name != root_link_name:
             if link.parent_joint_name not in self.joints:
-                raise ValueError('{} and {} are not connected'.format(root_link_name, tip_link_name))
+                raise ValueError(f'{root_link_name} and {tip_link_name} are not connected')
             parent_joint = self.joints[link.parent_joint_name]
             parent_link = self.links[parent_joint.parent_link_name]
             if joints:

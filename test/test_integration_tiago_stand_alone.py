@@ -96,6 +96,31 @@ class TiagoTestWrapper(GiskardTestWrapper):
         pass
 
 
+@pytest.fixture()
+def apartment_setup(better_pose: TiagoTestWrapper) -> TiagoTestWrapper:
+    object_name = 'apartment'
+    apartment_pose = PoseStamped()
+    apartment_pose.header.frame_id = 'map'
+    apartment_pose.pose.orientation.w = 1
+    better_pose.add_urdf(name=object_name,
+                         urdf=rospy.get_param('apartment_description'),
+                         pose=apartment_pose)
+    js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
+    better_pose.set_json_goal('SetSeedConfiguration',
+                              seed_configuration=js)
+    base_pose = PoseStamped()
+    base_pose.header.frame_id = 'side_B'
+    base_pose.pose.position.x = 1.5
+    base_pose.pose.position.y = 2.4
+    base_pose.pose.orientation.w = 1
+    better_pose.set_json_goal('SetOdometry',
+                              group_name='tiago_dual',
+                              base_pose=base_pose)
+    better_pose.allow_all_collisions()
+    better_pose.move_base(base_pose)
+    return better_pose
+
+
 class TestCartGoals:
     def test_drive(self, zero_pose: TiagoTestWrapper):
         goal = PoseStamped()
@@ -265,7 +290,7 @@ class TestCollisionAvoidance:
     def test_open_cabinet_left(self, apartment_setup: TiagoTestWrapper):
         tcp = 'gripper_left_grasping_frame'
         handle_name = 'handle_cab1_top_door'
-        handle_name_frame = 'iai_apartment/handle_cab1_top_door'
+        handle_name_frame = 'handle_cab1_top_door'
         goal_angle = np.pi / 2
         left_pose = PoseStamped()
         left_pose.header.frame_id = handle_name_frame
@@ -279,7 +304,7 @@ class TestCollisionAvoidance:
                                       root_link=tf.get_tf_root(),
                                       check=False)
         goal_point = PointStamped()
-        goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
+        goal_point.header.frame_id = 'cabinet1_door_top_left'
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
         apartment_setup.avoid_joint_limits(50)

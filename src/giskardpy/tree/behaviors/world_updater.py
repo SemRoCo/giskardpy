@@ -222,9 +222,7 @@ class WorldUpdater(GiskardBehavior):
         logging.loginfo(f'Added object \'{req.group_name}\' at \'{req.parent_link_group}/{req.parent_link}\'.')
         if world_body.joint_state_topic:
             plugin_name = str(PrefixName(req.group_name, 'js'))
-            plugin = running_is_success(SyncConfiguration)(plugin_name,
-                                                           group_name=req.group_name,
-                                                           joint_state_topic=world_body.joint_state_topic)
+            plugin = running_is_success(SyncConfiguration)(joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')

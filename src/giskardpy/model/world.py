@@ -511,10 +511,10 @@ class WorldTree:
 
     def _link_joint_to_links(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)
+        self._raise_if_link_does_not_exist(joint.child_link_name)
+        self._raise_if_link_does_not_exist(joint.parent_link_name)
         child_link = self.links[joint.child_link_name]
-        self._raise_if_link_does_not_exist(child_link.name)
         parent_link = self.links[joint.parent_link_name]
-        self._raise_if_link_does_not_exist(parent_link.name)
         self.joints[joint.name] = joint
         child_link.parent_joint_name = joint.name
         assert joint.name not in parent_link.child_joint_names

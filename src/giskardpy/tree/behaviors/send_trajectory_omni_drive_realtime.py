@@ -45,9 +45,9 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         for joint in self.world.joints.values():
             if isinstance(joint, (OmniDrive, DiffDrive)):
                 # FIXME can only handle one drive
-                self.controlled_joints = [joint]
+                # self.controlled_joints = [joint]
                 self.joint = joint
-        self.world.register_controlled_joints([j.name for j in self.controlled_joints])
+        # self.world.register_controlled_joints([j.name for j in self.controlled_joints])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     @profile

@@ -129,6 +129,7 @@ external_collision_avoidance = collision_avoidance_config + ['_external_collisio
 
 # robot interface
 robot_interface_configs = giskard + ['robot_interface_configs']
+hardware_config = giskard + ['hardware_config']
 
 # rnd stuff
 timer_collector = ['timer_collector']

@@ -18,6 +18,9 @@ class GiskardBehavior(Behaviour):
         self.world = self.get_god_map().unsafe_get_data(identifier.world)  # type: WorldTree
         super().__init__(name)
 
+    def __str__(self):
+        return f'{self.__class__.__name__}'
+
     @property
     def traj_time_in_sec(self):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)

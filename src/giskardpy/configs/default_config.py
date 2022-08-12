@@ -47,8 +47,10 @@ class Giskard:
         robot = RobotInterfaceConfig(urdf, **kwargs)
         self.robot_interface_configs.append(robot)
 
-    def add_robot_from_parameter_server(self, parameter_name, **kwargs):
+    def add_robot_from_parameter_server(self, parameter_name: str = 'robot_description',
+                                        joint_state_topics: List[str] = ('/joint_states',), **kwargs):
         urdf = rospy.get_param(parameter_name)
+        self.hardware_config.joint_state_topics.extend(joint_state_topics)
         self.add_robot_urdf(urdf, **kwargs)
 
     def register_controlled_joints(self, joint_names: List[str]):
@@ -78,10 +80,11 @@ class Giskard:
         self.robot_interface_configs.joint_state_topic = topic_name
 
     def add_sync_tf_frame(self, parent_link, child_link, add_after_robot=False):
+        self.add_fixed_joint(parent_link=parent_link, child_link=child_link)
         self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link, add_after_robot)
 
-    def set_odometry_topic(self, odometry_topic):
-        self.behavior_tree_config.set_odometry_topic(odometry_topic)
+    def add_odometry_topic(self, odometry_topic):
+        self.hardware_config.odometry_topics.append(odometry_topic)
 
     def add_follow_joint_trajectory_server(self, namespace, state_topic):
         self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic)
@@ -97,7 +100,7 @@ class Giskard:
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name)
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
-        brumbrum_joint = self.hardware_config.drive_interface.make_joint(self._god_map)
+        brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint(self._god_map)
         joints.append(brumbrum_joint)
         self._controlled_joints.append(brumbrum_joint.name)
 
@@ -150,7 +153,7 @@ class Giskard:
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
-        if self.hardware_config.drive_interface is None:
+        if len(self.hardware_config.drive_interfaces) == 0:
             logging.loginfo('No cmd_vel topic has been registered.')
 
     def live(self):

@@ -12,6 +12,7 @@ import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.configs.hardware_interface_config import HardwareConfig
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
@@ -621,15 +622,13 @@ class OpenLoop(StandAlone):
     def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(running_is_success(SyncConfiguration)('update robot configuration',
-                                                             self.god_map.unsafe_get_data(identifier.robot_group_name)))
         sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        try:
-            sync.add_child(running_is_success(SyncOdometry)('sync odometry',
-                                                            **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
-        except KeyError:
-            pass
+        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
+        for joint_state_topic in hardware_config.joint_state_topics:
+            sync.add_child(running_is_success(SyncConfiguration)(joint_state_topic=joint_state_topic))
+        for odometry_topic in hardware_config.odometry_topics:
+            sync.add_child(running_is_success(SyncOdometry)(odometry_topic=odometry_topic))
         sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
@@ -665,32 +664,32 @@ class OpenLoop(StandAlone):
 
     @property
     def add_real_time_tracking(self):
-        return self.config.robot_interface_configs.drive_interface is not None
+        return len(self.config.hardware_config.drive_interfaces) > 0
 
     def grow_move_robots(self):
         execution_action_server = Parallel('move robots',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
-        action_servers = self.god_map.get_data(identifier.robot_interface)
-        for follow_joint_trajectory_config in action_servers:
+        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
+        for follow_joint_trajectory_config in hardware_config.follow_joint_trajectory_interfaces:
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
-        base_drive = self.config.robot_interface_configs.drive_interface
         if self.add_real_time_tracking:
-            real_time_tracking = PluginBehavior('base sequence')
-            real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
-                                                                           **self.god_map.unsafe_get_data(
-                                                                               identifier.SyncTfFrames)))
-            real_time_tracking.add_plugin(SyncOdometry('sync odometry',
-                                                       **self.god_map.unsafe_get_data(identifier.SyncOdometry)))
-            real_time_tracking.add_plugin(RosTime('time'))
-            real_time_tracking.add_plugin(ControllerPlugin('base controller'))
-            real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
-            if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
-                real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
-                                                                      **self.god_map.unsafe_get_data(
-                                                                          identifier.PublishDebugExpressions)))
-            real_time_tracking.add_plugin(base_drive.make_plugin())
+            for drive_interface in hardware_config.drive_interfaces:
+                real_time_tracking = PluginBehavior('base sequence')
+                real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
+                                                                               **self.god_map.unsafe_get_data(
+                                                                                   identifier.SyncTfFrames)))
+                for odometry_topic in hardware_config.odometry_topics:
+                    real_time_tracking.add_plugin(SyncOdometry(odometry_topic))
+                real_time_tracking.add_plugin(RosTime('time'))
+                real_time_tracking.add_plugin(ControllerPlugin('base controller'))
+                real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
+                if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
+                    real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
+                                                                          **self.god_map.unsafe_get_data(
+                                                                              identifier.PublishDebugExpressions)))
+                real_time_tracking.add_plugin(drive_interface.make_plugin())
 
-            execution_action_server.add_child(real_time_tracking)
+                execution_action_server.add_child(real_time_tracking)
         return execution_action_server
 
 class ClosedLoop(OpenLoop):

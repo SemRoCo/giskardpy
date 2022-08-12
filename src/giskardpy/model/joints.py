@@ -86,6 +86,12 @@ class Joint(ABC):
     def free_variable_list(self) -> List[FreeVariable]:
         pass
 
+    def __str__(self):
+        return f'{self.parent_link_name}<-{self.child_link_name}'
+
+    def __repr__(self):
+        return str(self)
+
 
 class DependentJoint(Joint, ABC):
     @abc.abstractmethod

@@ -238,11 +238,6 @@ class BehaviorTreeConfig:
         # TODO make data structure
         self.plugin_config['SyncTfFrames']['frames'].append([parent_link, child_link, add_after_robot])
 
-    def set_odometry_topic(self, odometry_topic):
-        self.plugin_config['SyncOdometry'] = {
-            'odometry_topic': odometry_topic
-        }
-
 
 class RobotInterfaceConfig:
     def __init__(self, urdf: str, name: Optional[str] = None, joint_state_topic: str = '/joint_states'):

@@ -288,17 +288,11 @@ class JointGoalChecker(GoalChecker):
         self.goal_state = goal_state
         self.decimal = decimal
 
-    def get_current_joint_state(self):
-        """
-        :rtype: JointState
-        """
-        return rospy.wait_for_message(self.god_map.unsafe_get_data(identifier.joint_state_topic), JointState)
+    def get_current_joint_state(self) -> JointStates:
+        return self.world.state
 
     def __call__(self):
-        if self.god_map.get_data(identifier.control_mode) == ControlModes.stand_alone:
-            current_joint_state = self.world.state
-        else:
-            current_joint_state = JointStates.from_msg(self.get_current_joint_state())
+        current_joint_state = self.get_current_joint_state()
         self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
 
     def compare_joint_state(self, current_js, goal_js, decimal=2):

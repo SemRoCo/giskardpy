@@ -105,7 +105,15 @@ class TestCartGoals:
         # goal.pose.orientation.w = 1
         goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
         zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration={'odom_x':1})
+                                seed_configuration=zero_pose.better_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = 1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        zero_pose.set_json_goal('SetOdometry',
+                                group_name='tiago_dual',
+                                base_pose=base_pose)
+        zero_pose.allow_all_collisions()
         zero_pose.move_base(goal)
 
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')

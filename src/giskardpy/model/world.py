@@ -411,7 +411,7 @@ class WorldTree:
         self.root_link_name = PrefixName('world', 'giskard')
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
-        self.groups = {}
+        self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
 
     @profile

@@ -2,6 +2,8 @@ from __future__ import division
 
 from typing import Union, Dict
 
+from geometry_msgs.msg import PoseStamped
+from pybullet import getAxisAngleFromQuaternion
 from sensor_msgs.msg import JointState
 
 from giskardpy import casadi_wrapper as w, identifier
@@ -9,10 +11,11 @@ from giskardpy.configs.default_config import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
+from giskardpy.model.joints import OmniDrive, DiffDrive
 
 
 class SetSeedConfiguration(Goal):
-    #FIXME deal with prefix
+    # FIXME deal with prefix
     def __init__(self, seed_configuration: Dict[str, float], **kwargs):
         super().__init__(**kwargs)
         if self.god_map.get_data(identifier.execute) \
@@ -24,9 +27,31 @@ class SetSeedConfiguration(Goal):
             self.world.state[joint_name].position = initial_joint_value
 
 
+class SetOdometry(Goal):
+    def __init__(self, group_name: str, base_pose: PoseStamped, **kwargs):
+        super().__init__(**kwargs)
+        if self.god_map.get_data(identifier.execute) \
+                and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
+            raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
+        brumbrum_joint_name = self.world.groups[group_name].root_link.parent_joint_name
+        brumbrum_joint = self.world.joints[brumbrum_joint_name]
+        if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive)):
+            raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
+        base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
+        self.world.state[brumbrum_joint.x_name].position = base_pose.position.x
+        self.world.state[brumbrum_joint.y_name].position = base_pose.position.y
+        axis, angle = getAxisAngleFromQuaternion([base_pose.orientation.x,
+                                                  base_pose.orientation.y,
+                                                  base_pose.orientation.z,
+                                                  base_pose.orientation.w])
+        if axis[-1] < 0:
+            angle = -angle
+        self.world.state[brumbrum_joint.rot_name].position = angle
+
+
 class JointPositionContinuous(Goal):
 
-    def __init__(self, joint_name: str, goal: float, weight: float =WEIGHT_BELOW_CA, max_velocity: float = 1,
+    def __init__(self, joint_name: str, goal: float, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 1,
                  hard: bool = False, **kwargs):
         """
         This goal will move a continuous joint to the goal position
@@ -288,7 +313,8 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         self.joint_name = joint_name
         super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(**kwargs)
         if not self.world.is_joint_revolute(joint_name) and not self.world.is_joint_prismatic(joint_name):
-            raise ConstraintException(f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
+            raise ConstraintException(
+                f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
 
         self.goal = goal
         self.frequency = frequency
@@ -560,6 +586,7 @@ class JointPosition(Goal):
     def __str__(self):
         s = super().__str__()
         return f'{s}/{self.joint_name}'
+
 
 class AvoidJointLimits(Goal):
     def __init__(self, percentage=15, weight=WEIGHT_BELOW_CA, **kwargs):

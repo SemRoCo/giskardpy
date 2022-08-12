@@ -1,3 +1,4 @@
+from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.configs.default_config import Giskard, ControlModes
 from giskardpy.data_types import PrefixName
 
@@ -53,7 +54,10 @@ class TiagoStandAlone(Giskard):
     def __init__(self):
         super().__init__()
         self.general_config.control_mode = ControlModes.stand_alone
-        self.add_fixed_joint(parent_link=PrefixName('world', 'giskard'), child_link='map')
+        self.root_link_name = 'map'
+        self.collision_avoidance_config.collision_checker = CollisionCheckerLib.none
+        self.disable_visualization()
+        self.disable_tf_publishing()
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_robot_from_parameter_server('robot_description')
         self.register_controlled_joints(['torso_lift_joint', 'head_1_joint', 'head_2_joint'])

@@ -15,8 +15,8 @@ class TFPublisher(GiskardBehavior):
     """
 
     @profile
-    def __init__(self, name, publish_attached_objects, publish_world_objects, tf_topic):
-        super(TFPublisher, self).__init__(name)
+    def __init__(self, name, publish_attached_objects, publish_world_objects, tf_topic, enabled):
+        super().__init__(name)
         self.original_links = set(self.get_robot().link_names)
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.publish_attached_objects = publish_attached_objects
@@ -39,7 +39,7 @@ class TFPublisher(GiskardBehavior):
             with self.get_god_map() as god_map:
                 tf_msg = TFMessage()
                 if self.publish_attached_objects:
-                    robot_links = set(self.unsafe_get_robot().link_names)
+                    robot_links = set(self.robot.link_names)
                     attached_links = robot_links - self.original_links
                     if attached_links:
                         get_fk = self.world.compute_fk_pose

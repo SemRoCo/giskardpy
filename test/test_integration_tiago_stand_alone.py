@@ -301,7 +301,7 @@ class TestCollisionAvoidance:
                                                                          [0, 0, 0, 1]]))
         apartment_setup.set_cart_goal(left_pose,
                                       tip_link=tcp,
-                                      root_link=tf.get_tf_root(),
+                                      root_link=apartment_setup.world.root_link_name,
                                       check=False)
         goal_point = PointStamped()
         goal_point.header.frame_id = 'cabinet1_door_top_left'

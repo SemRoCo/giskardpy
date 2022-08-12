@@ -817,7 +817,7 @@ class GiskardTestWrapper(GiskardWrapper):
             assert name in self.get_group_names()
             response2 = self.get_group_info(name)
             if pose is not None:
-                p = tf.transform_pose(tf.get_tf_root(), pose)
+                p = self.transform_msg(self.world.root_link_name, pose)
                 o_p = self.world.groups[name].base_pose
                 compare_poses(p.pose, o_p)
                 compare_poses(o_p, response2.root_link_pose.pose)

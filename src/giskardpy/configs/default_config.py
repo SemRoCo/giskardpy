@@ -3,7 +3,7 @@ from collections import defaultdict
 from copy import deepcopy
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
-
+import giskardpy.utils.tfwrapper as tf
 import numpy as np
 import rospy
 from py_trees import Blackboard
@@ -39,6 +39,7 @@ class Giskard:
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
         self._controlled_joints = []
+        self.root_link_name = None
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self._backup = {}
@@ -55,6 +56,13 @@ class Giskard:
 
     def register_controlled_joints(self, joint_names: List[str]):
         self._controlled_joints.extend(joint_names)
+
+    def disable_visualization(self):
+        self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = False
+        self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = False
+
+    def disable_tf_publishing(self):
+        self.behavior_tree_config.plugin_config['TFPublisher']['enabled'] = False
 
     def add_fixed_joint(self, parent_link: my_string, child_link: my_string, homo_transform: Optional[np.ndarray] = None):
         if homo_transform is None:
@@ -79,9 +87,9 @@ class Giskard:
     def set_joint_states_topic(self, topic_name: str):
         self.robot_interface_configs.joint_state_topic = topic_name
 
-    def add_sync_tf_frame(self, parent_link, child_link, add_after_robot=False):
+    def add_sync_tf_frame(self, parent_link, child_link):
         self.add_fixed_joint(parent_link=parent_link, child_link=child_link)
-        self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link, add_after_robot)
+        self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link)
 
     def add_odometry_topic(self, odometry_topic):
         self.hardware_config.odometry_topics.append(odometry_topic)
@@ -114,7 +122,9 @@ class Giskard:
 
     def grow(self):
         self._create_parameter_backup()
-        world = WorldTree(self._god_map)
+        if self.root_link_name is None:
+            self.root_link_name = tf.get_tf_root()
+        world = WorldTree(self.root_link_name, self._god_map)
         world.delete_all_but_robot()
         world.register_controlled_joints(self._controlled_joints)
 

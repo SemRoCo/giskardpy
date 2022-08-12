@@ -209,6 +209,7 @@ class BehaviorTreeConfig:
             'frequency_range': 0.4,
         },
         'TFPublisher': {
+            'enabled': True,
             'publish_attached_objects': True,
             'publish_world_objects': False,
             'tf_topic': '/tf',
@@ -236,7 +237,7 @@ class BehaviorTreeConfig:
 
     def add_sync_tf_frame(self, parent_link, child_link, add_after_robot=False):
         # TODO make data structure
-        self.plugin_config['SyncTfFrames']['frames'].append([parent_link, child_link, add_after_robot])
+        self.plugin_config['SyncTfFrames']['frames'].append([parent_link, child_link])
 
 
 class RobotInterfaceConfig:

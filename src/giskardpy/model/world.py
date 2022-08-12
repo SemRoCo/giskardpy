@@ -13,7 +13,6 @@ import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.configs.data_types import FrameToAddToWorld
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
@@ -27,7 +26,6 @@ from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize
-import giskardpy.utils.tfwrapper as tf
 
 class TravelCompanion(object):
     def link_call(self, link_name: Union[PrefixName, str]) -> bool:
@@ -48,7 +46,8 @@ class WorldTree:
     links: Dict[Union[PrefixName, str], Link]
     god_map: GodMap
 
-    def __init__(self, god_map=None):
+    def __init__(self, root_link_name, god_map=None):
+        self.root_link_name = root_link_name
         self.god_map = god_map
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
@@ -421,7 +420,6 @@ class WorldTree:
 
     def _clear(self):
         self.state = JointStates()
-        self.root_link_name = PrefixName('world', 'giskard')
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
@@ -886,7 +884,7 @@ class WorldTree:
         elif isinstance(msg, QuaternionStamped):
             return self.transform_quaternion(target_frame, msg)
         else:
-            raise NotImplementedError('World can\'t transform message of type \'{}\''.format(type(msg)))
+            raise NotImplementedError(f'World can\'t transform message of type \'{type(msg)}\'')
 
     def transform_pose(self, target_frame, pose):
         """

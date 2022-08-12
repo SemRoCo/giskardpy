@@ -123,7 +123,7 @@ class WorldUpdater(GiskardBehavior):
             # if node_name in tree.tree_nodes:
             #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = tf.get_tf_root()
+            res.root_link_pose.header.frame_id = self.world.root_link_name
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
@@ -211,7 +211,10 @@ class WorldUpdater(GiskardBehavior):
         # assumes that parent has god map lock
         req = self.handle_convention(req)
         world_body = req.body
-        global_pose = transform_pose(tf.get_tf_root(), req.pose)
+        try:
+            global_pose = transform_pose(tf.get_tf_root(), req.pose)
+        except AssertionError:
+            global_pose = req.pose
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,
@@ -227,10 +230,10 @@ class WorldUpdater(GiskardBehavior):
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
+            raise NotImplementedError('tf_root_link_name is not implemented')
             plugin_name = str(PrefixName(world_body.name, 'localization'))
             plugin = SyncTfFrames(plugin_name,
-                                  group_name=req.group_name,
-                                  tf_root_link_name=world_body.tf_root_link_name)
+                                  frames=world_body.tf_root_link_name)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names.append(plugin_name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')

@@ -99,6 +99,7 @@ joint_convergence_threshold = plugins + ['GoalReached', 'joint_convergence_thres
 GoalReached_window_size = plugins + ['GoalReached', 'window_size']
 
 TFPublisher = plugins + ['TFPublisher']
+TFPublisher_enabled = TFPublisher + ['enabled']
 
 SyncOdometry = plugins + ['SyncOdometry']
 

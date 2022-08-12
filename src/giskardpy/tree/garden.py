@@ -55,7 +55,7 @@ from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.time_real import RosTime
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
-from giskardpy.tree.composites.async_composite import PluginBehavior
+from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
@@ -121,8 +121,8 @@ class ManagerNode:
         """
         self.enabled_children.remove(manager_node)
         self.disabled_children.add(manager_node)
-        if isinstance(self.node, PluginBehavior):
-            self.node.remove_plugin(manager_node.node.name)
+        if isinstance(self.node, AsyncBehavior):
+            self.node.remove_child(manager_node.node.name)
         else:
             self.node.remove_child(manager_node.node)
 
@@ -135,8 +135,8 @@ class ManagerNode:
         """
         self.disabled_children.remove(manager_node)
         self.enabled_children.add(manager_node)
-        if isinstance(self.node, PluginBehavior):
-            self.node.add_plugin(manager_node.node)
+        if isinstance(self.node, AsyncBehavior):
+            self.node.add_child(manager_node.node)
         else:
             idx = self.enabled_children.index(manager_node)
             self.node.insert_child(manager_node.node, idx)
@@ -148,9 +148,9 @@ class ManagerNode:
         :type manager_node: TreeManager.ManagerNode
         :return:
         """
-        if isinstance(self.node, PluginBehavior):
+        if isinstance(self.node, AsyncBehavior):
             self.enabled_children.add(manager_node)
-            self.node.add_plugin(manager_node.node)
+            self.node.add_child(manager_node.node)
         else:
             if manager_node.position < 0:
                 manager_node.position = 0
@@ -176,10 +176,10 @@ class ManagerNode:
         :type manager_node: TreeManager.ManagerNode
         :return:
         """
-        if isinstance(self.node, PluginBehavior):
+        if isinstance(self.node, AsyncBehavior):
             if manager_node in self.enabled_children:
                 self.enabled_children.remove(manager_node)
-                self.node.remove_plugin(manager_node.node.name)
+                self.node.remove_child(manager_node.node.name)
             elif manager_node in self.disabled_children:
                 self.disabled_children.remove(manager_node)
             else:
@@ -262,8 +262,8 @@ class TreeManager:
         manager_node = ManagerNode(node=node, parent=parent, position=idx)
         if parent is not None:
             parent.enabled_children.add(manager_node)
-        if isinstance(node, PluginBehavior):
-            children = node.get_plugins()
+        if isinstance(node, AsyncBehavior):
+            children = node._children
             for child_name in children:
                 child_node = ManagerNode(node=children[child_name], parent=manager_node, position=0)
                 self.tree_nodes[child_name] = child_node
@@ -415,7 +415,7 @@ def generate_pydot_graph(root, visibility_level, profile=None):
             attributes = ('box', 'orange', 'black')
         elif node_type == Parallel:
             attributes = ('note', 'gold', 'black')
-        elif node_type == PluginBehavior:
+        elif node_type == AsyncBehavior:
             attributes = ('house', 'green', 'black')
         # elif isinstance(node, PluginBase) or node.children != []:
         #     attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
@@ -440,16 +440,17 @@ def generate_pydot_graph(root, visibility_level, profile=None):
 
     def add_edges(root, root_dot_name, visibility_level, profile):
         if visibility_level < root.blackbox_level:
-            if isinstance(root, PluginBehavior):
-                childrens = []
+            if isinstance(root, AsyncBehavior) \
+                    or ((hasattr(root, 'original') and isinstance(root.original, AsyncBehavior))):
+                children = []
                 names2 = []
-                for name, children in root.get_plugins().items():
-                    childrens.append(children)
+                for name, children in root.get_children().items():
+                    children.append(children)
                     names2.append(name)
             else:
-                childrens = root.children
-                names2 = [c.name for c in childrens]
-            for name, c in zip(names2, childrens):
+                children = root.children
+                names2 = [c.name for c in children]
+            for name, c in zip(names2, children):
                 (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
                 proposed_dot_name = name
                 if hasattr(c, 'original'):
@@ -457,7 +458,7 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                 color = 'black'
                 if (isinstance(c, GiskardBehavior) or (hasattr(c, 'original')
                                                        and isinstance(c.original, GiskardBehavior))) \
-                        and not isinstance(c, PluginBehavior) and profile is not None:
+                        and not isinstance(c, AsyncBehavior) and profile is not None:
                     if hasattr(c, 'original'):
                         file_name = str(c.original.__class__).split('.')[-2]
                     else:
@@ -477,8 +478,7 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                 graph.add_node(node)
                 edge = pydot.Edge(root_dot_name, proposed_dot_name)
                 graph.add_edge(edge)
-                if (isinstance(c, PluginBehavior) and c.get_plugins() != []) or \
-                        (isinstance(c, Behaviour) and c.children != []):
+                if (hasattr(c, 'children') and c.children != []) or (hasattr(c, '_children') and c._children != []):
                     add_edges(c, proposed_dot_name, visibility_level, profile)
 
     add_edges(root, root.name, visibility_level, profile)
@@ -507,7 +507,8 @@ class StandAlone(TreeManager):
         sync.add_child(WorldUpdater('update world'))
         sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        if self.god_map.get_data(identifier.TFPublisher_enabled):
+            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
@@ -564,27 +565,27 @@ class StandAlone(TreeManager):
         return planning_3
 
     def grow_closed_loop_control(self):
-        planning_4 = failure_is_success(PluginBehavior)('closed loop control')
+        planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
         if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            planning_4.add_plugin(VisualizationBehavior('visualization'))
+            planning_4.add_child(VisualizationBehavior('visualization'))
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-            planning_4.add_plugin(CollisionChecker('collision checker'))
+            planning_4.add_child(CollisionChecker('collision checker'))
             if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-                planning_4.add_plugin(CollisionMarker('cpi marker'))
-        planning_4.add_plugin(ControllerPlugin('controller'))
-        planning_4.add_plugin(KinSimPlugin('kin sim'))
-        planning_4.add_plugin(LogTrajPlugin('log'))
+                planning_4.add_child(CollisionMarker('cpi marker'))
+        planning_4.add_child(ControllerPlugin('controller'))
+        planning_4.add_child(KinSimPlugin('kin sim'))
+        planning_4.add_child(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
+            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-            planning_4.add_plugin(DebugTFPublisher('debug tf publisher'))
+            planning_4.add_child(DebugTFPublisher('debug tf publisher'))
         # planning_4.add_plugin(WiggleCancel('wiggle'))
-        planning_4.add_plugin(LoopDetector('loop detector'))
-        planning_4.add_plugin(GoalReached('goal reached'))
-        planning_4.add_plugin(TimePlugin())
+        planning_4.add_child(LoopDetector('loop detector'))
+        planning_4.add_child(GoalReached('goal reached'))
+        planning_4.add_child(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-            planning_4.add_plugin(MaxTrajectoryLength('traj length check', **kwargs))
+            planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
         return planning_4
 
     def grow_plan_postprocessing(self):
@@ -629,7 +630,8 @@ class OpenLoop(StandAlone):
             sync.add_child(running_is_success(SyncConfiguration)(joint_state_topic=joint_state_topic))
         for odometry_topic in hardware_config.odometry_topics:
             sync.add_child(running_is_success(SyncOdometry)(odometry_topic=odometry_topic))
-        sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        if self.god_map.get_data(identifier.TFPublisher_enabled):
+            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
@@ -674,20 +676,20 @@ class OpenLoop(StandAlone):
             execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
         if self.add_real_time_tracking:
             for drive_interface in hardware_config.drive_interfaces:
-                real_time_tracking = PluginBehavior('base sequence')
-                real_time_tracking.add_plugin(success_is_running(SyncTfFrames)('sync tf frames',
-                                                                               **self.god_map.unsafe_get_data(
+                real_time_tracking = AsyncBehavior('base sequence')
+                real_time_tracking.add_child(success_is_running(SyncTfFrames)('sync tf frames',
+                                                                              **self.god_map.unsafe_get_data(
                                                                                    identifier.SyncTfFrames)))
                 for odometry_topic in hardware_config.odometry_topics:
-                    real_time_tracking.add_plugin(SyncOdometry(odometry_topic))
-                real_time_tracking.add_plugin(RosTime('time'))
-                real_time_tracking.add_plugin(ControllerPlugin('base controller'))
-                real_time_tracking.add_plugin(RealKinSimPlugin('kin sim'))
+                    real_time_tracking.add_child(SyncOdometry(odometry_topic))
+                real_time_tracking.add_child(RosTime('time'))
+                real_time_tracking.add_child(ControllerPlugin('base controller'))
+                real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
                 if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
-                    real_time_tracking.add_plugin(PublishDebugExpressions('PublishDebugExpressions',
-                                                                          **self.god_map.unsafe_get_data(
+                    real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
+                                                                         **self.god_map.unsafe_get_data(
                                                                               identifier.PublishDebugExpressions)))
-                real_time_tracking.add_plugin(drive_interface.make_plugin())
+                real_time_tracking.add_child(drive_interface.make_plugin())
 
                 execution_action_server.add_child(real_time_tracking)
         return execution_action_server
@@ -718,30 +720,30 @@ class ClosedLoop(OpenLoop):
         return planning_3
 
     def grow_closed_loop_control(self):
-        planning_4 = PluginBehavior('planning IIII')
+        planning_4 = AsyncBehavior('planning IIII')
         action_servers = self.god_map.get_data(identifier.robot_interface)
         behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
         for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
             C = behaviors[params['plugin']]
             del params['plugin']
-            planning_4.add_plugin(C(execution_action_server_name, **params))
-        planning_4.add_plugin(SyncConfiguration2('update robot configuration',
-                                                 self.god_map.unsafe_get_data(identifier.robot_group_name)))
-        planning_4.add_plugin(LogTrajPlugin('log'))
+            planning_4.add_child(C(execution_action_server_name, **params))
+        planning_4.add_child(SyncConfiguration2('update robot configuration',
+                                                self.god_map.unsafe_get_data(identifier.robot_group_name)))
+        planning_4.add_child(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.collision_checker) is not None:
-            planning_4.add_plugin(CollisionChecker('collision checker'))
-        planning_4.add_plugin(ControllerPlugin('controller'))
-        planning_4.add_plugin(KinSimPlugin('kin sim'))
+            planning_4.add_child(CollisionChecker('collision checker'))
+        planning_4.add_child(ControllerPlugin('controller'))
+        planning_4.add_child(KinSimPlugin('kin sim'))
 
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_plugin(LogDebugExpressionsPlugin('log lba'))
+            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         # planning_4.add_plugin(WiggleCancel('wiggle'))
         # planning_4.add_plugin(LoopDetector('loop detector'))
-        planning_4.add_plugin(GoalReached('goal reached'))
-        planning_4.add_plugin(TimePlugin('time'))
+        planning_4.add_child(GoalReached('goal reached'))
+        planning_4.add_child(TimePlugin('time'))
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-            planning_4.add_plugin(MaxTrajectoryLength('traj length check', **kwargs))
+            planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
         return planning_4
 
 

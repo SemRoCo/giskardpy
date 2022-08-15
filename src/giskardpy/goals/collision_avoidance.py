@@ -74,7 +74,7 @@ class ExternalCollisionAvoidance(Goal):
         a_P_pa = self.get_closest_point_on_a_in_a()
         map_V_n = self.map_V_n_symbol()
         actual_distance = self.get_actual_distance()
-        sample_period = self.get_sampling_period_symbol()
+        sample_period = self.sample_period
         number_of_external_collisions = self.get_number_of_external_collisions()
 
         map_T_a = self.get_fk(self.root, self.link_name)
@@ -133,8 +133,8 @@ class ExternalCollisionAvoidance(Goal):
                             upper_slack_limit=upper_slack)
 
     def __str__(self):
-        s = super(ExternalCollisionAvoidance, self).__str__()
-        return '{}/{}/{}'.format(s, self.link_name, self.idx)
+        s = super().__str__()
+        return f'{s}/{self.link_name}/{self.idx}'
 
 
 class SelfCollisionAvoidance(Goal):
@@ -148,7 +148,7 @@ class SelfCollisionAvoidance(Goal):
         self.soft_threshold = soft_threshold
         self.num_repeller = num_repeller
         self.idx = idx
-        super(SelfCollisionAvoidance, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.root = self.world.root_link_name
         self.robot_name = self.god_map.unsafe_get_data(identifier.robot_group_name)
 
@@ -183,7 +183,7 @@ class SelfCollisionAvoidance(Goal):
     def make_constraints(self):
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
-        sample_period = self.get_sampling_period_symbol()
+        sample_period = self.sample_period
 
         b_T_a2 = self.get_fk_evaluated(self.link_b, self.link_a)
         b_T_a = self.get_fk(self.link_b, self.link_a)
@@ -230,8 +230,8 @@ class SelfCollisionAvoidance(Goal):
                             upper_slack_limit=upper_slack)
 
     def __str__(self):
-        s = super(SelfCollisionAvoidance, self).__str__()
-        return '{}/{}/{}/{}'.format(s, self.link_a, self.link_b, self.idx)
+        s = super().__str__()
+        return f'{s}/{self.link_a}/{self.link_b}/{self.idx}'
 
 
 class CollisionAvoidanceHint(Goal):
@@ -251,7 +251,7 @@ class CollisionAvoidanceHint(Goal):
                                         sprint_threshold to max_threshold linearly, to smooth motions
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CollisionAvoidanceHint, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.link_name = tip_link
         self.key = (tip_link, None, object_link_name)
         self.object_group = object_group
@@ -290,11 +290,11 @@ class CollisionAvoidanceHint(Goal):
                                                                   'link_b_hash'])
 
     def make_constraints(self):
-        weight = self.get_parameter_as_symbolic_expression('weight')
+        weight = w.ros_msg_to_matrix(self.weight)
         actual_distance = self.get_actual_distance()
-        max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
-        max_threshold = self.get_parameter_as_symbolic_expression('threshold')
-        spring_threshold = self.get_parameter_as_symbolic_expression('threshold2')
+        max_velocity = w.ros_msg_to_matrix(self.max_velocity)
+        max_threshold = w.ros_msg_to_matrix(self.threshold)
+        spring_threshold = w.ros_msg_to_matrix(self.threshold2)
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.max(actual_distance, 0)
 
@@ -310,7 +310,7 @@ class CollisionAvoidanceHint(Goal):
                               spring_weight)
         weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
 
-        root_V_avoidance_hint = self.get_parameter_as_symbolic_expression('avoidance_hint')
+        root_V_avoidance_hint = w.ros_msg_to_matrix(self.avoidance_hint)
 
         # penetration_distance = threshold - actual_distance_capped
 
@@ -327,5 +327,5 @@ class CollisionAvoidanceHint(Goal):
                             expression=expr)
 
     def __str__(self):
-        s = super(CollisionAvoidanceHint, self).__str__()
+        s = super().__str__()
         return f'{s}/{self.link_name}/{self.link_b}'

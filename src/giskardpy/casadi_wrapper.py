@@ -164,7 +164,7 @@ def max(x, y):
     return ca.fmax(x, y)
 
 
-def min(x, y):
+def min(x: expr_symbol, y: expr_symbol) -> expr_symbol:
     """
     !gets very imprecise if inputs outside of [-1e7,1e7]!
     :type x: Union[float, Symbol]

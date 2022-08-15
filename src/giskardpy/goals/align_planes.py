@@ -15,7 +15,7 @@ class AlignPlanes(Goal):
         :param weight: float, default is WEIGHT_ABOVE_CA
         :param goal_constraint: bool, default False
         """
-        super(AlignPlanes, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.root = root_link
         self.tip = tip_link
         self.max_velocity = max_angular_velocity
@@ -29,17 +29,17 @@ class AlignPlanes(Goal):
 
 
     def __str__(self):
-        s = super(AlignPlanes, self).__str__()
-        return '{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
-                                                 self.tip_V_tip_normal.vector.x,
-                                                 self.tip_V_tip_normal.vector.y,
-                                                 self.tip_V_tip_normal.vector.z)
+        s = super().__str__()
+        return f'{s}/{self.root}/{self.tip}' \
+               f'_X:{self.tip_V_tip_normal.vector.x}' \
+               f'_Y:{self.tip_V_tip_normal.vector.y}' \
+               f'_Z:{self.tip_V_tip_normal.vector.z}'
 
     def make_constraints(self):
-        tip_V_tip_normal = self.get_parameter_as_symbolic_expression('tip_V_tip_normal')
+        tip_V_tip_normal = w.ros_msg_to_matrix(self.tip_V_tip_normal)
         root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
-        root_V_root_normal = self.get_parameter_as_symbolic_expression('root_V_root_normal')
+        root_V_root_normal = w.ros_msg_to_matrix(self.root_V_root_normal)
         self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_root_normal,
                                          reference_velocity=self.max_velocity,

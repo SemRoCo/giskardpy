@@ -35,7 +35,7 @@ class Open(Goal):
 
 class Close(Goal):
     def __init__(self, tip_link, environment_link, weight=WEIGHT_ABOVE_CA, **kwargs):
-        super(Close, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         joint_name = self.world.get_movable_parent_joint(environment_link)
         goal_joint_state, _ = self.world.get_joint_position_limits(joint_name)
         self.add_constraints_of_goal(Open(tip_link=tip_link,

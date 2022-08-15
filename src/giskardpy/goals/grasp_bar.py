@@ -21,7 +21,7 @@ class GraspBar(Goal):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float default WEIGHT_ABOVE_CA
         """
-        super(GraspBar, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.root = root_link
         self.tip = tip_link
 
@@ -42,13 +42,13 @@ class GraspBar(Goal):
         self.weight = weight
 
     def __str__(self):
-        s = super(GraspBar, self).__str__()
-        return '{}/{}/{}'.format(s, self.root, self.tip)
+        s = super().__str__()
+        return f'{s}/{self.root}/{self.tip}'
 
     def make_constraints(self):
-        root_V_bar_axis = self.get_parameter_as_symbolic_expression('bar_axis')
-        tip_V_tip_grasp_axis = self.get_parameter_as_symbolic_expression('tip_grasp_axis')
-        root_P_bar_center = self.get_parameter_as_symbolic_expression('bar_center')
+        root_V_bar_axis = w.ros_msg_to_matrix(self.bar_axis)
+        tip_V_tip_grasp_axis = w.ros_msg_to_matrix(self.tip_grasp_axis)
+        root_P_bar_center = w.ros_msg_to_matrix(self.bar_center)
 
         root_T_tip = self.get_fk(self.root, self.tip)
         root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)

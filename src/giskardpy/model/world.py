@@ -944,12 +944,10 @@ class WorldTree:
         except KeyError:
             # joint has no limits for this derivative
             return None, None
-        if not isinstance(lower_limit, numbers.Number) and lower_limit is not None:
-            f = w.speed_up(lower_limit, w.free_symbols(lower_limit))
-            lower_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
-        if not isinstance(upper_limit, numbers.Number) and upper_limit is not None:
-            f = w.speed_up(upper_limit, w.free_symbols(upper_limit))
-            upper_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
+        if not isinstance(lower_limit, (int, float)):
+            lower_limit = self.god_map.evaluate_expr(lower_limit)
+        if not isinstance(upper_limit, (int, float)):
+            upper_limit = self.god_map.evaluate_expr(upper_limit)
         return lower_limit, upper_limit
 
     @profile

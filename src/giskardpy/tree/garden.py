@@ -30,6 +30,7 @@ from giskardpy.tree.behaviors.goal_reached import GoalReached
 from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
+from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
@@ -719,7 +720,7 @@ class OpenLoop(StandAlone):
                 for odometry_topic in hardware_config.odometry_topics:
                     real_time_tracking.add_child(SyncOdometry(odometry_topic))
                 real_time_tracking.add_child(RosTime('time'))
-                real_time_tracking.add_child(ControllerPlugin('base controller'))
+                real_time_tracking.add_child(ControllerPluginBase('base controller'))
                 real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
                 if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',

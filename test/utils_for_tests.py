@@ -689,10 +689,9 @@ class GiskardTestWrapper(GiskardWrapper):
                     eps = 0.0001
                     np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1] + eps, error_msg)
                     np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0] + eps, error_msg)
-                vel_limit = self.world.joint_limit_expr(joint_name, 1)[1]
-                vel_limit = self.god_map.evaluate_expr(vel_limit) * 1.001
+                vel_limit = self.world.get_joint_velocity_limits(joint_name)[1] * 1.001
                 vel = trajectory_vel[joint_name]
-                error_msg = '{} has violated joint velocity limit {} > {}'.format(joint_name, vel, vel_limit)
+                error_msg = f'{joint_name} has violated joint velocity limit {vel} > {vel_limit}'
                 assert np.all(np.less_equal(vel, vel_limit)), error_msg
                 assert np.all(np.greater_equal(vel, -vel_limit)), error_msg
 

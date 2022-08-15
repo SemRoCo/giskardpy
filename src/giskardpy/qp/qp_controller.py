@@ -86,6 +86,7 @@ class H(Parent):
         self.velocity_constraints = velocity_constraints  # type: list[velocity_constraints]
         self.height = 0
         self._compute_height()
+        self.evaluted = True
 
     def _compute_height(self):
         self.height = self.number_of_free_variables_with_horizon()
@@ -118,7 +119,8 @@ class H(Parent):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):
                     weights[o][f't{t:03}/{v.position_name}/{o}'] = v.normalized_weight(t, o,
-                                                                                       self.prediction_horizon)
+                                                                                       self.prediction_horizon,
+                                                                                       evaluated=self.evaluted)
         slack_weights = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:  # type: VelocityConstraint
@@ -157,6 +159,7 @@ class B(Parent):
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
         self.no_limits = 1e4
+        self.evaluated = True
 
     def get_lower_slack_limits(self):
         result = {}
@@ -189,11 +192,11 @@ class B(Parent):
                     if t == self.prediction_horizon - 1 \
                             and o < min(v.order, self.order) - 1 \
                             and self.prediction_horizon > 2:  # and False:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = 0
+                        lb[o][f't{t:03}/{v.position_name}/{o}'] = 0
+                        ub[o][f't{t:03}/{v.position_name}/{o}'] = 0
                     else:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = v.get_lower_limit(o)
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.position_name, o)] = v.get_upper_limit(o)
+                        lb[o][f't{t:03}/{v.position_name}/{o}'] = v.get_lower_limit(o, evaluated=self.evaluated)
+                        ub[o][f't{t:03}/{v.position_name}/{o}'] = v.get_upper_limit(o, evaluated=self.evaluated)
         lb_params = []
         for o, x in sorted(lb.items()):
             lb_params.append(x)
@@ -220,6 +223,7 @@ class BA(Parent):
         self.round_to = 5
         self.round_to2 = 10
         self.default_limits = default_limits
+        self.evaluated = True
 
     def get_lower_constraint_velocities(self):
         result = {}
@@ -263,10 +267,10 @@ class BA(Parent):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
                     lb[f't{t:03}/{v.position_name}/p_limit'] = w.round_up(
-                        v.get_lower_limit(0, self.default_limits) - v.get_symbol(0),
+                        v.get_lower_limit(0, self.default_limits, evaluated=self.evaluated) - v.get_symbol(0),
                         self.round_to2)
                     ub[f't{t:03d}/{v.position_name}/p_limit'] = w.round_down(
-                        v.get_upper_limit(0, self.default_limits) - v.get_symbol(0),
+                        v.get_upper_limit(0, self.default_limits, evaluated=self.evaluated) - v.get_symbol(0),
                         self.round_to2)
 
         l_last_stuff = defaultdict(dict)
@@ -280,7 +284,7 @@ class BA(Parent):
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
                 for o in range(1, min(v.order, self.order) - 1):
-                    derivative_link[o]['t{:03d}/{}/{}/link'.format(t, o, v.position_name)] = 0
+                    derivative_link[o][f't{t:03}/{o}/{v.position_name}/link'] = 0
 
         lb_params = [lb]
         ub_params = [ub]

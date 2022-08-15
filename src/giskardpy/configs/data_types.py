@@ -166,7 +166,7 @@ class CollisionAvoidanceConfig:
 
 
 class BehaviorTreeConfig:
-    tree_tick_rate: float = 0.1
+    tree_tick_rate: float = 0.05
 
     plugin_config = {
         'GoalReached': {
@@ -175,18 +175,18 @@ class BehaviorTreeConfig:
         },
         'VisualizationBehavior': {
             'enabled': True,
-            'in_planning_loop': True
-        },
-        'PublishDebugExpressions': {
-            'enabled': False,
-            'expression_filter': None
+            'in_planning_loop': False
         },
         'CollisionMarker': {
             'enabled': True,
             'in_planning_loop': False
         },
+        'PublishDebugExpressions': {
+            'enabled': False,
+            'expression_filter': None
+        },
         'PlotTrajectory': {
-            'enabled': True,
+            'enabled': False,
             'history': 5,
             'velocity_threshold': 0.0,
             'cm_per_second': 2.5,
@@ -196,7 +196,7 @@ class BehaviorTreeConfig:
             'tick_stride': 0.5,
         },
         'PlotDebugExpressions': {
-            'enabled': True,
+            'enabled': False,
             'history': 5,
             'cm_per_second': 2.5,
             'height_per_derivative': 6,

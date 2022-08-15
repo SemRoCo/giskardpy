@@ -1,6 +1,7 @@
 import traceback
 from itertools import product
 from queue import Queue
+from time import time
 from xml.etree.ElementTree import ParseError
 
 import rospy
@@ -66,6 +67,7 @@ class WorldUpdater(GiskardBehavior):
     STALL = 2
 
     # TODO reject changes if plugin not active or something
+    @profile
     def __init__(self, name: str):
         self.added_plugin_names = []
         super().__init__(name)
@@ -97,6 +99,7 @@ class WorldUpdater(GiskardBehavior):
             res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
         return res
 
+    @profile
     def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
         link_name = self.world.groups[req.parent_group_name].get_link_short_name_match(req.root_link_name)
         self.world.register_group(req.group_name, link_name)
@@ -104,12 +107,14 @@ class WorldUpdater(GiskardBehavior):
         res.error_codes = res.SUCCESS
         return res
 
+    @profile
     def get_group_names_cb(self, req: GetGroupNamesRequest) -> GetGroupNamesResponse:
         group_names = self.world.group_names
         res = GetGroupNamesResponse()
         res.group_names = group_names
         return res
 
+    @profile
     def get_group_info_cb(self, req: GetGroupInfoRequest) -> GetGroupInfoResponse:
         res = GetGroupInfoResponse()
         res.error_codes = GetGroupInfoResponse.SUCCESS
@@ -151,13 +156,12 @@ class WorldUpdater(GiskardBehavior):
             if self.update_ticked.empty():
                 self.update_ticked.put(1)
 
-    def update_world_cb(self, req):
+    @profile
+    def update_world_cb(self, req: UpdateWorldRequest) -> UpdateWorldResponse:
         """
         Callback function of the ROS service to update the internal giskard world.
         :param req: Service request as received from the service client.
-        :type req: UpdateWorldRequest
         :return: Service response, reporting back any runtime errors that occurred.
-        :rtype UpdateWorldResponse
         """
         self.service_in_use.put('muh')
         try:
@@ -207,8 +211,10 @@ class WorldUpdater(GiskardBehavior):
             req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
         return req
 
+    @profile
     def add_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
+        # t = time()
         req = self.handle_convention(req)
         world_body = req.body
         try:
@@ -240,7 +246,9 @@ class WorldUpdater(GiskardBehavior):
         parent_group = self.world.get_parent_group_name(req.group_name)
         self.collision_scene.update_group_blacklist(parent_group)
         self.collision_scene.blacklist_inter_group_collisions()
+        # logging.logwarn(f'adding took {time() - t:03}')
 
+    @profile
     def update_group_pose(self, req: UpdateWorldRequest):
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
@@ -254,6 +262,7 @@ class WorldUpdater(GiskardBehavior):
         #     link_combinations=set(product(group.link_names_with_collisions,
         #                                   self.world.link_names_with_collisions)))
 
+    @profile
     def update_parent_link(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
         req = self.handle_convention(req)
@@ -271,6 +280,7 @@ class WorldUpdater(GiskardBehavior):
         else:
             logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
 
+    @profile
     def remove_object(self, name):
         # assumes that parent has god map lock
         if name not in self.world.groups:
@@ -287,6 +297,7 @@ class WorldUpdater(GiskardBehavior):
             tree.remove_node(name)
             self.added_plugin_names.remove(name)
 
+    @profile
     def clear_world(self):
         # assumes that parent has god map lock
         self.collision_scene.reset_collision_blacklist()

@@ -9,6 +9,7 @@ from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 
 
 class JointGroupPosController(CommandPublisher):
+    @profile
     def __init__(self, name, namespace='/joint_group_pos_controller', hz=100):
         self.namespace = namespace
         self.cmd_topic = '{}/command'.format(self.namespace)

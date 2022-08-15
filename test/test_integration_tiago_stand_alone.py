@@ -378,19 +378,19 @@ class TestCollisionAvoidance:
         apartment_setup.plan_and_execute()
 
     def test_dishwasher(self, apartment_setup: TiagoTestWrapper):
-        dishwasher_middle = 'iai_apartment/dishwasher_drawer_middle'
+        dishwasher_middle = 'dishwasher_drawer_middle'
         base_pose = PoseStamped()
         base_pose.header.frame_id = dishwasher_middle
         base_pose.pose.position.x = -1
         base_pose.pose.position.y = -0.25
         base_pose.pose.orientation.w = 1
-        base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
+        base_pose = apartment_setup.transform_msg(apartment_setup.default_root, base_pose)
         base_pose.pose.position.z = 0
-        apartment_setup.set_localization(base_pose)
+        apartment_setup.set_seed_odometry(base_pose)
 
         tcp = 'gripper_left_grasping_frame'
         handle_name = 'handle_cab7'
-        handle_name_frame = 'iai_apartment/handle_cab7'
+        handle_name_frame = 'handle_cab7'
         goal_angle = np.pi / 2
         left_pose = PoseStamped()
         left_pose.header.frame_id = handle_name_frame
@@ -401,7 +401,7 @@ class TestCollisionAvoidance:
                                                                          [0, 0, 0, 1]]))
         apartment_setup.set_cart_goal(left_pose,
                                       tip_link=tcp,
-                                      root_link=tf.get_tf_root(),
+                                      root_link=apartment_setup.default_root,
                                       check=False)
         apartment_setup.plan_and_execute()
 

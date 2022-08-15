@@ -8,10 +8,12 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class PublishDebugExpressions(GiskardBehavior):
+    @profile
     def __init__(self, name, enabled, expression_filter=None, **kwargs):
         super().__init__(name)
         self.expression_filter = expression_filter
 
+    @profile
     def setup(self, timeout):
         self.publisher = rospy.Publisher('~qp_data', JointState, queue_size=1)
         return super().setup(timeout)

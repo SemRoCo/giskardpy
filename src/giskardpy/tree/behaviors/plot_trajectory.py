@@ -11,8 +11,9 @@ from giskardpy.utils.utils import plot_trajectory
 class PlotTrajectory(GiskardBehavior):
     plot_thread: Thread
 
+    @profile
     def __init__(self, name, enabled, wait=False, joint_filter=None, **kwargs):
-        super(PlotTrajectory, self).__init__(name)
+        super().__init__(name)
         self.wait = wait
         self.kwargs = kwargs
         self.joint_filter = joint_filter

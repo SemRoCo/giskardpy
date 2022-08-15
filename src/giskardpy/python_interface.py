@@ -67,12 +67,6 @@ class GiskardWrapper(object):
     def get_robot_name(self) -> str:
         return self._god_map.unsafe_get_data(identifier.robot_group_name)
 
-    def get_robot_root_link(self) -> str:
-        """
-        Returns the name of the robot's root link
-        """
-        return str(self._world.groups[self.get_robot_name()].root_link_name)
-
     def set_cart_goal(self,
                       goal_pose: PoseStamped,
                       tip_link: str,

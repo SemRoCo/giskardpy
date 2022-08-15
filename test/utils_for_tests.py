@@ -35,6 +35,7 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
+from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
 
@@ -94,56 +95,6 @@ def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis,
             np.testing.assert_almost_equal(shortest_angular_distance(0, expected_angle), 0, decimal=decimal)
             assert not np.any(np.isnan(actual_axis))
             assert not np.any(np.isnan(expected_axis))
-
-
-def compare_poses(actual_pose, desired_pose, decimal=2):
-    """
-    :type actual_pose: Pose
-    :type desired_pose: Pose
-    """
-    compare_points(actual_point=actual_pose.position,
-                   desired_point=desired_pose.position,
-                   decimal=decimal)
-    compare_orientations(actual_orientation=actual_pose.orientation,
-                         desired_orientation=desired_pose.orientation,
-                         decimal=decimal)
-
-
-def compare_points(actual_point, desired_point, decimal=2):
-    np.testing.assert_almost_equal(actual_point.x, desired_point.x, decimal=decimal)
-    np.testing.assert_almost_equal(actual_point.y, desired_point.y, decimal=decimal)
-    np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
-
-
-def compare_orientations(actual_orientation, desired_orientation, decimal=2):
-    """
-    :type actual_orientation: Quaternion
-    :type desired_orientation: Quaternion
-    """
-    if isinstance(actual_orientation, Quaternion):
-        q1 = np.array([actual_orientation.x,
-                       actual_orientation.y,
-                       actual_orientation.z,
-                       actual_orientation.w])
-    else:
-        q1 = actual_orientation
-    if isinstance(desired_orientation, Quaternion):
-        q2 = np.array([desired_orientation.x,
-                       desired_orientation.y,
-                       desired_orientation.z,
-                       desired_orientation.w])
-    else:
-        q2 = desired_orientation
-    try:
-        np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
-        np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
-        np.testing.assert_almost_equal(q1[2], q2[2], decimal=decimal)
-        np.testing.assert_almost_equal(q1[3], q2[3], decimal=decimal)
-    except:
-        np.testing.assert_almost_equal(q1[0], -q2[0], decimal=decimal)
-        np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
-        np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
-        np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
 
 
 @composite
@@ -395,9 +346,6 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
-        # rospy.set_param('~config', config_file)
-        # rospy.set_param('~test', True)
-
         self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
                                                        UpdateTransform)
 
@@ -408,14 +356,9 @@ class GiskardTestWrapper(GiskardWrapper):
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
-        super(GiskardTestWrapper, self).__init__(node_name='tests')
+        super().__init__(node_name='tests')
         self.results = Queue(100)
-        try:
-            self.default_root = tf.get_tf_root()
-        except AssertionError:
-            self.default_root = str(self.world.root_link_name)
-        self.map = 'map'
-        self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
+        self.default_root = str(self.world.root_link_name)
         self.goal_checks = defaultdict(list)
 
         def create_publisher(topic):
@@ -427,10 +370,16 @@ class GiskardTestWrapper(GiskardWrapper):
         # rospy.sleep(1)
         self.original_number_of_links = len(self.world.links)
 
-    def set_localization(self, map_T_odom):
-        """
-        :type map_T_odom: PoseStamped
-        """
+    def set_seed_odometry(self, base_pose):
+        self.set_json_goal('SetOdometry',
+                           group_name=self.get_robot_name(),
+                           base_pose=base_pose)
+
+    def set_seed_configuration(self, seed_configuration):
+        self.set_json_goal('SetSeedConfiguration',
+                           seed_configuration=seed_configuration)
+
+    def set_localization(self, map_T_odom: PoseStamped):
         req = UpdateTransformRequest()
         req.transform.translation = map_T_odom.pose.position
         req.transform.rotation = map_T_odom.pose.orientation
@@ -439,6 +388,7 @@ class GiskardTestWrapper(GiskardWrapper):
         p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
         compare_poses(p2.pose, map_T_odom.pose)
 
+    @profile
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
@@ -479,9 +429,11 @@ class GiskardTestWrapper(GiskardWrapper):
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
         self.tree.kill_all_services()
-        logging.loginfo(
-            'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
-        logging.loginfo('total time spend moving: {}'.format(self.total_time_spend_moving))
+        giskarding_time = self.total_time_spend_giskarding
+        if self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
+            giskarding_time -= self.total_time_spend_moving
+        logging.loginfo(f'total time spend giskarding: {giskarding_time}')
+        logging.loginfo(f'total time spend moving: {self.total_time_spend_moving}')
         logging.loginfo('stopping tree')
 
     def set_object_joint_state(self, object_name, joint_state):

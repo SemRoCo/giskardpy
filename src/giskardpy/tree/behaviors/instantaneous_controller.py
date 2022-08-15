@@ -9,13 +9,13 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 class ControllerPlugin(GiskardBehavior):
     controller: QPController = None
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def initialise(self):
         self.controller = self.god_map.get_data(identifier.qp_controller)
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)

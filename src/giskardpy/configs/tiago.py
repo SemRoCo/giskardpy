@@ -6,7 +6,6 @@ from giskardpy.data_types import PrefixName
 class TiagoMujoco(Giskard):
     def __init__(self):
         super().__init__()
-        self.add_fixed_joint(parent_link=PrefixName('world', 'giskard'), child_link='map')
         self.add_sync_tf_frame('map', 'odom')
         self.add_odometry_topic('/tiago/base_footprint')
         self.add_robot_from_parameter_server()

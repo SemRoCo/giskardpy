@@ -34,8 +34,8 @@ class RosMsgToGoal(GetGoal):
     def initialise(self):
         self.clear_blackboard_exception()
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         # TODO make this interruptable
         loginfo('Parsing goal message.')

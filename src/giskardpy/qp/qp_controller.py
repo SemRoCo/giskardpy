@@ -627,10 +627,6 @@ class QPController:
 
     @profile
     def compile(self):
-        with suppress_stdout():
-            self._construct_big_ass_M(default_limits=True)
-            self._compile_big_ass_M()
-            self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M
         self._construct_big_ass_M(default_limits=False)
         self._compile_big_ass_M()
 
@@ -820,9 +816,15 @@ class QPController:
                self.np_ubA[bA_filter]
 
     def __swap_compiled_matrices(self):
-        self.compiled_big_ass_M, \
-        self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M_with_default_limits, \
-                                                      self.compiled_big_ass_M
+        if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
+            with suppress_stdout():
+                self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M
+                self._construct_big_ass_M(default_limits=True)
+                self._compile_big_ass_M()
+        else:
+            self.compiled_big_ass_M, \
+            self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M_with_default_limits, \
+                                                          self.compiled_big_ass_M
 
     @profile
     def get_cmd(self, substitutions: list) -> Tuple[list, dict]:

@@ -14,8 +14,8 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class InitQPController(GiskardBehavior):
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         constraints, vel_constraints, debug_expressions = self.get_constraints_from_goals()
         free_variables = self.get_active_free_symbols(constraints, vel_constraints)

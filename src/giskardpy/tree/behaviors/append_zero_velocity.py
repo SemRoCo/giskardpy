@@ -6,6 +6,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class SetZeroVelocity(GiskardBehavior):
+    @profile
     def __init__(self, name=None):
         if name is None:
             name = 'set velocity to zero'

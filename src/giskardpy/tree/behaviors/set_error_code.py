@@ -9,6 +9,7 @@ from giskardpy.utils import logging
 
 class SetErrorCode(GiskardBehavior):
 
+    @profile
     def __init__(self, name, context, print=True):
         self.reachability_threshold = 0.001
         self.print = print

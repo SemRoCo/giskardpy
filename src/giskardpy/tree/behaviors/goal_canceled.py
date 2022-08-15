@@ -7,6 +7,7 @@ from giskardpy.utils.utils import raise_to_blackboard
 
 
 class GoalCanceled(ActionServerBehavior):
+    @profile
     def __init__(self, name, as_name, action_type=None, feedback=None):
         super().__init__(name, as_name, action_type)
         self.feedback = feedback

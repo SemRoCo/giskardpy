@@ -26,10 +26,10 @@ class SyncOdometry(GiskardBehavior):
         self.lock = Queue(maxsize=1)
 
     def __str__(self):
-        return f'{super().__str__()}: {self.odometry_topic}'
+        return f'{super().__str__()} ({self.odometry_topic})'
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def setup(self, timeout=0.0):
         msg: Optional[Odometry] = None
         while msg is None and not rospy.is_shutdown():
@@ -54,8 +54,8 @@ class SyncOdometry(GiskardBehavior):
             pass
         self.lock.put(data)
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         joint: OmniDrive = self.world.joints[self.brumbrum]
         try:

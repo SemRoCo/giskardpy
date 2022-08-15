@@ -11,6 +11,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class WiggleCancel(GiskardBehavior):
+    @profile
     def __init__(self, name):
         super(WiggleCancel, self).__init__(name)
         self.amplitude_threshold = self.get_god_map().get_data(identifier.amplitude_threshold)
@@ -32,7 +33,7 @@ class WiggleCancel(GiskardBehavior):
 
     @profile
     def initialise(self):
-        super(WiggleCancel, self).initialise()
+        super().initialise()
         self.js_samples = []
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         self.max_detectable_freq = 1 / (2 * self.sample_period)

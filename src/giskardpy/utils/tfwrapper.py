@@ -80,6 +80,7 @@ def wait_for_transform(target_frame, source_frame, time, timeout):
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
+@profile
 def transform_msg(target_frame, msg, timeout=5):
     if isinstance(msg, PoseStamped):
         return transform_pose(target_frame, msg, timeout)
@@ -90,7 +91,7 @@ def transform_msg(target_frame, msg, timeout=5):
     elif isinstance(msg, QuaternionStamped):
         return transform_quaternion(target_frame, msg, timeout)
     else:
-        raise NotImplementedError('tf transform message of type \'{}\''.format(type(msg)))
+        raise NotImplementedError(f'tf transform message of type \'{type(msg)}\'')
 
 
 def transform_pose(target_frame, pose, timeout=5.0):

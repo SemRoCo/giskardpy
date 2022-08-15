@@ -12,7 +12,7 @@ class KinSimPlugin(GiskardBehavior):
         def f(joint_symbol):
             return self.god_map.expr_to_key[joint_symbol][-2]
         self.symbol_to_joint_map = KeyDefaultDict(f)
-        super(KinSimPlugin, self).initialise()
+        super().initialise()
 
     @profile
     def update(self):

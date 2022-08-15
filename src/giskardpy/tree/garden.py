@@ -1,3 +1,5 @@
+from collections import defaultdict
+from time import time
 from typing import Type, TypeVar, Union
 
 import py_trees
@@ -58,7 +60,7 @@ from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
-from giskardpy.utils.utils import create_path
+from giskardpy.utils.utils import create_path, resolve_ros_iris
 from giskardpy.utils.utils import get_all_classes_in_package
 
 T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])
@@ -201,6 +203,35 @@ class ManagerNode:
                 c.position -= 1
 
 
+def search_for(lines, function_name):
+    data = []
+    for i, x in enumerate(lines):
+        if x.startswith('File') \
+                and (function_name in lines[i + 6] or function_name in lines[i + 7]) \
+                and 'behavior' in x:
+            data.append((x.split('giskardpy/src/giskardpy/tree/behaviors/')[1][:-3], lines[i - 1].split(' ')[2]))
+    result = defaultdict(dict)
+    for file_name, time in data:
+        result[file_name][function_name] = float(time)
+    return result
+
+
+def extract_data_from_profile(path):
+    data = defaultdict(lambda: defaultdict(lambda: 'n/a'))
+    with open(path, 'r') as f:
+        profile = f.read()
+    lines = profile.split('\n')
+    keywords = ['__init__', 'setup', 'initialise', 'update']
+    for function_name in keywords:
+        new_data = search_for(lines, function_name)
+        for file_name, function_data in new_data.items():
+            data[file_name].update(function_data)
+    for file_name, function_data in data.items():
+        for function_name in keywords:
+            data[file_name][function_name]
+    return data
+
+
 class TreeManager:
     god_map: GodMap
 
@@ -219,17 +250,20 @@ class TreeManager:
         self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
-        self.render()
+        self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/profile2.txt')))
+        # self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/test_open_cabinet_left2.txt')))
 
     def live(self):
         sleeper = rospy.Rate(1 / self.god_map.get_data(identifier.tree_tick_rate))
         logging.loginfo('giskard is ready')
+        t = time()
         while not rospy.is_shutdown():
             try:
                 self.tick()
                 sleeper.sleep()
             except KeyboardInterrupt:
                 break
+        logging.loginfo('giskard died')
 
     def tick(self):
         self.tree.tick()
@@ -380,9 +414,9 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     graph = generate_pydot_graph(root, visibility_level, profile)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
     logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
-    graph.write(filename_wo_extension + '.dot')
+    # graph.write(filename_wo_extension + '.dot')
     graph.write_png(filename_wo_extension + '.png')
-    graph.write_svg(filename_wo_extension + '.svg')
+    # graph.write_svg(filename_wo_extension + '.svg')
 
 
 def generate_pydot_graph(root, visibility_level, profile=None):
@@ -441,11 +475,11 @@ def generate_pydot_graph(root, visibility_level, profile=None):
     def add_edges(root, root_dot_name, visibility_level, profile):
         if visibility_level < root.blackbox_level:
             if isinstance(root, AsyncBehavior) \
-                    or ((hasattr(root, 'original') and isinstance(root.original, AsyncBehavior))):
+                    or (hasattr(root, 'original') and isinstance(root.original, AsyncBehavior)):
                 children = []
                 names2 = []
-                for name, children in root.get_children().items():
-                    children.append(children)
+                for name, child in root.get_children().items():
+                    children.append(child)
                     names2.append(name)
             else:
                 children = root.children
@@ -468,7 +502,7 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                         if max_time > 1:
                             color = 'red'
                         proposed_dot_name += '\n' + '\n'.join(
-                            ['{}= {}'.format(k, v) for k, v in sorted(profile[file_name].items())])
+                            [f'{k}= {v}' for k, v in sorted(profile[file_name].items())])
 
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
@@ -566,11 +600,13 @@ class StandAlone(TreeManager):
 
     def grow_closed_loop_control(self):
         planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
-        if self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+                and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_4.add_child(VisualizationBehavior('visualization'))
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
-            if self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+            if self.god_map.get_data(identifier.enable_CPIMarker) \
+                    and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
                 planning_4.add_child(CollisionMarker('cpi marker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(KinSimPlugin('kin sim'))
@@ -595,7 +631,8 @@ class StandAlone(TreeManager):
         plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
         if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
                 and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            plan_postprocessing.add_child(running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
+            plan_postprocessing.add_child(
+                running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
         if self.god_map.get_data(identifier.enable_CPIMarker) \
                 and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
                 and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
@@ -607,7 +644,6 @@ class StandAlone(TreeManager):
             kwargs = self.god_map.get_data(identifier.PlotDebugTrajectory)
             plan_postprocessing.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))
         return plan_postprocessing
-
 
 
 class OpenLoop(StandAlone):
@@ -679,7 +715,7 @@ class OpenLoop(StandAlone):
                 real_time_tracking = AsyncBehavior('base sequence')
                 real_time_tracking.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                               **self.god_map.unsafe_get_data(
-                                                                                   identifier.SyncTfFrames)))
+                                                                                  identifier.SyncTfFrames)))
                 for odometry_topic in hardware_config.odometry_topics:
                     real_time_tracking.add_child(SyncOdometry(odometry_topic))
                 real_time_tracking.add_child(RosTime('time'))
@@ -688,11 +724,12 @@ class OpenLoop(StandAlone):
                 if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                                          **self.god_map.unsafe_get_data(
-                                                                              identifier.PublishDebugExpressions)))
+                                                                             identifier.PublishDebugExpressions)))
                 real_time_tracking.add_child(drive_interface.make_plugin())
 
                 execution_action_server.add_child(real_time_tracking)
         return execution_action_server
+
 
 class ClosedLoop(OpenLoop):
 

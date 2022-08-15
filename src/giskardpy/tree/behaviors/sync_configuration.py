@@ -61,5 +61,5 @@ class SyncConfiguration(GiskardBehavior):
         return Status.RUNNING
 
     def __str__(self):
-        return f'{super().__str__()}: {self.joint_state_topic}'
+        return f'{super().__str__()} ({self.joint_state_topic})'
 

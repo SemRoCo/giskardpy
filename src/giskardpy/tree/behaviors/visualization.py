@@ -7,21 +7,20 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class VisualizationBehavior(GiskardBehavior):
+    @profile
     def __init__(self, name, ensure_publish=False):
         super().__init__(name)
         self.ensure_publish = ensure_publish
         self.marker_ids = {}
-        try:
-            self.tf_root = tf.get_tf_root()
-        except AssertionError:
-            self.tf_root = str(self.world.root_link_name)
+        self.tf_root = str(self.world.root_link_name)
 
+    @profile
     def setup(self, timeout):
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         return super().setup(timeout)
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         markers = []
         time_stamp = rospy.Time()

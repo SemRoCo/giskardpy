@@ -548,17 +548,22 @@ class QPController:
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        if solver_name == SupportedQPSolver.gurobi:
-            from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            self.qp_solver = QPSolverGurobi()
-        elif solver_name == SupportedQPSolver.qp_oases:
+        try:
+            if solver_name == SupportedQPSolver.gurobi:
+                from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
+                self.qp_solver = QPSolverGurobi()
+            elif solver_name == SupportedQPSolver.cplex:
+                from giskardpy.qp.qp_solver_cplex import QPSolverCplex
+                self.qp_solver = QPSolverCplex()
+            elif not solver_name == SupportedQPSolver.qp_oases:
+                raise KeyError(f'Solver \'{solver_name}\' not supported')
+        except Exception as e:
+            logging.logwarn(e)
+            logging.logwarn('defaulting back to qpoases')
+            solver_name = SupportedQPSolver.qp_oases
+        if solver_name == SupportedQPSolver.qp_oases:
             from giskardpy.qp.qp_solver import QPSolver
             self.qp_solver = QPSolver()
-        elif solver_name == SupportedQPSolver.cplex:
-            from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            self.qp_solver = QPSolverCplex()
-        else:
-            raise KeyError(f'Solver \'{solver_name}\' not supported')
         logging.loginfo(f'Using QP Solver \'{solver_name}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
 

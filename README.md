@@ -40,9 +40,9 @@ source ~/giskardpy_ws/devel/setup.bash      # source new overlay
 ## Fast Custom Bullet Bindings
 Giskard will run much faster with Adrian Röfers bullet bindings instead of the official ones.
 ```
-./scripts/build_better_pybullet.sh /my/awesome/library/dir
-
+./scripts/build_better_pybullet.sh /path/of/your/choosing
 ```
+Where `/path/of/your/choosing` can be e.g. a new folder in your home directory.
 If everything worked fine, you should be able to do:
 ```python
 import betterpybullet as bpb

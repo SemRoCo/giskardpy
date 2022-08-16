@@ -184,7 +184,7 @@ class KeepHandInWorkspace(Goal):
 
         map_V_tip = w.scale(map_V_tip, 1)
         angle_error = w.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
-        self.add_debug_expr('rot', angle_error)
+        # self.add_debug_expr('rot', angle_error)
         self.add_constraint(reference_velocity=0.5,
                             lower_error=-angle_error-0.2,
                             upper_error=-angle_error+0.2,
@@ -195,7 +195,7 @@ class KeepHandInWorkspace(Goal):
         #                                  frame_V_goal=base_footprint_V_tip,
         #                                  reference_velocity=0.5)
 
-        self.add_debug_expr('distance_to_base', distance_to_base)
+        # self.add_debug_expr('distance_to_base', distance_to_base)
         self.add_constraint(reference_velocity=0.1,
                             lower_error=-distance_to_base + 0.35,
                             upper_error=-distance_to_base + 0.6,

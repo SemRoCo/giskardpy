@@ -49,6 +49,7 @@ from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
+from giskardpy.tree.behaviors.shaking_detector import WiggleCancel
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
@@ -616,7 +617,7 @@ class StandAlone(TreeManager):
             planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
             planning_4.add_child(DebugTFPublisher('debug tf publisher'))
-        # planning_4.add_plugin(WiggleCancel('wiggle'))
+        planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
         planning_4.add_child(TimePlugin())

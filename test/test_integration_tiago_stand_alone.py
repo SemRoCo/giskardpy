@@ -10,7 +10,9 @@ from giskard_msgs.msg import MoveResult
 from giskardpy import identifier
 from giskardpy.configs.tiago import TiagoMujoco, TiagoStandAlone
 from giskardpy.goals.goal import WEIGHT_BELOW_CA
+from giskardpy.utils.utils import publish_pose
 from utils_for_tests import GiskardTestWrapper
+
 dataset = [[0.22913762274280025, 0.12668560551603925, 1.2119360989114512, 0.3831037465025321, 0.4258398112983772,
             0.700523768823976, 0.4256270948162705],
            [0.4623148254066207, 0.05798606881767965, 1.2096909667115328, 0.43262374216032773, 0.22026786557460978,
@@ -212,6 +214,7 @@ dataset = [[0.22913762274280025, 0.12668560551603925, 1.2119360989114512, 0.3831
            [0.014824401257385711, 0.09415742552411599, 0.9965963362924803, 0.5149759923947974, 0.45297021272629523,
             0.6980736400133462, 0.20569615153960855]]
 
+
 @pytest.fixture(scope='module')
 def giskard(request, ros):
     c = TiagoTestWrapper()
@@ -323,27 +326,42 @@ def apartment_setup(better_pose: TiagoTestWrapper) -> TiagoTestWrapper:
 
 class TestCartGoals:
 
-    def test_random_eef_goals(self, better_pose: TiagoTestWrapper):
+    def test_random_eef_goals(self, apartment_setup: TiagoTestWrapper):
+        tip_link = 'arm_left_tool_link'
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'side_B'
+        base_pose.pose.position.x = 1.7
+        base_pose.pose.position.y = 1.
+        base_pose.pose.orientation.w = 1
         successes = []
         for i, goal in enumerate(dataset):
             print(i)
             pgoal = PoseStamped()
-            pgoal.header.frame_id = 'map'
+            pgoal.header.frame_id = 'iai_apartment/cabinet5'
             pgoal.pose.position = Point(goal[0], goal[1], goal[2])
+            pgoal.pose.position.z -= 0.5
             pgoal.pose.orientation = Quaternion(goal[3], goal[4], goal[5], goal[6])
+            publish_pose(pgoal)
+            pgoal.header.frame_id = 'cabinet5'
             try:
-                better_pose.set_prediction_horizon(1)
-                better_pose.set_seed_configuration(better_pose.better_pose)
-                better_pose.set_cart_goal(pgoal, 'arm_left_tool_link', root_link='torso_lift_link')
-                better_pose.allow_all_collisions()
-                better_pose.plan_and_execute()
+                apartment_setup.set_prediction_horizon(1)
+                apartment_setup.set_seed_configuration(apartment_setup.better_pose)
+                apartment_setup.set_json_goal('SetOdometry',
+                                              group_name='tiago_dual',
+                                              base_pose=base_pose)
+                apartment_setup.set_json_goal('KeepHandInWorkspace',
+                                          map_frame='map',
+                                          base_footprint='base_footprint',
+                                          tip_link=tip_link)
+                apartment_setup.set_cart_goal(pgoal, tip_link, root_link='map')
+                # better_pose.allow_all_collisions()
+                apartment_setup.plan_and_execute()
                 successes.append(True)
             except Exception as e:
                 print(e)
                 successes.append(False)
-        better_pose.god_map.get_data(identifier.timer_collector).pretty_print(lambda i,x: i != 0 and i%2==0)
+        apartment_setup.god_map.get_data(identifier.timer_collector).pretty_print(lambda i, x: i != 0 and i % 2 == 0)
         print(f'successes: {successes}')
-
 
     def test_drive(self, zero_pose: TiagoTestWrapper):
         goal = PoseStamped()

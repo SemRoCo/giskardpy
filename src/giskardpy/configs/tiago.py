@@ -55,7 +55,7 @@ class TiagoStandAlone(Giskard):
         self.general_config.control_mode = ControlModes.stand_alone
         self.root_link_name = 'map'
         self.collision_avoidance_config.collision_checker = CollisionCheckerLib.none
-        self.disable_visualization()
+        # self.disable_visualization()
         self.disable_tf_publishing()
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_robot_from_parameter_server('robot_description')

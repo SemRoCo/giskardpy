@@ -101,6 +101,10 @@ class Giskard:
         self.hardware_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name)
+        joints = self._god_map.get_data(identifier.joints_to_add, default=[])
+        brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint(self._god_map)
+        joints.append(brumbrum_joint)
+        self._controlled_joints.append(brumbrum_joint.name)
 
     def add_diff_drive_interface(self, parent_link_name: str, child_link_name: str,
                                  cmd_vel_topic: Optional[str] = None):
@@ -121,6 +125,8 @@ class Giskard:
                         'general_config': deepcopy(self.general_config)}
 
     def grow(self):
+        if len(self.robot_interface_configs) == 0:
+            self.add_robot_from_parameter_server()
         self._create_parameter_backup()
         if self.root_link_name is None:
             self.root_link_name = tf.get_tf_root()

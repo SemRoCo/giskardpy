@@ -127,13 +127,13 @@ class BiDict(dict):
         super().__delitem__(key)
 
 
-class PrefixName(object):
+class PrefixName:
     def __init__(self, name, prefix, separator='/'):
         self.short_name = name
         self.prefix = prefix
         self.separator = separator
         if prefix:
-            self.long_name = '{}{}{}'.format(self.prefix, self.separator, self.short_name)
+            self.long_name = f'{self.prefix}{self.separator}{self.short_name}'
         else:
             self.long_name = name
 

@@ -7,6 +7,8 @@ class SetPredictionHorizon(Goal):
     def __init__(self, prediction_horizon, **kwargs):
         super().__init__(**kwargs)
         self.new_prediction_horizon = prediction_horizon
+
+    def make_constraints(self):
         self.prediction_horizon = self.new_prediction_horizon
         if 5 > self.prediction_horizon > 1:
             logging.logwarn('Prediction horizon should be 1 or greater equal 5.')
@@ -27,5 +29,3 @@ class SetPredictionHorizon(Goal):
                 del self.god_map.get_data(identifier.joint_limits)['snap']
         self.god_map.set_data(identifier.prediction_horizon, self.prediction_horizon)
         self.world.sync_with_paramserver()
-
-    # def make_constraints(self):

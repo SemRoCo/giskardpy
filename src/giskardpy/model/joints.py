@@ -25,13 +25,18 @@ class Joint(ABC):
                  child_link_name: my_string,
                  god_map: GodMap,
                  parent_T_child: expr_matrix):
+        if isinstance(name, str):
+            name = PrefixName(name, None)
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
-        self.parent_T_child = parent_T_child
+        self._parent_T_child = parent_T_child
         self.god_map = god_map
         self.create_free_variables()
-        self.apply_joint_effect()
+
+    @property
+    def parent_T_child(self):
+        return w.dot(self._parent_T_child, self._joint_transformation())
 
     def create_free_variable(self, name: str, lower_limits: derivative_map, upper_limits: derivative_map):
         return FreeVariable(name=name,
@@ -45,10 +50,11 @@ class Joint(ABC):
         """
 
     @abc.abstractmethod
-    def apply_joint_effect(self):
+    def _joint_transformation(self):
         """
         modifies self.parent_T_child using free variables
         """
+        return w.eye(4)
 
     @abc.abstractmethod
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
@@ -87,7 +93,7 @@ class Joint(ABC):
         pass
 
     def __str__(self):
-        return f'{self.parent_link_name}<-{self.child_link_name}'
+        return f'{self.name}: {self.parent_link_name}<-{self.child_link_name}'
 
     def __repr__(self):
         return str(self)
@@ -118,8 +124,8 @@ class FixedJoint(Joint):
     def update_weights(self, weights: Dict[int, float]):
         pass
 
-    def apply_joint_effect(self):
-        pass
+    def _joint_transformation(self):
+        return w.eye(4)
 
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
         pass
@@ -330,10 +336,11 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
 
 class PrismaticJoint(OneDofJoint):
-    def apply_joint_effect(self):
+    def _joint_transformation(self):
         translation_axis = w.point3(*self.axis) * self.position_expression
-        parent_P_child = w.translation3(translation_axis[0], translation_axis[1], translation_axis[2])
-        self.parent_T_child = w.dot(self.parent_T_child, parent_P_child)
+        parent_T_child = w.translation3(translation_axis[0], translation_axis[1], translation_axis[2])
+        return parent_T_child
+        # self.parent_T_child = w.dot(self.parent_T_child, parent_P_child)
 
     def update_limits(self, linear_limits, angular_limits):
         self.delete_limits()
@@ -343,10 +350,11 @@ class PrismaticJoint(OneDofJoint):
 
 
 class RevoluteJoint(OneDofJoint):
-    def apply_joint_effect(self):
+    def _joint_transformation(self):
         rotation_axis = w.vector3(*self.axis)
         parent_R_child = w.rotation_matrix_from_axis_angle(rotation_axis, self.position_expression)
-        self.parent_T_child = w.dot(self.parent_T_child, parent_R_child)
+        return parent_R_child
+        # self.parent_T_child = w.dot(self.parent_T_child, parent_R_child)
 
     def update_limits(self, linear_limits, angular_limits):
         self.delete_limits()
@@ -371,7 +379,7 @@ class OneDofURDFJoint(OneDofJoint, URDFJoint, ABC):
                              name=self.name,
                              parent_link_name=self.parent_link_name,
                              child_link_name=self.child_link_name,
-                             parent_T_child=self.parent_T_child,
+                             parent_T_child=self._parent_T_child,
                              axis=self.urdf_joint.axis,
                              lower_limits=lower_limits,
                              upper_limits=upper_limits,
@@ -407,7 +415,7 @@ class MimicURDFJoint(MimicJoint, OneDofURDFJoint, ABC):
                             name=self.name,
                             parent_link_name=self.parent_link_name,
                             child_link_name=self.child_link_name,
-                            parent_T_child=self.parent_T_child,
+                            parent_T_child=self._parent_T_child,
                             mimed_joint_name=PrefixName(self.urdf_joint.mimic.joint, prefix),
                             multiplier=self.urdf_joint.mimic.multiplier,
                             offset=self.urdf_joint.mimic.offset,
@@ -516,14 +524,14 @@ class OmniDrive(Joint):
                                                  rotation_lower_limits,
                                                  rotation_upper_limits)
 
-    def apply_joint_effect(self):
+    def _joint_transformation(self):
         odom_T_base_footprint = w.frame_from_x_y_rot(self.x.get_symbol(0),
                                                      self.y.get_symbol(0),
                                                      self.rot.get_symbol(0))
         base_footprint_T_base_footprint_vel = w.frame_from_x_y_rot(self.x_vel.get_symbol(0),
                                                                    self.y_vel.get_symbol(0),
                                                                    self.rot_vel.get_symbol(0))
-        self.parent_T_child = w.dot(self.parent_T_child, odom_T_base_footprint, base_footprint_T_base_footprint_vel)
+        return w.dot(odom_T_base_footprint, base_footprint_T_base_footprint_vel)
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         world = self.god_map.unsafe_get_data(identifier.world)
@@ -669,14 +677,14 @@ class DiffDrive(Joint):
                                                  rotation_lower_limits,
                                                  rotation_upper_limits)
 
-    def apply_joint_effect(self):
+    def _joint_transformation(self):
         odom_T_base_footprint = w.frame_from_x_y_rot(self.x.get_symbol(0),
                                                      self.y.get_symbol(0),
                                                      self.rot.get_symbol(0))
         base_footprint_T_base_footprint_vel = w.frame_from_x_y_rot(self.x_vel.get_symbol(0),
                                                                    0,
                                                                    self.rot_vel.get_symbol(0))
-        self.parent_T_child = w.dot(self.parent_T_child, odom_T_base_footprint, base_footprint_T_base_footprint_vel)
+        return w.dot(odom_T_base_footprint, base_footprint_T_base_footprint_vel)
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         world = self.god_map.unsafe_get_data(identifier.world)

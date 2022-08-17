@@ -22,7 +22,8 @@ from giskardpy.configs.pr2 import PR2_Mujoco
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
 from giskardpy.model.world import SubWorldTree
-from utils_for_tests import compare_poses, compare_points, compare_orientations, publish_marker_vector, \
+from giskardpy.utils.math import compare_points, compare_orientations
+from utils_for_tests import compare_poses, publish_marker_vector, \
     JointGoalChecker, GiskardTestWrapper
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
@@ -280,6 +281,13 @@ class TestFk(object):
 
 
 class TestJointGoals(object):
+    def test_gripper_goal(self, zero_pose: PR2TestWrapper):
+        js = {
+            'r_gripper_l_finger_joint': 0.55
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+
     def test_joint_movement1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(pocky_pose)

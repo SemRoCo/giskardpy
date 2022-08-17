@@ -4,10 +4,14 @@ from giskardpy.configs.default_config import Giskard
 class PR2_Mujoco(Giskard):
     def __init__(self):
         super().__init__()
-        self.set_odometry_topic('/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
+        self.add_odometry_topic('/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_follow_joint_trajectory_server(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/whole_body_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
+                                                state_topic='/pr2/l_gripper_l_finger_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
+                                                state_topic='/pr2/r_gripper_l_finger_controller/state')
         self.add_omni_drive_interface(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
                                       parent_link_name='odom_combined',
                                       child_link_name='base_footprint')
@@ -56,7 +60,7 @@ class PR2_Mujoco(Giskard):
 class PR2_Real(Giskard):
     def __init__(self):
         super().__init__()
-        self.set_odometry_topic('/base_odometry/odom')
+        self.add_odometry_topic('/base_odometry/odom')
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/body/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/body/state')

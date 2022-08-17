@@ -30,13 +30,17 @@ class Joint(ABC):
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
-        self._parent_T_child = parent_T_child
+        self.parent_T_child = parent_T_child
         self.god_map = god_map
         self.create_free_variables()
 
     @property
     def parent_T_child(self):
         return w.dot(self._parent_T_child, self._joint_transformation())
+
+    @parent_T_child.setter
+    def parent_T_child(self, value):
+        self._parent_T_child = value
 
     def create_free_variable(self, name: str, lower_limits: derivative_map, upper_limits: derivative_map):
         return FreeVariable(name=name,

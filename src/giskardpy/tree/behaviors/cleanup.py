@@ -25,12 +25,7 @@ class CleanUp(GiskardBehavior):
         self.god_map.set_data(identifier.closest_point, Collisions(self.god_map, 1))
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.god_map.set_data(identifier.time, 1)
-        current_js = deepcopy(self.god_map.get_data(identifier.joint_states))
-        trajectory = Trajectory()
-        trajectory.set(0, current_js)
-        self.god_map.set_data(identifier.trajectory, trajectory)
-        trajectory = Trajectory()
-        self.god_map.set_data(identifier.debug_trajectory, trajectory)
+
         # to reverse update godmap changes
         # self.get_god_map().set_data(identifier.giskard, deepcopy(self.rosparams))
         self.world.sync_with_paramserver()

@@ -17,14 +17,6 @@ class SupportedQPSolver(Enum):
     cplex = 3
 
 
-class FrameToAddToWorld:
-    def __init__(self, parent_link, child_link, transform, add_after_robot):
-        self.child_link = child_link
-        self.parent_link = parent_link
-        self.transform = transform
-        self.add_after_robot = add_after_robot
-
-
 class ControlModes(Enum):
     open_loop = 1
     close_loop = 2
@@ -32,16 +24,17 @@ class ControlModes(Enum):
 
 
 class GeneralConfig:
-    control_mode: ControlModes = ControlModes.open_loop
-    action_server_name: str = '~command'
-    path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
-    test_mode: bool = False
-    debug: bool = False
-    joint_limits: Dict[int, Dict[str, float]] = {
-        'velocity': defaultdict(lambda: 1),
-        'acceleration': defaultdict(lambda: 1e3),
-        'jerk': defaultdict(lambda: 30)
-    }
+    def __init__(self):
+        self.control_mode: ControlModes = ControlModes.open_loop
+        self.action_server_name: str = '~command'
+        self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
+        self.test_mode: bool = False
+        self.debug: bool = False
+        self.joint_limits: Dict[str, Dict[str, float]] = {
+            'velocity': defaultdict(lambda: 1),
+            'acceleration': defaultdict(lambda: 1e3),
+            'jerk': defaultdict(lambda: 30)
+        }
 
 
 class QPSolverConfig:

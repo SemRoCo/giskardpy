@@ -91,7 +91,9 @@ class PR2TestWrapper(GiskardTestWrapper):
                     'l_wrist_roll_joint': 0,
                     'torso_lift_joint': 0.2,
                     'head_pan_joint': 0,
-                    'head_tilt_joint': 0}
+                    'head_tilt_joint': 0,
+                    'l_gripper_l_finger_joint': 0.55,
+                    'r_gripper_l_finger_joint': 0.55}
 
     better_pose = {'r_shoulder_pan_joint': -1.7125,
                    'r_shoulder_lift_joint': -0.25672,
@@ -108,7 +110,8 @@ class PR2TestWrapper(GiskardTestWrapper):
                    'l_wrist_flex_joint': - 0.10001,
                    'l_wrist_roll_joint': 0,
                    'torso_lift_joint': 0.2,
-
+                   'l_gripper_l_finger_joint': 0.55,
+                   'r_gripper_l_finger_joint': 0.55,
                    'head_pan_joint': 0,
                    'head_tilt_joint': 0,
                    }
@@ -337,7 +340,7 @@ class TestJointGoals(object):
     # TODO test goal for unknown joint
 
 
-class TestConstraints(object):
+class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
     def test_SetPredictionHorizon(self, zero_pose: PR2TestWrapper):

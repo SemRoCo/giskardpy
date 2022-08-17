@@ -9,7 +9,7 @@ import rospy
 from py_trees import Blackboard
 
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib, FrameToAddToWorld, GeneralConfig, \
+from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig
 from giskardpy.configs.hardware_interface_config import HardwareConfig
 from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface, DiffDriveCmdVelInterface
@@ -27,7 +27,6 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 
 class Giskard:
-    general_config: GeneralConfig = GeneralConfig()
     behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
     qp_solver_config: QPSolverConfig = QPSolverConfig()
     collision_avoidance_config: CollisionAvoidanceConfig = CollisionAvoidanceConfig()
@@ -35,6 +34,7 @@ class Giskard:
     hardware_config: HardwareConfig = HardwareConfig()
 
     def __init__(self):
+        self.general_config: GeneralConfig = GeneralConfig()
         self._god_map = GodMap.init_from_paramserver()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))

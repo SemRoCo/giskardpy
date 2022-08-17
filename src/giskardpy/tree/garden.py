@@ -36,6 +36,7 @@ from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPl
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
+from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -252,7 +253,8 @@ class TreeManager:
         self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
-        self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/profile2.txt')))
+        # self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/profile2.txt')))
+        self.render()
         # self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/test_open_cabinet_left2.txt')))
 
     def live(self):
@@ -526,6 +528,7 @@ class StandAlone(TreeManager):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
         root.add_child(CleanUp('cleanup'))
+        root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
@@ -653,6 +656,7 @@ class OpenLoop(StandAlone):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
         root.add_child(CleanUp('cleanup'))
+        root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(self.grow_execution())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
@@ -678,6 +682,7 @@ class OpenLoop(StandAlone):
         execution = failure_is_success(Sequence)('execution')
         execution.add_child(IF('execute?', identifier.execute))
         if self.add_real_time_tracking:
+            execution.add_child(CleanUp('cleanup'))
             execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
             execution.add_child(InitQPController('InitQPController for base'))
         execution.add_child(SetTrackingStartTime('start start time'))

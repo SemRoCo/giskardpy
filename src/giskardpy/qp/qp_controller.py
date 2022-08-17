@@ -80,7 +80,7 @@ class Parent(object):
 
 class H(Parent):
     def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order):
-        super(H, self).__init__(sample_period, prediction_horizon, order)
+        super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[velocity_constraints]
@@ -598,6 +598,7 @@ class QPController:
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
         for c in self.constraints:
+            c.control_horizon = min(c.control_horizon, self.prediction_horizon)
             self.check_control_horizon(c)
 
     def add_velocity_constraints(self, constraints):

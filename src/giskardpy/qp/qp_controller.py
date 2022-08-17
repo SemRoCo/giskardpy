@@ -995,7 +995,7 @@ class QPController:
         substitutions = self.substitutions
         self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
-        sample_period = self.state[str(self.sample_period)]
+        sample_period = self.sample_period
         b_names = self.b_names()
         bA_names = self.bA_names()
         b_filter, bA_filter = self.make_filters()

@@ -28,6 +28,7 @@ from rospy_message_converter.message_converter import \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
 from sensor_msgs.msg import JointState
+from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.utils import logging
 
@@ -543,3 +544,25 @@ def trajectory_to_np(tj, joint_names):
     velocity = np.array(velocity)
     times = np.array(times)
     return names, position, velocity, times
+
+_pose_publisher = None
+def publish_pose(pose: PoseStamped):
+    global _pose_publisher
+    if _pose_publisher is None:
+        _pose_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray)
+        rospy.sleep(1)
+    m = Marker()
+    m.header = pose.header
+    m.pose = pose.pose
+    m.action = m.ADD
+    m.type = m.ARROW
+    m.id = 1337
+    m.ns = 'giskard_debug_poses'
+    m.scale.x = 0.1
+    m.scale.y = 0.05
+    m.scale.z = 0.025
+    m.color.r = 1
+    m.color.a = 1
+    ms = MarkerArray()
+    ms.markers.append(m)
+    _pose_publisher.publish(ms)

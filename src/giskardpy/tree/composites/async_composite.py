@@ -9,13 +9,14 @@ from py_trees import Status, Blackboard
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.utils import raise_to_blackboard
 
 
-class PluginBehavior(GiskardBehavior):
+class AsyncBehavior(GiskardBehavior):
 
     def __init__(self, name, hz=None):
-        super(PluginBehavior, self).__init__(name)
-        self._plugins = OrderedDict()
+        super().__init__(name)
+        self._children = OrderedDict()
         self.set_status(Status.INVALID)
         self.status_lock = RLock()
         self.looped_once = False
@@ -25,32 +26,32 @@ class PluginBehavior(GiskardBehavior):
         else:
             self.sleeper = None
 
-    def get_plugins(self):
-        return self._plugins
+    def get_children(self):
+        return self._children
 
-    def add_plugin(self, plugin):
+    def add_child(self, child):
         """
         Registers a plugin with the process manager. The name needs to be unique.
-        :param plugin: Behaviour
+        :param child: Behaviour
         :return:
         """
-        name = plugin.name
-        if name in self._plugins:
-            raise KeyError('A plugin with name "{}" already exists.'.format(name))
+        name = child.name
+        if name in self._children:
+            raise KeyError(f'A plugin with name \'{name}\' already exists.')
         with self.status_lock:
-            self._plugins[name] = plugin
+            self._children[name] = child
 
-    def remove_plugin(self, plugin_name):
+    def remove_child(self, child_name):
         with self.status_lock:
-            del self._plugins[plugin_name]
+            del self._children[child_name]
 
     def setup(self, timeout):
-        self.start_plugins()
-        return super(PluginBehavior, self).setup(timeout)
+        self.start_children()
+        return super().setup(timeout)
 
-    def start_plugins(self):
-        for plugin in self._plugins.values():
-            plugin.setup(10.0)
+    def start_children(self):
+        for child in self._children.values():
+            child.setup(10.0)
 
     def initialise(self):
         self.looped_once = False
@@ -58,10 +59,10 @@ class PluginBehavior(GiskardBehavior):
             self.set_status(Status.RUNNING)
         self.update_thread = Thread(target=self.loop_over_plugins)
         self.update_thread.start()
-        super(PluginBehavior, self).initialise()
+        super().initialise()
 
     def init_plugins(self):
-        for plugin in self._plugins.values():
+        for plugin in self._children.values():
             plugin.initialise()
             # plugin.status = Status.RUNNING
 
@@ -77,11 +78,11 @@ class PluginBehavior(GiskardBehavior):
             # FIXME sometimes terminate gets called without init being called
             # happens when a previous plugin fails
             logging.logwarn('terminate was called before init')
-        self.stop_plugins()
+        self.stop_children()
         super().terminate(new_status)
 
-    def stop_plugins(self):
-        for plugin_name, plugin in self._plugins.items():
+    def stop_children(self):
+        for plugin_name, plugin in self._children.items():
             plugin.stop()
 
     def update(self):
@@ -99,11 +100,11 @@ class PluginBehavior(GiskardBehavior):
             # self.init_plugins()
             self.get_blackboard().runtime = time()
             while self.is_running() and not rospy.is_shutdown():
-                for plugin_name, plugin in self._plugins.items():
+                for plugin_name, child in self._children.items():
                     with self.status_lock:
                         if not self.is_running():
                             return
-                        for node in plugin.tick():
+                        for node in child.tick():
                             status = node.status
                         if status is not None:
                             self.set_status(status)
@@ -116,5 +117,4 @@ class PluginBehavior(GiskardBehavior):
                     self.sleeper.sleep()
         except Exception as e:
             traceback.print_exc()
-            # TODO make 'exception' string a parameter somewhere
-            Blackboard().set('exception', e)
+            raise_to_blackboard(e)

@@ -24,6 +24,7 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     supported_state_types = [Twist]
 
+    @profile
     def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, **kwargs):
         super().__init__(name)
         self.cmd_vel_topic = cmd_vel_topic
@@ -43,15 +44,15 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             rospy.sleep(1)
 
         for joint in self.world.joints.values():
-            if isinstance(joint, OmniDrive) or isinstance(joint, DiffDrive):
+            if isinstance(joint, (OmniDrive, DiffDrive)):
                 # FIXME can only handle one drive
-                self.controlled_joints = [joint]
+                # self.controlled_joints = [joint]
                 self.joint = joint
-        self.world.register_controlled_joints(self.controlled_joints)
+        # self.world.register_controlled_joints([j.name for j in self.controlled_joints])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def initialise(self):
         super().initialise()
         self.trajectory = self.get_god_map().get_data(identifier.trajectory)
@@ -60,6 +61,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
         self.end_time = self.start_time + self.trajectory.points[-1].time_from_start + self.goal_time_tolerance
 
+    @profile
     def setup(self, timeout):
         super().setup(timeout)
         self.put_drive_goals_on_godmap()
@@ -93,6 +95,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         return twist
 
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         t = rospy.get_rostime()
         if self.start_time > t:

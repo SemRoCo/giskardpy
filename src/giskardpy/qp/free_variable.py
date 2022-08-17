@@ -49,14 +49,18 @@ class FreeVariable:
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {order}')
 
-    def get_lower_limit(self, order: int, default: bool = False) -> Union[expr_symbol, float]:
+    def get_lower_limit(self, order: int, default: bool = False, evaluated: bool = False) -> Union[expr_symbol, float]:
         if not default and order in self.default_lower_limits and order in self.lower_limits:
-            return w.max(self.default_lower_limits[order], self.lower_limits[order])
-        if order in self.default_lower_limits:
-            return self.default_lower_limits[order]
-        if order in self.lower_limits:
-            return self.lower_limits[order]
-        raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {order}')
+            expr = w.max(self.default_lower_limits[order], self.lower_limits[order])
+        elif order in self.default_lower_limits:
+            expr = self.default_lower_limits[order]
+        elif order in self.lower_limits:
+            expr = self.lower_limits[order]
+        else:
+            raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {order}')
+        if evaluated:
+            return self.god_map.evaluate_expr(expr)
+        return expr
 
     def set_lower_limit(self, order: int, limit: Union[expr_symbol, float]):
         self.lower_limits[order] = limit
@@ -64,14 +68,18 @@ class FreeVariable:
     def set_upper_limit(self, order: int, limit: Union[expr_symbol, float]):
         self.upper_limits[order] = limit
 
-    def get_upper_limit(self, order: int, default: bool = False) -> Union[expr_symbol, float]:
+    def get_upper_limit(self, order: int, default: bool = False, evaluated: bool = False) -> Union[expr_symbol, float]:
         if not default and order in self.default_upper_limits and order in self.upper_limits:
-            return w.min(self.default_upper_limits[order], self.upper_limits[order])
-        if order in self.default_upper_limits:
-            return self.default_upper_limits[order]
-        if order in self.upper_limits:
-            return self.upper_limits[order]
-        raise KeyError(f'Free variable {self} doesn\'t have upper limit for derivative of order {order}')
+            expr = w.min(self.default_upper_limits[order], self.upper_limits[order])
+        elif order in self.default_upper_limits:
+            expr = self.default_upper_limits[order]
+        elif order in self.upper_limits:
+            expr = self.upper_limits[order]
+        else:
+            raise KeyError(f'Free variable {self} doesn\'t have upper limit for derivative of order {order}')
+        if evaluated:
+            return self.god_map.evaluate_expr(expr)
+        return expr
 
     def has_position_limits(self) -> bool:
         try:
@@ -82,12 +90,15 @@ class FreeVariable:
         except Exception:
             return False
 
-    def normalized_weight(self, t: int, order: int, prediction_horizon: int) -> Union[expr_symbol, float]:
+    def normalized_weight(self, t: int, order: int, prediction_horizon: int,
+                          evaluated: bool = False) -> Union[expr_symbol, float]:
         weight = self.quadratic_weights[order]
         start = weight * self.horizon_functions[order]
         a = (weight - start) / prediction_horizon
         weight = a * t + start
-        return weight * (1 / self.get_upper_limit(order)) ** 2
+        expr = weight * (1 / self.get_upper_limit(order)) ** 2
+        if evaluated:
+            return self.god_map.evaluate_expr(expr)
 
     def __str__(self) -> str:
         return self.position_name

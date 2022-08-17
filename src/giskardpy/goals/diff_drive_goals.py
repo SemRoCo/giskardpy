@@ -16,7 +16,7 @@ class DiffDriveTangentialToPoint(Goal):
     def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, **kwargs):
         super().__init__(**kwargs)
-        self.goal_point = self.transform_msg(tf.get_tf_root(), goal_point)
+        self.goal_point = self.transform_msg(self.world.root_link_name, goal_point)
         self.weight = weight
         self.tip = 'base_footprint'
         self.root = 'map'
@@ -80,8 +80,8 @@ class PointingDiffDrive(Goal):
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root, self.tip)
-        root_P_goal_point = self.get_parameter_as_symbolic_expression('root_P_goal_point')
-        tip_V_pointing_axis = self.get_parameter_as_symbolic_expression('tip_V_pointing_axis')
+        root_P_goal_point = w.ros_msg_to_matrix(self.root_P_goal_point)
+        tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
 
         root_V_goal_axis = root_P_goal_point - w.position_of(root_T_tip)
         distance = w.norm(root_V_goal_axis)
@@ -125,7 +125,7 @@ class PointingDiffDriveEEF(Goal):
         base_root_T_eef_root = self.get_fk(self.base_root, self.eef_root)
         base_root_V_eef_tip = w.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
 
-        tip_V_pointing_axis = self.get_parameter_as_symbolic_expression('tip_V_pointing_axis')
+        tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
         base_root_T_base_tip = self.get_fk(self.base_root, self.base_tip)
         base_root_V_pointing_axis = w.dot(base_root_T_base_tip, tip_V_pointing_axis)
 
@@ -168,7 +168,7 @@ class KeepHandInWorkspace(Goal):
 
     def make_constraints(self):
         weight = WEIGHT_ABOVE_CA
-        base_footprint_V_pointing_axis = w.Matrix(msg_to_homogeneous_matrix(self.map_V_pointing_axis))
+        base_footprint_V_pointing_axis = w.ros_msg_to_matrix(self.map_V_pointing_axis)
         map_T_base_footprint = self.get_fk(self.map_frame, self.base_footprint)
         map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
         map_T_tip = self.get_fk(self.map_frame, self.tip_link)
@@ -184,7 +184,7 @@ class KeepHandInWorkspace(Goal):
 
         map_V_tip = w.scale(map_V_tip, 1)
         angle_error = w.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
-        self.add_debug_expr('rot', angle_error)
+        # self.add_debug_expr('rot', angle_error)
         self.add_constraint(reference_velocity=0.5,
                             lower_error=-angle_error-0.2,
                             upper_error=-angle_error+0.2,
@@ -195,7 +195,7 @@ class KeepHandInWorkspace(Goal):
         #                                  frame_V_goal=base_footprint_V_tip,
         #                                  reference_velocity=0.5)
 
-        self.add_debug_expr('distance_to_base', distance_to_base)
+        # self.add_debug_expr('distance_to_base', distance_to_base)
         self.add_constraint(reference_velocity=0.1,
                             lower_error=-distance_to_base + 0.35,
                             upper_error=-distance_to_base + 0.6,

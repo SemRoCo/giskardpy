@@ -6,6 +6,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class RosTime(GiskardBehavior):
+    @profile
     def initialise(self):
         self.last_call = rospy.get_rostime()
         self.start_time = self.god_map.get_data(identifier.tracking_start_time)

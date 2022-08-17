@@ -17,21 +17,19 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class SyncOdometry(GiskardBehavior):
-    """
-    Listens to a joint state topic, transforms it into a dict and writes it to the got map.
-    Gets replace with a kinematic sim plugin during a parallel universe.
-    """
 
     @profile
-    def __init__(self, name, odometry_topic: str):
-        super().__init__(name)
-        self.map_frame = tf.get_tf_root()
+    def __init__(self, odometry_topic: str):
         self.odometry_topic = odometry_topic
+        super().__init__(str(self))
         self.last_msg = None
         self.lock = Queue(maxsize=1)
 
-    @profile
+    def __str__(self):
+        return f'{super().__str__()} ({self.odometry_topic})'
+
     @catch_and_raise_to_blackboard
+    @profile
     def setup(self, timeout=0.0):
         msg: Optional[Odometry] = None
         while msg is None and not rospy.is_shutdown():
@@ -49,15 +47,15 @@ class SyncOdometry(GiskardBehavior):
         self.odometry_sub = rospy.Subscriber(self.odometry_topic, Odometry, self.cb, queue_size=1)
         return super().setup(timeout)
 
-    def cb(self, data):
+    def cb(self, data: Odometry):
         try:
             self.lock.get_nowait()
         except Empty:
             pass
         self.lock.put(data)
 
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         joint: OmniDrive = self.world.joints[self.brumbrum]
         try:
@@ -76,14 +74,5 @@ class SyncOdometry(GiskardBehavior):
 
         except Empty:
             pass
-        # print(f'odometry: x:{self.world.state[joint.x_name].position} '
-        #       f'y:{self.world.state[joint.y_name].position} '
-        #       f'z:{self.world.state[joint.rot_name].position}')
-        # print(f'odometry vel: x:{self.world.state[joint.x_name].velocity} '
-        #       f'y:{self.world.state[joint.y_name].velocity} '
-        #       f'z:{self.world.state[joint.rot_name].velocity}')
-        # print(f' odometry axis {axis}')
-
-        # self.world.state.update(self.last_msg)
         self.world.notify_state_change()
         return Status.RUNNING

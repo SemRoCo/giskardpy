@@ -6,8 +6,9 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class MaxTrajectoryLength(GiskardBehavior):
+    @profile
     def __init__(self, name, enabled, length):
-        super(MaxTrajectoryLength, self).__init__(name)
+        super().__init__(name)
         self.length = length
 
     @profile

@@ -12,7 +12,6 @@ class CollisionChecker(GiskardBehavior):
     @profile
     def __init__(self, name):
         super().__init__(name)
-        self.map_frame = tf.get_tf_root()
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects

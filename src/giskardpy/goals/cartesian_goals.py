@@ -44,8 +44,7 @@ class CartesianPosition(Goal):
                                                                   **kwargs))
 
     def make_constraints(self):
-        # r_P_g = self.get_parameter_as_symbolic_expression('goal_point')
-        r_P_g = w.Matrix(msg_to_homogeneous_matrix(self.goal_point))
+        r_P_g = w.ros_msg_to_matrix(self.goal_point)
         r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
         if self.root_link2 is not None:
             root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
@@ -86,8 +85,7 @@ class CartesianOrientation(Goal):
         #                                                        **kwargs))
 
     def make_constraints(self):
-        # r_R_g = self.get_parameter_as_symbolic_expression('goal_orientation')
-        r_R_g = w.Matrix(msg_to_homogeneous_matrix(self.goal_orientation))
+        r_R_g = w.ros_msg_to_matrix(self.goal_orientation)
         r_R_c = self.get_fk(self.root_link, self.tip_link)
         if self.root_link2 is not None:
             c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link2)
@@ -122,7 +120,7 @@ class CartesianPositionStraight(Goal):
         self.goal_point = self.transform_msg(self.root_link, goal_point)
 
     def make_constraints(self):
-        root_P_goal = self.get_parameter_as_symbolic_expression('goal_point')
+        root_P_goal = w.ros_msg_to_matrix(self.goal_point)
         root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
         t_T_r = self.get_fk(self.tip_link, self.root_link)
         tip_P_goal = w.dot(t_T_r, root_P_goal)
@@ -307,7 +305,7 @@ class RotationVelocityLimit(Goal):
 
         self.weight = weight
         self.max_velocity = max_velocity
-        super(RotationVelocityLimit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def make_constraints(self):
         r_R_c = w.rotation_of(self.get_fk(self.root_link, self.tip_link))
@@ -322,8 +320,8 @@ class RotationVelocityLimit(Goal):
                                                max_violation=0)
 
     def __str__(self):
-        s = super(RotationVelocityLimit, self).__str__()
-        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class CartesianVelocityLimit(Goal):
@@ -338,7 +336,7 @@ class CartesianVelocityLimit(Goal):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianVelocityLimit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
                                                               tip_link=tip_link,
                                                               max_velocity=max_linear_velocity,

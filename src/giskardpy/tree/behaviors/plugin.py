@@ -7,16 +7,19 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
-
+import giskardpy.utils.tfwrapper as tf
 
 class GiskardBehavior(Behaviour):
     time_collector: TimeCollector
 
     def __init__(self, name):
-        self.god_map = Blackboard().god_map  # type: GodMap
+        self.god_map: GodMap = Blackboard().god_map
         self.time_collector = self.god_map.unsafe_get_data(identifier.timer_collector)
-        self.world = self.get_god_map().unsafe_get_data(identifier.world)  # type: WorldTree
+        self.world: WorldTree = self.get_god_map().unsafe_get_data(identifier.world)
         super().__init__(name)
+
+    def __str__(self):
+        return f'{self.__class__.__name__}'
 
     @property
     def traj_time_in_sec(self):
@@ -91,3 +94,9 @@ class GiskardBehavior(Behaviour):
 
     def clear_blackboard_exception(self):
         clear_blackboard_exception()
+
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return self.world.transform_msg(target_frame, msg)
+        except KeyError as e:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)

@@ -9,7 +9,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
-from giskardpy.model.joints import OneDofJoint
+from giskardpy.model.joints import OneDofJoint, MimicJoint
 from giskardpy.utils.utils import raise_to_blackboard
 
 try:
@@ -96,14 +96,15 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{state_topic}\' has no joints')
         for joint in self.world.joints.values():
-            if isinstance(joint, OneDofJoint):
+            if isinstance(joint, OneDofJoint) and not isinstance(joint, MimicJoint):
                 if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)
         if len(self.controlled_joints) != len(controlled_joint_names):
-            joints_not_in_urdf = set(controlled_joint_names).difference(self.controlled_joints)
+            js = [j.name for j in self.controlled_joints]
+            joints_not_in_urdf = set(controlled_joint_names).difference(js)
             raise ValueError(f'{state_topic} provides the following joints '
                              f'that are not in the urdf: {joints_not_in_urdf}')
-        self.world.register_controlled_joints(self.controlled_joints)
+        self.world.register_controlled_joints(controlled_joint_names)
         loginfo(f'Successfully connected to \'{state_topic}\'.')
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
 

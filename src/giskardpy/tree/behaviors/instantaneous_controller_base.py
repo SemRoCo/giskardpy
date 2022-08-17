@@ -6,7 +6,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
-class ControllerPlugin(GiskardBehavior):
+class ControllerPluginBase(GiskardBehavior):
     controller: QPController = None
 
     @catch_and_raise_to_blackboard

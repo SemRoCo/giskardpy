@@ -14,8 +14,8 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class InitQPController(GiskardBehavior):
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         constraints, vel_constraints, debug_expressions = self.get_constraints_from_goals()
         free_variables = self.get_active_free_symbols(constraints, vel_constraints)
@@ -24,7 +24,7 @@ class InitQPController(GiskardBehavior):
             free_variables=free_variables,
             constraints=list(constraints.values()),
             velocity_constraints=list(vel_constraints.values()),
-            sample_period=self.get_god_map().to_symbol(identifier.sample_period),
+            sample_period=self.get_god_map().unsafe_get_data(identifier.sample_period),
             prediction_horizon=self.get_god_map().unsafe_get_data(identifier.prediction_horizon),
             debug_expressions=debug_expressions,
             solver_name=self.get_god_map().unsafe_get_data(identifier.qp_solver_name),

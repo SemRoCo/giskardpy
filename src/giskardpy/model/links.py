@@ -10,6 +10,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
+from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import resolve_ros_iris
 
@@ -175,8 +176,10 @@ class SphereGeometry(LinkGeometry):
 
 
 class Link:
-    def __init__(self, name):
-        self.name = name  # type: PrefixName
+    def __init__(self, name: my_string):
+        if isinstance(name, str):
+            name = PrefixName(name, None)
+        self.name = name
         self.visuals = []
         self.collisions = []
         self.parent_joint_name = None

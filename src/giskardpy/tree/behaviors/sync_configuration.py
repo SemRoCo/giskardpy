@@ -1,3 +1,5 @@
+from typing import Optional
+
 from rospy import ROSException
 
 from giskardpy.data_types import JointStates
@@ -14,30 +16,14 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 import giskardpy.utils.tfwrapper as tf
 
+
 class SyncConfiguration(GiskardBehavior):
-    """
-    Listens to a joint state topic, transforms it into a dict and writes it to the got map.
-    Gets replace with a kinematic sim plugin during a parallel universe.
-    """
 
     @profile
-    def __init__(self, name, group_name, tf_root_link_name=None, joint_state_topic=None):
-        """
-        :type js_identifier: str
-        """
-        super().__init__(name)
-        self.mjs = None
-        self.map_frame = tf.get_tf_root()
-        if joint_state_topic is None:
-            self.joint_state_topic = self.god_map.get_data(identifier.joint_state_topic)
-        else:
-            self.joint_state_topic = joint_state_topic
-        self.group_name = group_name
-        self.group = self.world.groups[self.group_name]  # type: SubWorldTree
-        if tf_root_link_name is None:
-            self.tf_root_link_name = self.group.root_link_name
-        else:
-            self.tf_root_link_name = tf_root_link_name
+    def __init__(self, joint_state_topic: str):
+        self.joint_state_topic: str = joint_state_topic
+        super().__init__(str(self))
+        self.mjs: Optional[JointStates] = None
         self.lock = Queue(maxsize=1)
 
     @profile
@@ -73,3 +59,7 @@ class SyncConfiguration(GiskardBehavior):
         self.get_world().state.update(self.mjs)
         self.world.notify_state_change()
         return Status.RUNNING
+
+    def __str__(self):
+        return f'{super().__str__()} ({self.joint_state_topic})'
+

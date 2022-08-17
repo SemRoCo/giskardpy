@@ -9,13 +9,14 @@ from giskardpy.utils.utils import plot_trajectory
 
 
 class PlotDebugExpressions(PlotTrajectory):
+    @profile
     def __init__(self, name, enabled, wait=False, **kwargs):
-        super(PlotDebugExpressions, self).__init__(name=name,
-                                                   enabled=enabled,
-                                                   velocity_threshold=None,
-                                                   normalize_position=False,
-                                                   wait=wait,
-                                                   **kwargs)
+        super().__init__(name=name,
+                         enabled=enabled,
+                         velocity_threshold=None,
+                         normalize_position=False,
+                         wait=wait,
+                         **kwargs)
 
     def plot(self):
         trajectory = self.get_god_map().get_data(identifier.debug_trajectory)
@@ -32,4 +33,3 @@ class PlotDebugExpressions(PlotTrajectory):
             except Exception:
                 traceback.print_exc()
                 logwarn('failed to save debug.pdf')
-

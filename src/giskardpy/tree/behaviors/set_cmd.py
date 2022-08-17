@@ -9,6 +9,7 @@ from giskardpy.utils.utils import raise_to_blackboard
 
 
 class SetCmd(GetGoal):
+    @profile
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.sample_period_backup = None

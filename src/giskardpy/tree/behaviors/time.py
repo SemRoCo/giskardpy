@@ -6,7 +6,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 class TimePlugin(GiskardBehavior):
 
-
+    @profile
     def __init__(self, name=None):
         if name is None:
             name = 'increase time'

@@ -2,7 +2,7 @@ from __future__ import division
 
 import traceback
 from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List, Union
 
 from tf2_py import LookupException
 
@@ -106,6 +106,10 @@ class Goal:
         key = identifier.world + ['get_object', (object_name,), 'joint_state', joint_name, 'position']
         return self.god_map.to_symbol(key)
 
+    @property
+    def sample_period(self):
+        return self.god_map.get_data(identifier.sample_period)
+
     def get_sampling_period_symbol(self):
         return self.god_map.to_symbol(identifier.sample_period)
 
@@ -125,14 +129,12 @@ class Goal:
         """
         return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
 
-    def get_parameter_as_symbolic_expression(self, name):
+    def get_parameter_as_symbolic_expression(self, name: str) -> Union[expr_symbol, expr_matrix]:
         """
         Returns a symbols that references a class attribute.
-        :type name: str
-        :return: w.Symbol
         """
         if not hasattr(self, name):
-            raise AttributeError('{} doesn\'t have attribute {}'.format(self.__class__.__name__, name))
+            raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
         return self.god_map.to_expr(self._get_identifier() + [name])
 
     def get_expr_velocity(self, expr):

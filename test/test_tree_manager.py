@@ -169,13 +169,13 @@ def tree(blackboard):
     wait_for_goal.add_child(TestBehavior('js2'))
     # ----------------------------------------------
     planning_3 = PluginBehavior('planning III', sleep=0)
-    planning_3.add_plugin(TestBehavior('coll'))
-    planning_3.add_plugin(TestBehavior('controller'))
-    planning_3.add_plugin(TestBehavior('kin sim'))
-    planning_3.add_plugin(TestBehavior('log'))
-    planning_3.add_plugin(TestBehavior('goal reached'))
-    planning_3.add_plugin(TestBehavior('wiggle'))
-    planning_3.add_plugin(TestBehavior('time'))
+    planning_3.add_child(TestBehavior('coll'))
+    planning_3.add_child(TestBehavior('controller'))
+    planning_3.add_child(TestBehavior('kin sim'))
+    planning_3.add_child(TestBehavior('log'))
+    planning_3.add_child(TestBehavior('goal reached'))
+    planning_3.add_child(TestBehavior('wiggle'))
+    planning_3.add_child(TestBehavior('time'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)('monitor execution')
     publish_result.add_child(TestBehavior('goal canceled'))
@@ -482,21 +482,21 @@ class TestTreeManager():
 
     def test_disable_plugin_behavior_node(self, tree_manager, tree):
         planningIII = tree_manager.tree_nodes['planning III'].node
-        assert 'coll' in [x for x in planningIII.get_plugins()]
+        assert 'coll' in [x for x in planningIII._children]
         assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
         assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         tree_manager.disable_node('coll')
-        assert 'coll' not in [x for x in planningIII.get_plugins()]
+        assert 'coll' not in [x for x in planningIII._children]
 
     def test_enable_plugin_behavior_node(self, tree_manager, tree):
         planningIII = tree_manager.tree_nodes['planning III'].node
-        assert 'coll' in [x for x in planningIII.get_plugins()]
+        assert 'coll' in [x for x in planningIII._children]
         assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
         assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         tree_manager.disable_node('coll')
-        assert 'coll' not in [x for x in planningIII.get_plugins()]
+        assert 'coll' not in [x for x in planningIII._children]
         tree_manager.enable_node('coll')
-        assert 'coll' in [x for x in planningIII.get_plugins()]
+        assert 'coll' in [x for x in planningIII._children]
         assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
 
@@ -523,18 +523,18 @@ class TestTreeManager():
     def test_remove_and_readd_plugin_behavior_node(self, tree_manager, tree):
         planningIII = tree_manager.tree_nodes['planning III'].node
         coll = tree_manager.tree_nodes['coll'].node
-        assert 'coll' in [x for x in planningIII.get_plugins()]
+        assert 'coll' in [x for x in planningIII._children]
         assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
         assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         tree_manager.remove_node('coll')
-        assert 'coll' not in [x for x in planningIII.get_plugins()]
+        assert 'coll' not in [x for x in planningIII._children]
         with pytest.raises(KeyError):
             tree_manager.enable_node('coll')
-        assert 'coll' not in [x for x in planningIII.get_plugins()]
+        assert 'coll' not in [x for x in planningIII._children]
         assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
         assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
         tree_manager.insert_node(coll, 'planning III')
-        assert 'coll' in [x for x in planningIII.get_plugins()]
+        assert 'coll' in [x for x in planningIII._children]
         assert 'coll' not in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].disabled_children]
         assert 'coll' in [x.node.position_name for x in tree_manager.tree_nodes['planning III'].enabled_children]
 
@@ -624,10 +624,10 @@ class TestTreeManagerGiskardIntegration():
         planningIII = tree_manager.tree_nodes['planning III'].node
         removes_itself = RemovesItselfBehavior('removesitself')
         tree_manager.insert_node(removes_itself, 'planning III')
-        assert 'removesitself' in [x for x in planningIII.get_plugins()]
+        assert 'removesitself' in [x for x in planningIII._children]
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)
-        assert 'removesitself' not in [x for x in planningIII.get_plugins()]
+        assert 'removesitself' not in [x for x in planningIII._children]
 
     def test_replace_plugin_behavior_node_during_execution_same_thread(self, zero_pose):
         tree_manager = zero_pose.get_god_map().get_data(identifier.tree_manager)
@@ -635,11 +635,11 @@ class TestTreeManagerGiskardIntegration():
         test_behavior = GiskardTestBehavior('test_behavior', Status.RUNNING)
         replaces_itself = ReplaceBehavior('replace', test_behavior, 'replace', 'planning III', 3, Status.RUNNING)
         tree_manager.insert_node(replaces_itself, 'planning III', 3)
-        assert 'replace' in [x for x in planningIII.get_plugins()]
+        assert 'replace' in [x for x in planningIII._children]
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)
-        assert 'replace' not in [x for x in planningIII.get_plugins()]
-        assert 'test_behavior' in [x for x in planningIII.get_plugins()]
+        assert 'replace' not in [x for x in planningIII._children]
+        assert 'test_behavior' in [x for x in planningIII._children]
         assert test_behavior.executed
 
     def test_replace_plugin_behavior_node_during_execution_different_thread(self, zero_pose):
@@ -651,11 +651,11 @@ class TestTreeManagerGiskardIntegration():
         replace_behavior = ReplaceBehavior('replace', test_behavior2, 'test_behavior1', 'planning III', 3, Status.SUCCESS)
         tree_manager.insert_node(test_behavior1, 'planning III', 3)
         tree_manager.insert_node(replace_behavior, 'wait for goal', 3)
-        assert 'replace' in [x.position_name for x in wait_for_goal.children]
+        assert 'replace' in [x.position_name for x in wait_for_goal._children]
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)
-        assert 'test_behavior1' not in [x for x in planningIII.get_plugins()]
-        assert 'test_behavior2' in [x for x in planningIII.get_plugins()]
+        assert 'test_behavior1' not in [x for x in planningIII._children]
+        assert 'test_behavior2' in [x for x in planningIII._children]
         assert test_behavior2.executed
 
     def test_replace_node_during_execution(self, zero_pose):
@@ -664,9 +664,9 @@ class TestTreeManagerGiskardIntegration():
         test_behavior = GiskardTestBehavior('test_behavior', Status.FAILURE)
         replaces_itself = ReplaceBehavior('replace', test_behavior, 'replace', 'planning II', 3, Status.FAILURE)
         tree_manager.insert_node(replaces_itself, 'planning II', 3)
-        assert 'replace' in [x.position_name for x in planningII.children]
+        assert 'replace' in [x.position_name for x in planningII._children]
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)
-        assert 'replace' not in [x.position_name for x in planningII.children]
-        assert 'test_behavior' in [x.position_name for x in planningII.children]
+        assert 'replace' not in [x.position_name for x in planningII._children]
+        assert 'test_behavior' in [x.position_name for x in planningII._children]
         assert test_behavior.executed

@@ -46,6 +46,7 @@ action_server_name = general_options + ['action_server_name']
 data_folder = general_options + ['path_to_data_folder']
 debug = general_options + ['debug']
 test_mode = general_options + ['test_mode']
+control_mode = general_options + ['control_mode']
 
 joint_limits = general_options + ['joint_limits']
 
@@ -98,21 +99,15 @@ joint_convergence_threshold = plugins + ['GoalReached', 'joint_convergence_thres
 GoalReached_window_size = plugins + ['GoalReached', 'window_size']
 
 TFPublisher = plugins + ['TFPublisher']
+TFPublisher_enabled = TFPublisher + ['enabled']
 
 SyncOdometry = plugins + ['SyncOdometry']
 
 SyncTfFrames = plugins + ['SyncTfFrames']
-SyncTfFrames_frames = SyncTfFrames + ['frames']
+frames_to_add = ['frames_to_add']
+joints_to_add = ['joints_to_add']
 
 PublishDebugExpressions = plugins + ['PublishDebugExpressions']
-
-# reachability check
-reachability_check = giskard + ['reachability_check']
-rc_sample_period = reachability_check + ['sample_period']
-rc_prismatic_velocity = reachability_check + ['prismatic_velocity']
-rc_continuous_velocity = reachability_check + ['continuous_velocity']
-rc_revolute_velocity = reachability_check + ['revolute_velocity']
-rc_other_velocity = reachability_check + ['other_velocity']
 
 # behavior tree
 tree_manager = giskard + ['_tree']
@@ -134,10 +129,8 @@ ignored_self_collisions = collision_avoidance_config + ['_ignored_self_collision
 external_collision_avoidance = collision_avoidance_config + ['_external_collision_avoidance']
 
 # robot interface
-robot_interface_config = giskard + ['robot_interface_config']
-robot_interface = robot_interface_config + ['follow_joint_trajectory_interfaces']
-robot_base_drive = robot_interface_config + ['drive_interface']
-joint_state_topic = robot_interface_config + ['joint_state_topic']
+robot_interface_configs = giskard + ['robot_interface_configs']
+hardware_config = giskard + ['hardware_config']
 
 # rnd stuff
 timer_collector = ['timer_collector']

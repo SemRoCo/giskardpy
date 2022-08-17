@@ -9,8 +9,8 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class SetDriveGoals(GiskardBehavior):
-    @profile
     @catch_and_raise_to_blackboard
+    @profile
     def update(self):
         self.god_map.set_data(identifier.goals, {})
         drive_goals: List[Goal] = self.god_map.get_data(identifier.drive_goals)

@@ -8,8 +8,9 @@ from giskardpy.utils import logging
 class LoopDetector(GiskardBehavior):
     past_joint_states: set
 
+    @profile
     def __init__(self, name):
-        super(LoopDetector, self).__init__(name)
+        super().__init__(name)
         self.precision = self.get_god_map().get_data(identifier.LoopDetector_precision)
         self.window_size = 21
 

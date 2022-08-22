@@ -45,7 +45,7 @@ class QPSolverConfig:
                  added_slack: float = 100,
                  sample_period: float = 0.05,
                  weight_factor: float = 100,
-                 joint_weights: Optional[Dict[int, Dict[str, float]]] = None):
+                 joint_weights: Optional[Dict[str, Dict[str, float]]] = None):
         self.qp_solver = qp_solver
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
@@ -179,7 +179,7 @@ class BehaviorTreeConfig:
             'expression_filter': None
         },
         'PlotTrajectory': {
-            'enabled': False,
+            'enabled': True,
             'history': 5,
             'velocity_threshold': 0.0,
             'cm_per_second': 2.5,
@@ -189,7 +189,7 @@ class BehaviorTreeConfig:
             'tick_stride': 0.5,
         },
         'PlotDebugExpressions': {
-            'enabled': False,
+            'enabled': True,
             'history': 5,
             'cm_per_second': 2.5,
             'height_per_derivative': 6,

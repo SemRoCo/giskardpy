@@ -707,8 +707,10 @@ class QPController:
                        f'{self.p_lb[self.p_lb == np.inf].dropna()}')
         logging.logerr(f'The following ub entries contain inf:\n'
                        f'{self.p_ub[self.p_ub == np.inf].dropna()}')
-        if len(self.p_A[self.p_A == np.inf].dropna()) > 0:
-            logging.logerr(f'A contains inf')
+        if np.inf in self.np_A:
+            rows = self.p_A[self.p_A == np.inf].dropna(how='all').dropna(axis=1)
+            logging.logerr(f'A contains inf in:\n'
+                           f'{list(rows.index)}')
         # p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
         # p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
         # if len(p_filtered) > 0:

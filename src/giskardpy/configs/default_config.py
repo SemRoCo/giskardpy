@@ -23,18 +23,16 @@ from giskardpy.my_types import my_string
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import resolve_ros_iris
 
 
 class Giskard:
-    behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
-    qp_solver_config: QPSolverConfig = QPSolverConfig()
-    collision_avoidance_config: CollisionAvoidanceConfig = CollisionAvoidanceConfig()
-    robot_interface_configs: List[RobotInterfaceConfig] = []
-    hardware_config: HardwareConfig = HardwareConfig()
-
     def __init__(self):
         self.general_config: GeneralConfig = GeneralConfig()
+        self.qp_solver_config: QPSolverConfig = QPSolverConfig()
+        self.behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
+        self.collision_avoidance_config: CollisionAvoidanceConfig = CollisionAvoidanceConfig()
+        self.robot_interface_configs: List[RobotInterfaceConfig] = []
+        self.hardware_config: HardwareConfig = HardwareConfig()
         self._god_map = GodMap.init_from_paramserver()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))

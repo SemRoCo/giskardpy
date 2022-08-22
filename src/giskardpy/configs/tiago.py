@@ -25,6 +25,7 @@ class TiagoMujoco(Giskard):
         self.add_diff_drive_interface(cmd_vel_topic='/tiago/cmd_vel',
                                       parent_link_name='odom',
                                       child_link_name='base_footprint')
+        self.qp_solver_config.joint_weights['velocity']['brumbrum'] = 0.1
 
 
 class IAI_Tiago(Giskard):

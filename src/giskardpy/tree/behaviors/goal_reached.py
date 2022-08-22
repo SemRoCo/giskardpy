@@ -30,6 +30,7 @@ class GoalReached(GiskardBehavior):
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
                 run_time = self.get_runtime()
+                logging.loginfo('Velocities went below threshold.')
                 logging.loginfo('Found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * self.sample_period,
                                                                                        run_time))
                 self.time_collector.lengths.append(planning_time * self.sample_period)

@@ -5,9 +5,9 @@ from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped, Vect
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.goals.pointing import PointingDiffDrive
 from giskardpy.god_map import GodMap
-from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
+from giskardpy.model.joints import DiffDrive
+from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix, normalize
 
 
 class CartesianPosition(Goal):
@@ -144,16 +144,16 @@ class CartesianPositionStraight(Goal):
         t_R_a = w.normalize_rotation_matrix(t_R_a)
 
         # Apply rotation matrix on the fk of the tip link
-        a_T_t = w.dot(w.inverse_frame(t_R_a) ,
+        a_T_t = w.dot(w.inverse_frame(t_R_a),
                       self.get_fk_evaluated(self.tip_link, self.root_link),
                       self.get_fk(self.root_link, self.tip_link))
         expr_p = w.position_of(a_T_t)
         dist = w.norm(root_P_goal - root_P_tip)
 
-        #self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
-        #self.add_debug_matrix(self.tip_link + '_R_frame', t_R_a)
-        #self.add_debug_matrix(self.tip_link + '_T_a', w.inverse_frame(a_T_t))
-        #self.add_debug_expr('error', dist)
+        # self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
+        # self.add_debug_matrix(self.tip_link + '_R_frame', t_R_a)
+        # self.add_debug_matrix(self.tip_link + '_T_a', w.inverse_frame(a_T_t))
+        # self.add_debug_expr('error', dist)
 
         self.add_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
                                    lower_errors=[dist, 0, 0],
@@ -205,29 +205,123 @@ class CartesianPose(Goal):
                                                           **kwargs))
 
 
-class DiffDriveBaseGoal(CartesianPose):
+class DiffDriveBaseGoal(Goal):
 
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None, **kwargs):
-        super().__init__(root_link, tip_link, goal_pose, max_linear_velocity, max_angular_velocity, weight, **kwargs)
-        goal_point = PointStamped()
-        goal_point.header = goal_pose.header
-        goal_point.point = goal_pose.pose.position
+        super().__init__(**kwargs)
+        self.max_linear_velocity = max_linear_velocity
+        self.max_angular_velocity = max_angular_velocity
         if pointing_axis is None:
             pointing_axis = Vector3Stamped()
             pointing_axis.header.frame_id = tip_link
             pointing_axis.vector.x = 1
-        #TODO handle weights properly
-        self.add_constraints_of_goal(PointingDiffDrive(tip_link=tip_link,
-                                                       root_link=root_link,
-                                                       goal_point=goal_point,
-                                                       pointing_axis=pointing_axis,
-                                                       max_velocity=max_angular_velocity,
-                                                       **kwargs))
+        self.weight = weight
+        self.map = root_link
+        self.base_footprint = tip_link
+        self.goal_pose = self.transform_msg(self.map, goal_pose)
+        diff_drive_joints = [v for k, v in self.world.joints.items() if isinstance(v, DiffDrive)]
+        assert len(diff_drive_joints) == 1
+        self.joint: DiffDrive = diff_drive_joints[0]
+
+        if pointing_axis is not None:
+            self.base_footprint_V_pointing_axis = self.transform_msg(self.base_footprint, pointing_axis)
+            self.base_footprint_V_pointing_axis.vector = normalize(self.base_footprint_V_pointing_axis.vector)
+        else:
+            self.base_footprint_V_pointing_axis = Vector3Stamped()
+            self.base_footprint_V_pointing_axis.header.frame_id = self.base_footprint
+            self.base_footprint_V_pointing_axis.vector.z = 1
+
+    def make_constraints(self):
+        map_T_base_footprint = self.get_fk(self.map, self.base_footprint)
+        map_P_base_footprint = w.position_of(map_T_base_footprint)
+        map_R_base_footprint = w.rotation_of(map_T_base_footprint)
+        map_T_base_footprint_goal = w.ros_msg_to_matrix(self.goal_pose)
+        map_P_base_footprint_goal = w.position_of(map_T_base_footprint_goal)
+        map_R_base_footprint_goal = w.rotation_of(map_T_base_footprint_goal)
+        base_footprint_V_pointing_axis = w.ros_msg_to_matrix(self.base_footprint_V_pointing_axis)
+
+        map_V_goal_x = map_P_base_footprint_goal - map_P_base_footprint
+        distance = w.norm(map_V_goal_x)
+
+        map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
+        # map_goal_angle1 = w.angle_between_vector(map_V_goal_x, map_V_pointing_axis)
+        axis, map_current_angle = w.axis_angle_from_matrix(map_R_base_footprint)
+        map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
+        # rot_vel_symbol = self.joint.rot_vel.get_symbol(0)
+        # map_current_angle = self.joint.rot.get_symbol(0)
+
+        map_V_goal_x = w.scale(map_V_goal_x, 1)
+        # map_V_z = w.vector3(0, 0, 1)
+        # map_V_goal_y = w.cross(map_V_z, map_V_goal_x)
+        # map_V_goal_y = w.scale(map_V_goal_y, 1)
+        # map_R_goal = w.hstack([map_V_goal_x, map_V_goal_y, map_V_z, w.Matrix([0, 0, 0, 1])])
+        # axis, map_goal_angle1 = w.axis_angle_from_matrix(map_R_goal)
+        map_goal_angle1 = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
+        map_goal_angle1 = w.if_greater_zero(map_V_goal_x[1], map_goal_angle1, -map_goal_angle1)
+        # map_goal_angle1_2 = w.angle_between_vector(w.vector3(1, 0, 0), map_V_goal_x)
+        angle_error1 = map_goal_angle1 - map_current_angle
+
+        axis2, map_goal_angle2 = w.axis_angle_from_matrix(map_R_base_footprint_goal)
+        map_goal_angle2 = w.if_greater_zero(axis2[2], map_goal_angle2, -map_goal_angle2)
+        angle_error2 = map_goal_angle2 - map_current_angle
+
+        eps = 0.01
+        weight_rotate_to_goal = w.ca.if_else(w.logic_and(w.ca.ge(w.abs(angle_error1), eps),
+                                                         w.ca.ge(w.abs(distance), eps)),
+                                             self.weight,
+                                             0)
+        # weight_translation_raw = w.if_greater_eq(w.abs(distance), eps, self.weight, 0)
+        weight_translation = w.ca.if_else(w.logic_and(w.ca.le(w.abs(angle_error1), eps * 2),
+                                                      w.ca.ge(w.abs(distance), eps)),
+                                          self.weight,
+                                          0)
+        # weight_translation = w.if_less_eq(weight_rotate_to_goal, eps, self.weight, 0)
+        weight_final_rotation = w.ca.if_else(w.logic_and(w.ca.le(w.abs(distance), eps * 2),
+                                                         w.ca.ge(w.abs(angle_error2), eps)),
+                                             self.weight,
+                                             0)
+
+        self.add_debug_expr('map_goal_angle1', map_goal_angle1)
+        self.add_debug_expr('map_current_angle', map_current_angle)
+        self.add_debug_expr('angle_error1', angle_error1)
+        self.add_debug_expr('weight_rotate_to_goal', weight_rotate_to_goal / 1000)
+        self.add_debug_expr('distance', distance)
+        self.add_debug_expr('weight_translation', weight_translation / 1000)
+        self.add_debug_expr('angle_error2', angle_error2)
+        self.add_debug_expr('weight_final_rotation', weight_final_rotation / 1000)
+
+        # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
+        #                                  frame_V_goal=map_V_goal_x,
+        #                                  reference_velocity=self.max_angular_velocity,
+        #                                  weight=weight)
+
+        self.add_constraint(reference_velocity=self.max_angular_velocity,
+                            lower_error=angle_error1,
+                            upper_error=angle_error1,
+                            weight=weight_rotate_to_goal,
+                            expression=map_current_angle,
+                            name_suffix='/rot1')
+        self.add_constraint(reference_velocity=self.max_linear_velocity,
+                            lower_error=-distance,
+                            upper_error=-distance,
+                            weight=weight_translation,
+                            expression=distance,
+                            name_suffix='/dist')
+        self.add_constraint(reference_velocity=self.max_angular_velocity,
+                            lower_error=angle_error2,
+                            upper_error=angle_error2,
+                            weight=weight_final_rotation,
+                            expression=map_current_angle,
+                            name_suffix='/rot2')
+
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.map}/{self.base_footprint}'
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity : float = 0.1,
+    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPoseStraight, self).__init__(**kwargs)
         goal_point = PointStamped()

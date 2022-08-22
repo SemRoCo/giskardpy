@@ -179,21 +179,37 @@ def limit(x, lower_limit, upper_limit):
     return max(lower_limit, min(upper_limit, x))
 
 
+def if_else(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+    return ca.if_else(condition, if_result, else_result)
+
+
+def logic_and(*args: List[expr_symbol]):
+    assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    if len(args) == 2:
+        return ca.logic_and(args[0], args[1])
+    else:
+        return ca.logic_and(args[0], logic_and(*args[1:]))
+
+
+def logic_or(*args: List[expr_symbol]):
+    assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    if len(args) == 2:
+        return ca.logic_or(args[0], args[1])
+    else:
+        return ca.logic_or(args[0], logic_and(*args[1:]))
+
+
 def if_greater(a, b, if_result, else_result):
-    return ca.if_else(ca.gt(a, b), if_result, else_result)
+    return if_else(ca.gt(a, b), if_result, else_result)
 
 
 def if_less(a, b, if_result, else_result):
-    return ca.if_else(ca.lt(a, b), if_result, else_result)
+    return if_else(ca.lt(a, b), if_result, else_result)
 
 
-def if_greater_zero(condition, if_result, else_result):
+def if_greater_zero(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if condition > 0 else else_result
-    :rtype: Union[float, Symbol]
     """
     _condition = sign(condition)  # 1 or -1
     _if = max(0, _condition) * if_result  # 0 or if_result
@@ -201,64 +217,39 @@ def if_greater_zero(condition, if_result, else_result):
     return _if + _else + (1 - abs(_condition)) * else_result  # if_result or else_result
 
 
-def if_greater_eq_zero(condition, if_result, else_result):
+def if_greater_eq_zero(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if condition >= 0 else else_result
-    :rtype: Union[float, Symbol]
     """
     return if_greater_eq(condition, 0, if_result, else_result)
 
 
-def if_greater_eq(a, b, if_result, else_result):
+def if_greater_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type a: Union[float, Symbol]
-    :type b: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if a >= b else else_result
-    :rtype: Union[float, Symbol]
     """
-    return ca.if_else(ca.ge(a, b), if_result, else_result)
+    return if_else(ca.ge(a, b), if_result, else_result)
 
 
-def if_less_eq(a, b, if_result, else_result):
+def if_less_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type a: Union[float, Symbol]
-    :type b: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if a <= b else else_result
-    :rtype: Union[float, Symbol]
     """
     return if_greater_eq(b, a, if_result, else_result)
 
 
 def if_eq_zero(condition, if_result, else_result):
     """
-    A short expression which can be compiled quickly.
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if condition == 0 else else_result
-    :rtype: Union[float, Symbol]
     """
-    return ca.if_else(condition, else_result, if_result)
+    return if_else(condition, else_result, if_result)
 
 
-def if_eq(a, b, if_result, else_result):
-    return ca.if_else(ca.eq(a, b), if_result, else_result)
+def if_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+    return if_else(ca.eq(a, b), if_result, else_result)
 
 
-def if_eq_cases(a, b_result_cases: Union[List[Tuple[expr_symbol, expr_symbol]], expr_matrix],
+def if_eq_cases(a: expr_symbol, b_result_cases: Union[List[Tuple[expr_symbol, expr_symbol]], expr_matrix],
                 else_result: expr_symbol) -> expr_symbol:
     result = else_result
     if isinstance(b_result_cases, list):
@@ -270,7 +261,8 @@ def if_eq_cases(a, b_result_cases: Union[List[Tuple[expr_symbol, expr_symbol]], 
     return result
 
 
-def if_less_eq_cases(a, b_result_cases: List[Tuple[expr_symbol, expr_symbol]], else_result: expr_symbol) -> expr_symbol:
+def if_less_eq_cases(a: expr_symbol, b_result_cases: List[Tuple[expr_symbol, expr_symbol]],
+                     else_result: expr_symbol) -> expr_symbol:
     """
     This only works if b_result_cases is sorted in an ascending order.
     """

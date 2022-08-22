@@ -93,6 +93,14 @@ def success_is_running(cls: T) -> T:
     return py_trees.meta.success_is_running(cls)
 
 
+def anything_is_success(cls: T) -> T:
+    return running_is_success(failure_is_success(cls))
+
+
+def anything_is_failure(cls: T) -> T:
+    return running_is_failure(success_is_failure(cls))
+
+
 class ManagerNode:
     def __init__(self, node, parent, position: int):
         """
@@ -577,6 +585,7 @@ class StandAlone(TreeManager):
         planning.add_child(self.grow_planning2())
         # planning.add_child(planning_1)
         # planning.add_child(SetErrorCode('set error code'))
+        planning.add_child(self.grow_plan_postprocessing())
         return planning
 
     def grow_planning2(self):
@@ -600,7 +609,7 @@ class StandAlone(TreeManager):
         planning_3 = Sequence('planning III')
         # planning_3.add_child(PrintText('asdf'))
         planning_3.add_child(self.grow_closed_loop_control())
-        planning_3.add_child(self.grow_plan_postprocessing())
+        # planning_3.add_child(self.grow_plan_postprocessing())
         return planning_3
 
     def grow_closed_loop_control(self):
@@ -637,11 +646,11 @@ class StandAlone(TreeManager):
         if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
                 and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             plan_postprocessing.add_child(
-                running_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
+                anything_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
         if self.god_map.get_data(identifier.enable_CPIMarker) \
                 and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
                 and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            plan_postprocessing.add_child(running_is_success(CollisionMarker)('collision marker'))
+            plan_postprocessing.add_child(anything_is_success(CollisionMarker)('collision marker'))
         if self.god_map.get_data(identifier.PlotTrajectory_enabled):
             kwargs = self.god_map.get_data(identifier.PlotTrajectory)
             plan_postprocessing.add_child(PlotTrajectory('plot trajectory', **kwargs))
@@ -675,7 +684,7 @@ class OpenLoop(StandAlone):
         if self.god_map.get_data(identifier.TFPublisher_enabled):
             sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
-        # sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
+        sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
 
     def grow_execution(self):

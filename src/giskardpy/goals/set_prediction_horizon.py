@@ -1,5 +1,6 @@
 from giskardpy import identifier
 from giskardpy.goals.goal import Goal
+from giskardpy.god_map import GodMap
 from giskardpy.utils import logging
 
 
@@ -29,3 +30,9 @@ class SetPredictionHorizon(Goal):
                 del self.god_map.get_data(identifier.joint_limits)['snap']
         self.god_map.set_data(identifier.prediction_horizon, self.prediction_horizon)
         self.world.sync_with_paramserver()
+
+
+class SetMaxTrajLength(Goal):
+    def __init__(self, new_length: int, **kwargs):
+        super().__init__(**kwargs)
+        self.god_map.set_data(identifier.MaxTrajectoryLength + ['length'], new_length)

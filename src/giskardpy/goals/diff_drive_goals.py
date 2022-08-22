@@ -52,53 +52,6 @@ class DiffDriveTangentialToPoint(Goal):
 
 
 
-class PointingDiffDrive(Goal):
-    def __init__(self, tip_link, goal_point, root_link, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
-        """
-        Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
-        :param tip_link: str, name of the tip of the kin chain
-        :param goal_point: PointStamped as json, where the pointing_axis will point towards
-        :param root_link: str, name of the root of the kin chain
-        :param pointing_axis: Vector3Stamped as json, default is z axis, this axis will point towards the goal_point
-        :param weight: float, default WEIGHT_BELOW_CA
-        """
-        super().__init__(**kwargs)
-        self.weight = weight
-        self.max_velocity = max_velocity
-        self.root = root_link
-        self.tip = tip_link
-        self.root_P_goal_point = tf.transform_point(self.root, goal_point)
-
-        if pointing_axis is not None:
-            self.tip_V_pointing_axis = tf.transform_vector(self.tip, pointing_axis)
-            self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
-        else:
-            self.tip_V_pointing_axis = Vector3Stamped()
-            self.tip_V_pointing_axis.header.frame_id = self.tip
-            self.tip_V_pointing_axis.vector.z = 1
-
-    def make_constraints(self):
-        root_T_tip = self.get_fk(self.root, self.tip)
-        root_P_goal_point = w.ros_msg_to_matrix(self.root_P_goal_point)
-        tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
-
-        root_V_goal_axis = root_P_goal_point - w.position_of(root_T_tip)
-        distance = w.norm(root_V_goal_axis)
-        root_V_goal_axis /= distance  # FIXME avoid /0
-        root_V_pointing_axis = w.dot(root_T_tip, tip_V_pointing_axis)
-        weight = w.if_less_eq(distance, 0.05, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA)
-
-        self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
-                                         frame_V_goal=root_V_goal_axis,
-                                         reference_velocity=self.max_velocity,
-                                         weight=weight)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root}/{self.tip}'
-
-
 class PointingDiffDriveEEF(Goal):
     def __init__(self, base_tip, base_root, eef_tip, eef_root, pointing_axis=None, max_velocity=0.3,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
@@ -149,9 +102,13 @@ class PointingDiffDriveEEF(Goal):
 
 
 class KeepHandInWorkspace(Goal):
-    def __init__(self, map_frame, tip_link, base_footprint, pointing_axis=None, max_velocity=0.3,
+    def __init__(self, tip_link, base_footprint=None, map_frame=None, pointing_axis=None, max_velocity=0.3,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         super().__init__(**kwargs)
+        if base_footprint is None:
+            base_footprint = 'base_footprint'
+        if map_frame is None:
+            map_frame = self.world.root_link_name
         self.weight = weight
         self.max_velocity = max_velocity
         self.map_frame = map_frame
@@ -196,12 +153,12 @@ class KeepHandInWorkspace(Goal):
         #                                  reference_velocity=0.5)
 
         # self.add_debug_expr('distance_to_base', distance_to_base)
-        self.add_constraint(reference_velocity=0.1,
-                            lower_error=-distance_to_base + 0.35,
-                            upper_error=-distance_to_base + 0.6,
-                            weight=weight,
-                            expression=distance_to_base,
-                            name_suffix='/dist')
+        # self.add_constraint(reference_velocity=0.1,
+        #                     lower_error=-distance_to_base + 0.35,
+        #                     upper_error=-distance_to_base + 0.6,
+        #                     weight=weight,
+        #                     expression=distance_to_base,
+        #                     name_suffix='/dist')
 
         # fk_vel = self.get_fk_velocity(self.base_footprint, self.tip_link)
         # eef_root_V_eef_tip = w.vector3(fk_vel[0], fk_vel[1], 0)

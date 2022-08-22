@@ -438,7 +438,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_object_joint_state(self, object_name, joint_state):
         super().set_object_joint_state(object_name, joint_state)
-        self.wait_heartbeats()
+        self.wait_heartbeats(2)
         current_js = self.world.groups[object_name].state
         joint_names_without_prefix = set(j.short_name for j in current_js)
         assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()
@@ -551,6 +551,39 @@ class GiskardTestWrapper(GiskardWrapper):
                                max_velocity=angular_velocity,
                                check=check,
                                **kwargs)
+
+    def set_diff_drive_base_goal(self, goal_pose, tip_link=None, root_link=None, weight=None, linear_velocity=None,
+                                 angular_velocity=None, check=True, **kwargs):
+        if tip_link is None:
+            tip_link = 'base_footprint'
+        if root_link is None:
+            root_link = self.default_root
+        self.set_json_goal(constraint_type='DiffDriveBaseGoal',
+                           tip_link=tip_link,
+                           root_link=root_link,
+                           goal_pose=goal_pose,
+                           max_linear_velocity=linear_velocity,
+                           max_angular_velocity=angular_velocity,
+                           weight=weight)
+        if check:
+            goal_point = PointStamped()
+            goal_point.header = goal_pose.header
+            goal_point.point = goal_pose.pose.position
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_point))
+            goal_orientation = QuaternionStamped()
+            goal_orientation.header = goal_pose.header
+            goal_orientation.quaternion = goal_pose.pose.orientation
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_orientation))
+
+    def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
+        self.set_json_goal('KeepHandInWorkspace',
+                           tip_link=tip_link,
+                           map_frame=map_frame,
+                           base_footprint=base_footprint)
+
+    def set_diff_drive_tangential_to_point(self, goal_point: PointStamped):
+        self.set_json_goal('DiffDriveTangentialToPoint',
+                           goal_point=goal_point)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None, check=True,
                           **kwargs: goal_parameter):

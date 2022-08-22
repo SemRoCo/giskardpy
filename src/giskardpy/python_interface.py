@@ -245,6 +245,11 @@ class GiskardWrapper(object):
                            prediction_horizon=prediction_horizon,
                            **kwargs)
 
+    def set_max_traj_length(self, new_length: int, **kwargs: goal_parameter):
+        self.set_json_goal(constraint_type='SetMaxTrajLength',
+                           new_length=new_length,
+                           **kwargs)
+
     def set_limit_cartesian_velocity_goal(self,
                                           root_link: str,
                                           tip_link: str,

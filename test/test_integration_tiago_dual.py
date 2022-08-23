@@ -275,7 +275,11 @@ class TestCollisionAvoidance:
         # zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute()
         zero_pose.set_seed_configuration(js)
-        zero_pose.set_joint_goal(zero_pose.better_pose2)
+        # zero_pose.set_joint_goal(zero_pose.better_pose2)
+        js2 = {
+            'torso_lift_joint': 0.3400000002235174,
+        }
+        zero_pose.set_joint_goal(js2)
         zero_pose.plan()
 
     def test_demo1(self, apartment_setup: TiagoTestWrapper):

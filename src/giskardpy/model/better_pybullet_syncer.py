@@ -94,12 +94,12 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 map_T_b = contact.obj_b.np_transform
                 link_b = contact.obj_b.name
                 for p in contact.points:  # type: ContactPoint
-                    map_P_a = map_T_a.dot(p.point_a)
-                    map_P_b = map_T_b.dot(p.point_b)
+                    map_P_a = map_T_a.dot(p.point_a.reshape(4))
+                    map_P_b = map_T_b.dot(p.point_b.reshape(4))
                     c = Collision(link_a=link_a,
                                   link_b=link_b,
                                   contact_distance=p.distance,
-                                  map_V_n=p.normal_world_b,
+                                  map_V_n=p.normal_world_b.reshape(4),
                                   map_P_pa=map_P_a,
                                   map_P_pb=map_P_b)
                     result_list.append(c)

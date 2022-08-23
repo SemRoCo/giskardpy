@@ -446,6 +446,41 @@ class TestCartGoals:
 
 
 class TestCollisionAvoidance:
+    def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_left_1_joint': -1.1069832458862692,
+            'arm_left_2_joint': 1.4746164329656843,
+            'arm_left_3_joint': 2.7736173839819602,
+            'arm_left_4_joint': 1.6237723180496708,
+            'arm_left_5_joint': -1.5975088318771629,
+            'arm_left_6_joint': 1.3300843607103001,
+            'arm_left_7_joint': -0.016546381784501657,
+            'arm_right_1_joint': -1.0919070230703032,
+            'arm_right_2_joint': 1.4928456221831905,
+            'arm_right_3_joint': 2.740050318770805,
+            'arm_right_4_joint': 1.6576417817518292,
+            'arm_right_5_joint': -1.4619211253492215,
+            'arm_right_6_joint': 1.2787860569647924,
+            'arm_right_7_joint': 0.013613188642612156,
+            'gripper_left_left_finger_joint': 0.0393669359310417,
+            'gripper_left_right_finger_joint': 0.04396903656716549,
+            'gripper_right_left_finger_joint': 0.03097991016001716,
+            'gripper_right_right_finger_joint': 0.04384773311365822,
+            'head_1_joint': -0.10322685494051058,
+            'head_2_joint': -1.0027367693813412,
+            'torso_lift_joint': 0.2499968644929236,
+        }
+        # zero_pose.set_joint_goal(js)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.plan_and_execute()
+        zero_pose.set_seed_configuration(js)
+        # zero_pose.set_joint_goal(zero_pose.better_pose2)
+        js2 = {
+            'torso_lift_joint': 0.3400000002235174,
+        }
+        zero_pose.set_joint_goal(js2)
+        zero_pose.plan()
+
     def test_left_arm(self, zero_pose: TiagoTestWrapper):
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'arm_left_3_link'

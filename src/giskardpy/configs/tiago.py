@@ -3,7 +3,16 @@ from giskardpy.configs.default_config import Giskard, ControlModes
 from giskardpy.data_types import PrefixName
 
 
-class TiagoMujoco(Giskard):
+class TiagoBase(Giskard):
+    def __init__(self):
+        super().__init__()
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_fixed_column_link')
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_fixed_column_link')
+
+
+class TiagoMujoco(TiagoBase):
     def __init__(self):
         super().__init__()
         self.add_sync_tf_frame('map', 'odom')
@@ -28,7 +37,7 @@ class TiagoMujoco(Giskard):
         self.qp_solver_config.joint_weights['velocity']['brumbrum'] = 0.1
 
 
-class IAI_Tiago(Giskard):
+class IAI_Tiago(TiagoBase):
     def __init__(self):
         super().__init__()
         self.add_sync_tf_frame('map', 'odom')
@@ -51,7 +60,7 @@ class IAI_Tiago(Giskard):
                                       child_link_name='base_footprint')
 
 
-class TiagoStandAlone(Giskard):
+class TiagoStandAlone(TiagoBase):
     def __init__(self):
         super().__init__()
         self.general_config.control_mode = ControlModes.stand_alone

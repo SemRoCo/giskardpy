@@ -356,7 +356,7 @@ class TreeManager:
         :return:
         """
         if node.name in self.tree_nodes:
-            raise ValueError('node with that name already exists')
+            raise ValueError(f'Node named {node.name} already exists.')
         parent = self.tree_nodes[parent_name]
         tree_node = ManagerNode(node=node, parent=parent, position=position)
         parent.add_child(tree_node)

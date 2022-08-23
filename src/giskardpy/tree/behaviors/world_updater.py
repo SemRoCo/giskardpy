@@ -1,4 +1,5 @@
 import traceback
+from collections import defaultdict
 from itertools import product
 from queue import Queue
 from time import time
@@ -69,7 +70,7 @@ class WorldUpdater(GiskardBehavior):
     # TODO reject changes if plugin not active or something
     @profile
     def __init__(self, name: str):
-        self.added_plugin_names = []
+        self.added_plugin_names = defaultdict(list)
         super().__init__(name)
         self.original_link_names = self.robot.link_names
         self.service_in_use = Queue(maxsize=1)
@@ -230,10 +231,10 @@ class WorldUpdater(GiskardBehavior):
         # FIXME also keep track of base pose
         logging.loginfo(f'Added object \'{req.group_name}\' at \'{req.parent_link_group}/{req.parent_link}\'.')
         if world_body.joint_state_topic:
-            plugin_name = str(PrefixName(req.group_name, 'js'))
+            # plugin_name = str(PrefixName(req.group_name, 'js'))
             plugin = running_is_success(SyncConfiguration)(joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
-            self.added_plugin_names.append(plugin_name)
+            self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
             raise NotImplementedError('tf_root_link_name is not implemented')
@@ -241,7 +242,7 @@ class WorldUpdater(GiskardBehavior):
             plugin = SyncTfFrames(plugin_name,
                                   frames=world_body.tf_root_link_name)
             self.tree.insert_node(plugin, 'Synchronize', 1)
-            self.added_plugin_names.append(plugin_name)
+            self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
         parent_group = self.world.get_parent_group_name(req.group_name)
         self.collision_scene.update_group_blacklist(parent_group)
@@ -287,24 +288,22 @@ class WorldUpdater(GiskardBehavior):
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
         self.collision_scene.remove_black_list_entries(set(self.world.groups[name].link_names_with_collisions))
         self.world.delete_group(name)
-        self._remove_plugin(str(PrefixName(name, 'js')))
-        self._remove_plugin(str(PrefixName(name, 'localization')))
-        logging.loginfo('Deleted \'{}\''.format(name))
+        self._remove_plugins_of_group(name)
+        logging.loginfo(f'Deleted \'{name}\'.')
 
-    def _remove_plugin(self, name):
-        tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
-        if name in tree.tree_nodes:
-            tree.remove_node(name)
-            self.added_plugin_names.remove(name)
+    def _remove_plugins_of_group(self, group_name):
+        for plugin_name in self.added_plugin_names[group_name]:
+            self.tree.remove_node(plugin_name)
+        del self.added_plugin_names[group_name]
 
     @profile
     def clear_world(self):
         # assumes that parent has god map lock
         self.collision_scene.reset_collision_blacklist()
         self.world.delete_all_but_robot()
-        for plugin_name in self.added_plugin_names:
-            self.tree.remove_node(plugin_name)
-        self.added_plugin_names = []
+        for group_name in list(self.added_plugin_names.keys()):
+            self._remove_plugins_of_group(group_name)
+        self.added_plugin_names = defaultdict(list)
         logging.loginfo('Cleared world.')
 
     def clear_markers(self):

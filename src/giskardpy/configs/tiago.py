@@ -34,10 +34,10 @@ class IAI_Tiago(Giskard):
         self.add_sync_tf_frame('map', 'odom')
         self.add_odometry_topic('/mobile_base_controller/odom')
         self.add_robot_from_parameter_server()
-        self.add_follow_joint_trajectory_server(namespace='/arm_left_controller/follow_joint_trajectory',
-                                                state_topic='/arm_left_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/arm_right_controller/follow_joint_trajectory',
-                                                state_topic='/arm_right_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/arm_left_impedance_controller/follow_joint_trajectory',
+                                                state_topic='/arm_left_impedance_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/arm_right_impedance_controller/follow_joint_trajectory',
+                                                state_topic='/arm_right_impedance_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/gripper_left_controller/follow_joint_trajectory',
                                                 state_topic='/gripper_left_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/gripper_right_controller/follow_joint_trajectory',

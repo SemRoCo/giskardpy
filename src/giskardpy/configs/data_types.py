@@ -209,7 +209,7 @@ class BehaviorTreeConfig:
         },
         'MaxTrajectoryLength': {
             'enabled': True,
-            'length': 30
+            'length': 60 # seconds
         },
         'LoopDetector': {
             'precision': 3

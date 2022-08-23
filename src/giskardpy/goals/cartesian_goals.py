@@ -220,6 +220,7 @@ class DiffDriveBaseGoal(Goal):
         self.map = root_link
         self.base_footprint = tip_link
         self.goal_pose = self.transform_msg(self.map, goal_pose)
+        self.goal_pose.pose.position.z = 0
         diff_drive_joints = [v for k, v in self.world.joints.items() if isinstance(v, DiffDrive)]
         assert len(diff_drive_joints) == 1
         self.joint: DiffDrive = diff_drive_joints[0]

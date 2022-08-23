@@ -380,6 +380,7 @@ class GiskardTestWrapper(GiskardWrapper):
                            seed_configuration=seed_configuration)
 
     def set_localization(self, map_T_odom: PoseStamped):
+        map_T_odom.pose.position.z = 0
         req = UpdateTransformRequest()
         req.transform.translation = map_T_odom.pose.position
         req.transform.rotation = map_T_odom.pose.orientation

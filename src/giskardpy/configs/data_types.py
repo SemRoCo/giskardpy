@@ -176,6 +176,7 @@ class BehaviorTreeConfig:
         },
         'PublishDebugExpressions': {
             'enabled': False,
+            'enabled_base': False,
             'expression_filter': None
         },
         'PlotTrajectory': {
@@ -195,6 +196,7 @@ class BehaviorTreeConfig:
             'height_per_derivative': 6,
             'order': 2,
             'tick_stride': 0.5,
+            'y_limits': [-0.5, 0.5]
         },
         'WiggleCancel': {
             'amplitude_threshold': 0.55,

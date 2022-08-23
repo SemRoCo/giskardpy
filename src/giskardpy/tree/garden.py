@@ -356,7 +356,7 @@ class TreeManager:
         :return:
         """
         if node.name in self.tree_nodes:
-            raise ValueError('node with that name already exists')
+            raise ValueError(f'Node named {node.name} already exists.')
         parent = self.tree_nodes[parent_name]
         tree_node = ManagerNode(node=node, parent=parent, position=position)
         parent.add_child(tree_node)
@@ -629,6 +629,10 @@ class StandAlone(TreeManager):
             planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
             planning_4.add_child(DebugTFPublisher('debug tf publisher'))
+        if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
+            planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
+                                                         **self.god_map.unsafe_get_data(
+                                                             identifier.PublishDebugExpressions)))
         planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
@@ -737,7 +741,7 @@ class OpenLoop(StandAlone):
                 real_time_tracking.add_child(RosTime('time'))
                 real_time_tracking.add_child(ControllerPluginBase('base controller'))
                 real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
-                if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
+                if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                                          **self.god_map.unsafe_get_data(
                                                                              identifier.PublishDebugExpressions)))

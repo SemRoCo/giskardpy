@@ -67,6 +67,23 @@ class TiagoTestWrapper(GiskardTestWrapper):
         'gripper_left_right_finger_joint': 0.045,
     }
 
+    better_pose2 = {
+        'arm_left_1_joint': 0.27,
+        'arm_left_2_joint': - 1.07,
+        'arm_left_3_joint': 1.5,
+        'arm_left_4_joint': 2.0,
+        'arm_left_5_joint': - 2.0,
+        'arm_left_6_joint': 1.2,
+        'arm_left_7_joint': 0.5,
+        'arm_right_1_joint': 0.27,
+        'arm_right_2_joint': - 1.07,
+        'arm_right_3_joint': 1.5,
+        'arm_right_4_joint': 2.0,
+        'arm_right_5_joint': - 2.0,
+        'arm_right_6_joint': 1.2,
+        'arm_right_7_joint': 0.5,
+    }
+
     def __init__(self):
         self.mujoco_reset = rospy.ServiceProxy('reset', Trigger)
         super().__init__(TiagoMujoco)
@@ -108,6 +125,14 @@ class TestCartGoals:
         goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
         zero_pose.allow_all_collisions()
         zero_pose.move_base(goal)
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = 2
+        goal.pose.position.y = 0
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()
 
@@ -116,10 +141,35 @@ class TestCartGoals:
 
         start_base_pose = PoseStamped()
         start_base_pose.header.frame_id = 'map'
-        start_base_pose.pose.position = Point(1.295, 2.294, 0.097)
+        start_base_pose.pose.position = Point(1.295, 2.294, 0)
         start_base_pose.pose.orientation = Quaternion(0.000, 0.000, 0.990, -0.139)
         apartment_setup.allow_all_collisions()
         apartment_setup.move_base(start_base_pose)
+
+        countertip_P_goal = PointStamped()
+        countertip_P_goal.header.frame_id = countertop_frame
+        countertip_P_goal.point.x = 1.3
+        countertip_P_goal.point.y = -0.3
+        map_P_goal = tf.msg_to_homogeneous_matrix(tf.transform_point('map', countertip_P_goal))
+        map_P_goal[-2] = 0
+
+        # map_P_base_footprint = tf.msg_to_homogeneous_matrix(tf.lookup_point('map', 'base_footprint'))
+        # # map_P_goal = np.array([1.3, -0.3, 0, 1])
+        # x = map_P_goal - map_P_base_footprint
+        # x = x[:3]
+        # x /= np.linalg.norm(x)
+        # z = np.array([0,0,1])
+        # y = np.cross(z, x)
+        # y /= np.linalg.norm(y)
+        # map_R_goal = np.vstack([x,y,z]).T
+        # map_R_goal = np.vstack([np.vstack([map_R_goal.T, [0,0,0]]).T, [0,0,0,1]])
+        #
+        # base_pose = tf.lookup_pose('map', 'base_footprint')
+        # base_pose.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_goal))
+        # # base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
+        # # base_pose.pose.position.z = 0
+        # apartment_setup.allow_all_collisions()
+        # apartment_setup.move_base(base_pose)
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = countertop_frame
@@ -197,6 +247,37 @@ class TestCartGoals:
 
 
 class TestCollisionAvoidance:
+    def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_left_1_joint': -1.1069832458862692,
+            'arm_left_2_joint': 1.4746164329656843,
+            'arm_left_3_joint': 2.7736173839819602,
+            'arm_left_4_joint': 1.6237723180496708,
+            'arm_left_5_joint': -1.5975088318771629,
+            'arm_left_6_joint': 1.3300843607103001,
+            'arm_left_7_joint': -0.016546381784501657,
+            'arm_right_1_joint': -1.0919070230703032,
+            'arm_right_2_joint': 1.4928456221831905,
+            'arm_right_3_joint': 2.740050318770805,
+            'arm_right_4_joint': 1.6576417817518292,
+            'arm_right_5_joint': -1.4619211253492215,
+            'arm_right_6_joint': 1.2787860569647924,
+            'arm_right_7_joint': 0.013613188642612156,
+            'gripper_left_left_finger_joint': 0.0393669359310417,
+            'gripper_left_right_finger_joint': 0.04396903656716549,
+            'gripper_right_left_finger_joint': 0.03097991016001716,
+            'gripper_right_right_finger_joint': 0.04384773311365822,
+            'head_1_joint': -0.10322685494051058,
+            'head_2_joint': -1.0027367693813412,
+            'torso_lift_joint': 0.2499968644929236,
+        }
+        # zero_pose.set_joint_goal(js)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.plan_and_execute()
+        zero_pose.set_seed_configuration(js)
+        zero_pose.set_joint_goal(zero_pose.better_pose2)
+        zero_pose.plan()
+
     def test_demo1(self, apartment_setup: TiagoTestWrapper):
         # setup
         apartment_name = 'apartment'

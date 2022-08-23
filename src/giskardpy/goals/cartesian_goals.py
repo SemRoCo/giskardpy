@@ -220,6 +220,7 @@ class DiffDriveBaseGoal(Goal):
         self.map = root_link
         self.base_footprint = tip_link
         self.goal_pose = self.transform_msg(self.map, goal_pose)
+        self.goal_pose.pose.position.z = 0
         diff_drive_joints = [v for k, v in self.world.joints.items() if isinstance(v, DiffDrive)]
         assert len(diff_drive_joints) == 1
         self.joint: DiffDrive = diff_drive_joints[0]
@@ -244,12 +245,13 @@ class DiffDriveBaseGoal(Goal):
         map_V_goal_x = map_P_base_footprint_goal - map_P_base_footprint
         distance = w.norm(map_V_goal_x)
 
-        map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
+        # map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
         # map_goal_angle1 = w.angle_between_vector(map_V_goal_x, map_V_pointing_axis)
         axis, map_current_angle = w.axis_angle_from_matrix(map_R_base_footprint)
         map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
         # rot_vel_symbol = self.joint.rot_vel.get_symbol(0)
-        # map_current_angle = self.joint.rot.get_symbol(0)
+        # map_current_angle = w.angle_between_vector(map_V_pointing_axis, w.vector3(1, 0, 0))
+        # map_current_angle = w.if_greater_zero(map_V_pointing_axis[1], map_current_angle, -map_current_angle)
 
         map_V_goal_x = w.scale(map_V_goal_x, 1)
         # map_V_z = w.vector3(0, 0, 1)
@@ -260,36 +262,41 @@ class DiffDriveBaseGoal(Goal):
         map_goal_angle1 = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
         map_goal_angle1 = w.if_greater_zero(map_V_goal_x[1], map_goal_angle1, -map_goal_angle1)
         # map_goal_angle1_2 = w.angle_between_vector(w.vector3(1, 0, 0), map_V_goal_x)
-        angle_error1 = map_goal_angle1 - map_current_angle
+        rotate_to_goal_error = w.shortest_angular_distance(map_current_angle, map_goal_angle1)
 
         axis2, map_goal_angle2 = w.axis_angle_from_matrix(map_R_base_footprint_goal)
         map_goal_angle2 = w.if_greater_zero(axis2[2], map_goal_angle2, -map_goal_angle2)
-        angle_error2 = map_goal_angle2 - map_current_angle
+        final_rotation_error = w.shortest_angular_distance(map_current_angle, map_goal_angle2)
 
         eps = 0.01
-        weight_rotate_to_goal = w.ca.if_else(w.logic_and(w.ca.ge(w.abs(angle_error1), eps),
-                                                         w.ca.ge(w.abs(distance), eps)),
-                                             self.weight,
-                                             0)
-        # weight_translation_raw = w.if_greater_eq(w.abs(distance), eps, self.weight, 0)
-        weight_translation = w.ca.if_else(w.logic_and(w.ca.le(w.abs(angle_error1), eps * 2),
-                                                      w.ca.ge(w.abs(distance), eps)),
+        # weight_translation = w.if_less_eq(weight_rotate_to_goal, eps, self.weight, 0)
+        weight_final_rotation = w.if_else(w.logic_and(w.ca.le(w.abs(distance), eps * 2),
+                                                      w.ca.ge(w.abs(final_rotation_error), 0)),
                                           self.weight,
                                           0)
-        # weight_translation = w.if_less_eq(weight_rotate_to_goal, eps, self.weight, 0)
-        weight_final_rotation = w.ca.if_else(w.logic_and(w.ca.le(w.abs(distance), eps * 2),
-                                                         w.ca.ge(w.abs(angle_error2), eps)),
-                                             self.weight,
-                                             0)
+        weight_rotate_to_goal = w.if_else(w.logic_and(w.ca.ge(w.abs(rotate_to_goal_error), eps),
+                                                      w.ca.ge(w.abs(distance), eps),
+                                                      w.ca.le(weight_final_rotation, eps)),
+                                          self.weight,
+                                          0)
+        # weight_translation_raw = w.if_greater_eq(w.abs(distance), eps, self.weight, 0)
+        weight_translation = w.if_else(w.logic_and(w.ca.le(w.abs(rotate_to_goal_error), eps *2),
+                                                   w.ca.ge(w.abs(distance), eps)),
+                                       self.weight,
+                                       0)
 
-        self.add_debug_expr('map_goal_angle1', map_goal_angle1)
-        self.add_debug_expr('map_current_angle', map_current_angle)
-        self.add_debug_expr('angle_error1', angle_error1)
-        self.add_debug_expr('weight_rotate_to_goal', weight_rotate_to_goal / 1000)
-        self.add_debug_expr('distance', distance)
-        self.add_debug_expr('weight_translation', weight_translation / 1000)
-        self.add_debug_expr('angle_error2', angle_error2)
-        self.add_debug_expr('weight_final_rotation', weight_final_rotation / 1000)
+        # self.add_debug_expr('map_current_angle', map_current_angle)
+        # self.add_debug_expr('rotate_to_goal_map_goal_angle1', map_goal_angle1)
+        # self.add_debug_expr('rotate_to_goal_error', rotate_to_goal_error)
+        # self.add_debug_expr('rotate_to_goal_weight', weight_rotate_to_goal / 10000)
+        # # self.add_debug_expr('map_current_angle', map_current_angle)
+        # self.add_debug_expr('distance', distance)
+        # self.add_debug_expr('distance_weight', weight_translation / 20000)
+        # self.add_debug_expr('final_rotation_error', final_rotation_error)
+        # self.add_debug_expr('final_rotation_weight', weight_final_rotation / 30000)
+        # self.add_debug_vector('map_V_goal_x', map_V_goal_x)
+        # self.add_debug_vector('map_P_base_footprint_goal', map_P_base_footprint_goal)
+        # self.add_debug_vector('map_P_base_footprint', map_P_base_footprint)
 
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=map_V_goal_x,
@@ -297,20 +304,24 @@ class DiffDriveBaseGoal(Goal):
         #                                  weight=weight)
 
         self.add_constraint(reference_velocity=self.max_angular_velocity,
-                            lower_error=angle_error1,
-                            upper_error=angle_error1,
+                            lower_error=rotate_to_goal_error,
+                            upper_error=rotate_to_goal_error,
                             weight=weight_rotate_to_goal,
                             expression=map_current_angle,
                             name_suffix='/rot1')
-        self.add_constraint(reference_velocity=self.max_linear_velocity,
-                            lower_error=-distance,
-                            upper_error=-distance,
-                            weight=weight_translation,
-                            expression=distance,
-                            name_suffix='/dist')
+        self.add_point_goal_constraints(frame_P_current=map_P_base_footprint,
+                                        frame_P_goal=map_P_base_footprint_goal,
+                                        reference_velocity=self.max_linear_velocity,
+                                        weight=weight_translation)
+        # self.add_constraint(reference_velocity=self.max_linear_velocity,
+        #                     lower_error=-distance,
+        #                     upper_error=-distance,
+        #                     weight=weight_translation,
+        #                     expression=distance,
+        #                     name_suffix='/dist')
         self.add_constraint(reference_velocity=self.max_angular_velocity,
-                            lower_error=angle_error2,
-                            upper_error=angle_error2,
+                            lower_error=final_rotation_error,
+                            upper_error=final_rotation_error,
                             weight=weight_final_rotation,
                             expression=map_current_angle,
                             name_suffix='/rot2')

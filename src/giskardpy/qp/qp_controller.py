@@ -711,13 +711,10 @@ class QPController:
             rows = self.p_A[self.p_A == np.inf].dropna(how='all').dropna(axis=1)
             logging.logerr(f'A contains inf in:\n'
                            f'{list(rows.index)}')
-        # p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
-        # p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
-        # if len(p_filtered) > 0:
-        #     logging.logerr('{} has the following nans:'.format(name))
-        #     self.__print_pandas_array(p_filtered)
-        #     return True
-        # logging.loginfo('{} has no nans'.format(name))
+        if np.any(np.isnan(self.np_A)):
+            rows = self.p_A.isna()[self.p_A.isna()].dropna(how='all').dropna(axis=1)
+            logging.logerr(f'A constrains nan in: \n'
+                           f'{list(rows.index)}')
         return True
 
     def __print_pandas_array(self, array):

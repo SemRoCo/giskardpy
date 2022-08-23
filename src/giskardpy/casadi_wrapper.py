@@ -35,7 +35,7 @@ def diag(*args):
 
 
 def Symbol(data):
-    if isinstance(data, str) or isinstance(data, unicode):
+    if isinstance(data, str):
         return ca.SX.sym(data)
     return ca.SX(data)
 

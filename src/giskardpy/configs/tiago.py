@@ -6,10 +6,18 @@ from giskardpy.data_types import PrefixName
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
+        # self.collision_avoidance_config.load_moveit_self_collision_matrix('tiago.srdf')
         self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_fixed_column_link')
         self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_lift_link')
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_lift_link')
+
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_fixed_column_link')
         self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_fixed_column_link')
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_fixed_column_link')
+        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_fixed_column_link')
+        #
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_fixed_column_link')
 
 
 class TiagoMujoco(TiagoBase):
@@ -33,7 +41,9 @@ class TiagoMujoco(TiagoBase):
         # self.add_diff_drive_interface(cmd_vel_topic='/mobile_base_controller/cmd_vel',
         self.add_diff_drive_interface(cmd_vel_topic='/tiago/cmd_vel',
                                       parent_link_name='odom',
-                                      child_link_name='base_footprint')
+                                      child_link_name='base_footprint',
+                                      translation_acceleration_limit=1,
+                                      rotation_acceleration_limit=1)
         self.qp_solver_config.joint_weights['velocity']['brumbrum'] = 0.1
 
 
@@ -57,7 +67,9 @@ class IAI_Tiago(TiagoBase):
                                                 state_topic='/torso_controller/state')
         self.add_diff_drive_interface(cmd_vel_topic='/mobile_base_controller/cmd_vel',
                                       parent_link_name='odom',
-                                      child_link_name='base_footprint')
+                                      child_link_name='base_footprint',
+                                      translation_acceleration_limit=1,
+                                      rotation_acceleration_limit=1)
 
 
 class TiagoStandAlone(TiagoBase):

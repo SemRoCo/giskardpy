@@ -240,7 +240,11 @@ class JointGoalChecker(GoalChecker):
         self.decimal = decimal
 
     def get_current_joint_state(self) -> JointStates:
-        return self.world.state
+        try:
+            current_joint_state = rospy.wait_for_message('joint_states', JointState)
+            return JointStates.from_msg(current_joint_state)
+        except:
+            return self.world.state
 
     def __call__(self):
         current_joint_state = self.get_current_joint_state()
@@ -257,12 +261,10 @@ class JointGoalChecker(GoalChecker):
             current = current_js[PrefixName(joint_name, None)].position
             if self.world.is_joint_continuous(PrefixName(joint_name, RobotPrefix)):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                           goal))
+                                               err_msg=f'{joint_name}: actual: {current} desired: {goal}')
             else:
                 np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                           goal))
+                                               err_msg=f'{joint_name}: actual: {current} desired: {goal}')
 
 
 class TranslationGoalChecker(GoalChecker):
@@ -678,6 +680,7 @@ class GiskardTestWrapper(GiskardWrapper):
                     f'expected: {move_result_error_code(expected_error_code)} | error_massage: {error_message}'
             if error_code == MoveResult.SUCCESS:
                 try:
+                    self.wait_heartbeats(10)
                     for goal_checker in self.goal_checks[len(r.error_codes) - 1]:
                         goal_checker()
                 except:

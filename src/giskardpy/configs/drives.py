@@ -65,11 +65,15 @@ class DiffDriveCmdVelInterface(DriveInterface):
                  parent_link_name: my_string,
                  child_link_name: my_string,
                  cmd_vel_topic: Optional[str] = None,
-                 translation_velocity_limit: float = .2,
-                 rotation_velocity_limit: float = .2,
                  joint_name: my_string = 'brumbrum',
                  odom_x_name: str = 'odom_x',
                  odom_rot_name: str = 'odom_rot',
+                 translation_velocity_limit: Optional[float] = 0.2,
+                 rotation_velocity_limit: Optional[float] = 0.2,
+                 translation_acceleration_limit: Optional[float] = None,
+                 rotation_acceleration_limit: Optional[float] = None,
+                 translation_jerk_limit: Optional[float] = 5,
+                 rotation_jerk_limit: Optional[float] = 10,
                  **diff_drive_params):
         self.cmd_vel_topic = cmd_vel_topic
         if isinstance(parent_link_name, str):
@@ -80,6 +84,12 @@ class DiffDriveCmdVelInterface(DriveInterface):
         self.child_link_name = child_link_name
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
+        self.translation_velocity_limit = translation_velocity_limit
+        self.rotation_velocity_limit = rotation_velocity_limit
+        self.translation_acceleration_limit = translation_acceleration_limit
+        self.rotation_acceleration_limit = rotation_acceleration_limit
+        self.translation_jerk_limit = translation_jerk_limit
+        self.rotation_jerk_limit = rotation_jerk_limit
         self.diff_drive_params = diff_drive_params
         if isinstance(joint_name, str):
             joint_name = PrefixName(joint_name, None)
@@ -91,11 +101,15 @@ class DiffDriveCmdVelInterface(DriveInterface):
         return DiffDrive(god_map=god_map,
                          parent_link_name=self.parent_link_name,
                          child_link_name=self.child_link_name,
-                         translation_velocity_limit=self.translation_velocity_limit,
-                         rotation_velocity_limit=self.rotation_velocity_limit,
                          name=self.joint_name,
                          x_name=self.odom_x_name,
                          rot_name=self.odom_rot_name,
+                         translation_velocity_limit=self.translation_velocity_limit,
+                         rotation_velocity_limit=self.rotation_velocity_limit,
+                         translation_acceleration_limit=self.translation_acceleration_limit,
+                         rotation_acceleration_limit=self.rotation_acceleration_limit,
+                         translation_jerk_limit=self.translation_jerk_limit,
+                         rotation_jerk_limit=self.rotation_jerk_limit,
                          **self.diff_drive_params)
 
     def make_plugin(self):

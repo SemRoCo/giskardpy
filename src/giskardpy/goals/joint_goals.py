@@ -1,6 +1,6 @@
 from __future__ import division
 
-from typing import Union, Dict
+from typing import Union, Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped
 from pybullet import getAxisAngleFromQuaternion
@@ -587,14 +587,16 @@ class JointPosition(Goal):
 
 
 class AvoidJointLimits(Goal):
-    def __init__(self, percentage=15, weight=WEIGHT_BELOW_CA, **kwargs):
+    def __init__(self, percentage=15, weight=WEIGHT_BELOW_CA, joint_list: Optional[List[str]] = None, **kwargs):
         """
         This goal will push joints away from their position limits
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         :param weight: float, default WEIGHT_BELOW_CA
         """
         super().__init__(**kwargs)
-        for joint_name in self.god_map.get_data(identifier.controlled_joints):
+        if joint_list is None:
+            joint_list = self.god_map.get_data(identifier.controlled_joints)
+        for joint_name in joint_list:
             if self.world.is_joint_revolute(joint_name):
                 self.add_constraints_of_goal(AvoidJointLimitsRevolute(joint_name=joint_name,
                                                                       percentage=percentage,

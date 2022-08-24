@@ -7,6 +7,10 @@ class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
         self.collision_avoidance_config.load_moveit_self_collision_matrix('package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
+        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
+                                                                               number_of_repeller=2,
+                                                                               soft_threshold=0.2,
+                                                                               hard_threshold=0.1)
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_lift_link')

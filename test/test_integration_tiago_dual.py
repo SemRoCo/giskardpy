@@ -364,17 +364,25 @@ class TestCollisionAvoidance:
         goal_point = PointStamped()
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
         # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
-        apartment_setup.set_keep_hand_in_workspace(tip_link=r_tcp)
+        apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
         # apartment_setup.avoid_joint_limits(50)
+        apartment_setup.plan_and_execute()
+
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point, weight=WEIGHT_BELOW_CA)
+        apartment_setup.set_cart_goal(left_pose,
+                                      tip_link=l_tcp,
+                                      root_link=apartment_setup.default_root,
+                                      check=False)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
                                       tip_link=l_tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=goal_angle)
-        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-                                      goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
+        apartment_setup.avoid_joint_limits(joint_list=['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint',
+                                                       'arm_left_4_joint', 'arm_left_5_joint', 'arm_left_6_joint',
+                                                       'arm_left_7_joint'])
         apartment_setup.plan_and_execute()
 
         # grasp cup

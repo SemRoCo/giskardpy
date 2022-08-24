@@ -422,6 +422,7 @@ class GiskardWrapper(object):
 
     def avoid_joint_limits(self,
                            percentage: int = 15,
+                           joint_list: Optional[List[str]] = None,
                            weight: Optional[float] = None):
         """
         This goal will push joints away from their position limits
@@ -430,7 +431,8 @@ class GiskardWrapper(object):
         """
         self.set_json_goal(constraint_type='AvoidJointLimits',
                            percentage=percentage,
-                           weight=weight)
+                           weight=weight,
+                           joint_list=joint_list)
 
     def allow_self_collision(self):
         """

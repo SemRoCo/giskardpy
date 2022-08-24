@@ -6,7 +6,7 @@ from giskardpy.data_types import PrefixName
 import casadi as ca
 
 
-goal_parameter = Union[str, float, bool, genpy.Message, dict]
+goal_parameter = Union[str, float, bool, genpy.Message, dict, list]
 my_string = Union[str, PrefixName]
 expr_symbol = Union[ca.SX, float]
 expr_matrix = ca.SX

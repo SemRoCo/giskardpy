@@ -30,6 +30,7 @@ from giskardpy import identifier, RobotPrefix
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
+from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import goal_parameter
@@ -584,9 +585,10 @@ class GiskardTestWrapper(GiskardWrapper):
                            map_frame=map_frame,
                            base_footprint=base_footprint)
 
-    def set_diff_drive_tangential_to_point(self, goal_point: PointStamped):
+    def set_diff_drive_tangential_to_point(self, goal_point: PointStamped, weight: float = WEIGHT_ABOVE_CA):
         self.set_json_goal('DiffDriveTangentialToPoint',
-                           goal_point=goal_point)
+                           goal_point=goal_point,
+                           weight=weight)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None, check=True,
                           **kwargs: goal_parameter):

@@ -247,6 +247,42 @@ class TestCartGoals:
 
 
 class TestCollisionAvoidance:
+    def test_avoid_self_collision(self, zero_pose: TiagoTestWrapper):
+        js = {'torso_lift_joint': 0.20229999999999998,
+              'head_1_joint': 0.0,
+              'head_2_joint': -6.204516145491557e-05,
+              'arm_left_1_joint': 1.5007963267948965,
+              'arm_left_2_joint': -0.00010014511403544368,
+              'arm_left_3_joint': -0.000276526865282678,
+              'arm_left_4_joint': -0.00023983621298795388,
+              'arm_left_5_joint': 0.0,
+              'arm_left_6_joint': 0.0,
+              'arm_left_7_joint': 0.0,
+              'gripper_left_right_finger_joint': 0.0225,
+              'gripper_left_left_finger_joint': 0.0225,
+              'arm_right_1_joint': 0.7976995091702535,
+              'arm_right_2_joint': 0.0019869697434773403,
+              'arm_right_3_joint': 1.5707963267948968,
+              'arm_right_4_joint': 1.8883382204789572,
+              'arm_right_5_joint': 1.5740510036959563,
+              'arm_right_6_joint': -0.48445592287451544,
+              'arm_right_7_joint': 0.0,
+              'gripper_right_right_finger_joint': 0.0225,
+              'gripper_right_left_finger_joint': 0.0225,
+              }
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+
+        tip_link = 'gripper_right_grasping_frame'
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = tip_link
+        r_goal.pose.position.x = 0.3
+        r_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(goal_pose=r_goal,
+                                tip_link=tip_link,
+                                root_link='map')
+        zero_pose.plan_and_execute()
+
     def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
         js = {
             'arm_left_1_joint': -1.1069832458862692,

@@ -6,16 +6,16 @@ from giskardpy.data_types import PrefixName
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
-        # self.collision_avoidance_config.load_moveit_self_collision_matrix('tiago.srdf')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_lift_link')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_lift_link')
-
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_fixed_column_link')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_fixed_column_link')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_fixed_column_link')
-        self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_fixed_column_link')
+        self.collision_avoidance_config.load_moveit_self_collision_matrix('package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_lift_link')
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_lift_link')
+        #
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_fixed_column_link')
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_fixed_column_link')
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_fixed_column_link')
+        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_fixed_column_link')
         #
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_fixed_column_link')
 

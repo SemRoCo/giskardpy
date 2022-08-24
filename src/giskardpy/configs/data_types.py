@@ -100,6 +100,19 @@ class CollisionAvoidanceConfig:
     def ignore_self_collisions_of_pair(self, link_name1, link_name2):
         self._ignored_self_collisions.append((link_name1, link_name2))
 
+    def load_moveit_self_collision_matrix(self, path_to_srdf):
+        import lxml.etree as ET
+        path_to_srdf = resolve_ros_iris(path_to_srdf)
+        srdf = ET.parse(path_to_srdf)
+        srdf_root = srdf.getroot()
+        for child in srdf_root:
+            if hasattr(child, 'tag') and child.tag == 'disable_collisions':
+                link1 = child.attrib['link1']
+                link2 = child.attrib['link2']
+                reason = child.attrib['reason']
+                if reason in ['Never', 'Adjacent']:
+                    self.ignore_self_collisions_of_pair(link1, link2)
+
     def add_self_collision(self, link_name1, link_name2):
         self._add_self_collisions.append((link_name1, link_name2))
 

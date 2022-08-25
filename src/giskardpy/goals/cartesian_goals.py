@@ -259,7 +259,11 @@ class DiffDriveBaseGoal(Goal):
         # map_V_goal_y = w.scale(map_V_goal_y, 1)
         # map_R_goal = w.hstack([map_V_goal_x, map_V_goal_y, map_V_z, w.Matrix([0, 0, 0, 1])])
         # axis, map_goal_angle1 = w.axis_angle_from_matrix(map_R_goal)
-        map_goal_angle1 = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
+        map_goal_angle1_f = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
+        map_goal_angle1_b = w.angle_between_vector(map_V_goal_x, w.vector3(-1, 0, 0))
+        map_goal_angle1 = w.if_less(map_goal_angle1_f, map_goal_angle1_b,
+                                    if_result=map_goal_angle1_f,
+                                    else_result=map_goal_angle1_f+np.pi)
         map_goal_angle1 = w.if_greater_zero(map_V_goal_x[1], map_goal_angle1, -map_goal_angle1)
         # map_goal_angle1_2 = w.angle_between_vector(w.vector3(1, 0, 0), map_V_goal_x)
         rotate_to_goal_error = w.shortest_angular_distance(map_current_angle, map_goal_angle1)
@@ -313,12 +317,6 @@ class DiffDriveBaseGoal(Goal):
                                         frame_P_goal=map_P_base_footprint_goal,
                                         reference_velocity=self.max_linear_velocity,
                                         weight=weight_translation)
-        # self.add_constraint(reference_velocity=self.max_linear_velocity,
-        #                     lower_error=-distance,
-        #                     upper_error=-distance,
-        #                     weight=weight_translation,
-        #                     expression=distance,
-        #                     name_suffix='/dist')
         self.add_constraint(reference_velocity=self.max_angular_velocity,
                             lower_error=final_rotation_error,
                             upper_error=final_rotation_error,

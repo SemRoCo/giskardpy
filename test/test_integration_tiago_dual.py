@@ -144,6 +144,26 @@ class TestCartGoals:
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()
 
+    def test_drive4(self, zero_pose: TiagoTestWrapper):
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = -1
+        goal.pose.position.y = -1
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = -2
+        goal.pose.position.y = 0
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+        # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
+        # zero_pose.plan_and_execute()
+
     def test_drive3(self, apartment_setup: TiagoTestWrapper):
         countertop_frame = 'iai_apartment/island_countertop'
 
@@ -300,6 +320,36 @@ class TestCollisionAvoidance:
             'arm_right_6_joint': 0.0,
             'arm_right_7_joint': 0.0,
         }
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(zero_pose.better_pose2)
+        zero_pose.plan_and_execute()
+
+    def test_avoid_self_collision3(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_left_1_joint': 1.2332888859151083,
+            'arm_left_2_joint': 0.4185640314869073,
+            'arm_left_3_joint': 1.0368366387642085,
+            'arm_left_4_joint': 1.8054287324754177,
+            'arm_left_5_joint': -0.44285464455362633,
+            'arm_left_6_joint': 0.9944000347356291,
+            'arm_left_7_joint': 0.875213472376144,
+            'arm_right_1_joint': 0.23721292047845496,
+            'arm_right_2_joint': -1.066129051458068,
+            'arm_right_3_joint': 1.5439742936745464,
+            'arm_right_4_joint': 2.0496711118535336,
+            'arm_right_5_joint': -2.0031904020067732,
+            'arm_right_6_joint': 1.1995526028397177,
+            'arm_right_7_joint': 0.5027308160853101,
+            'gripper_left_left_finger_joint': 0.04337267958287432,
+            'gripper_left_right_finger_joint': 0.04330186757287549,
+            'gripper_right_left_finger_joint': 0.043748218050233635,
+            'gripper_right_right_finger_joint': 0.0441509917474264,
+            'head_1_joint': 0.282281470239997,
+            'head_2_joint': -0.4559600213165583,
+            'torso_lift_joint': 0.2874509265775276,
+        }
+
         zero_pose.set_joint_goal(js, check=False)
         zero_pose.plan_and_execute()
         zero_pose.set_joint_goal(zero_pose.better_pose2)

@@ -10,6 +10,7 @@ from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils import logging
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
@@ -49,6 +50,7 @@ class InitQPController(GiskardBehavior):
             constraints.update(_constraints)
             vel_constraints.update(_vel_constraints)
             debug_expressions.update(_debug_expressions)
+            logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         self.get_god_map().set_data(identifier.constraints, constraints)
         self.get_god_map().set_data(identifier.vel_constraints, vel_constraints)
         self.get_god_map().set_data(identifier.debug_expressions, debug_expressions)

@@ -438,7 +438,7 @@ class TestCartGoals:
     def test_drive5(self, zero_pose: TiagoTestWrapper):
         goal = PoseStamped()
         goal.header.frame_id = 'map'
-        goal.pose.position.x = -0.01
+        goal.pose.position.x = 0.01
         goal.pose.position.y = 0.5
         goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 8, [0, 0, 1]))
         zero_pose.allow_all_collisions()

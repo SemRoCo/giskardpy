@@ -164,7 +164,33 @@ class TestCartGoals:
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()
 
+    def test_drive5(self, zero_pose: TiagoTestWrapper):
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = -1
+        goal.pose.position.y = -1
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
+        # zero_pose.allow_all_collisions()
+
+        pointing_goal = PointStamped()
+        pointing_goal.header.frame_id = 'base_footprint'
+        pointing_goal.point.x = 1
+        zero_pose.set_pointing_goal(tip_link='xtion_link',
+                                    root_link='base_footprint',
+                                    goal_point=pointing_goal)
+        zero_pose.set_joint_goal(zero_pose.better_pose2)
+        zero_pose.move_base(goal)
+
     def test_drive3(self, apartment_setup: TiagoTestWrapper):
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'iai_apartment/side_B'
+        base_pose.pose.position.x = 1.5
+        base_pose.pose.position.y = 2.4
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/3, [0,0,1]))
+        base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
+        apartment_setup.set_localization(base_pose)
+
         countertop_frame = 'iai_apartment/island_countertop'
 
         start_base_pose = PoseStamped()

@@ -283,9 +283,10 @@ class DiffDriveBaseGoal(Goal):
                                                   if_result=map_goal_angle_direction_f + np.pi,
                                                   else_result=map_goal_angle_direction_f - np.pi)
 
-        middle_angle = (angle_start + map_goal_angle2) / 2
-        map_goal_angle1 = w.if_less(w.abs(map_goal_angle_direction_f - middle_angle),
-                                    w.abs(map_goal_angle_direction_b - middle_angle),
+        middle_angle = self.god_map.evaluate_expr((angle_start + map_goal_angle2) / 2)
+        a = self.god_map.evaluate_expr(w.abs(map_goal_angle_direction_f - middle_angle))
+        b = self.god_map.evaluate_expr(w.abs(map_goal_angle_direction_b - middle_angle))
+        map_goal_angle1 = w.if_less(a, b,
                                     if_result=map_goal_angle_direction_f,
                                     else_result=map_goal_angle_direction_b)
 

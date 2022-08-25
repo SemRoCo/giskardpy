@@ -682,7 +682,7 @@ class GiskardTestWrapper(GiskardWrapper):
                     f'expected: {move_result_error_code(expected_error_code)} | error_massage: {error_message}'
             if error_code == MoveResult.SUCCESS:
                 try:
-                    self.wait_heartbeats(10)
+                    self.wait_heartbeats(30)
                     for goal_checker in self.goal_checks[len(r.error_codes) - 1]:
                         goal_checker()
                 except:

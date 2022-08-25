@@ -86,16 +86,21 @@ class CollisionAvoidanceConfig:
         def init_25mm(cls):
             return cls(soft_threshold=0.025, hard_threshold=0.0)
 
-    collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
+    def __init__(self):
+        self.collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
 
-    _add_self_collisions: List[Tuple[str, str]] = []
-    _ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
+        self._add_self_collisions: List[Tuple[str, str]] = []
+        self._ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
+        self._fixed_joints_for_self_collision_avoidance = []
 
-    _external_collision_avoidance: Dict[str, CollisionAvoidanceEntry] = defaultdict(CollisionAvoidanceEntry)
-    _self_collision_avoidance: Dict[str, CollisionAvoidanceEntry] = defaultdict(CollisionAvoidanceEntry)
+        self._external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
+        self._self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
 
     def ignore_all_self_collisions_of_link(self, link_name):
         self._ignored_self_collisions.append(link_name)
+
+    def assume_joints_fixed_for_self_collision_avoidance(self, joint_names: List[str]):
+        self._fixed_joints_for_self_collision_avoidance.extend(joint_names)
 
     def ignore_self_collisions_of_pair(self, link_name1, link_name2):
         self._ignored_self_collisions.append((link_name1, link_name2))

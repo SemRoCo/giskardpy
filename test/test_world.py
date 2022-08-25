@@ -7,7 +7,7 @@ from geometry_msgs.msg import Pose
 from hypothesis import given
 
 from giskard_msgs.msg import CollisionEntry
-from giskardpy import identifier, RobotName, RobotPrefix
+from giskardpy import identifier, RobotPrefix
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.god_map import GodMap
@@ -17,6 +17,7 @@ from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.utils.utils import suppress_stderr
 from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, rnd_joint_state, hsr_urdf
 
+RobotName = 'pr2'
 
 @pytest.fixture(scope='module')
 def module_setup(request):

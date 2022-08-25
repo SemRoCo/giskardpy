@@ -113,6 +113,14 @@ class TiagoTestWrapper(GiskardTestWrapper):
             rospy.sleep(0.5)
         self.clear_world()
         self.reset_base()
+        self.left_gripper_group = 'left_gripper'
+        self.register_group(group_name=self.left_gripper_group,
+                            parent_group_name=self.get_robot_name(),
+                            root_link_name='gripper_left_link')
+        self.right_gripper_group = 'right_gripper'
+        self.register_group(group_name=self.right_gripper_group,
+                            parent_group_name=self.get_robot_name(),
+                            root_link_name='gripper_right_link')
 
 
 class TestCartGoals:
@@ -247,6 +255,56 @@ class TestCartGoals:
 
 
 class TestCollisionAvoidance:
+    def test_avoid_self_collision1(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'torso_lift_joint': 0.0,
+            'head_1_joint': 0.0,
+            'head_2_joint': -6.204516145491557e-05,
+            'arm_left_1_joint': 1.389657460632337,
+            'arm_left_2_joint': 0.5662906493435158,
+            'arm_left_3_joint': 0.046819079632679506,
+            'arm_left_4_joint': 1.7033676662318802,
+            'arm_left_5_joint': 1.4860966513544849,
+            'arm_left_6_joint': 0.4646651458180766,
+            'arm_left_7_joint': 0.08836923136195018,
+            'arm_right_1_joint': -0.00010014511403544368,
+            'arm_right_2_joint': -0.00010014511403544368,
+            'arm_right_3_joint': -0.000276526865282678,
+            'arm_right_4_joint': -0.00023983621298795388,
+            'arm_right_5_joint': 0.0,
+            'arm_right_6_joint': 0.0,
+            'arm_right_7_joint': 0.0,
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(zero_pose.better_pose2)
+        zero_pose.plan_and_execute()
+
+    def test_avoid_self_collision2(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'torso_lift_joint': 0.0,
+            'head_1_joint': 0.0,
+            'head_2_joint': -6.204516145491557e-05,
+            'arm_left_1_joint': 1.389657460632337,
+            'arm_left_2_joint': 0.5662906493435158,
+            'arm_left_3_joint': 0.046819079632679506,
+            'arm_left_4_joint': 1.7033676662318802,
+            'arm_left_5_joint': 1.4860966513544849,
+            'arm_left_6_joint': 2,
+            'arm_left_7_joint': 0.08836923136195018,
+            'arm_right_1_joint': -0.00010014511403544368,
+            'arm_right_2_joint': -0.00010014511403544368,
+            'arm_right_3_joint': -0.000276526865282678,
+            'arm_right_4_joint': -0.00023983621298795388,
+            'arm_right_5_joint': 0.0,
+            'arm_right_6_joint': 0.0,
+            'arm_right_7_joint': 0.0,
+        }
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(zero_pose.better_pose2)
+        zero_pose.plan_and_execute()
+
     def test_avoid_self_collision(self, zero_pose: TiagoTestWrapper):
         js = {'torso_lift_joint': 0.20229999999999998,
               'head_1_joint': 0.0,
@@ -280,7 +338,8 @@ class TestCollisionAvoidance:
         r_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(goal_pose=r_goal,
                                 tip_link=tip_link,
-                                root_link='map')
+                                root_link='map',
+                                weight=WEIGHT_BELOW_CA)
         zero_pose.plan_and_execute()
 
     def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
@@ -380,9 +439,10 @@ class TestCollisionAvoidance:
                                       environment_link=handle_name,
                                       goal_joint_state=goal_angle)
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(joint_list=['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint',
-                                                       'arm_left_4_joint', 'arm_left_5_joint', 'arm_left_6_joint',
-                                                       'arm_left_7_joint'])
+        apartment_setup.set_avoid_joint_limits_goal(
+            joint_list=['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint',
+                        'arm_left_4_joint', 'arm_left_5_joint', 'arm_left_6_joint',
+                        'arm_left_7_joint'])
         apartment_setup.plan_and_execute()
 
         # grasp cup
@@ -478,7 +538,7 @@ class TestCollisionAvoidance:
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -487,7 +547,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=goal_angle)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         # grasp cup
@@ -610,7 +670,7 @@ class TestCollisionAvoidance:
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -619,7 +679,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=goal_angle)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -628,7 +688,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=0)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
     def test_open_cabinet_right(self, apartment_setup: TiagoTestWrapper):
@@ -659,7 +719,7 @@ class TestCollisionAvoidance:
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
         # apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
         #                               goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -668,7 +728,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=goal_angle)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -677,10 +737,11 @@ class TestCollisionAvoidance:
                                       goal_joint_state=0)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
     def test_dishwasher(self, apartment_setup: TiagoTestWrapper):
+        apartment_name = 'apartment'
         dishwasher_middle = 'iai_apartment/dishwasher_drawer_middle'
         base_pose = PoseStamped()
         base_pose.header.frame_id = dishwasher_middle
@@ -694,7 +755,7 @@ class TestCollisionAvoidance:
         tcp = 'gripper_left_grasping_frame'
         handle_name = 'handle_cab7'
         handle_name_frame = 'iai_apartment/handle_cab7'
-        goal_angle = np.pi / 2
+        goal_angle = 0.95
         left_pose = PoseStamped()
         left_pose.header.frame_id = handle_name_frame
         left_pose.pose.position.x = -0.1
@@ -707,7 +768,7 @@ class TestCollisionAvoidance:
                                       root_link=tf.get_tf_root(),
                                       check=False)
         apartment_setup.plan_and_execute()
-
+        apartment_setup.allow_collision(apartment_setup.left_gripper_group, apartment_name)
         apartment_setup.set_json_goal('Open',
                                       tip_link=tcp,
                                       environment_link=handle_name,
@@ -720,6 +781,7 @@ class TestCollisionAvoidance:
         apartment_setup.plan_and_execute()
         # apartment_setup.set_apartment_js({joint_name: goal_angle})
 
+        apartment_setup.allow_collision(apartment_setup.left_gripper_group, apartment_name)
         apartment_setup.set_json_goal('Open',
                                       tip_link=tcp,
                                       environment_link=handle_name,
@@ -756,6 +818,12 @@ class TestConstraints:
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
         apartment_setup.plan_and_execute()
+
+    def test_avoid_joint_limits(self, better_pose: TiagoTestWrapper):
+        better_pose.set_joint_goal(better_pose.better_pose2)
+        better_pose.plan_and_execute()
+        better_pose.set_avoid_joint_limits_goal(40)
+        better_pose.plan_and_execute()
 
 
 class TestJointGoals:

@@ -420,10 +420,10 @@ class GiskardWrapper(object):
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         self._set_collision_entries([collision_entry])
 
-    def avoid_joint_limits(self,
-                           percentage: int = 15,
-                           joint_list: Optional[List[str]] = None,
-                           weight: Optional[float] = None):
+    def set_avoid_joint_limits_goal(self,
+                                    percentage: int = 15,
+                                    joint_list: Optional[List[str]] = None,
+                                    weight: Optional[float] = None):
         """
         This goal will push joints away from their position limits
         :param percentage: default 15, if limits are 0-100, the constraint will push into the 15-85 range

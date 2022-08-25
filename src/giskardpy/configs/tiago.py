@@ -11,6 +11,8 @@ class TiagoBase(Giskard):
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
                                                                                hard_threshold=0.1)
+        self.collision_avoidance_config.assume_joints_fixed_for_self_collision_avoidance(['head_1_joint',
+                                                                                          'head_2_joint'])
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_lift_link')

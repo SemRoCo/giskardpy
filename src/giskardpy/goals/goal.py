@@ -83,7 +83,7 @@ class Goal:
         """
         return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
-    def get_joint_position_symbol(self, joint_name):
+    def get_joint_position_symbol(self, joint_name: my_string) -> expr_symbol:
         """
         returns a symbol that refers to the given joint
         """

@@ -20,7 +20,7 @@ class ExternalCollisionAvoidance(Goal):
         self.num_repeller = num_repeller
         self.link_name = link_name
         self.idx = idx
-        super(ExternalCollisionAvoidance, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.root = self.world.root_link_name
         self.robot_name = self.robot.name
 

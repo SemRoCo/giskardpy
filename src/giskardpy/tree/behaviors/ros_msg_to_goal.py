@@ -189,15 +189,16 @@ class RosMsgToGoal(GetGoal):
     @profile
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
+        fixed_joints = tuple(self.collision_avoidance_config._fixed_joints_for_self_collision_avoidance)
         config = self.get_god_map().get_data(identifier.self_collision_avoidance)
         robot_group_name = self.god_map.unsafe_get_data(identifier.robot_group_name)
         for link_a_o, link_b_o in self.world.groups[robot_group_name].possible_collision_combinations():
             link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
             try:
-                link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
-                link_a, link_b = self.world.sort_links(link_a, link_b)
-                if (link_a, link_b) in self.collision_scene.black_list:
+                if (link_a_o, link_b_o) in self.collision_scene.black_list:
                     continue
+                link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
+                link_a, link_b = self.world.sort_links(link_a, link_b)
                 counter[link_a, link_b] += 1
             except KeyError as e:
                 # no controlled joint between both links

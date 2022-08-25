@@ -227,13 +227,13 @@ class Collisions:
         return self.all_collisions
 
 
-class CollisionWorldSynchronizer(object):
+class CollisionWorldSynchronizer:
     black_list: set
 
     def __init__(self, world):
         self.world = world  # type: WorldTree
         try:
-            self.ignored_pairs = self.god_map.get_data(identifier.ignored_self_collisions)
+            self.ignored_pairs = set(self.god_map.get_data(identifier.ignored_self_collisions))
         except KeyError as e:
             self.ignored_pairs = set()
         try:
@@ -292,7 +292,6 @@ class CollisionWorldSynchronizer(object):
         # logging.loginfo('calculating self collision matrix')
         joint_state_tmp = self.world.state
         t = time()
-
         # find meaningless collisions
         for link_a, link_b in link_combinations:
             link_combination = self.world.sort_links(link_a, link_b)

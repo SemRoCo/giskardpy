@@ -3,11 +3,13 @@ from time import time
 from py_trees import Behaviour, Blackboard
 
 from giskardpy import identifier
+from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
 import giskardpy.utils.tfwrapper as tf
+
 
 class GiskardBehavior(Behaviour):
     time_collector: TimeCollector
@@ -24,6 +26,10 @@ class GiskardBehavior(Behaviour):
     @property
     def traj_time_in_sec(self):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
+
+    @property
+    def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
+        return self.god_map.unsafe_get_data(identifier.collision_avoidance_config)
 
     def get_god_map(self):
         """

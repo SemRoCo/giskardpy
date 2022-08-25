@@ -42,13 +42,10 @@ class TravelCompanion(object):
 
 
 class WorldTree:
-    joints: Dict[Union[PrefixName, str], Joint]
-    links: Dict[Union[PrefixName, str], Link]
-    god_map: GodMap
 
     def __init__(self, root_link_name, god_map=None):
         self.root_link_name = root_link_name
-        self.god_map = god_map
+        self.god_map: GodMap = god_map
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
@@ -352,22 +349,29 @@ class WorldTree:
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
 
     @memoize
-    def compute_chain_reduced_to_controlled_joints(self, link_a, link_b):
+    def compute_chain_reduced_to_controlled_joints(self,
+                                                   link_a: my_string,
+                                                   link_b: my_string,
+                                                   joints_to_exclude: Optional[tuple] = None) \
+            -> Tuple[my_string, my_string]:
+        if joints_to_exclude is None:
+            joints_to_exclude = {}
+        joint_list = [j for j in self.controlled_joints if j not in joints_to_exclude]
         chain1, connection, chain2 = self.compute_split_chain(link_b, link_a, joints=True, links=True, fixed=True,
                                                               non_controlled=True)
         chain = chain1 + connection + chain2
         for i, thing in enumerate(chain):
-            if i % 2 == 1 and thing in self.controlled_joints:
+            if i % 2 == 1 and thing in joint_list:
                 new_link_b = chain[i - 1]
                 break
         else:
             raise KeyError(f'no controlled joint in chain between {link_a} and {link_b}')
         for i, thing in enumerate(reversed(chain)):
-            if i % 2 == 1 and thing in self.controlled_joints:
+            if i % 2 == 1 and thing in joint_list:
                 new_link_a = chain[len(chain) - i]
                 break
         else:
-            raise KeyError('no controlled joint in chain between {} and {}'.format(link_a, link_b))
+            raise KeyError(f'no controlled joint in chain between {link_a} and {link_b}')
         return new_link_a, new_link_b
 
     @memoize
@@ -420,8 +424,8 @@ class WorldTree:
 
     def _clear(self):
         self.state = JointStates()
-        self.links = {self.root_link_name: Link(self.root_link_name)}
-        self.joints = {}
+        self.links: Dict[Union[PrefixName, str], Link] = {self.root_link_name: Link(self.root_link_name)}
+        self.joints: Dict[Union[PrefixName, str], Joint] = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
 

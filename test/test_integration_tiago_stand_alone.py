@@ -583,7 +583,7 @@ class TestCollisionAvoidance:
         goal_point.header.frame_id = 'cabinet1_door_top_left'
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -592,7 +592,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=goal_angle)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -601,7 +601,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=0)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
     def test_open_cabinet_right(self, apartment_setup: TiagoTestWrapper):
@@ -632,7 +632,7 @@ class TestCollisionAvoidance:
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
         # apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
         #                               goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -641,7 +641,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=goal_angle)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_json_goal('Open',
@@ -650,7 +650,7 @@ class TestCollisionAvoidance:
                                       goal_joint_state=0)
         apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
                                       goal_point=goal_point)
-        apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
     def test_dishwasher(self, apartment_setup: TiagoTestWrapper):

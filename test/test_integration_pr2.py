@@ -651,7 +651,7 @@ class TestConstraints:
     def test_AvoidJointLimits1(self, zero_pose: PR2TestWrapper):
         percentage = 10
         zero_pose.allow_all_collisions()
-        zero_pose.avoid_joint_limits(percentage=percentage)
+        zero_pose.set_avoid_joint_limits_goal(percentage=percentage)
         zero_pose.plan_and_execute()
 
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
@@ -4259,7 +4259,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip)
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
         kitchen_setup.allow_collision(kitchen_setup.get_robot_name(), tray_name)
-        kitchen_setup.avoid_joint_limits(percentage=percentage)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         # grasp tray
         kitchen_setup.plan_and_execute()
 
@@ -4283,7 +4283,7 @@ class TestCollisionAvoidanceGoals:
         base_goal.pose.position.x -= 0.5
         base_goal.pose.position.y -= 0.3
         base_goal.pose.orientation.w = 1
-        kitchen_setup.avoid_joint_limits(percentage=percentage)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.allow_collision(group1=tray_name,
                                       group2=kitchen_setup.l_gripper_group)
         # kitchen_setup.allow_self_collision()
@@ -4303,7 +4303,7 @@ class TestCollisionAvoidanceGoals:
         tray_goal.pose.position.z = .1
         tray_goal.pose.position.x = .1
         tray_goal.pose.orientation = Quaternion(*quaternion_about_axis(-1, [0, 1, 0]))
-        kitchen_setup.avoid_joint_limits(percentage=percentage)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.allow_collision(group1=tray_name,
                                       group2=kitchen_setup.l_gripper_group)
         kitchen_setup.set_cart_goal(tray_goal, tray_name, 'base_footprint')

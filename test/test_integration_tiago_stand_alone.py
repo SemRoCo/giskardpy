@@ -380,6 +380,21 @@ class TestCartGoals:
         apartment_setup.god_map.get_data(identifier.timer_collector).pretty_print(lambda i, x: i != 0 and i % 2 == 0)
         print(f'successes: {successes}')
 
+    def test_drive2(self, zero_pose: TiagoTestWrapper):
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position = Point(0.489, -0.598, 0.000)
+        goal.pose.orientation.w = 1
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position = Point(-0.026, 0.569, 0.000)
+        goal.pose.orientation = Quaternion(0, 0, 0.916530200374776, 0.3999654882623912)
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+
     def test_drive(self, zero_pose: TiagoTestWrapper):
         goal = PoseStamped()
         goal.header.frame_id = 'map'
@@ -387,79 +402,95 @@ class TestCartGoals:
         goal.pose.position.y = 1
         # goal.pose.orientation.w = 1
         goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=zero_pose.better_pose)
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = 'map'
-        base_pose.pose.position.x = 1
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
-        zero_pose.set_json_goal('SetOdometry',
-                                group_name='tiago_dual',
-                                base_pose=base_pose)
         zero_pose.allow_all_collisions()
         zero_pose.move_base(goal)
-
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = 2
+        goal.pose.position.y = 0
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()
 
-    def test_drive_new(self, better_pose: TiagoTestWrapper):
-        tip_link = 'gripper_left_grasping_frame'
-        root_link = 'map'
-        # map_T_eef = tf.lookup_pose(root_link, tip_link)
-        # map_T_eef.pose.orientation = Quaternion(*quaternion_from_matrix([[1,0,0,0,],
-        #                                                                  [0,0,1,0],
-        #                                                                  [0,-1,0,0],
-        #                                                                  [0,0,0,1]]))
-        # better_pose.set_cart_goal(map_T_eef, tip_link, 'base_footprint', root_link2='map', check=False)
+    def test_drive4(self, zero_pose: TiagoTestWrapper):
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = -1
+        goal.pose.position.y = -1
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = -2
+        goal.pose.position.y = 0
+        # goal.pose.orientation.w = 1
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+        # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
+        # zero_pose.plan_and_execute()
+
+    def test_drive5(self, zero_pose: TiagoTestWrapper):
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = -0.01
+        goal.pose.position.y = 0.5
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 8, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+
+    def test_drive3(self, apartment_setup: TiagoTestWrapper):
+        countertop_frame = 'iai_apartment/island_countertop'
+
+        start_base_pose = PoseStamped()
+        start_base_pose.header.frame_id = 'map'
+        start_base_pose.pose.position = Point(1.295, 2.294, 0)
+        start_base_pose.pose.orientation = Quaternion(0.000, 0.000, 0.990, -0.139)
+        # apartment_setup.allow_all_collisions()
+        apartment_setup.move_base(start_base_pose)
+
+        countertip_P_goal = PointStamped()
+        countertip_P_goal.header.frame_id = countertop_frame
+        countertip_P_goal.point.x = 1.3
+        countertip_P_goal.point.y = -0.3
+        map_P_goal = tf.msg_to_homogeneous_matrix(tf.transform_point('map', countertip_P_goal))
+        map_P_goal[-2] = 0
+
+        # map_P_base_footprint = tf.msg_to_homogeneous_matrix(tf.lookup_point('map', 'base_footprint'))
+        # # map_P_goal = np.array([1.3, -0.3, 0, 1])
+        # x = map_P_goal - map_P_base_footprint
+        # x = x[:3]
+        # x /= np.linalg.norm(x)
+        # z = np.array([0,0,1])
+        # y = np.cross(z, x)
+        # y /= np.linalg.norm(y)
+        # map_R_goal = np.vstack([x,y,z]).T
+        # map_R_goal = np.vstack([np.vstack([map_R_goal.T, [0,0,0]]).T, [0,0,0,1]])
         #
-        # # base_goal = PoseStamped()
-        # # base_goal.header.frame_id = 'map'
-        # # base_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0,-1,0,0,],
-        # #                                                                  [1,0,0,0],
-        # #                                                                  [0,0,1,0],
-        # #                                                                  [0,0,0,1]]))
-        # # better_pose.set_cart_goal(base_goal, 'base_footprint', 'map', check=False)
-        # better_pose.plan_and_execute()
+        # base_pose = tf.lookup_pose('map', 'base_footprint')
+        # base_pose.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_goal))
+        # # base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
+        # # base_pose.pose.position.z = 0
+        # apartment_setup.allow_all_collisions()
+        # apartment_setup.move_base(base_pose)
 
-        # tip_link = 'base_footprint'
-        goal = PoseStamped()
-        goal.header.frame_id = tip_link
-        # goal.pose.position.x = 1
-        goal.pose.position.z = 1.3
-        goal.pose.orientation.w = 1
-        # goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
-
-        # better_pose.set_cart_goal(goal, tip_link=tip_link, root_link=root_link, weight=WEIGHT_BELOW_CA)
-        better_pose.set_json_goal('KeepHandInWorkspace',
-                                  map_frame='map',
-                                  base_footprint='base_footprint',
-                                  tip_link=tip_link)
-        # gp = PointStamped()
-        # gp.header.frame_id = tip_link
-        # better_pose.set_pointing_goal(tip_link=tip_link,
-        #                               goal_point=gp,
-        #                               root_link='map',
-        #                               )
-        # better_pose.set_json_goal('PointingDiffDriveEEF',
-        #                           base_tip='base_footprint',
-        #                           base_root='map',
-        #                           eef_tip=tip_link,
-        #                           eef_root='base_footprint')
-        better_pose.allow_all_collisions()
-        better_pose.plan_and_execute()
-
-    def test_drive2(self, zero_pose: TiagoTestWrapper):
-        goal = PoseStamped()
-        goal.header.frame_id = 'map'
-        goal.pose.position = Point(0.489, -0.598, 0.000)
-        goal.pose.orientation.w = 1
-        zero_pose.move_base(goal)
-
-        goal = PoseStamped()
-        goal.header.frame_id = 'map'
-        goal.pose.position = Point(-0.026, 0.569, 0.000)
-        goal.pose.orientation = Quaternion(0, 0, 0.916530200374776, 0.3999654882623912)
-        zero_pose.move_base(goal)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = countertop_frame
+        base_pose.pose.position.x = 1.3
+        base_pose.pose.position.y = -0.3
+        base_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [0, 0, 1, 0],
+                                                                         [0, 0, 0, 1]]))
+        base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
+        base_pose.pose.position.z = 0
+        # apartment_setup.allow_all_collisions()
+        apartment_setup.move_base(base_pose)
 
 
 class TestCollisionAvoidance:

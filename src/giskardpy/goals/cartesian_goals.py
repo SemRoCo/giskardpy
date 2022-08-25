@@ -234,6 +234,11 @@ class DiffDriveBaseGoal(Goal):
             self.base_footprint_V_pointing_axis.vector.z = 1
 
     def make_constraints(self):
+        map_T_base_current = self.world.compute_fk_np(self.map, self.base_footprint)
+        map_R_base_current = w.rotation_of(map_T_base_current)
+        axis_start, angle_start = w.axis_angle_from_matrix(map_R_base_current)
+        angle_start = w.if_greater_zero(axis_start[2], angle_start, -angle_start)
+
         map_T_base_footprint = self.get_fk(self.map, self.base_footprint)
         map_P_base_footprint = w.position_of(map_T_base_footprint)
         map_R_base_footprint = w.rotation_of(map_T_base_footprint)
@@ -253,24 +258,38 @@ class DiffDriveBaseGoal(Goal):
         # map_current_angle = w.angle_between_vector(map_V_pointing_axis, w.vector3(1, 0, 0))
         # map_current_angle = w.if_greater_zero(map_V_pointing_axis[1], map_current_angle, -map_current_angle)
 
-        map_V_goal_x = w.scale(map_V_goal_x, 1)
-        # map_V_z = w.vector3(0, 0, 1)
-        # map_V_goal_y = w.cross(map_V_z, map_V_goal_x)
-        # map_V_goal_y = w.scale(map_V_goal_y, 1)
-        # map_R_goal = w.hstack([map_V_goal_x, map_V_goal_y, map_V_z, w.Matrix([0, 0, 0, 1])])
-        # axis, map_goal_angle1 = w.axis_angle_from_matrix(map_R_goal)
-        map_goal_angle1_f = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
-        map_goal_angle1_b = w.angle_between_vector(map_V_goal_x, w.vector3(-1, 0, 0))
-        map_goal_angle1 = w.if_less(map_goal_angle1_f, map_goal_angle1_b,
-                                    if_result=map_goal_angle1_f,
-                                    else_result=map_goal_angle1_f+np.pi)
-        map_goal_angle1 = w.if_greater_zero(map_V_goal_x[1], map_goal_angle1, -map_goal_angle1)
-        # map_goal_angle1_2 = w.angle_between_vector(w.vector3(1, 0, 0), map_V_goal_x)
-        rotate_to_goal_error = w.shortest_angular_distance(map_current_angle, map_goal_angle1)
-
         axis2, map_goal_angle2 = w.axis_angle_from_matrix(map_R_base_footprint_goal)
         map_goal_angle2 = w.if_greater_zero(axis2[2], map_goal_angle2, -map_goal_angle2)
         final_rotation_error = w.shortest_angular_distance(map_current_angle, map_goal_angle2)
+
+        map_V_goal_x = w.scale(map_V_goal_x, 1)
+        map_V_goal_z = w.vector3(0, 0, 1)
+        map_V_goal_y = w.cross(map_V_goal_z, map_V_goal_x)
+        map_V_goal_y = w.scale(map_V_goal_y, 1)
+        map_R_goal = w.Matrix([[map_V_goal_x[0], map_V_goal_y[0], map_V_goal_z[0], 0],
+                               [map_V_goal_x[1], map_V_goal_y[1], map_V_goal_z[1], 0],
+                               [map_V_goal_x[2], map_V_goal_y[2], map_V_goal_z[2], 0],
+                               [0, 0, 0, 1]])
+        axis_direction, map_goal_angle_direction_f = w.axis_angle_from_matrix(map_R_goal)
+        map_goal_angle_direction_f = w.if_greater_zero(axis_direction[2],
+                                                       if_result=map_goal_angle_direction_f,
+                                                       else_result=-map_goal_angle_direction_f)
+        map_goal_angle_direction_f = w.if_greater(map_goal_angle_direction_f, np.pi,
+                                                  map_goal_angle_direction_f - np.pi,
+                                                  map_goal_angle_direction_f)
+
+        # map_goal_angle1_f = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
+        map_goal_angle_direction_b = w.if_less_eq(map_goal_angle_direction_f, 0,
+                                                  if_result=map_goal_angle_direction_f + np.pi,
+                                                  else_result=map_goal_angle_direction_f - np.pi)
+
+        middle_angle = (angle_start + map_goal_angle2) / 2
+        map_goal_angle1 = w.if_less(w.abs(map_goal_angle_direction_f - middle_angle),
+                                    w.abs(map_goal_angle_direction_b - middle_angle),
+                                    if_result=map_goal_angle_direction_f,
+                                    else_result=map_goal_angle_direction_b)
+
+        rotate_to_goal_error = w.shortest_angular_distance(map_current_angle, map_goal_angle1)
 
         eps = 0.01
         # weight_translation = w.if_less_eq(weight_rotate_to_goal, eps, self.weight, 0)
@@ -284,7 +303,7 @@ class DiffDriveBaseGoal(Goal):
                                           self.weight,
                                           0)
         # weight_translation_raw = w.if_greater_eq(w.abs(distance), eps, self.weight, 0)
-        weight_translation = w.if_else(w.logic_and(w.ca.le(w.abs(rotate_to_goal_error), eps *2),
+        weight_translation = w.if_else(w.logic_and(w.ca.le(w.abs(rotate_to_goal_error), eps * 2),
                                                    w.ca.ge(w.abs(distance), eps)),
                                        self.weight,
                                        0)
@@ -301,6 +320,9 @@ class DiffDriveBaseGoal(Goal):
         # self.add_debug_vector('map_V_goal_x', map_V_goal_x)
         # self.add_debug_vector('map_P_base_footprint_goal', map_P_base_footprint_goal)
         # self.add_debug_vector('map_P_base_footprint', map_P_base_footprint)
+        # self.add_debug_expr('middle_angle', middle_angle)
+        # self.add_debug_expr('angle_start', angle_start)
+        # self.add_debug_expr('map_goal_angle2', map_goal_angle2)
 
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=map_V_goal_x,

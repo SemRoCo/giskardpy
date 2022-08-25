@@ -40,9 +40,9 @@ class DiffDriveTangentialToPoint(Goal):
         tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
         map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)
         angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
-        self.add_debug_vector('map_V_tangent', map_V_tangent)
-        self.add_debug_vector('map_V_forward', map_V_forward)
-        self.add_debug_expr('angle', angle)
+        # self.add_debug_vector('map_V_tangent', map_V_tangent)
+        # self.add_debug_vector('map_V_forward', map_V_forward)
+        # self.add_debug_expr('angle', angle)
         self.add_constraint(reference_velocity=0.5,
                             lower_error=-angle,
                             upper_error=-angle,
@@ -84,8 +84,8 @@ class PointingDiffDriveEEF(Goal):
 
         # weight = w.if_less_eq(distance, 0.05, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA)
         # weight = WEIGHT_BELOW_CA
-        self.add_debug_expr('fk_vel/x', fk_vel[0])
-        self.add_debug_expr('fk_vel/y', fk_vel[1])
+        # self.add_debug_expr('fk_vel/x', fk_vel[0])
+        # self.add_debug_expr('fk_vel/y', fk_vel[1])
         # self.add_debug_vector('base_root_V_eef_tip', base_root_V_eef_tip)
         # self.add_debug_vector('eef_root_V_eef_tip', eef_root_V_eef_tip)
         # self.add_debug_vector('base_root_V_pointing_axis', base_root_V_pointing_axis)

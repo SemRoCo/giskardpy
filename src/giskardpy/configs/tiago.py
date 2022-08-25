@@ -116,4 +116,6 @@ class TiagoStandAlone(TiagoBase):
         self.register_controlled_joints(['gripper_right_left_finger_joint', 'gripper_right_right_finger_joint',
                                          'gripper_left_left_finger_joint', 'gripper_left_right_finger_joint'])
         self.add_diff_drive_interface(parent_link_name='odom',
-                                      child_link_name='base_footprint')
+                                      child_link_name='base_footprint',
+                                      translation_velocity_limit=0.19,
+                                      rotation_velocity_limit=0.19)

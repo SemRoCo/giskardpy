@@ -629,19 +629,6 @@ def hstack(list_of_matrices):
     return ca.horzcat(*list_of_matrices)
 
 
-def asdf(a_R_b, a_R_c):
-    """
-    :param a_R_b: 4x4 or 3x3 Matrix
-    :type a_R_b: Matrix
-    :param a_R_c: 4x4 or 3x3 Matrix
-    :type a_R_c: Matrix
-    :return: angle of axis angle representation of b_R_c
-    :rtype: Union[float, Symbol]
-    """
-    difference = dot(a_R_b.T, a_R_c)
-    return axis_angle_from_matrix(difference)[0]
-
-
 def axis_angle_from_matrix(rotation_matrix: expr_matrix) -> Tuple[expr_matrix, expr_symbol]:
     """
     MAKE SURE MATRIX IS NORMALIZED

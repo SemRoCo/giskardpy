@@ -242,7 +242,7 @@ class JointGoalChecker(GoalChecker):
 
     def get_current_joint_state(self) -> JointStates:
         try:
-            current_joint_state = rospy.wait_for_message('joint_states', JointState)
+            current_joint_state = rospy.wait_for_message('joint_states', JointState, timeout=rospy.Duration(0.5))
             return JointStates.from_msg(current_joint_state)
         except:
             return self.world.state

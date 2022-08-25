@@ -8,6 +8,7 @@ from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
+from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -72,6 +73,8 @@ class Collisions:
     @profile
     def __init__(self, god_map: GodMap, collision_list_size):
         self.god_map = god_map
+        self.collision_avoidance_config: CollisionAvoidanceConfig = self.god_map.get_data(identifier.collision_avoidance_config)
+        self.fixed_joints = tuple(self.collision_avoidance_config._fixed_joints_for_self_collision_avoidance)
         self.world: WorldTree = self.god_map.get_data(identifier.world)
         self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
         self.robot_root = self.robot.root_link_name
@@ -124,7 +127,7 @@ class Collisions:
     def transform_self_collision(self, collision: Collision) -> Collision:
         link_a = collision.original_link_a
         link_b = collision.original_link_b
-        new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b)
+        new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b, self.fixed_joints)
         if not self.world.link_order(new_link_a, new_link_b):
             collision = collision.reverse()
             new_link_a, new_link_b = new_link_b, new_link_a

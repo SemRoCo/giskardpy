@@ -269,6 +269,23 @@ class TiagoTestWrapper(GiskardTestWrapper):
         'gripper_left_right_finger_joint': 0.045,
     }
 
+    better_pose2 = {
+        'arm_left_1_joint': 0.27,
+        'arm_left_2_joint': - 1.07,
+        'arm_left_3_joint': 1.5,
+        'arm_left_4_joint': 2.0,
+        'arm_left_5_joint': - 2.0,
+        'arm_left_6_joint': 1.2,
+        'arm_left_7_joint': 0.5,
+        'arm_right_1_joint': 0.27,
+        'arm_right_2_joint': - 1.07,
+        'arm_right_3_joint': 1.5,
+        'arm_right_4_joint': 2.0,
+        'arm_right_5_joint': - 2.0,
+        'arm_right_6_joint': 1.2,
+        'arm_right_7_joint': 0.5,
+    }
+
     def __init__(self):
         super().__init__(TiagoStandAlone)
 
@@ -480,6 +497,35 @@ class TestCollisionAvoidance:
         }
         zero_pose.set_joint_goal(js2)
         zero_pose.plan()
+
+    def test_avoid_self_collision4(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_left_1_joint': 0.21181287002285662,
+            'arm_left_2_joint': -0.6151379734525764,
+            'arm_left_3_joint': 0.769352860826213,
+            'arm_left_4_joint': 1.5366410535725352,
+            'arm_left_5_joint': 0.6692852960138725,
+            'arm_left_6_joint': 0.8499649769704987,
+            'arm_left_7_joint': 0.3934248653346525,
+            'arm_right_1_joint': 0.2605757577669546,
+            'arm_right_2_joint': -1.1145267872723925,
+            'arm_right_3_joint': 1.4016496683543236,
+            'arm_right_4_joint': 2.1447945222448572,
+            'arm_right_5_joint': -2.0050615624226524,
+            'arm_right_6_joint': 1.2321070888078671,
+            'arm_right_7_joint': 0.5130944511015763,
+            'gripper_left_left_finger_joint': 0.0016253199614312491,
+            'gripper_left_right_finger_joint': 0.0015128278396200111,
+            'gripper_right_left_finger_joint': 0.043748218050233635,
+            'gripper_right_right_finger_joint': 0.04384773311365822,
+            'head_1_joint': 1.2314613306445925,
+            'head_2_joint': 0.4333201391595926,
+        }
+
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()
+        zero_pose.set_joint_goal(zero_pose.better_pose2)
+        zero_pose.plan_and_execute()
 
     def test_left_arm(self, zero_pose: TiagoTestWrapper):
         box_pose = PoseStamped()

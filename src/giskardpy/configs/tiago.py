@@ -6,13 +6,24 @@ from giskardpy.data_types import PrefixName
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
-        self.collision_avoidance_config.load_moveit_self_collision_matrix('package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
+        self.collision_avoidance_config.load_moveit_self_collision_matrix(
+            'package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
                                                                                hard_threshold=0.1)
-        self.collision_avoidance_config.assume_joints_fixed_for_self_collision_avoidance(['head_1_joint',
-                                                                                          'head_2_joint'])
+        self.collision_avoidance_config.fix_joints_for_self_collision_avoidance(['head_1_joint',
+                                                                                 'head_2_joint',
+                                                                                 'gripper_left_left_finger_joint',
+                                                                                 'gripper_left_right_finger_joint',
+                                                                                 'gripper_right_left_finger_joint',
+                                                                                 'gripper_right_right_finger_joint'])
+        self.collision_avoidance_config.fix_joints_for_external_collision_avoidance(['gripper_left_left_finger_joint',
+                                                                                     'gripper_left_right_finger_joint',
+                                                                                     'gripper_right_left_finger_joint',
+                                                                                     'gripper_right_right_finger_joint'])
+        self.collision_avoidance_config.set_default_self_collision_avoidance(hard_threshold=0.03,
+                                                                             soft_threshold=0.06)
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_lift_link')

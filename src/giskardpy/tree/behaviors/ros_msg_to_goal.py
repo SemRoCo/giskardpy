@@ -163,10 +163,11 @@ class RosMsgToGoal(GetGoal):
 
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
-        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        for joint_name in controlled_joints:
-            child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name)
+        fixed_joints = tuple(self.collision_avoidance_config._fixed_joints_for_external_collision_avoidance)
+        joints = [j for j in self.world.controlled_joints if j not in fixed_joints]
+        for joint_name in joints:
+            child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
             if child_links:
                 number_of_repeller = config[joint_name].number_of_repeller
                 for i in range(number_of_repeller):

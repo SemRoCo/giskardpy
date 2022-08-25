@@ -95,6 +95,9 @@ class UnreachableException(PlanningException):
     pass
 
 
+class SelfCollisionViolatedException(PlanningException):
+    pass
+
 # errors during execution
 # int64 EXECUTION_ERROR # if no execution code fits
 # int64 PREEMPTED # goal got canceled via action server interface

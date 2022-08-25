@@ -92,6 +92,7 @@ class CollisionAvoidanceConfig:
         self._add_self_collisions: List[Tuple[str, str]] = []
         self._ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
         self._fixed_joints_for_self_collision_avoidance = []
+        self._fixed_joints_for_external_collision_avoidance = []
 
         self._external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
         self._self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
@@ -99,8 +100,11 @@ class CollisionAvoidanceConfig:
     def ignore_all_self_collisions_of_link(self, link_name):
         self._ignored_self_collisions.append(link_name)
 
-    def assume_joints_fixed_for_self_collision_avoidance(self, joint_names: List[str]):
+    def fix_joints_for_self_collision_avoidance(self, joint_names: List[str]):
         self._fixed_joints_for_self_collision_avoidance.extend(joint_names)
+
+    def fix_joints_for_external_collision_avoidance(self, joint_names: List[str]):
+        self._fixed_joints_for_external_collision_avoidance.extend(joint_names)
 
     def ignore_self_collisions_of_pair(self, link_name1, link_name2):
         self._ignored_self_collisions.append((link_name1, link_name2))

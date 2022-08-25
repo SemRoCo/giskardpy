@@ -185,10 +185,20 @@ class WorldTree:
         return collector_companion.collected_link_names, collector_companion.collected_joint_names
 
     @memoize
-    def get_directly_controlled_child_links_with_collisions(self, joint_name):
+    def get_directly_controlled_child_links_with_collisions(self,
+                                                            joint_name: my_string,
+                                                            joints_to_exclude: Optional[Tuple] = None) \
+            -> List[my_string]:
+        if joints_to_exclude is None:
+            joints_to_exclude = set()
+        else:
+            joints_to_exclude = set(joints_to_exclude)
+
+        def stopper(joint_name):
+            return joint_name not in joints_to_exclude and self.is_joint_controlled(joint_name)
         child_link_name = self.joints[joint_name].child_link_name
         links, joints = self.search_branch(child_link_name,
-                                           stop_at_joint_when=self.is_joint_controlled,
+                                           stop_at_joint_when=stopper,
                                            collect_link_when=self.has_link_collisions)
         return links
 

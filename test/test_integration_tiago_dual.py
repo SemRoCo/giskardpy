@@ -285,7 +285,7 @@ class TestCollisionAvoidance:
             'torso_lift_joint': 0.0,
             'head_1_joint': 0.0,
             'head_2_joint': -6.204516145491557e-05,
-            'arm_left_1_joint': 1.389657460632337,
+            'arm_left_1_joint': 2,
             'arm_left_2_joint': 0.5662906493435158,
             'arm_left_3_joint': 0.046819079632679506,
             'arm_left_4_joint': 1.7033676662318802,

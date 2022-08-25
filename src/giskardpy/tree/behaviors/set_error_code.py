@@ -83,6 +83,8 @@ class SetErrorCode(GiskardBehavior):
             error_code = MoveResult.PLANNING_ERROR
             if isinstance(exception, ShakingException):
                 error_code = MoveResult.SHAKING
+            elif isinstance(exception, SelfCollisionViolatedException):
+                error_code = MoveResult.SELF_COLLISION_VIOLATED
             elif isinstance(exception, UnreachableException):
                 if self.get_god_map().get_data(identifier.check_reachability):
                     error_code = MoveResult.UNREACHABLE

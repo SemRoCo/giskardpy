@@ -444,6 +444,22 @@ class TestCartGoals:
         zero_pose.allow_all_collisions()
         zero_pose.move_base(goal)
 
+    def test_drive6(self, zero_pose: TiagoTestWrapper):
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = 0.01
+        goal.pose.position.y = 0.5
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.position.x = -0.01
+        goal.pose.position.y = -0.5
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi * 0.2, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
+
     def test_drive3(self, apartment_setup: TiagoTestWrapper):
         countertop_frame = 'iai_apartment/island_countertop'
 

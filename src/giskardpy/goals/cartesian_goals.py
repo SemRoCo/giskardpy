@@ -283,10 +283,13 @@ class DiffDriveBaseGoal(Goal):
                                                   if_result=map_goal_angle_direction_f + np.pi,
                                                   else_result=map_goal_angle_direction_f - np.pi)
 
-        middle_angle = self.god_map.evaluate_expr((angle_start + map_goal_angle2) / 2)
-        a = self.god_map.evaluate_expr(w.abs(map_goal_angle_direction_f - middle_angle))
-        b = self.god_map.evaluate_expr(w.abs(map_goal_angle_direction_b - middle_angle))
-        map_goal_angle1 = w.if_less(a, b,
+        middle_angle = w.normalize_angle(
+            map_goal_angle2 + w.shortest_angular_distance(map_goal_angle2, angle_start) / 2)
+
+        middle_angle = self.god_map.evaluate_expr(middle_angle)
+        a = self.god_map.evaluate_expr(w.shortest_angular_distance(map_goal_angle_direction_f, middle_angle))
+        b = self.god_map.evaluate_expr(w.shortest_angular_distance(map_goal_angle_direction_b, middle_angle))
+        map_goal_angle1 = w.if_less(w.abs(a), w.abs(b),
                                     if_result=map_goal_angle_direction_f,
                                     else_result=map_goal_angle_direction_b)
 
@@ -321,9 +324,9 @@ class DiffDriveBaseGoal(Goal):
         # self.add_debug_vector('map_V_goal_x', map_V_goal_x)
         # self.add_debug_vector('map_P_base_footprint_goal', map_P_base_footprint_goal)
         # self.add_debug_vector('map_P_base_footprint', map_P_base_footprint)
-        # self.add_debug_expr('middle_angle', middle_angle)
-        # self.add_debug_expr('angle_start', angle_start)
-        # self.add_debug_expr('map_goal_angle2', map_goal_angle2)
+        self.add_debug_expr('map_goal_angle1', map_goal_angle1)
+        self.add_debug_expr('map_current_angle', map_current_angle)
+        self.add_debug_expr('rotate_to_goal_error', rotate_to_goal_error)
 
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=map_V_goal_x,

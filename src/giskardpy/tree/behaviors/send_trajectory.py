@@ -27,6 +27,8 @@ import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard, \
+    catch_and_raise_to_blackboard
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
@@ -125,6 +127,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.max_deadline = deadline + self.goal_time_tolerance
         self.cancel_tries = 0
 
+    @catch_and_raise_to_blackboard
     @profile
     def update(self):
         """

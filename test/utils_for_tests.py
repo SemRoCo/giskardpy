@@ -715,6 +715,15 @@ class GiskardTestWrapper(GiskardWrapper):
         return trajectory2
 
     def are_joint_limits_violated(self):
+        joints = list(self.world.controlled_joints)
+        for joint in joints:
+            try:
+                lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
+            except:
+                continue
+            assert lower_limit < self.world.state[joint].position < upper_limit
+
+    def are_joint_limits_in_traj_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)

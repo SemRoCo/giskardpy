@@ -79,7 +79,8 @@ class Parent(object):
 
 
 class H(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order):
+    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
+                 default_limits=False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables
         self.constraints = constraints  # type: list[Constraint]
@@ -137,29 +138,17 @@ class H(Parent):
         params.append(error_slack_weights)
         return self._sorter(*params)[0]
 
-    # @profile
-    # @memoize
-    # def make_error_id_to_vel_ids_map(self):
-    #     d = defaultdict(list)
-    #     start_id1 = self.number_of_free_variables_with_horizon()
-    #     start_id = self.number_of_free_variables_with_horizon() + self.number_of_constraint_vel_variables()
-    #     c = 0
-    #     for t in range(self.prediction_horizon):
-    #         for i, constraint in enumerate(self.constraints):
-    #             if t < constraint.control_horizon:
-    #                 d[start_id + i].append(start_id1 + c)
-    #                 c += 1
-    #     return {k: np.array(v) for k, v in d.items()}
-
 
 class B(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order):
+    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
+                 default_limits=False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
         self.no_limits = 1e4
         self.evaluated = True
+        self.default_limits = default_limits
 
     def get_lower_slack_limits(self):
         result = {}
@@ -266,12 +255,31 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
-                    lb[f't{t:03}/{v.position_name}/p_limit'] = w.round_up(
-                        v.get_lower_limit(0, self.default_limits, evaluated=self.evaluated) - v.get_symbol(0),
+                    normal_lower_bound = w.round_up(
+                        v.get_lower_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
                         self.round_to2)
-                    ub[f't{t:03d}/{v.position_name}/p_limit'] = w.round_down(
-                        v.get_upper_limit(0, self.default_limits, evaluated=self.evaluated) - v.get_symbol(0),
+                    normal_upper_bound = w.round_down(
+                        v.get_upper_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
                         self.round_to2)
+                    if self.default_limits:
+                        lower_vel = (v.get_upper_limit(order=3,
+                                                                         default=False,
+                                                                         evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
+                        lower_bound = w.if_greater(normal_lower_bound, 0,
+                                                   if_result=lower_vel,
+                                                   else_result=normal_lower_bound)
+                        lb[f't{t:03d}/{v.position_name}/p_limit'] = lower_bound
+
+                        upper_vel =  (v.get_lower_limit(order=3,
+                                                                         default=False,
+                                                                         evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
+                        upper_bound = w.if_less(normal_upper_bound, 0,
+                                                if_result=upper_vel,
+                                                else_result=normal_upper_bound)
+                        ub[f't{t:03d}/{v.position_name}/p_limit'] = upper_bound
+                    else:
+                        lb[f't{t:03d}/{v.position_name}/p_limit'] = normal_lower_bound
+                        ub[f't{t:03d}/{v.position_name}/p_limit'] = normal_upper_bound
 
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
@@ -304,8 +312,8 @@ class BA(Parent):
 
 class A(Parent):
     def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 time_collector):
-        super(A, self).__init__(sample_period, prediction_horizon, order, time_collector)
+                 time_collector, default_limits=False):
+        super().__init__(sample_period, prediction_horizon, order, time_collector)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
@@ -314,10 +322,11 @@ class A(Parent):
         self._compute_height()
         self.width = 0
         self._compute_width()
+        self.default_limits = default_limits
 
     def _compute_height(self):
         # rows for position limits of non continuous joints
-        self.height = self.prediction_horizon * (self.number_of_joints - self.num_of_continuous_joints())
+        self.height = self.prediction_horizon * (self.num_position_limits())
         # rows for linking vel/acc/jerk
         self.height += self.number_of_joints * self.prediction_horizon * (self.order - 2)
         # rows for velocity constraints
@@ -334,10 +343,17 @@ class A(Parent):
             self.width += c.control_horizon
         # slack variable for constraint error
         self.width += len(self.constraints)
+        # constraints for getting out of hard limits
+        # if self.default_limits:
+        #     self.width += self.num_position_limits()
 
     @property
     def number_of_joints(self):
         return len(self.free_variables)
+
+    @memoize
+    def num_position_limits(self):
+        return self.number_of_joints - self.num_of_continuous_joints()
 
     @memoize
     def num_of_continuous_joints(self):
@@ -411,6 +427,7 @@ class A(Parent):
             number_of_joints * self.prediction_horizon * (self.order - 2) +  # links
             len(self.velocity_constraints) * (self.prediction_horizon) +  # velocity constraints
             len(self.constraints),  # constraints
+            # (self.num_position_limits() if self.default_limits else 0) +  # weights for position limits
             number_of_joints * self.prediction_horizon * (self.order - 1) +
             len(self.velocity_constraints) * self.prediction_horizon + len(self.constraints)
         )
@@ -508,6 +525,11 @@ class A(Parent):
 
         A_soft.remove(rows_to_delete, [])
         A_soft.remove([], columns_to_delete)
+
+        # position constraints if limits are violated
+        # if self.default_limits:
+        #     A_soft[0:self.num_position_limits() * self.prediction_horizon,
+        #     self.prediction_horizon:self.num_position_limits] = w.eye(self.num_position_limits())
         return A_soft
 
     def A(self):
@@ -753,13 +775,15 @@ class QPController:
                    velocity_constraints=self.velocity_constraints,
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
-                   order=self.order)
+                   order=self.order,
+                   default_limits=default_limits)
         self.H = H(free_variables=self.free_variables,
                    constraints=self.constraints,
                    velocity_constraints=self.velocity_constraints,
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
-                   order=self.order)
+                   order=self.order,
+                   default_limits=default_limits)
         self.bA = BA(free_variables=self.free_variables,
                      constraints=self.constraints,
                      velocity_constraints=self.velocity_constraints,
@@ -773,7 +797,8 @@ class QPController:
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
                    order=self.order,
-                   time_collector=self.time_collector)
+                   time_collector=self.time_collector,
+                   default_limits=default_limits)
 
         logging.loginfo(f'Constructing new controller with {self.A.height} constraints '
                         f'and {self.A.width} free variables...')
@@ -846,7 +871,9 @@ class QPController:
         """
         filtered_stuff = self.evaluate_and_split(substitutions)
         try:
+            # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve(*filtered_stuff)
+            # self.__swap_compiled_matrices()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
         except Exception as e_original:
             self.xdot_full = None
@@ -858,8 +885,9 @@ class QPController:
                     self.xdot_full = self.qp_solver.solve(*self.evaluate_and_split(substitutions))
                     return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
                 except Exception as e2:
-                    self._create_debug_pandas()
-                    raise OutOfJointLimitsException(self._are_joint_limits_violated())
+                    # self._create_debug_pandas()
+                    # raise OutOfJointLimitsException(self._are_joint_limits_violated())
+                    raise OutOfJointLimitsException(joint_limits_violated_msg)
                 finally:
                     self.__swap_compiled_matrices()
             if self.retries_with_relaxed_constraints:

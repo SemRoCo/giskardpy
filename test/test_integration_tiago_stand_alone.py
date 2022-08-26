@@ -532,6 +532,11 @@ class TestCartGoals:
 
 
 class TestCollisionAvoidance:
+    def test_avoid_all(self, zero_pose: TiagoTestWrapper):
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.avoid_collision(0.1, group1=zero_pose.get_robot_name())
+        zero_pose.plan_and_execute()
+
     def test_attach_object(self, better_pose):
         parent_link = 'arm_left_tool_link'
         box_name = 'box'

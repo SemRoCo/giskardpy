@@ -42,6 +42,8 @@ class TiagoBase(Giskard):
                                                                                max_velocity=0.2)
         self.collision_avoidance_config.set_default_self_collision_avoidance(hard_threshold=0.03,
                                                                              soft_threshold=0.07)
+        self.collision_avoidance_config.set_default_external_collision_avoidance(hard_threshold=0.03,
+                                                                                 soft_threshold=0.08)
         # self.general_config.joint_limits['jerk'] = defaultdict(lambda: 60)
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
         # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')

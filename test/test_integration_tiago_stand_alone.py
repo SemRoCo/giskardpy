@@ -1035,8 +1035,47 @@ class TestJointGoals:
             'torso_lift_joint': 0.3487927046680741,
         }
 
+        # zero_pose.set_seed_configuration(js)
+        # zero_pose.set_joint_goal(zero_pose.better_pose2, check=False)
+        pointing_goal = PointStamped()
+        pointing_goal.header.frame_id = 'base_footprint'
+        pointing_goal.point.x = 2
+        zero_pose.set_pointing_goal(tip_link='xtion_link',
+                                    root_link='base_footprint',
+                                    goal_point=pointing_goal)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        zero_pose.are_joint_limits_violated()
+
+    def test_out_of_joint_soft_limits7(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_left_1_joint': 1.3505632726981545,
+            'arm_left_2_joint': -1.1195635667275154,
+            'arm_left_3_joint': 2.3115915820828667,
+            'arm_left_4_joint': 0.9410957928690423,
+            'arm_left_5_joint': -0.9138386896689713,
+            'arm_left_6_joint': 0.32143255957945216,
+            'arm_left_7_joint': 2.0158598934576375,
+            'arm_right_1_joint': 0.3006285274060041,
+            'arm_right_2_joint': -1.1107991645139517,
+            'arm_right_3_joint': 1.4956685979283315,
+            'arm_right_4_joint': 2.0495483917627206,
+            'arm_right_5_joint': -1.9978918685519071,
+            'arm_right_6_joint': 1.2007401412818746,
+            'arm_right_7_joint': 0.49898664261947634,
+            'gripper_left_left_finger_joint': 0.04418634626215283,
+            'gripper_left_right_finger_joint': 0.04378708138690458,
+            'gripper_right_left_finger_joint': 0.03060437169265785,
+            'gripper_right_right_finger_joint': 0.04051188814220821,
+            'head_1_joint': 0.018108434658135126,
+            'head_2_joint': 0.09081672674822555,
+            'torso_lift_joint': 0.3486754163734459,
+        }
+
         zero_pose.set_seed_configuration(js)
-        zero_pose.set_joint_goal(zero_pose.better_pose2, check=False)
+        js2 = deepcopy(js)
+        # del js2['arm_right_2_joint']
+        zero_pose.set_joint_goal(js2, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()

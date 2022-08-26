@@ -262,7 +262,7 @@ class BA(Parent):
                         v.get_upper_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
                         self.round_to2)
                     if self.default_limits:
-                        lower_vel = (v.get_upper_limit(order=3,
+                        lower_vel = 0.5 * (v.get_upper_limit(order=3,
                                                        default=False,
                                                        evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
                         lower_bound = w.if_greater(normal_lower_bound, 0,
@@ -270,7 +270,7 @@ class BA(Parent):
                                                    else_result=normal_lower_bound)
                         lb[f't{t:03d}/{v.position_name}/p_limit'] = lower_bound
 
-                        upper_vel = (v.get_lower_limit(order=3,
+                        upper_vel = 0.5 * (v.get_lower_limit(order=3,
                                                        default=False,
                                                        evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
                         upper_bound = w.if_less(normal_upper_bound, 0,

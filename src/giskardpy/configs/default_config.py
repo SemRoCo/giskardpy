@@ -250,7 +250,7 @@ class BehaviorTreeConfig:
             'tf_topic': '/tf',
         },
         'MaxTrajectoryLength': {
-            'enabled': True,
+            'enabled': False,
             'length': 30
         },
         'LoopDetector': {
@@ -345,7 +345,8 @@ class Giskard:
 
     def _create_parameter_backup(self):
         self._backup = {'qp_solver_config': deepcopy(self.qp_solver_config),
-                        'general_config': deepcopy(self.general_config)}
+                        'general_config': deepcopy(self.general_config),
+                        'global_planner': deepcopy(self.path_planning)}
 
     def grow(self):
         self._create_parameter_backup()

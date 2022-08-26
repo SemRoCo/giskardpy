@@ -721,7 +721,8 @@ class GiskardTestWrapper(GiskardWrapper):
                 lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
             except:
                 continue
-            assert lower_limit < self.world.state[joint].position < upper_limit
+            assert lower_limit < self.world.state[joint].position < upper_limit, \
+                f'joint limit of {joint} is violated {lower_limit} < {self.world.state[joint].position} < {upper_limit}'
 
     def are_joint_limits_in_traj_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()

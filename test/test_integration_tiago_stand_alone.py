@@ -532,6 +532,20 @@ class TestCartGoals:
 
 
 class TestCollisionAvoidance:
+    def test_attach_object(self, better_pose):
+        parent_link = 'arm_left_tool_link'
+        box_name = 'box'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = parent_link
+        box_pose.pose.position.x = 0.2
+        box_pose.pose.orientation.w = 1
+        better_pose.add_box(box_name,
+                            (0.1, 0.1, 0.1),
+                            pose=box_pose,
+                            parent_link=parent_link,
+                            parent_link_group=better_pose.get_robot_name())
+        better_pose.set_joint_goal(better_pose.default_pose)
+        better_pose.plan_and_execute()
 
     def test_demo1(self, apartment_setup: TiagoTestWrapper):
         # setup
@@ -632,7 +646,7 @@ class TestCollisionAvoidance:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, 1, 0],
                                                                          [0, 0, 0, 1]]))
-        base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
+        base_pose = apartment_setup.transform_msg(apartment_setup.default_root, base_pose)
         base_pose.pose.position.z = 0
         apartment_setup.move_base(base_pose)
 
@@ -995,6 +1009,37 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
         lower_limit, upper_limit = zero_pose.world.joints['arm_right_5_joint'].get_limit_expressions(0)
         assert lower_limit < zero_pose.world.state['arm_right_5_joint'].position < upper_limit
+
+    def test_out_of_joint_soft_limits6(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_left_1_joint': 0.2999719152605501,
+            'arm_left_2_joint': -1.0770103752381537,
+            'arm_left_3_joint': 1.538071509678013,
+            'arm_left_4_joint': 1.9890333283428183,
+            'arm_left_5_joint': -1.9048274775275487,
+            'arm_left_6_joint': 1.1571632014060012,
+            'arm_left_7_joint': 0.6375186679031444,
+            'arm_right_1_joint': 0.2716512459628158,
+            'arm_right_2_joint': -1.0826349036723986,
+            'arm_right_3_joint': 1.5215471970784948,
+            'arm_right_4_joint': 2.0190831292184264,
+            'arm_right_5_joint': -1.9978066473844511,
+            'arm_right_6_joint': 1.206231348680554,
+            'arm_right_7_joint': 0.4999018438525896,
+            'gripper_left_left_finger_joint': 0.0016879097059911336,
+            'gripper_left_right_finger_joint': 0.0017554347466345558,
+            'gripper_right_left_finger_joint': 0.0009368327712725209,
+            'gripper_right_right_finger_joint': 0.01085319375968001,
+            'head_1_joint': -0.0033940217264349197,
+            'head_2_joint': -0.9843060924802811,
+            'torso_lift_joint': 0.3487927046680741,
+        }
+
+        zero_pose.set_seed_configuration(js)
+        zero_pose.set_joint_goal(zero_pose.better_pose2, check=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        zero_pose.are_joint_limits_violated()
 
     def test_joint_goals(self, zero_pose: TiagoTestWrapper):
         js1 = {

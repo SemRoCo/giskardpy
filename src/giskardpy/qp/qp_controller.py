@@ -263,16 +263,16 @@ class BA(Parent):
                         self.round_to2)
                     if self.default_limits:
                         lower_vel = (v.get_upper_limit(order=3,
-                                                                         default=False,
-                                                                         evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
+                                                       default=False,
+                                                       evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
                         lower_bound = w.if_greater(normal_lower_bound, 0,
                                                    if_result=lower_vel,
                                                    else_result=normal_lower_bound)
                         lb[f't{t:03d}/{v.position_name}/p_limit'] = lower_bound
 
-                        upper_vel =  (v.get_lower_limit(order=3,
-                                                                         default=False,
-                                                                         evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
+                        upper_vel = (v.get_lower_limit(order=3,
+                                                       default=False,
+                                                       evaluated=self.evaluated) * self.sample_period ** 2) * self.sample_period
                         upper_bound = w.if_less(normal_upper_bound, 0,
                                                 if_result=upper_vel,
                                                 else_result=normal_upper_bound)

@@ -237,6 +237,9 @@ class CollisionWorldSynchronizer:
 
     def __init__(self, world):
         self.world = world  # type: WorldTree
+        self.collision_avoidance_config: CollisionAvoidanceConfig = self.god_map.get_data(identifier.collision_avoidance_config)
+        self.fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+        self.links_to_ignore = set(self.collision_avoidance_config.ignored_collisions)
         try:
             self.ignored_pairs = set(self.god_map.get_data(identifier.ignored_self_collisions))
         except KeyError as e:
@@ -304,11 +307,13 @@ class CollisionWorldSynchronizer:
                 continue
             try:
                 if link_a == link_b \
+                        or link_a in self.links_to_ignore \
+                        or link_b in self.links_to_ignore \
                         or link_a in self.ignored_pairs \
                         or link_b in self.ignored_pairs \
                         or (link_a, link_b) in self.ignored_pairs \
                         or (link_b, link_a) in self.ignored_pairs \
-                        or group.are_linked(link_a, link_b, non_controlled=non_controlled) \
+                        or group.are_linked(link_a, link_b, non_controlled=non_controlled, exception=self.fixed_joints) \
                         or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
                     self.add_black_list_entry(*link_combination)
             except Exception as e:
@@ -323,11 +328,12 @@ class CollisionWorldSynchronizer:
 
         # Remove combinations which can never touch
         # by checking combinations which a single joint can influence
-        for joint_name in group.controlled_joints:
+        joints = [j for j in group.controlled_joints if j not in self.fixed_joints]
+        for joint_name in joints:
             parent_links = group.get_siblings_with_collisions(joint_name)
             if not parent_links:
                 continue
-            child_links = group.get_directly_controlled_child_links_with_collisions(joint_name)
+            child_links = group.get_directly_controlled_child_links_with_collisions(joint_name, self.fixed_joints)
             if group.is_joint_continuous(joint_name):
                 min_position = -np.pi
                 max_position = np.pi

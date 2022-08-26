@@ -365,7 +365,7 @@ class WorldTree:
                                                    joints_to_exclude: Optional[tuple] = None) \
             -> Tuple[my_string, my_string]:
         if joints_to_exclude is None:
-            joints_to_exclude = {}
+            joints_to_exclude = set()
         joint_list = [j for j in self.controlled_joints if j not in joints_to_exclude]
         chain1, connection, chain2 = self.compute_split_chain(link_b, link_a, joints=True, links=True, fixed=True,
                                                               non_controlled=True)
@@ -867,12 +867,15 @@ class WorldTree:
 
     @memoize
     @profile
-    def are_linked(self, link_a, link_b, non_controlled=False, fixed=False):
+    def are_linked(self, link_a, link_b, non_controlled=False, fixed=False, exception=None):
         """
         Return True if all joints between link_a and link_b are fixed.
         """
         chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=True, links=False, fixed=fixed,
                                                               non_controlled=non_controlled)
+        if exception is not None:
+            chain1 = [x for x in chain1 if x not in exception]
+            chain2 = [x for x in chain2 if x not in exception]
         return not chain1 and not connection and not chain2
 
     def _add_link(self, link: Link):

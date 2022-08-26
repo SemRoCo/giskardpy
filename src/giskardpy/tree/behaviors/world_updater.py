@@ -220,7 +220,7 @@ class WorldUpdater(GiskardBehavior):
         world_body = req.body
         try:
             global_pose = transform_pose(tf.get_tf_root(), req.pose)
-        except AssertionError:
+        except:
             global_pose = req.pose
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,

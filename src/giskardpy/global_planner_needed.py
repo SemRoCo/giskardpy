@@ -201,24 +201,24 @@ class GlobalPlannerNeeded(GetGoal):
 
     def update(self):
 
-        # Check if giskard is solving currently
-        if self.is_qp_solving_running():
-            return Status.RUNNING
-
-        # Check if someone set the variable to true
-        if self.get_god_map().get_data(identifier.global_planner_needed):
-            self.reset()
-            return Status.RUNNING
-
-        # Check if cartesian goals are defined
-        cart_c = self.get_cartesian_move_constraint()
-        if cart_c is None:
-            self.get_god_map().set_data(identifier.global_planner_needed, False)
-            return Status.RUNNING
-
-        if self.is_unplanned(cart_c):
-            self.reset()
-            self.god_map.set_data(identifier.global_planner_needed, True)
+        # # Check if giskard is solving currently
+        # if self.is_qp_solving_running():
+        #     return Status.RUNNING
+        #
+        # # Check if someone set the variable to true
+        # if self.get_god_map().get_data(identifier.global_planner_needed):
+        #     self.reset()
+        #     return Status.RUNNING
+        #
+        # # Check if cartesian goals are defined
+        # cart_c = self.get_cartesian_move_constraint()
+        # if cart_c is None:
+        #     self.get_god_map().set_data(identifier.global_planner_needed, False)
+        #     return Status.RUNNING
+        #
+        # if self.is_unplanned(cart_c):
+        #     self.reset()
+        #     self.god_map.set_data(identifier.global_planner_needed, True)
 
         # Else check if cartesian goal is nontrivial
         #if self.is_cartesian_constraint_nontrivial(cart_c):

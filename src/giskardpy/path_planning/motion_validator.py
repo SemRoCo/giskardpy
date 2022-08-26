@@ -8,6 +8,7 @@ import rospy
 from giskardpy import identifier
 from giskardpy.data_types import PrefixName
 from giskardpy.model.pybullet_syncer import PyBulletMotionValidationIDs, PyBulletRayTester, PyBulletBoxSpace
+from giskardpy.path_planning.state_validator import update_robot_state, get_robot_joint_state
 from giskardpy.utils.tfwrapper import pose_stamped_to_list, pose_to_list, interpolate_pose
 
 
@@ -39,18 +40,6 @@ def current_milli_time():
     return round(time.time() * 1000)
 
 
-def update_joint_state(js, new_js):
-    if any(map(lambda e: type(e) != PrefixName, new_js)):
-        raise Exception('oi, there are no PrefixNames in yer new_js >:(!')
-    js.update((k, new_js[k]) for k in js.keys() and new_js.keys())
-
-
-def update_robot_state(collision_scene, state):
-    update_joint_state(collision_scene.world.state, state)
-    collision_scene.world.notify_state_change()
-    collision_scene.sync()
-
-
 class AbstractMotionValidator():
     """
     This class ensures that every Planner in OMPL makes the same assumption for
@@ -66,7 +55,7 @@ class AbstractMotionValidator():
         self.ignore_state_validator = ignore_state_validator
 
     def checkMotion(self, s1, s2):
-        with self.god_map.get_data(identifier.rosparam + ['motion_validator_lock']):
+        with self.god_map.get_data(identifier.giskard + ['motion_validator_lock']):
             res_a = self.check_motion(s1, s2)
             res_b = self.check_motion(s2, s1)
             if self.ignore_state_validator:
@@ -77,7 +66,7 @@ class AbstractMotionValidator():
                        self.state_validator.is_collision_free(s2)
 
     def checkMotionTimed(self, s1, s2):
-        with self.god_map.get_data(identifier.rosparam + ['motion_validator_lock']):
+        with self.god_map.get_data(identifier.giskard + ['motion_validator_lock']):
             c1, f1 = self.check_motion_timed(s1, s2)
             if not self.ignore_state_validator:
                 c1 = c1 and self.state_validator.is_collision_free(s1)
@@ -173,8 +162,7 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
     def _check_motion(self, s1, s2):
         # Shoot ray from start to end pose and check if it intersects with the kitchen,
         # if so return false, else true.
-        old_js = deepcopy(self.object_in_motion.state)
-        state1 = self.state_validator.ik.get_ik(old_js, s1)
+        old_js = deepcopy(get_robot_joint_state(self.collision_scene))
         # s = 0.
         # for j_n, v in state1.items():
         #    v2 = self.state_validator.ik.get_ik(old_js, s1)[j_n].position
@@ -182,9 +170,8 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         #    if n != 0:
         #        rospy.logerr(f'joint_name: {j_n}: first: {v.position}, second: {v2}, diff: {n}')
         #    s += n
-        update_robot_state(self.collision_scene, state1)
+        self.state_validator.set_tip_link(old_js, s1)
         query_b = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
-        state2 = self.state_validator.ik.get_ik(old_js, s2)
         # s = 0.
         # for j_n, v in state2.items():
         #    v2 = self.state_validator.ik.get_ik(old_js, s2)[j_n].position
@@ -192,7 +179,7 @@ class ObjectRayMotionValidator(SimpleRayMotionValidator):
         #    if n != 0:
         #        rospy.logerr(f'joint_name: {j_n}: first: {v.position}, second: {v2}, diff: {n}')
         #    s += n
-        update_robot_state(self.collision_scene, state2)
+        self.state_validator.set_tip_link(old_js, s2)
         query_e = self.collision_scene.get_aabb_collisions(self.collision_link_names).get_points()
         update_robot_state(self.collision_scene, old_js)
         collision_free, coll_links, dists, fractions = self.raytester.ray_test_batch(query_b, query_e)
@@ -217,14 +204,12 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
 
     @profile
     def check_motion_old(self, s1, s2):
-        old_js = deepcopy(self.object_in_motion.state)
+        old_js = deepcopy(get_robot_joint_state(self.collision_scene))
         ret = True
         for collision_link_name in self.collision_link_names:
-            state_ik = self.state_validator.ik.get_ik(old_js, s1)
-            update_robot_state(self.collision_scene, state_ik)
+            self.state_validator.set_tip_link(old_js, s1)
             query_b = pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))
-            state_ik = self.state_validator.ik.get_ik(old_js, s2)
-            update_robot_state(self.collision_scene, state_ik)
+            self.state_validator.set_tip_link(old_js, s2)
             query_e = pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))
             start_positions = [query_b[0]]
             end_positions = [query_e[0]]
@@ -239,16 +224,14 @@ class CompoundBoxMotionValidator(AbstractMotionValidator):
 
     @profile
     def get_box_params(self, s1, s2):
-        old_js = deepcopy(self.object_in_motion.state)
-        state_ik = self.state_validator.ik.get_ik(old_js, s1)
-        update_robot_state(self.collision_scene, state_ik)
+        old_js = deepcopy(get_robot_joint_state(self.collision_scene))
+        self.state_validator.set_tip_link(old_js, s1)
         start_positions = list()
         end_positions = list()
         min_sizes = list()
         for collision_link_name in self.collision_link_names:
             start_positions.append(pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))[0])
-        state_ik = self.state_validator.ik.get_ik(old_js, s2)
-        update_robot_state(self.collision_scene, state_ik)
+        self.state_validator.set_tip_link(old_js, s2)
         for collision_link_name in self.collision_link_names:
             end_positions.append(pose_stamped_to_list(self.collision_scene.get_pose(collision_link_name))[0])
             collision_object = self.collision_scene.get_aabb_info(collision_link_name)

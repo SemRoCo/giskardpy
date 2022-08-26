@@ -5,9 +5,11 @@ from copy import deepcopy
 import numpy as np
 import rospy
 from nav_msgs.srv import GetMap
+from pybullet import getAxisAngleFromQuaternion
 
 from giskardpy import identifier
 from giskardpy.data_types import PrefixName
+from giskardpy.model.joints import OmniDrive
 from giskardpy.path_planning.ik import PyBulletIK
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 
@@ -16,14 +18,38 @@ def current_milli_time():
     return round(time.time() * 1000)
 
 
+def get_robot_joint_state(collision_scene):
+    state = deepcopy(collision_scene.robot.state)
+    omni_joint = collision_scene.world.joints['brumbrum']
+    state[omni_joint.x_name] = collision_scene.world.state[omni_joint.x_name]
+    state[omni_joint.y_name] = collision_scene.world.state[omni_joint.y_name]
+    state[omni_joint.rot_name] = collision_scene.world.state[omni_joint.rot_name]
+    return state
+
+
 def update_joint_state(js, new_js):
-    if any(map(lambda e: type(e) != PrefixName, new_js)):
-        raise Exception('oi, there are no PrefixNames in yer new_js >:(!')
+    #if any(map(lambda e: type(e) != PrefixName, new_js)):
+    #    raise Exception('oi, there are no PrefixNames in yer new_js >:(!')
     js.update((k, new_js[k]) for k in js.keys() and new_js.keys())
 
 
 def update_robot_state(collision_scene, state):
     update_joint_state(collision_scene.world.state, state)
+    collision_scene.world.notify_state_change()
+    collision_scene.sync()
+
+
+def update_robot_pose(collision_scene, pose):
+    joint: OmniDrive = collision_scene.world.joints['brumbrum']
+    collision_scene.world.state[joint.x_name].position = pose.position.x
+    collision_scene.world.state[joint.y_name].position = pose.position.y
+    axis, angle = getAxisAngleFromQuaternion([pose.orientation.x,
+                                              pose.orientation.y,
+                                              pose.orientation.z,
+                                              pose.orientation.w])
+    if axis[-1] < 0:
+        angle = -angle
+    collision_scene.world.state[joint.rot_name].position = angle
     collision_scene.world.notify_state_change()
     collision_scene.sync()
 
@@ -75,6 +101,19 @@ class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
             self.publisher = VisualizationBehavior('motion planning object publisher', ensure_publish=False)
             self.publisher.setup(10)
 
+    def get_ik(self, js, pose):
+        if self.is_3D:
+            return self.ik.get_ik(js, pose)
+        else:
+            return pose
+
+    def set_tip_link(self, old_js, pose):
+        if self.is_3D:
+            state = self.ik.get_ik(old_js, pose)
+            update_robot_state(self.collision_scene, state)
+        else:
+            update_robot_pose(self.collision_scene, pose)
+
     def clear(self):
         self.ik.clear()
 
@@ -115,17 +154,16 @@ class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
             return True
 
     def is_collision_free(self, pose):
-        with self.god_map.get_data(identifier.rosparam + ['state_validator_lock']):
+        with self.god_map.get_data(identifier.giskard + ['state_validator_lock']):
             # Get current joint states
-            old_js = deepcopy(self.collision_scene.robot.state)
+            old_js = deepcopy(get_robot_joint_state(self.collision_scene))
             # Calc IK for navigating to given state and ...
             results = []
             for i in range(0, self.ik_sampling):
                 if self.debug:
                     s_s = current_milli_time()
-                state_ik = self.ik.get_ik(deepcopy(self.collision_scene.robot.state), pose)
                 # override on current joint states.
-                update_robot_state(self.collision_scene, state_ik)
+                self.set_tip_link(deepcopy(self.collision_scene.robot.state), pose)
                 if self.debug:
                     s_c = current_milli_time()
                 results.append(
@@ -151,11 +189,10 @@ class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
 
     def get_furthest_normal(self, pose):
         # Get current joint states
-        old_js = deepcopy(self.collision_scene.robot.state)
+        old_js = deepcopy(get_robot_joint_state(self.collision_scene))
         # Calc IK for navigating to given state and ...
-        state_ik = self.ik.get_ik(old_js, pose)
         # override on current joint states.
-        update_robot_state(self.collision_scene, state_ik)
+        self.set_tip_link(old_js, pose)
         # Check if kitchen is colliding with robot
         result = self.collision_scene.get_furthest_normal(self.collision_link_names)
         # Reset joint state
@@ -164,11 +201,10 @@ class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
 
     def get_closest_collision_distance(self, pose, link_names):
         # Get current joint states
-        old_js = deepcopy(self.collision_scene.robot.state)
+        old_js = deepcopy(get_robot_joint_state(self.collision_scene))
         # Calc IK for navigating to given state and ...
-        state_ik = self.ik.get_ik(old_js, pose)
         # override on current joint states.
-        update_robot_state(self.collision_scene, state_ik)
+        self.set_tip_link(old_js, pose)
         # Check if kitchen is colliding with robot
         collision = self.collision_scene.get_furthest_collision(link_names)[0]
         # Reset joint state

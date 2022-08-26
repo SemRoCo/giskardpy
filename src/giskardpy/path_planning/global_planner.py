@@ -54,7 +54,8 @@ from ompl import tools as ot
 SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve_time max_initial_iterations '
                                                 'max_refine_iterations min_refine_thresh')
 
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, write_to_tmp, \
+    raise_to_blackboard
 
 
 def allocPathLengthDirectInfSampler(probDefn, maxNumberCalls):
@@ -430,7 +431,7 @@ class PreGraspSampler(GiskardBehavior):
         self.grasping_object_name = None
         if 'grasping_object' in self.__goal_dict:
             self.grasping_object_name = self.__goal_dict['grasping_object']
-        goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)  # type: PoseStamped
+        goal = transform_pose('map', ros_pose)  # type: PoseStamped
         self.goal_orientation = None
         if 'grasping_orientation' in self.__goal_dict:
             self.goal_orientation = convert_dictionary_to_ros_message(self.__goal_dict[u'grasping_orientation'])
@@ -642,7 +643,7 @@ class GlobalPlanner(GetGoal):
                 raise Exception('Please specify a narrow padding value.')
 
         ros_pose = convert_dictionary_to_ros_message(self.__goal_dict[u'goal'])
-        self.goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)  # type: PoseStamped
+        self.goal = transform_pose('map', ros_pose)  # type: PoseStamped
 
         self.root_link = self.__goal_dict[u'root_link']
         tip_link = self.__goal_dict[u'tip_link']
@@ -652,8 +653,8 @@ class GlobalPlanner(GetGoal):
         self.tip_link = tip_link
         link_names = self.robot.link_names
 
-        if self.root_link not in link_names:
-            raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
+        # if self.root_link not in link_names:
+        #     raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
         if self.tip_link not in link_names:
             raise Exception(u'Tip_link {} is no known link of the robot.'.format(self.tip_link))
         # if not self.robot.are_linked(self.root_link, self.tip_link):
@@ -676,7 +677,7 @@ class GlobalPlanner(GetGoal):
             rospy.loginfo('The provided goal might be reached by using CartesianPose,'
                           ' nevertheless continuing with planning for navigating...')
         self.collision_scene.update_collision_environment()
-        map_frame = self.get_god_map().get_data(identifier.map_frame)
+        map_frame = 'map'
         motion_validator_class = self._get_motion_validator_class(motion_validator_type)
         verify_solution_f = verify_ompl_navigation_solution
         dist = 0.1
@@ -691,7 +692,7 @@ class GlobalPlanner(GetGoal):
             if 'goal_sampling_axis' in self.__goal_dict \
             else None
         self.collision_scene.update_collision_environment()
-        map_frame = self.get_god_map().get_data(identifier.map_frame)
+        map_frame = 'map'
         motion_validator_class = self._get_motion_validator_class(motion_validator_type)
         verify_solution_f = verify_ompl_movement_solution
         dist = 0
@@ -706,7 +707,7 @@ class GlobalPlanner(GetGoal):
             if 'goal_sampling_axis' in self.__goal_dict \
             else None
         self.collision_scene.update_collision_environment()
-        map_frame = self.get_god_map().get_data(identifier.map_frame)
+        map_frame = 'map'
         motion_validator_class = self._get_motion_validator_class(motion_validator_type)
         verify_solution_f = verify_ompl_movement_solution
         dist = 0
@@ -810,12 +811,42 @@ class GlobalPlanner(GetGoal):
                 predict_f = 5.0
         return trajectory, predict_f
 
+    def parse_cart_goal(self, cart_c):
+
+        __goal_dict = yaml.load(cart_c.parameter_value_pair)
+        ros_pose = convert_dictionary_to_ros_message(__goal_dict[u'goal'])
+        pose_goals = list()
+        if 'goals' in __goal_dict:
+            pose_goals = list(map(convert_dictionary_to_ros_message, __goal_dict[u'goals']))
+        pose_goal = transform_pose(self.map_frame, ros_pose).pose
+
+        root_link = __goal_dict[u'root_link']
+        tip_link = __goal_dict[u'tip_link']
+        link_names = self.get_robot().link_names
+
+        # if root_link not in link_names:
+        #    raise Exception(u'Root_link {} is no known link of the robot.'.format(root_link))
+        if tip_link not in link_names:
+            raise Exception(u'Tip_link {} is no known link of the robot.'.format(tip_link))
+        # if not self.get_robot().are_linked(root_link, tip_link):
+        #    raise Exception(u'Did not found link chain of the robot from'
+        #                    u' root_link {} to tip_link {}.'.format(root_link, tip_link))
+
+        return root_link, tip_link, pose_goal, pose_goals
+
+    def is_unplanned(self, cartesian_constraint):
+        if cartesian_constraint.type == 'CartesianPathCarrot':
+            r, t, p, gs = self.parse_cart_goal(cartesian_constraint)
+            return len(gs) == 0
+        else:
+            return False
+
     @profile
     def update(self):
 
-        global_planner_needed = self.god_map.get_data(identifier.global_planner_needed)
-        if not global_planner_needed:
-            return Status.SUCCESS
+        # global_planner_needed = self.god_map.get_data(identifier.global_planner_needed)
+        # if not global_planner_needed:
+        #    return Status.SUCCESS
 
         # Check if move_cmd exists
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
@@ -827,21 +858,24 @@ class GlobalPlanner(GetGoal):
         if not cart_c:
             return Status.SUCCESS
 
+        if not self.is_unplanned(cart_c):
+            return Status.SUCCESS
+
         # Parse and save the Cartesian Goal Constraint
         self.save_cart_goal(cart_c)
         # self.collision_scene.update_collision_environment()
-        navigation = global_planner_needed and self.is_global_navigation_needed()
+        navigation = True #self.is_global_navigation_needed()
         movement = not navigation
         try:
             trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=self.narrow)
         except FeasibleGlobalPlanningException:
-            self.raise_to_blackboard(GlobalPlanningException())
+            raise_to_blackboard(GlobalPlanningException())
             return Status.FAILURE
         poses = []
         start = None
         for i, point in enumerate(trajectory):
             base_pose = PoseStamped()
-            base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
+            base_pose.header.frame_id = 'map'
             base_pose.pose.position.x = point[0]
             base_pose.pose.position.y = point[1]
             base_pose.pose.position.z = point[2] if len(point) > 3 else 0
@@ -860,7 +894,7 @@ class GlobalPlanner(GetGoal):
         move_cmd.constraints.remove(cart_c)
         move_cmd.constraints.append(self.get_cartesian_path_constraints(start, poses, predict_f))
         self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
-        self.get_god_map().set_data(identifier.global_planner_needed, False)
+        # self.get_god_map().set_data(identifier.global_planner_needed, False)
         return Status.SUCCESS
 
     def get_cartesian_path_constraints(self, start, poses, predict_f):

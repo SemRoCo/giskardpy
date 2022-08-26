@@ -208,8 +208,10 @@ class CartesianPose(Goal):
 class DiffDriveBaseGoal(Goal):
 
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
-                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None, **kwargs):
+                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
+                 always_forward: bool = False, **kwargs):
         super().__init__(**kwargs)
+        self.always_forward = always_forward
         self.max_linear_velocity = max_linear_velocity
         self.max_angular_velocity = max_angular_velocity
         if pointing_axis is None:
@@ -274,9 +276,7 @@ class DiffDriveBaseGoal(Goal):
         map_goal_angle_direction_f = w.if_greater_zero(axis_direction[2],
                                                        if_result=map_goal_angle_direction_f,
                                                        else_result=-map_goal_angle_direction_f)
-        map_goal_angle_direction_f = w.if_greater(map_goal_angle_direction_f, np.pi,
-                                                  map_goal_angle_direction_f - np.pi,
-                                                  map_goal_angle_direction_f)
+        map_goal_angle_direction_f = w.normalize_angle(map_goal_angle_direction_f)
 
         # map_goal_angle1_f = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
         map_goal_angle_direction_b = w.if_less_eq(map_goal_angle_direction_f, 0,
@@ -289,13 +289,15 @@ class DiffDriveBaseGoal(Goal):
         middle_angle = self.god_map.evaluate_expr(middle_angle)
         a = self.god_map.evaluate_expr(w.shortest_angular_distance(map_goal_angle_direction_f, middle_angle))
         b = self.god_map.evaluate_expr(w.shortest_angular_distance(map_goal_angle_direction_b, middle_angle))
-        map_goal_angle1 = w.if_less(w.abs(a), w.abs(b),
-                                    if_result=map_goal_angle_direction_f,
-                                    else_result=map_goal_angle_direction_b)
-
+        eps = 0.01
+        if self.always_forward:
+            map_goal_angle1 = map_goal_angle_direction_f
+        else:
+            map_goal_angle1 = w.if_less_eq(w.abs(a) - w.abs(b), 0.03,
+                                           if_result=map_goal_angle_direction_f,
+                                           else_result=map_goal_angle_direction_b)
         rotate_to_goal_error = w.shortest_angular_distance(map_current_angle, map_goal_angle1)
 
-        eps = 0.01
         # weight_translation = w.if_less_eq(weight_rotate_to_goal, eps, self.weight, 0)
         weight_final_rotation = w.if_else(w.logic_and(w.ca.le(w.abs(distance), eps * 2),
                                                       w.ca.ge(w.abs(final_rotation_error), 0)),

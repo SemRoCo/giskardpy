@@ -50,7 +50,7 @@ class InitQPController(GiskardBehavior):
             constraints.update(_constraints)
             vel_constraints.update(_vel_constraints)
             debug_expressions.update(_debug_expressions)
-            logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
+            # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         self.get_god_map().set_data(identifier.constraints, constraints)
         self.get_god_map().set_data(identifier.vel_constraints, vel_constraints)
         self.get_god_map().set_data(identifier.debug_expressions, debug_expressions)

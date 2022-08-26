@@ -87,7 +87,7 @@ class MeshGeometry(LinkGeometry):
         super().__init__(link_T_geometry)
         self.file_name = file_name
         if not os.path.isfile(resolve_ros_iris(file_name)):
-            raise CorruptShapeException('Can\'t find file {}'.format(self.file_name))
+            raise CorruptShapeException(f'Can\'t find file {self.file_name}')
         if scale is None:
             self.scale = [1, 1, 1]
         else:

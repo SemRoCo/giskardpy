@@ -202,11 +202,11 @@ class BehaviorTreeConfig:
         },
         'VisualizationBehavior': {
             'enabled': True,
-            'in_planning_loop': True
+            'in_planning_loop': False
         },
         'CollisionMarker': {
             'enabled': True,
-            'in_planning_loop': True
+            'in_planning_loop': False
         },
         'PublishDebugExpressions': {
             'enabled': False,

@@ -33,6 +33,7 @@ from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
+from giskardpy.model.world import WorldTree, SubWorldTree
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
@@ -219,13 +220,10 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 
 class GoalChecker(object):
-    def __init__(self, god_map):
-        """
-        :type god_map: giskardpy.god_map.GodMap
-        """
+    def __init__(self, god_map: GodMap):
         self.god_map = god_map
-        self.world = self.god_map.unsafe_get_data(identifier.world)
-        self.robot = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+        self.world: WorldTree = self.god_map.unsafe_get_data(identifier.world)
+        self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
@@ -270,7 +268,7 @@ class JointGoalChecker(GoalChecker):
 
 class TranslationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected):
-        super(TranslationGoalChecker, self).__init__(god_map)
+        super().__init__(god_map)
         self.expected = expected
         self.tip_link = tip_link
         self.root_link = root_link
@@ -278,7 +276,7 @@ class TranslationGoalChecker(GoalChecker):
 
     def __call__(self):
         expected = self.expected
-        current_pose = tf.lookup_pose(self.root_link, self.tip_link)
+        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
         np.testing.assert_array_almost_equal(msg_to_list(expected.point),
                                              msg_to_list(current_pose.pose.position), decimal=2)
 
@@ -321,7 +319,7 @@ class PointingGoalChecker(GoalChecker):
 
 class RotationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected):
-        super(RotationGoalChecker, self).__init__(god_map)
+        super().__init__(god_map)
         self.expected = expected
         self.tip_link = tip_link
         self.root_link = root_link
@@ -329,7 +327,7 @@ class RotationGoalChecker(GoalChecker):
 
     def __call__(self):
         expected = self.expected
-        current_pose = tf.lookup_pose(self.root_link, self.tip_link)
+        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
 
         try:
             np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),

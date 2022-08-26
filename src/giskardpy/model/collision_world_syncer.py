@@ -1,7 +1,7 @@
 from collections import defaultdict
 from itertools import product, combinations_with_replacement, combinations
 from time import time
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Set
 
 import numpy as np
 from sortedcontainers import SortedKeyList
@@ -31,6 +31,7 @@ class Collision:
         self.link_b = link_b
         self.link_b_hash = self.link_b.__hash__()
         self.original_link_b = link_b
+        self.is_external = None
 
         self.map_P_pa = self.__point_to_4d(map_P_pa)
         self.map_P_pb = self.__point_to_4d(map_P_pb)
@@ -74,7 +75,7 @@ class Collisions:
     def __init__(self, god_map: GodMap, collision_list_size):
         self.god_map = god_map
         self.collision_avoidance_config: CollisionAvoidanceConfig = self.god_map.get_data(identifier.collision_avoidance_config)
-        self.fixed_joints = tuple(self.collision_avoidance_config._fixed_joints_for_self_collision_avoidance)
+        self.fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
         self.world: WorldTree = self.god_map.get_data(identifier.world)
         self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
         self.robot_root = self.robot.root_link_name
@@ -103,6 +104,7 @@ class Collisions:
     def add(self, collision: Collision):
         is_external = collision.link_b not in self.robot.link_names_with_collisions \
                 or collision.link_a not in self.robot.link_names_with_collisions
+        collision.is_external = is_external
         if is_external:
             collision = self.transform_external_collision(collision)
             key = collision.link_a
@@ -470,7 +472,8 @@ class CollisionWorldSynchronizer:
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
-                                            min_dist: dict) -> dict:
+                                            min_dist: dict,
+                                            ignored_collisions: Set[str]) -> dict:
         """
         :param collision_goals: list of CollisionEntry
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
@@ -487,7 +490,11 @@ class CollisionWorldSynchronizer:
             else:
                 group2_links = self.world.groups[collision_entry.group2].link_names_with_collisions
             for link1 in group1_links:
+                if link1 in ignored_collisions:
+                    continue
                 for link2 in group2_links:
+                    if link2 in ignored_collisions:
+                        continue
                     key = self.world.sort_links(link1, link2)
                     r_key = (key[1], key[0])
                     if self.is_allow_collision(collision_entry):

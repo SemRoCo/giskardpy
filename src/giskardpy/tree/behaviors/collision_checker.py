@@ -18,17 +18,6 @@ class CollisionChecker(GiskardBehavior):
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
 
-    def _cal_max_param(self, parameter_name):
-        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        default_distance = max(getattr(external_distances.default_factory(), parameter_name),
-                               getattr(self_distances.default_factory(), parameter_name))
-        for value in external_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
-        for value in self_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
-        return default_distance
-
     def add_added_checks(self, collision_matrix):
         try:
             added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
@@ -49,7 +38,7 @@ class CollisionChecker(GiskardBehavior):
         try:
             self.collision_matrix = self.god_map.get_data(identifier.collision_matrix)
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
-            self.collision_list_size = self._cal_max_param('number_of_repeller')
+            self.collision_list_size = self.collision_avoidance_config.cal_max_param('number_of_repeller')
             self.collision_scene.sync()
             super().initialise()
         except Exception as e:

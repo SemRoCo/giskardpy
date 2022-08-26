@@ -89,25 +89,37 @@ class CollisionAvoidanceConfig:
     def __init__(self):
         self.collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
 
-        self._add_self_collisions: List[Tuple[str, str]] = []
-        self._ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
-        self._fixed_joints_for_self_collision_avoidance = []
-        self._fixed_joints_for_external_collision_avoidance = []
+        self.add_self_collisions: List[Tuple[str, str]] = []
+        self.ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
+        self.ignored_collisions: List[str] = []
+        self.fixed_joints_for_self_collision_avoidance = []
+        self.fixed_joints_for_external_collision_avoidance = []
 
-        self._external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
-        self._self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
+        self.external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
+        self.self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
+
+    def cal_max_param(self, parameter_name):
+        external_distances = self.external_collision_avoidance
+        self_distances = self.self_collision_avoidance
+        default_distance = max(getattr(external_distances.default_factory(), parameter_name),
+                               getattr(self_distances.default_factory(), parameter_name))
+        for value in external_distances.values():
+            default_distance = max(default_distance, getattr(value, parameter_name))
+        for value in self_distances.values():
+            default_distance = max(default_distance, getattr(value, parameter_name))
+        return default_distance
 
     def ignore_all_self_collisions_of_link(self, link_name):
-        self._ignored_self_collisions.append(link_name)
+        self.ignored_self_collisions.append(link_name)
 
     def fix_joints_for_self_collision_avoidance(self, joint_names: List[str]):
-        self._fixed_joints_for_self_collision_avoidance.extend(joint_names)
+        self.fixed_joints_for_self_collision_avoidance.extend(joint_names)
 
     def fix_joints_for_external_collision_avoidance(self, joint_names: List[str]):
-        self._fixed_joints_for_external_collision_avoidance.extend(joint_names)
+        self.fixed_joints_for_external_collision_avoidance.extend(joint_names)
 
     def ignore_self_collisions_of_pair(self, link_name1, link_name2):
-        self._ignored_self_collisions.append((link_name1, link_name2))
+        self.ignored_self_collisions.append((link_name1, link_name2))
 
     def load_moveit_self_collision_matrix(self, path_to_srdf):
         import lxml.etree as ET
@@ -123,14 +135,14 @@ class CollisionAvoidanceConfig:
                     self.ignore_self_collisions_of_pair(link1, link2)
 
     def add_self_collision(self, link_name1, link_name2):
-        self._add_self_collisions.append((link_name1, link_name2))
+        self.add_self_collisions.append((link_name1, link_name2))
 
     def set_default_external_collision_avoidance(self,
                                                  number_of_repeller: int = 1,
                                                  soft_threshold: float = 0.05,
                                                  hard_threshold: float = 0.0,
                                                  max_velocity: float = 0.2):
-        self._external_collision_avoidance.default_factory = lambda: self.CollisionAvoidanceEntry(
+        self.external_collision_avoidance.default_factory = lambda: self.CollisionAvoidanceEntry(
             number_of_repeller=number_of_repeller,
             soft_threshold=soft_threshold,
             hard_threshold=hard_threshold,
@@ -144,20 +156,20 @@ class CollisionAvoidanceConfig:
                                                hard_threshold: Optional[float] = None,
                                                max_velocity: Optional[float] = None):
         if number_of_repeller is not None:
-            self._external_collision_avoidance[joint_name].number_of_repeller = number_of_repeller
+            self.external_collision_avoidance[joint_name].number_of_repeller = number_of_repeller
         if soft_threshold is not None:
-            self._external_collision_avoidance[joint_name].soft_threshold = soft_threshold
+            self.external_collision_avoidance[joint_name].soft_threshold = soft_threshold
         if hard_threshold is not None:
-            self._external_collision_avoidance[joint_name].hard_threshold = hard_threshold
+            self.external_collision_avoidance[joint_name].hard_threshold = hard_threshold
         if max_velocity is not None:
-            self._external_collision_avoidance[joint_name].max_velocity = max_velocity
+            self.external_collision_avoidance[joint_name].max_velocity = max_velocity
 
     def set_default_self_collision_avoidance(self,
                                              number_of_repeller: int = 1,
                                              soft_threshold: float = 0.05,
                                              hard_threshold: float = 0.0,
                                              max_velocity: float = 0.2):
-        self._self_collision_avoidance.default_factory = lambda: self.CollisionAvoidanceEntry(
+        self.self_collision_avoidance.default_factory = lambda: self.CollisionAvoidanceEntry(
             number_of_repeller=number_of_repeller,
             soft_threshold=soft_threshold,
             hard_threshold=hard_threshold,
@@ -171,13 +183,13 @@ class CollisionAvoidanceConfig:
                                            hard_threshold: Optional[float] = None,
                                            max_velocity: Optional[float] = None):
         if number_of_repeller is not None:
-            self._self_collision_avoidance[link_name].number_of_repeller = number_of_repeller
+            self.self_collision_avoidance[link_name].number_of_repeller = number_of_repeller
         if soft_threshold is not None:
-            self._self_collision_avoidance[link_name].soft_threshold = soft_threshold
+            self.self_collision_avoidance[link_name].soft_threshold = soft_threshold
         if hard_threshold is not None:
-            self._self_collision_avoidance[link_name].hard_threshold = hard_threshold
+            self.self_collision_avoidance[link_name].hard_threshold = hard_threshold
         if max_velocity is not None:
-            self._self_collision_avoidance[link_name].max_velocity = max_velocity
+            self.self_collision_avoidance[link_name].max_velocity = max_velocity
 
 
 class BehaviorTreeConfig:
@@ -210,6 +222,8 @@ class BehaviorTreeConfig:
             'normalize_position': True,
             'order': 4,
             'tick_stride': 0.5,
+            # 'joint_filter': ['arm_left_2_joint'],
+            'diff_after': 4,
         },
         'PlotDebugExpressions': {
             'enabled': True,

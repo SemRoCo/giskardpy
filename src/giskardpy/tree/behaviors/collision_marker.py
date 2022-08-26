@@ -49,11 +49,14 @@ class CollisionMarker(GiskardBehavior):
         m.ns = self.name_space
         m.scale = Vector3(0.003, 0, 0)
         m.pose.orientation.w = 1
-        red_threshold = 0.05  # TODO don't hardcode this
         if len(collisions) > 0:
             for collision in collisions:  # type: Collision
-                yellow_threshold = red_threshold * 2
-                green_threshold = yellow_threshold * 2
+                if collision.is_external:
+                    thresholds = self.collision_avoidance_config.external_collision_avoidance[collision.link_a]
+                else:
+                    thresholds = self.collision_avoidance_config.self_collision_avoidance[collision.link_a]
+                red_threshold = thresholds.hard_threshold
+                yellow_threshold = thresholds.soft_threshold
                 contact_distance = collision.contact_distance
                 if collision.map_P_pa is None:
                     map_T_a = self.world.compute_fk_np(self.world.root_link_name, collision.original_link_a)
@@ -66,16 +69,15 @@ class CollisionMarker(GiskardBehavior):
                     map_P_pb = np.dot(map_T_b, collision.b_P_pb)
                 else:
                     map_P_pb = collision.map_P_pb
-                if contact_distance < green_threshold:
-                    m.points.append(Point(*map_P_pa[:3]))
-                    m.points.append(Point(*map_P_pb[:3]))
-                    m.colors.append(self.green)
-                    m.colors.append(self.green)
+                m.points.append(Point(*map_P_pa[:3]))
+                m.points.append(Point(*map_P_pb[:3]))
+                m.colors.append(self.red)
+                m.colors.append(self.green)
                 if contact_distance < yellow_threshold:
-                    m.colors[-2] = self.yellow
+                    # m.colors[-2] = self.yellow
                     m.colors[-1] = self.yellow
                 if contact_distance < red_threshold:
-                    m.colors[-2] = self.red
+                    # m.colors[-2] = self.red
                     m.colors[-1] = self.red
         return m
 

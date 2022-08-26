@@ -360,7 +360,7 @@ class DiffDriveBaseGoal(Goal):
 class CartesianPoseStraight(Goal):
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, **kwargs):
-        super(CartesianPoseStraight, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
         goal_point.point = goal_pose.pose.position

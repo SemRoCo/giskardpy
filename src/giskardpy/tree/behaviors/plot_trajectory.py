@@ -37,7 +37,6 @@ class PlotTrajectory(GiskardBehavior):
                                 controlled_joints=controlled_joints,
                                 path_to_data_folder=self.path_to_data_folder,
                                 sample_period=sample_period,
-                                diff_after=2,
                                 **self.kwargs)
             except Exception as e:
                 logwarn(e)

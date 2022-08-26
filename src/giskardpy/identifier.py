@@ -122,11 +122,8 @@ added_collision_checks = ['added_collision_checks']
 
 collision_checker = collision_avoidance_config + ['collision_checker']
 
-self_collision_avoidance = collision_avoidance_config + ['_self_collision_avoidance']
-added_self_collisions = collision_avoidance_config + ['_add_self_collisions']
-ignored_self_collisions = collision_avoidance_config + ['_ignored_self_collisions']
-
-external_collision_avoidance = collision_avoidance_config + ['_external_collision_avoidance']
+added_self_collisions = collision_avoidance_config + ['add_self_collisions']
+ignored_self_collisions = collision_avoidance_config + ['ignored_self_collisions']
 
 # robot interface
 robot_interface_configs = giskard + ['robot_interface_configs']

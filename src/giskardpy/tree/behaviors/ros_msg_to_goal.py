@@ -119,26 +119,17 @@ class RosMsgToGoal(GetGoal):
     def collision_entries_to_collision_matrix(self, collision_entries: List[CollisionEntry]):
         self.collision_scene.sync()
         max_distances = self.make_max_distances()
+        ignored_collisions = set(self.collision_avoidance_config.ignored_collisions)
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                    max_distances)
+                                                                                    max_distances,
+                                                                                    ignored_collisions)
         return collision_matrix
 
-    def _cal_max_param(self, parameter_name):
-        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        default_distance = max(getattr(external_distances.default_factory(), parameter_name),
-                               getattr(self_distances.default_factory(), parameter_name))
-        for value in external_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
-        for value in self_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
-        return default_distance
-
     def make_max_distances(self):
-        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
+        external_distances = self.collision_avoidance_config.external_collision_avoidance
+        self_distances = self.collision_avoidance_config.self_collision_avoidance
         # FIXME check all dict entries
-        default_distance = self._cal_max_param('soft_threshold')
+        default_distance = self.collision_avoidance_config.cal_max_param('soft_threshold')
 
         max_distances = defaultdict(lambda: default_distance)
         # override max distances based on external distances dict
@@ -163,8 +154,8 @@ class RosMsgToGoal(GetGoal):
 
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
-        config = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        fixed_joints = tuple(self.collision_avoidance_config._fixed_joints_for_external_collision_avoidance)
+        config = self.collision_avoidance_config.external_collision_avoidance
+        fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_external_collision_avoidance)
         joints = [j for j in self.world.controlled_joints if j not in fixed_joints]
         for joint_name in joints:
             child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
@@ -190,8 +181,8 @@ class RosMsgToGoal(GetGoal):
     @profile
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
-        fixed_joints = tuple(self.collision_avoidance_config._fixed_joints_for_self_collision_avoidance)
-        config = self.get_god_map().get_data(identifier.self_collision_avoidance)
+        fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+        config = self.collision_avoidance_config.self_collision_avoidance
         robot_group_name = self.god_map.unsafe_get_data(identifier.robot_group_name)
         for link_a_o, link_b_o in self.world.groups[robot_group_name].possible_collision_combinations():
             link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)

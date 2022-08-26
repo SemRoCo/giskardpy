@@ -35,7 +35,7 @@ cmd_id = ['cmd_id']
 post_processing = ['post_processing']
 soft_constraints = post_processing + ['soft_constraints']
 result_message = ['result_message']
-collision_goal = [u'collision_goal']
+collision_goal = ['collision_goal']
 tracking_start_time = ['tracking_start_time']
 
 # stuff from rosparam
@@ -81,7 +81,7 @@ CPIMarker_in_planning_loop = plugins + ['CollisionMarker', 'in_planning_loop']
 
 PlotTrajectory = plugins + ['PlotTrajectory']
 PlotTrajectory_enabled = PlotTrajectory + ['enabled']
-PlotTrajectory_path_enabled = PlotTrajectory + [u'path_enabled']
+PlotTrajectory_path_enabled = PlotTrajectory + ['path_enabled']
 
 PlotDebugTrajectory = plugins + ['PlotDebugExpressions']
 PlotDebugTrajectory_enabled = PlotDebugTrajectory + ['enabled']
@@ -97,7 +97,7 @@ amplitude_threshold = plugins + ['WiggleCancel', 'amplitude_threshold']
 num_samples_in_fft = plugins + ['WiggleCancel', 'window_size']
 frequency_range = plugins + ['WiggleCancel', 'frequency_range']
 
-LoopDetector_precision = plugins + [u'LoopDetector', u'precision']
+LoopDetector_precision = plugins + ['LoopDetector', 'precision']
 
 joint_convergence_threshold = plugins + ['GoalReached', 'joint_convergence_threshold']
 GoalReached_window_size = plugins + ['GoalReached', 'window_size']
@@ -111,14 +111,14 @@ SyncTfFrames_frames = SyncTfFrames + ['frames']
 
 PublishDebugExpressions = plugins + ['PublishDebugExpressions']
 
-global_planner_needed = plugins + [u'GlobalPlannerNeeded', u'global_planner_needed']
-global_planner = plugins + [u'global_planner']
+#global_planner_needed = plugins + ['GlobalPlannerNeeded', 'global_planner_needed']
+global_planner = plugins + ['global_planner']
 plot_path = global_planner + ['plot']
-path_benchmark = global_planner + [u'benchmark']
-gp_narrow = global_planner + [u'narrow']
-gp_normal = global_planner + [u'normal']
-path_interpolation = global_planner + [u'path_interpolation']
-path_replanning_max_retries = global_planner + [u'max_replanning_retries']
+path_benchmark = global_planner + ['benchmark']
+gp_narrow = global_planner + ['planner_configs', 'narrow']
+gp_normal = global_planner + ['planner_configs', 'normal']
+path_interpolation = global_planner + ['path_interpolation']
+path_replanning_max_retries = global_planner + ['max_replanning_retries']
 
 # reachability check
 reachability_check = giskard + ['reachability_check']

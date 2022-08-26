@@ -12,7 +12,7 @@ from giskardpy.tree.plugin import GiskardBehavior
 class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
-        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
+        self.map_frame = 'map'
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects

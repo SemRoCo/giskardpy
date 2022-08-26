@@ -29,7 +29,7 @@ class RetryPlanning(GiskardBehavior):
         e = self.get_blackboard_exception()
         if e and self.must_replan(e):
             self.clear_blackboard_exception()
-            self.get_god_map().set_data(identifier.global_planner_needed, True)
+            # self.get_god_map().set_data(identifier.global_planner_needed, True)
             return Status.RUNNING
         elif self.is_reaching_goal_pose_trivial():
             logging.loginfo(f'{self.path_constraint_name} terminated early, but goal can be reached trivially.')
@@ -40,14 +40,15 @@ class RetryPlanning(GiskardBehavior):
             self.must_replan(PlanningException())
             logging.loginfo(f'{self.path_constraint_name} did not traverse the planned path.')
             logging.loginfo(u'Replanning a new path.')
-            self.get_god_map().set_data(identifier.global_planner_needed, True)
+            # self.get_god_map().set_data(identifier.global_planner_needed, True)
             return Status.RUNNING
         else:
             return Status.SUCCESS
 
     def send_trivial_cartesian_pose_goal(self):
         c, nc = self.move_parameter_value_pair_to_constraint(self.path_constraint_name, 'CartesianPose',
-                                                             parameters=['root_link', 'tip_link', 'goal'])
+                                                             from_parameters=['root_link', 'tip_link', 'goal'],
+                                                             to_parameters=['root_link', 'tip_link', 'goal_pose'])
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
         m = MoveGoal()
         move_cmd.constraints.remove(c)
@@ -57,7 +58,7 @@ class RetryPlanning(GiskardBehavior):
         client = actionlib.SimpleActionClient("/giskard/command", MoveAction)
         client.send_goal(m)
 
-    def move_parameter_value_pair_to_constraint(self, from_type, to_type, parameters=None):
+    def move_parameter_value_pair_to_constraint(self, from_type, to_type, from_parameters=None, to_parameters=None):
 
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
         if any([c.type in [from_type] for c in move_cmd.constraints]):
@@ -65,8 +66,8 @@ class RetryPlanning(GiskardBehavior):
                 if c.type == from_type:
                     npvps_d = dict()
                     pvps = yaml.load(c.parameter_value_pair)
-                    for k in parameters:
-                        npvps_d[k] = deepcopy(pvps[k])
+                    for f_k, t_k in zip(from_parameters, to_parameters):
+                        npvps_d[t_k] = deepcopy(pvps[f_k])
                     nc = Constraint()
                     nc.type = to_type
                     nc.parameter_value_pair = json.dumps(npvps_d)
@@ -145,7 +146,7 @@ class RetryPlanning(GiskardBehavior):
                         d.pop('goals')
                     n_c.parameter_value_pair = yaml.dump(d)
                     global_move_cmd.constraints.append(n_c)
-                    self.get_god_map().set_data(identifier.global_planner_needed, True)
+                    #self.get_god_map().set_data(identifier.global_planner_needed, True)
                 elif c.type == 'CartesianPreGrasp':
                     logging.loginfo(u'Resampling a new PreGrasp pose.')
                     n_c = Constraint()

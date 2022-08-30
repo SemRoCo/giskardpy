@@ -63,8 +63,10 @@ def free_symbols(expression):
 def is_matrix(expression):
     return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
 
+
 def is_homo_vector(expression):
     return is_matrix(expression) and expression.shape == (4, 1) and expression[-1] == 0
+
 
 def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
@@ -269,7 +271,7 @@ def if_less_eq_cases(a: expr_symbol, b_result_cases: List[Tuple[expr_symbol, exp
     result = else_result
     if isinstance(b_result_cases, list):
         b_result_cases = Matrix(b_result_cases)
-    for i in reversed(range(b_result_cases.shape[0]-1)):
+    for i in reversed(range(b_result_cases.shape[0] - 1)):
         b = b_result_cases[i, 0]
         b_result = b_result_cases[i, 1]
         result = if_less_eq(a, b, b_result, result)
@@ -406,6 +408,31 @@ def translation3(x, y, z):
     r[1, 3] = y
     r[2, 3] = z
     return r
+
+
+def rotation_matrix_from_vectors(x=None, y=None, z=None):
+    if x is not None:
+        x = scale(x, 1)
+    if y is not None:
+        y = scale(y, 1)
+    if z is not None:
+        z = scale(z, 1)
+    if x is not None and y is not None and z is None:
+        z = cross(x, y)
+        z = scale(z, 1)
+    elif x is not None and y is None and z is not None:
+        y = cross(z, x)
+        y = scale(y, 1)
+    elif x is None and y is not None and z is not None:
+        x = cross(y, z)
+        x = scale(x, 1)
+    else:
+        raise AttributeError(f'only one vector can be None')
+    R = Matrix([[x[0], y[0], z[0], 0],
+                [x[1], y[1], z[1], 0],
+                [x[2], y[2], z[2], 0],
+                [0, 0, 0, 1]])
+    return R
 
 
 def rotation_matrix_from_rpy(roll, pitch, yaw):
@@ -1100,6 +1127,13 @@ def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+
+
+def angle_from_matrix(R, hint):
+    axis, angle = axis_angle_from_matrix(R)
+    return normalize_angle(if_greater_zero(hint(axis),
+                                           if_result=angle,
+                                           else_result=-angle))
 
 
 def velocity_limit_from_position_limit(acceleration_limit, position_limit, current_position, step_size, eps=1e-5):

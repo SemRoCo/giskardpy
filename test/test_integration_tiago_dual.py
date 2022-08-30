@@ -207,23 +207,43 @@ class TestCartGoals:
         map_P_goal = tf.msg_to_homogeneous_matrix(tf.transform_point('map', countertip_P_goal))
         map_P_goal[-2] = 0
 
-        # map_P_base_footprint = tf.msg_to_homogeneous_matrix(tf.lookup_point('map', 'base_footprint'))
-        # # map_P_goal = np.array([1.3, -0.3, 0, 1])
-        # x = map_P_goal - map_P_base_footprint
-        # x = x[:3]
-        # x /= np.linalg.norm(x)
-        # z = np.array([0,0,1])
-        # y = np.cross(z, x)
-        # y /= np.linalg.norm(y)
-        # map_R_goal = np.vstack([x,y,z]).T
-        # map_R_goal = np.vstack([np.vstack([map_R_goal.T, [0,0,0]]).T, [0,0,0,1]])
-        #
-        # base_pose = tf.lookup_pose('map', 'base_footprint')
-        # base_pose.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_goal))
-        # # base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
-        # # base_pose.pose.position.z = 0
-        # apartment_setup.allow_all_collisions()
-        # apartment_setup.move_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = countertop_frame
+        base_pose.pose.position.x = 1.3
+        base_pose.pose.position.y = -0.3
+        base_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [0, 0, 1, 0],
+                                                                         [0, 0, 0, 1]]))
+        base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
+        base_pose.pose.position.z = 0
+        apartment_setup.allow_all_collisions()
+        apartment_setup.move_base(base_pose)
+
+    def test_drive3_1(self, apartment_setup: TiagoTestWrapper):
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'iai_apartment/side_B'
+        base_pose.pose.position.x = 1.5
+        base_pose.pose.position.y = 3.4
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/5, [0,0,1]))
+        base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
+        apartment_setup.set_localization(base_pose)
+
+        countertop_frame = 'iai_apartment/island_countertop'
+
+        start_base_pose = PoseStamped()
+        start_base_pose.header.frame_id = 'map'
+        start_base_pose.pose.position = Point(1.295, 3.294, 0)
+        start_base_pose.pose.orientation = Quaternion(0.000, 0.000, 0.990, -0.139)
+        apartment_setup.allow_all_collisions()
+        apartment_setup.move_base(start_base_pose)
+
+        countertip_P_goal = PointStamped()
+        countertip_P_goal.header.frame_id = countertop_frame
+        countertip_P_goal.point.x = 1.3
+        countertip_P_goal.point.y = -0.3
+        map_P_goal = tf.msg_to_homogeneous_matrix(tf.transform_point('map', countertip_P_goal))
+        map_P_goal[-2] = 0
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = countertop_frame

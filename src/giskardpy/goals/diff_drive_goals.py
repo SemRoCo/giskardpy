@@ -14,12 +14,13 @@ from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 class DiffDriveTangentialToPoint(Goal):
 
     def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
-                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, **kwargs):
+                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.goal_point = self.transform_msg(self.world.root_link_name, goal_point)
         self.weight = weight
         self.tip = 'base_footprint'
         self.root = 'map'
+        self.drive = drive
         if forward is not None:
             self.tip_V_pointing_axis = tf.transform_vector(self.tip, forward)
             self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
@@ -39,16 +40,29 @@ class DiffDriveTangentialToPoint(Goal):
         map_V_tangent = w.cross(map_V_base_to_center, map_V_up)
         tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
         map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)
-        angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
-        # self.add_debug_vector('map_V_tangent', map_V_tangent)
-        # self.add_debug_vector('map_V_forward', map_V_forward)
-        # self.add_debug_expr('angle', angle)
-        self.add_constraint(reference_velocity=0.5,
-                            lower_error=-angle,
-                            upper_error=-angle,
-                            weight=self.weight,
-                            expression=angle,
-                            name_suffix='/rot')
+
+        if self.drive:
+            angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
+            self.add_constraint(reference_velocity=0.5,
+                                lower_error=-angle,
+                                upper_error=-angle,
+                                weight=self.weight,
+                                expression=angle,
+                                name_suffix='/rot')
+        else:
+            # angle = w.abs(w.angle_between_vector(w.vector3(1,0,0), map_V_tangent))
+            map_R_goal = w.rotation_matrix_from_vectors(x=map_V_tangent, y=None, z=w.vector3(0,0,1))
+            goal_angle = w.angle_from_matrix(map_R_goal, lambda axis: axis[2])
+            map_R_base = w.rotation_of(map_T_base)
+            axis, map_current_angle = w.axis_angle_from_matrix(map_R_base)
+            map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
+            angle_error = w.shortest_angular_distance(map_current_angle, goal_angle)
+            self.add_constraint(reference_velocity=0.5,
+                                lower_error=angle_error,
+                                upper_error=angle_error,
+                                weight=self.weight,
+                                expression=map_current_angle,
+                                name_suffix='/rot')
 
 
 

@@ -599,11 +599,11 @@ class TestCollisionAvoidance:
         l_tcp = 'gripper_left_grasping_frame'
         r_tcp = 'gripper_right_grasping_frame'
         handle_name = 'handle_cab1_top_door'
-        handle_name_frame = 'iai_apartment/handle_cab1_top_door'
-        cupboard_floor_frame = 'iai_apartment/cabinet1_coloksu_level4'
+        handle_name_frame = 'handle_cab1_top_door'
+        cupboard_floor_frame = 'cabinet1_coloksu_level4'
         cupboard_floor = 'cabinet1_coloksu_level4'
         base_footprint = 'base_footprint'
-        countertop_frame = 'iai_apartment/island_countertop'
+        countertop_frame = 'island_countertop'
         countertop = 'island_countertop'
         grasp_offset = 0.1
         start_base_pose = apartment_setup.world.compute_fk_pose(apartment_setup.default_root, base_footprint)
@@ -638,7 +638,7 @@ class TestCollisionAvoidance:
                                       weight=WEIGHT_ABOVE_CA * 10,
                                       check=False)
         goal_point = PointStamped()
-        goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
+        goal_point.header.frame_id = 'cabinet1_door_top_left'
         # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
         apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
         # apartment_setup.avoid_joint_limits(50)
@@ -709,6 +709,76 @@ class TestCollisionAvoidance:
                                       tip_link=cup_name,
                                       root_link=apartment_setup.default_root)
         apartment_setup.plan_and_execute()
+
+    def test_close_cabinet(self, apartment_setup: TiagoTestWrapper):
+        # setup
+        apartment_name = 'apartment'
+        l_tcp = 'gripper_left_grasping_frame'
+        r_tcp = 'gripper_right_grasping_frame'
+        handle_name = 'handle_cab1_top_door'
+        handle_name_frame = 'handle_cab1_top_door'
+        cupboard_floor_frame = 'cabinet1_coloksu_level4'
+        cupboard_floor = 'cabinet1_coloksu_level4'
+        base_footprint = 'base_footprint'
+        countertop_frame = 'island_countertop'
+        countertop = 'island_countertop'
+        grasp_offset = 0.1
+        goal_angle = np.pi / 2
+        start_base_pose = apartment_setup.world.compute_fk_pose(apartment_setup.default_root, base_footprint)
+        start_base_pose.pose.position.y -= 1
+        start_base_pose.pose.position.x += 0.3
+        start_base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi*3/4, [0,0,1]))
+        apartment_setup.set_seed_odometry(start_base_pose)
+
+        apartment_state = {
+            'cabinet1_door_top_left_joint': goal_angle
+        }
+        apartment_setup.set_seed_configuration(apartment_state)
+        apartment_setup.set_seed_configuration(apartment_setup.better_pose2)
+
+        left_pose = PoseStamped()
+        left_pose.header.frame_id = handle_name_frame
+        left_pose.pose.position.x = -grasp_offset
+        left_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [0, 0, -1, 0],
+                                                                         [0, 0, 0, 1]]))
+        apartment_setup.set_cart_goal(left_pose,
+                                      tip_link=l_tcp,
+                                      root_link=apartment_setup.default_root,
+                                      weight=WEIGHT_ABOVE_CA * 10,
+                                      check=False)
+        goal_point = PointStamped()
+        goal_point.header.frame_id = 'cabinet1_door_top_left'
+        # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
+        apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
+        # apartment_setup.avoid_joint_limits(50)
+        # apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
+        apartment_setup.plan_and_execute()
+
+        apartment_setup.set_cart_goal(left_pose,
+                                      tip_link=l_tcp,
+                                      root_link=apartment_setup.default_root,
+                                      weight=WEIGHT_ABOVE_CA * 10,
+                                      check=False)
+        goal_point = PointStamped()
+        goal_point.header.frame_id = 'cabinet1_door_top_left'
+        # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
+        # apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
+        # apartment_setup.avoid_joint_limits(50)
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
+        apartment_setup.plan_and_execute()
+
+        apartment_setup.set_json_goal('Close',
+                                      tip_link=l_tcp,
+                                      environment_link=handle_name)
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
+        apartment_setup.set_avoid_joint_limits_goal(
+            joint_list=['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
+                        'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint'])
+        apartment_setup.plan_and_execute()
+
+
 
     def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
         js = {

@@ -25,6 +25,7 @@ class SetSeedConfiguration(Goal):
             if joint_name not in self.world.state:
                 raise KeyError(f'world has no joint \'{joint_name}\'')
             self.world.state[joint_name].position = initial_joint_value
+        self.world.notify_state_change()
 
 
 class SetOdometry(Goal):

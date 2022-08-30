@@ -17,6 +17,7 @@ class DiffDriveTangentialToPoint(Goal):
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.goal_point = self.transform_msg(self.world.root_link_name, goal_point)
+        self.goal_point.point.z = 0
         self.weight = weight
         self.tip = 'base_footprint'
         self.root = 'map'

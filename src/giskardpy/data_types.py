@@ -105,6 +105,14 @@ class JointStates(defaultdict):
     def to_position_dict(self):
         return {k: v.position for k, v in self.items()}
 
+    def pretty_print(self):
+        for joint_name, joint_state in self.items():
+            print(f'{joint_name}:')
+            print(f'\tposition: {joint_state.position}')
+            print(f'\tvelocity: {joint_state.velocity}')
+            print(f'\tacceleration: {joint_state.acceleration}')
+            print(f'\tjerk: {joint_state.jerk}')
+
 
 class BiDict(dict):
     # TODO test me

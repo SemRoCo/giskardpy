@@ -898,6 +898,8 @@ class QPController:
                     return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
                 except Exception as e_relaxed:
                     logging.logerr('Relaxing hard constraints failed.')
+                    logging.loginfo('current sate:')
+                    self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
             else:
                 logging.logwarn('Ran out of allowed retries with relaxed hard constraints.')
             self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)

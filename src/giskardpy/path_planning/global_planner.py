@@ -642,6 +642,9 @@ class GlobalPlanner(GetGoal):
             except KeyError:
                 raise Exception('Please specify a narrow padding value.')
 
+        self.navigation = self.__goal_dict[u'navigation'] if 'navigation' in self.__goal_dict else False
+        self.manipulation = self.__goal_dict[u'manipulation'] if 'manipulation' in self.__goal_dict else False
+
         ros_pose = convert_dictionary_to_ros_message(self.__goal_dict[u'goal'])
         self.goal = transform_pose('map', ros_pose)  # type: PoseStamped
 
@@ -765,10 +768,11 @@ class GlobalPlanner(GetGoal):
             finally:
                 planner.clear()
 
+    def __check_any(self, bools):
+        return sum([1 for v in bools if v]) != 1
+
     def plan(self, navigation=False, movement=False, narrow=False):
-        if not navigation and not movement:
-            raise Exception()
-        if navigation and movement:
+        if self.__check_any([navigation, movement]):
             raise Exception()
 
         if narrow:
@@ -863,11 +867,10 @@ class GlobalPlanner(GetGoal):
 
         # Parse and save the Cartesian Goal Constraint
         self.save_cart_goal(cart_c)
-        # self.collision_scene.update_collision_environment()
-        navigation = True #self.is_global_navigation_needed()
-        movement = not navigation
         try:
-            trajectory, predict_f = self.plan(navigation=navigation, movement=movement, narrow=self.narrow)
+            trajectory, predict_f = self.plan(navigation=self.navigation,
+                                              movement=self.manipulation,
+                                              narrow=self.narrow)
         except FeasibleGlobalPlanningException:
             raise_to_blackboard(GlobalPlanningException())
             return Status.FAILURE
@@ -1328,7 +1331,8 @@ class MovementPlanner(OMPLPlanner):
 
     def clear(self):
         super().clear()
-        self.motion_validator.clear()
+        if self.motion_validator_class is not None:
+            self.motion_validator.clear()
         self.collision_checker.clear()
 
     def get_planner(self, si):
@@ -1464,8 +1468,8 @@ class MovementPlanner(OMPLPlanner):
             verify = ''
         path = self.setup.getSolutionPath()
         path_cost = path.cost(self.optimization_objective).value()
-        self.god_map.set_data(identifier.rosparam + ['path_time'], self.setup.getLastPlanComputationTime())
-        self.god_map.set_data(identifier.rosparam + ['path_cost'], path_cost)
+        self.god_map.set_data(identifier.giskard + ['path_time'], self.setup.getLastPlanComputationTime())
+        self.god_map.set_data(identifier.giskard + ['path_cost'], path_cost)
         cost = '- Cost: {}'.format(str(round(path_cost, 5)))
         title = u'{} Path from {} in map\n{} {}'.format(dim, self.setup.getPlanner().getName(), verify, cost)
         fig, ax = plt.subplots()

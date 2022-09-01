@@ -1,4 +1,5 @@
 from copy import copy
+from typing import List
 
 import PyKDL
 import numpy as np
@@ -441,10 +442,10 @@ def np_to_pose_stamped(matrix, frame_id):
 
 
 def interpolate_pose(s1, s2, f):
-    np1 = pose_to_np(s1)
-    np2 = pose_to_np(s2)
-    np3_trans = np1[0] + (np2[0] - np1[0]) * f
-    key_rots = R.from_quat([np1[1], np2[1]])
+    np1_t, np1_r = map(np.array, pose_to_list(s1))
+    np2_t, np2_r = map(np.array, pose_to_list(s2))
+    np3_trans = np1_t + (np2_t - np1_t) * f
+    key_rots = R.from_quat([np1_r, np2_r])
     key_times = [0, 1]
     slerp = Slerp(key_times, key_rots)
     times = [f]
@@ -464,12 +465,12 @@ def norm_rotation_matrix(r):
 
 
 def pose_diff(a, b):
-    a_t, a_r = pose_to_np(a)
-    b_t, b_r = pose_to_np(b)
+    a_t, a_r = pose_to_list(a)
+    b_t, b_r = pose_to_list(b)
     m_P_a = translation_matrix(a_t)
     m_P_b = translation_matrix(b_t)
     b_P_a = concatenate_matrices(m_P_a, inverse_matrix(m_P_b))
-    angle = np.sum(a_r * b_r)
+    angle = np.sum(np.array(a_r) * np.array(b_r))
     if angle > 1.0 - 1e-9:
         r_diff = 0.0
     else:

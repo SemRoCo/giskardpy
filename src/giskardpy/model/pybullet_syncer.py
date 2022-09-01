@@ -174,6 +174,7 @@ class PyBulletMotionValidationIDs():
 
     def __init__(self, collision_scene, environment_name='kitchen', environment_object_names=None, moving_links=None):
         self.collision_scene = collision_scene
+        self.collision_matrix = self.collision_scene.update_collision_environment()
         self.client_id = collision_scene.client_id
 
         # Save objects for with collision should be checked from ...
@@ -223,7 +224,7 @@ class PyBulletMotionValidationIDs():
                 id not in self.environment_object_ids and id not in self.environment_ids and id != -1)
 
     def should_ignore_collision(self, link1, link2):
-        for (robot_link, _, link_b), _ in self.collision_scene.collision_matrix.items():
+        for (robot_link, link_b), _ in self.collision_matrix.items():
             if robot_link == link1 and link_b == link2:
                 return False
             elif link_b == link1 and robot_link == link2:

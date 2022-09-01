@@ -468,10 +468,9 @@ class CollisionWorldSynchronizer(object):
         """
         pass
 
-
     def update_collision_environment(self, collision_entries: List[CollisionEntry] = None):
         # t = time()
-        if collision_entries is None:
+        if collision_entries is None or len(collision_entries) is 0:
             collision_entries = self.god_map.get_data(identifier.collision_goal)
         self.sync()
         max_distances = self.make_max_distances()
@@ -542,8 +541,8 @@ class CollisionWorldSynchronizer(object):
         self.reset_cache()
         collisions = self.god_map.get_data(identifier.closest_point)
         try:
-            controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link_name)
-            controlled_parent_link = self.robot.joints[controlled_parent_joint].child_link_name
+            controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link_name)
+            controlled_parent_link = self.world.joints[controlled_parent_joint].child_link_name
             return collisions.get_external_collisions(controlled_parent_link)
         except KeyError:
             return list()

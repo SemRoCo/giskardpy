@@ -202,12 +202,13 @@ class CartesianPathCarrot(Goal):
         if self.initialized:
             goal_translation, goal_orientation = self.get_goal_expr()
 
-            #self.add_debug_vector("debugGoal", goal_translation)
-            #self.add_debug_vector("debugCurrentX", w.position_of(self.get_fk(self.root_link, self.tip_link)))
-            #self.add_debug_vector("debugNext", self.predict())
+            # self.add_debug_vector("debugGoal", goal_translation)
+            # self.add_debug_vector("debugCurrentX", w.position_of(self.get_fk(self.root_link, self.tip_link)))
+            # self.add_debug_vector("debugNext", self.predict())
 
             self.minimize_position(goal_translation, self.get_dyn_weight())
             self.minimize_rotation(goal_orientation, self.weight)
+            # self.add_debug_vector('map_P_goal', goal_translation)
 
     def get_closest_traj_point(self):
 

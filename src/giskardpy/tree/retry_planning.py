@@ -1,10 +1,10 @@
 import json
+import yaml
 from copy import deepcopy
 
 import actionlib
 import numpy as np
 import rospy
-import yaml
 from py_trees import Status
 
 import giskardpy.identifier as identifier
@@ -144,7 +144,7 @@ class RetryPlanning(GiskardBehavior):
                     d = yaml.load(c.parameter_value_pair)
                     if 'goals' in d:
                         d.pop('goals')
-                    n_c.parameter_value_pair = yaml.dump(d)
+                    n_c.parameter_value_pair = json.dumps(d)
                     global_move_cmd.constraints.append(n_c)
                     #self.get_god_map().set_data(identifier.global_planner_needed, True)
                 elif c.type == 'CartesianPreGrasp':
@@ -153,7 +153,7 @@ class RetryPlanning(GiskardBehavior):
                     n_c.type = 'CartesianPreGrasp'
                     d = yaml.load(c.parameter_value_pair)
                     d.pop('goal')
-                    n_c.parameter_value_pair = yaml.dump(d)
+                    n_c.parameter_value_pair = json.dumps(d)
                     global_move_cmd.constraints.append(n_c)
                 else:
                     global_move_cmd.constraints.append(c)

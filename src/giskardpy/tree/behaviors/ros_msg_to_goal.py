@@ -53,8 +53,8 @@ class RosMsgToGoal(GetGoal):
             raise_to_blackboard(e)
             traceback.print_exc()
             return Status.SUCCESS
-        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-            self.parse_collision_entries(move_cmd.collisions)
+        if self.god_map.get_data(identifier.collision_matrix) is not None:
+            self.parse_collision_entries(self.god_map.get_data(identifier.collision_goal))
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
 

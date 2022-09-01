@@ -2,6 +2,7 @@ from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils import logging
@@ -106,5 +107,8 @@ class SetCollisionGoal(GetGoal):
 
     def update(self):
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
-        self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+            self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
+            collision_matrix = self.collision_scene.update_collision_environment(move_cmd.collisions)
+            self.god_map.set_data(identifier.collision_matrix, collision_matrix)
         return Status.SUCCESS

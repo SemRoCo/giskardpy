@@ -4,11 +4,11 @@ from copy import deepcopy
 
 import numpy as np
 import rospy
+import urdf_parser_py.urdf as up
 from nav_msgs.srv import GetMap
 from pybullet import getAxisAngleFromQuaternion
 
 from giskardpy import identifier
-from giskardpy.data_types import PrefixName
 from giskardpy.model.joints import OmniDrive
 from giskardpy.path_planning.ik import PyBulletIK
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
@@ -76,14 +76,59 @@ class AbstractStateValidator:
         pass
 
 
+def fix_remove_transmissions_from_xml_str(robot_description: str):
+    s = '<transmission '
+    e = '</transmission>'
+    final_description = deepcopy(robot_description)
+    while s in final_description and e in final_description:
+        to_rmv = final_description[final_description.index(s):final_description.index(e)+len(e)]
+        final_description = final_description.replace(to_rmv, '')
+    return final_description
+
+
+def omni_drive_to_joints(collision_scene, robot):
+    odom_start_name = 'odom_combined'
+    robot_start = 'base_footprint'
+    link_suffix = '_link'
+    zero_origin = up.Pose([0, 0, 0], [0, 0, 0])
+    omni_joint = collision_scene.world.joints['brumbrum']
+    odom_start = up.Link(name=odom_start_name)
+    odom_x = up.Link(name=omni_joint.x_name + link_suffix)
+    odom_y = up.Link(name=omni_joint.y_name + link_suffix)
+    odom_x_joint = up.Joint(name=omni_joint.x_name,
+                            parent=odom_start_name, child=omni_joint.x_name + link_suffix,
+                            joint_type='prismatic', axis=[1, 0, 0],
+                            limit=up.JointLimit(effort=200.0, velocity=0.5, lower=-1000, upper=1000),
+                            origin=deepcopy(zero_origin))
+    odom_y_joint = up.Joint(name=omni_joint.y_name,
+                            parent=omni_joint.x_name + link_suffix, child=omni_joint.y_name + link_suffix,
+                            joint_type='prismatic', axis=[0, 1, 0],
+                            limit=up.JointLimit(effort=200.0, velocity=0.5, lower=-1000, upper=1000),
+                            origin=deepcopy(zero_origin))
+    odom_rot_joint = up.Joint(name=omni_joint.rot_name,
+                              parent=omni_joint.y_name + link_suffix, child=robot_start,
+                              joint_type='continuous', axis=[0, 0, 1],
+                              limit=up.JointLimit(effort=200.0, velocity=0.4),
+                              origin=deepcopy(zero_origin))
+    robot.add_link(odom_start)
+    robot.add_link(odom_x)
+    robot.add_link(odom_y)
+    robot.add_joint(odom_x_joint)
+    robot.add_joint(odom_y_joint)
+    robot.add_joint(odom_rot_joint)
+    return robot
+
+
 class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
 
     def __init__(self, is_3D, root_link, tip_link, collision_scene, god_map,
-                 ik=None, ik_sampling=1, publish=False, dist=0.0):
+                 ik=None, ik_sampling=1, publish=True, dist=0.0):
         super().__init__(is_3D)
         self.giskard_lock = threading.Lock()
         if ik is None:
-            self.ik = PyBulletIK(root_link, tip_link)
+            robot = up.URDF.from_xml_string(fix_remove_transmissions_from_xml_str(rospy.get_param('robot_description')))
+            robot_with_base = omni_drive_to_joints(collision_scene, robot)
+            self.ik = PyBulletIK(robot_with_base.to_xml_string(), root_link, tip_link)
         else:
             self.ik = ik(root_link, tip_link)
         self.debug = False
@@ -163,7 +208,7 @@ class GiskardRobotBulletCollisionChecker(AbstractStateValidator):
                 if self.debug:
                     s_s = current_milli_time()
                 # override on current joint states.
-                self.set_tip_link(deepcopy(self.collision_scene.robot.state), pose)
+                self.set_tip_link(deepcopy(old_js), pose)
                 if self.debug:
                     s_c = current_milli_time()
                 results.append(

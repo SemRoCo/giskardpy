@@ -48,9 +48,9 @@ class KDLIK(IK):
 
 class PyBulletIK(IK):
 
-    def __init__(self, root_link, tip_link, static_joints=None, robot_description='robot_description'):
+    def __init__(self, robot_description, root_link, tip_link, static_joints=None):
         IK.__init__(self, root_link, tip_link)
-        self.robot_description = rospy.get_param(robot_description)
+        self.robot_description = robot_description
         self.pybullet_joints = list()
         self.robot_id = None
         self.pybullet_tip_link_id = None

@@ -35,7 +35,7 @@ result_message = ['result_message']
 tracking_start_time = ['tracking_start_time']
 
 # stuff from rosparam
-robot_description = ['robot_description']
+robot_descriptions = ['robot_descriptions']
 
 giskard = ['giskard']
 

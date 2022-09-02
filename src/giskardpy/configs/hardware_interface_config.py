@@ -1,26 +1,29 @@
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface, DiffDriveCmdVelInterface
 from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
+from giskardpy.model.joints import Joint
 
 
 class HardwareConfig:
     def __init__(self):
         self.drive_interfaces: List[DriveInterface] = []
         self.follow_joint_trajectory_interfaces: List[FollowJointTrajectoryInterface] = []
-        self.joint_state_topics: List[str] = []
-        self.odometry_topics: List[str] = []
+        self.joint_state_topics: List[Tuple[str, str]] = []
+        self.odometry_topics: List[Tuple[str, Joint]] = []
 
-    def add_follow_joint_trajectory_server(self, namespace, state_topic):
+    def add_follow_joint_trajectory_server(self, namespace, state_topic, group_name):
         self.follow_joint_trajectory_interfaces.append(FollowJointTrajectoryInterface(
-            namespace=namespace,
-            state_topic=state_topic))
+            action_namespace=namespace,
+            state_topic=state_topic,
+            group_name=group_name))
 
-    def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,
+    def add_omni_drive_interface(self, group_name, cmd_vel_topic, parent_link_name, child_link_name,
                                  joint_name: str = 'brumbrum',
                                  odom_x_name: str = 'odom_x', odom_y_name: str = 'odom_y',
                                  odom_rot_name: str = 'odom_rot', **kwargs):
-        self.drive_interfaces.append(OmniDriveCmdVelInterface(cmd_vel_topic=cmd_vel_topic,
+        self.drive_interfaces.append(OmniDriveCmdVelInterface(group_name=group_name,
+                                                              cmd_vel_topic=cmd_vel_topic,
                                                               parent_link_name=parent_link_name,
                                                               child_link_name=child_link_name,
                                                               joint_name=joint_name,

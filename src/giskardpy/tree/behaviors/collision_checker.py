@@ -6,6 +6,7 @@ import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.exceptions import SelfCollisionViolatedException
 from giskardpy.model.collision_world_syncer import Collisions
+from giskardpy.data_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard, catch_and_raise_to_blackboard
 
@@ -38,7 +39,8 @@ class CollisionChecker(GiskardBehavior):
         try:
             self.collision_matrix = self.god_map.get_data(identifier.collision_matrix)
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
-            self.collision_list_size = self.collision_avoidance_config.cal_max_param('number_of_repeller')
+            self.collision_list_size = sum([self.collision_avoidance_config.cal_max_param(PrefixName('number_of_repeller', r_n))
+                                             for r_n in self.robot_names()])
             self.collision_scene.sync()
             super().initialise()
         except Exception as e:

@@ -18,6 +18,7 @@ from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
@@ -41,18 +42,26 @@ class Giskard:
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self._backup = {}
+        self.group_names = []
 
     def add_robot_urdf(self, urdf: str, **kwargs):
         robot = RobotInterfaceConfig(urdf, **kwargs)
         self.robot_interface_configs.append(robot)
 
     def add_robot_from_parameter_server(self, parameter_name: str = 'robot_description',
-                                        joint_state_topics: List[str] = ('/joint_states',), **kwargs):
+                                        joint_state_topics: List[str] = ('/joint_states',),
+                                        group_name: Optional[str] = None, **kwargs):
         urdf = rospy.get_param(parameter_name)
-        self.hardware_config.joint_state_topics.extend(joint_state_topics)
+        if group_name is None:
+            group_name = robot_name_from_urdf_string(urdf)
+            self.group_names.append(group_name)
+        self.hardware_config.joint_state_topics.extend([(group_name, jst) for jst in joint_state_topics])
         self.add_robot_urdf(urdf, **kwargs)
 
-    def register_controlled_joints(self, joint_names: List[str]):
+    def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.group_names[0]
+        joint_names = [PrefixName(j, group_name) for j in joint_names]
         self._controlled_joints.extend(joint_names)
 
     def disable_visualization(self):
@@ -89,20 +98,33 @@ class Giskard:
         self.add_fixed_joint(parent_link=parent_link, child_link=child_link)
         self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link)
 
-    def add_odometry_topic(self, odometry_topic):
-        self.hardware_config.odometry_topics.append(odometry_topic)
+    # def add_odometry_topic(self, odometry_topic, group_name=None):
+    #     self.hardware_config.odometry_topics.append(odometry_topic)
 
-    def add_follow_joint_trajectory_server(self, namespace, state_topic):
-        self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic)
+    def add_follow_joint_trajectory_server(self, namespace, state_topic, group_name = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic, group_name=group_name)
 
-    def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name):
-        self.hardware_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
+    def get_default_group_name(self):
+        if len(self.group_names) > 1:
+            raise AttributeError(f'group name has to be set if you have multiple robots')
+        return self.group_names[0]
+
+    def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,
+                                 odometry_topic, group_name=None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        child_link_name = PrefixName(child_link_name, group_name)
+        self.hardware_config.add_omni_drive_interface(group_name=group_name,
+                                                      cmd_vel_topic=cmd_vel_topic,
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name)
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
         brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint(self._god_map)
         joints.append(brumbrum_joint)
         self._controlled_joints.append(brumbrum_joint.name)
+        self.hardware_config.odometry_topics.append((odometry_topic, brumbrum_joint))
 
     def add_diff_drive_interface(self, parent_link_name: str, child_link_name: str,
                                  cmd_vel_topic: Optional[str] = None,
@@ -141,7 +163,7 @@ class Giskard:
         if self.root_link_name is None:
             self.root_link_name = tf.get_tf_root()
         world = WorldTree(self.root_link_name, self._god_map)
-        world.delete_all_but_robot()
+        world.delete_all_but_robots()
         world.register_controlled_joints(self._controlled_joints)
 
         if self.collision_avoidance_config.collision_checker == CollisionCheckerLib.bpb:

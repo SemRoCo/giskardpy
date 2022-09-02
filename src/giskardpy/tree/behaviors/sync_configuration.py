@@ -2,7 +2,7 @@ from typing import Optional
 
 from rospy import ROSException
 
-from giskardpy.data_types import JointStates
+from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.model.world import SubWorldTree
 
 from queue import Queue, Empty
@@ -20,10 +20,14 @@ import giskardpy.utils.tfwrapper as tf
 class SyncConfiguration(GiskardBehavior):
 
     @profile
-    def __init__(self, joint_state_topic: str):
-        self.joint_state_topic: str = joint_state_topic
+    def __init__(self, group_name, joint_state_topic='joint_states'):
+        """
+        :type js_identifier: str
+        """
+        self.joint_state_topic = joint_state_topic
         super().__init__(str(self))
         self.mjs: Optional[JointStates] = None
+        self.group_name = group_name
         self.lock = Queue(maxsize=1)
 
     @profile
@@ -52,7 +56,7 @@ class SyncConfiguration(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = JointStates.from_msg(js, None)
+            self.mjs = JointStates.from_msg(js, self.group_name)
         except Empty:
             pass
 

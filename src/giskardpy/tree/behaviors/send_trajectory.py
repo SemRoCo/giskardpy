@@ -5,6 +5,7 @@ from rospy import ROSException
 from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
@@ -45,12 +46,13 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
     @profile
-    def __init__(self, name, namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
-        GiskardBehavior.__init__(self, name)
+    def __init__(self, group_name, action_namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
+        self.group_name = group_name
+        self.action_namespace = action_namespace
+        GiskardBehavior.__init__(self, str(self))
         self.min_deadline: rospy.Time
         self.max_deadline: rospy.Time
         self.controlled_joints: List[OneDofJoint] = []
-        self.action_namespace = namespace
         self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
@@ -72,7 +74,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(self.action_namespace))
                 rospy.sleep(1)
 
-        ActionClient.__init__(self, name, action_msg_type, None, self.action_namespace)
+        ActionClient.__init__(self, str(self), action_msg_type, None, self.action_namespace)
         loginfo(f'Successfully connected to \'{self.action_namespace}\'.')
 
         # loginfo(f'Waiting for state topic \'{state_topic}\' to appear.')
@@ -95,6 +97,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             except ROSException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
                 rospy.sleep(1)
+        controlled_joint_names = [PrefixName(j, self.group_name) for j in controlled_joint_names]
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{state_topic}\' has no joints')
         for joint in self.world.joints.values():
@@ -221,3 +224,6 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 logging.logwarn('Cancelling \'{}\''.format(self.action_namespace))
                 self.action_client.cancel_goal()
         self.sent_goal = False
+
+    def __str__(self):
+        return f'{self.__class__.__name__}/{self.group_name}/{self.action_namespace}'

@@ -8,7 +8,7 @@ from giskardpy.my_types import my_string
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, link_name, max_velocity=0.2, hard_threshold=0.0,
+    def __init__(self, link_name, robot_name, max_velocity=0.2, hard_threshold=0.0,
                  soft_thresholds: Optional[Dict[my_string, float]] = None, idx=0,
                  num_repeller=1, **kwargs):
         """
@@ -22,7 +22,7 @@ class ExternalCollisionAvoidance(Goal):
         self.idx = idx
         super().__init__(**kwargs)
         self.root = self.world.root_link_name
-        self.robot_name = self.robot.name
+        self.robot_name = robot_name
 
     # def get_contact_normal_on_b_in_root(self):
     #     return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
@@ -139,7 +139,7 @@ class ExternalCollisionAvoidance(Goal):
 
 class SelfCollisionAvoidance(Goal):
 
-    def __init__(self, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_a, link_b, robot_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         self.link_a = link_a
         self.link_b = link_b
@@ -148,9 +148,11 @@ class SelfCollisionAvoidance(Goal):
         self.soft_threshold = soft_threshold
         self.num_repeller = num_repeller
         self.idx = idx
+        if self.link_a.prefix != self.link_b.prefix:
+            raise Exception('Links {} and {} have different prefix'.format(self.link_a, self.link_b))
         super().__init__(**kwargs)
         self.root = self.world.root_link_name
-        self.robot_name = self.god_map.unsafe_get_data(identifier.robot_group_name)
+        self.robot_name = robot_name
 
     def get_contact_normal_in_b(self):
         return self.god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',
@@ -234,7 +236,8 @@ class SelfCollisionAvoidance(Goal):
         return f'{s}/{self.link_a}/{self.link_b}/{self.idx}'
 
 
-class CollisionAvoidanceHint(Goal):
+
+class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_testing
     def __init__(self, tip_link, avoidance_hint, object_link_name, object_group = None, max_linear_velocity=0.1,
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """

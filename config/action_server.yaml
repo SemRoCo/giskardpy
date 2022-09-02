@@ -1,0 +1,11 @@
+robot_interface:
+  base:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/base/follow_joint_trajectory
+    state_topic: /whole_body_controller/base/state
+    fill_velocity_values: True
+  body:
+    plugin: SendFollowJointTrajectory
+    namespace: /whole_body_controller/body/follow_joint_trajectory
+    state_topic: /whole_body_controller/body/state
+    fill_velocity_values: False

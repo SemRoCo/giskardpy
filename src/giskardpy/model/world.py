@@ -6,6 +6,7 @@ from itertools import combinations
 from typing import Dict, Union, Tuple, Set, Optional, List
 
 import numpy as np
+import rospy
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
 
@@ -223,17 +224,38 @@ class WorldTree:
                                            collect_link_when=self.has_link_collisions)
         return links
 
-    def register_group(self, name, root_link_name):
+    def register_group(self, name, root_link_name, actuated=False):
         if root_link_name not in self.links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         if name in self.groups:
             raise DuplicateNameException('Group with name {} already exists'.format(name))
-        new_group = SubWorldTree(name, root_link_name, self)
+        new_group = SubWorldTree(name, root_link_name, self, actuated=actuated)
         # if the group is a subtree of a subtree, register it for the subtree as well
         for group in self.groups.values():
             if root_link_name in group.links:
                 group.groups[name] = new_group
         self.groups[name] = new_group
+
+    def robot(self, robot_name=''):
+        """
+        :rtype: SubWorldTree
+        """
+        for robot in self.robots:
+            if robot.name == robot_name:
+                return robot
+        raise KeyError('')
+
+    @property
+    def robots(self):
+        """
+        :rtype: list of SubWorldTree
+        """
+        return [self.groups[group_name] for group_name in list(self.group_names)
+                if self.groups[group_name].actuated]
+
+    @property
+    def robot_names(self):
+        return [r.name for r in self.robots]
 
     @property
     def group_names(self):
@@ -276,17 +298,15 @@ class WorldTree:
     def joint_names_as_set(self):
         return set(self.joints.keys())
 
-    def add_urdf(self, urdf, prefix=None, group_name=None, parent_link_name=None):
+    def add_urdf(self, urdf, group_name=None, parent_link_name=None, actuated=False):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
-        if group_name is None:
-            group_name = parsed_urdf.name
         if group_name in self.groups:
             raise DuplicateNameException(
                 f'Failed to add group \'{group_name}\' because one with such a name already exists')
 
         urdf_root_link_name = parsed_urdf.link_map[parsed_urdf.get_root()].name
-        urdf_root_link_name = PrefixName(urdf_root_link_name, prefix)
+        urdf_root_link_name = PrefixName(urdf_root_link_name, group_name)
 
         if parent_link_name is not None:
             parent_link = self.links[parent_link_name]
@@ -303,12 +323,12 @@ class WorldTree:
                 return
             for child_joint_name, child_link_name in urdf.child_map[short_name]:
                 urdf_link = urdf.link_map[child_link_name]
-                child_link = Link.from_urdf(urdf_link, prefix)
+                child_link = Link.from_urdf(urdf_link, group_name)
                 self._add_link(child_link)
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
 
-                joint = URDFJoint.from_urdf(urdf_joint, prefix, self.god_map)
+                joint = URDFJoint.from_urdf(urdf_joint, group_name, self.god_map)
 
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
@@ -316,7 +336,7 @@ class WorldTree:
         helper(parsed_urdf, urdf_root_link)
 
         #FIXME should root link be odom?
-        self.register_group(group_name, urdf_root_link_name)
+        self.register_group(group_name, urdf_root_link_name, actuated=actuated)
         if self.god_map is not None:
             self.sync_with_paramserver()
         self._set_free_variables_on_mimic_joints(group_name)
@@ -357,6 +377,134 @@ class WorldTree:
 
     def get_parent_link_of_link(self, link_name: Union[PrefixName, str]) -> PrefixName:
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
+
+    def get_group_of_joint(self, joint_name: Union[PrefixName, str]):
+        ret = set()
+        for group_name, subtree in self.groups.items():
+            if joint_name in subtree.joints:
+                ret.add(subtree)
+        if len(ret) == 0:
+            raise KeyError(f'No groups found with joint name {joint_name}.')
+        if len(ret) > 1:
+            raise KeyError(f'Multiple groups {ret} found with joint name {joint_name}.')
+        else:
+            return ret.pop()
+
+    def get_robots_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
+        groups = set()
+        for group_name, subtree in self.groups.items():
+            if subtree.actuated:
+                try:
+                    subtree.get_link_short_name_match(link_name)
+                except KeyError:
+                    continue
+                groups.add(group_name)
+        return groups
+
+    def get_group_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> str:
+        groups = self.get_groups_containing_link_short_name(link_name)
+        groups_size = len(groups)
+        ret = self._get_group_from_groups(groups)
+        if ret is None and groups_size > 0:
+            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {link_name}. '
+                                        f'Please define a group name for link {link_name}.')
+        elif ret is None:
+            raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
+        return ret
+
+    def get_groups_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
+        groups = set()
+        for group_name, subtree in self.groups.items():
+            try:
+                subtree.get_link_short_name_match(link_name)
+            except KeyError:
+                continue
+            groups.add(group_name)
+        return groups
+
+    def get_group_of_joint_short_names(self, joint_names: [PrefixName, str]) -> Union[PrefixName, str]:
+        if len(joint_names) > 0:
+            groups = [self.get_group_containing_joint_short_name(j_n) for j_n in joint_names]
+            if all(map(lambda e: e == groups[0], groups)):
+                return groups[0]
+            else:
+                raise Exception(f'Containing different group names {groups} '
+                                f'for given list of joint_names {joint_names}.')
+
+    def get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> str:
+        groups = self.get_groups_containing_joint_short_name(joint_name)
+        groups_size = len(groups)
+        ret = self._get_group_from_groups(groups)
+        if ret is None and groups_size > 0:
+            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {joint_name}.'
+                                        f'Please define a group name for link {joint_name}.')
+        elif ret is None:
+            raise UnknownGroupException(f'Did not find any group containing the link {joint_name}.')
+        return ret
+
+    def get_groups_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Set[str]:
+        groups = set()
+        for group_name, subtree in self.groups.items():
+            try:
+                subtree.get_joint_short_name_match(joint_name)
+            except KeyError:
+                continue
+            groups.add(group_name)
+        return groups
+
+    def get_parents_of_group_name(self, group_name: str) -> Set[str]:
+        ancestry = list()
+        traversed = False
+        parent = self.get_parent_group_name(group_name)
+        while not traversed:
+            if parent in ancestry:
+                traversed = True
+            else:
+                ancestry.append(parent)
+            parent = self.get_parent_group_name(ancestry[-1])
+        return set(ancestry)
+
+    def get_group_containing_link(self, link_name: Union[PrefixName, str]) -> str:
+        groups = self.get_groups_containing_link(link_name)
+        ret = self._get_group_from_groups(groups)
+        if ret is None:
+            raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
+        return ret
+
+    def _get_group_from_groups(self, groups: Set[Union[PrefixName, str]]) -> str:
+        if len(groups) == 1:
+            return list(groups)[0]
+        else:
+            groups_l = list(groups)
+            group = None
+            for i in range(len(groups_l)):
+                g_a = groups_l[i]
+                if i + 1 == len(groups):
+                    break
+                else:
+                   g_b = groups_l[i+1]
+                if g_a != g_b:
+                    g_ancestry = self.get_parents_of_group_name(g_a)
+                    group_ancestry = self.get_parents_of_group_name(g_b)
+                    relatives = list(g_ancestry & group_ancestry)
+                    if relatives and relatives[0] in groups:
+                        group = relatives[0]
+            return group
+
+    def get_groups_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
+        groups = set()
+        for group_name, subtree in self.groups.items():
+            if link_name in subtree.link_names:
+                groups.add(group_name)
+        return groups
+
+    def get_robots_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
+        groups = set()
+        for group_name, subtree in self.groups.items():
+            if subtree.actuated:
+                if link_name in subtree.link_names:
+                    groups.add(group_name)
+        return groups
 
     @memoize
     def compute_chain_reduced_to_controlled_joints(self,
@@ -401,7 +549,8 @@ class WorldTree:
     def add_world_body(self, group_name: str,
                        msg: WorldBody,
                        pose: Pose,
-                       parent_link_name: Union[str, PrefixName]):
+                       parent_link_name: Union[str, PrefixName],
+                       prefix: Optional[my_string] = None):
         if group_name in self.groups:
             raise DuplicateNameException(f'Group with name \'{group_name}\' already exists')
         self._raise_if_link_does_not_exist(parent_link_name)
@@ -409,9 +558,8 @@ class WorldTree:
             parent_link_name = PrefixName(parent_link_name, None)
         if msg.type == msg.URDF_BODY:
             self.add_urdf(urdf=msg.urdf,
-                          group_name=group_name,
                           parent_link_name=parent_link_name,
-                          prefix=None)
+                          group_name=group_name)
         else:
             link = Link.from_world_body(prefix=group_name, msg=msg)
             self._add_link(link)
@@ -439,8 +587,7 @@ class WorldTree:
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
 
-    @profile
-    def delete_all_but_robot(self):
+    def delete_all_but_robots(self):
         self._clear()
         joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
         for joint in joints_to_add:
@@ -448,8 +595,7 @@ class WorldTree:
             self._add_joint_and_create_child(joint)
         for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
             self.add_urdf(robot_config.urdf,
-                          group_name=None,
-                          prefix=None)
+                          group_name=robot_config.name)
         self.fast_all_fks = None # TODO unnecessary?
         self.notify_model_change()
 
@@ -973,7 +1119,10 @@ class WorldTree:
             links = self.link_names_with_collisions
         else:
             links = self.groups[group_name].link_names_with_collisions
-        link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
+        try:
+            link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
+        except Exception:
+            pass
         for link_name in links:
             direct_children = set()
             for child_joint_name in self.links[link_name].child_joint_names:
@@ -1047,7 +1196,7 @@ class WorldTree:
 
 
 class SubWorldTree(WorldTree):
-    def __init__(self, name, root_link_name, world):
+    def __init__(self, name, root_link_name, world, actuated=False):
         """
         :type name: str
         :type root_link_name: PrefixName
@@ -1056,6 +1205,7 @@ class SubWorldTree(WorldTree):
         self.name = name
         self.root_link_name = root_link_name
         self.world = world
+        self.actuated = actuated
 
     @property
     def controlled_joints(self):
@@ -1107,6 +1257,17 @@ class SubWorldTree(WorldTree):
             raise ValueError(f'Found multiple link matches \'{matches}\'.')
         if len(matches) == 0:
             raise UnknownLinkException(f'Found no link match for \'{link_name}\'.')
+        return matches[0]
+
+    def get_joint_short_name_match(self, joint_name):
+        matches = []
+        for joint_name2 in self.joint_names:
+            if joint_name == joint_name2 or joint_name == joint_name2.short_name:
+                matches.append(joint_name2)
+        if len(matches) > 1:
+            raise ValueError(f'Found multiple link matches \'{matches}\'.')
+        if len(matches) == 0:
+            raise UnknownLinkException(f'Found no link match for \'{joint_name}\'.')
         return matches[0]
 
     def reset_cache(self):

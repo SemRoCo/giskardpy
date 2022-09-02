@@ -19,8 +19,9 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 class SyncOdometry(GiskardBehavior):
 
     @profile
-    def __init__(self, odometry_topic: str):
+    def __init__(self, odometry_topic: str, joint):
         self.odometry_topic = odometry_topic
+        self.brumbrum = joint
         super().__init__(str(self))
         self.last_msg = None
         self.lock = Queue(maxsize=1)
@@ -31,19 +32,19 @@ class SyncOdometry(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @profile
     def setup(self, timeout=0.0):
-        msg: Optional[Odometry] = None
-        while msg is None and not rospy.is_shutdown():
-            try:
-                msg = rospy.wait_for_message(self.odometry_topic, Odometry, rospy.Duration(1))
-                self.lock.put(msg)
-            except ROSException as e:
-                logging.logwarn(f'Waiting for topic \'{self.odometry_topic}\' to appear.')
-        root_link = msg.header.frame_id
-        child_link = msg.child_frame_id
-        joints = self.world.compute_chain(root_link, child_link, True, False, True, True)
-        if len(joints) != 1:
-            raise GiskardException(f'Chain between {root_link} and {child_link} should be one joint, but its {joints}')
-        self.brumbrum = joints[0]
+        # msg: Optional[Odometry] = None
+        # while msg is None and not rospy.is_shutdown():
+        #     try:
+        #         msg = rospy.wait_for_message(self.odometry_topic, Odometry, rospy.Duration(1))
+        #         self.lock.put(msg)
+        #     except ROSException as e:
+        #         logging.logwarn(f'Waiting for topic \'{self.odometry_topic}\' to appear.')
+        # root_link = msg.header.frame_id
+        # child_link = msg.child_frame_id
+        # joints = self.world.compute_chain(root_link, child_link, True, False, True, True)
+        # if len(joints) != 1:
+        #     raise GiskardException(f'Chain between {root_link} and {child_link} should be one joint, but its {joints}')
+        # self.brumbrum = joints[0]
         self.odometry_sub = rospy.Subscriber(self.odometry_topic, Odometry, self.cb, queue_size=1)
         return super().setup(timeout)
 
@@ -57,7 +58,7 @@ class SyncOdometry(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @profile
     def update(self):
-        joint: OmniDrive = self.world.joints[self.brumbrum]
+        joint: OmniDrive = self.world.joints[self.brumbrum.name]
         try:
             odometry: Odometry = self.lock.get()
             pose = odometry.pose.pose

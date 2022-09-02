@@ -13,6 +13,7 @@ import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
 from giskardpy import casadi_wrapper as w
 from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
@@ -29,6 +30,7 @@ class RosMsgToGoal(GetGoal):
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals, Goal)
+        self.robot_names = self.collision_scene.robot_names
 
     @profile
     def initialise(self):
@@ -39,7 +41,7 @@ class RosMsgToGoal(GetGoal):
     def update(self):
         # TODO make this interruptable
         loginfo('Parsing goal message.')
-        move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
+        move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
             return Status.FAILURE
         self.get_god_map().set_data(identifier.goals, {})
@@ -129,22 +131,24 @@ class RosMsgToGoal(GetGoal):
         external_distances = self.collision_avoidance_config.external_collision_avoidance
         self_distances = self.collision_avoidance_config.self_collision_avoidance
         # FIXME check all dict entries
-        default_distance = self.collision_avoidance_config.cal_max_param('soft_threshold')
+        default_distance = {r_n: self.collision_avoidance_config.cal_max_param(PrefixName('soft_threshold', r_n)) for r_n in
+                            self.robot_names}
 
         max_distances = defaultdict(lambda: default_distance)
         # override max distances based on external distances dict
-        for link_name in self.robot.link_names_with_collisions:
-            try:
-                controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link_name)
-                distance = external_distances[controlled_parent_joint].soft_threshold
-                for child_link_name in self.world.get_directly_controlled_child_links_with_collisions(
-                        controlled_parent_joint):
-                    max_distances[child_link_name] = distance
-            except KeyError:
-                pass
+        for robot in self.collision_scene.robots:
+            for link_name in robot.link_names_with_collisions:
+                try:
+                    controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link_name)
+                    distance = external_distances[controlled_parent_joint][PrefixName('soft_threshold', robot.name)]
+                    for child_link_name in self.world.get_directly_controlled_child_links_with_collisions(
+                            controlled_parent_joint):
+                        max_distances[child_link_name] = distance
+                except KeyError:
+                    pass
 
         for link_name in self_distances:
-            distance = self_distances[link_name].soft_threshold
+            distance = self_distances[link_name][PrefixName('soft_threshold', link_name.prefix)]
             if link_name in max_distances:
                 max_distances[link_name] = max(distance, max_distances[link_name])
             else:
@@ -158,17 +162,19 @@ class RosMsgToGoal(GetGoal):
         fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_external_collision_avoidance)
         joints = [j for j in self.world.controlled_joints if j not in fixed_joints]
         for joint_name in joints:
+            robot = self.world.get_group_of_joint(joint_name)
             child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
             if child_links:
-                number_of_repeller = config[joint_name].number_of_repeller
+                number_of_repeller = config[joint_name][PrefixName('number_of_repeller', robot.name)]
                 for i in range(number_of_repeller):
                     child_link = self.world.joints[joint_name].child_link_name
-                    hard_threshold = config[joint_name].hard_threshold
+                    hard_threshold = config[joint_name][PrefixName('hard_threshold', robot.name)]
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
                     else:
-                        soft_threshold = config[joint_name].soft_threshold
+                        soft_threshold = config[joint_name][PrefixName('soft_threshold', robot.name)]
                     constraint = ExternalCollisionAvoidance(god_map=self.god_map,
+                                                            robot_name=robot.name,
                                                             link_name=child_link,
                                                             hard_threshold=hard_threshold,
                                                             soft_thresholds=soft_threshold,
@@ -183,45 +189,57 @@ class RosMsgToGoal(GetGoal):
         counter = defaultdict(int)
         fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
         config = self.collision_avoidance_config.self_collision_avoidance
-        robot_group_name = self.god_map.unsafe_get_data(identifier.robot_group_name)
-        for link_a_o, link_b_o in self.world.groups[robot_group_name].possible_collision_combinations():
-            link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
-            try:
-                if (link_a_o, link_b_o) in self.collision_scene.black_list:
-                    continue
-                link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
-                link_a, link_b = self.world.sort_links(link_a, link_b)
-                counter[link_a, link_b] += 1
-            except KeyError as e:
-                # no controlled joint between both links
-                pass
+        for robot_name in self.robot_names:
+            for link_a_o, link_b_o in self.world.groups[robot_name].possible_collision_combinations():
+                link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
+                try:
+                    if (link_a_o, link_b_o) in self.collision_scene.black_list:
+                        continue
+                    link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
+                    link_a, link_b = self.world.sort_links(link_a, link_b)
+                    counter[link_a, link_b] += 1
+                except KeyError as e:
+                    # no controlled joint between both links
+                    pass
 
         for link_a, link_b in counter:
+            group_names = self.world.get_groups_containing_link(link_a)
+            if len(group_names) != 1:
+                group_name = self.world.get_parent_group_name(group_names.pop())
+            else:
+                group_name = group_names.pop()
             num_of_constraints = min(1, counter[link_a, link_b])
             for i in range(num_of_constraints):
                 key = f'{link_a}, {link_b}'
                 key_r = f'{link_b}, {link_a}'
                 # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
                 if key in config:
-                    hard_threshold = config[key].hard_threshold
-                    soft_threshold = config[key].soft_threshold
-                    number_of_repeller = config[key].number_of_repeller
+                    hard_threshold = config[key][PrefixName('hard_threshold', group_name)]
+                    soft_threshold = config[key][PrefixName('soft_threshold', group_name)]
+                    number_of_repeller = config[key][PrefixName('number_of_repeller', group_name)]
                 elif key_r in config:
-                    hard_threshold = config[key_r].hard_threshold
-                    soft_threshold = config[key_r].soft_threshold
-                    number_of_repeller = config[key_r].number_of_repeller
+                    hard_threshold = config[key_r][PrefixName('hard_threshold', group_name)]
+                    soft_threshold = config[key_r][PrefixName('soft_threshold', group_name)]
+                    number_of_repeller = config[key_r][PrefixName('number_of_repeller', group_name)]
                 else:
                     # TODO minimum is not the best if i reduce to the links next to the controlled chains
                     #   should probably add symbols that retrieve the values for the current pair
-                    hard_threshold = min(config[link_a].hard_threshold,
-                                         config[link_b].hard_threshold)
-                    soft_threshold = min(config[link_a].soft_threshold,
-                                         config[link_b].soft_threshold)
-                    number_of_repeller = min(config[link_a].number_of_repeller,
-                                             config[link_b].number_of_repeller)
+                    hard_threshold = min(config[link_a][PrefixName('hard_threshold', group_name)],
+                                         config[link_b][PrefixName('hard_threshold', group_name)])
+                    soft_threshold = min(config[link_a][PrefixName('soft_threshold', group_name)],
+                                         config[link_b][PrefixName('soft_threshold', group_name)])
+                    number_of_repeller = min(config[link_a][PrefixName('number_of_repeller', group_name)],
+                                             config[link_b][PrefixName('number_of_repeller', group_name)])
+                groups_a = self.world.get_group_containing_link(link_a)
+                groups_b = self.world.get_group_containing_link(link_b)
+                if groups_b == groups_a:
+                    robot_name = groups_a
+                else:
+                    raise Exception(f'Could not find group containing the link {link_a} and {link_b}.')
                 constraint = SelfCollisionAvoidance(god_map=self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,
+                                                    robot_name=robot_name,
                                                     hard_threshold=hard_threshold,
                                                     soft_threshold=soft_threshold,
                                                     idx=i,

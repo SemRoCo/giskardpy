@@ -1,10 +1,13 @@
 parent: !include default.yaml
-action_server:
+# parent: robots/base_bot.yaml
+robot_interface:
   base:
     plugin: SendFollowJointTrajectory
     namespace: /xy
     state_topic: /xy/state
+    robot_name: base_bot
   body:
     plugin: SendFollowJointTrajectory
     namespace: /z
     state_topic: /z/state
+    robot_name: base_bot

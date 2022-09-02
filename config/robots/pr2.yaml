@@ -1,31 +1,30 @@
-parent: !include [default.yaml, robots/pr2.yaml, action_server.yaml]
-robot_interface:
-  base:
-<<<<<<< HEAD
-    plugin: CmdVelInterface
-    cmd_vel_topic: /pr2/cmd_vel
-    drive:
-      type: OmniDrive
-      parent_link_name: odom_combined
-      child_link_name: base_footprint
-  body:
-    plugin: SendFollowJointTrajectory
-    namespace: /pr2/whole_body_controller/follow_joint_trajectory
-    state_topic: /pr2/whole_body_controller/state
-    fill_velocity_values: False
-plugins:
-  SyncTfFrames:
-    frames:
-      - [map, odom_combined]
 general_options:
+  joint_weights:
+    # the planner prefers low weight joints to achieve solutions
+    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
+    velocity:
+      default: 0.001
+      override: {}
+    acceleration:
+      default: 0
+      override: { }
+    jerk:
+      default: 0.001
+      override: { }
+#    snap:
+#      default: 0
+#      override: { }
   joint_limits: # giskard will use the min of this number and limits from the urdf
     velocity:
       linear: # m/s
         default: 1
-        override: {}
+        override:
+          odom_x_joint: 0.5
+          odom_y_joint: 0.5
       angular: # rad/s
         default: 1
         override:
+          odom_z_joint: 0.6
           head_pan_joint: 0.5
           head_tilt_joint: 0.5
     acceleration:
@@ -40,9 +39,12 @@ general_options:
         default: 30
         override:
           torso_lift_joint: 5
+          odom_x_joint: 5
+          odom_y_joint: 5
       angular: # rad/s**3
         default: 30
-        override: {}
+        override:
+          odom_z_joint: 10
 #    snap:
 #      linear: # m/s**4
 #        default: 250
@@ -50,9 +52,6 @@ general_options:
 #      angular: # rad/s**3
 #        default: 250
 #        override: { }
-plugins:
-  LoopDetector:
-    precision: 4 # decimal places
 collision_avoidance:
   external_collision_avoidance:
     default:
@@ -101,8 +100,3 @@ collision_avoidance:
       - base_link
     add: [ ] # list pairs of links that should be added to the self collision matrix
     number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it
-=======
-    robot_name: pr2
-  body:
-    robot_name: pr2
->>>>>>> a018cd7d105dd186f3940076d6fa666a95610d18

@@ -55,7 +55,7 @@ def main(stdscr):
     god_map = GodMap.init_from_paramserver(giskard_name, upload_config=False)
     world = WorldTree(god_map)
     world.delete_all_but_robot()
-    robot: SubWorldTree = world.groups[god_map.get_data(identifier.robot_group_name)]
+    robot: SubWorldTree = world.groups[god_map.get_data(identifier.robot_group_name)] # fixme
     joint_limits = robot.get_all_joint_position_limits()
     num_joints = len(joint_limits)
     rospy.Subscriber(js_topic, JointState, js_cb)

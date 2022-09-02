@@ -4,6 +4,7 @@ import giskardpy.utils.tfwrapper as tf
 import rospy
 from actionlib import SimpleActionClient
 from genpy import Message
+from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
 from rospy import ServiceException
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest
@@ -17,7 +18,6 @@ from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, Regist
 from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
-from giskardpy import identifier
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
@@ -27,7 +27,7 @@ from giskardpy.my_types import goal_parameter
 from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary
 
 
-class GiskardWrapper(object):
+class GiskardWrapper:
     last_feedback: MoveFeedback = None
 
     def __init__(self, node_name: str = 'giskard'):
@@ -64,13 +64,18 @@ class GiskardWrapper(object):
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
 
-    def get_robot_name(self) -> str:
-        return self._god_map.unsafe_get_data(identifier.robot_group_name)
+    def get_root(self, robot_name):
+        """
+        Returns the name of the robot's root link
+        """
+        return str(self._world.groups[robot_name].root_link_name)
 
     def set_cart_goal(self,
                       goal_pose: PoseStamped,
                       tip_link: str,
                       root_link: str,
+                      tip_group: str = None,
+                      root_group: str = None,
                       weight: Optional[float] = None,
                       max_linear_velocity: Optional[float] = None,
                       max_angular_velocity: Optional[float] = None,
@@ -87,7 +92,9 @@ class GiskardWrapper(object):
         self.set_json_goal(constraint_type='CartesianPose',
                            goal_pose=goal_pose,
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            root_link=root_link,
+                           root_group=root_group,
                            weight=weight,
                            max_linear_velocity=max_linear_velocity,
                            max_angular_velocity=max_angular_velocity,
@@ -97,6 +104,8 @@ class GiskardWrapper(object):
                                goal_pose: PoseStamped,
                                tip_link: str,
                                root_link: str,
+                               tip_group: str = None,
+                               root_group: str = None,
                                weight: Optional[float] = None,
                                max_linear_velocity: Optional[float] = None,
                                max_angular_velocity: Optional[float] = None,
@@ -114,7 +123,9 @@ class GiskardWrapper(object):
         self.set_json_goal(constraint_type='CartesianPoseStraight',
                            goal_pose=goal_pose,
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            root_link=root_link,
+                           root_group=root_group,
                            weight=weight,
                            max_linear_velocity=max_linear_velocity,
                            max_angular_velocity=max_angular_velocity,
@@ -124,6 +135,8 @@ class GiskardWrapper(object):
                              goal_point: PointStamped,
                              tip_link: str,
                              root_link: str,
+                             tip_group: str = None,
+                             root_group: str = None,
                              weight: Optional[float] = None,
                              max_velocity: Optional[float] = None,
                              **kwargs: goal_parameter):
@@ -138,7 +151,9 @@ class GiskardWrapper(object):
         self.set_json_goal(constraint_type='CartesianPosition',
                            goal_point=goal_point,
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            root_link=root_link,
+                           root_group=root_group,
                            weight=weight,
                            max_velocity=max_velocity,
                            **kwargs)
@@ -147,6 +162,8 @@ class GiskardWrapper(object):
                                       goal_pose: PoseStamped,
                                       tip_link: str,
                                       root_link: str,
+                                      tip_group: str = None,
+                                      root_group: str = None,
                                       weight: Optional[float] = None,
                                       max_velocity: Optional[float] = None,
                                       **kwargs: goal_parameter):
@@ -162,7 +179,9 @@ class GiskardWrapper(object):
         self.set_json_goal(constraint_type='CartesianPositionStraight',
                            goal_pose=goal_pose,
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            root_link=root_link,
+                           root_group=root_group,
                            weight=weight,
                            max_velocity=max_velocity,
                            **kwargs)
@@ -171,6 +190,8 @@ class GiskardWrapper(object):
                           goal_orientation: QuaternionStamped,
                           tip_link: str,
                           root_link: str,
+                          tip_group: str = None,
+                          root_group: str = None,
                           weight: Optional[float] = None,
                           max_velocity: Optional[float] = None,
                           **kwargs: goal_parameter):
@@ -185,13 +206,16 @@ class GiskardWrapper(object):
         self.set_json_goal(constraint_type='CartesianOrientation',
                            goal_orientation=goal_orientation,
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            root_link=root_link,
+                           root_group=root_group,
                            weight=weight,
                            max_velocity=max_velocity,
                            **kwargs)
 
     def set_joint_goal(self,
                        goal_state: dict,
+                       group_name: str,
                        weight: Optional[float] = None,
                        max_velocity: Optional[float] = None,
                        hard: bool = False,
@@ -204,6 +228,7 @@ class GiskardWrapper(object):
         """
         self.set_json_goal(constraint_type='JointPositionList',
                            goal_state=goal_state,
+                           group_name=group_name,
                            weight=weight,
                            max_velocity=max_velocity,
                            hard=hard,
@@ -212,7 +237,9 @@ class GiskardWrapper(object):
     def set_align_planes_goal(self,
                               tip_link: str,
                               tip_normal: Vector3Stamped,
-                              root_link: Optional[str] = None,
+                              root_link: str,
+                              tip_group: str = None,
+                              root_group: str = None,
                               root_normal: Optional[Vector3Stamped] = None,
                               max_angular_velocity: Optional[float] = None,
                               weight: Optional[float] = None,
@@ -233,8 +260,10 @@ class GiskardWrapper(object):
 
         self.set_json_goal(constraint_type='AlignPlanes',
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            tip_normal=tip_normal,
                            root_link=root_link,
+                           root_group=root_group,
                            root_normal=root_normal,
                            max_angular_velocity=max_angular_velocity,
                            weight=weight,
@@ -253,6 +282,8 @@ class GiskardWrapper(object):
     def set_limit_cartesian_velocity_goal(self,
                                           root_link: str,
                                           tip_link: str,
+                                          tip_group: str = None,
+                                          root_group: str = None,
                                           weight: Optional[float] = None,
                                           max_linear_velocity: float = 0.1,
                                           max_angular_velocity: float = 0.5,
@@ -270,7 +301,9 @@ class GiskardWrapper(object):
         """
         self.set_json_goal('CartesianVelocityLimit',
                            root_link=root_link,
+                           root_group=root_group,
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            weight=weight,
                            max_linear_velocity=max_linear_velocity,
                            max_angular_velocity=max_angular_velocity,
@@ -349,7 +382,9 @@ class GiskardWrapper(object):
     def set_pointing_goal(self,
                           tip_link: str,
                           goal_point: PointStamped,
-                          root_link: Optional[str] = None,
+                          root_link: str,
+                          tip_group: str = None,
+                          root_group: str = None,
                           pointing_axis: Optional[Vector3Stamped] = None,
                           weight: Optional[float] = None,
                           **kwargs: goal_parameter):
@@ -363,8 +398,10 @@ class GiskardWrapper(object):
         """
         self.set_json_goal(constraint_type='Pointing',
                            tip_link=tip_link,
+                           tip_group=tip_group,
                            goal_point=goal_point,
                            root_link=root_link,
+                           root_group=root_group,
                            pointing_axis=pointing_axis,
                            weight=weight,
                            **kwargs)
@@ -434,24 +471,24 @@ class GiskardWrapper(object):
                            weight=weight,
                            joint_list=joint_list)
 
-    def allow_self_collision(self):
+    def allow_self_collision(self, robot_name: str):
         """
         Allows the collision with itself for the next goal.
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.group1 = self.get_robot_name()
-        collision_entry.group2 = self.get_robot_name()
+        collision_entry.group1 = robot_name
+        collision_entry.group2 = robot_name
         self._set_collision_entries([collision_entry])
 
-    def avoid_self_collision(self, min_distance: float = -1):
+    def avoid_self_collision(self, robot_name: str, min_distance: float = -1):
         """
         Avoid collisions with itself for the next goal.
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.group1 = self.get_robot_name()
-        collision_entry.group2 = self.get_robot_name()
+        collision_entry.group1 = robot_name
+        collision_entry.group2 = robot_name
         collision_entry.distance = min_distance
         self._set_collision_entries([collision_entry])
 
@@ -774,9 +811,7 @@ class GiskardWrapper(object):
         req.group_name = group_name
         return self._get_group_info_srv.call(req)
 
-    def get_controlled_joints(self, name: Optional[str] = None):
-        if name is None:
-            name = self.get_robot_name()
+    def get_controlled_joints(self, name: str):
         return self.get_group_info(name).controlled_joints
 
     def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 0) -> UpdateWorldResponse:

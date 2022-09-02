@@ -23,6 +23,7 @@ class DriveInterface(ABC):
 
 class OmniDriveCmdVelInterface(DriveInterface):
     def __init__(self,
+                 group_name: str,
                  parent_link_name: str,
                  child_link_name: str,
                  cmd_vel_topic: Optional[str] = None,
@@ -62,6 +63,7 @@ class OmniDriveCmdVelInterface(DriveInterface):
 
 class DiffDriveCmdVelInterface(DriveInterface):
     def __init__(self,
+                 group_name: str,
                  parent_link_name: my_string,
                  child_link_name: my_string,
                  cmd_vel_topic: Optional[str] = None,
@@ -77,10 +79,10 @@ class DiffDriveCmdVelInterface(DriveInterface):
                  **diff_drive_params):
         self.cmd_vel_topic = cmd_vel_topic
         if isinstance(parent_link_name, str):
-            parent_link_name = PrefixName(parent_link_name, None)
+            parent_link_name = PrefixName(parent_link_name, group_name)
         self.parent_link_name = parent_link_name
         if isinstance(child_link_name, str):
-            child_link_name = PrefixName(child_link_name, None)
+            child_link_name = PrefixName(child_link_name, group_name)
         self.child_link_name = child_link_name
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
@@ -92,7 +94,7 @@ class DiffDriveCmdVelInterface(DriveInterface):
         self.rotation_jerk_limit = rotation_jerk_limit
         self.diff_drive_params = diff_drive_params
         if isinstance(joint_name, str):
-            joint_name = PrefixName(joint_name, None)
+            joint_name = PrefixName(joint_name, group_name)
         self.joint_name = joint_name
         self.odom_x_name = odom_x_name
         self.odom_rot_name = odom_rot_name

@@ -63,6 +63,10 @@ from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
+from giskardpy.utils.config_loader import get_namespaces
+from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
+from giskardpy.utils.time_collector import TimeCollector
+from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import create_path, resolve_ros_iris
 from giskardpy.utils.utils import get_all_classes_in_package
 
@@ -633,7 +637,7 @@ class StandAlone(TreeManager):
             planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                          **self.god_map.unsafe_get_data(
                                                              identifier.PublishDebugExpressions)))
-        planning_4.add_child(WiggleCancel('wiggle'))
+        # planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
         planning_4.add_child(TimePlugin())
@@ -681,10 +685,11 @@ class OpenLoop(StandAlone):
         sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
         hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for joint_state_topic in hardware_config.joint_state_topics:
-            sync.add_child(running_is_success(SyncConfiguration)(joint_state_topic=joint_state_topic))
-        for odometry_topic in hardware_config.odometry_topics:
-            sync.add_child(running_is_success(SyncOdometry)(odometry_topic=odometry_topic))
+        for group_name, joint_state_topic in hardware_config.joint_state_topics:
+            sync.add_child(running_is_success(SyncConfiguration)(group_name=group_name,
+                                                                 joint_state_topic=joint_state_topic))
+        for odometry_topic, joint in hardware_config.odometry_topics:
+            sync.add_child(running_is_success(SyncOdometry)(odometry_topic=odometry_topic, joint=joint))
         if self.god_map.get_data(identifier.TFPublisher_enabled):
             sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
@@ -736,8 +741,8 @@ class OpenLoop(StandAlone):
                 real_time_tracking.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                               **self.god_map.unsafe_get_data(
                                                                                   identifier.SyncTfFrames)))
-                for odometry_topic in hardware_config.odometry_topics:
-                    real_time_tracking.add_child(SyncOdometry(odometry_topic))
+                for odometry_topic, joint in hardware_config.odometry_topics:
+                    real_time_tracking.add_child(SyncOdometry(odometry_topic, joint=joint))
                 real_time_tracking.add_child(RosTime('time'))
                 real_time_tracking.add_child(ControllerPluginBase('base controller'))
                 real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
@@ -784,8 +789,9 @@ class ClosedLoop(OpenLoop):
             C = behaviors[params['plugin']]
             del params['plugin']
             planning_4.add_child(C(execution_action_server_name, **params))
-        planning_4.add_child(SyncConfiguration2('update robot configuration',
-                                                self.god_map.unsafe_get_data(identifier.robot_group_name)))
+        # todo: fixme
+        #planning_4.add_child(SyncConfiguration2('update robot configuration',
+        #                                         self.god_map.unsafe_get_data(identifier.robot_group_name)))
         planning_4.add_child(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.collision_checker) is not None:
             planning_4.add_child(CollisionChecker('collision checker'))
@@ -809,12 +815,13 @@ class ClosedLoop(OpenLoop):
 
 
 def sanity_check_derivatives(god_map):
-    weights = god_map.get_data(identifier.joint_weights)
-    limits = god_map.get_data(identifier.joint_limits)
-    check_derivatives(weights, 'Weights')
-    check_derivatives(limits, 'Limits')
-    if len(weights) != len(limits):
-        raise AttributeError('Weights and limits are not defined for the same number of derivatives')
+    for robot_name in god_map.get_data(identifier.rosparam + ['namespaces']):
+        weights = god_map.get_data(identifier.joint_weights[robot_name])
+        limits = god_map.get_data(identifier.joint_limits[robot_name])
+        check_derivatives(weights, 'Weights')
+        check_derivatives(limits, 'Limits')
+        if len(weights) != len(limits):
+            raise AttributeError('Weights and limits are not defined for the same number of derivatives')
 
 
 def check_derivatives(entries, name):

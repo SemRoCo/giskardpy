@@ -6,7 +6,6 @@ from betterpybullet import ContactPoint
 from geometry_msgs.msg import PoseStamped, Quaternion
 from sortedcontainers import SortedDict
 
-from giskardpy import identifier
 from giskardpy.data_types import BiDict
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
@@ -65,7 +64,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return self.query
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
+    def check_collisions(self, cut_off_distances, collision_list_sizes):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
@@ -76,11 +75,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        query = self.cut_off_distances_to_query(cut_off_distances)
 
+        query = self.cut_off_distances_to_query(cut_off_distances)
         result = self.kw.get_closest_filtered_POD_batch(query)
-        collisions = self.bpb_result_to_collisions(result, collision_list_size)
-        return collisions
+
+        return self.bpb_result_to_collisions(result, collision_list_sizes)
 
     @profile
     def bpb_result_to_list(self, result):
@@ -96,6 +95,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a.reshape(4))
                     map_P_b = map_T_b.dot(p.point_b.reshape(4))
+                    groups_b = self.world.get_groups_containing_link(link_b)
+                    if len(groups_b) == 1:
+                        body_b = groups_b.pop()
+                    else:
+                        body_b = ' '
                     c = Collision(link_a=link_a,
                                   link_b=link_b,
                                   contact_distance=p.distance,
@@ -112,7 +116,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return SortedDict({k: v for k, v in sorted(result_dict.items())})
 
     @profile
-    def bpb_result_to_collisions(self, result, collision_list_size=15):
+    def bpb_result_to_collisions(self, result, collision_list_size):
         collisions = Collisions(self.god_map, collision_list_size)
         for c in self.bpb_result_to_list(result):
             collisions.add(c)

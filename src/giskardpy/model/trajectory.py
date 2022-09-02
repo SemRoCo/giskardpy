@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from giskardpy.data_types import JointStates
+from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.model.joints import Joint
 
 
@@ -63,7 +63,10 @@ class Trajectory:
                 for free_variable in joint.free_variable_list:
                     if free_variable.name in traj_point:
                         if i == 0:
-                            trajectory_msg.joint_names.append(str(free_variable.name))
+                            joint_name = free_variable.name
+                            if isinstance(joint_name, PrefixName):
+                                joint_name = joint_name.short_name
+                            trajectory_msg.joint_names.append(joint_name)
                         p.positions.append(traj_point[free_variable.name].position)
                         if fill_velocity_values:
                             p.velocities.append(traj_point[free_variable.name].velocity)

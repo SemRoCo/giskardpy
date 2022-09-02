@@ -76,12 +76,21 @@ class Goal:
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
 
-    @property
-    def robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+    def get_link(self, link_name: str, group_name: str) -> PrefixName:
+        if '/' in link_name:
+            raise Exception(f'Link name {link_name} contains invalid character \'/\''
+                            f' or may contain already a prefix.')
+        if group_name is None:
+            group_name = self.world.get_group_containing_link_short_name(link_name)
+        return PrefixName(link_name, group_name)
+
+    def get_joint(self, joint_name: str, group_name: str) -> PrefixName:
+        if '/' in joint_name:
+            raise Exception(f'Link name {joint_name} contains invalid character \'/\''
+                            f' or may contain already a prefix.')
+        if group_name is None:
+            group_name = self.world.get_group_containing_joint_short_name(joint_name)
+        return PrefixName(joint_name, group_name)
 
     def get_joint_position_symbol(self, joint_name: my_string) -> expr_symbol:
         """

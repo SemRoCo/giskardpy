@@ -56,7 +56,7 @@ def get_tf_root() -> str:
     return tf_roots.pop()
 
 
-def get_full_frame_name(frame_name):
+def get_full_frame_names(frame_name):
     """
     Gets the full tf frame name if the frame with the name frame_name
     is in a separate namespace.
@@ -64,16 +64,18 @@ def get_full_frame_name(frame_name):
     :rtype: str
     """
     global tfBuffer
+    ret = list()
     tf_frames = tfBuffer._getFrameStrings()
     for tf_frame in tf_frames:
         try:
             frame = tf_frame[tf_frame.index("/") + 1:]
             if frame == frame_name or frame_name == tf_frame:
-                return tf_frame
+                ret.append(tf_frame)
         except ValueError:
             continue
-    raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
-
+    if len(ret) == 0:
+        raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
+    return ret
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
     global tfBuller

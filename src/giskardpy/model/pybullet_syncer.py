@@ -1,15 +1,9 @@
-import traceback
-from collections import defaultdict
-
 from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy import identifier
 from giskardpy.data_types import BiDict
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions, Collision
 from giskardpy.model.pybullet_wrapper import ContactInfo
-from giskardpy.model.world import WorldTree
-from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
 
 
@@ -40,7 +34,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         pose = self.fks[link.name]
         position = pose[:3]
         orientation = pose[4:]
-        pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[link.name], position, orientation)
+        pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[str(link.name)], position, orientation)
 
     def check_collisions2(self, link_combinations, distance):
         in_collision = set()
@@ -51,7 +45,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         return in_collision
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
+    def check_collisions(self, cut_off_distances, collision_list_size):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
@@ -62,16 +56,15 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        collisions = Collisions(self.world, collision_list_size)
-        for (robot_link, body_b, link_b), distance in cut_off_distances.items():
+        collisions = Collisions(self.god_map, collision_list_size)
+        for (link_a, link_b), distance in cut_off_distances.items():
             link_b_id = self.object_name_to_bullet_id[link_b]
-            robot_link_id = self.object_name_to_bullet_id[robot_link]
+            robot_link_id = self.object_name_to_bullet_id[link_a]
             contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
                                                                       distance * 1.1)]
             if len(contacts) > 0:
                 for contact in contacts:  # type: ContactInfo
-                    collision = Collision(link_a=robot_link,
-                                          body_b=body_b,
+                    collision = Collision(link_a=link_a,
                                           link_b=link_b,
                                           map_P_pa=contact.position_on_a,
                                           map_P_pb=contact.position_on_b,
@@ -101,7 +94,6 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.add_object(link)
-            self.init_collision_matrix(RobotName)
             # logging.logwarn('synced world')
         else:
             # logging.logwarn('updated world')

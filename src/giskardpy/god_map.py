@@ -199,13 +199,7 @@ class GodMap(object):
     @classmethod
     @profile
     def init_from_paramserver(cls):
-        import rospy
-
         self = cls()
-        robot_urdf = rospy.get_param('robot_description')
-        self.set_data(identifier.robot_description, robot_urdf)
-        self.set_data(identifier.robot_group_name, robot_name_from_urdf_string(robot_urdf))
-
         return self
 
     def __copy__(self):

@@ -58,12 +58,20 @@ class GiskardBehavior(Behaviour):
     def collision_scene(self, value):
         self.god_map.unsafe_set_data(identifier.collision_scene, value)
 
-    @property
-    def robot(self):
+    def robot(self, robot_name=''):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+        return self.collision_scene.robot(robot_name=robot_name)
+
+    def robot_names(self):
+        return self.collision_scene.robot_names
+
+    def robot_namespaces(self):
+        """
+        :rtype: list of str
+        """
+        return self.collision_scene.robot_namespaces
 
     def get_world(self):
         """
@@ -77,17 +85,8 @@ class GiskardBehavior(Behaviour):
         """
         return self.world
 
-    def get_robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.robot
-
-    def unsafe_get_robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.robot
+    def raise_to_blackboard(self, exception):
+        Blackboard().set('exception', exception)
 
     def get_blackboard(self):
         return Blackboard()

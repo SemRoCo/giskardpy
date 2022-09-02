@@ -1,13 +1,13 @@
 from __future__ import division
 
-import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 import giskardpy.utils.tfwrapper as tf
 
 class GraspBar(Goal):
-    def __init__(self, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
-                 max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length, root_group: str = None,
+                 tip_group: str = None, max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA,
+                 **kwargs):
         """
         TODO update description
         This goal can be used to grasp bars. It's like a cartesian goal with some freedom along one axis.
@@ -22,8 +22,8 @@ class GraspBar(Goal):
         :param weight: float default WEIGHT_ABOVE_CA
         """
         super().__init__(**kwargs)
-        self.root = root_link
-        self.tip = tip_link
+        self.root = self.get_link(root_link, root_group)
+        self.tip = self.get_link(tip_link, tip_group)
 
         bar_center = self.transform_msg(self.root, bar_center)
 

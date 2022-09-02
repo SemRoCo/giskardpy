@@ -2,6 +2,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Optional, List, Tuple, Dict, Union
 
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.utils.utils import resolve_ros_iris
 
 
@@ -108,6 +109,24 @@ class CollisionAvoidanceConfig:
         for value in self_distances.values():
             default_distance = max(default_distance, getattr(value, parameter_name))
         return default_distance
+
+    #TODO merge
+    # def _cal_max_param(self, parameter_name):
+    #     external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
+    #     self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
+    #     try:
+    #         default_distance = max(external_distances.default_factory(parameter_name.prefix)[parameter_name],
+    #                                self_distances.default_factory(parameter_name.prefix)[parameter_name])
+    #     except KeyError:
+    #         pass
+    #     for key, value in external_distances.items():
+    #         if key.prefix == parameter_name.prefix:
+    #             default_distance = max(default_distance, value[parameter_name])
+    #     for key, value in self_distances.items():
+    #         if key.prefix == parameter_name.prefix:
+    #             default_distance = max(default_distance, value[parameter_name])
+    #     return default_distance
+
 
     def ignore_all_self_collisions_of_link(self, link_name):
         self.ignored_self_collisions.append(link_name)
@@ -273,6 +292,8 @@ class BehaviorTreeConfig:
 
 class RobotInterfaceConfig:
     def __init__(self, urdf: str, name: Optional[str] = None, joint_state_topic: str = '/joint_states'):
+        if name is None:
+            name = robot_name_from_urdf_string(urdf)
         self.urdf = urdf
         self.name = name
         self.joint_state_topic = joint_state_topic

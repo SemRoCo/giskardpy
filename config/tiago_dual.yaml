@@ -5,23 +5,28 @@ collision_avoidance:
       odom_z_joint: # this affects all links between this and the next controlled joint
         hard_threshold: 0.02 # at this distance in [cm] that can not be surpassed
         soft_threshold: 0.7 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-action_server:
+robot_interface:
   base:
     plugin: SendFollowJointTrajectoryDiffDrive
     namespace: /mobile_base_controller
+    robot_name: tiago_dual
   torso:
     plugin: SendFollowJointTrajectory
     namespace: /torso_controller/follow_joint_trajectory
     state_topic: /torso_controller/state
+    robot_name: tiago_dual
   neck:
     plugin: SendFollowJointTrajectory
     namespace: /head_controller/follow_joint_trajectory
     state_topic: /head_controller/state
+    robot_name: tiago_dual
   left_arm:
     plugin: SendFollowJointTrajectory
     namespace: /arm_left_controller/follow_joint_trajectory
     state_topic: /arm_left_controller/state
+    robot_name: tiago_dual
   right_arm:
     plugin: SendFollowJointTrajectory
     namespace: /arm_right_controller/follow_joint_trajectory
     state_topic: /arm_right_controller/state
+    robot_name: tiago_dual

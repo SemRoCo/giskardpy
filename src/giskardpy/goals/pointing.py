@@ -9,8 +9,8 @@ from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
 
 class Pointing(Goal):
-    def __init__(self, tip_link, goal_point, root_link, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_BELOW_CA, **kwargs):
+    def __init__(self, tip_link, goal_point, root_link, tip_group: str = None, root_group: str = None,
+                 pointing_axis=None, max_velocity=0.3, weight=WEIGHT_BELOW_CA, **kwargs):
         """
         Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
         :param tip_link: str, name of the tip of the kin chain
@@ -22,12 +22,12 @@ class Pointing(Goal):
         super().__init__(**kwargs)
         self.weight = weight
         self.max_velocity = max_velocity
-        self.root = root_link
-        self.tip = tip_link
-        self.root_P_goal_point = tf.transform_point(self.root, goal_point)
+        self.root = self.get_link(root_link, root_group)
+        self.tip = self.get_link(tip_link, tip_group)
+        self.root_P_goal_point = self.transform_msg(self.root, goal_point)
 
         if pointing_axis is not None:
-            self.tip_V_pointing_axis = tf.transform_vector(self.tip, pointing_axis)
+            self.tip_V_pointing_axis = self.transform_msg(self.tip, pointing_axis)
             self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
         else:
             self.tip_V_pointing_axis = Vector3Stamped()

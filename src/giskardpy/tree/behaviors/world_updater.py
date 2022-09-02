@@ -72,7 +72,7 @@ class WorldUpdater(GiskardBehavior):
     def __init__(self, name: str):
         self.added_plugin_names = defaultdict(list)
         super().__init__(name)
-        self.original_link_names = self.robot.link_names
+        self.original_link_names = self.world.link_names
         self.service_in_use = Queue(maxsize=1)
         self.work_permit = Queue(maxsize=1)
         self.update_ticked = Queue(maxsize=1)
@@ -112,7 +112,7 @@ class WorldUpdater(GiskardBehavior):
     def get_group_names_cb(self, req: GetGroupNamesRequest) -> GetGroupNamesResponse:
         group_names = self.world.group_names
         res = GetGroupNamesResponse()
-        res.group_names = group_names
+        res.group_names = list(group_names)
         return res
 
     @profile
@@ -203,13 +203,21 @@ class WorldUpdater(GiskardBehavior):
         # default to world root if all is empty
         if req.parent_link_group == '' and req.parent_link == '':
             req.parent_link = self.world.root_link_name
-        # default to robot group, if parent link name is not empty
-        else:
+        # if only one robot added, try to infer parent group and link from it
+        elif len(self.collision_scene.robots) == 1:
+            # default to robot group, if parent link name is not empty
             if req.parent_link_group == '':
-                req.parent_link_group = self.god_map.unsafe_get_data(identifier.robot_group_name)
-            elif req.parent_link == '':
-                req.parent_link = self.world.groups[req.parent_link_group].root_link_name
+                req.parent_link_group = self.collision_scene.robot_names[0]
+            if req.parent_link == '':
+               req.parent_link = self.world.groups[req.parent_link_group].root_link_name
             req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
+        else:
+            if req.parent_link != '':
+                req.parent_link_group = self.world.get_group_containing_link_short_name(req.parent_link)
+            if req.parent_link_group == '':
+                raise UnknownGroupException('Parent link group has to be set.')
+            if req.parent_link == '':
+                req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
         return req
 
     @profile
@@ -229,7 +237,7 @@ class WorldUpdater(GiskardBehavior):
                                   parent_link_name=req.parent_link)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
-        logging.loginfo(f'Added object \'{req.group_name}\' at \'{req.parent_link_group}/{req.parent_link}\'.')
+        logging.loginfo(f'Added object \'{req.group_name}\' on \'{req.parent_link_group}\' at \'{req.parent_link}\'.')
         if world_body.joint_state_topic:
             # plugin_name = str(PrefixName(req.group_name, 'js'))
             plugin = running_is_success(SyncConfiguration)(joint_state_topic=world_body.joint_state_topic)
@@ -300,7 +308,7 @@ class WorldUpdater(GiskardBehavior):
     def clear_world(self):
         # assumes that parent has god map lock
         self.collision_scene.reset_collision_blacklist()
-        self.world.delete_all_but_robot()
+        self.world.delete_all_but_robots()
         for group_name in list(self.added_plugin_names.keys()):
             self._remove_plugins_of_group(group_name)
         self.added_plugin_names = defaultdict(list)

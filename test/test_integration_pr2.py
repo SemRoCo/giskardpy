@@ -840,7 +840,7 @@ class TestConstraints(object):
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
         kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
-        dgaya_pose = deepcopy(gaya_pose)
+        dgaya_pose = deepcopy(kitchen_setup.better_pose)
         del dgaya_pose[u'head_pan_joint']
         del dgaya_pose[u'head_tilt_joint']
         kitchen_setup.set_joint_goal(dgaya_pose)
@@ -2757,7 +2757,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=tip_link,
                                     root_link=kitchen_setup.default_root,
-                                    goal=goal_c
+                                    goal_pose=goal_c
                                     )
 
         kitchen_setup.plan_and_execute()
@@ -3197,7 +3197,8 @@ class TestCartesianPath(object):
             base_pose.pose.position.x = 0.0
             base_pose.pose.position.y = 2.0
             base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-            kitchen_setup.teleport_base(base_pose)
+            kitchen_setup.set_cart_goal(base_pose, tip_link, check=False)
+            kitchen_setup.plan_and_execute()
 
             base_pose = PoseStamped()
             base_pose.header.frame_id = 'map'
@@ -3215,7 +3216,7 @@ class TestCartesianPath(object):
                                         goal=goal_c,
                                         predict_f=10.0)
             try:
-                kitchen_setup.plan()
+                kitchen_setup.plan_and_execute()
             except Exception:
                 pass
         # kitchen_setup.send_goal()
@@ -3236,7 +3237,8 @@ class TestCartesianPath(object):
         base_pose.pose.position.x = 0
         base_pose.pose.position.y = 2.0
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_pose)
+        kitchen_setup.set_cart_goal(base_pose, 'base_footprint', check=False)
+        kitchen_setup.plan_and_execute()
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
@@ -3249,6 +3251,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPathCarrot',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
+                                    navigation=True,
                                     goal=goal_c,
                                     predict_f=10.0)
         kitchen_setup.plan_and_execute()
@@ -3349,7 +3352,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=tip_link,
                                     root_link=kitchen_setup.default_root,
-                                    goal=table_navigation_goal
+                                    goal_pose=table_navigation_goal
                                     )
 
         kitchen_setup.plan_and_execute()
@@ -3380,7 +3383,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=tip_link,
                                     root_link=kitchen_setup.default_root,
-                                    goal=goal_c
+                                    goal_pose=goal_c
                                     )
 
         r_gripper_vec = Vector3Stamped()
@@ -3420,7 +3423,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=tip_link,
                                     root_link=kitchen_setup.default_root,
-                                    goal=goal_c
+                                    goal_pose=goal_c
                                     )
 
         r_gripper_vec = Vector3Stamped()
@@ -3461,7 +3464,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=tip_link,
                                     root_link=kitchen_setup.default_root,
-                                    goal=goal_c)
+                                    goal_pose=goal_c)
 
         f = 0.5
         amp = 1.0
@@ -3687,7 +3690,7 @@ class TestCartesianPath(object):
         # kitchen_setup.check_cart_goal(tip_link, goal_c)
         # zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
-    @pytest.mark.repeat(5)
+    #@pytest.mark.repeat(5)
     def test_navi_5(self, kitchen_setup):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
@@ -3712,7 +3715,8 @@ class TestCartesianPath(object):
         base_pose.pose.position.x = 0
         base_pose.pose.position.y = 2.1
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 8, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_pose)
+        kitchen_setup.set_cart_goal(base_pose, tip_link)
+        kitchen_setup.plan_and_execute()
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'map'
@@ -3722,12 +3726,12 @@ class TestCartesianPath(object):
         goal_c = base_pose
         # kitchen_setup.allow_all_collisions()
         try:
-            kitchen_setup.allow_all_collisions()
-            kitchen_setup.set_json_goal('CartesianPose',
+            kitchen_setup.set_json_goal('CartesianPathCarrot',
                                         tip_link=tip_link,
                                         root_link=kitchen_setup.default_root,
-                                        goal=goal_c)
-                                        #predict_f=10.0)
+                                        goal=goal_c,
+                                        navigation=True,
+                                        predict_f=10.0)
             kitchen_setup.plan_and_execute()
         except Exception:
             pass
@@ -3785,7 +3789,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
@@ -3793,12 +3797,12 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
         # grasp milk
-        kitchen_setup.attach_object(milk_name, tip_link)
+        kitchen_setup.update_parent_link_of_group(milk_name, tip_link, timeout=0)
 
         if tip_link == kitchen_setup.l_tip:
             kitchen_setup.close_l_gripper()
@@ -3809,7 +3813,7 @@ class TestCartesianPath(object):
 
         kitchen_setup.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup.default_root)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         # dont allow robot to move
@@ -3840,11 +3844,42 @@ class TestCartesianPath(object):
         #                                             goal=milk_grasp_pre_pose)
         # kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
-    @pytest.mark.repeat(5)
+    pytest.mark.repeat(10)
     def test_milk_1(self, kitchen_setup):
         rospy.sleep(10.0)  # 0.5
+
+        tj1 = [[0.997, -1.203, 0.753, 0.000296188, 0.000302034, -0.71112, 0.70307],
+               [0.989898, -1.20243, 0.762806, 0.00569843, -0.00266739, -0.71901, 0.694971],
+               [0.982795, -1.20185, 0.772613, 0.0110997, -0.00563638, -0.726781, 0.686757],
+               [0.975693, -1.20128, 0.782419, 0.0164992, -0.00860443, -0.73443, 0.678429],
+               [0.968591, -1.2007, 0.792226, 0.0218959, -0.0115711, -0.741959, 0.669988],
+               [0.975679, -1.19652, 0.804871, 0.00678613, -0.0180347, -0.747338, 0.664165],
+               [0.982768, -1.19235, 0.817517, -0.00832589, -0.0244924, -0.752469, 0.65812],
+               [0.989856, -1.18817, 0.830162, -0.0234351, -0.0309419, -0.757349, 0.651856],
+               [-0.11277931342596872, 0.9917351400282081, -0.0035713740108498817, 0.6652526551866923, 0.07269070971981108, -0.0368557264112681, 0.742156736086242],
+               [-0.07648921983422724, 0.9946554011515814, -0.0023005225203988266, 0.6942301746759857, 0.049762488400744806, -0.023779993083494964, 0.7176368658635545],
+               [0.899286029752928, -0.9010284571976042, 0.8474999999999999, 0.0, 0.0, -0.7109135380122774, 0.7032794192004101]]
+        for tj in [tj1]:
+            poses = []
+            for i, point in enumerate(tj):
+                base_pose = PoseStamped()
+                base_pose.header.frame_id = 'map'
+                base_pose.pose.position.x = point[0]
+                base_pose.pose.position.y = point[1]
+                base_pose.pose.position.z = point[2] if len(point) > 3 else 0
+                if len(point) > 3:
+                    base_pose.pose.orientation = Quaternion(point[3], point[4], point[5], point[6])
+                else:
+                    arr = quaternion_from_euler(0, 0, point[2])
+                    base_pose.pose.orientation = Quaternion(arr[0], arr[1], arr[2], arr[3])
+                if i == 0:
+                    # important assumption for constraint:
+                    # we do not to reach the first pose, since it is the start pose
+                    continue
+                else:
+                    poses.append(base_pose)
 
         tip_link = kitchen_setup.l_tip
         milk_name = u'milk'
@@ -3860,12 +3895,13 @@ class TestCartesianPath(object):
         base_goal.pose.orientation.y = 0
         base_goal.pose.orientation.z = 0
         base_goal.pose.orientation.w = 1
-        kitchen_setup.teleport_base(base_goal)
+        kitchen_setup.set_cart_goal(base_goal, 'base_footprint')
+        kitchen_setup.plan_and_execute()
 
         # spawn milk
         milk_pose = PoseStamped()
         milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
-        milk_pose.pose.position = Point(0, 0, 0.12)
+        milk_pose.pose.position = Point(0, 0, 0.125)
         milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         milk_pre_pose = PoseStamped()
@@ -3887,18 +3923,21 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
         kitchen_setup.plan_and_execute()
 
         # attach milk
-        kitchen_setup.attach_object(milk_name, tip_link)
+        kitchen_setup.update_parent_link_of_group(milk_name, tip_link, timeout=0)
 
         # pick up
+        kitchen_setup.allow_collision(milk_name, kitchen_setup.robot.name)
         kitchen_setup.set_json_goal(u'CartesianPathCarrot',
                                     tip_link=tip_link,
                                     predict_f=2.0,
                                     narrow=True,
+                                    manipulation=True,
                                     narrow_padding=1.0,
+                                    #goals=poses,
                                     root_link=kitchen_setup.default_root,
                                     goal=milk_pre_pose)
         kitchen_setup.plan_and_execute()
@@ -3910,7 +3949,7 @@ class TestCartesianPath(object):
         else:
             raise Exception('Wrong tip link')
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     @pytest.mark.repeat(5)
@@ -3964,7 +4003,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
@@ -3972,12 +4011,12 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
         # attach milk
-        kitchen_setup.attach_object(milk_name, tip_link)
+        kitchen_setup.update_parent_link_of_group(milk_name, tip_link, timeout=0)
 
         if tip_link == kitchen_setup.l_tip:
             kitchen_setup.close_l_gripper()
@@ -3988,7 +4027,7 @@ class TestCartesianPath(object):
 
         kitchen_setup.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup.default_root)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         # dont allow robot to move
@@ -4058,7 +4097,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
@@ -4066,12 +4105,12 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
         # attach milk
-        kitchen_setup.attach_object(milk_name, tip_link)
+        kitchen_setup.update_parent_link_of_group(milk_name, tip_link, timeout=0)
 
         if tip_link == kitchen_setup.l_tip:
             kitchen_setup.close_l_gripper()
@@ -4082,7 +4121,7 @@ class TestCartesianPath(object):
 
         kitchen_setup.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup.default_root)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         # dont allow robot to move
@@ -4120,7 +4159,7 @@ class TestCartesianPath(object):
         #                                             goal=milk_grasp_pre_pose)
         # kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
     # ease_fridge_pregrasp_1
     @pytest.mark.repeat(5)
@@ -4216,11 +4255,11 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
         kitchen_setup.plan_and_execute()
 
         # grasp milk
-        kitchen_setup.attach_object(milk_name, tip_link)
+        kitchen_setup.update_parent_link_of_group(milk_name, tip_link, timeout=0)
 
         if tip_link == kitchen_setup.l_tip:
             kitchen_setup.close_l_gripper()
@@ -4236,7 +4275,7 @@ class TestCartesianPath(object):
         rospy.logerr('Pregrasping')
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         # place milk back
@@ -4266,7 +4305,7 @@ class TestCartesianPath(object):
         #                                             goal=milk_grasp_pre_pose)
         # kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
     def test_ease_fridge_with_cart_goals_and_global_planner_aligned_planes(self, kitchen_setup):
         rospy.sleep(10.0)  # 0.5
@@ -4316,19 +4355,19 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
 
         kitchen_setup.plan_and_execute()
 
         # grasp milk
-        kitchen_setup.attach_object(milk_name, tip_link)
+        kitchen_setup.update_parent_link_of_group(milk_name, tip_link, timeout=0)
 
         if tip_link == kitchen_setup.l_tip:
             kitchen_setup.close_l_gripper()
@@ -4348,7 +4387,7 @@ class TestCartesianPath(object):
 
         kitchen_setup.set_cart_goal(milk_lift_pre_pose, milk_name, kitchen_setup.default_root)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         # place milk back
@@ -4374,7 +4413,7 @@ class TestCartesianPath(object):
         #                                             goal=milk_grasp_pre_pose)
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+        kitchen_setup.send_and_check_joint_goal(kitchen_setup.better_pose)
 
     def test_faster_ease_cereal_with_planner(self, kitchen_setup):
         """
@@ -4418,7 +4457,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_joint_goal(oven_area_cereal, check=False)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -4444,7 +4483,7 @@ class TestCartesianPath(object):
                                     goal=post_grasp_pose,
                                     goal_sampling_axis=[True, False, False])
         kitchen_setup.plan_and_execute()
-        # kitchen_setup.set_joint_goal(gaya_pose)
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
         # place milk back
 
@@ -4464,7 +4503,7 @@ class TestCartesianPath(object):
         kitchen_setup.open_l_gripper()
         kitchen_setup.detach_object(cereal_name)
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def publish_frame(self, name, pose_stamped):
@@ -4521,7 +4560,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -4536,7 +4575,7 @@ class TestCartesianPath(object):
         kitchen_setup.open_l_gripper()
         kitchen_setup.detach_object(cereal_name)
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def test_cereal_1_native(self, kitchen_setup):
@@ -6667,23 +6706,22 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=pre_grasp_pose)
+                                    goal_pose=pre_grasp_pose)
         kitchen_setup.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
 
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
-        kitchen_setup.set_cart_goal(grasp_pose,
-                                    tip_link=kitchen_setup.r_tip)
+        kitchen_setup.set_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip, check=False)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
 
         for tj in [tj_1, tj_2, tj_3, tj_4, tj_5, tj_6, tj_7, tj_8, tj_9, tj_10, tj_11, tj_12,
                    tj_13, tj_14, tj_15, tj_16, tj_17, tj_18, tj_19, tj_20, tj_21, tj_22, tj_23,
                    tj_24, tj_25]:
             poses = []
-            for i, point in enumerate(tj_12):
+            for i, point in enumerate(tj):
                 base_pose = PoseStamped()
                 base_pose.header.frame_id = 'map'
                 base_pose.pose.position.x = point[0]
@@ -6748,7 +6786,7 @@ class TestCartesianPath(object):
                 kitchen_setup.plan_and_execute()
             except Exception:
                 pass
-            # kitchen_setup.set_joint_goal(gaya_pose)
+            # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
             # place milk back
 
@@ -6794,17 +6832,18 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=pre_grasp_pose)
+                                    goal_pose=pre_grasp_pose)
         kitchen_setup.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
 
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         kitchen_setup.set_cart_goal(grasp_pose,
-                                    tip_link=kitchen_setup.r_tip)
+                                    tip_link=kitchen_setup.r_tip,
+                                    check=False)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         # kitchen_setup.close_r_gripper()
 
@@ -6829,6 +6868,7 @@ class TestCartesianPath(object):
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
                                     goal=post_grasp_pose,
+                                    manipulation=True,
                                     narrow=True,
                                     narrow_padding=0.2,
                                     predict_f=2.0)
@@ -6836,7 +6876,7 @@ class TestCartesianPath(object):
             kitchen_setup.plan_and_execute()
         except Exception:
             pass
-        # kitchen_setup.set_joint_goal(gaya_pose)
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
         # place milk back
 
@@ -6883,7 +6923,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=pre_grasp_pose)
+                                    goal_pose=pre_grasp_pose)
         kitchen_setup.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
@@ -6893,7 +6933,7 @@ class TestCartesianPath(object):
                                     tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -6918,7 +6958,7 @@ class TestCartesianPath(object):
                                     root_link=kitchen_setup.default_root,
                                     goal=post_grasp_pose)
         kitchen_setup.plan_and_execute()
-        # kitchen_setup.set_joint_goal(gaya_pose)
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
         # place milk back
 
@@ -6938,7 +6978,7 @@ class TestCartesianPath(object):
         kitchen_setup.open_l_gripper()
         kitchen_setup.detach_object(cereal_name)
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def test_cereal_stuck(self, kitchen_setup):
@@ -7340,7 +7380,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=pre_grasp_pose)
+                                    goal_pose=pre_grasp_pose)
         kitchen_setup.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
@@ -7350,7 +7390,7 @@ class TestCartesianPath(object):
                                     tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -7420,7 +7460,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=pre_grasp_pose)
+                                    goal_pose=pre_grasp_pose)
         kitchen_setup.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
@@ -7430,7 +7470,7 @@ class TestCartesianPath(object):
                                     tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -7458,7 +7498,7 @@ class TestCartesianPath(object):
                                     narrow_padding=0.2,
                                     goal_sampling_axis=[True, False, False])
         kitchen_setup.plan()
-        # kitchen_setup.set_joint_goal(gaya_pose)
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
         # place milk back
 
@@ -7478,7 +7518,7 @@ class TestCartesianPath(object):
         # kitchen_setup.open_l_gripper()
         # kitchen_setup.detach_object(cereal_name)
 
-    # kitchen_setup.set_joint_goal(gaya_pose)
+    # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
     # kitchen_setup.plan_and_execute()
 
     def test_ease_cereal_different_drawers(self, kitchen_setup):
@@ -7522,7 +7562,7 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=pre_grasp_pose)
+                                    goal_pose=pre_grasp_pose)
         kitchen_setup.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
@@ -7532,7 +7572,7 @@ class TestCartesianPath(object):
                                     tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -7555,9 +7595,9 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=post_grasp_pose)
+                                    goal_pose=post_grasp_pose)
         kitchen_setup.plan_and_execute()
-        # kitchen_setup.set_joint_goal(gaya_pose)
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
         # place milk back
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
@@ -7586,14 +7626,14 @@ class TestCartesianPath(object):
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=grasp_pose)
+                                    goal_pose=grasp_pose)
         kitchen_setup.plan_and_execute()
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.open_l_gripper()
         kitchen_setup.detach_object(cereal_name)
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
 
@@ -9461,7 +9501,6 @@ class TestCollisionAvoidanceGoals:
                                     tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        #kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
         kitchen_setup.detach_group(cereal_name)
         kitchen_setup.update_parent_link_of_group(cereal_name, parent_link=kitchen_setup.r_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
@@ -10222,7 +10261,7 @@ class TestEASE():
         bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         kitchen_setup.add_cylinder(bowl_name, height=0.05, radius=0.07, pose=bowl_pose)
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         # grasp bowl
@@ -10245,10 +10284,10 @@ class TestEASE():
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(bowl_name, kitchen_setup.l_tip)
-        kitchen_setup.attach_object(cup_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(bowl_name, kitchen_setup.l_tip, timeout=0)
+        kitchen_setup.update_parent_link_of_group(cup_name, kitchen_setup.r_tip, timeout=0)
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
@@ -10276,7 +10315,7 @@ class TestEASE():
         kitchen_setup.detach_object(cup_name)
         kitchen_setup.allow_collision([], cup_name, [])
         kitchen_setup.allow_collision([], bowl_name, [])
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def look_at(self, kitchen_setup, tip_link=None, goal_point=None):
@@ -10295,7 +10334,7 @@ class TestEASE():
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
         kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis, root_link=tip_link)
-        dgaya_pose = deepcopy(gaya_pose)
+        dgaya_pose = deepcopy(kitchen_setup.better_pose)
         del dgaya_pose[u'head_pan_joint']
         del dgaya_pose[u'head_tilt_joint']
         kitchen_setup.set_joint_goal(dgaya_pose)
@@ -10344,7 +10383,7 @@ class TestEASE():
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
-                                    goal=pre_grasp_pose)
+                                    goal_pose=pre_grasp_pose)
         kitchen_setup.plan_and_execute()
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
@@ -10353,7 +10392,7 @@ class TestEASE():
         kitchen_setup.set_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.attach_object(cereal_name, kitchen_setup.r_tip)
+        kitchen_setup.update_parent_link_of_group(cereal_name, kitchen_setup.r_tip, timeout=0)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_r_gripper()
 
@@ -10388,7 +10427,7 @@ class TestEASE():
         kitchen_setup.plan_and_execute()
 
         # gaya pose
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def test_grasp_cup(self, kitchen_setup):
@@ -10459,7 +10498,7 @@ class TestEASE():
 
         kitchen_setup.add_cylinder(cup_name, height=0.07, radius=0.04, pose=cup_pose)
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         point = tf.np_to_pose(kitchen_setup.world.get_fk('map', cup_name)).position
@@ -10491,7 +10530,7 @@ class TestEASE():
         kitchen_setup.plan_and_execute()
 
         # attach cup
-        kitchen_setup.attach_object(cup_name, tip)
+        kitchen_setup.update_parent_link_of_group(cup_name, tip, timeout=0)
         kitchen_setup.close_l_gripper()
 
         # pregrasp
@@ -10504,7 +10543,7 @@ class TestEASE():
         kitchen_setup.plan_and_execute()
 
         # gaya pose
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
         # base_goal = PoseStamped()
@@ -10526,7 +10565,7 @@ class TestEASE():
 
         # kitchen_setup.detach_object(cup_name)
         # kitchen_setup.allow_collision([], cup_name, [])
-        # kitchen_setup.set_joint_goal(gaya_pose)
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         # kitchen_setup.plan_and_execute()
 
     def test_grasp_milk(self, kitchen_setup):
@@ -10568,11 +10607,11 @@ class TestEASE():
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=tip_link,
-                                    goal=milk_pose)
+                                    goal_pose=milk_pose)
         kitchen_setup.plan_and_execute()
 
         # grasp milk
-        kitchen_setup.attach_object(milk_name, tip_link)
+        kitchen_setup.update_parent_link_of_group(milk_name, tip_link, timeout=0)
 
         if tip_link == kitchen_setup.l_tip:
             kitchen_setup.close_l_gripper()
@@ -10588,7 +10627,7 @@ class TestEASE():
                                     dist=0.1)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def test_move_to_cup(self, kitchen_setup):
@@ -10681,7 +10720,7 @@ class TestEASE():
             r_goal = deepcopy(tf.lookup_pose(kitchen_setup.default_root, 'base_footprint'))
             r_goal.pose.position.x -= 0.2
             kitchen_setup.move_base(r_goal)
-            kitchen_setup.set_joint_goal(gaya_pose)
+            kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
             kitchen_setup.plan_and_execute()
 
     def test_close_cereal_drawer(self, kitchen_setup):
@@ -10755,7 +10794,7 @@ class TestEASE():
             r_goal = deepcopy(tf.lookup_pose(kitchen_setup.default_root, 'base_footprint'))
             r_goal.pose.position.x -= 0.2
             kitchen_setup.move_base(r_goal)
-            kitchen_setup.set_joint_goal(gaya_pose)
+            kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
             kitchen_setup.plan_and_execute()
 
     def test_open_fridge(self, kitchen_setup):
@@ -10829,7 +10868,7 @@ class TestEASE():
         kitchen_setup.set_cart_goal(base_goal, tip_link='base_footprint')
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def test_move_to_dining_area(self, kitchen_setup, left):
@@ -10848,7 +10887,7 @@ class TestEASE():
         kitchen_setup.set_json_goal(u'CartesianPose',
                                     tip_link=tip_link,
                                     root_link=kitchen_setup.default_root,
-                                    goal=table_navigation_goal
+                                    goal_pose=table_navigation_goal
                                     )
 
         kitchen_setup.plan_and_execute()
@@ -10857,7 +10896,7 @@ class TestEASE():
         # move to dining table
         self.test_move_to_dining_area(kitchen_setup, left)
         # go in gaya pose
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
         # place
         # preplacing
@@ -10895,7 +10934,7 @@ class TestEASE():
             kitchen_setup.open_l_gripper()
         else:
             kitchen_setup.open_r_gripper()
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
     def test_fetch_milk(self, kitchen_setup):

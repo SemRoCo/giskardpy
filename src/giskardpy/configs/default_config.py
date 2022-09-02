@@ -39,7 +39,7 @@ class GeneralConfig:
 
 class PathPlanningConfig:
     def __init__(self,
-                 plot: bool = False,
+                 plot: bool = True,
                  benchmark: bool = False,
                  path_interpolation: bool = True,
                  max_replanning_retries: int = 10,
@@ -54,9 +54,9 @@ class PathPlanningConfig:
             self.planner_configs['normal'] = {
                 'navigation': {
                     'planner': ['RRTConnect'],  # sublist of above planners
-                    'motion_validator': ['box'],  # sublist of ['rays', 'box', 'discrete']
-                    'time': 15,
-                    'range': 2.0
+                    'motion_validator': ['discrete'],  # sublist of ['rays', 'box', 'discrete']
+                    'time': 120,
+                    'range': 0.2
                 },
                 'movement': {
                     'planner': ['RRTConnect'],  # sublist of above planners
@@ -67,12 +67,12 @@ class PathPlanningConfig:
             self.planner_configs['narrow'] = {
                 'navigation': {
                     'planner': ['InformedRRTstar'],  # sublist of above planners
-                    'motion_validator': ['box'],  # sublist of ['rays', 'box', 'discrete']
+                    'motion_validator': ['discrete'],  # sublist of ['rays', 'box', 'discrete']
                     'time': 30,
                     'range': 0.2
                 },
                 'movement': {
-                    'planner': ['RRT'],
+                    'planner': ['InformedRRTstar'],
                     'motion_validator': ['discrete'],  # sublist of ['rays', 'box', 'discrete']
                     'time': 30,
                     'range': 0.1
@@ -210,7 +210,7 @@ class BehaviorTreeConfig:
         },
         'VisualizationBehavior': {
             'enabled': True,
-            'in_planning_loop': False
+            'in_planning_loop': True
         },
         'PublishDebugExpressions': {
             'enabled': False,
@@ -260,7 +260,7 @@ class BehaviorTreeConfig:
             'frames': [],
         },
         'PlotDebugTF': {
-            'enabled': False,
+            'enabled': True,
         },
     }
 

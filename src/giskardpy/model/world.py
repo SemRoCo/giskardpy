@@ -369,6 +369,27 @@ class WorldTree:
 
         self._link_joint_to_links(new_joint)
 
+    def get_link(self, link_name: str, group_name: str) -> my_string:
+        if '/' in link_name:
+            if isinstance(link_name, str):
+                return PrefixName(*reversed(link_name.split('/')))
+            return link_name
+        if group_name is None:
+            try:
+                group_name = self.get_group_containing_link_short_name(link_name)
+            except UnknownGroupException:
+                return link_name
+        return PrefixName(link_name, group_name)
+
+    def get_joint(self, joint_name: str, group_name: str) -> PrefixName:
+        if '/' in joint_name:
+            if isinstance(joint_name, str):
+                return PrefixName(*reversed(joint_name.split('/')))
+            return joint_name
+        if group_name is None:
+            group_name = self.get_group_containing_joint_short_name(joint_name)
+        return PrefixName(joint_name, group_name)
+
     def _set_free_variables_on_mimic_joints(self, group_name):
         # TODO prevent this from happening twice
         for joint_name, joint in self.groups[group_name].joints.items():  # type: (PrefixName, MimicJoint)
@@ -595,7 +616,8 @@ class WorldTree:
             self._add_joint_and_create_child(joint)
         for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
             self.add_urdf(robot_config.urdf,
-                          group_name=robot_config.name)
+                          group_name=robot_config.name,
+                          actuated=True)
         self.fast_all_fks = None # TODO unnecessary?
         self.notify_model_change()
 
@@ -1049,12 +1071,7 @@ class WorldTree:
         else:
             raise NotImplementedError(f'World can\'t transform message of type \'{type(msg)}\'')
 
-    def transform_pose(self, target_frame, pose):
-        """
-        :type target_frame: Union[str, PrefixName]
-        :type pose: PoseStamped
-        :rtype: PoseStamped
-        """
+    def transform_pose(self, target_frame: my_string, pose: PoseStamped) -> PoseStamped:
         f_T_p = msg_to_homogeneous_matrix(pose.pose)
         t_T_f = self.compute_fk_np(target_frame, pose.header.frame_id)
         t_T_p = np.dot(t_T_f, f_T_p)

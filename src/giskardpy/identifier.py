@@ -114,16 +114,13 @@ tree_manager = giskard + ['_tree']
 tree_tick_rate = giskard + ['behavior_tree_config', 'tree_tick_rate']
 
 # collision avoidance
-collision_avoidance_config = giskard + ['collision_avoidance_config']
+collision_avoidance_configs = giskard + ['collision_avoidance_configs']
 collision_scene = ['collision_scene']
 collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
-collision_checker = collision_avoidance_config + ['collision_checker']
-
-added_self_collisions = collision_avoidance_config + ['add_self_collisions']
-ignored_self_collisions = collision_avoidance_config + ['ignored_self_collisions']
+collision_checker = giskard + ['collision_checker']
 
 # robot interface
 robot_interface_configs = giskard + ['robot_interface_configs']

@@ -4,7 +4,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 
 from giskardpy.utils import logging
 import giskardpy.utils.tfwrapper as tf
-from src.giskardpy.test.utils_for_tests import PR2AndDonbot
+from utils_for_tests import PR2AndDonbot
 
 folder_name = 'tmp_data/'
 

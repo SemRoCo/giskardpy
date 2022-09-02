@@ -39,8 +39,8 @@ class CollisionChecker(GiskardBehavior):
         try:
             self.collision_matrix = self.god_map.get_data(identifier.collision_matrix)
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
-            self.collision_list_size = sum([self.collision_avoidance_config.cal_max_param(PrefixName('number_of_repeller', r_n))
-                                             for r_n in self.robot_names()])
+            self.collision_list_size = sum([config.cal_max_param('number_of_repeller')
+                                            for config in self.collision_avoidance_configs.values()])
             self.collision_scene.sync()
             super().initialise()
         except Exception as e:

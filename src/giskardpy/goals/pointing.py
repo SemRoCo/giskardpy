@@ -22,8 +22,8 @@ class Pointing(Goal):
         super().__init__(**kwargs)
         self.weight = weight
         self.max_velocity = max_velocity
-        self.root = self.get_link(root_link, root_group)
-        self.tip = self.get_link(tip_link, tip_group)
+        self.root = self.world.get_link(root_link, root_group)
+        self.tip = self.world.get_link(tip_link, tip_group)
         self.root_P_goal_point = self.transform_msg(self.root, goal_point)
 
         if pointing_axis is not None:

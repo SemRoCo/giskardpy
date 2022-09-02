@@ -220,124 +220,6 @@ def pykdl_frame_to_numpy(pykdl_frame):
                      [0, 0, 0, 1]])
 
 
-class GoalChecker(object):
-    def __init__(self, god_map: GodMap):
-        self.god_map = god_map
-        self.world: WorldTree = self.god_map.unsafe_get_data(identifier.world)
-        #self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
-
-    def transform_msg(self, target_frame, msg, timeout=1):
-        try:
-            return tf.transform_msg(target_frame, msg, timeout=timeout)
-        except LookupException as e:
-            return self.world.transform_msg(target_frame, msg)
-
-
-class JointGoalChecker(GoalChecker):
-    def __init__(self, god_map, goal_state, decimal=2):
-        super().__init__(god_map)
-        self.goal_state = goal_state
-        self.decimal = decimal
-
-    def get_current_joint_state(self) -> JointStates:
-        return self.world.state
-
-    def __call__(self):
-        current_joint_state = self.get_current_joint_state()
-        self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
-
-    def compare_joint_state(self, current_js, goal_js, decimal=2):
-        """
-        :type current_js: dict
-        :type goal_js: dict
-        :type decimal: int
-        """
-        for joint_name in goal_js:
-            group_name = self.world.get_group_containing_joint_short_name(joint_name)
-            full_joint_name = PrefixName(joint_name, group_name)
-            goal = goal_js[joint_name]
-            current = current_js[full_joint_name].position
-            if self.world.is_joint_continuous(full_joint_name):
-                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(full_joint_name, current,
-                                                                                           goal))
-            else:
-                np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(full_joint_name, current,
-                                                                                           goal))
-
-
-class TranslationGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, root_link, expected):
-        super().__init__(god_map)
-        self.expected = deepcopy(expected)
-        self.tip_link = tip_link
-        self.root_link = root_link
-        self.expected = self.transform_msg(self.root_link, self.expected)
-
-    def __call__(self):
-        expected = self.expected
-        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
-        np.testing.assert_array_almost_equal(msg_to_list(expected.point),
-                                             msg_to_list(current_pose.position), decimal=2)
-
-
-class AlignPlanesGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, tip_normal, root_link, root_normal):
-        super(AlignPlanesGoalChecker, self).__init__(god_map)
-        self.tip_normal = tip_normal
-        self.tip_link = tip_link
-        self.root_link = root_link
-        self.expected = self.transform_msg(self.root_link, root_normal)
-
-    def __call__(self):
-        expected = self.expected
-        current = self.transform_msg(self.root_link, self.tip_normal)
-        np.testing.assert_array_almost_equal(msg_to_list(expected.vector), msg_to_list(current.vector), decimal=2)
-
-
-class PointingGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, goal_point, root_link, pointing_axis=None):
-        super(PointingGoalChecker, self).__init__(god_map)
-        self.tip_link = tip_link
-        self.root_link = root_link
-        if pointing_axis:
-            self.tip_V_pointer = self.transform_msg(self.tip_link, pointing_axis)
-        else:
-            self.tip_V_pointer = Vector3Stamped()
-            self.tip_V_pointer.vector.z = 1
-            self.tip_V_pointer.header.frame_id = tip_link
-        self.tip_V_pointer = tf.msg_to_homogeneous_matrix(self.tip_V_pointer)
-        self.goal_point = self.transform_msg(self.root_link, goal_point)
-        self.goal_point.header.stamp = rospy.Time()
-
-    def __call__(self):
-        tip_P_goal = tf.msg_to_homogeneous_matrix(self.transform_msg(self.tip_link, self.goal_point))
-        tip_P_goal[-1] = 0
-        tip_P_goal = tip_P_goal / np.linalg.norm(tip_P_goal)
-        np.testing.assert_array_almost_equal(tip_P_goal, self.tip_V_pointer, decimal=2)
-
-
-class RotationGoalChecker(GoalChecker):
-    def __init__(self, god_map, tip_link, root_link, expected):
-        super().__init__(god_map)
-        self.expected = deepcopy(expected)
-        self.tip_link = tip_link
-        self.root_link = root_link
-        self.expected = self.transform_msg(self.root_link, self.expected)
-
-    def __call__(self):
-        expected = self.expected
-        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
-
-        try:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
-                                                 msg_to_list(current_pose.orientation), decimal=2)
-        except AssertionError:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
-                                                 -np.array(msg_to_list(current_pose.orientation)), decimal=2)
-
-
 class GiskardTestWrapper(GiskardWrapper):
     god_map: GodMap
     default_pose = {}
@@ -393,11 +275,15 @@ class GiskardTestWrapper(GiskardWrapper):
         p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
         compare_poses(p2.pose, map_T_odom.pose)
 
-    @profile
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
         except LookupException as e:
+            try:
+                group_name = self.world.get_group_containing_link_short_name(msg.header.frame_id)
+                msg.header.frame_id = PrefixName(msg.header.frame_id, group_name)
+            except UnknownGroupException:
+                pass
             return self.world.transform_msg(target_frame, msg)
 
     def wait_heartbeats(self, number=2):
@@ -498,10 +384,16 @@ class GiskardTestWrapper(GiskardWrapper):
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
         if root_group is None:
-            root_group = self.world.get_group_containing_link_short_name(root_link)
+            try:
+                root_group = self.world.get_group_containing_link_short_name(root_link)
+            except UnknownGroupException:
+                pass
         root_link = PrefixName(root_link, root_group)
         if tip_group is None:
-            tip_group = self.world.get_group_containing_link_short_name(tip_link)
+            try:
+                tip_group = self.world.get_group_containing_link_short_name(tip_link)
+            except UnknownGroupException:
+                pass
         tip_link = PrefixName(tip_link, tip_group)
         return root_link, tip_link
 
@@ -516,7 +408,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         super().set_joint_goal(goal, group_name, weight=weight, hard=hard)
         if check:
-            self.add_goal_check(JointGoalChecker(god_map=self.god_map,
+            self.add_goal_check(JointGoalChecker(giskard=self,
                                                  goal_state=goal,
                                                  decimal=decimal))
 
@@ -534,39 +426,39 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.sleep(0.5)
 
     def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, tip_group=None, root_group=None,
-                          weight=None, max_velocity=None, check=True,
+                          weight=None, max_velocity=None, check=False,
                           **kwargs):
         if root_link is None:
             root_link = self.get_robot_short_root_link_name(root_group)
         super().set_rotation_goal(goal_orientation=goal_orientation,
                                   tip_link=tip_link,
-                                                          tip_group=tip_group,
+                                  tip_group=tip_group,
                                   root_link=root_link,
-                                                          root_group=root_group,
+                                  root_group=root_group,
                                   max_velocity=max_velocity,
                                   weight=weight, **kwargs)
         if check:
             full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(RotationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_orientation))
+            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
     def set_translation_goal(self, goal_point, tip_link, root_link=None, tip_group=None, root_group=None,
-                             weight=None, max_velocity=None, check=True,
+                             weight=None, max_velocity=None, check=False,
                              **kwargs):
         if root_link is None:
             root_link = self.get_robot_short_root_link_name(root_group)
         super().set_translation_goal(goal_point=goal_point,
                                      tip_link=tip_link,
-                                                             tip_group=tip_group,
+                                     tip_group=tip_group,
                                      root_link=root_link,
-                                                             root_group=root_group,
+                                     root_group=root_group,
                                      max_velocity=max_velocity,
                                      weight=weight,
                                      **kwargs)
         if check:
             full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(TranslationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_point))
+            self.add_goal_check(TranslationGoalChecker(self, full_tip_link, full_root_link, goal_point))
 
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                       weight=None, max_velocity=None,
@@ -574,15 +466,16 @@ class GiskardTestWrapper(GiskardWrapper):
         if root_link is None:
             root_link = self.get_robot_short_root_link_name(root_group)
         super().set_straight_translation_goal(goal_pose=goal_pose,
-                                                                      tip_link=tip_link,
-                                                                      root_link=root_link,
-                                                                      tip_group=tip_group,
-                                                                      root_group=root_group,
+                                              tip_link=tip_link,
+                                              root_link=root_link,
+                                              tip_group=tip_group,
+                                              root_group=root_group,
                                               max_velocity=max_velocity, weight=weight,
                                               **kwargs)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None, weight=None, linear_velocity=None,
-                      angular_velocity=None, check=True, **kwargs):
+    def set_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None, weight=None,
+                      linear_velocity=None,
+                      angular_velocity=None, check=False, **kwargs):
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
         goal_point.point = goal_pose.pose.position
@@ -625,11 +518,11 @@ class GiskardTestWrapper(GiskardWrapper):
             goal_point = PointStamped()
             goal_point.header = goal_pose.header
             goal_point.point = goal_pose.pose.position
-            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_point))
+            self.add_goal_check(TranslationGoalChecker(self, tip_link, root_link, goal_point))
             goal_orientation = QuaternionStamped()
             goal_orientation.header = goal_pose.header
             goal_orientation.quaternion = goal_pose.pose.orientation
-            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_orientation))
+            self.add_goal_check(RotationGoalChecker(self, tip_link, root_link, goal_orientation))
 
     def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
         self.set_json_goal('KeepHandInWorkspace',
@@ -643,56 +536,59 @@ class GiskardTestWrapper(GiskardWrapper):
                            weight=weight,
                            **kwargs)
 
-    def set_pointing_goal(self, tip_link, goal_point, root_link=None, tip_group=None, root_group=None, pointing_axis=None, weight=None, check=True):
+    def set_pointing_goal(self, tip_link, goal_point, root_link=None, tip_group=None, root_group=None,
+                          pointing_axis=None, weight=None, check=False):
         if root_link is None:
             root_link = self.get_robot_short_root_link_name(root_group)
         super().set_pointing_goal(tip_link=tip_link,
-                                                          tip_group=tip_group,
+                                  tip_group=tip_group,
                                   goal_point=goal_point,
                                   root_link=root_link,
-                                                          root_group=root_group,
+                                  root_group=root_group,
                                   pointing_axis=pointing_axis,
                                   weight=weight)
         if check:
             full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
-                                                                   tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(PointingGoalChecker(self.god_map,
+                                                                       tip_link=tip_link, tip_group=tip_group)
+            self.add_goal_check(PointingGoalChecker(self,
                                                     tip_link=full_tip_link,
                                                     goal_point=goal_point,
                                                     root_link=full_root_link,
                                                     pointing_axis=pointing_axis))
 
-    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, tip_group=None, root_group=None, root_normal=None, max_angular_velocity=None,
-                              weight=None, check=True):
+    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, tip_group=None, root_group=None,
+                              root_normal=None, max_angular_velocity=None,
+                              weight=None, check=False):
         if root_link is None:
             root_link = self.get_robot_short_root_link_name(root_group)
         super().set_align_planes_goal(tip_link=tip_link,
                                       tip_group=tip_group,
                                       root_link=root_link,
-                                                              root_group=root_group,
-                                                              tip_normal=tip_normal,
+                                      root_group=root_group,
+                                      tip_normal=tip_normal,
                                       root_normal=root_normal,
                                       max_angular_velocity=max_angular_velocity,
                                       weight=weight)
         if check:
             full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(AlignPlanesGoalChecker(self.god_map, full_tip_link, tip_normal, full_root_link, root_normal))
+            self.add_goal_check(
+                AlignPlanesGoalChecker(self, full_tip_link, tip_normal, full_root_link, root_normal))
 
     def add_goal_check(self, goal_checker):
         self.goal_checks[self.number_of_cmds - 1].append(goal_checker)
 
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                weight=None, linear_velocity=None, angular_velocity=None,
-                               check=True):
+                               check=False):
         if root_link is None:
             root_link = self.get_robot_short_root_link_name(root_group)
         super().set_straight_cart_goal(goal_pose,
-                                                               tip_link,
-                                                               root_link,
-                                                               tip_group=tip_group,
-                                                               root_group=root_group,
-                                                               weight=weight,
+                                       tip_link,
+                                       root_link,
+                                       tip_group=tip_group,
+                                       root_group=root_group,
+                                       weight=weight,
                                        max_linear_velocity=linear_velocity,
                                        max_angular_velocity=angular_velocity)
 
@@ -702,11 +598,11 @@ class GiskardTestWrapper(GiskardWrapper):
             goal_point = PointStamped()
             goal_point.header = goal_pose.header
             goal_point.point = goal_pose.pose.position
-            self.add_goal_check(TranslationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_point))
+            self.add_goal_check(TranslationGoalChecker(self, full_tip_link, full_root_link, goal_point))
             goal_orientation = QuaternionStamped()
             goal_orientation.header = goal_pose.header
             goal_orientation.quaternion = goal_pose.pose.orientation
-            self.add_goal_check(RotationGoalChecker(self.god_map, full_tip_link, full_root_link, goal_orientation))
+            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
     #
     # GENERAL GOAL STUFF ###############################################################################################
@@ -1074,19 +970,21 @@ class GiskardTestWrapper(GiskardWrapper):
         :rtype: list
         """
         self.collision_scene.reset_cache()
-        collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
-                                          distance=distance_threshold,
-                                          group1=self.get_robot_name()),
-                           CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-                                          distance=distance_threshold,
-                                          group1=self.get_robot_name(),
-                                          group2=self.get_robot_name())
-                           ]
+        collision_goals = []
+        for robot_name in self.robot_names:
+            collision_goals.append(CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
+                                                  distance=distance_threshold,
+                                                  group1=robot_name))
+            collision_goals.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
+                                                  distance=distance_threshold,
+                                                  group1=robot_name,
+                                                  group2=robot_name))
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
-                                                                                    defaultdict(lambda: 0.3))
-        collisions = self.collision_scene.check_collisions(collision_matrix)
-        controlled_parent_joint = self.robot().get_controlled_parent_joint_of_link(link)
-        controlled_parent_link = self.robot().joints[controlled_parent_joint].child_link_name
+                                                                                    defaultdict(lambda: 0.3),
+                                                                                    self.collision_scene.ignored_self_collion_pairs)
+        collisions = self.collision_scene.check_collisions(collision_matrix, 15)
+        controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link)
+        controlled_parent_link = self.world.joints[controlled_parent_joint].child_link_name
         collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():
             if controlled_parent_link in key:
@@ -1173,16 +1071,20 @@ class PR22(GiskardTestWrapper):
         self.default_roots = dict()
         self.tf_prefix = dict()
         self.robot_names = ['pr2_a', 'pr2_b']
-        super(PR22, self).__init__(u'package://giskardpy/config/pr2_twice.yaml', self.robot_names , self.robot_names)
+        super(PR22, self).__init__(u'package://giskardpy/config/pr2_twice.yaml', self.robot_names, self.robot_names)
         for robot_name in self.namespaces:
             self.r_tips[robot_name] = u'r_gripper_tool_frame'
             self.l_tips[robot_name] = u'l_gripper_tool_frame'
             self.tf_prefix[robot_name] = robot_name.replace('/', '')
-            self.r_grippers[robot_name] = rospy.ServiceProxy(u'/{}/r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
-            self.l_grippers[robot_name] = rospy.ServiceProxy(u'/{}/l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
-            self.set_localization_srvs[robot_name] = rospy.ServiceProxy('/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
-                                                                        UpdateTransform)
-            self.set_bases[robot_name] = rospy.ServiceProxy('/{}/base_simulator/set_joint_states'.format(robot_name), SetJointState)
+            self.r_grippers[robot_name] = rospy.ServiceProxy(
+                u'/{}/r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+            self.l_grippers[robot_name] = rospy.ServiceProxy(
+                u'/{}/l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+            self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
+                '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+                UpdateTransform)
+            self.set_bases[robot_name] = rospy.ServiceProxy('/{}/base_simulator/set_joint_states'.format(robot_name),
+                                                            SetJointState)
             self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
 
     def move_base(self, goal_pose, robot_name):
@@ -1258,9 +1160,9 @@ class PR22(GiskardTestWrapper):
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                                               goal_pose.pose.orientation.y,
-                                                                                               goal_pose.pose.orientation.z,
-                                                                                               goal_pose.pose.orientation.w]))[0]}
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         self.set_bases[robot_name].call(goal)
@@ -1289,42 +1191,42 @@ class PR22(GiskardTestWrapper):
 
 class PR2AndDonbot(GiskardTestWrapper):
     default_pose_pr2 = {'r_elbow_flex_joint': -0.15,
-                    'r_forearm_roll_joint': 0,
-                    'r_shoulder_lift_joint': 0,
-                    'r_shoulder_pan_joint': 0,
-                    'r_upper_arm_roll_joint': 0,
-                    'r_wrist_flex_joint': -0.10001,
-                    'r_wrist_roll_joint': 0,
-                    'l_elbow_flex_joint': -0.15,
-                    'l_forearm_roll_joint': 0,
-                    'l_shoulder_lift_joint': 0,
-                    'l_shoulder_pan_joint': 0,
-                    'l_upper_arm_roll_joint': 0,
-                    'l_wrist_flex_joint': -0.10001,
-                    'l_wrist_roll_joint': 0,
-                    'torso_lift_joint': 0.2,
-                    'head_pan_joint': 0,
-                    'head_tilt_joint': 0}
+                        'r_forearm_roll_joint': 0,
+                        'r_shoulder_lift_joint': 0,
+                        'r_shoulder_pan_joint': 0,
+                        'r_upper_arm_roll_joint': 0,
+                        'r_wrist_flex_joint': -0.10001,
+                        'r_wrist_roll_joint': 0,
+                        'l_elbow_flex_joint': -0.15,
+                        'l_forearm_roll_joint': 0,
+                        'l_shoulder_lift_joint': 0,
+                        'l_shoulder_pan_joint': 0,
+                        'l_upper_arm_roll_joint': 0,
+                        'l_wrist_flex_joint': -0.10001,
+                        'l_wrist_roll_joint': 0,
+                        'torso_lift_joint': 0.2,
+                        'head_pan_joint': 0,
+                        'head_tilt_joint': 0}
 
     better_pose_pr2 = {'r_shoulder_pan_joint': -1.7125,
-                   'r_shoulder_lift_joint': -0.25672,
-                   'r_upper_arm_roll_joint': -1.46335,
-                   'r_elbow_flex_joint': -2.12,
-                   'r_forearm_roll_joint': 1.76632,
-                   'r_wrist_flex_joint': -0.10001,
-                   'r_wrist_roll_joint': 0.05106,
-                   'l_shoulder_pan_joint': 1.9652,
-                   'l_shoulder_lift_joint': - 0.26499,
-                   'l_upper_arm_roll_joint': 1.3837,
-                   'l_elbow_flex_joint': -2.12,
-                   'l_forearm_roll_joint': 16.99,
-                   'l_wrist_flex_joint': - 0.10001,
-                   'l_wrist_roll_joint': 0,
-                   'torso_lift_joint': 0.2,
+                       'r_shoulder_lift_joint': -0.25672,
+                       'r_upper_arm_roll_joint': -1.46335,
+                       'r_elbow_flex_joint': -2.12,
+                       'r_forearm_roll_joint': 1.76632,
+                       'r_wrist_flex_joint': -0.10001,
+                       'r_wrist_roll_joint': 0.05106,
+                       'l_shoulder_pan_joint': 1.9652,
+                       'l_shoulder_lift_joint': - 0.26499,
+                       'l_upper_arm_roll_joint': 1.3837,
+                       'l_elbow_flex_joint': -2.12,
+                       'l_forearm_roll_joint': 16.99,
+                       'l_wrist_flex_joint': - 0.10001,
+                       'l_wrist_roll_joint': 0,
+                       'torso_lift_joint': 0.2,
 
-                   'head_pan_joint': 0,
-                   'head_tilt_joint': 0,
-                   }
+                       'head_pan_joint': 0,
+                       'head_tilt_joint': 0,
+                       }
 
     default_pose_donbot = {
         'ur5_elbow_joint': 0.0,
@@ -1371,11 +1273,15 @@ class PR2AndDonbot(GiskardTestWrapper):
                 self.r_tips[robot_name] = u'r_gripper_tool_frame'
                 self.l_tips[robot_name] = u'l_gripper_tool_frame'
                 self.tf_prefix[robot_name] = robot_name.replace('/', '')
-                self.r_grippers[robot_name] = rospy.ServiceProxy(u'/{}/r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
-                self.l_grippers[robot_name] = rospy.ServiceProxy(u'/{}/l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
-                self.set_localization_srvs[robot_name] = rospy.ServiceProxy('/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
-                                                                            UpdateTransform)
-                self.set_bases[robot_name] = rospy.ServiceProxy('/{}/base_simulator/set_joint_states'.format(robot_name), SetJointState)
+                self.r_grippers[robot_name] = rospy.ServiceProxy(
+                    u'/{}/r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+                self.l_grippers[robot_name] = rospy.ServiceProxy(
+                    u'/{}/l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+                self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
+                    '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+                    UpdateTransform)
+                self.set_bases[robot_name] = rospy.ServiceProxy(
+                    '/{}/base_simulator/set_joint_states'.format(robot_name), SetJointState)
                 self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
                 self.default_poses[robot_name] = self.default_pose_pr2
                 self.better_poses[robot_name] = self.better_pose_pr2
@@ -1422,7 +1328,8 @@ class PR2AndDonbot(GiskardTestWrapper):
         self.gripper_pubs[robot_name].publish(goal)
         rospy.sleep(0.5)
         self.wait_heartbeats()
-        np.testing.assert_almost_equal(self.world.state[PrefixName(gripper_joint, robot_name)].position, width, decimal=3)
+        np.testing.assert_almost_equal(self.world.state[PrefixName(gripper_joint, robot_name)].position, width,
+                                       decimal=3)
 
     def reset_base(self, robot_name):
         p = PoseStamped()
@@ -1452,10 +1359,10 @@ class PR2AndDonbot(GiskardTestWrapper):
             goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
             js = {'odom_x_joint': goal_pose.pose.position.x,
                   'odom_y_joint': goal_pose.pose.position.y,
-                   'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                           goal_pose.pose.orientation.y,
-                                                                           goal_pose.pose.orientation.z,
-                                                                           goal_pose.pose.orientation.w]))[0]}
+                  'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                          goal_pose.pose.orientation.y,
+                                                                          goal_pose.pose.orientation.z,
+                                                                          goal_pose.pose.orientation.w]))[0]}
             self.allow_all_collisions()
             self.set_joint_goal(js, group_name=robot_name, decimal=1)
             self.plan_and_execute()
@@ -1523,13 +1430,14 @@ class PR2AndDonbot(GiskardTestWrapper):
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                                               goal_pose.pose.orientation.y,
-                                                                                               goal_pose.pose.orientation.z,
-                                                                                               goal_pose.pose.orientation.w]))[0]}
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         self.set_bases[robot_name].call(goal)
         rospy.sleep(0.5)
+
 
 class PR2(GiskardTestWrapper):
     default_pose = {'r_elbow_flex_joint': -0.15,
@@ -1641,6 +1549,7 @@ class PR2(GiskardTestWrapper):
         self.register_group('r_gripper',
                             parent_group_name=self.robot_name,
                             root_link_name='r_wrist_roll_link')
+
 
 class PR2CloseLoop(PR2):
 
@@ -1754,15 +1663,18 @@ class Donbot2(GiskardTestWrapper):
         self.default_roots = dict()
         self.set_localization_srvs = dict()
         self.robot_names = ['donbot_a', 'donbot_b']
-        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml', self.robot_names, self.robot_names)
+        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml', self.robot_names,
+                                      self.robot_names)
         for robot_name in self.namespaces:
             self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
             self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)
             self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
-            self.set_localization_srvs[robot_name] = rospy.ServiceProxy('/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
-                                                                        UpdateTransform)
-            self.gripper_pubs[robot_name] = rospy.Publisher('/{}'.format(str(PrefixName(self.gripper_pub_topic, robot_name))),
-                                                            PositionCmd, queue_size=10)
+            self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
+                '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+                UpdateTransform)
+            self.gripper_pubs[robot_name] = rospy.Publisher(
+                '/{}'.format(str(PrefixName(self.gripper_pub_topic, robot_name))),
+                PositionCmd, queue_size=10)
 
     def move_base(self, robot_name, goal_pose):
         goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
@@ -1805,7 +1717,8 @@ class Donbot2(GiskardTestWrapper):
         self.gripper_pubs[robot_name].publish(goal)
         rospy.sleep(0.5)
         self.wait_heartbeats()
-        np.testing.assert_almost_equal(self.world.groups[robot_name].state[str(PrefixName(gripper_joint, robot_name))].position, width, decimal=3)
+        np.testing.assert_almost_equal(
+            self.world.groups[robot_name].state[str(PrefixName(gripper_joint, robot_name))].position, width, decimal=3)
 
     def reset_base(self, robot_name):
         p = PoseStamped()
@@ -2082,3 +1995,116 @@ class SuccessfulActionServer(object):
         rospy.sleep(goal.trajectory.points[-1].time_from_start)
         if self._as.is_active():
             self._as.set_succeeded()
+
+
+class GoalChecker:
+    def __init__(self, giskard: GiskardTestWrapper):
+        self.giskard = giskard
+        self.god_map = giskard.god_map
+        self.world: WorldTree = self.god_map.unsafe_get_data(identifier.world)
+        # self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+
+
+class JointGoalChecker(GoalChecker):
+    def __init__(self, giskard, goal_state, decimal=2):
+        super().__init__(giskard)
+        self.goal_state = goal_state
+        self.decimal = decimal
+
+    def get_current_joint_state(self) -> JointStates:
+        return self.world.state
+
+    def __call__(self):
+        current_joint_state = self.get_current_joint_state()
+        self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
+
+    def compare_joint_state(self, current_js, goal_js, decimal=2):
+        """
+        :type current_js: dict
+        :type goal_js: dict
+        :type decimal: int
+        """
+        for joint_name in goal_js:
+            group_name = self.world.get_group_containing_joint_short_name(joint_name)
+            full_joint_name = PrefixName(joint_name, group_name)
+            goal = goal_js[joint_name]
+            current = current_js[full_joint_name].position
+            if self.world.is_joint_continuous(full_joint_name):
+                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
+                                               err_msg='{}: actual: {} desired: {}'.format(full_joint_name, current,
+                                                                                           goal))
+            else:
+                np.testing.assert_almost_equal(current, goal, decimal,
+                                               err_msg='{}: actual: {} desired: {}'.format(full_joint_name, current,
+                                                                                           goal))
+
+
+class TranslationGoalChecker(GoalChecker):
+    def __init__(self, giskard, tip_link, root_link, expected):
+        super().__init__(giskard)
+        self.expected = deepcopy(expected)
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = self.giskard.transform_msg(self.root_link, self.expected)
+
+    def __call__(self):
+        expected = self.expected
+        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
+        np.testing.assert_array_almost_equal(msg_to_list(expected.point),
+                                             msg_to_list(current_pose.pose.position), decimal=2)
+
+
+class AlignPlanesGoalChecker(GoalChecker):
+    def __init__(self, giskard, tip_link, tip_normal, root_link, root_normal):
+        super().__init__(giskard)
+        self.tip_normal = tip_normal
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = self.giskard.transform_msg(self.root_link, root_normal)
+
+    def __call__(self):
+        expected = self.expected
+        current = self.giskard.transform_msg(self.root_link, self.tip_normal)
+        np.testing.assert_array_almost_equal(msg_to_list(expected.vector), msg_to_list(current.vector), decimal=2)
+
+
+class PointingGoalChecker(GoalChecker):
+    def __init__(self, giskard, tip_link, goal_point, root_link, pointing_axis=None):
+        super().__init__(giskard)
+        self.tip_link = tip_link
+        self.root_link = root_link
+        if pointing_axis:
+            self.tip_V_pointer = self.giskard.transform_msg(self.tip_link, pointing_axis)
+        else:
+            self.tip_V_pointer = Vector3Stamped()
+            self.tip_V_pointer.vector.z = 1
+            self.tip_V_pointer.header.frame_id = tip_link
+        self.tip_V_pointer = tf.msg_to_homogeneous_matrix(self.tip_V_pointer)
+        self.goal_point = self.giskard.transform_msg(self.root_link, goal_point)
+        self.goal_point.header.stamp = rospy.Time()
+
+    def __call__(self):
+        tip_P_goal = tf.msg_to_homogeneous_matrix(self.giskard.transform_msg(self.tip_link, self.goal_point))
+        tip_P_goal[-1] = 0
+        tip_P_goal = tip_P_goal / np.linalg.norm(tip_P_goal)
+        np.testing.assert_array_almost_equal(tip_P_goal, self.tip_V_pointer, decimal=2)
+
+
+class RotationGoalChecker(GoalChecker):
+    def __init__(self, giskard, tip_link, root_link, expected):
+        super().__init__(giskard)
+        self.expected = deepcopy(expected)
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = self.giskard.transform_msg(self.root_link, self.expected)
+
+    def __call__(self):
+        expected = self.expected
+        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
+
+        try:
+            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.quaternion),
+                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
+        except AssertionError:
+            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.quaternion),
+                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)

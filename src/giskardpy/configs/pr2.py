@@ -1,4 +1,5 @@
 from giskardpy.configs.default_config import Giskard
+from giskardpy.data_types import PrefixName
 
 
 class PR2_Mujoco(Giskard):
@@ -17,42 +18,46 @@ class PR2_Mujoco(Giskard):
                                       child_link_name='base_footprint',
                                       odometry_topic='/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
 
-        link_to_ignore = ['bl_caster_l_wheel_link',
-                          'bl_caster_r_wheel_link',
-                          'bl_caster_rotation_link',
-                          'br_caster_l_wheel_link',
-                          'br_caster_r_wheel_link',
-                          'br_caster_rotation_link',
-                          'fl_caster_l_wheel_link',
-                          'fl_caster_r_wheel_link',
-                          'fl_caster_rotation_link',
-                          'fr_caster_l_wheel_link',
-                          'fr_caster_r_wheel_link',
-                          'fr_caster_rotation_link',
-                          'l_shoulder_lift_link',
-                          'r_shoulder_lift_link',
-                          'base_link']
+        link_to_ignore = [PrefixName('bl_caster_l_wheel_link', self.get_default_group_name()),
+                          PrefixName('bl_caster_r_wheel_link', self.get_default_group_name()),
+                          PrefixName('bl_caster_rotation_link', self.get_default_group_name()),
+                          PrefixName('br_caster_l_wheel_link', self.get_default_group_name()),
+                          PrefixName('br_caster_r_wheel_link', self.get_default_group_name()),
+                          PrefixName('br_caster_rotation_link', self.get_default_group_name()),
+                          PrefixName('fl_caster_l_wheel_link', self.get_default_group_name()),
+                          PrefixName('fl_caster_r_wheel_link', self.get_default_group_name()),
+                          PrefixName('fl_caster_rotation_link', self.get_default_group_name()),
+                          PrefixName('fr_caster_l_wheel_link', self.get_default_group_name()),
+                          PrefixName('fr_caster_r_wheel_link', self.get_default_group_name()),
+                          PrefixName('fr_caster_rotation_link', self.get_default_group_name()),
+                          PrefixName('l_shoulder_lift_link', self.get_default_group_name()),
+                          PrefixName('r_shoulder_lift_link', self.get_default_group_name()),
+                          PrefixName('base_link', self.get_default_group_name())]
         for link_name in link_to_ignore:
             self.collision_avoidance_config.ignore_all_self_collisions_of_link(link_name)
         self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                                                  hard_threshold=0.0)
-        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
+        for joint_name in [PrefixName('r_wrist_roll_joint', self.get_default_group_name()),
+                           PrefixName('l_wrist_roll_joint', self.get_default_group_name())]:
             self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
                                                                                    number_of_repeller=4,
                                                                                    soft_threshold=0.05,
                                                                                    hard_threshold=0.0,
                                                                                    max_velocity=0.2)
-        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
+        for joint_name in [PrefixName('r_wrist_flex_joint', self.get_default_group_name()),
+                           PrefixName('l_wrist_flex_joint', self.get_default_group_name())]:
             self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
                                                                                    number_of_repeller=2,
                                                                                    soft_threshold=0.05,
                                                                                    hard_threshold=0.0,
                                                                                    max_velocity=0.2)
-        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
+        for joint_name in [PrefixName('r_elbow_flex_joint', self.get_default_group_name()),
+                           PrefixName('l_elbow_flex_joint', self.get_default_group_name())]:
             self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
                                                                                    soft_threshold=0.05,
                                                                                    hard_threshold=0.0)
-        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
+        for joint_name in [PrefixName('r_forearm_roll_joint', self.get_default_group_name()),
+                           PrefixName('l_forearm_roll_joint', self.get_default_group_name())]:
             self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
                                                                                    soft_threshold=0.025,
                                                                                    hard_threshold=0.0)

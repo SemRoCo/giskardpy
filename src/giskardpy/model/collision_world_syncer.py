@@ -74,10 +74,10 @@ class Collisions:
     @profile
     def __init__(self, god_map: GodMap, collision_list_size):
         self.god_map = god_map
-        self.collision_avoidance_config: CollisionAvoidanceConfig = self.god_map.get_data(identifier.collision_avoidance_config)
-        self.fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-        self.world: WorldTree = self.god_map.get_data(identifier.world)
         self.collision_scene: CollisionWorldSynchronizer = self.god_map.get_data(identifier.collision_scene)
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(identifier.collision_avoidance_configs)
+        self.fixed_joints = self.collision_scene.fixed_joints
+        self.world: WorldTree = self.god_map.get_data(identifier.world)
         self.collision_list_size = collision_list_size
 
         # @profile
@@ -250,19 +250,19 @@ class CollisionWorldSynchronizer:
 
     def __init__(self, world):
         self.world = world  # type: WorldTree
-        self.collision_avoidance_config: CollisionAvoidanceConfig = self.god_map.get_data(identifier.collision_avoidance_config)
-        self.fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-        self.links_to_ignore = set(self.collision_avoidance_config.ignored_collisions)
-        try:
-            self.ignored_pairs = set(self.god_map.get_data(identifier.ignored_self_collisions))
-        except KeyError as e:
-            self.ignored_pairs = set()
-        try:
-            self.white_list_pairs = self.god_map.get_data(identifier.added_self_collisions)
-            self.white_list_pairs = set(
-                tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
-        except KeyError as e:
-            self.white_list_pairs = set()
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(identifier.collision_avoidance_configs)
+        self.fixed_joints = []
+        self.links_to_ignore = set()
+        self.ignored_self_collion_pairs = set()
+        self.white_list_pairs = set()
+        for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
+            self.fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+            self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))
+            self.ignored_self_collion_pairs.update(collision_avoidance_config.ignored_self_collisions)
+            self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
+        self.white_list_pairs = set(
+            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
+        self.fixed_joints = tuple(self.fixed_joints)
 
         self.world_version = -1
 
@@ -340,10 +340,10 @@ class CollisionWorldSynchronizer:
                 if link_a == link_b \
                         or link_a.short_name in self.links_to_ignore \
                         or link_b.short_name in self.links_to_ignore \
-                        or link_a.short_name in self.ignored_pairs \
-                        or link_b.short_name in self.ignored_pairs \
-                        or (link_a.short_name, link_b.short_name) in self.ignored_pairs \
-                        or (link_b.short_name, link_a.short_name) in self.ignored_pairs \
+                        or link_a.short_name in self.ignored_self_collion_pairs \
+                        or link_b.short_name in self.ignored_self_collion_pairs \
+                        or (link_a.short_name, link_b.short_name) in self.ignored_self_collion_pairs \
+                        or (link_b.short_name, link_a.short_name) in self.ignored_self_collion_pairs \
                         or group.are_linked(link_a, link_b, non_controlled=non_controlled, exception=self.fixed_joints) \
                         or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
                     self.add_black_list_entry(*link_combination)

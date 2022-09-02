@@ -76,7 +76,7 @@ def kitchen_setup(better_pose):
                          pose=tf.lookup_pose('map', 'iai_kitchen/world'),
                          js_topic='/kitchen/joint_states',
                          set_js_topic='/kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
+    js = {str(k.short_name): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
     better_pose.set_kitchen_js(js)
     return better_pose
 

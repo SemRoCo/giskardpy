@@ -51,10 +51,12 @@ class CollisionMarker(GiskardBehavior):
         m.pose.orientation.w = 1
         if len(collisions) > 0:
             for collision in collisions:  # type: Collision
+                group_name = collision.link_a.prefix
+                config = self.collision_avoidance_configs[group_name]
                 if collision.is_external:
-                    thresholds = self.collision_avoidance_config.external_collision_avoidance[collision.link_a]
+                    thresholds = config.external_collision_avoidance[collision.link_a]
                 else:
-                    thresholds = self.collision_avoidance_config.self_collision_avoidance[collision.link_a]
+                    thresholds = config.self_collision_avoidance[collision.link_a]
                 red_threshold = thresholds.hard_threshold
                 yellow_threshold = thresholds.soft_threshold
                 contact_distance = collision.contact_distance

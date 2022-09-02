@@ -144,7 +144,7 @@ class PrefixDefaultDict(KeyDefaultDict):
         """
         :type key: PrefixName
         """
-        return super(PrefixDefaultDict, self).__missing__(key.prefix, cache=False)
+        return super().__missing__(key.prefix, cache=False)
 
 
 class PrefixName:

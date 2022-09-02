@@ -12,7 +12,7 @@ import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import PrefixName
-from giskardpy.exceptions import ConstraintInitalizationException, GiskardException
+from giskardpy.exceptions import ConstraintInitalizationException, GiskardException, UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, expr_matrix, expr_symbol
@@ -72,25 +72,14 @@ class Goal:
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
+            try:
+                group_name = self.world.get_group_containing_link_short_name(msg.header.frame_id)
+                msg.header.frame_id = self.world.get_link(msg.header.frame_id, group_name)
+            except UnknownGroupException:
+                pass
             return self.world.transform_msg(target_frame, msg)
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
-
-    def get_link(self, link_name: str, group_name: str) -> PrefixName:
-        if '/' in link_name:
-            raise Exception(f'Link name {link_name} contains invalid character \'/\''
-                            f' or may contain already a prefix.')
-        if group_name is None:
-            group_name = self.world.get_group_containing_link_short_name(link_name)
-        return PrefixName(link_name, group_name)
-
-    def get_joint(self, joint_name: str, group_name: str) -> PrefixName:
-        if '/' in joint_name:
-            raise Exception(f'Link name {joint_name} contains invalid character \'/\''
-                            f' or may contain already a prefix.')
-        if group_name is None:
-            group_name = self.world.get_group_containing_joint_short_name(joint_name)
-        return PrefixName(joint_name, group_name)
 
     def get_joint_position_symbol(self, joint_name: my_string) -> expr_symbol:
         """

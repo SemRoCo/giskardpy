@@ -28,10 +28,11 @@ from giskardpy.utils.time_collector import TimeCollector
 
 class Giskard:
     def __init__(self):
+        self.collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
         self.general_config: GeneralConfig = GeneralConfig()
         self.qp_solver_config: QPSolverConfig = QPSolverConfig()
         self.behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
-        self.collision_avoidance_config: CollisionAvoidanceConfig = CollisionAvoidanceConfig()
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
         self.robot_interface_configs: List[RobotInterfaceConfig] = []
         self.hardware_config: HardwareConfig = HardwareConfig()
         self._god_map = GodMap.init_from_paramserver()
@@ -43,6 +44,10 @@ class Giskard:
         blackboard.god_map = self._god_map
         self._backup = {}
         self.group_names = []
+
+    @property
+    def collision_avoidance_config(self):
+        return self.collision_avoidance_configs[self.get_default_group_name()]
 
     def add_robot_urdf(self, urdf: str, **kwargs):
         robot = RobotInterfaceConfig(urdf, **kwargs)
@@ -166,22 +171,22 @@ class Giskard:
         world.delete_all_but_robots()
         world.register_controlled_joints(self._controlled_joints)
 
-        if self.collision_avoidance_config.collision_checker == CollisionCheckerLib.bpb:
+        if self.collision_checker == CollisionCheckerLib.bpb:
             logging.loginfo('Using bpb for collision checking.')
             from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
             collision_scene = BetterPyBulletSyncer(world)
-        elif self.collision_avoidance_config.collision_checker == CollisionCheckerLib.pybullet:
+        elif self.collision_checker == CollisionCheckerLib.pybullet:
             logging.loginfo('Using pybullet for collision checking.')
             from giskardpy.model.pybullet_syncer import PyBulletSyncer
             collision_scene = PyBulletSyncer(world)
-        elif self.collision_avoidance_config.collision_checker == CollisionCheckerLib.none:
+        elif self.collision_checker == CollisionCheckerLib.none:
             logging.logwarn('Using no collision checking.')
             from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
             collision_scene = CollisionWorldSynchronizer(world)
         else:
-            raise KeyError(f'Unknown collision checker {self.collision_avoidance_config.collision_checker}. '
+            raise KeyError(f'Unknown collision checker {self.collision_checker}. '
                            f'Collision avoidance is disabled')
-        self._god_map.set_data(identifier.collision_checker, self.collision_avoidance_config.collision_checker)
+        self._god_map.set_data(identifier.collision_checker, self.collision_checker)
         self._god_map.set_data(identifier.collision_scene, collision_scene)
         if self.general_config.control_mode == ControlModes.open_loop:
             self._tree = OpenLoop(self._god_map)

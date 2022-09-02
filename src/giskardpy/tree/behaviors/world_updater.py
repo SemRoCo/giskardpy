@@ -230,6 +230,11 @@ class WorldUpdater(GiskardBehavior):
             global_pose = transform_pose(tf.get_tf_root(), req.pose)
         except:
             global_pose = req.pose
+        try:
+            group_name = self.world.get_group_containing_link_short_name(req.parent_link)
+            req.parent_link = self.world.get_link(req.parent_link, group_name)
+        except UnknownGroupException:
+            pass
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,
@@ -240,7 +245,8 @@ class WorldUpdater(GiskardBehavior):
         logging.loginfo(f'Added object \'{req.group_name}\' on \'{req.parent_link_group}\' at \'{req.parent_link}\'.')
         if world_body.joint_state_topic:
             # plugin_name = str(PrefixName(req.group_name, 'js'))
-            plugin = running_is_success(SyncConfiguration)(joint_state_topic=world_body.joint_state_topic)
+            plugin = running_is_success(SyncConfiguration)(group_name=req.group_name,
+                                                           joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')

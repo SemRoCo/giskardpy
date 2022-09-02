@@ -88,8 +88,6 @@ class CollisionAvoidanceConfig:
             return cls(soft_threshold=0.025, hard_threshold=0.0)
 
     def __init__(self):
-        self.collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
-
         self.add_self_collisions: List[Tuple[str, str]] = []
         self.ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
         self.ignored_collisions: List[str] = []

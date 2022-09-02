@@ -1,4 +1,5 @@
 from time import time
+from typing import Dict
 
 from py_trees import Behaviour, Blackboard
 
@@ -28,8 +29,8 @@ class GiskardBehavior(Behaviour):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @property
-    def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
-        return self.god_map.unsafe_get_data(identifier.collision_avoidance_config)
+    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceConfig]:
+        return self.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
 
     def get_god_map(self):
         """

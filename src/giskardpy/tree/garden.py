@@ -16,7 +16,7 @@ from giskardpy.data_types import order_map
 from giskardpy.global_planner_needed import GlobalPlannerNeeded
 from giskardpy.god_map import GodMap
 from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
-from giskardpy.path_planning.global_planner import PreGraspSampler, GlobalPlanner
+from giskardpy.path_planning.global_planner import GlobalPlanner
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
@@ -545,7 +545,6 @@ class OpenLoop(TreeManager):
         planning = success_is_failure(Sequence)('planning')
         planning.add_child(IF('command set?', identifier.next_move_goal))
         global_planning = Sequence(u'global planning')
-        global_planning.add_child(PreGraspSampler())
         self.global_planner_needed = running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded',
                                                                           self.action_server_name)
         global_planning.add_child(self.global_planner_needed)

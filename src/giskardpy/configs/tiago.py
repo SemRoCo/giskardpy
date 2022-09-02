@@ -40,8 +40,8 @@ class TiagoBase(Giskard):
                                                                                soft_threshold=0.05,
                                                                                hard_threshold=0.0,
                                                                                max_velocity=0.2)
-        self.collision_avoidance_config.set_default_self_collision_avoidance(hard_threshold=0.03,
-                                                                             soft_threshold=0.07)
+        self.collision_avoidance_config.set_default_self_collision_avoidance(hard_threshold=0.04,
+                                                                             soft_threshold=0.08)
         self.collision_avoidance_config.set_default_external_collision_avoidance(hard_threshold=0.03,
                                                                                  soft_threshold=0.08)
         # self.general_config.joint_limits['jerk'] = defaultdict(lambda: 60)

@@ -583,10 +583,11 @@ class GiskardTestWrapper(GiskardWrapper):
                            map_frame=map_frame,
                            base_footprint=base_footprint)
 
-    def set_diff_drive_tangential_to_point(self, goal_point: PointStamped, weight: float = WEIGHT_ABOVE_CA):
+    def set_diff_drive_tangential_to_point(self, goal_point: PointStamped, weight: float = WEIGHT_ABOVE_CA, **kwargs):
         self.set_json_goal('DiffDriveTangentialToPoint',
                            goal_point=goal_point,
-                           weight=weight)
+                           weight=weight,
+                           **kwargs)
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None, check=True,
                           **kwargs: goal_parameter):

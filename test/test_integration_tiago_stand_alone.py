@@ -750,25 +750,34 @@ class TestCollisionAvoidance:
                                       check=False)
         goal_point = PointStamped()
         goal_point.header.frame_id = 'cabinet1_door_top_left'
+        goal_point = apartment_setup.transform_msg('map', goal_point)
         # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
         apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
         # apartment_setup.avoid_joint_limits(50)
         # apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.plan_and_execute()
 
+        pointing_point = PointStamped()
+        pointing_point.header.frame_id = 'gripper_left_grasping_frame'
+        apartment_setup.set_pointing_goal(tip_link='xtion_optical_frame',
+                                          root_link='gripper_left_grasping_frame',
+                                          goal_point=pointing_point,
+                                          check=False)
+
         apartment_setup.set_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       weight=WEIGHT_ABOVE_CA * 10,
                                       check=False)
-        goal_point = PointStamped()
-        goal_point.header.frame_id = 'cabinet1_door_top_left'
         # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
         # apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
         # apartment_setup.avoid_joint_limits(50)
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.plan_and_execute()
-
+        # type: "DiffDriveTangentialToPoint"
+        # parameter_value_pair: "{\"goal_point\":{\"message_type\":\"geometry_msgs/PointStamped\",\"message\":{\"\
+    # header\":{\"stamp\":{\"secs\":0,\"nsecs\":0.0},\"frame_id\":\"map\",\"seq\":0},\"\
+    # point\":{\"x\":0.563000037094409,\"y\":1.1559999675637478,\"z\":1.39499994913737}}}}"
         apartment_setup.set_json_goal('Close',
                                       tip_link=l_tcp,
                                       environment_link=handle_name)

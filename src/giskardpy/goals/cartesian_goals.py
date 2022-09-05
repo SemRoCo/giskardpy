@@ -69,9 +69,6 @@ class ShakyCartesianPosition(Goal):
         self.root_link = root_link
         self.tip_link = tip_link
         super(ShakyCartesianPosition, self).__init__(**kwargs)
-        if not self.world.are_linked(root_link, tip_link):
-            raise ConstraintException(u'{} called with non linked links {} and {} '.format(self.__class__.__name__,
-                                                                                           root_link, tip_link))
 
         self.frequency = frequency
         self.noise_amplitude = noise_amplitude
@@ -84,7 +81,7 @@ class ShakyCartesianPosition(Goal):
         elif shaking_axis == 'z':
             self.shaking_index = 2
         else:
-            raise Exception('no')
+            raise Exception('Shaking axis can only be x, y, or z.')
 
     def make_constraints(self):
         """

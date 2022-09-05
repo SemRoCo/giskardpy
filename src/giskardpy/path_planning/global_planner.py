@@ -415,12 +415,12 @@ class GlobalPlanner(GetGoal):
                 js = self.get_god_map().get_data(identifier.joint_states)
                 try:
                     trajectory = planner.setup_and_plan(js)
-                    rospy.logerr(f"Found solution:{len(trajectory) != 0}")
+                    # rospy.logerr(f"Found solution:{len(trajectory) != 0}")
                     if len(trajectory) != 0:
                         if self.god_map.get_data(identifier.path_interpolation):
                             planner.interpolate_solution()
                             trajectory = planner.get_solution(ob.PlannerStatus.EXACT_SOLUTION)
-                        rospy.logerr(trajectory.tolist())
+                        # rospy.logerr(trajectory.tolist())
                         return trajectory, planner_name, motion_validator_type
                 finally:
                     planner.clear()

@@ -13,8 +13,8 @@ from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.data_types import order_map
-from giskardpy.global_planner_needed import GlobalPlannerNeeded
 from giskardpy.god_map import GodMap
+from giskardpy.path_planning.global_planner_needed import GlobalPlannerNeeded
 from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
 from giskardpy.path_planning.global_planner import GlobalPlanner
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
@@ -493,7 +493,6 @@ class OpenLoop(TreeManager):
         root.add_child(self.grow_wait_for_goal())
         root.add_child(CleanUp('cleanup'))
         root.add_child(self.grow_process_goal())
-        self.global_planner_needed.solver = self.planning_4
         root.add_child(self.grow_execution())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
@@ -545,9 +544,8 @@ class OpenLoop(TreeManager):
         planning = success_is_failure(Sequence)('planning')
         planning.add_child(IF('command set?', identifier.next_move_goal))
         global_planning = Sequence(u'global planning')
-        self.global_planner_needed = running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded',
-                                                                          self.action_server_name)
-        global_planning.add_child(self.global_planner_needed)
+        global_planner_needed = running_is_success(GlobalPlannerNeeded)(u'GlobalPlannerNeeded', self.action_server_name)
+        global_planning.add_child(global_planner_needed)
         if self.god_map.get_data(identifier.enable_VisualizationBehavior):
             global_planning.add_child(running_is_success(VisualizationBehavior)(u'visualization'))
         global_planning.add_child(GlobalPlanner(u'global planner', self.action_server_name))
@@ -606,7 +604,6 @@ class OpenLoop(TreeManager):
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_plugin(MaxTrajectoryLength('traj length check', **kwargs))
-        self.planning_4 = planning_4
         return planning_4
 
     def grow_plan_postprocessing(self):

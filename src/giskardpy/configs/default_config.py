@@ -54,9 +54,9 @@ class PathPlanningConfig:
             self.planner_configs['normal'] = {
                 'navigation': {
                     'planner': ['RRTConnect'],  # sublist of above planners
-                    'motion_validator': ['discrete'],  # sublist of ['rays', 'box', 'discrete']
-                    'time': 120,
-                    'range': 0.2
+                    'motion_validator': ['box'],  # sublist of ['rays', 'box', 'discrete']
+                    'time': 15,
+                    'range': 1.0
                 },
                 'movement': {
                     'planner': ['RRTConnect'],  # sublist of above planners

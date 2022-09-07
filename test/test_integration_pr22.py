@@ -7,13 +7,18 @@ import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from numpy import pi
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
 
 import giskardpy.utils.tfwrapper as tf
+from giskard_msgs.srv import UpdateWorldResponse
+from giskardpy.configs.pr2_twice import PR22
 from giskardpy.data_types import PrefixName
 from giskardpy.identifier import fk_pose
 from giskardpy.utils import logging
-from utils_for_tests import PR22, compare_poses, compare_points
+from giskardpy.utils.math import compare_points
+from giskardpy.utils.utils import position_dict_to_joint_states
+from iai_naive_kinematics_sim.srv import SetJointState, UpdateTransform, SetJointStateRequest, UpdateTransformRequest
+from utils_for_tests import compare_poses, GiskardTestWrapper
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -63,17 +68,160 @@ pick_up_pose = {
 folder_name = 'tmp_data/'
 
 
+class PR22TestWrapper(GiskardTestWrapper):
+    default_pose = {'r_elbow_flex_joint': -0.15,
+                    'r_forearm_roll_joint': 0,
+                    'r_shoulder_lift_joint': 0,
+                    'r_shoulder_pan_joint': 0,
+                    'r_upper_arm_roll_joint': 0,
+                    'r_wrist_flex_joint': -0.10001,
+                    'r_wrist_roll_joint': 0,
+                    'l_elbow_flex_joint': -0.15,
+                    'l_forearm_roll_joint': 0,
+                    'l_shoulder_lift_joint': 0,
+                    'l_shoulder_pan_joint': 0,
+                    'l_upper_arm_roll_joint': 0,
+                    'l_wrist_flex_joint': -0.10001,
+                    'l_wrist_roll_joint': 0,
+                    'torso_lift_joint': 0.2,
+                    'head_pan_joint': 0,
+                    'head_tilt_joint': 0}
+
+    better_pose = {'r_shoulder_pan_joint': -1.7125,
+                   'r_shoulder_lift_joint': -0.25672,
+                   'r_upper_arm_roll_joint': -1.46335,
+                   'r_elbow_flex_joint': -2.12,
+                   'r_forearm_roll_joint': 1.76632,
+                   'r_wrist_flex_joint': -0.10001,
+                   'r_wrist_roll_joint': 0.05106,
+                   'l_shoulder_pan_joint': 1.9652,
+                   'l_shoulder_lift_joint': - 0.26499,
+                   'l_upper_arm_roll_joint': 1.3837,
+                   'l_elbow_flex_joint': -2.12,
+                   'l_forearm_roll_joint': 16.99,
+                   'l_wrist_flex_joint': - 0.10001,
+                   'l_wrist_roll_joint': 0,
+                   'torso_lift_joint': 0.2,
+                   'head_pan_joint': 0,
+                   'head_tilt_joint': 0,
+                   }
+
+    def __init__(self):
+        self.r_tips = dict()
+        self.l_tips = dict()
+        self.r_grippers = dict()
+        self.l_grippers = dict()
+        self.set_localization_srvs = dict()
+        self.set_bases = dict()
+        self.default_roots = dict()
+        self.tf_prefix = dict()
+        self.robot_names = ['pr2_a', 'pr2_b']
+        self.odom_roots = {}
+        super().__init__(PR22)
+        for robot_name in self.robot_names:
+            self.odom_roots[robot_name] = 'odom_combined'
+            self.r_tips[robot_name] = 'r_gripper_tool_frame'
+            self.l_tips[robot_name] = 'l_gripper_tool_frame'
+            self.tf_prefix[robot_name] = robot_name.replace('/', '')
+            self.r_grippers[robot_name] = rospy.ServiceProxy(
+                '/{}/r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+            self.l_grippers[robot_name] = rospy.ServiceProxy(
+                '/{}/l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+            self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
+                '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+                UpdateTransform)
+            self.set_bases[robot_name] = rospy.ServiceProxy('/{}/base_simulator/set_joint_states'.format(robot_name),
+                                                            SetJointState)
+            self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
+
+    def move_base(self, goal_pose, robot_name):
+        self.teleport_base(goal_pose, robot_name)
+
+    def open_r_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+                          u'r_gripper_r_finger_tip_joint']
+        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.r_grippers[robot_name].call(sjs)
+
+    def close_r_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+                          u'r_gripper_r_finger_tip_joint']
+        sjs.state.position = [0, 0, 0, 0]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.r_grippers[robot_name].call(sjs)
+
+    def open_l_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+                          u'l_gripper_r_finger_tip_joint']
+        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.l_grippers[robot_name].call(sjs)
+
+    def close_l_gripper(self, robot_name):
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+                          u'l_gripper_r_finger_tip_joint']
+        sjs.state.position = [0, 0, 0, 0]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.l_grippers[robot_name].call(sjs)
+
+    def clear_world(self):
+        return_val = super(GiskardTestWrapper, self).clear_world()
+        assert return_val.error_codes == UpdateWorldResponse.SUCCESS
+        assert len(self.world.groups) == 2
+        assert len(self.world.robot_names) == 2
+        assert self.original_number_of_links == len(self.world.links)
+
+    def teleport_base(self, goal_pose, robot_name):
+        goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
+        js = {'odom_x_joint': goal_pose.pose.position.x,
+              'odom_y_joint': goal_pose.pose.position.y,
+              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
+        goal = SetJointStateRequest()
+        goal.state = position_dict_to_joint_states(js)
+        self.set_bases[robot_name].call(goal)
+        rospy.sleep(0.5)
+
+    def set_localization(self, map_T_odom, robot_name):
+        """
+        :type map_T_odom: PoseStamped
+        """
+        req = UpdateTransformRequest()
+        req.transform.translation = map_T_odom.pose.position
+        req.transform.rotation = map_T_odom.pose.orientation
+        assert self.set_localization_srvs[robot_name](req).success
+        self.wait_heartbeats(10)
+        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.world.groups[robot_name].root_link_name)
+        compare_poses(p2.pose, map_T_odom.pose)
+
+    def reset_base(self, robot_name):
+        p = PoseStamped()
+        p.header.frame_id = self.world.root_link_name
+        p.pose.orientation.w = 1
+        self.set_localization(p, robot_name)
+        self.wait_heartbeats()
+        self.teleport_base(p, robot_name)
+
+
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    c = PR22()
+    c = PR22TestWrapper()
     request.addfinalizer(c.tear_down)
     return c
 
 @pytest.fixture()
-def resetted_giskard(giskard):
-    """
-    :type giskard: PR22
-    """
+def resetted_giskard(giskard) -> PR22TestWrapper:
     logging.loginfo(u'resetting giskard')
     for robot_name in giskard.robot_names:
         giskard.open_l_gripper(robot_name)
@@ -89,11 +237,7 @@ def resetted_giskard(giskard):
     return giskard
 
 @pytest.fixture()
-def kitchen_setup(resetted_giskard):
-    """
-    :type resetted_giskard: PR22
-    :return:
-    """
+def kitchen_setup(resetted_giskard) -> PR22TestWrapper:
     resetted_giskard.allow_all_collisions()
     for robot_name in resetted_giskard.robot_names:
         resetted_giskard.set_joint_goal(resetted_giskard.better_pose, group_name=robot_name)
@@ -107,10 +251,7 @@ def kitchen_setup(resetted_giskard):
     return resetted_giskard
 
 @pytest.fixture()
-def zero_pose(resetted_giskard):
-    """
-    :type resetted_giskard: PR22
-    """
+def zero_pose(resetted_giskard) -> PR22TestWrapper:
     resetted_giskard.allow_all_collisions()
     for robot_name in resetted_giskard.robot_names:
         resetted_giskard.set_joint_goal(resetted_giskard.default_pose, group_name=robot_name)
@@ -118,10 +259,7 @@ def zero_pose(resetted_giskard):
     return resetted_giskard
 
 @pytest.fixture()
-def pocky_pose_setup(resetted_giskard):
-    """
-    :type resetted_giskard: PR22
-    """
+def pocky_pose_setup(resetted_giskard) -> PR22TestWrapper:
     resetted_giskard.set_joint_goal(pocky_pose)
     resetted_giskard.allow_all_collisions()
     resetted_giskard.plan_and_execute()
@@ -130,9 +268,6 @@ def pocky_pose_setup(resetted_giskard):
 
 class TestFk(object):
     def test_fk(self, zero_pose):
-        """
-        :type zero_pose: PR22
-        """
         for robot_name in zero_pose.robot_names:
             for root, tip in itertools.product(zero_pose.world.groups[robot_name].link_names, repeat=2):
                 fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
@@ -159,10 +294,7 @@ class TestFk(object):
 
 
 class TestJointGoals(object):
-    def test_joint_movement1a(self, zero_pose):
-        """
-        :type zero_pose: PR22
-        """
+    def test_joint_movement1a(self, zero_pose: PR22TestWrapper):
         zero_pose.allow_all_collisions()
         for robot_name in zero_pose.robot_names:
             zero_pose.set_joint_goal(pocky_pose, group_name=robot_name)
@@ -221,10 +353,7 @@ class TestJointGoals(object):
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
-    def test_prismatic_joint1_with_group_name(self, zero_pose):
-        """
-        :type zero_pose: PR22
-        """
+    def test_prismatic_joint1_with_group_name(self, zero_pose: PR22TestWrapper):
         zero_pose.allow_self_collision(zero_pose.robot_names[0])
         zero_pose.allow_self_collision(zero_pose.robot_names[1])
         js = {'torso_lift_joint': 0.1}

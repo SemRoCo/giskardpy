@@ -49,8 +49,8 @@ class Giskard:
     def collision_avoidance_config(self):
         return self.collision_avoidance_configs[self.get_default_group_name()]
 
-    def add_robot_urdf(self, urdf: str, **kwargs):
-        robot = RobotInterfaceConfig(urdf, **kwargs)
+    def add_robot_urdf(self, urdf: str, name: str, **kwargs):
+        robot = RobotInterfaceConfig(urdf, name=name, **kwargs)
         self.robot_interface_configs.append(robot)
 
     def add_robot_from_parameter_server(self, parameter_name: str = 'robot_description',
@@ -61,7 +61,7 @@ class Giskard:
             group_name = robot_name_from_urdf_string(urdf)
             self.group_names.append(group_name)
         self.hardware_config.joint_state_topics.extend([(group_name, jst) for jst in joint_state_topics])
-        self.add_robot_urdf(urdf, **kwargs)
+        self.add_robot_urdf(urdf, name=group_name, **kwargs)
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         if group_name is None:

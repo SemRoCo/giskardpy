@@ -192,6 +192,7 @@ class IMServer(object):
                 if not self.enable_self_collision:
                     self.giskard.allow_self_collision()
                 self.giskard.plan_and_execute(wait=False)
+                # self.giskard.plan(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)
                 self.i_server.setPose(self.marker_name, Pose())
             self.i_server.applyChanges()

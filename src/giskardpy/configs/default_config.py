@@ -92,8 +92,9 @@ class Giskard:
     def add_odometry_topic(self, odometry_topic):
         self.hardware_config.odometry_topics.append(odometry_topic)
 
-    def add_follow_joint_trajectory_server(self, namespace, state_topic):
-        self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic)
+    def add_follow_joint_trajectory_server(self, namespace, state_topic, fill_velocity_values=False):
+        self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic,
+                                                                fill_velocity_values=fill_velocity_values)
 
     def add_omni_drive_interface(self, parent_link_name, child_link_name,
                                  cmd_vel_topic: Optional[str] = None):

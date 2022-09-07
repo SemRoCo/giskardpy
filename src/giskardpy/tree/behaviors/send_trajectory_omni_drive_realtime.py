@@ -19,6 +19,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
+import numpy as np
 
 
 class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
@@ -27,6 +28,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     @profile
     def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, **kwargs):
         super().__init__(name)
+        self.threshold = np.array([0.01, 0.01, 0.01])
         self.cmd_vel_topic = cmd_vel_topic
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
@@ -82,14 +84,20 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         twist = Twist()
         try:
             twist.linear.x = cmd[0][self.joint.x_vel.position_name]
+            if twist.linear.x < self.threshold[0]:
+                twist.linear.x = 0
         except:
             twist.linear.x = 0
         try:
             twist.linear.y = cmd[0][self.joint.y_vel.position_name]
+            if twist.linear.y < self.threshold[0]:
+                twist.linear.y = 0
         except:
             twist.linear.y = 0
         try:
             twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
+            if twist.linear.z < self.threshold[0]:
+                twist.linear.z = 0
         except:
             twist.angular.z = 0
         return twist

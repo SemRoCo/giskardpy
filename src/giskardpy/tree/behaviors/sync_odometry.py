@@ -2,10 +2,12 @@ from queue import Queue, Empty
 from typing import Optional
 
 import rospy
+import rostopic
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from py_trees import Status
 from pybullet import getAxisAngleFromQuaternion
-from rospy import ROSException
+from rospy import ROSException, AnyMsg
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.data_types import JointStates
@@ -34,17 +36,20 @@ class SyncOdometry(GiskardBehavior):
         msg: Optional[Odometry] = None
         while msg is None and not rospy.is_shutdown():
             try:
-                msg = rospy.wait_for_message(self.odometry_topic, Odometry, rospy.Duration(1))
+                msg = rospy.wait_for_message(self.odometry_topic, PoseWithCovarianceStamped, rospy.Duration(1))
                 self.lock.put(msg)
             except ROSException as e:
                 logging.logwarn(f'Waiting for topic \'{self.odometry_topic}\' to appear.')
         root_link = msg.header.frame_id
-        child_link = msg.child_frame_id
+        try:
+            child_link = msg.child_frame_id
+        except:
+            child_link = 'base_footprint'
         joints = self.world.compute_chain(root_link, child_link, True, False, True, True)
         if len(joints) != 1:
             raise GiskardException(f'Chain between {root_link} and {child_link} should be one joint, but its {joints}')
         self.brumbrum = joints[0]
-        self.odometry_sub = rospy.Subscriber(self.odometry_topic, Odometry, self.cb, queue_size=1)
+        self.odometry_sub = rospy.Subscriber(self.odometry_topic, PoseWithCovarianceStamped, self.cb, queue_size=1)
         return super().setup(timeout)
 
     def cb(self, data: Odometry):

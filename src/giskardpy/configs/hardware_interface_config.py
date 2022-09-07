@@ -11,10 +11,11 @@ class HardwareConfig:
         self.joint_state_topics: List[str] = []
         self.odometry_topics: List[str] = []
 
-    def add_follow_joint_trajectory_server(self, namespace, state_topic):
+    def add_follow_joint_trajectory_server(self, namespace, state_topic, fill_velocity_values):
         self.follow_joint_trajectory_interfaces.append(FollowJointTrajectoryInterface(
             namespace=namespace,
-            state_topic=state_topic))
+            state_topic=state_topic,
+            fill_velocity_values=fill_velocity_values))
 
     def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,
                                  joint_name: str = 'brumbrum',

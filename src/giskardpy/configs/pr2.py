@@ -1,7 +1,52 @@
+from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_config import Giskard
 
 
-class PR2_Mujoco(Giskard):
+class PR2_Base(Giskard):
+    def __init__(self):
+        super().__init__()
+        link_to_ignore = ['bl_caster_l_wheel_link',
+                          'bl_caster_r_wheel_link',
+                          'bl_caster_rotation_link',
+                          'br_caster_l_wheel_link',
+                          'br_caster_r_wheel_link',
+                          'br_caster_rotation_link',
+                          'fl_caster_l_wheel_link',
+                          'fl_caster_r_wheel_link',
+                          'fl_caster_rotation_link',
+                          'fr_caster_l_wheel_link',
+                          'fr_caster_r_wheel_link',
+                          'fr_caster_rotation_link',
+                          'l_shoulder_lift_link',
+                          'r_shoulder_lift_link',
+                          'base_link']
+        for link_name in link_to_ignore:
+            self.collision_avoidance_config.ignore_all_self_collisions_of_link(link_name)
+        self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
+                                                                                 hard_threshold=0.0)
+        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
+            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
+                                                                                   number_of_repeller=4,
+                                                                                   soft_threshold=0.05,
+                                                                                   hard_threshold=0.0,
+                                                                                   max_velocity=0.2)
+        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
+            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
+                                                                                   number_of_repeller=2,
+                                                                                   soft_threshold=0.05,
+                                                                                   hard_threshold=0.0,
+                                                                                   max_velocity=0.2)
+        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
+            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
+                                                                                   soft_threshold=0.05,
+                                                                                   hard_threshold=0.0)
+        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
+            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
+                                                                                   soft_threshold=0.025,
+                                                                                   hard_threshold=0.0)
+
+
+class PR2_Mujoco(PR2_Base):
     def __init__(self):
         super().__init__()
         self.add_odometry_topic('/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
@@ -16,48 +61,8 @@ class PR2_Mujoco(Giskard):
                                       parent_link_name='odom_combined',
                                       child_link_name='base_footprint')
 
-        link_to_ignore = ['bl_caster_l_wheel_link',
-                          'bl_caster_r_wheel_link',
-                          'bl_caster_rotation_link',
-                          'br_caster_l_wheel_link',
-                          'br_caster_r_wheel_link',
-                          'br_caster_rotation_link',
-                          'fl_caster_l_wheel_link',
-                          'fl_caster_r_wheel_link',
-                          'fl_caster_rotation_link',
-                          'fr_caster_l_wheel_link',
-                          'fr_caster_r_wheel_link',
-                          'fr_caster_rotation_link',
-                          'l_shoulder_lift_link',
-                          'r_shoulder_lift_link',
-                          'base_link']
-        for link_name in link_to_ignore:
-            self.collision_avoidance_config.ignore_all_self_collisions_of_link(link_name)
-        self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
-                                                                                 hard_threshold=0.0)
-        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=4,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
-        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=2,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
-        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0)
-        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.025,
-                                                                                   hard_threshold=0.0)
 
-
-class PR2_Real(Giskard):
+class PR2_Real(PR2_Base):
     def __init__(self):
         super().__init__()
         self.add_odometry_topic('/base_odometry/odom')
@@ -68,42 +73,33 @@ class PR2_Real(Giskard):
                                       parent_link_name='odom_combined',
                                       child_link_name='base_footprint')
 
-        link_to_ignore = ['bl_caster_l_wheel_link',
-                          'bl_caster_r_wheel_link',
-                          'bl_caster_rotation_link',
-                          'br_caster_l_wheel_link',
-                          'br_caster_r_wheel_link',
-                          'br_caster_rotation_link',
-                          'fl_caster_l_wheel_link',
-                          'fl_caster_r_wheel_link',
-                          'fl_caster_rotation_link',
-                          'fr_caster_l_wheel_link',
-                          'fr_caster_r_wheel_link',
-                          'fr_caster_rotation_link',
-                          'l_shoulder_lift_link',
-                          'r_shoulder_lift_link',
-                          'base_link']
-        for link_name in link_to_ignore:
-            self.collision_avoidance_config.ignore_all_self_collisions_of_link(link_name)
-        self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
-                                                                                 hard_threshold=0.0)
-        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=4,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
-        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=2,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
-        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0)
-        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.025,
-                                                                                   hard_threshold=0.0)
+
+class PR2StandAlone(PR2_Base):
+    def __init__(self):
+        super().__init__()
+        self.general_config.control_mode = ControlModes.stand_alone
+        self.root_link_name = 'map'
+        self.disable_tf_publishing()
+        self.add_fixed_joint(parent_link='map', child_link='odom_combined')
+        self.add_robot_from_parameter_server('robot_description')
+        self.register_controlled_joints([
+            'torso_lift_joint',
+            'head_pan_joint',
+            'head_tilt_joint',
+            'r_shoulder_pan_joint',
+            'r_shoulder_lift_joint',
+            'r_upper_arm_roll_joint',
+            'r_forearm_roll_joint',
+            'r_elbow_flex_joint',
+            'r_wrist_flex_joint',
+            'r_wrist_roll_joint',
+            'l_shoulder_pan_joint',
+            'l_shoulder_lift_joint',
+            'l_upper_arm_roll_joint',
+            'l_forearm_roll_joint',
+            'l_elbow_flex_joint',
+            'l_wrist_flex_joint',
+            'l_wrist_roll_joint',
+        ])
+        self.add_omni_drive_interface(parent_link_name='odom_combined',
+                                      child_link_name='base_footprint')

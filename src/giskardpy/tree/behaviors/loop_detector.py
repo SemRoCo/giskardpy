@@ -1,6 +1,9 @@
+from collections import defaultdict
+
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy.data_types import JointStates
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 
@@ -16,8 +19,11 @@ class LoopDetector(GiskardBehavior):
 
     @profile
     def initialise(self):
-        super(LoopDetector, self).initialise()
+        super().initialise()
         self.past_joint_states = set()
+        self.joint_velocity_limits = self.world.get_all_joint_velocity_limits()
+        self.velocity_limits = defaultdict(lambda: 1)
+        self.velocity_limits.update(self.world.get_all_free_variable_velocity_limits())
 
     @profile
     def update(self):
@@ -36,12 +42,5 @@ class LoopDetector(GiskardBehavior):
         self.past_joint_states.add(rounded_js)
         return Status.RUNNING
 
-    def round_js(self, js):
-        """
-        :param js: joint_name -> SingleJointState
-        :type js: dict
-        :return: a sequence of all the rounded joint positions
-        :rtype: tuple
-        """
-        # FIXME weird non deterministic error, happens because pluginbehavior is not stopped fast enough?
-        return tuple(round(x.position, self.precision) for x in js.values())
+    def round_js(self, js: JointStates) -> tuple:
+        return tuple(round(state.position / self.velocity_limits[name], self.precision) for name, state in js.items())

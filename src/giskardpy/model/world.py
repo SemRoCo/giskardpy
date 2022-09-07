@@ -1001,6 +1001,30 @@ class WorldTree:
     def get_joint_velocity_limits(self, joint_name):
         return self.compute_joint_limits(joint_name, 1)
 
+    def get_all_joint_velocity_limits(self):
+        joint_limits = {}
+        for joint_name in self.controlled_joints:
+            try:
+                joint_limits[joint_name] = self.get_joint_velocity_limits(joint_name)[1]
+            except:
+                pass
+        return joint_limits
+
+    @property
+    def free_variables(self):
+        free_variables = []
+        for joint_name in self.movable_joints:
+            free_variables.extend(self.joints[joint_name].free_variable_list)
+        return free_variables
+
+    def get_all_free_variable_velocity_limits(self):
+        limits = {}
+        for free_variable in self.free_variables:
+            limits[free_variable.name] = free_variable.get_upper_limit(order=1,
+                                                                       default=False,
+                                                                       evaluated=True)
+        return limits
+
     def get_all_joint_position_limits(self):
         return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
 

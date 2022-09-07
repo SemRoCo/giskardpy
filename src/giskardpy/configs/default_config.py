@@ -95,7 +95,8 @@ class Giskard:
     def add_follow_joint_trajectory_server(self, namespace, state_topic):
         self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic)
 
-    def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name):
+    def add_omni_drive_interface(self, parent_link_name, child_link_name,
+                                 cmd_vel_topic: Optional[str] = None):
         self.hardware_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name)

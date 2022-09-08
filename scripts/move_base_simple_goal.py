@@ -7,20 +7,17 @@ from tf.transformations import rotation_from_matrix, quaternion_matrix
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.tfwrapper import transform_pose, init
 
-#fixme
 def call_back(pose_stamped):
     """
     :type pose_stamped: PoseStamped
     """
     rospy.loginfo('received simple move base goal')
-    goal = transform_pose(root, pose_stamped)
-    js = {x_joint: goal.pose.position.x,
-          y_joint: goal.pose.position.y,
-          z_joint: rotation_from_matrix(quaternion_matrix([goal.pose.orientation.x,
-                                                           goal.pose.orientation.y,
-                                                           goal.pose.orientation.z,
-                                                           goal.pose.orientation.w]))[0]}
-    giskard.set_joint_goal(js)
+    tip_link = 'base_footprint'
+    root_link = 'map'
+    giskard.set_straight_cart_goal(goal_pose=pose_stamped,
+                                   tip_link=tip_link,
+                                   root_link=root_link)
+    giskard.allow_all_collisions()
     giskard.plan_and_execute(wait=False)
 
 
@@ -28,10 +25,6 @@ if __name__ == '__main__':
     try:
         rospy.init_node('move_base_simple_goal')
         init()
-        x_joint = 'odom_x_joint'
-        y_joint = 'odom_y_joint'
-        z_joint = 'odom_z_joint'
-        root = 'odom_combined'
 
         giskard = GiskardWrapper()
         sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, call_back, queue_size=10)

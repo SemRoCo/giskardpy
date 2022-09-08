@@ -195,6 +195,9 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
     def reset_base(self):
         super(PR2TestWrapper, self).reset_base()
 
+    def set_localization(self, map_T_odom: PoseStamped):
+        super(PR2TestWrapper, self).set_localization(map_T_odom)
+
     def reset(self):
         self.mujoco_reset()
         super().reset()
@@ -202,7 +205,8 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    c = PR2TestWrapper()
+    # c = PR2TestWrapper()
+    c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 

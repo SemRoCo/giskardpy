@@ -6,22 +6,6 @@
 
   <node pkg="topic_tools" name="remap_joint_states" type="relay" args="joint_states body/joint_states"/>
 
-<!--   <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher" output="screen"> -->
-<!--     <rosparam param="source_list"> -->
-<!--     - base/joint_states -->
-<!--     - body/joint_states -->
-<!--     </rosparam> -->
-<!--     <rosparam param="zeros"> -->
-<!--     'odom_x_joint': 0.0 -->
-<!--     'odom_y_joint': 0.0 -->
-<!--     'odom_z_joint': 0.0 -->
-<!--     </rosparam> -->
-<!--     <param name="rate" value="120"/> -->
-<!--     <param name="use_gui" value="False"/> -->
-<!--     <remap from="joint_states" to="giskard/joint_states"/> -->
-<!--     <remap from="robot_description" to="giskard/robot_description"/> -->
-<!--   </node> -->
-
   <include file="$(find omni_pose_follower)/launch/omni_pose_follower_pr2.launch"/>
 
   <node pkg="giskardpy" type="giskard_pr2_real.py" name="giskard" output="screen"/>

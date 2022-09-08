@@ -77,25 +77,18 @@ folder_name = 'tmp_data/'
 class PR2TestWrapper(GiskardTestWrapper):
     default_pose = {
         'r_elbow_flex_joint': -0.15,
-
         'r_forearm_roll_joint': 0,
         'r_shoulder_lift_joint': 0,
         'r_shoulder_pan_joint': 0,
         'r_upper_arm_roll_joint': 0,
-
         'r_wrist_flex_joint': -0.10001,
-
         'r_wrist_roll_joint': 0,
-
         'l_elbow_flex_joint': -0.15,
-
         'l_forearm_roll_joint': 0,
         'l_shoulder_lift_joint': 0,
         'l_shoulder_pan_joint': 0,
         'l_upper_arm_roll_joint': 0,
-
         'l_wrist_flex_joint': -0.10001,
-
         'l_wrist_roll_joint': 0,
         'torso_lift_joint': 0.2,
         'head_pan_joint': 0,
@@ -165,6 +158,14 @@ class PR2TestWrapper(GiskardTestWrapper):
 
     def reset_base(self):
         pass
+
+    def set_localization(self, map_T_odom: PoseStamped):
+        map_T_odom.pose.position.z = 0
+        self.set_seed_odometry(map_T_odom)
+        self.plan_and_execute()
+        # self.wait_heartbeats(15)
+        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+        # compare_poses(p2.pose, map_T_odom.pose)
 
     def reset(self):
         self.open_l_gripper()
@@ -1339,6 +1340,7 @@ class TestConstraints:
 class TestCartGoals(object):
     def test_move_base(self, zero_pose: PR2TestWrapper):
         map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))

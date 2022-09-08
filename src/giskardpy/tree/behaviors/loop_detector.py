@@ -21,7 +21,6 @@ class LoopDetector(GiskardBehavior):
     def initialise(self):
         super().initialise()
         self.past_joint_states = set()
-        self.joint_velocity_limits = self.world.get_all_joint_velocity_limits()
         self.velocity_limits = defaultdict(lambda: 1)
         self.velocity_limits.update(self.world.get_all_free_variable_velocity_limits())
 

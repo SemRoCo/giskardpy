@@ -62,7 +62,7 @@ class PR2_Mujoco(PR2_Base):
                                       child_link_name='base_footprint')
 
 
-class PR2_Real(PR2_Base):
+class PR2_Real_Time(PR2_Base):
     def __init__(self):
         super().__init__()
         self.add_sync_tf_frame('map', 'odom_combined')
@@ -75,7 +75,23 @@ class PR2_Real(PR2_Base):
         self.add_odometry_topic('/robot_pose_ekf/odom_combined')
         self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
                                       parent_link_name='odom_combined',
-                                      child_link_name='base_footprint')
+                                      child_link_name='base_footprint',
+                                      translation_jerk_limit=5,
+                                      rotation_jerk_limit=5)
+        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/body/follow_joint_trajectory',
+                                                state_topic='/whole_body_controller/body/state',
+                                                fill_velocity_values=True)
+
+class PR2_Real(PR2_Base):
+    def __init__(self):
+        super().__init__()
+        self.add_sync_tf_frame('map', 'odom_combined')
+        self.add_robot_from_parameter_server(parameter_name='giskard/robot_description',
+                                             joint_state_topics=['base/joint_states',
+                                                                 'body/joint_states'])
+        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
+                                                state_topic='/whole_body_controller/base/state',
+                                                fill_velocity_values=True)
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/body/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/body/state',
                                                 fill_velocity_values=True)
@@ -110,4 +126,6 @@ class PR2StandAlone(PR2_Base):
             'l_wrist_roll_joint',
         ])
         self.add_omni_drive_interface(parent_link_name='odom_combined',
-                                      child_link_name='base_footprint')
+                                      child_link_name='base_footprint',
+                                      translation_jerk_limit=5,
+                                      rotation_jerk_limit=5)

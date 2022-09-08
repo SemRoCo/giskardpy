@@ -94,6 +94,9 @@ class PR2_Real_Time(PR2_Base):
         self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
                                                 state_topic='/torso_controller/state',
                                                 fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
+                                                state_topic='/head_traj_controller/state',
+                                                fill_velocity_values=True)
 
 class PR2_Real(PR2_Base):
     def __init__(self):
@@ -113,6 +116,9 @@ class PR2_Real(PR2_Base):
                                                 fill_velocity_values=True)
         self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
                                                 state_topic='/torso_controller/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
+                                                state_topic='/head_traj_controller/state',
                                                 fill_velocity_values=True)
 
 

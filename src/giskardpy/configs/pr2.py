@@ -46,6 +46,8 @@ class PR2_Base(Giskard):
             self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
                                                                                    soft_threshold=0.025,
                                                                                    hard_threshold=0.0)
+        self.collision_avoidance_config.fix_joints_for_self_collision_avoidance(['head_pan_joint',
+                                                                                 'head_tilt_joint'])
         self.general_config.joint_limits = {
             'velocity': defaultdict(lambda: 0.5),
             'acceleration': defaultdict(lambda: 1e3),

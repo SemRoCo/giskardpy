@@ -34,9 +34,14 @@ class SyncOdometry(GiskardBehavior):
     @profile
     def setup(self, timeout=0.0):
         msg: Optional[Odometry] = None
+        odom = True
         while msg is None and not rospy.is_shutdown():
             try:
-                msg = rospy.wait_for_message(self.odometry_topic, PoseWithCovarianceStamped, rospy.Duration(1))
+                try:
+                    msg = rospy.wait_for_message(self.odometry_topic, Odometry, rospy.Duration(1))
+                except:
+                    msg = rospy.wait_for_message(self.odometry_topic, PoseWithCovarianceStamped, rospy.Duration(1))
+                    odom = False
                 self.lock.put(msg)
             except ROSException as e:
                 logging.logwarn(f'Waiting for topic \'{self.odometry_topic}\' to appear.')
@@ -49,7 +54,11 @@ class SyncOdometry(GiskardBehavior):
         if len(joints) != 1:
             raise GiskardException(f'Chain between {root_link} and {child_link} should be one joint, but its {joints}')
         self.brumbrum = joints[0]
-        self.odometry_sub = rospy.Subscriber(self.odometry_topic, PoseWithCovarianceStamped, self.cb, queue_size=1)
+        if odom:
+            self.odometry_sub = rospy.Subscriber(self.odometry_topic, Odometry, self.cb, queue_size=1)
+        else:
+            self.odometry_sub = rospy.Subscriber(self.odometry_topic, PoseWithCovarianceStamped, self.cb, queue_size=1)
+
         return super().setup(timeout)
 
     def cb(self, data: Odometry):

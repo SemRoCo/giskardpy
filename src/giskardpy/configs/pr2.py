@@ -78,8 +78,14 @@ class PR2_Real_Time(PR2_Base):
                                       child_link_name='base_footprint',
                                       translation_jerk_limit=5,
                                       rotation_jerk_limit=5)
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/body/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/body/state',
+        self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
+                                                state_topic='/l_arm_controller/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/r_arm_controller/follow_joint_trajectory',
+                                                state_topic='/r_arm_controller/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
+                                                state_topic='/torso_controller/state',
                                                 fill_velocity_values=True)
 
 class PR2_Real(PR2_Base):
@@ -92,8 +98,14 @@ class PR2_Real(PR2_Base):
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/base/state',
                                                 fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/body/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/body/state',
+        self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
+                                                state_topic='/l_arm_controller/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/r_arm_controller/follow_joint_trajectory',
+                                                state_topic='/r_arm_controller/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
+                                                state_topic='/torso_controller/state',
                                                 fill_velocity_values=True)
 
 

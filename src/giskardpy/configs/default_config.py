@@ -97,10 +97,22 @@ class Giskard:
                                                                 fill_velocity_values=fill_velocity_values)
 
     def add_omni_drive_interface(self, parent_link_name, child_link_name,
-                                 cmd_vel_topic: Optional[str] = None):
+                                 cmd_vel_topic: Optional[str] = None,
+                                 translation_velocity_limit: Optional[float] = 0.2,
+                                 rotation_velocity_limit: Optional[float] = 0.2,
+                                 translation_acceleration_limit: Optional[float] = None,
+                                 rotation_acceleration_limit: Optional[float] = None,
+                                 translation_jerk_limit: Optional[float] = 5,
+                                 rotation_jerk_limit: Optional[float] = 10):
         self.hardware_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                       parent_link_name=parent_link_name,
-                                                      child_link_name=child_link_name)
+                                                      child_link_name=child_link_name,
+                                                      translation_velocity_limit=translation_velocity_limit,
+                                                      rotation_velocity_limit=rotation_velocity_limit,
+                                                      translation_acceleration_limit=translation_acceleration_limit,
+                                                      rotation_acceleration_limit=rotation_acceleration_limit,
+                                                      translation_jerk_limit=translation_jerk_limit,
+                                                      rotation_jerk_limit=rotation_jerk_limit)
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
         brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint(self._god_map)
         joints.append(brumbrum_joint)

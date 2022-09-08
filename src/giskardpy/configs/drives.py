@@ -26,34 +26,48 @@ class OmniDriveCmdVelInterface(DriveInterface):
                  parent_link_name: str,
                  child_link_name: str,
                  cmd_vel_topic: Optional[str] = None,
-                 translation_velocity_limit: float = 1,
-                 rotation_velocity_limit: float = 1,
                  joint_name: str = 'brumbrum',
                  odom_x_name: str = 'odom_x',
                  odom_y_name: str = 'odom_y',
                  odom_rot_name: str = 'odom_rot',
+                 translation_velocity_limit: Optional[float] = 0.2,
+                 rotation_velocity_limit: Optional[float] = 0.2,
+                 translation_acceleration_limit: Optional[float] = None,
+                 rotation_acceleration_limit: Optional[float] = None,
+                 translation_jerk_limit: Optional[float] = 5,
+                 rotation_jerk_limit: Optional[float] = 10,
                  **omni_drive_params):
         self.cmd_vel_topic = cmd_vel_topic
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
-        self.translation_velocity_limit = translation_velocity_limit
-        self.rotation_velocity_limit = rotation_velocity_limit
         self.omni_drive_params = omni_drive_params
         self.joint_name = joint_name
         self.odom_x_name = odom_x_name
         self.odom_y_name = odom_y_name
         self.odom_rot_name = odom_rot_name
+        self.translation_velocity_limit = translation_velocity_limit
+        self.rotation_velocity_limit = rotation_velocity_limit
+        self.translation_velocity_limit = translation_velocity_limit
+        self.rotation_velocity_limit = rotation_velocity_limit
+        self.translation_acceleration_limit = translation_acceleration_limit
+        self.rotation_acceleration_limit = rotation_acceleration_limit
+        self.translation_jerk_limit = translation_jerk_limit
+        self.rotation_jerk_limit = rotation_jerk_limit
 
     def make_joint(self, god_map):
         return OmniDrive(god_map=god_map,
                          parent_link_name=self.parent_link_name,
                          child_link_name=self.child_link_name,
-                         translation_velocity_limit=self.translation_velocity_limit,
-                         rotation_velocity_limit=self.rotation_velocity_limit,
                          name=self.joint_name,
                          x_name=self.odom_x_name,
                          y_name=self.odom_y_name,
                          rot_name=self.odom_rot_name,
+                         translation_velocity_limit=self.translation_velocity_limit,
+                         rotation_velocity_limit=self.rotation_velocity_limit,
+                         translation_acceleration_limit=self.translation_acceleration_limit,
+                         rotation_acceleration_limit=self.rotation_acceleration_limit,
+                         translation_jerk_limit=self.translation_jerk_limit,
+                         rotation_jerk_limit=self.rotation_jerk_limit,
                          **self.omni_drive_params)
 
     def make_plugin(self):

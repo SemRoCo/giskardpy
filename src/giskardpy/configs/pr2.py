@@ -65,29 +65,21 @@ class PR2_Mujoco(PR2_Base):
 class PR2_Real(PR2_Base):
     def __init__(self):
         super().__init__()
-        # self.add_odometry_topic('/robot_pose_ekf/odom_combined')
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_robot_from_parameter_server(parameter_name='giskard/robot_description',
-                                             joint_state_topics=['base/joint_states',
-                                                                 'body/joint_states'])
-        # self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
-        #                                         state_topic='/torso_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/base/state',
-                                                fill_velocity_values=True)
-        # self.add_follow_joint_trajectory_server(namespace='/r_arm_controller/follow_joint_trajectory',
-        #                                         state_topic='/r_arm_controller/state')
-        # self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
-        #                                         state_topic='/l_arm_controller/state')
-        # self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
-        #                                         state_topic='/head_traj_controller/state')
+        # self.add_robot_from_parameter_server(parameter_name='giskard/robot_description',
+        #                                      joint_state_topics=['base/joint_states',
+        #                                                          'body/joint_states'])
+        # self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
+        #                                         state_topic='/whole_body_controller/base/state',
+        #                                         fill_velocity_values=True)
+        self.add_odometry_topic('/robot_pose_ekf/odom_combined')
+        self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
+                                      parent_link_name='odom_combined',
+                                      child_link_name='base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/body/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/body/state',
                                                 fill_velocity_values=True)
 
-        # self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
-        #                               parent_link_name='odom_combined',
-        #                               child_link_name='base_footprint')
 
 
 class PR2StandAlone(PR2_Base):

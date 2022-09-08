@@ -177,6 +177,7 @@ catkin_install_python(PROGRAMS
 	scripts/remove_object.py
 	scripts/fake_servers.py
 	scripts/move_base_simple_goal_diff_drive.py
+	scripts/base_joint_state_publisher.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

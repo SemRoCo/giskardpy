@@ -82,7 +82,8 @@ class PR2_Real(PR2_Base):
         # self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
         #                                         state_topic='/head_traj_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/body/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/body/state')
+                                                state_topic='/whole_body_controller/body/state',
+                                                fill_velocity_values=True)
 
         # self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
         #                               parent_link_name='odom_combined',

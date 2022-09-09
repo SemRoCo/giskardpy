@@ -6,7 +6,8 @@
 
   <node pkg="topic_tools" name="remap_joint_states" type="relay" args="joint_states body/joint_states"/>
 
-  <include file="$(find omni_pose_follower)/launch/omni_pose_follower_pr2.launch"/>
+  <include file="$(find omni_pose_follower)/launch/omni_pose_follower_map_pr2.launch"/>
+  <!-- include file="$(find base_controller)/launch/base_controller_pr2.launch"/ -->
 
   <node pkg="giskardpy" type="giskard_pr2_real.py" name="giskard" output="screen"/>
 

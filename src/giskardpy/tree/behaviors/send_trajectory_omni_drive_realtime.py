@@ -28,7 +28,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     @profile
     def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, **kwargs):
         super().__init__(name)
-        self.threshold = np.array([0.01, 0.01, 0.01])
+        self.threshold = np.array([0.02, 0.02, 0.10])
         self.cmd_vel_topic = cmd_vel_topic
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
@@ -96,8 +96,8 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             twist.linear.y = 0
         try:
             twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
-            if abs(twist.linear.z) < self.threshold[2]:
-                twist.linear.z = 0
+            if abs(twist.angular.z) < self.threshold[2]:
+                twist.angular.z = 0
         except:
             twist.angular.z = 0
         return twist

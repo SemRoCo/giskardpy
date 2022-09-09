@@ -17,7 +17,7 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 class LinkGeometry(object):
     def __init__(self, link_T_geometry):
-        self.color = ColorRGBA(1.0, 1.0, 1.0, 0.5)
+        self.color = ColorRGBA(20/255, 27.1/255, 41.2/255, 0.2)
         self.link_T_geometry = link_T_geometry
 
     @classmethod

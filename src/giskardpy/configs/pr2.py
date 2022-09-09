@@ -50,9 +50,10 @@ class PR2_Base(Giskard):
                                                                                  'head_tilt_joint'])
         self.general_config.joint_limits = {
             'velocity': defaultdict(lambda: 0.5),
-            'acceleration': defaultdict(lambda: 1e3),
-            'jerk': defaultdict(lambda: 15)
+            'acceleration': defaultdict(lambda: 1),
+            'jerk': defaultdict(lambda: 10)
         }
+        # self.general_config.joint_limits['torso_lift_joint']
 
 
 class PR2_Mujoco(PR2_Base):
@@ -87,18 +88,19 @@ class PR2_Real_Time(PR2_Base):
                                       child_link_name='base_footprint',
                                       translation_jerk_limit=5,
                                       rotation_jerk_limit=5)
+        fill_velocity_values = True
         self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
                                                 state_topic='/l_arm_controller/state',
-                                                fill_velocity_values=True)
+                                                fill_velocity_values=fill_velocity_values)
         self.add_follow_joint_trajectory_server(namespace='/r_arm_controller/follow_joint_trajectory',
                                                 state_topic='/r_arm_controller/state',
-                                                fill_velocity_values=True)
+                                                fill_velocity_values=fill_velocity_values)
         self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
                                                 state_topic='/torso_controller/state',
-                                                fill_velocity_values=True)
+                                                fill_velocity_values=fill_velocity_values)
         self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
                                                 state_topic='/head_traj_controller/state',
-                                                fill_velocity_values=True)
+                                                fill_velocity_values=fill_velocity_values)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,

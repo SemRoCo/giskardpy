@@ -166,6 +166,7 @@ catkin_install_python(PROGRAMS
 	scripts/giskard_pr2_real_time.py
 	scripts/giskard_tiago.py
 	scripts/interactive_marker.py
+	scripts/joystick_e_stop.py
 	scripts/add_box.py
 	scripts/add_cylinder.py
 	scripts/add_sphere.py

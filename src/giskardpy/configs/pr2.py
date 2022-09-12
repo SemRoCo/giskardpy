@@ -96,7 +96,7 @@ class PR2_Mujoco(PR2_Base):
 class PR2_Real_Time(PR2_Base):
     def __init__(self):
         super().__init__()
-        self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.5)
+        self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
         self.add_sync_tf_frame('map', 'odom_combined')
         # self.add_robot_from_parameter_server(parameter_name='giskard/robot_description',
         #                                      joint_state_topics=['base/joint_states',

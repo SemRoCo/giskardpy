@@ -8,6 +8,7 @@ from typing import Dict, Union, Tuple, Set, Optional, List
 import numpy as np
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
+from std_msgs.msg import ColorRGBA
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
@@ -46,6 +47,7 @@ class WorldTree:
     def __init__(self, root_link_name, god_map=None):
         self.root_link_name = root_link_name
         self.god_map: GodMap = god_map
+        self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
@@ -276,7 +278,8 @@ class WorldTree:
     def joint_names_as_set(self):
         return set(self.joints.keys())
 
-    def add_urdf(self, urdf, prefix=None, group_name=None, parent_link_name=None):
+    def add_urdf(self, urdf: str, prefix: Optional[str] = None, group_name: Optional[str] = None,
+                 parent_link_name: Optional[str] = None):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name is None:
@@ -303,7 +306,9 @@ class WorldTree:
                 return
             for child_joint_name, child_link_name in urdf.child_map[short_name]:
                 urdf_link = urdf.link_map[child_link_name]
-                child_link = Link.from_urdf(urdf_link, prefix)
+                child_link = Link.from_urdf(urdf_link=urdf_link,
+                                            prefix=prefix,
+                                            color=self.default_link_color)
                 self._add_link(child_link)
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
@@ -1017,6 +1022,17 @@ class WorldTree:
             free_variables.extend(self.joints[joint_name].free_variable_list)
         return free_variables
 
+    def dye_group(self, group_name: my_string, color: ColorRGBA):
+        if group_name in self.groups:
+            for _, link in self.groups[group_name].links.items():
+                link.dye_collisions(color)
+        else:
+            raise UnknownGroupException(f'No group named {group_name}')
+
+    def dye_world(self, color: ColorRGBA):
+        for link in self.links.values():
+            link.dye_collisions(color)
+
     def get_all_free_variable_velocity_limits(self):
         limits = {}
         for free_variable in self.free_variables:
@@ -1185,12 +1201,8 @@ class SubWorldTree(WorldTree):
                 group.root_link_name in self.links and group.name != self.name}
 
     @cached_property
-    def links(self):
-        def helper(root_link):
-            """
-            :type root_link: Link
-            :rtype: list
-            """
+    def links(self) -> Dict[my_string, Link]:
+        def helper(root_link: Link) -> Dict[my_string, Link]:
             links = {root_link.name: root_link}
             for j in root_link.child_joint_names:
                 j = self.world.joints[j]

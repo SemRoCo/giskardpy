@@ -90,13 +90,11 @@ class WorldUpdater(GiskardBehavior):
         return super(WorldUpdater, self).setup(timeout)
 
     def dye_group(self, req):
-        group_name = req.group_name
         res = DyeGroupResponse()
-        if group_name in self.world.groups:
-            for _, link in self.world.groups[req.group_name].links.items():
-                link.dye_collisions(req.color)
+        try:
+            self.world.dye_group(req.group_name, req.color)
             res.error_codes = DyeGroupResponse.SUCCESS
-        else:
+        except UnknownGroupException:
             res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
         return res
 

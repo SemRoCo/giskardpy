@@ -262,19 +262,37 @@ class BA(Parent):
                         v.get_upper_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
                         self.round_to2)
                     if self.default_limits:
-                        lower_vel = w.min(v.get_upper_limit(order=1, default=False, evaluated=True) * self.sample_period,
-                                          v.get_upper_limit(order=3,
-                                                            default=False,
-                                                            evaluated=self.evaluated) * self.sample_period ** 3)
+                        if self.order >= 4:
+                            lower_vel = w.min(v.get_upper_limit(order=1,
+                                                                default=False,
+                                                                evaluated=True) * self.sample_period,
+                                              v.get_upper_limit(order=3,
+                                                                default=False,
+                                                                evaluated=self.evaluated) * self.sample_period ** 3)
+                            upper_vel = w.max(v.get_lower_limit(order=1,
+                                                                default=False,
+                                                                evaluated=True) * self.sample_period,
+                                              v.get_lower_limit(order=3,
+                                                                default=False,
+                                                                evaluated=self.evaluated) * self.sample_period ** 3)
+                        else:
+                            lower_vel = w.min(v.get_upper_limit(order=1,
+                                                                default=False,
+                                                                evaluated=True) * self.sample_period,
+                                              v.get_upper_limit(order=2,
+                                                                default=False,
+                                                                evaluated=self.evaluated) * self.sample_period ** 2)
+                            upper_vel = w.max(v.get_lower_limit(order=1,
+                                                                default=False,
+                                                                evaluated=True) * self.sample_period,
+                                              v.get_lower_limit(order=2,
+                                                                default=False,
+                                                                evaluated=self.evaluated) * self.sample_period ** 2)
                         lower_bound = w.if_greater(normal_lower_bound, 0,
                                                    if_result=lower_vel,
                                                    else_result=normal_lower_bound)
                         lb[f't{t:03d}/{v.position_name}/p_limit'] = lower_bound
 
-                        upper_vel = w.max(v.get_lower_limit(order=1, default=False, evaluated=True) * self.sample_period,
-                                          v.get_lower_limit(order=3,
-                                                            default=False,
-                                                            evaluated=self.evaluated) * self.sample_period ** 3)
                         upper_bound = w.if_less(normal_upper_bound, 0,
                                                 if_result=upper_vel,
                                                 else_result=normal_upper_bound)

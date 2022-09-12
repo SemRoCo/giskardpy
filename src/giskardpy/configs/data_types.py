@@ -2,6 +2,9 @@ from collections import defaultdict
 from enum import Enum
 from typing import Optional, List, Tuple, Dict, Union
 
+from std_msgs.msg import ColorRGBA
+
+from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
 
 
@@ -35,6 +38,7 @@ class GeneralConfig:
             'acceleration': defaultdict(lambda: 1e3),
             'jerk': defaultdict(lambda: 30)
         }
+        self.default_link_color = ColorRGBA(1, 1, 1, 0.5)
 
 
 class QPSolverConfig:
@@ -133,6 +137,7 @@ class CollisionAvoidanceConfig:
                 reason = child.attrib['reason']
                 if reason in ['Never', 'Adjacent']:
                     self.ignore_self_collisions_of_pair(link1, link2)
+        logging.loginfo(f'loaded {path_to_srdf} for self collision avoidance matrix')
 
     def add_self_collision(self, link_name1, link_name2):
         self.add_self_collisions.append((link_name1, link_name2))
@@ -250,7 +255,7 @@ class BehaviorTreeConfig:
             'length': 60 # seconds
         },
         'LoopDetector': {
-            'precision': 3
+            'precision': 4
         },
         'SyncTfFrames': {
             'frames': [],

@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from std_msgs.msg import ColorRGBA
+
 from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_config import Giskard
 
@@ -7,23 +9,24 @@ from giskardpy.configs.default_config import Giskard
 class PR2_Base(Giskard):
     def __init__(self):
         super().__init__()
-        link_to_ignore = ['bl_caster_l_wheel_link',
-                          'bl_caster_r_wheel_link',
-                          'bl_caster_rotation_link',
-                          'br_caster_l_wheel_link',
-                          'br_caster_r_wheel_link',
-                          'br_caster_rotation_link',
-                          'fl_caster_l_wheel_link',
-                          'fl_caster_r_wheel_link',
-                          'fl_caster_rotation_link',
-                          'fr_caster_l_wheel_link',
-                          'fr_caster_r_wheel_link',
-                          'fr_caster_rotation_link',
-                          'l_shoulder_lift_link',
-                          'r_shoulder_lift_link',
-                          'base_link']
-        for link_name in link_to_ignore:
-            self.collision_avoidance_config.ignore_all_self_collisions_of_link(link_name)
+        self.collision_avoidance_config.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
+        # link_to_ignore = ['bl_caster_l_wheel_link',
+        #                   'bl_caster_r_wheel_link',
+        #                   'bl_caster_rotation_link',
+        #                   'br_caster_l_wheel_link',
+        #                   'br_caster_r_wheel_link',
+        #                   'br_caster_rotation_link',
+        #                   'fl_caster_l_wheel_link',
+        #                   'fl_caster_r_wheel_link',
+        #                   'fl_caster_rotation_link',
+        #                   'fr_caster_l_wheel_link',
+        #                   'fr_caster_r_wheel_link',
+        #                   'fr_caster_rotation_link',
+        #                   'l_shoulder_lift_link',
+        #                   'r_shoulder_lift_link',
+        #                   'base_link']
+        # for link_name in link_to_ignore:
+        #     self.collision_avoidance_config.ignore_all_self_collisions_of_link(link_name)
         self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                                                  hard_threshold=0.0)
         for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
@@ -48,12 +51,30 @@ class PR2_Base(Giskard):
                                                                                    hard_threshold=0.0)
         self.collision_avoidance_config.fix_joints_for_self_collision_avoidance(['head_pan_joint',
                                                                                  'head_tilt_joint'])
+        # self.general_config.joint_limits = {
+        #     'velocity': defaultdict(lambda: 0.5),
+        #     'acceleration': defaultdict(lambda: 1e3),
+        #     'jerk': defaultdict(lambda: 10)
+        # }
+        # self.qp_solver_config.joint_weights = {
+        #     'velocity': defaultdict(lambda: 0.001),
+        #     'acceleration': defaultdict(float),
+        #     'jerk': defaultdict(lambda: 0.001)
+        # }
         self.general_config.joint_limits = {
-            'velocity': defaultdict(lambda: 0.5),
-            'acceleration': defaultdict(lambda: 1),
-            'jerk': defaultdict(lambda: 10)
+            'velocity': defaultdict(lambda: 1),
+            'acceleration': defaultdict(lambda: 1.5),
         }
-        # self.general_config.joint_limits['torso_lift_joint']
+        self.qp_solver_config.joint_weights = {
+            'velocity': defaultdict(lambda: 0.001),
+            'acceleration': defaultdict(lambda: 0.001),
+        }
+        self.general_config.joint_limits['velocity']['head_pan_joint'] = 2
+        self.general_config.joint_limits['velocity']['head_tilt_joint'] = 2
+        self.general_config.joint_limits['acceleration']['head_pan_joint'] = 4
+        self.general_config.joint_limits['acceleration']['head_tilt_joint'] = 4
+        # self.general_config.joint_limits['jerk']['head_pan_joint'] = 30
+        # self.general_config.joint_limits['jerk']['head_tilt_joint'] = 30
 
 
 class PR2_Mujoco(PR2_Base):
@@ -75,6 +96,7 @@ class PR2_Mujoco(PR2_Base):
 class PR2_Real_Time(PR2_Base):
     def __init__(self):
         super().__init__()
+        self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.5)
         self.add_sync_tf_frame('map', 'odom_combined')
         # self.add_robot_from_parameter_server(parameter_name='giskard/robot_description',
         #                                      joint_state_topics=['base/joint_states',
@@ -86,6 +108,8 @@ class PR2_Real_Time(PR2_Base):
         self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
                                       parent_link_name='odom_combined',
                                       child_link_name='base_footprint',
+                                      translation_acceleration_limit=0.25,
+                                      rotation_acceleration_limit=0.25,
                                       translation_jerk_limit=5,
                                       rotation_jerk_limit=5)
         fill_velocity_values = True

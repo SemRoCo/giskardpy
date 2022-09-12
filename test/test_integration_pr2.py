@@ -293,6 +293,51 @@ def fake_table_setup(pocky_pose_setup: PR2TestWrapper) -> PR2TestWrapper:
 
 
 class TestJointGoals(object):
+    def test_joint_goal2(self, zero_pose: PR2TestWrapper):
+        js = {
+            'torso_lift_joint': 0.2999225173357618,
+            'head_pan_joint': 0.041880780651479044,
+            'head_tilt_joint': -0.3849665749806885,
+            'r_upper_arm_roll_joint': -0.9487714747527726,
+            'r_shoulder_pan_joint': -1.0047307505973626,
+            'r_shoulder_lift_joint': 0.48736790658811985,
+            'r_forearm_roll_joint': -14.895833882874182,
+            'r_elbow_flex_joint': -1.392377908925028,
+            'r_wrist_flex_joint': -0.4548695149411013,
+            'r_wrist_roll_joint': 0.11426798984097819,
+            'l_upper_arm_roll_joint': 1.7383062350263658,
+            'l_shoulder_pan_joint': 1.8799810286792007,
+            'l_shoulder_lift_joint': 0.011627231224188975,
+            'l_forearm_roll_joint': 312.67276414458695,
+            'l_elbow_flex_joint': -2.0300928925694675,
+            'l_wrist_flex_joint': -0.10014623223021513,
+            'l_wrist_roll_joint': -6.062015047706399,
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        start_state = {
+            'torso_lift_joint': 0.3000254972469308,
+            'head_pan_joint': 0.04135718187588074,
+            'head_tilt_joint': -0.3870040025362966,
+            'r_upper_arm_roll_joint': -0.8693958356996788,
+            'r_shoulder_pan_joint': -1.112011913457302,
+            'r_shoulder_lift_joint': 0.6165443541686221,
+            'r_forearm_roll_joint': -14.916890222524186,
+            'r_elbow_flex_joint': -1.6426864689071474,
+            'r_wrist_flex_joint': -0.6157655014694016,
+            'r_wrist_roll_joint': 0.07345662278755749,
+            'l_upper_arm_roll_joint': 1.7383062350263658,
+            'l_shoulder_pan_joint': 1.8799810286792007,
+            'l_shoulder_lift_joint': 0.011627231224188975,
+            'l_forearm_roll_joint': 281.2568789280418,
+            'l_elbow_flex_joint': -2.0300928925694675,
+            'l_wrist_flex_joint': -0.07256157688707354,
+            'l_wrist_roll_joint': -6.062015047706401,
+        }
+        zero_pose.set_joint_goal(start_state)
+        zero_pose.plan_and_execute()
+
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):
         js = {
             'r_gripper_l_finger_joint': 0.55

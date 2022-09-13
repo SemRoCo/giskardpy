@@ -97,7 +97,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         except:
             twist.linear.y = 0
         try:
-            twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
+            twist.angular.z = cmd[0][self.joint.yaw_vel.position_name]
             if abs(twist.angular.z) < self.threshold[2]:
                 twist.angular.z = 0
         except:

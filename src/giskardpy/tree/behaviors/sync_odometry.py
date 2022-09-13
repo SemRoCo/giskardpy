@@ -85,13 +85,14 @@ class SyncOdometry(GiskardBehavior):
                                                    pose.orientation.y,
                                                    pose.orientation.z,
                                                    pose.orientation.w)
-            self.world.state[joint.rot_name].position = yaw
-            pitch = 0.1
-            q = quaternion_from_rpy(roll, pitch, 0)
-            self.world.state[joint.qx_name].position = q[0]
-            self.world.state[joint.qy_name].position = q[1]
-            self.world.state[joint.qz_name].position = q[2]
-            self.world.state[joint.qw_name].position = q[3]
+            self.world.state[joint.roll_name].position = roll
+            self.world.state[joint.pitch_name].position = pitch
+            self.world.state[joint.yaw_name].position = yaw
+            # q = quaternion_from_rpy(roll, pitch, 0)
+            # self.world.state[joint.qx_name].position = q[0]
+            # self.world.state[joint.qy_name].position = q[1]
+            # self.world.state[joint.qz_name].position = q[2]
+            # self.world.state[joint.qw_name].position = q[3]
 
         except Empty:
             pass

@@ -205,8 +205,8 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    # c = PR2TestWrapper()
-    c = PR2TestWrapperMujoco()
+    c = PR2TestWrapper()
+    # c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -397,6 +397,9 @@ class TestJointGoals(object):
 
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
+
+    def test_open_dishwasher_apartment(self, apartment_setup: PR2TestWrapper):
+        pass
 
     def test_SetPredictionHorizon(self, zero_pose: PR2TestWrapper):
         zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)

@@ -47,7 +47,7 @@ class SetOdometry(Goal):
                                                   base_pose.orientation.w])
         if axis[-1] < 0:
             angle = -angle
-        self.world.state[brumbrum_joint.rot_name].position = angle
+        self.world.state[brumbrum_joint.yaw_name].position = angle
 
 
 class JointPositionContinuous(Goal):

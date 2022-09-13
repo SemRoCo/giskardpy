@@ -476,11 +476,12 @@ class OmniDrive(Joint):
         self.translation_jerk_limit = translation_jerk_limit
         self.rotation_jerk_limit = rotation_jerk_limit
         self.translation_names = ['odom_x', 'odom_y', 'odom_z']
-        self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
-        self.rot_name = 'odom_rot'
+        # self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
+        self.orientation_names = ['roll', 'pitch', 'yaw']
+        # self.rot_name = 'odom_rot'
         self.x_vel_name = 'odom_x_vel'
         self.y_vel_name = 'odom_y_vel'
-        self.rot_vel_name = 'odom_rot_vel'
+        self.rot_vel_name = 'odom_yaw_vel'
         self.translation_variables: List[FreeVariable] = []
         self.orientation_variables: List[FreeVariable] = []
         super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
@@ -519,27 +520,26 @@ class OmniDrive(Joint):
         self.y_vel = self.create_free_variable(self.y_vel_name,
                                                translation_lower_limits,
                                                translation_upper_limits)
-        self.rot = self.create_free_variable(self.rot_name,
+        self.yaw = self.create_free_variable(self.yaw_name,
                                              rotation_lower_limits,
                                              rotation_upper_limits)
-        self.rot_vel = self.create_free_variable(self.rot_vel_name,
+        self.yaw_vel = self.create_free_variable(self.rot_vel_name,
                                                  rotation_lower_limits,
                                                  rotation_upper_limits)
 
     def _joint_transformation(self):
         odom_T_base_footprint = w.frame_from_x_y_rot(self.x.get_symbol(0),
                                                      self.y.get_symbol(0),
-                                                     self.rot.get_symbol(0))
+                                                     self.yaw.get_symbol(0))
         base_footprint_T_base_footprint_vel = w.frame_from_x_y_rot(self.x_vel.get_symbol(0),
                                                                    self.y_vel.get_symbol(0),
-                                                                   self.rot_vel.get_symbol(0))
-        base_footprint_vel_T_base_footprint = w.frame_quaternion(x=0,
-                                                                 y=0,
-                                                                 z=self.translation_variables[2].get_symbol(0),
-                                                                 qx=self.orientation_variables[0].get_symbol(0),
-                                                                 qy=self.orientation_variables[1].get_symbol(0),
-                                                                 qz=self.orientation_variables[2].get_symbol(0),
-                                                                 qw=self.orientation_variables[3].get_symbol(0))
+                                                                   self.yaw_vel.get_symbol(0))
+        base_footprint_vel_T_base_footprint = w.frame_rpy(x=0,
+                                                          y=0,
+                                                          z=self.translation_variables[2].get_symbol(0),
+                                                          roll=self.orientation_variables[0].get_symbol(0),
+                                                          pitch=self.orientation_variables[1].get_symbol(0),
+                                                          yaw=0)
         return w.dot(odom_T_base_footprint, base_footprint_T_base_footprint_vel, base_footprint_vel_T_base_footprint)
 
     @property
@@ -567,20 +567,16 @@ class OmniDrive(Joint):
         return self.translation_names[2]
 
     @property
-    def qx_name(self):
+    def roll_name(self):
         return self.orientation_names[0]
 
     @property
-    def qy_name(self):
+    def pitch_name(self):
         return self.orientation_names[1]
 
     @property
-    def qz_name(self):
+    def yaw_name(self):
         return self.orientation_names[2]
-
-    @property
-    def qw_name(self):
-        return self.orientation_names[3]
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         state = self.world.state
@@ -613,13 +609,13 @@ class OmniDrive(Joint):
         # new_q = quaternion_multiply(q, odom_q_vel)
 
         # delta = (2 * np.arccos(np.min(np.max(-1, state[self.orientation_variables[3]]), 1)))
-        delta = state[self.rot_name].position
+        delta = state[self.yaw_name].position
         state[self.x_name].velocity = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
         state[self.x_name].position += state[self.x_name].velocity * dt
         state[self.y_name].velocity = (np.sin(delta) * x_vel + np.cos(delta) * y_vel)
         state[self.y_name].position += state[self.y_name].velocity * dt
-        state[self.rot_name].velocity = rot_vel
-        state[self.rot_name].position += rot_vel * dt
+        state[self.yaw_name].velocity = rot_vel
+        state[self.yaw_name].position += rot_vel * dt
         # state[self.orientation_variables[0]].velocity = odom_q_vel[0]
         # state[self.orientation_variables[1]].velocity = odom_q_vel[1]
         # state[self.orientation_variables[2]].velocity = odom_q_vel[2]
@@ -648,8 +644,8 @@ class OmniDrive(Joint):
         for order, angular_limit in angular_limits.items():
             # self.rot.set_upper_limit(order, angular_limit[self.rot_name])
             # self.rot.set_lower_limit(order, -angular_limit[self.rot_name])
-            self.rot_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
-            self.rot_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
+            self.yaw_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
+            self.yaw_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
 
     def update_weights(self, weights: derivative_joint_map):
         # self.delete_weights()
@@ -669,7 +665,7 @@ class OmniDrive(Joint):
 
     @property
     def free_variable_list(self) -> List[FreeVariable]:
-        return [self.x_vel, self.y_vel, self.rot_vel]
+        return [self.x_vel, self.y_vel, self.yaw_vel]
 
     def _all_symbols(self) -> List[FreeVariable]:
         return self.free_variable_list + self.translation_variables + self.orientation_variables

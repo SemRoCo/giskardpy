@@ -48,7 +48,7 @@ class BaseTrajFollower(Goal):
             y = self.current_traj_point(self.joint.y_name, t, derivative)
         else:
             y = 0
-        rot = self.current_traj_point(self.joint.rot_name, t, derivative)
+        rot = self.current_traj_point(self.joint.yaw_name, t, derivative)
         odom_T_base_footprint_goal = w.frame_from_x_y_rot(x, y, rot)
         # self.add_debug_expr('x goal in odom', x)
         return odom_T_base_footprint_goal
@@ -186,8 +186,8 @@ class BaseTrajFollower(Goal):
         # _, rotation_goal = w.axis_angle_from_matrix(map_T_base_footprint_goal)
         # axis_current, rotation_current = w.axis_angle_from_matrix(map_T_base_footprint_current)
 
-        rotation_goal = self.current_traj_point(self.joint.rot_name, t)
-        rotation_current = self.joint.rot.get_symbol(0)
+        rotation_goal = self.current_traj_point(self.joint.yaw_name, t)
+        rotation_current = self.joint.yaw.get_symbol(0)
         error = w.shortest_angular_distance(rotation_current, rotation_goal) / self.sample_period
         # self.add_debug_expr('rot goal', rotation_goal)
         # self.add_debug_expr('rot current', rotation_current)
@@ -196,13 +196,13 @@ class BaseTrajFollower(Goal):
     def add_rot_constraints(self):
         errors = []
         for t in range(self.prediction_horizon):
-            errors.append(self.current_traj_point(self.joint.rot_name, t * self.sample_period, 1))
+            errors.append(self.current_traj_point(self.joint.yaw_name, t * self.sample_period, 1))
             if t == 0:
                 errors[-1] += self.rot_error_at(t)
         self.add_velocity_constraint(lower_velocity_limit=errors,
                                      upper_velocity_limit=errors,
                                      weight=WEIGHT_BELOW_CA,
-                                     expression=self.joint.rot_vel.get_symbol(0),
+                                     expression=self.joint.yaw_vel.get_symbol(0),
                                      velocity_limit=0.5,
                                      name_suffix='/rot')
         # self.add_constraint(reference_velocity=0.5,

@@ -1474,7 +1474,7 @@ class TestCartGoals(object):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation = Quaternion(*quaternion_about_axis(1 / 2, [0, 0, 1]))
-        zero_pose.set_straight_cart_goal(p, 'base_footprint')
+        zero_pose.set_straight_cart_goal(p, 'base_footprint', check=False)
         zero_pose.plan_and_execute()
 
         p = PoseStamped()

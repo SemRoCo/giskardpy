@@ -418,7 +418,7 @@ class WorldTree:
                           parent_link_name=parent_link_name,
                           prefix=None)
         else:
-            link = Link.from_world_body(prefix=group_name, msg=msg)
+            link = Link.from_world_body(prefix=group_name, msg=msg, color=self.default_link_color)
             self._add_link(link)
             joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,

@@ -10,11 +10,13 @@ from pybullet import getAxisAngleFromQuaternion
 from rospy import ROSException, AnyMsg
 
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.casadi_wrapper import rotation_matrix_from_rpy
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import GiskardException
 from giskardpy.model.joints import OmniDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.math import quaternion_from_axis_angle, rpy_from_matrix, rpy_from_quaternion, quaternion_from_rpy
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
@@ -78,13 +80,18 @@ class SyncOdometry(GiskardBehavior):
             self.last_msg = JointStates()
             self.world.state[joint.x_name].position = pose.position.x
             self.world.state[joint.y_name].position = pose.position.y
-            axis, angle = getAxisAngleFromQuaternion([pose.orientation.x,
-                                                      pose.orientation.y,
-                                                      pose.orientation.z,
-                                                      pose.orientation.w])
-            if axis[-1] < 0:
-                angle = -angle
-            self.world.state[joint.rot_name].position = angle
+            self.world.state[joint.z_name].position = pose.position.z
+            roll, pitch, yaw = rpy_from_quaternion(pose.orientation.x,
+                                                   pose.orientation.y,
+                                                   pose.orientation.z,
+                                                   pose.orientation.w)
+            self.world.state[joint.rot_name].position = yaw
+            pitch = 0.1
+            q = quaternion_from_rpy(roll, pitch, 0)
+            self.world.state[joint.qx_name].position = q[0]
+            self.world.state[joint.qy_name].position = q[1]
+            self.world.state[joint.qz_name].position = q[2]
+            self.world.state[joint.qw_name].position = q[3]
 
         except Empty:
             pass

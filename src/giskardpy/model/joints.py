@@ -4,6 +4,7 @@ from typing import Dict, Tuple, Optional, List
 
 import numpy as np
 import urdf_parser_py.urdf as up
+from tf.transformations import quaternion_about_axis, quaternion_multiply
 
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
@@ -11,6 +12,7 @@ from giskardpy.data_types import PrefixName
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import my_string, expr_symbol, expr_matrix, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.utils.math import axis_angle_from_quaternion, quaternion_from_axis_angle, qv_mult
 
 
 class Joint(ABC):
@@ -33,6 +35,10 @@ class Joint(ABC):
         self.parent_T_child = parent_T_child
         self.god_map = god_map
         self.create_free_variables()
+
+    @property
+    def world(self):
+        return self.god_map.get_data(identifier.world)
 
     @property
     def parent_T_child(self):
@@ -451,13 +457,6 @@ class MimicContinuousURDFJoint(MimicURDFJoint, ContinuousJoint):
 
 
 class OmniDrive(Joint):
-    x: FreeVariable
-    y: FreeVariable
-    rot: FreeVariable
-    x_vel: FreeVariable
-    y_vel: FreeVariable
-    rot_vel: FreeVariable
-
     def __init__(self,
                  god_map: GodMap,
                  parent_link_name: my_string,
@@ -469,12 +468,6 @@ class OmniDrive(Joint):
                  rotation_acceleration_limit: Optional[float] = None,
                  translation_jerk_limit: Optional[float] = 5,
                  rotation_jerk_limit: Optional[float] = 10,
-                 x_name: Optional[str] = 'odom_x',
-                 y_name: Optional[str] = 'odom_y',
-                 rot_name: Optional[str] = 'odom_rot',
-                 x_vel_name: Optional[str] = 'base_footprint_x_vel',
-                 y_vel_name: Optional[str] = 'base_footprint_y_vel',
-                 rot_vel_name: Optional[str] = 'base_footprint_rot_vel',
                  **kwargs):
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
@@ -482,12 +475,14 @@ class OmniDrive(Joint):
         self.rotation_acceleration_limit = rotation_acceleration_limit
         self.translation_jerk_limit = translation_jerk_limit
         self.rotation_jerk_limit = rotation_jerk_limit
-        self.x_name = x_name
-        self.y_name = y_name
-        self.rot_name = rot_name
-        self.x_vel_name = x_vel_name
-        self.y_vel_name = y_vel_name
-        self.rot_vel_name = rot_vel_name
+        self.translation_names = ['odom_x', 'odom_y', 'odom_z']
+        self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
+        self.rot_name = 'odom_rot'
+        self.x_vel_name = 'odom_x_vel'
+        self.y_vel_name = 'odom_y_vel'
+        self.rot_vel_name = 'odom_rot_vel'
+        self.translation_variables: List[FreeVariable] = []
+        self.orientation_variables: List[FreeVariable] = []
         super().__init__(name, parent_link_name, child_link_name, god_map, w.eye(4))
 
     def create_free_variables(self):
@@ -509,21 +504,24 @@ class OmniDrive(Joint):
             rotation_upper_limits[3] = self.rotation_jerk_limit
         rotation_lower_limits = {k: -v for k, v in rotation_upper_limits.items()}
 
-        self.x = self.create_free_variable(self.x_name,
-                                           translation_lower_limits,
-                                           translation_upper_limits)
-        self.y = self.create_free_variable(self.y_name,
-                                           translation_lower_limits,
-                                           translation_upper_limits)
-        self.rot = self.create_free_variable(self.rot_name,
-                                             rotation_lower_limits,
-                                             rotation_upper_limits)
+        for translation_variable_name in self.translation_names:
+            self.translation_variables.append(self.create_free_variable(name=translation_variable_name,
+                                                                        lower_limits=translation_lower_limits,
+                                                                        upper_limits=translation_upper_limits))
+
+        for orientation_variable_name in self.orientation_names:
+            self.orientation_variables.append(self.create_free_variable(name=orientation_variable_name,
+                                                                        lower_limits=rotation_lower_limits,
+                                                                        upper_limits=rotation_upper_limits))
         self.x_vel = self.create_free_variable(self.x_vel_name,
                                                translation_lower_limits,
                                                translation_upper_limits)
         self.y_vel = self.create_free_variable(self.y_vel_name,
                                                translation_lower_limits,
                                                translation_upper_limits)
+        self.rot = self.create_free_variable(self.rot_name,
+                                             rotation_lower_limits,
+                                             rotation_upper_limits)
         self.rot_vel = self.create_free_variable(self.rot_vel_name,
                                                  rotation_lower_limits,
                                                  rotation_upper_limits)
@@ -535,33 +533,101 @@ class OmniDrive(Joint):
         base_footprint_T_base_footprint_vel = w.frame_from_x_y_rot(self.x_vel.get_symbol(0),
                                                                    self.y_vel.get_symbol(0),
                                                                    self.rot_vel.get_symbol(0))
-        return w.dot(odom_T_base_footprint, base_footprint_T_base_footprint_vel)
+        base_footprint_vel_T_base_footprint = w.frame_quaternion(x=0,
+                                                                 y=0,
+                                                                 z=self.translation_variables[2].get_symbol(0),
+                                                                 qx=self.orientation_variables[0].get_symbol(0),
+                                                                 qy=self.orientation_variables[1].get_symbol(0),
+                                                                 qz=self.orientation_variables[2].get_symbol(0),
+                                                                 qw=self.orientation_variables[3].get_symbol(0))
+        return w.dot(odom_T_base_footprint, base_footprint_T_base_footprint_vel, base_footprint_vel_T_base_footprint)
+
+    @property
+    def x(self):
+        return self.translation_variables[0]
+
+    @property
+    def y(self):
+        return self.translation_variables[1]
+
+    @property
+    def z(self):
+        return self.translation_variables[2]
+
+    @property
+    def x_name(self):
+        return self.translation_names[0]
+
+    @property
+    def y_name(self):
+        return self.translation_names[1]
+
+    @property
+    def z_name(self):
+        return self.translation_names[2]
+
+    @property
+    def qx_name(self):
+        return self.orientation_names[0]
+
+    @property
+    def qy_name(self):
+        return self.orientation_names[1]
+
+    @property
+    def qz_name(self):
+        return self.orientation_names[2]
+
+    @property
+    def qw_name(self):
+        return self.orientation_names[3]
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
-        world = self.god_map.unsafe_get_data(identifier.world)
+        state = self.world.state
         for free_variable in self.free_variable_list:
             try:
                 vel = new_cmds[0][free_variable.position_name]
             except KeyError as e:
                 # joint is currently not part of the optimization problem
                 continue
-            world.state[free_variable.name].velocity = vel
+            state[free_variable.name].velocity = vel
             if len(new_cmds) >= 2:
                 acc = new_cmds[1][free_variable.position_name]
-                world.state[free_variable.name].acceleration = acc
+                state[free_variable.name].acceleration = acc
             if len(new_cmds) >= 3:
                 jerk = new_cmds[2][free_variable.position_name]
-                world.state[free_variable.name].jerk = jerk
-        x = world.state[self.x_vel_name].velocity
-        y = world.state[self.y_vel_name].velocity
-        rot = world.state[self.rot_vel_name].velocity
-        delta = world.state[self.rot_name].position
-        world.state[self.x_name].velocity = (np.cos(delta) * x - np.sin(delta) * y)
-        world.state[self.x_name].position += world.state[self.x_name].velocity * dt
-        world.state[self.y_name].velocity = (np.sin(delta) * x + np.cos(delta) * y)
-        world.state[self.y_name].position += world.state[self.y_name].velocity * dt
-        world.state[self.rot_name].velocity = rot
-        world.state[self.rot_name].position += rot * dt
+                state[free_variable.name].jerk = jerk
+        x_vel = state[self.x_vel_name].velocity
+        y_vel = state[self.y_vel_name].velocity
+        rot_vel = state[self.rot_vel_name].velocity
+        # q = np.array([state[self.orientation_variables[0].name].position,
+        #               state[self.orientation_variables[1].name].position,
+        #               state[self.orientation_variables[2].name].position,
+        #               state[self.orientation_variables[3].name].position])
+        # axis, delta = axis_angle_from_quaternion(*q)
+        # if axis[2] < 0:
+        #     axis = -axis
+        #     delta = -delta
+
+        # odom_q_vel = quaternion_from_axis_angle(np.array([0, 0, 1]), rot_vel)
+        # new_q = quaternion_multiply(q, odom_q_vel)
+
+        # delta = (2 * np.arccos(np.min(np.max(-1, state[self.orientation_variables[3]]), 1)))
+        delta = state[self.rot_name].position
+        state[self.x_name].velocity = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
+        state[self.x_name].position += state[self.x_name].velocity * dt
+        state[self.y_name].velocity = (np.sin(delta) * x_vel + np.cos(delta) * y_vel)
+        state[self.y_name].position += state[self.y_name].velocity * dt
+        state[self.rot_name].velocity = rot_vel
+        state[self.rot_name].position += rot_vel * dt
+        # state[self.orientation_variables[0]].velocity = odom_q_vel[0]
+        # state[self.orientation_variables[1]].velocity = odom_q_vel[1]
+        # state[self.orientation_variables[2]].velocity = odom_q_vel[2]
+        # state[self.orientation_variables[3]].velocity = odom_q_vel[3]
+        # state[self.orientation_variables[0]].position = new_q[0]
+        # state[self.orientation_variables[1]].position = new_q[1]
+        # state[self.orientation_variables[2]].position = new_q[2]
+        # state[self.orientation_variables[3]].position = new_q[3]
 
     def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
         for free_variable in self._all_symbols():
@@ -606,7 +672,7 @@ class OmniDrive(Joint):
         return [self.x_vel, self.y_vel, self.rot_vel]
 
     def _all_symbols(self) -> List[FreeVariable]:
-        return self.free_variable_list + [self.x, self.y, self.rot]
+        return self.free_variable_list + self.translation_variables + self.orientation_variables
 
 
 class DiffDrive(Joint):

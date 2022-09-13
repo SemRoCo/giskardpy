@@ -26,7 +26,8 @@ class SyncTfFrames(GiskardBehavior):
                 parent_T_child = lookup_pose(parent_link, child_link)
                 parent_T_child_old = self.world.compute_fk_pose(parent_link, child_link)
                 try:
-                    compare_poses(parent_T_child_old.pose, parent_T_child.pose)
+                    compare_poses(parent_T_child_old.pose, parent_T_child.pose, decimal=3)
+                    # raise Exception()
                 except:
                     parent_T_child = msg_to_homogeneous_matrix(parent_T_child)
                     chain = self.world.compute_chain(parent_link, child_link, joints=True, links=False, fixed=True,

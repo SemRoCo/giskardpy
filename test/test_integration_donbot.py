@@ -358,9 +358,12 @@ class TestCartGoals(object):
         p.header.frame_id = 'camera_link'
         p.pose.position = Point(0, 1, 0)
         p.pose.orientation.w = 1
-        zero_pose.allow_self_collision()
-        zero_pose.set_translation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_BELOW_CA)
-        zero_pose.set_rotation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_ABOVE_CA)
+        # zero_pose.allow_self_collision()
+        zero_pose.set_straight_cart_goal(goal_pose=p,
+                                         tip_link=zero_pose.camera_tip,
+                                         root_link='ur5_shoulder_link')
+        # zero_pose.set_translation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_BELOW_CA)
+        # zero_pose.set_rotation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_ABOVE_CA)
         zero_pose.plan_and_execute()
 
     def test_endless_wiggling1(self, zero_pose):

@@ -7,6 +7,7 @@ class Donbot(Giskard):
 
     def __init__(self):
         super().__init__()
+        self.collision_avoidance_config.load_moveit_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
         self.add_sync_tf_frame('map', 'odom')
         # self.set_odometry_topic('/donbot/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',

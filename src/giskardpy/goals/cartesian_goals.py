@@ -8,6 +8,8 @@ from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import DiffDrive
 from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix, normalize
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.utils import logging
 
 
 class CartesianPosition(Goal):
@@ -26,6 +28,12 @@ class CartesianPosition(Goal):
         self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
+        if isinstance(goal_point, PoseStamped):
+            logging.logwarn('deprication warning: CartesianPosition called with PoseStamped instead of PointStamped')
+            p = PointStamped()
+            p.header = goal_point.header
+            p.point = goal_point.pose.position
+            goal_point = p
         self.root_link = root_link
         self.tip_link = tip_link
         if self.root_link2 is not None:
@@ -61,12 +69,18 @@ class CartesianPosition(Goal):
 
 
 class CartesianOrientation(Goal):
-    def __init__(self, root_link, tip_link, goal_orientation, reference_velocity=None, max_velocity=0.5,
+    def __init__(self, root_link, tip_link, goal_orientation: QuaternionStamped, reference_velocity=None, max_velocity=0.5,
                  weight=WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
         super().__init__(**kwargs)
         self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
+        if isinstance(goal_orientation, PoseStamped):
+            logging.logwarn('deprication warning: CartesianOrientation called with PoseStamped instead of QuaternionStamped')
+            q = QuaternionStamped()
+            q.header = goal_orientation.header
+            q.quaternion = goal_orientation.pose.orientation
+            goal_orientation = q
         self.root_link = root_link
         self.tip_link = tip_link
         if self.root_link2 is not None:

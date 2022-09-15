@@ -205,8 +205,8 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    c = PR2TestWrapper()
-    # c = PR2TestWrapperMujoco()
+    # c = PR2TestWrapper()
+    c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -297,7 +297,7 @@ class TestJointGoals(object):
         js = {
             'torso_lift_joint': 0.2999225173357618,
             'head_pan_joint': 0.041880780651479044,
-            'head_tilt_joint': -0.3849665749806885,
+            'head_tilt_joint': -0.37,
             'r_upper_arm_roll_joint': -0.9487714747527726,
             'r_shoulder_pan_joint': -1.0047307505973626,
             'r_shoulder_lift_joint': 0.48736790658811985,
@@ -315,6 +315,7 @@ class TestJointGoals(object):
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
+        zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
         start_state = {
             'torso_lift_joint': 0.3000254972469308,

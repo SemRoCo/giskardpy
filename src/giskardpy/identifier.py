@@ -5,6 +5,8 @@ fk_np = world + ['compute_fk_np']
 joint_states = world + ['state']
 controlled_joints = ['controlled_joints']
 
+fill_trajectory_velocity_values = ['fill_trajectory_velocity_values']
+
 # goal_params = ['goal_params']
 trajectory = ['traj']
 debug_trajectory = ['lbA_traj']

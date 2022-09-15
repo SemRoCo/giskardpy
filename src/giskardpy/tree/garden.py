@@ -19,7 +19,7 @@ from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
-from giskardpy.tree.behaviors.cleanup import CleanUp
+from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.collision_marker import CollisionMarker
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
@@ -258,6 +258,7 @@ class TreeManager:
         else:
             self.tree = tree
         self.tree_nodes = {}
+        self.god_map.get_data(identifier.world).reset_cache()
         self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
@@ -535,7 +536,7 @@ class StandAlone(TreeManager):
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
-        root.add_child(CleanUp('cleanup'))
+        root.add_child(CleanUpPlanning('CleanUpPlanning'))
         root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
@@ -668,7 +669,7 @@ class OpenLoop(StandAlone):
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
-        root.add_child(CleanUp('cleanup'))
+        root.add_child(CleanUpPlanning('CleanUpPlanning'))
         root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(self.grow_execution())
@@ -695,7 +696,7 @@ class OpenLoop(StandAlone):
         execution = failure_is_success(Sequence)('execution')
         execution.add_child(IF('execute?', identifier.execute))
         if self.add_real_time_tracking:
-            execution.add_child(CleanUp('cleanup'))
+            execution.add_child(CleanUpBaseController('CleanUpBaseController'))
             execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
             execution.add_child(InitQPController('InitQPController for base'))
         execution.add_child(SetTrackingStartTime('start start time'))

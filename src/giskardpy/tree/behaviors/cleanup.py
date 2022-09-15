@@ -35,3 +35,13 @@ class CleanUp(GiskardBehavior):
 
     def update(self):
         return Status.SUCCESS
+
+
+class CleanUpPlanning(CleanUp):
+    def initialise(self):
+        super().initialise()
+        self.god_map.set_data(identifier.fill_trajectory_velocity_values, None)
+
+
+class CleanUpBaseController(CleanUp):
+    pass

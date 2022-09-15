@@ -78,7 +78,8 @@ robot_interface:
     plugin: SendFollowJointTrajectory
     namespace: /whole_body_controller/base/follow_joint_trajectory
     state_topic: /whole_body_controller/base/state
+    goal_time_tolerance: 2
   body:
     plugin: SendFollowJointTrajectory
-    namespace: /whole_body_controller/body/follow_joint_trajectory
-    state_topic: /whole_body_controller/body/state
+    namespace: /scaled_pos_joint_traj_controller/follow_joint_trajectory
+    state_topic: /scaled_pos_joint_traj_controller/state

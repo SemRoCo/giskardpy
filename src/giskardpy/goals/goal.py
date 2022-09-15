@@ -4,8 +4,6 @@ import traceback
 from collections import OrderedDict
 from typing import Optional, Tuple, Dict, List, Union
 
-from tf2_py import LookupException
-
 from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier

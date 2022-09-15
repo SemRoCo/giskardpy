@@ -258,6 +258,7 @@ class TreeManager:
         else:
             self.tree = tree
         self.tree_nodes = {}
+        self.god_map.get_data(identifier.world).reset_cache()
         self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)

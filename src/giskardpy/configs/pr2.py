@@ -85,11 +85,13 @@ class PR2_IAI(PR2_Base):
         self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
                                       parent_link_name='odom_combined',
                                       child_link_name='base_footprint',
-                                      translation_acceleration_limit=0.25,
-                                      rotation_acceleration_limit=0.25,
+                                      translation_velocity_limit=0.4,
+                                      rotation_velocity_limit=0.2,
+                                      translation_acceleration_limit=1,
+                                      rotation_acceleration_limit=1,
                                       translation_jerk_limit=5,
                                       rotation_jerk_limit=5)
-        fill_velocity_values = True
+        fill_velocity_values = False
         self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
                                                 state_topic='/l_arm_controller/state',
                                                 fill_velocity_values=fill_velocity_values)

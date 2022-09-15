@@ -28,7 +28,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     @profile
     def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, **kwargs):
         super().__init__(name)
-        self.threshold = np.array([0.02, 0.02, 0.10])
+        self.threshold = np.array([0.02, 0.02, 0.02])
         self.cmd_vel_topic = cmd_vel_topic
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 

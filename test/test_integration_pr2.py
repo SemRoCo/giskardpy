@@ -399,7 +399,13 @@ class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
     def test_open_dishwasher_apartment(self, apartment_setup: PR2TestWrapper):
-        pass
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'base_footprint'
+        base_pose.pose.position.x = 0.4
+        base_pose.pose.position.y = -2
+        base_pose.pose.orientation.w = 1
+        # apartment_setup.allow_all_collisions()
+        apartment_setup.move_base(base_pose)
 
     def test_SetPredictionHorizon(self, zero_pose: PR2TestWrapper):
         zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
@@ -4562,7 +4568,7 @@ class TestInfoServices(object):
 
 # time: *[1-9].
 # import pytest
-# pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
+# pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_attached_collision2'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])

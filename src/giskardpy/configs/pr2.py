@@ -141,3 +141,7 @@ class PR2StandAlone(PR2_Base):
                                       child_link_name='base_footprint',
                                       translation_jerk_limit=5,
                                       rotation_jerk_limit=5)
+        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
+                                                                               number_of_repeller=2,
+                                                                               soft_threshold=0.2,
+                                                                               hard_threshold=0.1)

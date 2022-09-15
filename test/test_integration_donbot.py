@@ -93,7 +93,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         self.camera_tip = 'camera_link'
         self.gripper_tip = 'gripper_tool_frame'
         # self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
-        self.mujoco_reset = rospy.ServiceProxy('donbot/reset', Trigger)
+        # self.mujoco_reset = rospy.ServiceProxy('donbot/reset', Trigger)
         super().__init__(Donbot)
 
     def move_base(self, goal_pose):
@@ -132,7 +132,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         np.testing.assert_almost_equal(self.world.state[gripper_joint].position, width, decimal=3)
 
     def reset(self):
-        self.mujoco_reset()
+        # self.mujoco_reset()
         self.clear_world()
         self.reset_base()
         self.open_gripper()

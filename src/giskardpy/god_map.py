@@ -11,7 +11,6 @@ from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, V
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.model.utils import robot_name_from_urdf_string
-from giskardpy.utils.config_loader import upload_config_file_to_paramserver
 
 
 def set_default_in_override_block(block_identifier, god_map):

@@ -18,9 +18,6 @@ class HardwareConfig:
             fill_velocity_values=fill_velocity_values))
 
     def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,
-                                 joint_name: str = 'brumbrum',
-                                 odom_x_name: str = 'odom_x', odom_y_name: str = 'odom_y',
-                                 odom_rot_name: str = 'odom_rot',
                                  translation_velocity_limit: Optional[float] = 0.2,
                                  rotation_velocity_limit: Optional[float] = 0.2,
                                  translation_acceleration_limit: Optional[float] = None,
@@ -31,10 +28,6 @@ class HardwareConfig:
         self.drive_interfaces.append(OmniDriveCmdVelInterface(cmd_vel_topic=cmd_vel_topic,
                                                               parent_link_name=parent_link_name,
                                                               child_link_name=child_link_name,
-                                                              joint_name=joint_name,
-                                                              odom_x_name=odom_x_name,
-                                                              odom_y_name=odom_y_name,
-                                                              odom_rot_name=odom_rot_name,
                                                               translation_velocity_limit=translation_velocity_limit,
                                                               rotation_velocity_limit=rotation_velocity_limit,
                                                               translation_acceleration_limit=translation_acceleration_limit,
@@ -44,8 +37,6 @@ class HardwareConfig:
                                                               **kwargs))
 
     def add_diff_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,
-                                 joint_name: str = 'brumbrum',
-                                 odom_x_name: str = 'odom_x', odom_rot_name: str = 'odom_rot',
                                  translation_velocity_limit: Optional[float] = 0.2,
                                  rotation_velocity_limit: Optional[float] = 0.2,
                                  translation_acceleration_limit: Optional[float] = None,
@@ -56,9 +47,6 @@ class HardwareConfig:
         self.drive_interfaces.append(DiffDriveCmdVelInterface(cmd_vel_topic=cmd_vel_topic,
                                                               parent_link_name=parent_link_name,
                                                               child_link_name=child_link_name,
-                                                              joint_name=joint_name,
-                                                              odom_x_name=odom_x_name,
-                                                              odom_rot_name=odom_rot_name,
                                                               translation_velocity_limit=translation_velocity_limit,
                                                               rotation_velocity_limit=rotation_velocity_limit,
                                                               translation_acceleration_limit=translation_acceleration_limit,

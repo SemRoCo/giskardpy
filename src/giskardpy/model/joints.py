@@ -596,19 +596,6 @@ class OmniDrive(Joint):
         x_vel = state[self.x_vel_name].velocity
         y_vel = state[self.y_vel_name].velocity
         rot_vel = state[self.rot_vel_name].velocity
-        # q = np.array([state[self.orientation_variables[0].name].position,
-        #               state[self.orientation_variables[1].name].position,
-        #               state[self.orientation_variables[2].name].position,
-        #               state[self.orientation_variables[3].name].position])
-        # axis, delta = axis_angle_from_quaternion(*q)
-        # if axis[2] < 0:
-        #     axis = -axis
-        #     delta = -delta
-
-        # odom_q_vel = quaternion_from_axis_angle(np.array([0, 0, 1]), rot_vel)
-        # new_q = quaternion_multiply(q, odom_q_vel)
-
-        # delta = (2 * np.arccos(np.min(np.max(-1, state[self.orientation_variables[3]]), 1)))
         delta = state[self.yaw_name].position
         state[self.x_name].velocity = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
         state[self.x_name].position += state[self.x_name].velocity * dt
@@ -616,14 +603,6 @@ class OmniDrive(Joint):
         state[self.y_name].position += state[self.y_name].velocity * dt
         state[self.yaw_name].velocity = rot_vel
         state[self.yaw_name].position += rot_vel * dt
-        # state[self.orientation_variables[0]].velocity = odom_q_vel[0]
-        # state[self.orientation_variables[1]].velocity = odom_q_vel[1]
-        # state[self.orientation_variables[2]].velocity = odom_q_vel[2]
-        # state[self.orientation_variables[3]].velocity = odom_q_vel[3]
-        # state[self.orientation_variables[0]].position = new_q[0]
-        # state[self.orientation_variables[1]].position = new_q[1]
-        # state[self.orientation_variables[2]].position = new_q[2]
-        # state[self.orientation_variables[3]].position = new_q[3]
 
     def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
         for free_variable in self._all_symbols():
@@ -631,19 +610,13 @@ class OmniDrive(Joint):
             free_variable.upper_limits = {}
 
         for order, linear_limit in linear_limits.items():
-            # self.x.set_upper_limit(order, linear_limit[self.x_name])
-            # self.y.set_upper_limit(order, linear_limit[self.y_name])
             self.x_vel.set_upper_limit(order, linear_limit[self.x_vel_name])
             self.y_vel.set_upper_limit(order, linear_limit[self.y_vel_name])
 
-            # self.x.set_lower_limit(order, -linear_limit[self.x_name])
-            # self.y.set_lower_limit(order, -linear_limit[self.y_name])
             self.x_vel.set_lower_limit(order, -linear_limit[self.x_vel_name])
             self.y_vel.set_lower_limit(order, -linear_limit[self.y_vel_name])
 
         for order, angular_limit in angular_limits.items():
-            # self.rot.set_upper_limit(order, angular_limit[self.rot_name])
-            # self.rot.set_lower_limit(order, -angular_limit[self.rot_name])
             self.yaw_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
             self.yaw_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
 
@@ -654,7 +627,7 @@ class OmniDrive(Joint):
                 for free_variable in self._all_symbols():
                     free_variable.quadratic_weights[order] = weight[self.name]
             except KeyError:
-                # can't do if in, because the dict may be a defaultdict
+                # can't do "if in", because the dict may be a defaultdict
                 pass
 
     def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:

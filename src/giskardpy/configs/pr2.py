@@ -109,6 +109,30 @@ class PR2_IAI(PR2_Base):
                                                                                soft_threshold=0.2,
                                                                                hard_threshold=0.1)
 
+class PR2_Unreal(PR2_Base):
+    def __init__(self):
+        super().__init__()
+        # self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
+        self.add_sync_tf_frame('map', 'odom_combined')
+        self.add_odometry_topic('/base_odometry/odom')
+        self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
+                                      parent_link_name='odom_combined',
+                                      child_link_name='base_footprint',
+                                      translation_velocity_limit=0.4,
+                                      rotation_velocity_limit=0.2,
+                                      translation_acceleration_limit=1,
+                                      rotation_acceleration_limit=1,
+                                      translation_jerk_limit=5,
+                                      rotation_jerk_limit=5)
+        fill_velocity_values = False
+        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/follow_joint_trajectory',
+                                                state_topic='/whole_body_controller/state',
+                                                fill_velocity_values=fill_velocity_values)
+        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
+                                                                               number_of_repeller=2,
+                                                                               soft_threshold=0.2,
+                                                                               hard_threshold=0.1)
+
 
 class PR2StandAlone(PR2_Base):
     def __init__(self):

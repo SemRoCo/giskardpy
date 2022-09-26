@@ -387,7 +387,7 @@ class TreeManager:
         return self.tree_nodes[node_name].node
 
     def render(self, profile=None):
-        path = self.god_map.get_data(identifier.data_folder) + 'tree'
+        path = self.god_map.get_data(identifier.tmp_folder) + 'tree'
         create_path(path)
         render_dot_tree(self.tree.root, name=path, profile=profile)
 

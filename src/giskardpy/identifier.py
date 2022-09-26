@@ -45,7 +45,7 @@ giskard = ['giskard']
 # general options
 general_options = giskard + ['general_config']
 action_server_name = general_options + ['action_server_name']
-data_folder = general_options + ['path_to_data_folder']
+tmp_folder = general_options + ['path_to_data_folder']
 debug = general_options + ['debug']
 test_mode = general_options + ['test_mode']
 control_mode = general_options + ['control_mode']

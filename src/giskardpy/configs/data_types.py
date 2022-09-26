@@ -30,7 +30,7 @@ class GeneralConfig:
     def __init__(self):
         self.control_mode: ControlModes = ControlModes.open_loop
         self.action_server_name: str = '~command'
-        self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
+        self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
         self.test_mode: bool = False
         self.debug: bool = False
         self.joint_limits: Dict[str, Dict[str, float]] = {

@@ -390,7 +390,8 @@ def write_to_tmp(file_name: str, file_str: str) -> str:
 
 
 def to_tmp_path(file_name: str) -> str:
-    return f'/tmp/giskardpy/{file_name}'
+    path = blackboard_god_map().get_data(identifier.tmp_folder)
+    return resolve_ros_iris(f'{path}{file_name}')
 
 
 def load_from_tmp(file_name: str):

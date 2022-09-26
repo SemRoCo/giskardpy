@@ -162,7 +162,6 @@ include_directories(
 
 catkin_install_python(PROGRAMS 
 	scripts/giskard_pr2.py
-	scripts/giskard_pr2_iai.py
 	scripts/giskard_tiago.py
 	scripts/interactive_marker.py
 	scripts/joystick_e_stop.py

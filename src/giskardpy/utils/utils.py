@@ -402,18 +402,6 @@ def load_from_tmp(file_name: str):
     return loaded_file
 
 
-def convert_to_stl_and_save_in_tmp(file_name: str):
-    resolved_old_path = resolve_ros_iris(file_name)
-    short_file_name = file_name.split('/')[-1][:-3]
-    tmp_path = f'/tmp/giskardpy/{short_file_name}stl'
-    if not os.path.exists(tmp_path):
-        logging.loginfo(f'Converting {file_name} to stl and saving in {tmp_path}.')
-        subprocess.check_output(['ctmconv', resolved_old_path, tmp_path])
-    else:
-        logging.loginfo(f'Found converted file in {tmp_path}.')
-    return tmp_path
-
-
 def fix_obj(file_name):
     logging.loginfo(f'Attempting to fix {file_name}.')
     with open(file_name, 'r') as f:

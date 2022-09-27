@@ -729,13 +729,13 @@ class QPController:
 
     def save_all_pandas(self):
         if hasattr(self, 'p_xdot') and self.p_xdot is not None:
-            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
+            save_pandas([self.p_weights, self.p_A, self.p_Ax, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
                          self.p_xdot],
-                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
+                        ['weights', 'A', 'Ax', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
                         '../tmp_data')
         else:
-            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
-                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
+            save_pandas([self.p_weights, self.p_A, self.p_Ax, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
+                        ['weights', 'A', 'Ax', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
                         '../tmp_data')
 
     def _is_inf_in_data(self):

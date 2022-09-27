@@ -18,6 +18,7 @@ class DriveInterface(ABC):
                  odom_x_name: my_string = 'odom_x',
                  odom_y_name: my_string = 'odom_y',
                  odom_rot_name: my_string = 'odom_rot',
+                 track_only_velocity: bool = False,
                  translation_velocity_limit: Optional[float] = 0.2,
                  rotation_velocity_limit: Optional[float] = 0.2,
                  translation_acceleration_limit: Optional[float] = None,
@@ -46,6 +47,7 @@ class DriveInterface(ABC):
         self.rotation_acceleration_limit = rotation_acceleration_limit
         self.translation_jerk_limit = translation_jerk_limit
         self.rotation_jerk_limit = rotation_jerk_limit
+        self.track_only_velocity = track_only_velocity
         self.kwargs = kwargs
 
     @abc.abstractmethod
@@ -78,7 +80,9 @@ class OmniDriveCmdVelInterface(DriveInterface):
                          **self.kwargs)
 
     def make_plugin(self):
-        return SendTrajectoryToCmdVel(self.cmd_vel_topic, self.cmd_vel_topic)
+        return SendTrajectoryToCmdVel(name=self.cmd_vel_topic,
+                                      cmd_vel_topic=self.cmd_vel_topic,
+                                      track_only_velocity=self.track_only_velocity)
 
 
 class DiffDriveCmdVelInterface(DriveInterface):
@@ -98,4 +102,6 @@ class DiffDriveCmdVelInterface(DriveInterface):
                          **self.kwargs)
 
     def make_plugin(self):
-        return SendTrajectoryToCmdVel(self.cmd_vel_topic, self.cmd_vel_topic)
+        return SendTrajectoryToCmdVel(name=self.cmd_vel_topic,
+                                      cmd_vel_topic=self.cmd_vel_topic,
+                                      track_only_velocity=self.track_only_velocity)

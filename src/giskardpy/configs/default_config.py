@@ -98,6 +98,7 @@ class Giskard:
 
     def add_omni_drive_interface(self, parent_link_name, child_link_name,
                                  cmd_vel_topic: Optional[str] = None,
+                                 track_only_velocity: bool = False,
                                  translation_velocity_limit: Optional[float] = 0.2,
                                  rotation_velocity_limit: Optional[float] = 0.2,
                                  translation_acceleration_limit: Optional[float] = None,
@@ -107,6 +108,7 @@ class Giskard:
         self.hardware_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name,
+                                                      track_only_velocity=track_only_velocity,
                                                       translation_velocity_limit=translation_velocity_limit,
                                                       rotation_velocity_limit=rotation_velocity_limit,
                                                       translation_acceleration_limit=translation_acceleration_limit,
@@ -120,6 +122,7 @@ class Giskard:
 
     def add_diff_drive_interface(self, parent_link_name: str, child_link_name: str,
                                  cmd_vel_topic: Optional[str] = None,
+                                 track_only_velocity: bool = False,
                                  translation_velocity_limit: Optional[float] = 0.2,
                                  rotation_velocity_limit: Optional[float] = 0.2,
                                  translation_acceleration_limit: Optional[float] = None,
@@ -129,6 +132,7 @@ class Giskard:
         self.hardware_config.add_diff_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name,
+                                                      track_only_velocity=track_only_velocity,
                                                       translation_velocity_limit=translation_velocity_limit,
                                                       rotation_velocity_limit=rotation_velocity_limit,
                                                       translation_acceleration_limit=translation_acceleration_limit,

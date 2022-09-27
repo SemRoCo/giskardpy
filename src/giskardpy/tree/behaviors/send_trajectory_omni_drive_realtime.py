@@ -26,11 +26,12 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     supported_state_types = [Twist]
 
     @profile
-    def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, **kwargs):
+    def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, track_only_velocity: bool = False, **kwargs):
         super().__init__(name)
         self.threshold = np.array([0.02, 0.02, 0.02])
         self.cmd_vel_topic = cmd_vel_topic
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
+        self.track_only_velocity = track_only_velocity
 
         loginfo(f'Waiting for cmd_vel topic \'{self.cmd_vel_topic}\' to appear.')
         try:
@@ -80,7 +81,8 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         return [SetPredictionHorizon(god_map=self.god_map,
                                      prediction_horizon=self.god_map.get_data(identifier.prediction_horizon)+4),
                 BaseTrajFollower(god_map=self.god_map,
-                                 joint_name=self.joint.name)]
+                                 joint_name=self.joint.name,
+                                 track_only_velocity=self.track_only_velocity)]
 
     def solver_cmd_to_twist(self, cmd) -> Twist:
         twist = Twist()

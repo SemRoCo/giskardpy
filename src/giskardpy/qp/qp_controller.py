@@ -669,6 +669,7 @@ class QPController:
             logging.logwarn(f'Specified control horizon of {constraint.name} is bigger than prediction horizon.'
                             f'Reducing control horizon of {constraint.control_horizon} '
                             f'to prediction horizon of {self.prediction_horizon}')
+            constraint.control_horizon = self.prediction_horizon
 
     def add_debug_expressions(self, debug_expressions):
         """

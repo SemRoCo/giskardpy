@@ -29,7 +29,7 @@ class CartesianPosition(Goal):
         if reference_velocity is None:
             reference_velocity = max_velocity
         if isinstance(goal_point, PoseStamped):
-            logging.logwarn('deprication warning: CartesianPosition called with PoseStamped instead of PointStamped')
+            logging.logwarn('deprecated warning: CartesianPosition called with PoseStamped instead of PointStamped')
             p = PointStamped()
             p.header = goal_point.header
             p.point = goal_point.pose.position

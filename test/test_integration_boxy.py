@@ -7,7 +7,7 @@ from tf.transformations import quaternion_from_matrix
 
 from giskardpy.utils.tfwrapper import lookup_point, transform_point, \
     transform_pose
-from utils_for_tests import Donbot, Boxy
+from utils_for_tests import BoxyTestWrapper
 
 
 # TODO roslaunch iai_boxy_sim ros_control_sim.launch
@@ -15,7 +15,7 @@ from utils_for_tests import Donbot, Boxy
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    c = Boxy()
+    c = BoxyTestWrapper()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -35,7 +35,7 @@ class TestJointGoals(object):
 class TestConstraints(object):
     def test_pointing(self, better_pose):
         """
-        :type better_pose: Boxy
+        :type better_pose: BoxyTestWrapper
         """
         tip = 'head_mount_kinect2_rgb_optical_frame'
         goal_point = lookup_point('map', better_pose.r_tip)
@@ -77,7 +77,7 @@ class TestConstraints(object):
 
     def test_open_drawer(self, kitchen_setup):  # where is the kitchen_setup actually loaded
         """"
-        :type kitchen_setup: Boxy
+        :type kitchen_setup: BoxyTestWrapper
         """
         handle_frame_id = 'iai_kitchen/sink_area_left_middle_drawer_handle'
         handle_name = 'sink_area_left_middle_drawer_handle'

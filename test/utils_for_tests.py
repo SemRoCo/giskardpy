@@ -27,6 +27,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
+from giskardpy.configs.boxy import Boxy
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
@@ -1067,7 +1068,7 @@ class BaseBot(GiskardTestWrapper):
         # self.plan_and_execute()
 
 
-class Boxy(GiskardTestWrapper):
+class BoxyTestWrapper(GiskardTestWrapper):
     default_pose = {
         'neck_shoulder_pan_joint': 0.0,
         'neck_shoulder_lift_joint': 0.0,
@@ -1121,10 +1122,7 @@ class Boxy(GiskardTestWrapper):
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
         self.r_gripper_group = 'r_gripper'
-        if config is None:
-            super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml')
-        else:
-            super(Boxy, self).__init__(config)
+        super().__init__(Boxy)
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -1144,7 +1142,7 @@ class Boxy(GiskardTestWrapper):
         self.register_group(self.r_gripper_group, self.get_robot_name(), 'right_arm_7_link')
 
 
-class BoxyCloseLoop(Boxy):
+class BoxyCloseLoop(BoxyTestWrapper):
 
     def __init__(self, config=None):
         super().__init__('package://giskardpy/config/boxy_closed_loop.yaml')

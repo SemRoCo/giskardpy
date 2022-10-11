@@ -64,8 +64,7 @@ class DriveInterface(ABC):
 class OmniDriveCmdVelInterface(DriveInterface):
 
     def make_joint(self, god_map):
-        return OmniDrive(god_map=god_map,
-                         parent_link_name=self.parent_link_name,
+        return OmniDrive(parent_link_name=self.parent_link_name,
                          child_link_name=self.child_link_name,
                          name=self.joint_name,
                          odom_x_name=self.odom_x_name,
@@ -87,8 +86,7 @@ class OmniDriveCmdVelInterface(DriveInterface):
 
 class DiffDriveCmdVelInterface(DriveInterface):
     def make_joint(self, god_map):
-        return DiffDrive(god_map=god_map,
-                         parent_link_name=self.parent_link_name,
+        return DiffDrive(parent_link_name=self.parent_link_name,
                          child_link_name=self.child_link_name,
                          name=self.joint_name,
                          x_name=self.odom_x_name,

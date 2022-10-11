@@ -77,16 +77,19 @@ class SyncOdometry(GiskardBehavior):
         try:
             odometry: Odometry = self.lock.get()
             pose = odometry.pose.pose
-            self.last_msg = JointStates()
-            self.world.state[joint.x_name].position = pose.position.x
-            self.world.state[joint.y_name].position = pose.position.y
-            self.world.state[joint.z_name].position = pose.position.z
             roll, pitch, yaw = rpy_from_quaternion(pose.orientation.x,
                                                    pose.orientation.y,
                                                    pose.orientation.z,
                                                    pose.orientation.w)
-            self.world.state[joint.roll_name].position = roll
-            self.world.state[joint.pitch_name].position = pitch
+            self.last_msg = JointStates()
+            self.world.state[joint.x_name].position = pose.position.x
+            self.world.state[joint.y_name].position = pose.position.y
+            try:
+                self.world.state[joint.z_name].position = pose.position.z
+                self.world.state[joint.roll_name].position = roll
+                self.world.state[joint.pitch_name].position = pitch
+            except:
+                pass
             self.world.state[joint.yaw_name].position = yaw
             # q = quaternion_from_rpy(roll, pitch, 0)
             # self.world.state[joint.qx_name].position = q[0]

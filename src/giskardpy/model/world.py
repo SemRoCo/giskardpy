@@ -313,7 +313,7 @@ class WorldTree:
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
 
-                joint = URDFJoint.from_urdf(urdf_joint, prefix, self.god_map)
+                joint = URDFJoint.from_urdf(urdf_joint, prefix)
 
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
@@ -334,7 +334,6 @@ class WorldTree:
         connecting_joint = FixedJoint(name=joint_name,
                                       parent_link_name=parent_link.name,
                                       child_link_name=child_link.name,
-                                      god_map=self.god_map,
                                       parent_T_child=transform)
         self._link_joint_to_links(connecting_joint)
 
@@ -423,7 +422,6 @@ class WorldTree:
             joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,
                                child_link_name=link.name,
-                               god_map=self.god_map,
                                parent_T_child=w.Matrix(msg_to_homogeneous_matrix(pose)))
             self._link_joint_to_links(joint)
             self.register_group(group_name, link.name)
@@ -503,9 +501,17 @@ class WorldTree:
 
         new_weights = {}
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights)) + 1):
-            def default(joint_name):
-                return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
+            class Default:
+                def __init__(self, derivative_name, god_map):
+                    self.god_map = god_map
+                    self.derivative_name = derivative_name
 
+                def __call__(self, joint_name):
+                    return self.god_map.to_symbol(identifier.joint_weights + [self.derivative_name, joint_name])
+            # def default(joint_name):
+            #     return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
+            # default = lambda joint_name: self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
+            default = Default(order_map[i], self.god_map)
             d = KeyDefaultDict(default)
             new_weights[i] = d
             # self._set_joint_weights(i, d)

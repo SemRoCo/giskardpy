@@ -77,7 +77,6 @@ class Giskard:
         joint = FixedJoint(name=joint_name,
                            parent_link_name=parent_link,
                            child_link_name=child_link,
-                           god_map=self._god_map,
                            parent_T_child=homo_transform)
         joints.append(joint)
         self._god_map.set_data(identifier.joints_to_add, joints)

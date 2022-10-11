@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from std_msgs.msg import ColorRGBA
+
 from giskardpy.configs.default_config import Giskard
 
 
@@ -7,6 +9,7 @@ class Donbot(Giskard):
 
     def __init__(self):
         super().__init__()
+        self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.collision_avoidance_config.load_moveit_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
         self.add_sync_tf_frame('map', 'odom')
         # self.set_odometry_topic('/donbot/base_footprint')

@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from std_msgs.msg import ColorRGBA
+
 from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.configs.default_config import Giskard, ControlModes
 from giskardpy.data_types import PrefixName
@@ -8,6 +10,7 @@ from giskardpy.data_types import PrefixName
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
+        self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.collision_avoidance_config.load_moveit_self_collision_matrix(
             'package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',

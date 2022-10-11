@@ -120,7 +120,7 @@ class MeshGeometry(LinkGeometry):
         marker.scale.x = self.scale[0]
         marker.scale.y = self.scale[1]
         marker.scale.z = self.scale[2]
-        marker.mesh_use_embedded_materials = True
+        marker.mesh_use_embedded_materials = False
         return marker
 
     def as_urdf(self):

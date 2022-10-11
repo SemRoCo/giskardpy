@@ -63,14 +63,15 @@ class PR2_Base(Giskard):
 class PR2_Mujoco(PR2_Base):
     def __init__(self):
         super().__init__()
+        self.general_config.default_link_color = ColorRGBA(1,1,1, 0.7)
         self.add_odometry_topic('/pr2/base_footprint')
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_follow_joint_trajectory_server(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/whole_body_controller/state')
-        # self.add_follow_joint_trajectory_server(namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
-        #                                         state_topic='/pr2/l_gripper_l_finger_controller/state')
-        # self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
-        #                                         state_topic='/pr2/r_gripper_l_finger_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
+                                                state_topic='/pr2/l_gripper_l_finger_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
+                                                state_topic='/pr2/r_gripper_l_finger_controller/state')
         self.add_omni_drive_interface(cmd_vel_topic='/pr2/cmd_vel',
                                       parent_link_name='odom_combined',
                                       child_link_name='base_footprint',

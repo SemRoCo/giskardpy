@@ -5,6 +5,7 @@ from giskard_msgs.msg import MoveResult
 from giskardpy.exceptions import *
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class SetErrorCode(GiskardBehavior):
@@ -16,6 +17,7 @@ class SetErrorCode(GiskardBehavior):
         self.context = context
         super().__init__(name)
 
+    @catch_and_raise_to_blackboard
     @profile
     def update(self):
         e = self.get_blackboard_exception()

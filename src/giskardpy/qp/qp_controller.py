@@ -566,8 +566,8 @@ class A(Parent):
         # if self.default_limits:
         #     A_soft[0:self.num_position_limits() * self.prediction_horizon,
         #     self.prediction_horizon:self.num_position_limits] = w.eye(self.num_position_limits())
-        hack = blackboard_god_map().to_symbol(identifier.hack)
-        A_soft = w.ca.substitute(A_soft, hack, 1)
+        # hack = blackboard_god_map().to_symbol(identifier.hack)
+        # A_soft = w.ca.substitute(A_soft, hack, 1)
         return A_soft
 
     def A(self):

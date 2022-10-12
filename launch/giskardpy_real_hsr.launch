@@ -27,7 +27,7 @@
    The joint goal splitter uses this interface to send joint trajectories to the base controller of the hsr-->
   <!--#######################################################################-->
 
-  <!--<include file="$(find giskardpy)/launch/giskardpy_splitter_hsr.launch"/>-->
+  <!--<include file="$(find giskardpy)/launch/giskardpy_hsr_mujoco.launch"/>-->
 
   <node pkg="joint_trajectory_action" type="joint_trajectory_action" name="joint_trajectory_action" output="screen">
     <rosparam param="/base_trajectory_action/follow_joint_trajectory/joints">

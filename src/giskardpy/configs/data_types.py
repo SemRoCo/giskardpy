@@ -66,6 +66,14 @@ class QPSolverConfig:
             self.joint_weights = joint_weights
 
 
+class HardwareConfig:
+    def __init__(self):
+        self.send_trajectory_to_cmd_vel_kwargs: List[dict] = []
+        self.follow_joint_trajectory_interfaces_kwargs: List[dict] = []
+        self.joint_state_topics: List[str] = []
+        self.odometry_node_kwargs: List[dict] = []
+
+
 class CollisionAvoidanceConfig:
     class CollisionAvoidanceEntry:
         def __init__(self,
@@ -99,8 +107,10 @@ class CollisionAvoidanceConfig:
         self.fixed_joints_for_self_collision_avoidance = []
         self.fixed_joints_for_external_collision_avoidance = []
 
-        self.external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
-        self.self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
+        self.external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(
+            self.CollisionAvoidanceEntry)
+        self.self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(
+            self.CollisionAvoidanceEntry)
 
     def cal_max_param(self, parameter_name):
         external_distances = self.external_collision_avoidance
@@ -252,7 +262,7 @@ class BehaviorTreeConfig:
         },
         'MaxTrajectoryLength': {
             'enabled': True,
-            'length': 60 # seconds
+            'length': 60  # seconds
         },
         'LoopDetector': {
             'precision': 4

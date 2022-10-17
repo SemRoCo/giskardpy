@@ -1,7 +1,4 @@
-import inspect
-from collections import defaultdict
 from copy import deepcopy
-from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
 
 from tf2_py import LookupException
@@ -12,9 +9,8 @@ import rospy
 from py_trees import Blackboard
 
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib, GeneralConfig, \
-    BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig
-from giskardpy.configs.hardware_interface_config import HardwareConfig
+from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
+    BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
@@ -24,7 +20,7 @@ from giskardpy.my_types import my_string
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
-import giskardpy.utils.tfwrapper as tf
+
 
 class Giskard:
     def __init__(self):
@@ -91,12 +87,14 @@ class Giskard:
         self.add_fixed_joint(parent_link=parent_link, child_link=child_link)
         self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link)
 
-    def add_odometry_topic(self, odometry_topic):
-        self.hardware_config.odometry_topics.append(odometry_topic)
+    def add_odometry_topic(self, odometry_topic, joint_name):
+        self.hardware_config.odometry_node_kwargs.append({'odometry_topic': odometry_topic,
+                                                          'joint_name': joint_name})
 
     def add_follow_joint_trajectory_server(self, namespace, state_topic, fill_velocity_values=False):
-        self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic,
-                                                                fill_velocity_values=fill_velocity_values)
+        self.hardware_config.follow_joint_trajectory_interfaces_kwargs.append({'namespace': namespace,
+                                                                        'state_topic': state_topic,
+                                                                        'fill_velocity_values': fill_velocity_values})
 
     def add_omni_drive_joint(self,
                              parent_link_name: str,
@@ -125,7 +123,8 @@ class Giskard:
                                    translation_jerk_limit=translation_jerk_limit,
                                    rotation_jerk_limit=rotation_jerk_limit)
         self.add_joint(brumbrum_joint)
-        self.add_odometry_topic(odometry_topic)
+        self.add_odometry_topic(odometry_topic=odometry_topic,
+                                joint_name=brumbrum_joint.name)
 
     def add_diff_drive_joint(self,
                              parent_link_name: str,
@@ -154,15 +153,16 @@ class Giskard:
                                    translation_jerk_limit=translation_jerk_limit,
                                    rotation_jerk_limit=rotation_jerk_limit)
         self.add_joint(brumbrum_joint)
-        self.add_odometry_topic(odometry_topic)
+        self.add_odometry_topic(odometry_topic=odometry_topic,
+                                joint_name=brumbrum_joint.name)
 
     def add_base_cmd_velocity(self,
                               cmd_vel_topic: str,
                               track_only_velocity: bool = False,
                               joint_name: Optional[my_string] = None):
-        self.hardware_config.add_base_cmd_velocity(cmd_vel_topic=cmd_vel_topic,
-                                                   track_only_velocity=track_only_velocity,
-                                                   joint_name=joint_name)
+        self.hardware_config.send_trajectory_to_cmd_vel_kwargs.append({'cmd_vel_topic': cmd_vel_topic,
+                                                                'track_only_velocity': track_only_velocity,
+                                                                'joint_name': joint_name})
 
     def reset_config(self):
         for parameter, value in self._backup.items():
@@ -217,7 +217,7 @@ class Giskard:
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
-        if len(self.hardware_config.send_trajectory_to_cmd_vel) == 0:
+        if len(self.hardware_config.send_trajectory_to_cmd_vel_kwargs) == 0:
             logging.loginfo('No cmd_vel topic has been registered.')
 
     def live(self):

@@ -8,8 +8,6 @@ from typing import List, Dict, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import rospy
-from zope.interface import named
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.data_types import SupportedQPSolver
@@ -26,7 +24,7 @@ from giskardpy.utils.utils import memoize, create_path, suppress_stdout, blackbo
 
 
 def save_pandas(dfs, names, path):
-    folder_name = '{}/pandas_{}/'.format(path, datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss'))
+    folder_name = f'{path}/pandas_{datetime.datetime.now().strftime("%Yy-%mm-%dd--%Hh-%Mm-%Ss")}/'
     create_path(folder_name)
     for df, name in zip(dfs, names):
         csv_string = 'name\n'
@@ -36,7 +34,7 @@ def save_pandas(dfs, names, path):
                     csv_string += column.add_prefix(column_name + '||').to_csv(float_format='%.4f')
             else:
                 csv_string += df.to_csv(float_format='%.4f')
-        file_name2 = '{}{}.csv'.format(folder_name, name)
+        file_name2 = f'{folder_name}{name}.csv'
         with open(file_name2, 'w') as f:
             f.write(csv_string)
 
@@ -619,6 +617,9 @@ class QPController:
             elif solver_name == SupportedQPSolver.cplex:
                 from giskardpy.qp.qp_solver_cplex import QPSolverCplex
                 self.qp_solver = QPSolverCplex()
+            elif solver_name == SupportedQPSolver.qp_oases:
+                from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
+                self.qp_solver = QPSolverQPOases()
             elif not solver_name == SupportedQPSolver.qp_oases:
                 raise KeyError(f'Solver \'{solver_name}\' not supported')
         except Exception as e:

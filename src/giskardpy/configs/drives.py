@@ -7,6 +7,7 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OmniDrive, DiffDrive, Joint
 from giskardpy.my_types import my_string
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
+from giskardpy.utils.utils import blackboard_god_map
 
 
 class DriveInterface(ABC):
@@ -17,7 +18,7 @@ class DriveInterface(ABC):
                  joint_name: my_string = 'brumbrum',
                  odom_x_name: my_string = 'odom_x',
                  odom_y_name: my_string = 'odom_y',
-                 odom_rot_name: my_string = 'odom_rot',
+                 odom_yaw_name: my_string = 'odom_yaw',
                  track_only_velocity: bool = False,
                  translation_velocity_limit: Optional[float] = 0.2,
                  rotation_velocity_limit: Optional[float] = 0.2,
@@ -38,7 +39,7 @@ class DriveInterface(ABC):
         self.joint_name = joint_name
         self.odom_x_name = odom_x_name
         self.odom_y_name = odom_y_name
-        self.odom_rot_name = odom_rot_name
+        self.odom_yaw_name = odom_yaw_name
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
         self.translation_velocity_limit = translation_velocity_limit
@@ -50,8 +51,12 @@ class DriveInterface(ABC):
         self.track_only_velocity = track_only_velocity
         self.kwargs = kwargs
 
+    @property
+    def god_map(self):
+        return blackboard_god_map()
+
     @abc.abstractmethod
-    def make_joint(self, god_map: GodMap) -> Joint:
+    def make_joint(self) -> Joint:
         """
         """
 
@@ -63,13 +68,13 @@ class DriveInterface(ABC):
 
 class OmniDriveCmdVelInterface(DriveInterface):
 
-    def make_joint(self, god_map):
+    def make_joint(self):
         return OmniDrive(parent_link_name=self.parent_link_name,
                          child_link_name=self.child_link_name,
                          name=self.joint_name,
                          odom_x_name=self.odom_x_name,
                          odom_y_name=self.odom_y_name,
-                         odom_rot_name=self.odom_rot_name,
+                         odom_yaw_name=self.odom_yaw_name,
                          translation_velocity_limit=self.translation_velocity_limit,
                          rotation_velocity_limit=self.rotation_velocity_limit,
                          translation_acceleration_limit=self.translation_acceleration_limit,
@@ -79,18 +84,19 @@ class OmniDriveCmdVelInterface(DriveInterface):
                          **self.kwargs)
 
     def make_plugin(self):
-        return SendTrajectoryToCmdVel(name=self.cmd_vel_topic,
-                                      cmd_vel_topic=self.cmd_vel_topic,
-                                      track_only_velocity=self.track_only_velocity)
+        if self.cmd_vel_topic is not None:
+            return SendTrajectoryToCmdVel(name=self.cmd_vel_topic,
+                                          cmd_vel_topic=self.cmd_vel_topic,
+                                          track_only_velocity=self.track_only_velocity)
 
 
 class DiffDriveCmdVelInterface(DriveInterface):
-    def make_joint(self, god_map):
+    def make_joint(self):
         return DiffDrive(parent_link_name=self.parent_link_name,
                          child_link_name=self.child_link_name,
                          name=self.joint_name,
                          x_name=self.odom_x_name,
-                         rot_name=self.odom_rot_name,
+                         yaw_name=self.odom_yaw_name,
                          translation_velocity_limit=self.translation_velocity_limit,
                          rotation_velocity_limit=self.rotation_velocity_limit,
                          translation_acceleration_limit=self.translation_acceleration_limit,

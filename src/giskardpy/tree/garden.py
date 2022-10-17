@@ -723,7 +723,8 @@ class OpenLoop(StandAlone):
 
     @property
     def add_real_time_tracking(self):
-        return len(self.config.hardware_config.drive_interfaces) > 0
+        drive_interfaces = self.config.hardware_config.drive_interfaces
+        return len(drive_interfaces) > 0 and drive_interfaces[0].make_plugin() is not None
 
     def grow_move_robots(self):
         execution_action_server = Parallel('move robots',
@@ -747,7 +748,6 @@ class OpenLoop(StandAlone):
                                                                          **self.god_map.unsafe_get_data(
                                                                              identifier.PublishDebugExpressions)))
                 real_time_tracking.add_child(drive_interface.make_plugin())
-
                 execution_action_server.add_child(real_time_tracking)
         return execution_action_server
 

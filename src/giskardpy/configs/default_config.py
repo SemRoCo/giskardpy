@@ -103,7 +103,10 @@ class Giskard:
                                  translation_acceleration_limit: Optional[float] = None,
                                  rotation_acceleration_limit: Optional[float] = None,
                                  translation_jerk_limit: Optional[float] = 5,
-                                 rotation_jerk_limit: Optional[float] = 10):
+                                 rotation_jerk_limit: Optional[float] = 10,
+                                 odom_x_name: Optional[str] = 'odom_x',
+                                 odom_y_name: Optional[str] = 'odom_y',
+                                 odom_yaw_name: Optional[str] = 'odom_yaw'):
         self.hardware_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
                                                       parent_link_name=parent_link_name,
                                                       child_link_name=child_link_name,
@@ -113,9 +116,12 @@ class Giskard:
                                                       translation_acceleration_limit=translation_acceleration_limit,
                                                       rotation_acceleration_limit=rotation_acceleration_limit,
                                                       translation_jerk_limit=translation_jerk_limit,
-                                                      rotation_jerk_limit=rotation_jerk_limit)
+                                                      rotation_jerk_limit=rotation_jerk_limit,
+                                                      odom_x_name=odom_x_name,
+                                                      odom_y_name=odom_y_name,
+                                                      odom_yaw_name=odom_yaw_name)
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
-        brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint(self._god_map)
+        brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint()
         joints.append(brumbrum_joint)
         self._controlled_joints.append(brumbrum_joint.name)
 

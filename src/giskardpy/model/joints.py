@@ -457,6 +457,9 @@ class OmniDrive(Joint):
                  rotation_acceleration_limit: Optional[float] = None,
                  translation_jerk_limit: Optional[float] = 5,
                  rotation_jerk_limit: Optional[float] = 10,
+                 odom_x_name: Optional[str] = None,
+                 odom_y_name: Optional[str] = None,
+                 odom_yaw_name: Optional[str] = None,
                  **kwargs):
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
@@ -465,8 +468,14 @@ class OmniDrive(Joint):
         self.translation_jerk_limit = translation_jerk_limit
         self.rotation_jerk_limit = rotation_jerk_limit
         self.translation_names = ['odom_x', 'odom_y', 'odom_z']
-        # self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
+        if odom_x_name is not None:
+            self.translation_names[0] = odom_x_name
+        if odom_y_name is not None:
+            self.translation_names[1] = odom_y_name
         self.orientation_names = ['roll', 'pitch', 'yaw']
+        if odom_yaw_name is not None:
+            self.orientation_names[2] = odom_yaw_name
+        # self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
         # self.rot_name = 'odom_rot'
         self.x_vel_name = 'odom_x_vel'
         self.y_vel_name = 'odom_y_vel'
@@ -513,6 +522,10 @@ class OmniDrive(Joint):
         self.yaw_vel = self.create_free_variable(self.rot_vel_name,
                                                  rotation_lower_limits,
                                                  rotation_upper_limits)
+
+    @property
+    def position_variable_names(self):
+        return [self.x_name, self.y_name, self.yaw_name]
 
     def _joint_transformation(self):
         odom_T_base_footprint = w.frame_from_x_y_rot(self.x.get_symbol(0),
@@ -1185,7 +1198,7 @@ class DiffDrive(Joint):
                  rotation_jerk_limit: Optional[float] = 10,
                  x_name: Optional[str] = 'odom_x',
                  y_name: Optional[str] = 'odom_y',
-                 rot_name: Optional[str] = 'odom_rot',
+                 yaw_name: Optional[str] = 'odom_yaw',
                  x_vel_name: Optional[str] = 'base_footprint_x_vel',
                  rot_vel_name: Optional[str] = 'base_footprint_rot_vel',
                  **kwargs):
@@ -1197,7 +1210,7 @@ class DiffDrive(Joint):
         self.rotation_jerk_limit = rotation_jerk_limit
         self.x_name = x_name
         self.y_name = y_name
-        self.yaw_name = rot_name
+        self.yaw_name = yaw_name
         self.x_vel_name = x_vel_name
         self.rot_vel_name = rot_vel_name
         super().__init__(name, parent_link_name, child_link_name, w.eye(4))

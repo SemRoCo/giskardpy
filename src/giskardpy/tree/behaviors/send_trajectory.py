@@ -9,7 +9,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
-from giskardpy.model.joints import OneDofJoint, MimicJoint
+from giskardpy.model.joints import OneDofJoint, MimicJoint, OmniDrive
 from giskardpy.utils.utils import raise_to_blackboard
 
 try:
@@ -93,19 +93,24 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                         or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
                     controlled_joint_names = msg.joint_names
             except ROSException as e:
-                logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(state_topic))
+                logging.logwarn(f'Couldn\'t connect to {state_topic}. Is it running?')
                 rospy.sleep(1)
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{state_topic}\' has no joints')
+
         for joint in self.world.joints.values():
             if isinstance(joint, OneDofJoint) and not isinstance(joint, MimicJoint):
                 if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)
-        if len(self.controlled_joints) != len(controlled_joint_names):
-            js = [j.name for j in self.controlled_joints]
-            joints_not_in_urdf = set(controlled_joint_names).difference(js)
+                    controlled_joint_names.remove(joint.free_variable.name)
+            elif isinstance(joint, OmniDrive):
+                if set(controlled_joint_names) == set(joint.position_variable_names):
+                    self.controlled_joints.append(joint)
+                    for position_variable in joint.position_variable_names:
+                        controlled_joint_names.remove(position_variable)
+        if len(controlled_joint_names) > 0:
             raise ValueError(f'{state_topic} provides the following joints '
-                             f'that are not in the urdf: {joints_not_in_urdf}')
+                             f'that are not known to giskard: {controlled_joint_names}')
         self.world.register_controlled_joints(controlled_joint_names)
         loginfo(f'Successfully connected to \'{state_topic}\'.')
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
@@ -155,8 +160,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if self.action_client.get_state() == GoalStatus.ABORTED:
             result = self.action_client.get_result()
             self.feedback_message = self.error_code_to_str[result.error_code]
-            msg = '\'{}\' failed to execute goal. Error: \'{}\''.format(self.action_namespace,
-                                                                        self.error_code_to_str[result.error_code])
+            msg = f'\'{self.action_namespace}\' failed to execute goal. ' \
+                  f'Error: \'{self.error_code_to_str[result.error_code]}\''
             logging.logerr(msg)
             if result.error_code == FollowJointTrajectoryResult.INVALID_GOAL:
                 e = FollowJointTrajectory_INVALID_GOAL(msg)
@@ -196,11 +201,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         if current_time > self.max_deadline:
             self.action_client.cancel_goal()
-            msg = 'Cancelling \'{}\' because it took to long to execute the goal.'.format(self.action_namespace)
+            msg = f'Cancelling \'{self.action_namespace}\' because it took to long to execute the goal.'
             logging.logerr(msg)
             self.cancel_tries += 1
             if self.cancel_tries > 5:
-                logging.logwarn('\'{}\' didn\'t cancel execution after 5 tries.'.format(self.action_namespace))
+                logging.logwarn(f'\'{self.action_namespace}\' didn\'t cancel execution after 5 tries.')
                 raise_to_blackboard(ExecutionTimeoutException(msg))
                 return py_trees.Status.FAILURE
             return py_trees.Status.RUNNING

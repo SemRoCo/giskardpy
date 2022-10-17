@@ -25,6 +25,9 @@ class HardwareConfig:
                                  rotation_acceleration_limit: Optional[float] = None,
                                  translation_jerk_limit: Optional[float] = 5,
                                  rotation_jerk_limit: Optional[float] = 10,
+                                 odom_x_name: Optional[str] = 'odom_x',
+                                 odom_y_name: Optional[str] = 'odom_y',
+                                 odom_yaw_name: Optional[str] = 'odom_yaw',
                                  **kwargs):
         self.drive_interfaces.append(OmniDriveCmdVelInterface(cmd_vel_topic=cmd_vel_topic,
                                                               parent_link_name=parent_link_name,
@@ -36,6 +39,9 @@ class HardwareConfig:
                                                               rotation_acceleration_limit=rotation_acceleration_limit,
                                                               translation_jerk_limit=translation_jerk_limit,
                                                               rotation_jerk_limit=rotation_jerk_limit,
+                                                              odom_x_name=odom_x_name,
+                                                              odom_y_name=odom_y_name,
+                                                              odom_yaw_name=odom_yaw_name,
                                                               **kwargs))
 
     def add_diff_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,

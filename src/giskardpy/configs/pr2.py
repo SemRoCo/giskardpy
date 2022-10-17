@@ -93,7 +93,6 @@ class PR2_IAI(PR2_Base):
         super().__init__()
         self.general_config.default_link_color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_odometry_topic('/robot_pose_ekf/odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
                                   translation_velocity_limit=0.4,
@@ -102,7 +101,7 @@ class PR2_IAI(PR2_Base):
                                   rotation_acceleration_limit=1,
                                   translation_jerk_limit=5,
                                   rotation_jerk_limit=5,
-                                  odometry_topic='/pr2/base_footprint')
+                                  odometry_topic='/robot_pose_ekf/odom_combined')
         fill_velocity_values = False
         self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
                                                 state_topic='/l_arm_controller/state',
@@ -130,7 +129,6 @@ class PR2_Unreal(PR2_Base):
         # self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
         # self.collision_avoidance_config.collision_checker = self.collision_avoidance_config.collision_checker.none
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_odometry_topic('/base_odometry/odom')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
                                   translation_velocity_limit=0.4,
@@ -139,7 +137,7 @@ class PR2_Unreal(PR2_Base):
                                   rotation_acceleration_limit=1,
                                   translation_jerk_limit=5,
                                   rotation_jerk_limit=5,
-                                  odometry_topic='/pr2/base_footprint')
+                                  odometry_topic='/base_odometry/odom')
         fill_velocity_values = False
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/state',

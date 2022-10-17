@@ -64,6 +64,12 @@ class HSR_Mujoco(HSR_Base):
         super().__init__()
         self.add_robot_from_parameter_server(joint_state_topics=['hsrb4s/joint_states'])
         self.add_sync_tf_frame('map', 'odom')
+        self.add_omni_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  odom_x_name='odom_x',
+                                  odom_y_name='odom_y',
+                                  odom_yaw_name='odom_t',
+                                  odometry_topic='/hsrb4s/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/hsrb4s/arm_trajectory_controller/follow_joint_trajectory',
                                                 state_topic='/hsrb4s/arm_trajectory_controller/state',
                                                 fill_velocity_values=True)
@@ -73,9 +79,3 @@ class HSR_Mujoco(HSR_Base):
         self.add_follow_joint_trajectory_server(namespace='/omni_pose_follower/follow_joint_trajectory',
                                                 state_topic='/omni_pose_follower/state',
                                                 fill_velocity_values=True)
-        self.add_omni_drive_interface(parent_link_name='odom',
-                                      child_link_name='base_footprint',
-                                      odom_x_name='odom_x',
-                                      odom_y_name='odom_y',
-                                      odom_yaw_name='odom_t')
-        self.add_odometry_topic(odometry_topic='/hsrb4s/base_footprint')

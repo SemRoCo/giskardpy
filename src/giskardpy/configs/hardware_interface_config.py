@@ -1,66 +1,24 @@
 from typing import Optional, List
 
-from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface, DiffDriveCmdVelInterface
-from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
+from giskardpy.my_types import my_string
 
 
 class HardwareConfig:
     def __init__(self):
-        self.drive_interfaces: List[DriveInterface] = []
-        self.follow_joint_trajectory_interfaces: List[FollowJointTrajectoryInterface] = []
+        self.send_trajectory_to_cmd_vel: List[dict] = []
+        self.follow_joint_trajectory_interfaces: List[dict] = []
         self.joint_state_topics: List[str] = []
         self.odometry_topics: List[str] = []
 
     def add_follow_joint_trajectory_server(self, namespace, state_topic, fill_velocity_values):
-        self.follow_joint_trajectory_interfaces.append(FollowJointTrajectoryInterface(
-            namespace=namespace,
-            state_topic=state_topic,
-            fill_velocity_values=fill_velocity_values))
+        self.follow_joint_trajectory_interfaces.append({'namespace': namespace,
+                                                        'state_topic': state_topic,
+                                                        'fill_velocity_values': fill_velocity_values})
 
-    def add_omni_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,
-                                 track_only_velocity: bool = False,
-                                 translation_velocity_limit: Optional[float] = 0.2,
-                                 rotation_velocity_limit: Optional[float] = 0.2,
-                                 translation_acceleration_limit: Optional[float] = None,
-                                 rotation_acceleration_limit: Optional[float] = None,
-                                 translation_jerk_limit: Optional[float] = 5,
-                                 rotation_jerk_limit: Optional[float] = 10,
-                                 odom_x_name: Optional[str] = 'odom_x',
-                                 odom_y_name: Optional[str] = 'odom_y',
-                                 odom_yaw_name: Optional[str] = 'odom_yaw',
-                                 **kwargs):
-        self.drive_interfaces.append(OmniDriveCmdVelInterface(cmd_vel_topic=cmd_vel_topic,
-                                                              parent_link_name=parent_link_name,
-                                                              child_link_name=child_link_name,
-                                                              track_only_velocity=track_only_velocity,
-                                                              translation_velocity_limit=translation_velocity_limit,
-                                                              rotation_velocity_limit=rotation_velocity_limit,
-                                                              translation_acceleration_limit=translation_acceleration_limit,
-                                                              rotation_acceleration_limit=rotation_acceleration_limit,
-                                                              translation_jerk_limit=translation_jerk_limit,
-                                                              rotation_jerk_limit=rotation_jerk_limit,
-                                                              odom_x_name=odom_x_name,
-                                                              odom_y_name=odom_y_name,
-                                                              odom_yaw_name=odom_yaw_name,
-                                                              **kwargs))
-
-    def add_diff_drive_interface(self, cmd_vel_topic, parent_link_name, child_link_name,
-                                 track_only_velocity: bool = False,
-                                 translation_velocity_limit: Optional[float] = 0.2,
-                                 rotation_velocity_limit: Optional[float] = 0.2,
-                                 translation_acceleration_limit: Optional[float] = None,
-                                 rotation_acceleration_limit: Optional[float] = None,
-                                 translation_jerk_limit: Optional[float] = 5,
-                                 rotation_jerk_limit: Optional[float] = 10,
-                                 **kwargs):
-        self.drive_interfaces.append(DiffDriveCmdVelInterface(cmd_vel_topic=cmd_vel_topic,
-                                                              parent_link_name=parent_link_name,
-                                                              child_link_name=child_link_name,
-                                                              track_only_velocity=track_only_velocity,
-                                                              translation_velocity_limit=translation_velocity_limit,
-                                                              rotation_velocity_limit=rotation_velocity_limit,
-                                                              translation_acceleration_limit=translation_acceleration_limit,
-                                                              rotation_acceleration_limit=rotation_acceleration_limit,
-                                                              translation_jerk_limit=translation_jerk_limit,
-                                                              rotation_jerk_limit=rotation_jerk_limit,
-                                                              **kwargs))
+    def add_base_cmd_velocity(self,
+                              cmd_vel_topic: str,
+                              track_only_velocity: bool = False,
+                              joint_name: Optional[my_string] = None):
+        self.send_trajectory_to_cmd_vel.append({'cmd_vel_topic': cmd_vel_topic,
+                                                'track_only_velocity': track_only_velocity,
+                                                'joint_name': joint_name})

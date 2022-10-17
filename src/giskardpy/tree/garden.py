@@ -46,6 +46,8 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
+from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
+from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
@@ -723,17 +725,17 @@ class OpenLoop(StandAlone):
 
     @property
     def add_real_time_tracking(self):
-        drive_interfaces = self.config.hardware_config.drive_interfaces
-        return len(drive_interfaces) > 0 and drive_interfaces[0].make_plugin() is not None
+        drive_interfaces = self.config.hardware_config.send_trajectory_to_cmd_vel
+        return len(drive_interfaces) > 0
 
     def grow_move_robots(self):
         execution_action_server = Parallel('move robots',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
         for follow_joint_trajectory_config in hardware_config.follow_joint_trajectory_interfaces:
-            execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
+            execution_action_server.add_child(SendFollowJointTrajectory(**follow_joint_trajectory_config))
         if self.add_real_time_tracking:
-            for drive_interface in hardware_config.drive_interfaces:
+            for drive_interface in hardware_config.send_trajectory_to_cmd_vel:
                 real_time_tracking = AsyncBehavior('base sequence')
                 real_time_tracking.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                               **self.god_map.unsafe_get_data(
@@ -747,7 +749,7 @@ class OpenLoop(StandAlone):
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                                          **self.god_map.unsafe_get_data(
                                                                              identifier.PublishDebugExpressions)))
-                real_time_tracking.add_child(drive_interface.make_plugin())
+                real_time_tracking.add_child(SendTrajectoryToCmdVel(**drive_interface))
                 execution_action_server.add_child(real_time_tracking)
         return execution_action_server
 

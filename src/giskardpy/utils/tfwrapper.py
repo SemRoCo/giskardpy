@@ -63,7 +63,7 @@ def get_full_frame_name(frame_name):
 
     :rtype: str
     """
-    global tfBuffer
+    tfBuffer = get_tf_buffer()
     tf_frames = tfBuffer._getFrameStrings()
     for tf_frame in tf_frames:
         try:
@@ -76,7 +76,7 @@ def get_full_frame_name(frame_name):
 
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
-    global tfBuller
+    tfBuffer = get_tf_buffer()
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
@@ -114,9 +114,7 @@ def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
         raise InvalidArgumentException('source frame can not be empty')
     if time is None:
         time = rospy.Time()
-    global tfBuffer
-    if tfBuffer is None:
-        init()
+    tfBuffer = get_tf_buffer()
     return tfBuffer.lookup_transform(str(target_frame),
                                      str(source_frame),  # source frame
                                      time,

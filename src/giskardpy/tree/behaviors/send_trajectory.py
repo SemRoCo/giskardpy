@@ -45,12 +45,13 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
     @profile
-    def __init__(self, name, namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
+    def __init__(self, namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
+        self.action_namespace = namespace
+        name = str(self)
         GiskardBehavior.__init__(self, name)
         self.min_deadline: rospy.Time
         self.max_deadline: rospy.Time
         self.controlled_joints: List[OneDofJoint] = []
-        self.action_namespace = namespace
         self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
 
@@ -112,8 +113,13 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             raise ValueError(f'{state_topic} provides the following joints '
                              f'that are not known to giskard: {controlled_joint_names}')
         self.world.register_controlled_joints(controlled_joint_names)
+        controlled_joint_names = [j.name for j in self.controlled_joints]
         loginfo(f'Successfully connected to \'{state_topic}\'.')
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
+        self.world.register_controlled_joints(controlled_joint_names)
+
+    def __str__(self):
+        return f'{super().__str__()} ({self.action_namespace})'
 
     @profile
     def initialise(self):

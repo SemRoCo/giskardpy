@@ -3,6 +3,9 @@ from collections import defaultdict
 from copy import deepcopy
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
+
+from tf2_py import LookupException
+
 import giskardpy.utils.tfwrapper as tf
 import numpy as np
 import rospy
@@ -12,18 +15,16 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver, CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig
 from giskardpy.configs.hardware_interface_config import HardwareConfig
-from giskardpy.configs.drives import DriveInterface, OmniDriveCmdVelInterface, DiffDriveCmdVelInterface
-from giskardpy.configs.follow_joint_trajectory import FollowJointTrajectoryInterface
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint
+from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
-
+import giskardpy.utils.tfwrapper as tf
 
 class Giskard:
     def __init__(self):
@@ -62,13 +63,14 @@ class Giskard:
     def disable_tf_publishing(self):
         self.behavior_tree_config.plugin_config['TFPublisher']['enabled'] = False
 
-    def add_fixed_joint(self, parent_link: my_string, child_link: my_string, homo_transform: Optional[np.ndarray] = None):
+    def add_joint(self, joint: Joint):
+        joints = self._god_map.get_data(identifier.joints_to_add, default=[])
+        joints.append(joint)
+
+    def add_fixed_joint(self, parent_link: my_string, child_link: my_string,
+                        homo_transform: Optional[np.ndarray] = None):
         if homo_transform is None:
             homo_transform = np.eye(4)
-        try:
-            joints = self._god_map.get_data(identifier.joints_to_add)
-        except KeyError:
-            joints = []
         if isinstance(parent_link, str):
             parent_link = PrefixName(parent_link, None)
         if isinstance(child_link, str):
@@ -78,13 +80,14 @@ class Giskard:
                            parent_link_name=parent_link,
                            child_link_name=child_link,
                            parent_T_child=homo_transform)
-        joints.append(joint)
-        self._god_map.set_data(identifier.joints_to_add, joints)
+        self.add_joint(joint)
 
     def set_joint_states_topic(self, topic_name: str):
         self.robot_interface_configs.joint_state_topic = topic_name
 
     def add_sync_tf_frame(self, parent_link, child_link):
+        if not tf.wait_for_transform(parent_link, child_link, rospy.Time(), rospy.Duration(1)):
+            raise LookupException(f'Cannot get transform of {parent_link}<-{child_link}')
         self.add_fixed_joint(parent_link=parent_link, child_link=child_link)
         self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link)
 
@@ -95,59 +98,66 @@ class Giskard:
         self.hardware_config.add_follow_joint_trajectory_server(namespace, state_topic,
                                                                 fill_velocity_values=fill_velocity_values)
 
-    def add_omni_drive_interface(self, parent_link_name, child_link_name,
-                                 cmd_vel_topic: Optional[str] = None,
-                                 track_only_velocity: bool = False,
-                                 translation_velocity_limit: Optional[float] = 0.2,
-                                 rotation_velocity_limit: Optional[float] = 0.2,
-                                 translation_acceleration_limit: Optional[float] = None,
-                                 rotation_acceleration_limit: Optional[float] = None,
-                                 translation_jerk_limit: Optional[float] = 5,
-                                 rotation_jerk_limit: Optional[float] = 10,
-                                 odom_x_name: Optional[str] = 'odom_x',
-                                 odom_y_name: Optional[str] = 'odom_y',
-                                 odom_yaw_name: Optional[str] = 'odom_yaw'):
-        self.hardware_config.add_omni_drive_interface(cmd_vel_topic=cmd_vel_topic,
-                                                      parent_link_name=parent_link_name,
-                                                      child_link_name=child_link_name,
-                                                      track_only_velocity=track_only_velocity,
-                                                      translation_velocity_limit=translation_velocity_limit,
-                                                      rotation_velocity_limit=rotation_velocity_limit,
-                                                      translation_acceleration_limit=translation_acceleration_limit,
-                                                      rotation_acceleration_limit=rotation_acceleration_limit,
-                                                      translation_jerk_limit=translation_jerk_limit,
-                                                      rotation_jerk_limit=rotation_jerk_limit,
-                                                      odom_x_name=odom_x_name,
-                                                      odom_y_name=odom_y_name,
-                                                      odom_yaw_name=odom_yaw_name)
-        joints = self._god_map.get_data(identifier.joints_to_add, default=[])
-        brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint()
-        joints.append(brumbrum_joint)
-        self._controlled_joints.append(brumbrum_joint.name)
+    def add_omni_drive_joint(self,
+                             parent_link_name: str,
+                             child_link_name: str,
+                             name: Optional[str] = 'brumbrum',
+                             odometry_topic: Optional[str] = None,
+                             translation_velocity_limit: Optional[float] = 0.2,
+                             rotation_velocity_limit: Optional[float] = 0.2,
+                             translation_acceleration_limit: Optional[float] = None,
+                             rotation_acceleration_limit: Optional[float] = None,
+                             translation_jerk_limit: Optional[float] = 5,
+                             rotation_jerk_limit: Optional[float] = 10,
+                             odom_x_name: Optional[str] = 'odom_x',
+                             odom_y_name: Optional[str] = 'odom_y',
+                             odom_yaw_name: Optional[str] = 'odom_yaw'):
+        brumbrum_joint = OmniDrive(parent_link_name=parent_link_name,
+                                   child_link_name=child_link_name,
+                                   name=name,
+                                   odom_x_name=odom_x_name,
+                                   odom_y_name=odom_y_name,
+                                   odom_yaw_name=odom_yaw_name,
+                                   translation_velocity_limit=translation_velocity_limit,
+                                   rotation_velocity_limit=rotation_velocity_limit,
+                                   translation_acceleration_limit=translation_acceleration_limit,
+                                   rotation_acceleration_limit=rotation_acceleration_limit,
+                                   translation_jerk_limit=translation_jerk_limit,
+                                   rotation_jerk_limit=rotation_jerk_limit)
+        self.add_joint(brumbrum_joint)
+        self.add_odometry_topic(odometry_topic)
 
-    def add_diff_drive_interface(self, parent_link_name: str, child_link_name: str,
-                                 cmd_vel_topic: Optional[str] = None,
-                                 track_only_velocity: bool = False,
-                                 translation_velocity_limit: Optional[float] = 0.2,
-                                 rotation_velocity_limit: Optional[float] = 0.2,
-                                 translation_acceleration_limit: Optional[float] = None,
-                                 rotation_acceleration_limit: Optional[float] = None,
-                                 translation_jerk_limit: Optional[float] = 5,
-                                 rotation_jerk_limit: Optional[float] = 10):
-        self.hardware_config.add_diff_drive_interface(cmd_vel_topic=cmd_vel_topic,
-                                                      parent_link_name=parent_link_name,
-                                                      child_link_name=child_link_name,
-                                                      track_only_velocity=track_only_velocity,
-                                                      translation_velocity_limit=translation_velocity_limit,
-                                                      rotation_velocity_limit=rotation_velocity_limit,
-                                                      translation_acceleration_limit=translation_acceleration_limit,
-                                                      rotation_acceleration_limit=rotation_acceleration_limit,
-                                                      translation_jerk_limit=translation_jerk_limit,
-                                                      rotation_jerk_limit=rotation_jerk_limit)
-        joints = self._god_map.get_data(identifier.joints_to_add, default=[])
-        brumbrum_joint = self.hardware_config.drive_interfaces[-1].make_joint(self._god_map)
-        joints.append(brumbrum_joint)
-        self._controlled_joints.append(brumbrum_joint.name)
+    def add_diff_drive_joint(self,
+                             parent_link_name: str,
+                             child_link_name: str,
+                             name: Optional[str] = 'brumbrum',
+                             odometry_topic: Optional[str] = None,
+                             translation_velocity_limit: Optional[float] = 0.2,
+                             rotation_velocity_limit: Optional[float] = 0.2,
+                             translation_acceleration_limit: Optional[float] = None,
+                             rotation_acceleration_limit: Optional[float] = None,
+                             translation_jerk_limit: Optional[float] = 5,
+                             rotation_jerk_limit: Optional[float] = 10,
+                             odom_x_name: Optional[str] = 'odom_x',
+                             odom_y_name: Optional[str] = 'odom_y',
+                             odom_yaw_name: Optional[str] = 'odom_yaw'):
+        brumbrum_joint = DiffDrive(parent_link_name=parent_link_name,
+                                   child_link_name=child_link_name,
+                                   name=name,
+                                   odom_x_name=odom_x_name,
+                                   odom_y_name=odom_y_name,
+                                   odom_yaw_name=odom_yaw_name,
+                                   translation_velocity_limit=translation_velocity_limit,
+                                   rotation_velocity_limit=rotation_velocity_limit,
+                                   translation_acceleration_limit=translation_acceleration_limit,
+                                   rotation_acceleration_limit=rotation_acceleration_limit,
+                                   translation_jerk_limit=translation_jerk_limit,
+                                   rotation_jerk_limit=rotation_jerk_limit)
+        self.add_joint(brumbrum_joint)
+        self.add_odometry_topic(odometry_topic)
+
+    def add_base_cmd_velocity(self, cmd_vel_topic):
+        self.hardware_config.add_base_cmd_velocity(cmd_vel_topic=cmd_vel_topic)
 
     def reset_config(self):
         for parameter, value in self._backup.items():
@@ -202,7 +212,7 @@ class Giskard:
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
-        if len(self.hardware_config.drive_interfaces) == 0:
+        if len(self.hardware_config.send_trajectory_to_cmd_vel) == 0:
             logging.loginfo('No cmd_vel topic has been registered.')
 
     def live(self):

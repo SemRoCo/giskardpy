@@ -1,7 +1,7 @@
 import abc
 from abc import ABC
 from threading import Thread
-from typing import List
+from typing import List, Optional
 
 import rospy
 import rostopic
@@ -26,10 +26,11 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     supported_state_types = [Twist]
 
     @profile
-    def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, track_only_velocity: bool = False, **kwargs):
-        super().__init__(name)
-        self.threshold = np.array([0.02, 0.02, 0.02])
+    def __init__(self, cmd_vel_topic, goal_time_tolerance=1, track_only_velocity: bool = False,
+                 joint_name: Optional[str] = None):
         self.cmd_vel_topic = cmd_vel_topic
+        super().__init__(str(self))
+        self.threshold = np.array([0.02, 0.02, 0.02])
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
         self.track_only_velocity = track_only_velocity
 
@@ -46,13 +47,22 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             logging.logwarn(f'Couldn\'t connect to {self.cmd_vel_topic}. Is it running?')
             rospy.sleep(1)
 
-        for joint in self.world.joints.values():
-            if isinstance(joint, (OmniDrive, DiffDrive)):
-                # FIXME can only handle one drive
-                # self.controlled_joints = [joint]
-                self.joint = joint
-        # self.world.register_controlled_joints([j.name for j in self.controlled_joints])
+        if joint_name is None:
+            for joint in self.world.joints.values():
+                if isinstance(joint, (OmniDrive, DiffDrive)):
+                    # FIXME can only handle one drive
+                    # self.controlled_joints = [joint]
+                    self.joint = joint
+            if not hasattr(self, 'joint'):
+                #TODO
+                pass
+        else:
+            self.joint = self.world.joints[joint_name]
+        self.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
+
+    def __str__(self):
+        return f'{super().__str__()} ({self.cmd_vel_topic})'
 
     @catch_and_raise_to_blackboard
     @profile
@@ -123,5 +133,4 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
 
     def terminate(self, new_status):
         self.vel_pub.publish(Twist())
-        logging.logwarn(f'Sending 0 velocity to {self.cmd_vel_topic}')
         super().terminate(new_status)

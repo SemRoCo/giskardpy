@@ -115,7 +115,7 @@ class PR2_IAI(PR2_Base):
         self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
                                                 state_topic='/head_traj_controller/state',
                                                 fill_velocity_values=fill_velocity_values)
-        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+        self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
@@ -142,7 +142,7 @@ class PR2_Unreal(PR2_Base):
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/state',
                                                 fill_velocity_values=fill_velocity_values)
-        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+        self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,

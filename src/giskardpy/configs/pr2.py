@@ -80,17 +80,8 @@ class PR2_Mujoco(PR2_Base):
                                                 state_topic='/pr2/l_gripper_l_finger_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/r_gripper_l_finger_controller/state')
-        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel')
-        # self.add_omni_drive_interface(cmd_vel_topic='/pr2/cmd_vel',
-        #                               parent_link_name='odom_combined',
-        #                               child_link_name='base_footprint',
-        #                               track_only_velocity=True,
-        #                               translation_velocity_limit=0.4,
-        #                               rotation_velocity_limit=0.2,
-        #                               translation_acceleration_limit=1,
-        #                               rotation_acceleration_limit=1,
-        #                               translation_jerk_limit=5,
-        #                               rotation_jerk_limit=5)
+        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+                                   track_only_velocity=True)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
@@ -103,16 +94,15 @@ class PR2_IAI(PR2_Base):
         self.general_config.default_link_color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_odometry_topic('/robot_pose_ekf/odom_combined')
-        self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
-                                      parent_link_name='odom_combined',
-                                      child_link_name='base_footprint',
-                                      track_only_velocity=True,
-                                      translation_velocity_limit=0.4,
-                                      rotation_velocity_limit=0.2,
-                                      translation_acceleration_limit=1,
-                                      rotation_acceleration_limit=1,
-                                      translation_jerk_limit=5,
-                                      rotation_jerk_limit=5)
+        self.add_omni_drive_joint(parent_link_name='odom_combined',
+                                  child_link_name='base_footprint',
+                                  translation_velocity_limit=0.4,
+                                  rotation_velocity_limit=0.2,
+                                  translation_acceleration_limit=1,
+                                  rotation_acceleration_limit=1,
+                                  translation_jerk_limit=5,
+                                  rotation_jerk_limit=5,
+                                  odometry_topic='/pr2/base_footprint')
         fill_velocity_values = False
         self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
                                                 state_topic='/l_arm_controller/state',
@@ -126,6 +116,8 @@ class PR2_IAI(PR2_Base):
         self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
                                                 state_topic='/head_traj_controller/state',
                                                 fill_velocity_values=fill_velocity_values)
+        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+                                   track_only_velocity=True)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
@@ -139,20 +131,21 @@ class PR2_Unreal(PR2_Base):
         # self.collision_avoidance_config.collision_checker = self.collision_avoidance_config.collision_checker.none
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_odometry_topic('/base_odometry/odom')
-        self.add_omni_drive_interface(cmd_vel_topic='/base_controller/command',
-                                      parent_link_name='odom_combined',
-                                      child_link_name='base_footprint',
-                                      track_only_velocity=True,
-                                      translation_velocity_limit=0.4,
-                                      rotation_velocity_limit=0.2,
-                                      translation_acceleration_limit=1,
-                                      rotation_acceleration_limit=1,
-                                      translation_jerk_limit=5,
-                                      rotation_jerk_limit=5)
+        self.add_omni_drive_joint(parent_link_name='odom_combined',
+                                  child_link_name='base_footprint',
+                                  translation_velocity_limit=0.4,
+                                  rotation_velocity_limit=0.2,
+                                  translation_acceleration_limit=1,
+                                  rotation_acceleration_limit=1,
+                                  translation_jerk_limit=5,
+                                  rotation_jerk_limit=5,
+                                  odometry_topic='/pr2/base_footprint')
         fill_velocity_values = False
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/state',
                                                 fill_velocity_values=fill_velocity_values)
+        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+                                   track_only_velocity=True)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
@@ -166,6 +159,15 @@ class PR2StandAlone(PR2_Base):
         self.root_link_name = 'map'
         self.disable_tf_publishing()
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
+        self.add_omni_drive_joint(parent_link_name='odom_combined',
+                                  child_link_name='base_footprint',
+                                  translation_velocity_limit=0.4,
+                                  rotation_velocity_limit=0.2,
+                                  translation_acceleration_limit=1,
+                                  rotation_acceleration_limit=1,
+                                  translation_jerk_limit=5,
+                                  rotation_jerk_limit=5,
+                                  odometry_topic='/pr2/base_footprint')
         self.add_robot_from_parameter_server('robot_description')
         self.register_controlled_joints([
             'torso_lift_joint',
@@ -186,10 +188,6 @@ class PR2StandAlone(PR2_Base):
             'l_wrist_flex_joint',
             'l_wrist_roll_joint',
         ])
-        self.add_omni_drive_interface(parent_link_name='odom_combined',
-                                      child_link_name='base_footprint',
-                                      translation_jerk_limit=5,
-                                      rotation_jerk_limit=5)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,

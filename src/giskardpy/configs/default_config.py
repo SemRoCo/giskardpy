@@ -156,8 +156,13 @@ class Giskard:
         self.add_joint(brumbrum_joint)
         self.add_odometry_topic(odometry_topic)
 
-    def add_base_cmd_velocity(self, cmd_vel_topic):
-        self.hardware_config.add_base_cmd_velocity(cmd_vel_topic=cmd_vel_topic)
+    def add_base_cmd_velocity(self,
+                              cmd_vel_topic: str,
+                              track_only_velocity: bool = False,
+                              joint_name: Optional[my_string] = None):
+        self.hardware_config.add_base_cmd_velocity(cmd_vel_topic=cmd_vel_topic,
+                                                   track_only_velocity=track_only_velocity,
+                                                   joint_name=joint_name)
 
     def reset_config(self):
         for parameter, value in self._backup.items():

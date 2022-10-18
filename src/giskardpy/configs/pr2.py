@@ -73,14 +73,14 @@ class PR2_Mujoco(PR2_Base):
                                   rotation_acceleration_limit=1,
                                   translation_jerk_limit=5,
                                   rotation_jerk_limit=5,
-                                  odometry_topic='/pr2/base_footprint')
+                                  odometry_topic='/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/whole_body_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/l_gripper_l_finger_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/r_gripper_l_finger_controller/state')
-        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+        self.add_base_cmd_velocity(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
                                    track_only_velocity=True)
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,

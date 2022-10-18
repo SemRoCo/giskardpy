@@ -1903,6 +1903,7 @@ class TestActionServerEvents(object):
 
 class TestWayPoints(object):
     def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):
+        # FIXME
         p = PoseStamped()
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(0, 0, 0)
@@ -1917,7 +1918,7 @@ class TestWayPoints(object):
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.SUCCESS,
                                                          MoveResult.PREEMPTED,
                                                          MoveResult.PREEMPTED],
-                                   stop_after=5)
+                                   stop_after=1)
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
@@ -1954,7 +1955,7 @@ class TestWayPoints(object):
         zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
         zero_pose.allow_all_collisions()
 
-        traj = zero_pose.plan_and_execute()
+        traj = zero_pose.plan_and_execute().trajectory
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
             try:
@@ -1999,7 +2000,7 @@ class TestWayPoints(object):
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                          MoveResult.UNKNOWN_CONSTRAINT,
                                                          MoveResult.SUCCESS],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2032,7 +2033,7 @@ class TestWayPoints(object):
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,
                                                          MoveResult.SUCCESS,
                                                          MoveResult.SUCCESS],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2065,7 +2066,7 @@ class TestWayPoints(object):
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                          MoveResult.SUCCESS,
                                                          MoveResult.UNKNOWN_CONSTRAINT, ],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2098,7 +2099,7 @@ class TestWayPoints(object):
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                          MoveResult.UNKNOWN_CONSTRAINT,
                                                          MoveResult.ERROR],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE).trajectory
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2118,7 +2119,7 @@ class TestWayPoints(object):
     def test_skip_failures2(self, zero_pose: PR2TestWrapper):
         zero_pose.set_joint_goal(pocky_pose)
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS, ],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}

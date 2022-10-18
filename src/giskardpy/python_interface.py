@@ -789,6 +789,13 @@ class GiskardWrapper(object):
         return self.get_group_info(name).controlled_joints
 
     def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 0) -> UpdateWorldResponse:
+        """
+        Overwrites the pose specified in the joint that connects the two groups.
+        :param group_name: Name of the group that will move
+        :param new_pose: New pose of the group
+        :param timeout: How long to wait if Giskard is busy
+        :return: Giskard's reply
+        """
         req = UpdateWorldRequest()
         req.operation = req.UPDATE_POSE
         req.group_name = group_name

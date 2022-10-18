@@ -1531,6 +1531,7 @@ class TestCartGoals(object):
 
     def test_move_base2(self, zero_pose: PR2TestWrapper):
         map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
@@ -1541,12 +1542,15 @@ class TestCartGoals(object):
         base_goal.pose.position.x = -1
         base_goal.pose.position.y = -1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.set_straight_cart_goal(base_goal, 'base_footprint')
+        zero_pose.set_straight_cart_goal(goal_pose=base_goal,
+                                         tip_link='base_footprint',
+                                         root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_move_base3(self, zero_pose: PR2TestWrapper):
         map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
@@ -1914,7 +1918,7 @@ class TestActionServerEvents(object):
     def test_interrupt1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'base_footprint'
-        p.pose.position = Point(2, 0, 0)
+        p.pose.position = Point(20, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(p, 'base_footprint')
         zero_pose.allow_all_collisions()

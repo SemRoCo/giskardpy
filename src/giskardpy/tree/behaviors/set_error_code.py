@@ -17,7 +17,6 @@ class SetErrorCode(GiskardBehavior):
         self.context = context
         super().__init__(name)
 
-    @catch_and_raise_to_blackboard
     @profile
     def update(self):
         e = self.get_blackboard_exception()

@@ -28,7 +28,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
 from giskardpy.configs.boxy import Boxy
-from giskardpy.configs.data_types import CollisionAvoidanceConfig
+from giskardpy.configs.data_types import CollisionAvoidanceConfig, GeneralConfig
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
@@ -1000,6 +1000,10 @@ class GiskardTestWrapper(GiskardWrapper):
     @property
     def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
         return self.god_map.unsafe_get_data(identifier.collision_avoidance_config)
+
+    @property
+    def general_config(self) -> GeneralConfig:
+        return self.god_map.unsafe_get_data(identifier.general_options)
 
     def get_external_collisions(self, link, distance_threshold):
         """

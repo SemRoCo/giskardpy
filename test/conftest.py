@@ -42,13 +42,14 @@ def resetted_giskard(giskard):
 
 
 @pytest.fixture()
-def zero_pose(resetted_giskard):
-    """
-    :type resetted_giskard: GiskardTestWrapper
-    """
-    resetted_giskard.allow_all_collisions()
-    resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
-    resetted_giskard.plan_and_execute()
+def zero_pose(resetted_giskard: GiskardTestWrapper):
+    if resetted_giskard.general_config.control_mode == resetted_giskard.general_config.control_mode.stand_alone:
+        resetted_giskard.set_seed_configuration(resetted_giskard.default_pose)
+        resetted_giskard.plan_and_execute()
+    else:
+        resetted_giskard.allow_all_collisions()
+        resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
+        resetted_giskard.plan_and_execute()
     return resetted_giskard
 
 

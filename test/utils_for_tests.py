@@ -592,6 +592,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None, check=True,
                           **kwargs: goal_parameter):
+        root_link = root_link if root_link else self.default_root
         super().set_pointing_goal(tip_link=tip_link,
                                   goal_point=goal_point,
                                   root_link=root_link,
@@ -601,7 +602,7 @@ class GiskardTestWrapper(GiskardWrapper):
             self.add_goal_check(PointingGoalChecker(self.god_map,
                                                     tip_link=tip_link,
                                                     goal_point=goal_point,
-                                                    root_link=root_link if root_link else self.get_robot_root_link(),
+                                                    root_link=root_link,
                                                     pointing_axis=pointing_axis))
 
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,

@@ -627,8 +627,8 @@ class QPController:
             logging.logwarn('defaulting back to qpoases')
             solver_name = SupportedQPSolver.qp_oases
         if solver_name == SupportedQPSolver.qp_oases:
-            from giskardpy.qp.qp_solver import QPSolver
-            self.qp_solver = QPSolver()
+            from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
+            self.qp_solver = QPSolverQPOases()
         logging.loginfo(f'Using QP Solver \'{solver_name}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
 

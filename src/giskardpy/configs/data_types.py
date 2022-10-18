@@ -8,6 +8,14 @@ from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
 
 
+class TfPublishingModes(Enum):
+    nothing = 0
+    all = 1
+    attached_objects = 2
+    world_objects = 4
+    attached_and_world_objects = 6
+
+
 class CollisionCheckerLib(Enum):
     bpb = 1
     pybullet = 2
@@ -256,8 +264,7 @@ class BehaviorTreeConfig:
         },
         'TFPublisher': {
             'enabled': True,
-            'publish_attached_objects': True,
-            'publish_world_objects': False,
+            'mode': TfPublishingModes.attached_objects,
             'tf_topic': '/tf',
         },
         'MaxTrajectoryLength': {

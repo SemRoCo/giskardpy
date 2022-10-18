@@ -86,7 +86,7 @@ class HSR_Standalone(HSR_Base):
         super().__init__()
         self.general_config.control_mode = ControlModes.stand_alone
         self.root_link_name = 'map'
-        self.disable_tf_publishing()
+        self.publish_all_tf()
         self.add_robot_from_parameter_server()
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_omni_drive_joint(parent_link_name='odom',

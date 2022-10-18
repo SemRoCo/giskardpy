@@ -121,6 +121,18 @@ def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
                                      rospy.Duration(timeout))
 
 
+def make_transform(parent_frame, child_frame, pose):
+    tf = TransformStamped()
+    tf.header.frame_id = str(parent_frame)
+    tf.header.stamp = rospy.get_rostime()
+    tf.child_frame_id = str(child_frame)
+    tf.transform.translation.x = pose.position.x
+    tf.transform.translation.y = pose.position.y
+    tf.transform.translation.z = pose.position.z
+    tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
+    return tf
+
+
 def transform_vector(target_frame, vector, timeout=5):
     """
     Transforms a pose stamped into a different target frame.

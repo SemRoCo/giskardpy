@@ -9,6 +9,7 @@ import numpy as np
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
 from std_msgs.msg import ColorRGBA
+from tf2_msgs.msg import TFMessage
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
@@ -25,8 +26,9 @@ from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
 from giskardpy.utils.utils import suppress_stderr, memoize
+
 
 class TravelCompanion(object):
     def link_call(self, link_name: Union[PrefixName, str]) -> bool:
@@ -198,6 +200,7 @@ class WorldTree:
 
         def stopper(joint_name):
             return joint_name not in joints_to_exclude and self.is_joint_controlled(joint_name)
+
         child_link_name = self.joints[joint_name].child_link_name
         links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=stopper,
@@ -320,7 +323,7 @@ class WorldTree:
 
         helper(parsed_urdf, urdf_root_link)
 
-        #FIXME should root link be odom?
+        # FIXME should root link be odom?
         self.register_group(group_name, urdf_root_link_name)
         if self.god_map is not None:
             self.sync_with_paramserver()
@@ -453,7 +456,7 @@ class WorldTree:
             self.add_urdf(robot_config.urdf,
                           group_name=None,
                           prefix=None)
-        self.fast_all_fks = None # TODO unnecessary?
+        self.fast_all_fks = None  # TODO unnecessary?
         self.notify_model_change()
 
     def _add_joint_and_create_child(self, joint: Joint):
@@ -508,6 +511,7 @@ class WorldTree:
 
                 def __call__(self, joint_name):
                     return self.god_map.to_symbol(identifier.joint_weights + [self.derivative_name, joint_name])
+
             # def default(joint_name):
             #     return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
             # default = lambda joint_name: self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
@@ -799,6 +803,16 @@ class WorldTree:
         for link in self.link_names_with_collisions:
             result[link] = fks_evaluated[self.fk_idx[link], :]
         return result
+
+    def as_tf_msg(self):
+        tf_msg = TFMessage()
+        for joint_name, joint in self.joints.items():
+            p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
+            p_T_c = make_transform(parent_frame=joint.parent_link_name,
+                                   child_frame=joint.child_link_name,
+                                   pose=p_T_c.pose)
+            tf_msg.transforms.append(p_T_c)
+        return tf_msg
 
     @profile
     def compute_all_fks_matrix(self):

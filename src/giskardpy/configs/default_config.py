@@ -10,7 +10,8 @@ from py_trees import Blackboard
 
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
-    BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig
+    BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
+    TfPublishingModes
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
@@ -58,6 +59,9 @@ class Giskard:
 
     def disable_tf_publishing(self):
         self.behavior_tree_config.plugin_config['TFPublisher']['enabled'] = False
+
+    def publish_all_tf(self):
+        self.behavior_tree_config.plugin_config['TFPublisher']['mode'] = TfPublishingModes.all
 
     def add_joint(self, joint: Joint):
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])

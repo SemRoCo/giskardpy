@@ -40,6 +40,14 @@ class Giskard:
         blackboard.god_map = self._god_map
         self._backup = {}
 
+    def configure_VisualizationBehavior(self, enabled=True, in_planning_loop=False):
+        self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
+
+    def configure_CollisionMarker(self, enabled=True, in_planning_loop=False):
+        self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
+
     def add_robot_urdf(self, urdf: str, **kwargs):
         robot = RobotInterfaceConfig(urdf, **kwargs)
         self.robot_interface_configs.append(robot)

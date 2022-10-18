@@ -155,6 +155,8 @@ class PR2_StandAlone(PR2_Base):
         super().__init__()
         self.general_config.control_mode = ControlModes.stand_alone
         self.publish_all_tf()
+        self.configure_VisualizationBehavior(in_planning_loop=True)
+        self.configure_CollisionMarker(in_planning_loop=True)
         self.root_link_name = 'map'
         self.add_robot_from_parameter_server()
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')

@@ -17,13 +17,15 @@ class InfeasibleException(QPSolverException):
     pass
 
 
-# int64 OUT_OF_JOINT_LIMITS=3
 class OutOfJointLimitsException(InfeasibleException):
     pass
 
 
-# int64 HARD_CONSTRAINTS_VIOLATED=4 # conflicting hard constraints, prob because of collision avoidance
 class HardConstraintsViolatedException(InfeasibleException):
+    pass
+
+
+class EmptyProblemException(InfeasibleException):
     pass
 
 

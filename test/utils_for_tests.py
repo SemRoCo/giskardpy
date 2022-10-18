@@ -456,6 +456,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_kitchen_js(self, joint_state, object_name='kitchen'):
         if self.is_standalone():
             self.set_seed_configuration(joint_state)
+            self.allow_all_collisions()
             self.plan_and_execute()
         else:
             self.set_object_joint_state(object_name, joint_state)
@@ -495,6 +496,7 @@ class GiskardTestWrapper(GiskardWrapper):
             self.add_goal_check(JointGoalChecker(self.god_map, goal, decimal))
 
     def teleport_base(self, goal_pose):
+        raise Exception()
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
@@ -616,7 +618,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
                               weight=None, check=True):
         if root_link is None:
-            root_link = self.robot.root_link_name
+            root_link = self.world.root_link_name
         super().set_align_planes_goal(tip_link=str(tip_link),
                                       tip_normal=tip_normal,
                                       root_link=str(root_link),

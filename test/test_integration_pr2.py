@@ -130,6 +130,11 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.odom_root = 'odom_combined'
         super().__init__(config)
 
+    def teleport_base(self, goal_pose):
+        self.set_seed_odometry(goal_pose)
+        self.allow_all_collisions()
+        self.plan_and_execute()
+
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
         self.plan_and_execute()
@@ -419,7 +424,7 @@ class TestConstraints:
     def test_JointPositionRange(self, zero_pose: PR2TestWrapper):
         # FIXME needs to be implemented like other position limits, or override limits
         joint_name = 'head_pan_joint'
-        lower_limit, upper_limit = zero_pose.robot.joints[joint_name].position_limits
+        lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint_name)
         lower_limit *= 0.5
         upper_limit *= 0.5
         zero_pose.set_joint_goal({
@@ -448,17 +453,6 @@ class TestConstraints:
         assert zero_pose.robot.state[joint_name].position <= upper_limit
         assert zero_pose.robot.state[joint_name].position >= lower_limit
 
-        # zero_pose.set_json_goal('JointPositionRange',
-        #                         joint_name=joint_name,
-        #                         upper_limit=10,
-        #                         lower_limit=9,
-        #                         hard=True)
-        # zero_pose.set_joint_goal({
-        #     joint_name: 0
-        # }, check=False)
-        # zero_pose.allow_all_collisions()
-        # zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
-
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         # FIXME bouncy
         tip = 'base_footprint'
@@ -467,7 +461,9 @@ class TestConstraints:
         base_pose.pose.position.x = 0
         base_pose.pose.position.y = 1.5
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_pose)
+        kitchen_setup.set_seed_odometry(base_pose)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.EMPTY_PROBLEM])
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip
         base_pose.pose.position.x = 2.3
@@ -555,7 +551,7 @@ class TestConstraints:
         np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
 
     def test_JointPositionContinuous(self, zero_pose: PR2TestWrapper):
-        joint = 'odom_z_joint'
+        joint = 'r_wrist_roll_joint'
         joint_goal = 4
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('JointPositionContinuous',
@@ -724,7 +720,7 @@ class TestConstraints:
                                 not zero_pose.robot.is_joint_continuous(j)]
 
         current_joint_state = zero_pose.robot.state.to_position_dict()
-        percentage *= 0.99  # if will not reach the exact percentager, because the weight is so low
+        percentage *= 0.95  # it will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
             lower_limit, upper_limit = zero_pose.robot.get_joint_position_limits(joint)
@@ -739,8 +735,6 @@ class TestConstraints:
         joints = [j for j in zero_pose.robot.controlled_joints if
                   not zero_pose.robot.is_joint_continuous(j)]
         goal_state = {j: zero_pose.robot.get_joint_position_limits(j)[1] for j in joints}
-        del goal_state['odom_x_joint']
-        del goal_state['odom_y_joint']
         zero_pose.set_json_goal('AvoidJointLimits',
                                 percentage=percentage)
         zero_pose.set_joint_goal(goal_state, check=False)
@@ -756,7 +750,7 @@ class TestConstraints:
                                 not zero_pose.robot.is_joint_continuous(j)]
 
         current_joint_state = zero_pose.robot.state.to_position_dict()
-        percentage *= 0.9  # if will not reach the exact percentage, because the weight is so low
+        percentage *= 0.9  # it will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
             lower_limit, upper_limit = zero_pose.robot.get_joint_position_limits(joint)
@@ -1019,7 +1013,7 @@ class TestConstraints:
         hand = kitchen_setup.r_tip
 
         goal_angle = np.pi / 4
-        handle_frame_id = 'iai_kitchen/sink_area_dish_washer_door_handle'
+        handle_frame_id = 'sink_area_dish_washer_door_handle'
         handle_name = 'sink_area_dish_washer_door_handle'
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_frame_id
@@ -1231,13 +1225,13 @@ class TestConstraints:
         goal_vector.header.frame_id = 'map'
         goal_vector.vector.y = -1
         goal_vector.vector = tf.normalize(goal_vector.vector)
-        zero_pose.set_align_planes_goal('base_footprint', eef_vector, root_normal=goal_vector)
+        zero_pose.set_align_planes_goal(tip_link='base_footprint', tip_normal=eef_vector, root_normal=goal_vector)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_align_planes4(self, kitchen_setup: PR2TestWrapper):
         elbow = 'r_elbow_flex_link'
-        handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        handle_frame_id = 'iai_fridge_door_handle'
 
         tip_axis = Vector3Stamped()
         tip_axis.header.frame_id = elbow
@@ -1251,7 +1245,7 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()
 
     def test_grasp_fridge_handle(self, kitchen_setup: PR2TestWrapper):
-        handle_name = 'iai_kitchen/iai_fridge_door_handle'
+        handle_name = 'iai_fridge_door_handle'
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_name
         bar_axis.vector.z = 1
@@ -1270,13 +1264,13 @@ class TestConstraints:
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
                                     bar_length=.4)
-        #
+
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.r_tip
         x_gripper.vector.x = 1
 
         x_goal = Vector3Stamped()
-        x_goal.header.frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        x_goal.header.frame_id = 'iai_fridge_door_handle'
         x_goal.vector.x = -1
         kitchen_setup.set_align_planes_goal(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
@@ -1289,7 +1283,7 @@ class TestConstraints:
         base_pose.pose.orientation.w = 1
         kitchen_setup.teleport_base(base_pose)
 
-        handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        handle_frame_id = 'iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'
 
         kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': np.pi / 2})
@@ -1374,7 +1368,7 @@ class TestConstraints:
         kitchen_setup.set_kitchen_js({'oven_area_oven_door_joint': 0})
 
     def test_grasp_dishwasher_handle(self, kitchen_setup: PR2TestWrapper):
-        handle_name = 'iai_kitchen/sink_area_dish_washer_door_handle'
+        handle_name = 'sink_area_dish_washer_door_handle'
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_name
         bar_axis.vector.y = 1
@@ -1397,7 +1391,7 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()
 
 
-class TestCartGoals(object):
+class TestCartGoals:
     def test_move_base_forward(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -1866,7 +1860,7 @@ class TestCartGoals(object):
         zero_pose.plan_and_execute()
 
 
-class TestActionServerEvents(object):
+class TestActionServerEvents:
     def test_interrupt1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'base_footprint'

@@ -23,6 +23,9 @@ WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
+class NonMotionGoal:
+    pass
+
 class Goal:
     def __init__(self, god_map: GodMap, control_horizon: int = None, **kwargs):
         self.god_map = god_map

@@ -123,8 +123,9 @@ class Giskard:
                                    translation_jerk_limit=translation_jerk_limit,
                                    rotation_jerk_limit=rotation_jerk_limit)
         self.add_joint(brumbrum_joint)
-        self.add_odometry_topic(odometry_topic=odometry_topic,
-                                joint_name=brumbrum_joint.name)
+        if odometry_topic is not None:
+            self.add_odometry_topic(odometry_topic=odometry_topic,
+                                    joint_name=brumbrum_joint.name)
 
     def add_diff_drive_joint(self,
                              parent_link_name: str,
@@ -153,8 +154,9 @@ class Giskard:
                                    translation_jerk_limit=translation_jerk_limit,
                                    rotation_jerk_limit=rotation_jerk_limit)
         self.add_joint(brumbrum_joint)
-        self.add_odometry_topic(odometry_topic=odometry_topic,
-                                joint_name=brumbrum_joint.name)
+        if odometry_topic is not None:
+            self.add_odometry_topic(odometry_topic=odometry_topic,
+                                    joint_name=brumbrum_joint.name)
 
     def add_base_cmd_velocity(self,
                               cmd_vel_topic: str,

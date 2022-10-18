@@ -79,3 +79,27 @@ class HSR_Mujoco(HSR_Base):
         self.add_follow_joint_trajectory_server(namespace='/omni_pose_follower/follow_joint_trajectory',
                                                 state_topic='/omni_pose_follower/state',
                                                 fill_velocity_values=True)
+
+
+class HSR_Standalone(HSR_Base):
+    def __init__(self):
+        super().__init__()
+        self.general_config.control_mode = ControlModes.stand_alone
+        self.root_link_name = 'map'
+        self.disable_tf_publishing()
+        self.add_robot_from_parameter_server()
+        self.add_fixed_joint(parent_link='map', child_link='odom')
+        self.add_omni_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  odom_x_name='odom_x',
+                                  odom_y_name='odom_y',
+                                  odom_yaw_name='odom_t')
+        self.register_controlled_joints([
+            'arm_flex_joint',
+            'arm_lift_joint',
+            'arm_roll_joint',
+            'head_pan_joint',
+            'head_tilt_joint',
+            'wrist_flex_joint',
+            'wrist_roll_joint',
+        ])

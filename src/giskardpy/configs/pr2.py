@@ -150,12 +150,13 @@ class PR2_Unreal(PR2_Base):
                                                                                hard_threshold=0.1)
 
 
-class PR2StandAlone(PR2_Base):
+class PR2_StandAlone(PR2_Base):
     def __init__(self):
         super().__init__()
         self.general_config.control_mode = ControlModes.stand_alone
+        self.publish_all_tf()
         self.root_link_name = 'map'
-        self.disable_tf_publishing()
+        self.add_robot_from_parameter_server()
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
@@ -164,9 +165,7 @@ class PR2StandAlone(PR2_Base):
                                   translation_acceleration_limit=1,
                                   rotation_acceleration_limit=1,
                                   translation_jerk_limit=5,
-                                  rotation_jerk_limit=5,
-                                  odometry_topic='/pr2/base_footprint')
-        self.add_robot_from_parameter_server('robot_description')
+                                  rotation_jerk_limit=5)
         self.register_controlled_joints([
             'torso_lift_joint',
             'head_pan_joint',

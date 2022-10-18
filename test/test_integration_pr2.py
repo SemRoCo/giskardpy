@@ -18,7 +18,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
-from giskardpy.configs.pr2 import PR2_Mujoco, PR2StandAlone
+from giskardpy.configs.pr2 import PR2_Mujoco, PR2_StandAlone
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
 from giskardpy.model.world import SubWorldTree
@@ -120,7 +120,7 @@ class PR2TestWrapper(GiskardTestWrapper):
 
     def __init__(self, config=None):
         if config is None:
-            config = PR2StandAlone
+            config = PR2_StandAlone
         self.r_tip = 'r_gripper_tool_frame'
         self.l_tip = 'l_gripper_tool_frame'
         self.l_gripper_group = 'l_gripper'

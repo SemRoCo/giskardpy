@@ -3,7 +3,7 @@ import rospy
 
 import giskardpy
 from giskardpy.configs.default_config import Giskard
-from giskardpy.configs.pr2 import PR2_Mujoco, PR2_IAI, PR2StandAlone, PR2_Unreal
+from giskardpy.configs.pr2 import PR2_Mujoco, PR2_IAI, PR2_StandAlone, PR2_Unreal
 from giskardpy.utils.dependency_checking import check_dependencies
 from giskardpy.utils.utils import get_all_classes_in_package
 

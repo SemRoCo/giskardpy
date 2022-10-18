@@ -14,7 +14,7 @@ from giskardpy.utils.tfwrapper import normalize_quaternion_msg
 
 class TFPublisher(GiskardBehavior):
     """
-    Published tf for attached and evironment objects.
+    Published tf for attached and environment objects.
     """
 
     @profile

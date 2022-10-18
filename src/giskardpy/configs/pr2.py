@@ -160,6 +160,7 @@ class PR2_StandAlone(PR2_Base):
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
+                                  name='brumbrum',
                                   translation_velocity_limit=0.4,
                                   rotation_velocity_limit=0.2,
                                   translation_acceleration_limit=1,
@@ -184,6 +185,7 @@ class PR2_StandAlone(PR2_Base):
             'l_elbow_flex_joint',
             'l_wrist_flex_joint',
             'l_wrist_roll_joint',
+            'brumbrum'
         ])
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,

@@ -28,6 +28,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
 from giskardpy.configs.boxy import Boxy
+from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
@@ -996,6 +997,10 @@ class GiskardTestWrapper(GiskardWrapper):
                                          expected_error_code=expected_response)
         return r
 
+    @property
+    def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
+        return self.god_map.unsafe_get_data(identifier.collision_avoidance_config)
+
     def get_external_collisions(self, link, distance_threshold):
         """
         :param distance_threshold:
@@ -1011,7 +1016,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                           group2=self.get_robot_name())
                            ]
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
-                                                                                    defaultdict(lambda: 0.3))
+                                                                                    defaultdict(lambda: 0.3),
+                                                                                    set(self.collision_avoidance_config.ignored_collisions))
         collisions = self.collision_scene.check_collisions(collision_matrix)
         controlled_parent_joint = self.robot.get_controlled_parent_joint_of_link(link)
         controlled_parent_link = self.robot.joints[controlled_parent_joint].child_link_name

@@ -93,7 +93,8 @@ class HSR_StandAlone(HSR_Base):
                                   child_link_name='base_footprint',
                                   odom_x_name='odom_x',
                                   odom_y_name='odom_y',
-                                  odom_yaw_name='odom_t')
+                                  odom_yaw_name='odom_t',
+                                  name='brumbrum')
         self.register_controlled_joints([
             'arm_flex_joint',
             'arm_lift_joint',
@@ -102,4 +103,5 @@ class HSR_StandAlone(HSR_Base):
             'head_tilt_joint',
             'wrist_flex_joint',
             'wrist_roll_joint',
+            'brumbrum'
         ])

@@ -67,7 +67,6 @@ class WorldUpdater(GiskardBehavior):
     BUSY = 1
     STALL = 2
 
-    # TODO reject changes if plugin not active or something
     @profile
     def __init__(self, name: str):
         self.added_plugin_names = defaultdict(list)
@@ -220,6 +219,8 @@ class WorldUpdater(GiskardBehavior):
             global_pose = transform_pose(tf.get_tf_root(), req.pose)
         except:
             global_pose = req.pose
+        if req.pose.header.frame_id == '':
+            raise TransformException('Frame_id in pose is not set.')
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,
@@ -252,7 +253,7 @@ class WorldUpdater(GiskardBehavior):
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]
-        joint_name = group.parent_link.parent_joint_name
+        joint_name = group.root_link.parent_joint_name
         pose = self.world.transform_pose(self.world.joints[joint_name].parent_link_name, req.pose).pose
         pose = w.Matrix(msg_to_homogeneous_matrix(pose))
         self.world.update_joint_parent_T_child(joint_name, pose)

@@ -373,6 +373,9 @@ class GiskardTestWrapper(GiskardWrapper):
         # rospy.sleep(1)
         self.original_number_of_links = len(self.world.links)
 
+    def is_standalone(self):
+        return self.general_config.control_mode == self.general_config.control_mode.stand_alone
+
     def set_seed_odometry(self, base_pose):
         self.set_json_goal('SetOdometry',
                            group_name=self.get_robot_name(),
@@ -451,7 +454,11 @@ class GiskardTestWrapper(GiskardWrapper):
                 np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
 
     def set_kitchen_js(self, joint_state, object_name='kitchen'):
-        self.set_object_joint_state(object_name, joint_state)
+        if self.is_standalone():
+            self.set_seed_configuration(joint_state)
+            self.plan_and_execute()
+        else:
+            self.set_object_joint_state(object_name, joint_state)
 
     def set_apartment_js(self, joint_state, object_name='apartment'):
         self.set_object_joint_state(object_name, joint_state)
@@ -952,8 +959,8 @@ class GiskardTestWrapper(GiskardWrapper):
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
-                 js_topic: str = '',
-                 set_js_topic: Optional[str] = None,
+                 js_topic: Optional[str] = '',
+                 set_js_topic: Optional[str] = '',
                  timeout: float = TimeOut,
                  expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
         response = super().add_urdf(name=name,

@@ -292,57 +292,7 @@ def fake_table_setup(pocky_pose_setup: PR2TestWrapper) -> PR2TestWrapper:
 #                 raise
 
 
-class TestJointGoals(object):
-    def test_michael(self, zero_pose: PR2TestWrapper):
-        js = {
-            'torso_lift_joint': 0.011500624939799309,
-            'r_upper_arm_roll_joint': -1.6238297462223272e-07,
-            'r_shoulder_pan_joint': 5.364527169149369e-07,
-            'r_shoulder_lift_joint': -9.097950055547699e-07,
-            'r_forearm_roll_joint': 6.705992916522518e-08,
-            'r_elbow_flex_joint': -0.14999867975711823,
-            'r_wrist_flex_joint': -0.09999898076057434,
-            'r_wrist_roll_joint': -8.198679779525264e-08,
-            'l_upper_arm_roll_joint': 8.51351899200381e-07,
-            'l_shoulder_pan_joint': 1.0728920187830226e-06,
-            'l_shoulder_lift_joint': 3.0179853638401255e-07,
-            'l_forearm_roll_joint': -1.9371736925677396e-07,
-            'l_elbow_flex_joint': -0.1499992161989212,
-            'l_wrist_flex_joint': -0.10000103712081909,
-            'l_wrist_roll_joint': -8.04675551080436e-07,
-            'head_pan_joint': -1.1920872111659264e-06,
-            'head_tilt_joint': 3.3278124647040386e-06,
-        }
-        zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
-        js1 = {"l_shoulder_pan_joint": 1.9652919379395388,
-               "l_shoulder_lift_joint": -0.26499816732737785,
-               "l_upper_arm_roll_joint": 1.3837617139225473,
-               "l_elbow_flex_joint": -2.1224566064321584,
-               "l_forearm_roll_joint": 16.99646118944817,
-               "l_wrist_flex_joint": -0.07350789589924167,
-               "l_wrist_roll_joint": 0.0}
-        js2 = {
-            "r_shoulder_pan_joint": -1.712587449591307,
-            "r_shoulder_lift_joint": -0.2567290370386635,
-            "r_upper_arm_roll_joint": -1.4633501125737374,
-            "r_elbow_flex_joint": -2.1221670650093913,
-            "r_forearm_roll_joint": 1.7663253481913623,
-            "r_wrist_flex_joint": -0.07942669250968948,
-            "r_wrist_roll_joint": 0.05106258161229582}
-        zero_pose.set_joint_goal(js1)
-        zero_pose.set_joint_goal(js2)
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = 'base_footprint'
-        base_goal.pose.orientation.w = 1
-        zero_pose.set_cart_goal(goal_pose=base_goal,
-                                root_link='odom_combined',
-                                tip_link='base_footprint')
-        zero_pose.avoid_collision(min_distance=0.1,
-                                  group1='pr2',
-                                  group2='')
-        zero_pose.plan_and_execute()
-
+class TestJointGoals:
     def test_joint_goal2(self, zero_pose: PR2TestWrapper):
         js = {
             'torso_lift_joint': 0.2999225173357618,
@@ -370,7 +320,7 @@ class TestJointGoals(object):
         start_state = {
             'torso_lift_joint': 0.3000254972469308,
             'head_pan_joint': 0.04135718187588074,
-            'head_tilt_joint': -0.3870040025362966,
+            'head_tilt_joint': -0.37,
             'r_upper_arm_roll_joint': -0.8693958356996788,
             'r_shoulder_pan_joint': -1.112011913457302,
             'r_shoulder_lift_joint': 0.6165443541686221,
@@ -383,7 +333,7 @@ class TestJointGoals(object):
             'l_shoulder_lift_joint': 0.011627231224188975,
             'l_forearm_roll_joint': 281.2568789280418,
             'l_elbow_flex_joint': -2.0300928925694675,
-            'l_wrist_flex_joint': -0.07256157688707354,
+            'l_wrist_flex_joint': -0.11,
             'l_wrist_roll_joint': -6.062015047706401,
         }
         zero_pose.set_joint_goal(start_state)
@@ -434,7 +384,8 @@ class TestJointGoals(object):
         zero_pose.set_joint_goal(goal_js, check=False)
         zero_pose.plan_and_execute()
         js = {u'torso_lift_joint': 0.32}
-        zero_pose.send_and_check_joint_goal(js)
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
 
         goal_js = {'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
                    'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,
@@ -1814,8 +1765,9 @@ class TestCartGoals(object):
         zero_pose.plan_and_execute()
 
     def test_wiggle1(self, kitchen_setup: PR2TestWrapper):
+        # FIXME
         tray_pose = PoseStamped()
-        tray_pose.header.frame_id = 'iai_kitchen/sink_area_surface'
+        tray_pose.header.frame_id = 'sink_area_surface'
         tray_pose.pose.position = Point(0.1, -0.4, 0.07)
         tray_pose.pose.orientation.w = 1
 
@@ -2432,7 +2384,7 @@ class TestWayPoints(object):
 #                     assert True
 
 
-class TestWorldManipulation(object):
+class TestWorldManipulation:
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
         kitchen_setup.dye_group(kitchen_setup.get_robot_name(), (1, 0, 0, 1))
@@ -2515,17 +2467,26 @@ class TestWorldManipulation(object):
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
         object_name = 'kitchen'
         kitchen_setup.clear_world()
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        if kitchen_setup.is_standalone():
+            js_topic = ''
+            set_js_topic = ''
+        else:
+            js_topic = '/kitchen/joint_states',
+            set_js_topic = '/kitchen/cram_joint_states'
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
-                               pose=tf.lookup_pose('map', 'iai_kitchen/world'),
-                               js_topic='/kitchen/joint_states',
-                               set_js_topic='/kitchen/cram_joint_states')
+                               pose=p,
+                               js_topic=js_topic,
+                               set_js_topic=set_js_topic)
         kitchen_setup.remove_group(object_name)
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
-                               pose=tf.lookup_pose('map', 'iai_kitchen/world'),
-                               js_topic='/kitchen/joint_states',
-                               set_js_topic='/kitchen/cram_joint_states')
+                               pose=p,
+                               js_topic=js_topic,
+                               set_js_topic=set_js_topic)
 
     def test_add_mesh(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2545,23 +2506,24 @@ class TestWorldManipulation(object):
                            expected_error_code=UpdateWorldResponse.CORRUPT_MESH_ERROR)
 
     def test_add_attach_detach_remove_add(self, zero_pose: PR2TestWrapper):
+        timeout = 1
         object_name = 'muh'
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p, timeout=0)
-        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip, timeout=0)
-        zero_pose.detach_group(object_name, timeout=0)
-        zero_pose.remove_group(object_name, timeout=0)
-        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p, timeout=0)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p, timeout=timeout)
+        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip, timeout=timeout)
+        zero_pose.detach_group(object_name, timeout=timeout)
+        zero_pose.remove_group(object_name, timeout=timeout)
+        zero_pose.add_box(object_name, size=(1, 1, 1), pose=p, timeout=timeout)
 
     def test_attach_to_kitchen(self, kitchen_setup: PR2TestWrapper):
         object_name = 'muh'
         drawer_joint = 'sink_area_left_middle_drawer_main_joint'
 
         cup_pose = PoseStamped()
-        cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        cup_pose.header.frame_id = 'sink_area_left_middle_drawer_main'
         cup_pose.pose.position = Point(0.1, 0.2, -.05)
         cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
@@ -4654,9 +4616,9 @@ class TestCollisionAvoidanceGoals:
         # kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0})
 
 
-class TestInfoServices(object):
+class TestInfoServices:
     def test_get_object_info(self, zero_pose: PR2TestWrapper):
-        result = zero_pose.get_group_info('robot')
+        result = zero_pose.get_group_info('pr2')
         expected = {'head_pan_joint',
                     'head_tilt_joint',
                     'l_elbow_flex_joint',
@@ -4666,9 +4628,6 @@ class TestInfoServices(object):
                     'l_upper_arm_roll_joint',
                     'l_wrist_flex_joint',
                     'l_wrist_roll_joint',
-                    'odom_x_joint',
-                    'odom_y_joint',
-                    'odom_z_joint',
                     'r_elbow_flex_joint',
                     'r_forearm_roll_joint',
                     'r_shoulder_lift_joint',

@@ -18,8 +18,8 @@ class AlignPlanes(Goal):
         :param goal_constraint: bool, default False
         """
         super().__init__(**kwargs)
-        self.root = self.world.get_link(root_link, root_group)
-        self.tip = self.world.get_link(tip_link, tip_group)
+        self.root = self.world.get_link_name(root_link, root_group)
+        self.tip = self.world.get_link_name(tip_link, tip_group)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 

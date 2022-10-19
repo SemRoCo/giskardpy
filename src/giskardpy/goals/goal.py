@@ -75,7 +75,7 @@ class Goal:
         try:
             try:
                 group_name = self.world.get_group_containing_link_short_name(msg.header.frame_id)
-                msg.header.frame_id = self.world.get_link(msg.header.frame_id, group_name)
+                msg.header.frame_id = self.world.get_link_name(msg.header.frame_id, group_name)
             except UnknownGroupException:
                 pass
             return self.world.transform_msg(target_frame, msg)

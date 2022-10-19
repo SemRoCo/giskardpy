@@ -229,7 +229,7 @@ class WorldUpdater(GiskardBehavior):
             global_pose = req.pose
         try:
             group_name = self.world.get_group_containing_link_short_name(req.parent_link)
-            req.parent_link = self.world.get_link(req.parent_link, group_name)
+            req.parent_link = self.world.get_link_name(req.parent_link, group_name)
         except UnknownGroupException:
             pass
         if req.pose.header.frame_id == '':

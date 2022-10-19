@@ -23,8 +23,8 @@ class GraspBar(Goal):
         :param weight: float default WEIGHT_ABOVE_CA
         """
         super().__init__(**kwargs)
-        self.root = self.world.get_link(root_link, root_group)
-        self.tip = self.world.get_link(tip_link, tip_group)
+        self.root = self.world.get_link_name(root_link, root_group)
+        self.tip = self.world.get_link_name(tip_link, tip_group)
 
         bar_center = self.transform_msg(self.root, bar_center)
 

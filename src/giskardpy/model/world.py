@@ -75,7 +75,7 @@ class WorldTree:
             link_name = PrefixName.from_string(link_name)
         except AttributeError:
             if group_name is None:
-                group_name = self.get_group_containing_joint_short_name(link_name)
+                group_name = self.get_group_containing_link_short_name(link_name)
             return PrefixName(link_name, group_name)
 
     def get_link(self, link_name: str, group_name: str) -> Link:
@@ -429,9 +429,11 @@ class WorldTree:
                 groups.add(group_name)
         return groups
 
-    def get_group_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> str:
+    def get_group_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Optional[str]:
         groups = self.get_groups_containing_link_short_name(link_name)
         groups_size = len(groups)
+        if groups_size == 0 and link_name in self._links:
+            return None
         ret = self._get_group_from_groups(groups)
         if ret is None and groups_size > 0:
             raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {link_name}. '
@@ -459,9 +461,11 @@ class WorldTree:
                 raise Exception(f'Containing different group names {groups} '
                                 f'for given list of joint_names {joint_names}.')
 
-    def get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> str:
+    def get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Optional[str]:
         groups = self.get_groups_containing_joint_short_name(joint_name)
         groups_size = len(groups)
+        if groups_size == 0 and joint_name in self._joints:
+            return None
         ret = self._get_group_from_groups(groups)
         if ret is None and groups_size > 0:
             raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {joint_name}.'

@@ -40,8 +40,8 @@ class CartesianPosition(Goal):
             p.header = goal_point.header
             p.point = goal_point.pose.position
             goal_point = p
-        self.root_link = self.world.get_link(root_link, root_group)
-        self.tip_link = self.world.get_link(tip_link, tip_group)
+        self.root_link = self.world.get_link_name(root_link, root_group)
+        self.tip_link = self.world.get_link_name(tip_link, tip_group)
         if self.root_link2 is not None:
             self.goal_point = self.transform_msg(self.root_link2, goal_point)
         else:
@@ -90,8 +90,8 @@ class CartesianOrientation(Goal):
             q.header = goal_orientation.header
             q.quaternion = goal_orientation.pose.orientation
             goal_orientation = q
-        self.root_link = self.world.get_link(root_link, root_group)
-        self.tip_link = self.world.get_link(tip_link, tip_group)
+        self.root_link = self.world.get_link_name(root_link, root_group)
+        self.tip_link = self.world.get_link_name(tip_link, tip_group)
         if self.root_link2 is not None:
             self.goal_orientation = self.transform_msg(self.root_link2, goal_orientation)
         else:
@@ -140,8 +140,8 @@ class CartesianPositionStraight(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        self.root_link = self.world.get_link(root_link, root_group)
-        self.tip_link = self.world.get_link(tip_link, tip_group)
+        self.root_link = self.world.get_link_name(root_link, root_group)
+        self.tip_link = self.world.get_link_name(tip_link, tip_group)
         self.goal_point = self.transform_msg(self.root_link, goal_point)
 
     def make_constraints(self):
@@ -420,8 +420,8 @@ class TranslationVelocityLimit(Goal):
                                 make some goal combination infeasible
         """
         super().__init__(**kwargs)
-        self.root_link = self.world.get_link(root_link, root_group)
-        self.tip_link = self.world.get_link(tip_link, tip_group)
+        self.root_link = self.world.get_link_name(root_link, root_group)
+        self.tip_link = self.world.get_link_name(tip_link, tip_group)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
@@ -459,8 +459,8 @@ class RotationVelocityLimit(Goal):
         """
         super(RotationVelocityLimit, self).__init__(**kwargs)
 
-        self.root_link = self.world.get_link(root_link, root_group)
-        self.tip_link = self.world.get_link(tip_link, tip_group)
+        self.root_link = self.world.get_link_name(root_link, root_group)
+        self.tip_link = self.world.get_link_name(tip_link, tip_group)
         self.hard = hard
 
         self.weight = weight

@@ -6,7 +6,7 @@ import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.exceptions import SelfCollisionViolatedException
 from giskardpy.model.collision_world_syncer import Collisions
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard, catch_and_raise_to_blackboard
 

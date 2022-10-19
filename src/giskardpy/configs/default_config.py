@@ -1,3 +1,4 @@
+from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, Optional, List, Union, Tuple
 
@@ -12,14 +13,13 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
     TfPublishingModes
-from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string
+from giskardpy.my_types import my_string, PrefixName
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
@@ -32,8 +32,6 @@ class Giskard:
         self.qp_solver_config: QPSolverConfig = QPSolverConfig()
         self.behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
         self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
-        self.robot_interface_configs: List[RobotInterfaceConfig] = []
-        self.hardware_config: HardwareConfig = HardwareConfig()
         self._god_map = GodMap.init_from_paramserver()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
@@ -42,7 +40,17 @@ class Giskard:
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self._backup = {}
-        self.group_names = []
+
+    def add_robot_urdf(self, urdf: str, name: str, **kwargs):
+        if not hasattr(self, 'robot_interface_configs'):
+            self.group_names = []
+            self.robot_interface_configs: List[RobotInterfaceConfig] = []
+            self.hardware_config: HardwareConfig = HardwareConfig()
+        if name is None:
+            name = robot_name_from_urdf_string(urdf)
+            self.group_names.append(name)
+        robot = RobotInterfaceConfig(urdf, name=name, **kwargs)
+        self.robot_interface_configs.append(robot)
 
     def configure_VisualizationBehavior(self, enabled=True, in_planning_loop=False):
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
@@ -52,25 +60,16 @@ class Giskard:
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
 
-    def add_robot_urdf(self, urdf: str, **kwargs):
-        robot = RobotInterfaceConfig(urdf, **kwargs)
     @property
     def collision_avoidance_config(self):
         return self.collision_avoidance_configs[self.get_default_group_name()]
-
-    def add_robot_urdf(self, urdf: str, name: str, **kwargs):
-        robot = RobotInterfaceConfig(urdf, name=name, **kwargs)
-        self.robot_interface_configs.append(robot)
 
     def add_robot_from_parameter_server(self, parameter_name: str = 'robot_description',
                                         joint_state_topics: List[str] = ('/joint_states',),
                                         group_name: Optional[str] = None, **kwargs):
         urdf = rospy.get_param(parameter_name)
-        if group_name is None:
-            group_name = robot_name_from_urdf_string(urdf)
-            self.group_names.append(group_name)
-        self.hardware_config.joint_state_topics.extend([(group_name, jst) for jst in joint_state_topics])
         self.add_robot_urdf(urdf, name=group_name, **kwargs)
+        self.hardware_config.joint_state_topics.extend([(group_name, jst) for jst in joint_state_topics])
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         if group_name is None:
@@ -120,16 +119,17 @@ class Giskard:
         self.hardware_config.odometry_node_kwargs.append({'odometry_topic': odometry_topic,
                                                           'joint_name': joint_name})
 
-    def add_follow_joint_trajectory_server(self, namespace, state_topic, group_name = None, fill_velocity_values=False):
+    def add_follow_joint_trajectory_server(self, namespace, state_topic, group_name=None, fill_velocity_values=False):
         if group_name is None:
             group_name = self.get_default_group_name()
         self.hardware_config.follow_joint_trajectory_interfaces_kwargs.append({'namespace': namespace,
-                                                                        'state_topic': state_topic,
-                                                                        'fill_velocity_values': fill_velocity_values})
+                                                                               'state_topic': state_topic,
+                                                                               'fill_velocity_values': fill_velocity_values})
 
     def add_omni_drive_joint(self,
                              parent_link_name: str,
                              child_link_name: str,
+                             robot_group_name: Optional[str] = None,
                              name: Optional[str] = 'brumbrum',
                              odometry_topic: Optional[str] = None,
                              translation_velocity_limit: Optional[float] = 0.2,
@@ -141,8 +141,12 @@ class Giskard:
                              odom_x_name: Optional[str] = 'odom_x',
                              odom_y_name: Optional[str] = 'odom_y',
                              odom_yaw_name: Optional[str] = 'odom_yaw'):
+        if robot_group_name is None:
+            robot_group_name = self.get_default_group_name()
+        if not isinstance(name, PrefixName):
+            name = PrefixName(name, robot_group_name)
         brumbrum_joint = OmniDrive(parent_link_name=parent_link_name,
-                                   child_link_name=child_link_name,
+                                   child_link_name=PrefixName(child_link_name, robot_group_name),
                                    name=name,
                                    odom_x_name=odom_x_name,
                                    odom_y_name=odom_y_name,
@@ -157,6 +161,7 @@ class Giskard:
         if odometry_topic is not None:
             self.add_odometry_topic(odometry_topic=odometry_topic,
                                     joint_name=brumbrum_joint.name)
+
     def get_default_group_name(self):
         if len(self.group_names) > 1:
             raise AttributeError(f'group name has to be set if you have multiple robots')
@@ -198,8 +203,8 @@ class Giskard:
                               track_only_velocity: bool = False,
                               joint_name: Optional[my_string] = None):
         self.hardware_config.send_trajectory_to_cmd_vel_kwargs.append({'cmd_vel_topic': cmd_vel_topic,
-                                                                'track_only_velocity': track_only_velocity,
-                                                                'joint_name': joint_name})
+                                                                       'track_only_velocity': track_only_velocity,
+                                                                       'joint_name': joint_name})
 
     def reset_config(self):
         for parameter, value in self._backup.items():

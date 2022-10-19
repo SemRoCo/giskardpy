@@ -8,6 +8,7 @@ from sensor_msgs.msg import JointState
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.default_config import ControlModes
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
 from giskardpy.god_map import GodMap
@@ -15,15 +16,17 @@ from giskardpy.model.joints import OmniDrive, DiffDrive
 
 
 class SetSeedConfiguration(Goal, NonMotionGoal):
-    # FIXME deal with prefix
-    def __init__(self, seed_configuration: Dict[str, float], **kwargs):
+    def __init__(self, seed_configuration: Dict[str, float], group_name: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
+        if group_name is not None:
+            seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
         if self.god_map.get_data(identifier.execute) \
                 and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
+            joint_name = self.world.get_closest_joint_name(joint_name, group_name)
             if joint_name not in self.world.state:
-                raise KeyError(f'world has no joint \'{joint_name}\'')
+                raise KeyError(f'World has no joint \'{joint_name}\'.')
             self.world.state[joint_name].position = initial_joint_value
         self.world.notify_state_change()
 
@@ -67,7 +70,7 @@ class JointPositionContinuous(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if not self.world.is_joint_continuous(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
@@ -122,7 +125,7 @@ class JointPositionPrismatic(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if not self.world.is_joint_prismatic(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
@@ -194,7 +197,7 @@ class JointVelocityRevolute(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if not self.world.is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
@@ -255,7 +258,7 @@ class JointPositionRevolute(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if not self.world.is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
@@ -443,7 +446,7 @@ class AvoidJointLimitsRevolute(Goal):
         self.max_velocity = max_linear_velocity
         self.percentage = percentage
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if not self.world.is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
@@ -497,7 +500,7 @@ class AvoidJointLimitsPrismatic(Goal):
         self.max_velocity = max_angular_velocity
         self.percentage = percentage
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if not self.world.is_joint_prismatic(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
@@ -551,8 +554,6 @@ class JointPositionList(Goal):
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for joint_name, goal_position in goal_state.items():
-            if not self.world.has_joint(self.world.get_joint(joint_name, group_name)):
-                raise KeyError(f'unknown joint \'{joint_name}\'')
             params = kwargs
             params.update({'joint_name': joint_name,
                            'group_name': group_name,
@@ -573,7 +574,7 @@ class JointPosition(Goal):
     def __init__(self, joint_name: str, goal: float, group_name: str = None, weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 100, **kwargs):
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if self.world.is_joint_continuous(self.joint_name):
             C = JointPositionContinuous
         elif self.world.is_joint_revolute(self.joint_name):
@@ -625,7 +626,7 @@ class AvoidJointLimits(Goal):
 class JointPositionRange(Goal):
     def __init__(self, joint_name, upper_limit, lower_limit, group_name: str = None, hard=False, **kwargs):
         super().__init__(**kwargs)
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_closest_joint_name(joint_name, group_name)
         if self.world.is_joint_continuous(joint_name):
             raise NotImplementedError(f'Can\'t limit range of continues joint \'{self.joint_name}\'.')
         self.upper_limit = upper_limit

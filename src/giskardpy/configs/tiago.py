@@ -4,7 +4,7 @@ from std_msgs.msg import ColorRGBA
 
 from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.configs.default_config import Giskard, ControlModes
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 
 
 class TiagoBase(Giskard):

@@ -2,7 +2,7 @@ import abc
 from abc import ABC
 from typing import Optional
 
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OmniDrive, DiffDrive, Joint
 from giskardpy.my_types import my_string

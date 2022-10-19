@@ -2,8 +2,7 @@ from typing import Optional
 
 from rospy import ROSException
 
-from giskardpy.data_types import JointStates, PrefixName
-from giskardpy.model.world import SubWorldTree
+from giskardpy.data_types import JointStates
 
 from queue import Queue, Empty
 
@@ -14,7 +13,6 @@ from sensor_msgs.msg import JointState
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-import giskardpy.utils.tfwrapper as tf
 
 
 class SyncConfiguration(GiskardBehavior):

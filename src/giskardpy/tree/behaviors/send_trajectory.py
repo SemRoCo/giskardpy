@@ -5,7 +5,7 @@ from rospy import ROSException
 from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \

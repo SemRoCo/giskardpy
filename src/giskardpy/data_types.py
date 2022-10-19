@@ -3,6 +3,8 @@ from copy import deepcopy
 
 from sensor_msgs.msg import JointState
 
+from giskardpy.my_types import my_string
+
 
 class KeyDefaultDict(defaultdict):
     """
@@ -145,47 +147,6 @@ class PrefixDefaultDict(KeyDefaultDict):
         :type key: PrefixName
         """
         return super().__missing__(key.prefix, cache=False)
-
-
-class PrefixName:
-    def __init__(self, name, prefix, separator='/'):
-        self.short_name = name
-        self.prefix = prefix
-        self.separator = separator
-        if prefix:
-            self.long_name = f'{self.prefix}{self.separator}{self.short_name}'
-        else:
-            self.long_name = name
-
-    def __str__(self):
-        return self.long_name.__str__()
-
-    def __repr__(self):
-        return self.long_name.__repr__()
-
-    def __hash__(self):
-        return self.long_name.__hash__()
-
-    def __eq__(self, other):
-        return self.long_name.__eq__(other.__str__())
-
-    def __ne__(self, other):
-        return self.long_name.__ne__(other.__str__())
-
-    def __le__(self, other):
-        return self.long_name.__le__(other.__str__())
-
-    def __ge__(self, other):
-        return self.long_name.__ge__(other.__str__())
-
-    def __gt__(self, other):
-        return self.long_name.__gt__(other.__str__())
-
-    def __lt__(self, other):
-        return self.long_name.__lt__(other.__str__())
-
-    def __contains__(self, item):
-        return self.long_name.__contains__(item.__str__())
 
 
 order_map = BiDict({

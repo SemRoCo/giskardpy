@@ -8,7 +8,7 @@ from tf.transformations import quaternion_about_axis, quaternion_multiply
 
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import my_string, expr_symbol, expr_matrix, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable

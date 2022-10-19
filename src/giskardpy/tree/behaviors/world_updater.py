@@ -16,7 +16,7 @@ import giskardpy.identifier as identifier
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.model.world import SubWorldTree

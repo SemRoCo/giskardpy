@@ -4,7 +4,8 @@ from typing import List, Optional, Union
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from giskardpy.data_types import JointStates, PrefixName
+from giskardpy.data_types import JointStates
+from giskardpy.my_types import PrefixName
 from giskardpy.model.joints import Joint, OmniDrive
 
 
@@ -67,11 +68,11 @@ class Trajectory:
                 for free_variable in free_variables:
                     if free_variable in traj_point:
                         if i == 0:
-                            joint_name = free_variable.name
+                            joint_name = free_variable
                             if isinstance(joint_name, PrefixName):
                                 joint_name = joint_name.short_name
                             trajectory_msg.joint_names.append(joint_name)
-                        p.positions.append(traj_point[free_variable.name].position)
+                        p.positions.append(traj_point[free_variable].position)
                         if fill_velocity_values:
                             p.velocities.append(traj_point[free_variable].velocity)
                     else:

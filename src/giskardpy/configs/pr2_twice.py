@@ -1,5 +1,5 @@
 from giskardpy.configs.default_config import Giskard
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 
 
 class PR22(Giskard):

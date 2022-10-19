@@ -1,3 +1,6 @@
+class DontPrintStackTrace:
+    pass
+
 class GiskardException(Exception):
     pass
 
@@ -25,7 +28,7 @@ class HardConstraintsViolatedException(InfeasibleException):
     pass
 
 
-class EmptyProblemException(InfeasibleException):
+class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
     pass
 
 

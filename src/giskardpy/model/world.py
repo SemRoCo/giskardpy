@@ -17,7 +17,7 @@ from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException
 from giskardpy.god_map import GodMap
@@ -387,14 +387,13 @@ class WorldTree:
                 return link_name
         return PrefixName(link_name, group_name)
 
-    def get_joint(self, joint_name: str, group_name: str) -> PrefixName:
-        if '/' in joint_name:
-            if isinstance(joint_name, str):
-                return PrefixName(*reversed(joint_name.split('/')))
-            return joint_name
-        if group_name is None:
-            group_name = self.get_group_containing_joint_short_name(joint_name)
-        return PrefixName(joint_name, group_name)
+    def get_closest_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        try:
+            joint_name = PrefixName.from_string(joint_name)
+        except AttributeError:
+            if group_name is None:
+                group_name = self.get_group_containing_joint_short_name(joint_name)
+            return PrefixName(joint_name, group_name)
 
     def _set_free_variables_on_mimic_joints(self, group_name):
         # TODO prevent this from happening twice

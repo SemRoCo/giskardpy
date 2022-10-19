@@ -9,7 +9,7 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException, GiskardException, UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree

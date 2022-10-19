@@ -13,7 +13,7 @@ import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
 from giskardpy import casadi_wrapper as w
 from giskardpy.configs.data_types import CollisionCheckerLib
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance

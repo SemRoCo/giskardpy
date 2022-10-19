@@ -4,7 +4,7 @@ from std_msgs.msg import ColorRGBA
 
 from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_config import Giskard
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 
 
 class PR2_Base(Giskard):
@@ -157,13 +157,13 @@ class PR2_Unreal(PR2_Base):
 
 class PR2_StandAlone(PR2_Base):
     def __init__(self):
+        self.add_robot_from_parameter_server()
         super().__init__()
         self.general_config.control_mode = ControlModes.stand_alone
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
         self.root_link_name = 'map'
-        self.add_robot_from_parameter_server()
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',

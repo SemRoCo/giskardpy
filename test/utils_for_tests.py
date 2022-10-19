@@ -28,10 +28,11 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
-from giskardpy.configs.boxy import Boxy
+# from giskardpy.configs.boxy import Boxy
 from giskardpy.configs.data_types import CollisionAvoidanceConfig, GeneralConfig
 from giskardpy.configs.default_config import ControlModes
-from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
+from giskardpy.data_types import KeyDefaultDict, JointStates
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
@@ -261,7 +262,9 @@ class GiskardTestWrapper(GiskardWrapper):
     def is_standalone(self):
         return self.general_config.control_mode == self.general_config.control_mode.stand_alone
 
-    def set_seed_odometry(self, group_name, base_pose):
+    def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.robot_name
         self.set_json_goal('SetOdometry',
                            group_name=group_name,
                            base_pose=base_pose)

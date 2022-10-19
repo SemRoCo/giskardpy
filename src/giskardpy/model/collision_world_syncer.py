@@ -8,7 +8,6 @@ from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
-from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
@@ -141,13 +140,13 @@ class Collisions:
         collision.link_a = new_link_a
         collision.link_b = new_link_b
 
-        new_b_T_r = self.world.compute_fk_np(new_link_b, self.robot_root)
+        new_b_T_r = self.world.compute_fk_np(new_link_b, robot.root_link_name)
         root_T_map = robot.get_fk(robot.root_link_name, self.world.root_link_name)
         new_b_T_map = np.dot(new_b_T_r, root_T_map)
         collision.new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
 
         if collision.map_P_pa is not None:
-            new_a_T_r = self.world.compute_fk_np(new_link_a, self.robot_root)
+            new_a_T_r = self.world.compute_fk_np(new_link_a, robot.root_link_name)
             new_a_P_pa = np.dot(np.dot(new_a_T_r, root_T_map), collision.map_P_pa)
             new_b_P_pb = np.dot(new_b_T_map, collision.map_P_pb)
         else:

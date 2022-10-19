@@ -49,6 +49,7 @@ class GiskardWrapper:
         self.clear_cmds()
         self._object_js_topics = {}
         rospy.sleep(.3)
+        self.robot_name = self.get_group_names()[0]
 
     def register_group(self, group_name: str, parent_group_name: str, root_link_name: str) -> RegisterGroupResponse:
         """
@@ -479,20 +480,24 @@ class GiskardWrapper:
                            weight=weight,
                            joint_list=joint_list)
 
-    def allow_self_collision(self, robot_name: str):
+    def allow_self_collision(self, robot_name: Optional[str] = None):
         """
         Allows the collision with itself for the next goal.
         """
+        if robot_name is None:
+            robot_name = self.robot_name
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.group1 = robot_name
         collision_entry.group2 = robot_name
         self._set_collision_entries([collision_entry])
 
-    def avoid_self_collision(self, robot_name: str, min_distance: float = -1):
+    def avoid_self_collision(self, robot_name: Optional[str] = None, min_distance: float = -1):
         """
         Avoid collisions with itself for the next goal.
         """
+        if robot_name is None:
+            robot_name = self.robot_name
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.group1 = robot_name

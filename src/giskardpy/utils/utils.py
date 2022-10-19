@@ -31,6 +31,7 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
+from giskardpy.exceptions import DontPrintStackTrace
 from giskardpy.utils import logging
 
 
@@ -488,7 +489,8 @@ def catch_and_raise_to_blackboard(function):
         try:
             r = function(*args, **kwargs)
         except Exception as e:
-            traceback.print_exc()
+            if not isinstance(e, DontPrintStackTrace):
+                traceback.print_exc()
             raise_to_blackboard(e)
             return Status.FAILURE
         return r

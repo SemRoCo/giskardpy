@@ -3,6 +3,7 @@ from __future__ import division
 import itertools
 import re
 from copy import deepcopy
+from typing import Optional
 
 import numpy as np
 import pytest
@@ -18,12 +19,10 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.configs.pr2 import PR2_Mujoco, PR2_StandAlone
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.identifier import fk_pose
 from utils_for_tests import PR2
-from giskardpy.model.world import SubWorldTree
 from giskardpy.utils.math import compare_points, compare_orientations
 from utils_for_tests import compare_poses, publish_marker_vector, \
     JointGoalChecker, GiskardTestWrapper
@@ -132,8 +131,8 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.odom_root = 'odom_combined'
         super().__init__(config)
 
-    def teleport_base(self, goal_pose):
-        self.set_seed_odometry(goal_pose)
+    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
+        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
         self.allow_all_collisions()
         self.plan_and_execute()
 
@@ -173,10 +172,6 @@ class PR2TestWrapper(GiskardTestWrapper):
         # self.wait_heartbeats(15)
         # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
         # compare_poses(p2.pose, map_T_odom.pose)
-
-    @property
-    def robot_name(self):
-        return self.god_map.get_data(identifier.robot_interface_configs)[0].name
 
     def reset(self):
         self.open_l_gripper()
@@ -383,10 +378,7 @@ class TestJointGoals:
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
-    def test_prismatic_joint2(self, kitchen_setup):
-        """
-        :type kitchen_setup: PR2
-        """
+    def test_prismatic_joint2(self, kitchen_setup: PR2TestWrapper):
         kitchen_setup.allow_self_collision(kitchen_setup.robot_name)
         js = {'torso_lift_joint': 0.1}
         kitchen_setup.set_joint_goal(js)

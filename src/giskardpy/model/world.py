@@ -931,7 +931,7 @@ class WorldTree:
         self._fks = KeyDefaultDict(f)
 
     @memoize
-    def compute_fk_pose(self, root, tip):
+    def compute_fk_pose(self, root: my_string, tip: my_string) -> PoseStamped:
         root = self.get_link_name(root)
         tip = self.get_link_name(tip)
         homo_m = self.compute_fk_np(root, tip)
@@ -939,6 +939,14 @@ class WorldTree:
         p.header.frame_id = str(root)
         p.pose = homo_matrix_to_pose(homo_m)
         return p
+
+    def compute_fk_point(self, root: my_string, tip: my_string) -> PointStamped:
+        root_T_tip = self.compute_fk_pose(root, tip)
+        root_P_tip = PointStamped()
+        root_P_tip.header = root_T_tip.header
+        root_P_tip.point = root_T_tip.pose.position
+        return root_P_tip
+
 
     @memoize
     def compute_fk_pose_with_collision_offset(self, root, tip, collision_id):

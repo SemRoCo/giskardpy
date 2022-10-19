@@ -186,8 +186,8 @@ class JointPositionPrismatic(Goal):
 
 
 class JointVelocityRevolute(Goal):
-    def __init__(self, joint_name: str, group_name: str, weight: float = WEIGHT_BELOW_CA, max_velocity: float = 1,
-                 hard: bool = False, **kwargs):
+    def __init__(self, joint_name: str, group_name: Optional[str] = None, weight: float = WEIGHT_BELOW_CA,
+                 max_velocity: float = 1, hard: bool = False, **kwargs):
         """
         This goal will move a prismatic joint to the goal position
         :param weight: default WEIGHT_BELOW_CA

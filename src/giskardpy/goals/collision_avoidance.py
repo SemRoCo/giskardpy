@@ -255,26 +255,26 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
         :param weight: float, default WEIGHT_ABOVE_CA
         """
         super().__init__(**kwargs)
-        self.link_name = tip_link
-        self.key = (tip_link, None, object_link_name)
+        self.link_name = self.world.get_link_name(tip_link)
+        self.link_b = self.world.get_link_name(object_link_name)
+        self.key = (self.link_name, None, self.link_b)
         self.object_group = object_group
-        self.link_b = object_link_name
-        self.link_b_hash = object_link_name.__hash__()
+        self.link_b_hash = self.link_b.__hash__()
         if root_link is None:
             self.root_link = self.world.root_link_name
         else:
-            self.root_link = root_link
+            self.root_link = self.world.get_link_name(root_link)
 
         if spring_threshold is None:
             spring_threshold = max_threshold
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        self.add_collision_check(self.world._links[tip_link].name,
-                                 self.world._links[object_link_name].name,
+        self.add_collision_check(self.world._links[self.link_name].name,
+                                 self.world._links[self.link_b].name,
                                  spring_threshold)
 
-        self.avoidance_hint = tf.transform_vector(self.root_link, avoidance_hint)
+        self.avoidance_hint = self.world.transform_msg(self.root_link, avoidance_hint)
         self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
 
         self.max_velocity = max_linear_velocity

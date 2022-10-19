@@ -287,9 +287,9 @@ class GiskardTestWrapper(GiskardWrapper):
         try:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
         except LookupException as e:
+            target_frame = self.world.get_link_name(target_frame)
             try:
-                group_name = self.world.get_group_containing_link_short_name(msg.header.frame_id)
-                msg.header.frame_id = PrefixName(msg.header.frame_id, group_name)
+                msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
             except UnknownGroupException:
                 pass
             return self.world.transform_msg(target_frame, msg)

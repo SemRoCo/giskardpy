@@ -540,33 +540,6 @@ class TestConstraints:
                                 goal_point=p)
         zero_pose.plan_and_execute()
 
-    def test_CartesianPosition2(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = 'box'
-        pocky_ps = PoseStamped()
-        pocky_ps.header.frame_id = zero_pose.l_tip
-        pocky_ps.pose.position.x = 0.05
-        pocky_ps.pose.orientation.w = 1
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.l_tip, pocky_ps)
-
-        tip = zero_pose.r_tip
-        p = PoseStamped()
-        p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = str(PrefixName(tip, zero_pose.world.groups[zero_pose.robot_name].prefix))
-        p.pose.position = Point(0.0, 0.5, 0.0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-
-        zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('CartesianPosition',
-                                root_link=tip,
-                                root_group=zero_pose.robot_name,
-                                tip_link=pocky,
-                                tip_group=zero_pose.robot_name,
-                                goal=p)
-        zero_pose.plan_and_execute()
-
     def test_CartesianPose(self, zero_pose: PR2TestWrapper):
         tip = zero_pose.r_tip
         p = PoseStamped()
@@ -589,7 +562,7 @@ class TestConstraints:
         compare_points(expected.pose.position, new_pose.pose.position)
 
     def test_JointPositionRevolute(self, zero_pose: PR2TestWrapper):
-        joint = 'r_shoulder_lift_joint'
+        joint = zero_pose.world.get_joint_name('r_shoulder_lift_joint')
         joint_goal = 1
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('JointPositionRevolute',
@@ -600,7 +573,7 @@ class TestConstraints:
         np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
 
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
-        joint = 'r_shoulder_lift_joint'
+        joint = zero_pose.world.get_joint_name('r_shoulder_lift_joint')
         joint_goal = 1
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('JointVelocityRevolute',
@@ -623,12 +596,13 @@ class TestConstraints:
                                 goal=joint_goal,
                                 max_velocity=1)
         zero_pose.plan_and_execute()
+        joint = zero_pose.world.get_joint_name(joint)
         np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, -2.283, decimal=2)
 
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'
         joint_name2 = 'sink_area_left_upper_drawer_main_joint'
-        group_name = 'kitchen'
+        group_name = 'iai_kitchen'
         joint_goal = 0.4
         #kitchen_setup.allow_all_collisions()
         kitchen_setup.set_json_goal('JointPosition',
@@ -830,6 +804,7 @@ class TestConstraints:
             assert upper_limit2 >= position >= lower_limit2
 
     def test_OverwriteWeights1(self, pocky_pose_setup: PR2TestWrapper):
+        # FIXME
         # joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
         # old_torso_value = pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights
         # old_odom_x_value = pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights
@@ -895,7 +870,7 @@ class TestConstraints:
         goal_point = tf.lookup_point('map', 'iai_kitchen/iai_fridge_door_handle')
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
-        pointing_axis.header.frame_id = str(PrefixName(tip, kitchen_setup.robot_name))
+        pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
         kitchen_setup.set_pointing_goal(tip, goal_point, root_link=kitchen_setup.default_root, pointing_axis=pointing_axis)
         kitchen_setup.plan_and_execute()
@@ -912,19 +887,19 @@ class TestConstraints:
         kitchen_setup.move_base(base_goal)
 
         current_x = Vector3Stamped()
-        current_x.header.frame_id = str(PrefixName(tip, kitchen_setup.robot_name))
+        current_x.header.frame_id = tip
         current_x.vector.x = 1
 
-        expected_x = tf.transform_point(tip, goal_point)
+        expected_x = kitchen_setup.transform_msg(tip, goal_point)
         np.testing.assert_almost_equal(expected_x.point.y, 0, 1)
         np.testing.assert_almost_equal(expected_x.point.z, 0, 1)
 
         rospy.loginfo("Starting looking")
         tip = 'head_mount_kinect_rgb_link'
-        goal_point = tf.lookup_point('map', kitchen_setup.r_tip)
+        goal_point = kitchen_setup.world.compute_fk_point('map', kitchen_setup.r_tip)
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
-        pointing_axis.header.frame_id = str(PrefixName(tip, kitchen_setup.robot_name))
+        pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
         kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
 
@@ -934,12 +909,12 @@ class TestConstraints:
         r_goal.pose.position.x -= 0.3
         r_goal.pose.position.z += 0.6
         r_goal.pose.orientation.w = 1
-        r_goal = tf.transform_pose(kitchen_setup.default_root, r_goal)
+        r_goal = kitchen_setup.transform_msg(kitchen_setup.default_root, r_goal)
         r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, -1, 0],
                                                                       [0, 1, 0, 0],
                                                                       [1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-        r_goal.header.frame_id = str(PrefixName(kitchen_setup.r_tip, kitchen_setup.robot_name))
+        r_goal.header.frame_id = kitchen_setup.r_tip
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, 'base_footprint', weight=WEIGHT_BELOW_CA)
         kitchen_setup.plan_and_execute()
 
@@ -1008,7 +983,7 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()
 
     def test_open_drawer(self, kitchen_setup: PR2TestWrapper):
-        handle_frame_id = 'kitchen/sink_area_left_middle_drawer_handle'
+        handle_frame_id = 'iai_kitchen/sink_area_left_middle_drawer_handle'
         handle_name = 'sink_area_left_middle_drawer_handle'
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_frame_id
@@ -1455,7 +1430,7 @@ class TestConstraints:
                                          bar_center=bar_center,
                                          bar_axis=bar_axis,
                                          bar_length=.3)
-        kitchen_setup.register_group('handle', 'kitchen', 'sink_area_dish_washer_door_handle')
+        kitchen_setup.register_group('handle', 'iai_kitchen', 'sink_area_dish_washer_door_handle')
         kitchen_setup.allow_collision(kitchen_setup.robot_name, 'handle')
         kitchen_setup.plan_and_execute()
 

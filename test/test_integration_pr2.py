@@ -386,9 +386,12 @@ class TestJointGoals:
 
     def test_hard_joint_limits(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
-        r_elbow_flex_joint_limits = zero_pose.robot.get_joint_position_limits('r_elbow_flex_joint')
-        torso_lift_joint_limits = zero_pose.robot.get_joint_position_limits('torso_lift_joint')
-        head_pan_joint_limits = zero_pose.robot.get_joint_position_limits('head_pan_joint')
+        r_elbow_flex_joint = zero_pose.world.get_joint_name('r_elbow_flex_joint')
+        torso_lift_joint = zero_pose.world.get_joint_name('torso_lift_joint')
+        head_pan_joint = zero_pose.world.get_joint_name('head_pan_joint')
+        r_elbow_flex_joint_limits = zero_pose.world.get_joint_position_limits(r_elbow_flex_joint)
+        torso_lift_joint_limits = zero_pose.world.get_joint_position_limits(torso_lift_joint)
+        head_pan_joint_limits = zero_pose.world.get_joint_position_limits(head_pan_joint)
 
         goal_js = {'r_elbow_flex_joint': r_elbow_flex_joint_limits[0] - 0.2,
                    'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
@@ -854,8 +857,8 @@ class TestConstraints:
         new_pose = tf.lookup_pose('map', 'base_footprint')
         compare_poses(new_pose.pose, old_pose.pose)
 
-        assert pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1] == 1000000
-        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1], int)
+        assert pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1] == 1000000
+        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1], int)
 
         updates = {
             1: {
@@ -874,13 +877,13 @@ class TestConstraints:
 
         # compare_poses(old_pose.pose, new_pose.pose)
         assert new_pose.pose.position.x >= 0.03
-        assert pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1] == 0.0001
-        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+        assert pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1] == 0.0001
+        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
                               float)
         pocky_pose_setup.plan_and_execute()
-        assert not isinstance(pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights[1],
+        assert not isinstance(pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1],
                               float)
-        assert not isinstance(pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
                               float)
 
     def test_pointing(self, kitchen_setup: PR2TestWrapper):

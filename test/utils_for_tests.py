@@ -257,7 +257,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
-        self.original_number_of_links = len(self.world.links)
+        self.original_number_of_links = len(self.world._links)
 
     def is_standalone(self):
         return self.general_config.control_mode == self.general_config.control_mode.stand_alone
@@ -443,7 +443,8 @@ class GiskardTestWrapper(GiskardWrapper):
                           weight=None, max_velocity=None, check=False,
                           **kwargs):
         if root_link is None:
-            root_link = self.get_robot_short_root_link_name(root_group)
+            root_link = self.world.root_link_name
+            root_group = None
         super().set_rotation_goal(goal_orientation=goal_orientation,
                                   tip_link=tip_link,
                                   tip_group=tip_group,
@@ -460,7 +461,8 @@ class GiskardTestWrapper(GiskardWrapper):
                              weight=None, max_velocity=None, check=False,
                              **kwargs):
         if root_link is None:
-            root_link = self.get_robot_short_root_link_name(root_group)
+            root_link = self.world.root_link_name
+            root_group = None
         super().set_translation_goal(goal_point=goal_point,
                                      tip_link=tip_link,
                                      tip_group=tip_group,
@@ -478,7 +480,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                       weight=None, max_velocity=None,
                                       **kwargs):
         if root_link is None:
-            root_link = self.get_robot_short_root_link_name(root_group)
+            root_link = self.world.root_link_name
+            root_group = None
         super().set_straight_translation_goal(goal_pose=goal_pose,
                                               tip_link=tip_link,
                                               root_link=root_link,
@@ -553,7 +556,8 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_pointing_goal(self, tip_link, goal_point, root_link=None, tip_group=None, root_group=None,
                           pointing_axis=None, weight=None, check=False):
         if root_link is None:
-            root_link = self.get_robot_short_root_link_name(root_group)
+            root_link = self.world.root_link_name
+            root_group = None
         super().set_pointing_goal(tip_link=tip_link,
                                   tip_group=tip_group,
                                   goal_point=goal_point,
@@ -574,7 +578,8 @@ class GiskardTestWrapper(GiskardWrapper):
                               root_normal=None, max_angular_velocity=None,
                               weight=None, check=False):
         if root_link is None:
-            root_link = self.get_robot_short_root_link_name(root_group)
+            root_link = self.world.root_link_name
+            root_group = None
         super().set_align_planes_goal(tip_link=tip_link,
                                       tip_group=tip_group,
                                       root_link=root_link,
@@ -596,7 +601,8 @@ class GiskardTestWrapper(GiskardWrapper):
                                weight=None, linear_velocity=None, angular_velocity=None,
                                check=False):
         if root_link is None:
-            root_link = self.get_robot_short_root_link_name(root_group)
+            root_link = self.world.root_link_name
+            root_group = None
         super().set_straight_cart_goal(goal_pose,
                                        tip_link,
                                        root_link,
@@ -700,7 +706,7 @@ class GiskardTestWrapper(GiskardWrapper):
         joints = list(self.world.controlled_joints)
         for joint in joints:
             try:
-                lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
+                lower_limit, upper_limit = self.world._joints[joint].get_limit_expressions(0)
             except:
                 continue
             assert lower_limit < self.world.state[joint].position < upper_limit, \
@@ -711,7 +717,7 @@ class GiskardTestWrapper(GiskardWrapper):
         trajectory_pos = self.get_result_trajectory_position()
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         for joint_name in controlled_joints:
-            if isinstance(self.world.joints[joint_name], OneDofJoint):
+            if isinstance(self.world._joints[joint_name], OneDofJoint):
                 if not self.world.is_joint_continuous(joint_name):
                     joint_limits = self.world.get_joint_position_limits(joint_name)
                     error_msg = f'{joint_name} has violated joint position limit'
@@ -748,7 +754,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 1
         assert len(self.get_group_names()) == 1
-        assert self.original_number_of_links == len(self.world.links)
+        assert self.original_number_of_links == len(self.world._links)
         return respone
 
     def remove_group(self,
@@ -1006,7 +1012,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                     self.collision_scene.ignored_self_collion_pairs)
         collisions = self.collision_scene.check_collisions(collision_matrix, 15)
         controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link)
-        controlled_parent_link = self.world.joints[controlled_parent_joint].child_link_name
+        controlled_parent_link = self.world._joints[controlled_parent_joint].child_link_name
         collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():
             if controlled_parent_link in key:
@@ -1201,7 +1207,7 @@ class PR2AndDonbot(GiskardTestWrapper):
         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 2
         assert len(self.world.robot_names) == 2
-        assert self.original_number_of_links == len(self.world.links)
+        assert self.original_number_of_links == len(self.world._links)
 
     def reset(self):
         self.clear_world()
@@ -1590,7 +1596,7 @@ class Donbot2(GiskardTestWrapper):
         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 2
         assert len(self.robot_names) == 2
-        assert self.original_number_of_links == len(self.world.links)
+        assert self.original_number_of_links == len(self.world._links)
 
     def reset(self):
         self.clear_world()

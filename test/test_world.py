@@ -169,7 +169,7 @@ class TestWorldTree(object):
 
     def test_link_urdf_str(self):
         world = create_world_with_pr2()
-        world.links['base_footprint'].as_urdf()
+        world._links['base_footprint'].as_urdf()
 
     def test_load_pr2(self):
         world = create_world_with_pr2()
@@ -198,7 +198,7 @@ class TestWorldTree(object):
             assert link_name.short_name in pr21.link_names
         for joint_name in pr22.joint_names:
             assert joint_name.short_name in pr21.joint_names
-        assert len(world.links) == len(pr21.links) + len(pr22.links) + 1
+        assert len(world._links) == len(pr21._links) + len(pr22._links) + 1
 
     def test_add_box(self):
         world = create_world_with_pr2()
@@ -208,8 +208,8 @@ class TestWorldTree(object):
         pose.orientation.w = 1
         world.add_world_body(box, pose)
         assert box.position_name in world.groups
-        assert box_name in world.links
-        assert PrefixName(box_name, world.connection_prefix) in world.joints
+        assert box_name in world._links
+        assert PrefixName(box_name, world.connection_prefix) in world._joints
 
     def test_attach_box(self):
 <<<<<<< HEAD
@@ -232,7 +232,7 @@ class TestWorldTree(object):
 
         new_fk = world.compute_fk_pose(world.root_link_name, box_name)
         assert box_name in world.groups[RobotName].link_names
-        assert world.joints[world.links[box_name].parent_joint_name].parent_link_name == new_parent_link_name
+        assert world._joints[world._links[box_name].parent_joint_name].parent_link_name == new_parent_link_name
         compare_poses(old_fk.pose, new_fk.pose)
 
         assert box_name in world.groups[RobotName].groups

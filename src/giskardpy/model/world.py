@@ -59,6 +59,28 @@ class WorldTree:
         self._model_version = 0
         self._clear()
 
+    def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        try:
+            joint_name = PrefixName.from_string(joint_name)
+        except AttributeError:
+            if group_name is None:
+                group_name = self.get_group_containing_joint_short_name(joint_name)
+            return PrefixName(joint_name, group_name)
+
+    def get_joint(self, joint_name: my_string, group_name: Optional[str] = None) -> Joint:
+        return self._joints[self.get_joint_name(joint_name, group_name)]
+
+    def get_link_name(self, link_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        try:
+            link_name = PrefixName.from_string(link_name)
+        except AttributeError:
+            if group_name is None:
+                group_name = self.get_group_containing_joint_short_name(link_name)
+            return PrefixName(link_name, group_name)
+
+    def get_link(self, link_name: str, group_name: str) -> Link:
+        return self._links[self.get_link_name(link_name, group_name)]
+
     @property
     def version(self):
         return self._model_version, self._state_version
@@ -127,12 +149,12 @@ class WorldTree:
             self._model_version += 1
 
     def travel_branch(self, link_name, companion: TravelCompanion):
-        link = self.links[link_name]
+        link = self._links[link_name]
         if not companion.link_call(link_name):
             for child_joint_name in link.child_joint_names:
                 if companion.joint_call(child_joint_name):
                     continue
-                child_link_name = self.joints[child_joint_name].child_link_name
+                child_link_name = self._joints[child_joint_name].child_link_name
                 self.travel_branch(child_link_name, companion)
 
     def search_branch(self, link_name,
@@ -202,7 +224,7 @@ class WorldTree:
         def stopper(joint_name):
             return joint_name not in joints_to_exclude and self.is_joint_controlled(joint_name)
 
-        child_link_name = self.joints[joint_name].child_link_name
+        child_link_name = self._joints[joint_name].child_link_name
         links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=stopper,
                                            collect_link_when=self.has_link_collisions)
@@ -223,21 +245,21 @@ class WorldTree:
         def stop_at_joint_when(other_joint_name):
             return joint_name == other_joint_name or self.is_joint_controlled(other_joint_name)
 
-        child_link_name = self.joints[parent_joint].child_link_name
+        child_link_name = self._joints[parent_joint].child_link_name
         links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=stop_at_joint_when,
                                            collect_link_when=self.has_link_collisions)
         return links
 
     def register_group(self, name, root_link_name, actuated=False):
-        if root_link_name not in self.links:
+        if root_link_name not in self._links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         if name in self.groups:
             raise DuplicateNameException('Group with name {} already exists'.format(name))
         new_group = SubWorldTree(name, root_link_name, self, actuated=actuated)
         # if the group is a subtree of a subtree, register it for the subtree as well
         for group in self.groups.values():
-            if root_link_name in group.links:
+            if root_link_name in group._links:
                 group.groups[name] = new_group
         self.groups[name] = new_group
 
@@ -277,19 +299,19 @@ class WorldTree:
 
     @property
     def root_link(self):
-        return self.links[self.root_link_name]
+        return self._links[self.root_link_name]
 
     @cached_property
     def link_names(self):
-        return set(self.links.keys())
+        return set(self._links.keys())
 
     @property
     def link_names_with_visuals(self):
-        return set(link.name for link in self.links.values() if link.has_visuals())
+        return set(link.name for link in self._links.values() if link.has_visuals())
 
     @cached_property
     def link_names_with_collisions(self):
-        return set(link.name for link in self.links.values() if link.has_collisions())
+        return set(link.name for link in self._links.values() if link.has_collisions())
 
     @cached_property
     def link_names_without_collisions(self):
@@ -297,11 +319,11 @@ class WorldTree:
 
     @property
     def joint_names(self):
-        return list(self.joints.keys())
+        return list(self._joints.keys())
 
     @property
     def joint_names_as_set(self):
-        return set(self.joints.keys())
+        return set(self._joints.keys())
 
     def add_urdf(self, urdf, group_name=None, parent_link_name=None, actuated=False):
         with suppress_stderr():
@@ -314,13 +336,13 @@ class WorldTree:
         urdf_root_link_name = PrefixName(urdf_root_link_name, group_name)
 
         if parent_link_name is not None:
-            parent_link = self.links[parent_link_name]
+            parent_link = self._links[parent_link_name]
             urdf_root_link = Link(urdf_root_link_name)
             self._add_link(urdf_root_link)
             self._add_fixed_joint(parent_link=parent_link,
                                   child_link=urdf_root_link)
         else:
-            urdf_root_link = self.links[urdf_root_link_name]
+            urdf_root_link = self._links[urdf_root_link_name]
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
@@ -366,48 +388,28 @@ class WorldTree:
         for i, link_or_joint in enumerate(self.compute_chain(parent_link, child_link, joints=True, links=True,
                                                              fixed=True, non_controlled=True)[1:-1]):
             if i == 0:
-                parent_link = self.joints[link_or_joint].parent_link_name
-                self.links[parent_link].child_joint_names.remove(link_or_joint)
+                parent_link = self._joints[link_or_joint].parent_link_name
+                self._links[parent_link].child_joint_names.remove(link_or_joint)
             if i % 2 == 0:
-                del self.joints[link_or_joint]
+                del self._joints[link_or_joint]
             else:
-                del self.links[link_or_joint]
+                del self._links[link_or_joint]
 
         self._link_joint_to_links(new_joint)
 
-    def get_link(self, link_name: str, group_name: str) -> my_string:
-        if '/' in link_name:
-            if isinstance(link_name, str):
-                return PrefixName(*reversed(link_name.split('/')))
-            return link_name
-        if group_name is None:
-            try:
-                group_name = self.get_group_containing_link_short_name(link_name)
-            except UnknownGroupException:
-                return link_name
-        return PrefixName(link_name, group_name)
-
-    def get_closest_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
-        try:
-            joint_name = PrefixName.from_string(joint_name)
-        except AttributeError:
-            if group_name is None:
-                group_name = self.get_group_containing_joint_short_name(joint_name)
-            return PrefixName(joint_name, group_name)
-
     def _set_free_variables_on_mimic_joints(self, group_name):
         # TODO prevent this from happening twice
-        for joint_name, joint in self.groups[group_name].joints.items():  # type: (PrefixName, MimicJoint)
+        for joint_name, joint in self.groups[group_name]._joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
                 joint.connect_to_existing_free_variables()
 
     def get_parent_link_of_link(self, link_name: Union[PrefixName, str]) -> PrefixName:
-        return self.joints[self.links[link_name].parent_joint_name].parent_link_name
+        return self._joints[self._links[link_name].parent_joint_name].parent_link_name
 
     def get_group_of_joint(self, joint_name: Union[PrefixName, str]):
         ret = set()
         for group_name, subtree in self.groups.items():
-            if joint_name in subtree.joints:
+            if joint_name in subtree._joints:
                 ret.add(subtree)
         if len(ret) == 0:
             raise KeyError(f'No groups found with joint name {joint_name}.')
@@ -560,9 +562,9 @@ class WorldTree:
 
     @memoize
     def get_movable_parent_joint(self, link_name):
-        joint = self.links[link_name].parent_joint_name
+        joint = self._links[link_name].parent_joint_name
         while not self.is_joint_movable(joint):
-            joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
+            joint = self._links[self._joints[joint].parent_link_name].parent_joint_name
         return joint
 
     def get_parent_group_name(self, group_name):
@@ -599,7 +601,7 @@ class WorldTree:
 
     @cached_property
     def movable_joints(self):
-        return [j.name for j in self.joints.values() if not isinstance(j, FixedJoint) and not isinstance(j, MimicJoint)]
+        return [j.name for j in self._joints.values() if not isinstance(j, FixedJoint) and not isinstance(j, MimicJoint)]
 
     @cached_property
     def movable_joints_as_set(self):
@@ -607,10 +609,12 @@ class WorldTree:
 
     def _clear(self):
         self.state = JointStates()
-        self.links: Dict[Union[PrefixName, str], Link] = {self.root_link_name: Link(self.root_link_name)}
-        self.joints: Dict[Union[PrefixName, str], Joint] = {}
+        self._links: Dict[Union[PrefixName, str], Link] = {self.root_link_name: Link(self.root_link_name)}
+        self._joints: Dict[Union[PrefixName, str], Joint] = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
+
+
 
     def delete_all_but_robots(self):
         self._clear()
@@ -634,7 +638,7 @@ class WorldTree:
 
     def _set_joint_limits(self, linear_limits, angular_limits, order):
         for joint_name in self.movable_joints:  # type: OneDofJoint
-            joint = self.joints[joint_name]
+            joint = self._joints[joint_name]
             joint.update_limits(linear_limits, angular_limits, order)
 
     @profile
@@ -665,7 +669,7 @@ class WorldTree:
             new_lin_limits[i] = d_linear
             new_ang_limits[i] = d_angular
         for joint_name in self.movable_joints:  # type: OneDofJoint
-            joint = self.joints[joint_name]
+            joint = self._joints[joint_name]
             joint.update_limits(new_lin_limits, new_ang_limits)
 
         new_weights = {}
@@ -690,14 +694,14 @@ class WorldTree:
 
     def overwrite_joint_weights(self, new_weights):
         for joint_name in self.movable_joints:
-            joint = self.joints[joint_name]
+            joint = self._joints[joint_name]
             if not self.is_joint_mimic(joint_name):
                 joint.update_weights(new_weights)
 
     @property
     def joint_constraints(self):
         joint_constraints = []
-        for joint_name, joint in self.joints.items():
+        for joint_name, joint in self._joints.items():
             if joint.has_free_variables():  # FIXME check name clashes
                 joint_constraints.extend(joint.free_variable_list)
         return joint_constraints
@@ -706,27 +710,27 @@ class WorldTree:
         self._raise_if_joint_exists(joint.name)
         self._raise_if_link_does_not_exist(joint.child_link_name)
         self._raise_if_link_does_not_exist(joint.parent_link_name)
-        child_link = self.links[joint.child_link_name]
-        parent_link = self.links[joint.parent_link_name]
-        self.joints[joint.name] = joint
+        child_link = self._links[joint.child_link_name]
+        parent_link = self._links[joint.parent_link_name]
+        self._joints[joint.name] = joint
         child_link.parent_joint_name = joint.name
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
 
     def _raise_if_link_does_not_exist(self, link_name: my_string):
-        if link_name not in self.links:
+        if link_name not in self._links:
             raise PhysicsWorldException(f'Link \'{link_name}\' does not exist.')
 
     def _raise_if_link_exists(self, link_name: my_string):
-        if link_name in self.links:
+        if link_name in self._links:
             raise DuplicateNameException(f'Link \'{link_name}\' does already exist.')
 
     def _raise_if_joint_does_not_exist(self, joint_name: my_string):
-        if joint_name not in self.joints:
+        if joint_name not in self._joints:
             raise PhysicsWorldException(f'Joint \'{joint_name}\' does not exist.')
 
     def _raise_if_joint_exists(self, joint_name: my_string):
-        if joint_name in self.joints:
+        if joint_name in self._joints:
             raise DuplicateNameException(f'Joint \'{joint_name}\' does already exist.')
 
     @profile
@@ -739,10 +743,10 @@ class WorldTree:
         """
         if not self.is_joint_fixed(joint_name):
             raise NotImplementedError('Can only change fixed joints')
-        joint = self.joints[joint_name]
+        joint = self._joints[joint_name]
         fk = w.Matrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
-        old_parent_link = self.links[joint.parent_link_name]
-        new_parent_link = self.links[new_parent_link_name]
+        old_parent_link = self._links[joint.parent_link_name]
+        new_parent_link = self._links[new_parent_link_name]
 
         joint.parent_link_name = new_parent_link_name
         joint.parent_T_child = fk
@@ -752,15 +756,15 @@ class WorldTree:
 
     @profile
     def update_joint_parent_T_child(self, joint_name: my_string, new_parent_T_child: expr_matrix, notify: bool = True):
-        joint = self.joints[joint_name]
+        joint = self._joints[joint_name]
         joint.parent_T_child = new_parent_T_child
         if notify:
             self.notify_model_change()
 
     def move_group(self, group_name, new_parent_link_name):
         group = self.groups[group_name]
-        joint_name = self.links[group.root_link_name].parent_joint_name
-        if self.joints[joint_name].parent_link_name == new_parent_link_name:
+        joint_name = self._links[group.root_link_name].parent_joint_name
+        if self._joints[joint_name].parent_link_name == new_parent_link_name:
             raise DuplicateNameException(
                 '\'{}\' is already attached to \'{}\''.format(group_name, new_parent_link_name))
         self.move_branch(joint_name, new_parent_link_name)
@@ -771,21 +775,21 @@ class WorldTree:
         self.delete_branch(self.groups[group_name].root_link_name)
 
     def delete_branch(self, link_name):
-        self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
+        self.delete_branch_at_joint(self._links[link_name].parent_joint_name)
 
     @profile
     def delete_branch_at_joint(self, joint_name):
-        joint = self.joints.pop(joint_name)  # type: Joint
-        self.links[joint.parent_link_name].child_joint_names.remove(joint_name)
+        joint = self._joints.pop(joint_name)  # type: Joint
+        self._links[joint.parent_link_name].child_joint_names.remove(joint_name)
 
         def helper(link_name):
-            link = self.links.pop(link_name)
+            link = self._links.pop(link_name)
             for group_name in list(self.groups.keys()):
                 if self.groups[group_name].root_link_name == link_name:
                     del self.groups[group_name]
                     logging.loginfo('Deleted group \'{}\', because it\'s root link got removed.'.format(group_name))
             for child_joint_name in link.child_joint_names:
-                child_joint = self.joints.pop(child_joint_name)  # type: Joint
+                child_joint = self._joints.pop(child_joint_name)  # type: Joint
                 helper(child_joint.child_link_name)
 
         helper(joint.child_link_name)
@@ -833,7 +837,7 @@ class WorldTree:
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name):
-        joint = self.links[link_name].parent_joint_name
+        joint = self._links[link_name].parent_joint_name
         if self.is_joint_controlled(joint):
             return joint
         return self.get_controlled_parent_joint_of_joint(joint)
@@ -844,7 +848,7 @@ class WorldTree:
 
     def search_for_parent_joint(self, joint_name, stop_when=None):
         try:
-            joint = self.links[self.joints[joint_name].parent_link_name].parent_joint_name
+            joint = self._links[self._joints[joint_name].parent_link_name].parent_joint_name
             while stop_when is not None and not stop_when(joint):
                 joint = self.search_for_parent_joint(joint)
         except KeyError as e:
@@ -858,12 +862,12 @@ class WorldTree:
         chain = []
         if links:
             chain.append(tip_link_name)
-        link = self.links[tip_link_name]
+        link = self._links[tip_link_name]
         while link.name != root_link_name:
-            if link.parent_joint_name not in self.joints:
+            if link.parent_joint_name not in self._joints:
                 raise ValueError(f'{root_link_name} and {tip_link_name} are not connected')
-            parent_joint = self.joints[link.parent_joint_name]
-            parent_link = self.links[parent_joint.parent_link_name]
+            parent_joint = self._joints[link.parent_joint_name]
+            parent_link = self._links[parent_joint.parent_link_name]
             if joints:
                 if (fixed or not isinstance(parent_joint, FixedJoint)) and \
                         (non_controlled or parent_joint.name in self.controlled_joints):
@@ -902,9 +906,9 @@ class WorldTree:
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, joints=True, links=False, fixed=True,
                                                             non_controlled=True)
         for joint_name in root_chain:
-            fk = w.dot(fk, w.inverse_frame(self.joints[joint_name].parent_T_child))
+            fk = w.dot(fk, w.inverse_frame(self._joints[joint_name].parent_T_child))
         for joint_name in tip_chain:
-            fk = w.dot(fk, self.joints[joint_name].parent_T_child)
+            fk = w.dot(fk, self._joints[joint_name].parent_T_child)
         # FIXME there is some reference fuckup going on, but i don't know where; deepcopy is just a quick fix
         return deepcopy(fk)
 
@@ -930,7 +934,7 @@ class WorldTree:
     def compute_fk_pose_with_collision_offset(self, root, tip, collision_id):
         try:
             root_T_tip = self.compute_fk_np(root, tip)
-            tip_link = self.links[tip]
+            tip_link = self._links[tip]
             root_T_tip = w.dot(root_T_tip, tip_link.collisions[collision_id].link_T_geometry)
             p = PoseStamped()
             p.header.frame_id = str(root)
@@ -950,7 +954,7 @@ class WorldTree:
             fks = []
             self.fk_idx = {}
             i = 0
-            for link in self.links.values():
+            for link in self._links.values():
                 if link.name == self.root_link_name:
                     continue
                 if link.has_collisions():
@@ -972,7 +976,7 @@ class WorldTree:
 
     def as_tf_msg(self):
         tf_msg = TFMessage()
-        for joint_name, joint in self.joints.items():
+        for joint_name, joint in self._joints.items():
             p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
             p_T_c = make_transform(parent_frame=joint.parent_link_name,
                                    child_frame=joint.child_link_name,
@@ -998,7 +1002,7 @@ class WorldTree:
 
             @profile
             def joint_call(self, joint_name: my_string) -> bool:
-                joint = self.world.joints[joint_name]
+                joint = self.world._joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = w.dot(map_T_parent, joint.parent_T_child)
                 return False
@@ -1011,7 +1015,7 @@ class WorldTree:
                 for link_name in self.world.link_names_with_collisions:
                     if link_name == self.world.root_link_name:
                         continue
-                    link = self.world.links[link_name]
+                    link = self.world._links[link_name]
                     for collision_id, geometry in enumerate(link.collisions):
                         link_name_with_id = link.name_with_collision_id(collision_id)
                         collision_fks.append(w.dot(self.fks[link_name], geometry.link_T_geometry))
@@ -1071,16 +1075,16 @@ class WorldTree:
 
     def _add_link(self, link: Link):
         self._raise_if_link_exists(link.name)
-        self.links[link.name] = link
+        self._links[link.name] = link
 
     def _delete_joint_limits(self):
         for joint_name in self.movable_joints:  # type: OneDofJoint
-            joint = self.joints[joint_name]
+            joint = self._joints[joint_name]
             joint.delete_limits()
             joint.delete_weights()
 
     def joint_limit_expr(self, joint_name, order):
-        return self.joints[joint_name].get_limit_expressions(order)
+        return self._joints[joint_name].get_limit_expressions(order)
 
     def transform_msg(self, target_frame, msg):
         if isinstance(msg, PoseStamped):
@@ -1165,10 +1169,10 @@ class WorldTree:
             pass
         for link_name in links:
             direct_children = set()
-            for child_joint_name in self.links[link_name].child_joint_names:
+            for child_joint_name in self._links[link_name].child_joint_names:
                 if self.is_joint_controlled(child_joint_name):
                     continue
-                child_link_name = self.joints[child_joint_name].child_link_name
+                child_link_name = self._joints[child_joint_name].child_link_name
                 links, joints = self.search_branch(link_name=child_link_name,
                                                    stop_at_joint_when=self.is_joint_controlled,
                                                    stop_at_link_when=None,
@@ -1181,7 +1185,7 @@ class WorldTree:
                 self.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
 
-    def get_joint_position_limits(self, joint_name):
+    def get_joint_position_limits(self, joint_name: my_string) -> Tuple[float, float]:
         """
         :return: minimum position, maximum position as float
         """
@@ -1203,18 +1207,18 @@ class WorldTree:
     def free_variables(self):
         free_variables = []
         for joint_name in self.movable_joints:
-            free_variables.extend(self.joints[joint_name].free_variable_list)
+            free_variables.extend(self._joints[joint_name].free_variable_list)
         return free_variables
 
     def dye_group(self, group_name: my_string, color: ColorRGBA):
         if group_name in self.groups:
-            for _, link in self.groups[group_name].links.items():
+            for _, link in self.groups[group_name]._links.items():
                 link.dye_collisions(color)
         else:
             raise UnknownGroupException(f'No group named {group_name}')
 
     def dye_world(self, color: ColorRGBA):
-        for link in self.links.values():
+        for link in self._links.values():
             link.dye_collisions(color)
 
     def get_all_free_variable_velocity_limits(self):
@@ -1229,10 +1233,10 @@ class WorldTree:
         return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
 
     def is_joint_prismatic(self, joint_name):
-        return isinstance(self.joints[joint_name], PrismaticJoint)
+        return isinstance(self._joints[joint_name], PrismaticJoint)
 
     def is_joint_fixed(self, joint_name):
-        return isinstance(self.joints[joint_name], FixedJoint)
+        return isinstance(self._joints[joint_name], FixedJoint)
 
     def is_joint_movable(self, joint_name):
         return not self.is_joint_fixed(joint_name)
@@ -1249,25 +1253,25 @@ class WorldTree:
             return False
 
     def is_joint_revolute(self, joint_name):
-        return isinstance(self.joints[joint_name], RevoluteJoint) and not self.is_joint_continuous(joint_name)
+        return isinstance(self._joints[joint_name], RevoluteJoint) and not self.is_joint_continuous(joint_name)
 
     def is_joint_continuous(self, joint_name):
-        return isinstance(self.joints[joint_name], ContinuousJoint)
+        return isinstance(self._joints[joint_name], ContinuousJoint)
 
     def is_joint_mimic(self, joint_name):
-        return isinstance(self.joints[joint_name], MimicJoint)
+        return isinstance(self._joints[joint_name], MimicJoint)
 
     def is_joint_rotational(self, joint_name):
         return self.is_joint_revolute(joint_name) or self.is_joint_continuous(joint_name)
 
     def has_joint(self, joint_name):
-        return joint_name in self.joints
+        return joint_name in self._joints
 
     def has_link_collisions(self, link_name) -> bool:
-        return self.links[link_name].has_collisions()
+        return self._links[link_name].has_collisions()
 
     def has_link_visuals(self, link_name):
-        return self.links[link_name].has_visuals()
+        return self._links[link_name].has_visuals()
 
 
 class SubWorldTree(WorldTree):
@@ -1288,7 +1292,7 @@ class SubWorldTree(WorldTree):
 
     @property
     def attachment_joint_name(self):
-        return self.world.links[self.root_link_name].parent_joint_name
+        return self.world._links[self.root_link_name].parent_joint_name
 
     @property
     def parent_link_of_root(self):
@@ -1314,7 +1318,7 @@ class SubWorldTree(WorldTree):
         """
         :rtype: JointStates
         """
-        return JointStates({j: self.world.state[j] for j in self.joints if j in self.world.state})
+        return JointStates({j: self.world.state[j] for j in self._joints if j in self.world.state})
 
     @state.setter
     def state(self, value):
@@ -1373,19 +1377,19 @@ class SubWorldTree(WorldTree):
 
     @property
     def root_link(self):
-        return self.world.links[self.root_link_name]
+        return self.world._links[self.root_link_name]
 
     @cached_property
-    def joints(self):
+    def _joints(self):
         def helper(root_link):
             """
             :type root_link: Link
             :rtype: dict
             """
-            joints = {j: self.world.joints[j] for j in root_link.child_joint_names}
+            joints = {j: self.world._joints[j] for j in root_link.child_joint_names}
             for j in root_link.child_joint_names:  # type: Joint
-                j = self.world.joints[j]
-                child_link = self.world.links[j.child_link_name]
+                j = self.world._joints[j]
+                child_link = self.world._links[j.child_link_name]
                 joints.update(helper(child_link))
             return joints
 
@@ -1394,15 +1398,15 @@ class SubWorldTree(WorldTree):
     @cached_property
     def groups(self):
         return {group_name: group for group_name, group in self.world.groups.items() if
-                group.root_link_name in self.links and group.name != self.name}
+                group.root_link_name in self._links and group.name != self.name}
 
     @cached_property
-    def links(self) -> Dict[my_string, Link]:
+    def _links(self) -> Dict[my_string, Link]:
         def helper(root_link: Link) -> Dict[my_string, Link]:
             links = {root_link.name: root_link}
             for j in root_link.child_joint_names:
-                j = self.world.joints[j]
-                child_link = self.world.links[j.child_link_name]
+                j = self.world._joints[j]
+                child_link = self.world._links[j.child_link_name]
                 links.update(helper(child_link))
             return links
 

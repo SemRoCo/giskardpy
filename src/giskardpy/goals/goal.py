@@ -88,7 +88,7 @@ class Goal:
         """
         if not self.world.has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        return self.world.joints[joint_name].position_expression
+        return self.world._joints[joint_name].position_expression
 
     def get_joint_velocity_symbols(self, joint_name):
         """
@@ -145,14 +145,14 @@ class Goal:
     def joint_position_symbols(self):
         position_symbols = []
         for joint in self.world.controlled_joints:
-            position_symbols.extend(self.world.joints[joint].free_variable_list)
+            position_symbols.extend(self.world._joints[joint].free_variable_list)
         return [x.get_symbol(0) for x in position_symbols]
 
     @property
     def joint_velocity_symbols(self):
         position_symbols = []
         for joint in self.world.controlled_joints:
-            position_symbols.extend(self.world.joints[joint].free_variable_list)
+            position_symbols.extend(self.world._joints[joint].free_variable_list)
         return [x.get_symbol(1) for x in position_symbols]
 
     def get_fk_velocity(self, root, tip):

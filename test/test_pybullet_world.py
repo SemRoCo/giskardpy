@@ -171,9 +171,9 @@ class TestPyBulletSyncer(object):
             if o.position_name in entry:
                 contains_box |= True
                 if o.position_name == entry[0]:
-                    assert entry[1] not in pr2_world.world.groups['r_hand'].links
+                    assert entry[1] not in pr2_world.world.groups['r_hand']._links
                 if o.position_name == entry[1]:
-                    assert entry[0] not in pr2_world.world.groups['r_hand'].links
+                    assert entry[0] not in pr2_world.world.groups['r_hand']._links
         assert contains_box
         pr2_world.world.delete_branch(o.position_name)
         pr2_world.init_collision_matrix(RobotName)

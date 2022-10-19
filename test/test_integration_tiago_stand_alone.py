@@ -1132,7 +1132,7 @@ class TestJointGoals:
         zero_pose.set_joint_goal(js, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        lower_limit, upper_limit = zero_pose.world.joints['arm_right_5_joint'].get_limit_expressions(0)
+        lower_limit, upper_limit = zero_pose.world._joints['arm_right_5_joint'].get_limit_expressions(0)
         assert lower_limit < zero_pose.world.state['arm_right_5_joint'].position < upper_limit
 
     def test_out_of_joint_soft_limits6(self, zero_pose: TiagoTestWrapper):

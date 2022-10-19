@@ -21,7 +21,7 @@ class BaseTrajFollower(Goal):
         super().__init__(**kwargs)
         self.weight = weight
         self.joint_name = joint_name
-        self.joint: OmniDrive = self.world.joints[joint_name]
+        self.joint: OmniDrive = self.world._joints[joint_name]
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
         self.track_only_velocity = track_only_velocity

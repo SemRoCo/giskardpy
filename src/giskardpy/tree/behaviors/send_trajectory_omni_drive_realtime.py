@@ -48,7 +48,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             rospy.sleep(1)
 
         if joint_name is None:
-            for joint in self.world.joints.values():
+            for joint in self.world._joints.values():
                 if isinstance(joint, (OmniDrive, DiffDrive)):
                     # FIXME can only handle one drive
                     # self.controlled_joints = [joint]
@@ -57,7 +57,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
                 #TODO
                 pass
         else:
-            self.joint = self.world.joints[joint_name]
+            self.joint = self.world._joints[joint_name]
         self.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 

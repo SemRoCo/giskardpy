@@ -101,7 +101,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{state_topic}\' has no joints')
 
-        for joint in self.world.joints.values():
+        for joint in self.world._joints.values():
             if isinstance(joint, OneDofJoint) and not isinstance(joint, MimicJoint):
                 if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)

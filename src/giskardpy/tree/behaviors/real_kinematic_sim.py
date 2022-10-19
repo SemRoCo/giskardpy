@@ -21,7 +21,7 @@ class RealKinSimPlugin(GiskardBehavior):
             return Status.RUNNING
         # if self.last_time is None:
         next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
-        joints = self.world.joints
+        joints = self.world._joints
         # next_time = rospy.get_rostime()
         dt = next_time - self.last_time
         # print(f'dt: {dt}')

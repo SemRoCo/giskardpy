@@ -268,7 +268,7 @@ class WorldUpdater(GiskardBehavior):
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
-        pose = self.world.transform_pose(self.world.joints[joint_name].parent_link_name, req.pose).pose
+        pose = self.world.transform_pose(self.world._joints[joint_name].parent_link_name, req.pose).pose
         pose = w.Matrix(msg_to_homogeneous_matrix(pose))
         self.world.update_joint_parent_T_child(joint_name, pose)
         # self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))

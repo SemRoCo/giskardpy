@@ -88,7 +88,7 @@ class ExternalCollisionAvoidance(Goal):
 
         soft_threshold = 0
         actual_link_b_hash = self.get_link_b_hash()
-        parent_joint = self.world.links[self.link_name].parent_joint_name
+        parent_joint = self.world._links[self.link_name].parent_joint_name
         direct_children = self.world.get_directly_controlled_child_links_with_collisions(parent_joint)
         for k, v in self.soft_thresholds.items():
             if k[0] in direct_children:
@@ -270,8 +270,8 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        self.add_collision_check(self.world.links[tip_link].name,
-                                 self.world.links[object_link_name].name,
+        self.add_collision_check(self.world._links[tip_link].name,
+                                 self.world._links[object_link_name].name,
                                  spring_threshold)
 
         self.avoidance_hint = tf.transform_vector(self.root_link, avoidance_hint)

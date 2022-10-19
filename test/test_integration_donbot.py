@@ -93,7 +93,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         self.camera_tip = 'camera_link'
         self.gripper_tip = 'gripper_tool_frame'
         # self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
-        self.mujoco_reset = rospy.ServiceProxy('donbot/reset', Trigger)
+        # self.mujoco_reset = rospy.ServiceProxy('donbot/reset', Trigger)
         super().__init__(Donbot)
 
     def move_base(self, goal_pose):
@@ -132,7 +132,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         np.testing.assert_almost_equal(self.world.state[gripper_joint].position, width, decimal=3)
 
     def reset(self):
-        self.mujoco_reset()
+        # self.mujoco_reset()
         self.clear_world()
         self.reset_base()
         self.open_gripper()
@@ -358,9 +358,12 @@ class TestCartGoals(object):
         p.header.frame_id = 'camera_link'
         p.pose.position = Point(0, 1, 0)
         p.pose.orientation.w = 1
-        zero_pose.allow_self_collision()
-        zero_pose.set_translation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_BELOW_CA)
-        zero_pose.set_rotation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_ABOVE_CA)
+        # zero_pose.allow_self_collision()
+        zero_pose.set_straight_cart_goal(goal_pose=p,
+                                         tip_link=zero_pose.camera_tip,
+                                         root_link='ur5_shoulder_link')
+        # zero_pose.set_translation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_BELOW_CA)
+        # zero_pose.set_rotation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_ABOVE_CA)
         zero_pose.plan_and_execute()
 
     def test_endless_wiggling1(self, zero_pose):

@@ -261,7 +261,7 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
         self.link_b = object_link_name
         self.link_b_hash = object_link_name.__hash__()
         if root_link is None:
-            self.root_link = self.robot.root_link_name
+            self.root_link = self.world.root_link_name
         else:
             self.root_link = root_link
 
@@ -293,11 +293,11 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
                                                                   'link_b_hash'])
 
     def make_constraints(self):
-        weight = w.ros_msg_to_matrix(self.weight)
+        weight = self.weight
         actual_distance = self.get_actual_distance()
-        max_velocity = w.ros_msg_to_matrix(self.max_velocity)
-        max_threshold = w.ros_msg_to_matrix(self.threshold)
-        spring_threshold = w.ros_msg_to_matrix(self.threshold2)
+        max_velocity = self.max_velocity
+        max_threshold = self.threshold
+        spring_threshold = self.threshold2
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.max(actual_distance, 0)
 
@@ -320,7 +320,6 @@ class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_test
         root_P_a = w.position_of(root_T_a)
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
-        # FIXME really?
         # self.add_debug_expr('dist', actual_distance)
         self.add_constraint(name_suffix='avoidance_hint',
                             reference_velocity=max_velocity,

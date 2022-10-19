@@ -28,6 +28,8 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier, RobotPrefix
+from giskardpy.configs.boxy import Boxy
+from giskardpy.configs.data_types import CollisionAvoidanceConfig, GeneralConfig
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException
@@ -256,6 +258,9 @@ class GiskardTestWrapper(GiskardWrapper):
         # rospy.sleep(1)
         self.original_number_of_links = len(self.world.links)
 
+    def is_standalone(self):
+        return self.general_config.control_mode == self.general_config.control_mode.stand_alone
+
     def set_seed_odometry(self, group_name, base_pose):
         self.set_json_goal('SetOdometry',
                            group_name=group_name,
@@ -343,7 +348,12 @@ class GiskardTestWrapper(GiskardWrapper):
                 np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
 
     def set_kitchen_js(self, joint_state, object_name='kitchen'):
-        self.set_object_joint_state(object_name, joint_state)
+        if self.is_standalone():
+            self.set_seed_configuration(joint_state)
+            self.allow_all_collisions()
+            self.plan_and_execute()
+        else:
+            self.set_object_joint_state(object_name, joint_state)
 
     def set_apartment_js(self, joint_state, object_name='apartment'):
         self.set_object_joint_state(object_name, joint_state)
@@ -413,6 +423,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                  decimal=decimal))
 
     def teleport_base(self, goal_pose):
+        raise Exception()
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,
@@ -919,8 +930,8 @@ class GiskardTestWrapper(GiskardWrapper):
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
-                 js_topic: str = '',
-                 set_js_topic: Optional[str] = None,
+                 js_topic: Optional[str] = '',
+                 set_js_topic: Optional[str] = '',
                  timeout: float = TimeOut,
                  expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
         response = super().add_urdf(name=name,
@@ -963,6 +974,14 @@ class GiskardTestWrapper(GiskardWrapper):
                                          parent_link_group=parent_link_group,
                                          expected_error_code=expected_response)
         return r
+
+    @property
+    def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
+        return self.god_map.unsafe_get_data(identifier.collision_avoidance_config)
+
+    @property
+    def general_config(self) -> GeneralConfig:
+        return self.god_map.unsafe_get_data(identifier.general_options)
 
     def get_external_collisions(self, link, distance_threshold):
         """
@@ -1594,7 +1613,7 @@ class BaseBot(GiskardTestWrapper):
         # self.plan_and_execute()
 
 
-class Boxy(GiskardTestWrapper):
+class BoxyTestWrapper(GiskardTestWrapper):
     default_pose = {
         'neck_shoulder_pan_joint': 0.0,
         'neck_shoulder_lift_joint': 0.0,
@@ -1649,10 +1668,7 @@ class Boxy(GiskardTestWrapper):
         self.l_tip = 'left_gripper_tool_frame'
         self.robot_name = 'boxy'
         self.r_gripper_group = 'r_gripper'
-        if config is None:
-            super(Boxy, self).__init__('package://giskardpy/config/boxy_sim.yaml', [self.robot_name], [''])
-        else:
-            super(Boxy, self).__init__(config)
+        super().__init__(Boxy)
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -1672,7 +1688,7 @@ class Boxy(GiskardTestWrapper):
         self.register_group(self.r_gripper_group, self.get_robot_name(), 'right_arm_7_link')
 
 
-class BoxyCloseLoop(Boxy):
+class BoxyCloseLoop(BoxyTestWrapper):
 
     def __init__(self, config=None):
         super().__init__('package://giskardpy/config/boxy_closed_loop.yaml')

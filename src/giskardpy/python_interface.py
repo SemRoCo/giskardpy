@@ -50,7 +50,14 @@ class GiskardWrapper:
         self._object_js_topics = {}
         rospy.sleep(.3)
 
-    def register_group(self, group_name: str, parent_group_name: str, root_link_name: str):
+    def register_group(self, group_name: str, parent_group_name: str, root_link_name: str) -> RegisterGroupResponse:
+        """
+        Register a new group for reference in collision checking. All child links of root_link_name will belong to it.
+        :param group_name: Name of the new group.
+        :param parent_group_name: Name of the group root_link_name belongs to
+        :param root_link_name: root link of the new group
+        :return: RegisterGroupResponse
+        """
         req = RegisterGroupRequest()
         req.group_name = group_name
         req.parent_group_name = parent_group_name
@@ -60,6 +67,7 @@ class GiskardWrapper:
             raise DuplicateNameException(f'Group with name {group_name} already exists.')
         if res.error_codes == res.BUSY:
             raise ServiceException('Giskard is busy and can\'t process service call.')
+        return res
 
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
@@ -745,8 +753,8 @@ class GiskardWrapper:
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
-                 js_topic: str = '',
-                 set_js_topic: Optional[str] = None,
+                 js_topic: Optional[str] = '',
+                 set_js_topic: Optional[str] = '',
                  timeout: float = 0) -> UpdateWorldResponse:
         """
         Adds a urdf to the world
@@ -757,12 +765,13 @@ class GiskardWrapper:
                                 If None, set_js_topic == js_topic
         :return: UpdateWorldResponse
         """
-        if set_js_topic is None:
+        js_topic = str(js_topic)
+        if set_js_topic == '':
             set_js_topic = js_topic
         urdf_body = WorldBody()
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = str(urdf)
-        urdf_body.joint_state_topic = str(js_topic)
+        urdf_body.joint_state_topic = js_topic
         req = UpdateWorldRequest()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
@@ -771,7 +780,7 @@ class GiskardWrapper:
         req.pose = pose
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
-        if js_topic:
+        if set_js_topic:
             # FIXME publisher has to be removed, when object gets deleted
             # FIXME there could be sync error, if objects get added/removed by something else
             self._object_js_topics[name] = rospy.Publisher(set_js_topic, JointState, queue_size=10)
@@ -815,6 +824,13 @@ class GiskardWrapper:
         return self.get_group_info(name).controlled_joints
 
     def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 0) -> UpdateWorldResponse:
+        """
+        Overwrites the pose specified in the joint that connects the two groups.
+        :param group_name: Name of the group that will move
+        :param new_pose: New pose of the group
+        :param timeout: How long to wait if Giskard is busy
+        :return: Giskard's reply
+        """
         req = UpdateWorldRequest()
         req.operation = req.UPDATE_POSE
         req.group_name = group_name

@@ -13,13 +13,12 @@ from sortedcontainers import SortedList
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib
-from giskardpy.configs.hardware_interface_config import HardwareConfig
+from giskardpy.configs.data_types import CollisionCheckerLib, HardwareConfig
 from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
-from giskardpy.tree.behaviors.cleanup import CleanUp
+from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.collision_marker import CollisionMarker
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
@@ -46,6 +45,8 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
+from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
+from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
@@ -262,6 +263,7 @@ class TreeManager:
         else:
             self.tree = tree
         self.tree_nodes = {}
+        self.god_map.get_data(identifier.world).reset_cache()
         self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
@@ -390,7 +392,7 @@ class TreeManager:
         return self.tree_nodes[node_name].node
 
     def render(self, profile=None):
-        path = self.god_map.get_data(identifier.data_folder) + 'tree'
+        path = self.god_map.get_data(identifier.tmp_folder) + 'tree'
         create_path(path)
         render_dot_tree(self.tree.root, name=path, profile=profile)
 
@@ -539,7 +541,7 @@ class StandAlone(TreeManager):
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
-        root.add_child(CleanUp('cleanup'))
+        root.add_child(CleanUpPlanning('CleanUpPlanning'))
         root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
@@ -672,7 +674,7 @@ class OpenLoop(StandAlone):
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
-        root.add_child(CleanUp('cleanup'))
+        root.add_child(CleanUpPlanning('CleanUpPlanning'))
         root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(self.grow_execution())
@@ -688,8 +690,8 @@ class OpenLoop(StandAlone):
         for group_name, joint_state_topic in hardware_config.joint_state_topics:
             sync.add_child(running_is_success(SyncConfiguration)(group_name=group_name,
                                                                  joint_state_topic=joint_state_topic))
-        for odometry_topic, joint in hardware_config.odometry_topics:
-            sync.add_child(running_is_success(SyncOdometry)(odometry_topic=odometry_topic, joint=joint))
+        for odometry_kwargs in hardware_config.odometry_node_kwargs:
+            sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
         if self.god_map.get_data(identifier.TFPublisher_enabled):
             sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
@@ -700,7 +702,7 @@ class OpenLoop(StandAlone):
         execution = failure_is_success(Sequence)('execution')
         execution.add_child(IF('execute?', identifier.execute))
         if self.add_real_time_tracking:
-            execution.add_child(CleanUp('cleanup'))
+            execution.add_child(CleanUpBaseController('CleanUpBaseController'))
             execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
             execution.add_child(InitQPController('InitQPController for base'))
         execution.add_child(SetTrackingStartTime('start start time'))
@@ -727,22 +729,23 @@ class OpenLoop(StandAlone):
 
     @property
     def add_real_time_tracking(self):
-        return len(self.config.hardware_config.drive_interfaces) > 0
+        drive_interfaces = self.config.hardware_config.send_trajectory_to_cmd_vel_kwargs
+        return len(drive_interfaces) > 0
 
     def grow_move_robots(self):
         execution_action_server = Parallel('move robots',
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for follow_joint_trajectory_config in hardware_config.follow_joint_trajectory_interfaces:
-            execution_action_server.add_child(follow_joint_trajectory_config.make_plugin())
+        for follow_joint_trajectory_config in hardware_config.follow_joint_trajectory_interfaces_kwargs:
+            execution_action_server.add_child(SendFollowJointTrajectory(**follow_joint_trajectory_config))
         if self.add_real_time_tracking:
-            for drive_interface in hardware_config.drive_interfaces:
+            for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
                 real_time_tracking = AsyncBehavior('base sequence')
                 real_time_tracking.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                               **self.god_map.unsafe_get_data(
                                                                                   identifier.SyncTfFrames)))
-                for odometry_topic, joint in hardware_config.odometry_topics:
-                    real_time_tracking.add_child(SyncOdometry(odometry_topic, joint=joint))
+                for odometry_kwargs in hardware_config.odometry_node_kwargs:
+                    real_time_tracking.add_child(SyncOdometry(**odometry_kwargs))
                 real_time_tracking.add_child(RosTime('time'))
                 real_time_tracking.add_child(ControllerPluginBase('base controller'))
                 real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
@@ -750,8 +753,7 @@ class OpenLoop(StandAlone):
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                                          **self.god_map.unsafe_get_data(
                                                                              identifier.PublishDebugExpressions)))
-                real_time_tracking.add_child(drive_interface.make_plugin())
-
+                real_time_tracking.add_child(SendTrajectoryToCmdVel(**drive_interface))
                 execution_action_server.add_child(real_time_tracking)
         return execution_action_server
 

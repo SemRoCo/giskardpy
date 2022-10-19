@@ -8,7 +8,7 @@ from giskardpy.my_types import my_string, expr_symbol
 
 
 class BaseTrajFollower(Goal):
-    def __init__(self, joint_name: my_string, weight: float = WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, joint_name: my_string, track_only_velocity: bool = False, weight: float = WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link.
         :param root_link: root link of kinematic chain
@@ -24,6 +24,7 @@ class BaseTrajFollower(Goal):
         self.joint: OmniDrive = self.world.joints[joint_name]
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
+        self.track_only_velocity = track_only_velocity
         # self.control_horizon = 1
 
     def x_symbol(self, t: int, free_variable_name: str, derivative: int = 0) -> expr_symbol:
@@ -48,7 +49,7 @@ class BaseTrajFollower(Goal):
             y = self.current_traj_point(self.joint.y_name, t, derivative)
         else:
             y = 0
-        rot = self.current_traj_point(self.joint.rot_name, t, derivative)
+        rot = self.current_traj_point(self.joint.yaw_name, t, derivative)
         odom_T_base_footprint_goal = w.frame_from_x_y_rot(x, y, rot)
         # self.add_debug_expr('x goal in odom', x)
         return odom_T_base_footprint_goal
@@ -67,7 +68,7 @@ class BaseTrajFollower(Goal):
 
         frame_P_goal = w.position_of(map_T_base_footprint_goal)
         frame_P_current = w.position_of(map_T_base_footprint_current)
-        error = frame_P_goal[:3] - frame_P_current[:3]
+        error = (frame_P_goal[:3] - frame_P_current[:3])/self.sample_period
         # error /= self.get_sampling_period_symbol()
         # self.add_debug_expr('error x', error[0])
         # self.add_debug_expr('error y', error[1])
@@ -104,7 +105,7 @@ class BaseTrajFollower(Goal):
                 y = 0
             base_footprint_P_vel = w.vector3(x, y, 0)
             map_P_vel = w.dot(map_T_base_footprint, base_footprint_P_vel)
-            if t == 0:
+            if t == 0 and not self.track_only_velocity:
                 actual_error_x, actual_error_y = self.trans_error_at(0)
                 errors_x.append(map_P_vel[0] + actual_error_x)
                 errors_y.append(map_P_vel[1] + actual_error_y)
@@ -186,8 +187,8 @@ class BaseTrajFollower(Goal):
         # _, rotation_goal = w.axis_angle_from_matrix(map_T_base_footprint_goal)
         # axis_current, rotation_current = w.axis_angle_from_matrix(map_T_base_footprint_current)
 
-        rotation_goal = self.current_traj_point(self.joint.rot_name, t)
-        rotation_current = self.joint.rot.get_symbol(0)
+        rotation_goal = self.current_traj_point(self.joint.yaw_name, t)
+        rotation_current = self.joint.yaw.get_symbol(0)
         error = w.shortest_angular_distance(rotation_current, rotation_goal) / self.sample_period
         # self.add_debug_expr('rot goal', rotation_goal)
         # self.add_debug_expr('rot current', rotation_current)
@@ -196,13 +197,13 @@ class BaseTrajFollower(Goal):
     def add_rot_constraints(self):
         errors = []
         for t in range(self.prediction_horizon):
-            errors.append(self.current_traj_point(self.joint.rot_name, t * self.sample_period, 1))
-            if t == 0:
+            errors.append(self.current_traj_point(self.joint.yaw_name, t * self.sample_period, 1))
+            if t == 0 and not self.track_only_velocity:
                 errors[-1] += self.rot_error_at(t)
         self.add_velocity_constraint(lower_velocity_limit=errors,
                                      upper_velocity_limit=errors,
                                      weight=WEIGHT_BELOW_CA,
-                                     expression=self.joint.rot_vel.get_symbol(0),
+                                     expression=self.joint.yaw_vel.get_symbol(0),
                                      velocity_limit=0.5,
                                      name_suffix='/rot')
         # self.add_constraint(reference_velocity=0.5,

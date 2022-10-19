@@ -4,8 +4,6 @@ import traceback
 from collections import OrderedDict
 from typing import Optional, Tuple, Dict, List, Union
 
-from tf2_py import LookupException
-
 from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
@@ -24,6 +22,9 @@ WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
 WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
+
+class NonMotionGoal:
+    pass
 
 class Goal:
     def __init__(self, god_map: GodMap, control_horizon: int = None, **kwargs):

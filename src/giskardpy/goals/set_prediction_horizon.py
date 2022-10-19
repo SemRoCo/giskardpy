@@ -36,3 +36,9 @@ class SetMaxTrajLength(Goal):
     def __init__(self, new_length: int, **kwargs):
         super().__init__(**kwargs)
         self.god_map.set_data(identifier.MaxTrajectoryLength + ['length'], new_length)
+
+
+class EnableVelocityTrajectoryTracking(Goal):
+    def __init__(self, enabled: bool = True, **kwargs):
+        super().__init__(**kwargs)
+        self.god_map.set_data(identifier.fill_trajectory_velocity_values, enabled)

@@ -1,7 +1,7 @@
 import abc
 from abc import ABC
 from threading import Thread
-from typing import List
+from typing import List, Optional
 
 import rospy
 import rostopic
@@ -19,16 +19,20 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
+import numpy as np
 
 
 class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     supported_state_types = [Twist]
 
     @profile
-    def __init__(self, name, cmd_vel_topic, goal_time_tolerance=1, **kwargs):
-        super().__init__(name)
+    def __init__(self, cmd_vel_topic, goal_time_tolerance=1, track_only_velocity: bool = False,
+                 joint_name: Optional[str] = None):
         self.cmd_vel_topic = cmd_vel_topic
+        super().__init__(str(self))
+        self.threshold = np.array([0.02, 0.02, 0.02])
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
+        self.track_only_velocity = track_only_velocity
 
         loginfo(f'Waiting for cmd_vel topic \'{self.cmd_vel_topic}\' to appear.')
         try:
@@ -43,13 +47,22 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             logging.logwarn(f'Couldn\'t connect to {self.cmd_vel_topic}. Is it running?')
             rospy.sleep(1)
 
-        for joint in self.world.joints.values():
-            if isinstance(joint, (OmniDrive, DiffDrive)):
-                # FIXME can only handle one drive
-                # self.controlled_joints = [joint]
-                self.joint = joint
-        # self.world.register_controlled_joints([j.name for j in self.controlled_joints])
+        if joint_name is None:
+            for joint in self.world.joints.values():
+                if isinstance(joint, (OmniDrive, DiffDrive)):
+                    # FIXME can only handle one drive
+                    # self.controlled_joints = [joint]
+                    self.joint = joint
+            if not hasattr(self, 'joint'):
+                #TODO
+                pass
+        else:
+            self.joint = self.world.joints[joint_name]
+        self.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
+
+    def __str__(self):
+        return f'{super().__str__()} ({self.cmd_vel_topic})'
 
     @catch_and_raise_to_blackboard
     @profile
@@ -75,21 +88,30 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         self.god_map.set_data(identifier.drive_goals, drive_goals)
 
     def get_drive_goals(self) -> List[Goal]:
-        return [SetPredictionHorizon(god_map=self.god_map, prediction_horizon=13),
-                BaseTrajFollower(god_map=self.god_map, joint_name=self.joint.name)]
+        return [SetPredictionHorizon(god_map=self.god_map,
+                                     prediction_horizon=self.god_map.get_data(identifier.prediction_horizon)+4),
+                BaseTrajFollower(god_map=self.god_map,
+                                 joint_name=self.joint.name,
+                                 track_only_velocity=self.track_only_velocity)]
 
     def solver_cmd_to_twist(self, cmd) -> Twist:
         twist = Twist()
         try:
             twist.linear.x = cmd[0][self.joint.x_vel.position_name]
+            if abs(twist.linear.x) < self.threshold[0]:
+                twist.linear.x = 0
         except:
             twist.linear.x = 0
         try:
             twist.linear.y = cmd[0][self.joint.y_vel.position_name]
+            if abs(twist.linear.y) < self.threshold[1]:
+                twist.linear.y = 0
         except:
             twist.linear.y = 0
         try:
-            twist.angular.z = cmd[0][self.joint.rot_vel.position_name]
+            twist.angular.z = cmd[0][self.joint.yaw_vel.position_name]
+            if abs(twist.angular.z) < self.threshold[2]:
+                twist.angular.z = 0
         except:
             twist.angular.z = 0
         return twist
@@ -111,5 +133,4 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
 
     def terminate(self, new_status):
         self.vel_pub.publish(Twist())
-        logging.logwarn(f'Sending 0 velocity to {self.cmd_vel_topic}')
         super().terminate(new_status)

@@ -185,13 +185,14 @@ class IMServer(object):
                 p.header.frame_id = feedback.header.frame_id
                 p.pose = feedback.pose
                 # self.giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-                self.giskard.set_cart_goal(root_link=self.root_link,
+                self.giskard.set_straight_cart_goal(root_link=self.root_link,
                                            tip_link=self.tip_link,
                                            goal_pose=p)
 
                 if not self.enable_self_collision:
                     self.giskard.allow_self_collision()
                 self.giskard.plan_and_execute(wait=False)
+                # self.giskard.plan(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)
                 self.i_server.setPose(self.marker_name, Pose())
             self.i_server.applyChanges()

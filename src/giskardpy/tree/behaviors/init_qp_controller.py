@@ -6,8 +6,9 @@ from py_trees import Status
 
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
-from giskardpy.exceptions import GiskardException
-from giskardpy.goals.goal import Goal
+from giskardpy.exceptions import GiskardException, EmptyProblemException
+from giskardpy.goals.goal import Goal, NonMotionGoal
+from giskardpy.goals.joint_goals import SetSeedConfiguration, SetOdometry
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
@@ -64,6 +65,6 @@ class InitQPController(GiskardBehavior):
         free_variables = list(sorted([v for v in self.world.joint_constraints if v.position_name in symbols],
                                      key=lambda x: x.position_name))
         if len(free_variables) == 0:
-            raise GiskardException('Goal parsing resulted in no free variables.')
+            raise EmptyProblemException('Goal parsing resulted in no free variables.')
         self.get_god_map().set_data(identifier.free_variables, free_variables)
         return free_variables

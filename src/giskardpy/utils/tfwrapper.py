@@ -63,7 +63,7 @@ def get_full_frame_names(frame_name):
 
     :rtype: str
     """
-    global tfBuffer
+    tfBuffer = get_tf_buffer()
     ret = list()
     tf_frames = tfBuffer._getFrameStrings()
     for tf_frame in tf_frames:
@@ -78,7 +78,7 @@ def get_full_frame_names(frame_name):
     return ret
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
-    global tfBuller
+    tfBuffer = get_tf_buffer()
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
@@ -116,13 +116,23 @@ def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
         raise InvalidArgumentException('source frame can not be empty')
     if time is None:
         time = rospy.Time()
-    global tfBuffer
-    if tfBuffer is None:
-        init()
+    tfBuffer = get_tf_buffer()
     return tfBuffer.lookup_transform(str(target_frame),
                                      str(source_frame),  # source frame
                                      time,
                                      rospy.Duration(timeout))
+
+
+def make_transform(parent_frame, child_frame, pose):
+    tf = TransformStamped()
+    tf.header.frame_id = str(parent_frame)
+    tf.header.stamp = rospy.get_rostime()
+    tf.child_frame_id = str(child_frame)
+    tf.transform.translation.x = pose.position.x
+    tf.transform.translation.y = pose.position.y
+    tf.transform.translation.z = pose.position.z
+    tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
+    return tf
 
 
 def transform_vector(target_frame, vector, timeout=5):

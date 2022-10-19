@@ -3,7 +3,19 @@ from enum import Enum
 from typing import Optional, List, Tuple, Dict, Union
 
 from giskardpy.model.utils import robot_name_from_urdf_string
+from std_msgs.msg import ColorRGBA
+
+from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
+
+
+class TfPublishingModes(Enum):
+    nothing = 0
+    all = 1
+    attached_objects = 2
+
+    world_objects = 4
+    attached_and_world_objects = 6
 
 
 class CollisionCheckerLib(Enum):
@@ -28,7 +40,7 @@ class GeneralConfig:
     def __init__(self):
         self.control_mode: ControlModes = ControlModes.open_loop
         self.action_server_name: str = '~command'
-        self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/data/')
+        self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
         self.test_mode: bool = False
         self.debug: bool = False
         self.joint_limits: Dict[str, Dict[str, float]] = {
@@ -36,6 +48,7 @@ class GeneralConfig:
             'acceleration': defaultdict(lambda: 1e3),
             'jerk': defaultdict(lambda: 30)
         }
+        self.default_link_color = ColorRGBA(1, 1, 1, 0.5)
 
 
 class QPSolverConfig:
@@ -61,6 +74,14 @@ class QPSolverConfig:
             }
         else:
             self.joint_weights = joint_weights
+
+
+class HardwareConfig:
+    def __init__(self):
+        self.send_trajectory_to_cmd_vel_kwargs: List[dict] = []
+        self.follow_joint_trajectory_interfaces_kwargs: List[dict] = []
+        self.joint_state_topics: List[str] = []
+        self.odometry_node_kwargs: List[dict] = []
 
 
 class CollisionAvoidanceConfig:
@@ -94,8 +115,10 @@ class CollisionAvoidanceConfig:
         self.fixed_joints_for_self_collision_avoidance = []
         self.fixed_joints_for_external_collision_avoidance = []
 
-        self.external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
-        self.self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
+        self.external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(
+            self.CollisionAvoidanceEntry)
+        self.self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(
+            self.CollisionAvoidanceEntry)
 
     def cal_max_param(self, parameter_name):
         external_distances = self.external_collision_avoidance
@@ -150,6 +173,7 @@ class CollisionAvoidanceConfig:
                 reason = child.attrib['reason']
                 if reason in ['Never', 'Adjacent']:
                     self.ignore_self_collisions_of_pair(link1, link2)
+        logging.loginfo(f'loaded {path_to_srdf} for self collision avoidance matrix')
 
     def add_self_collision(self, link_name1, link_name2):
         self.add_self_collisions.append((link_name1, link_name2))
@@ -258,16 +282,15 @@ class BehaviorTreeConfig:
         },
         'TFPublisher': {
             'enabled': True,
-            'publish_attached_objects': True,
-            'publish_world_objects': False,
+            'mode': TfPublishingModes.attached_objects,
             'tf_topic': '/tf',
         },
         'MaxTrajectoryLength': {
             'enabled': True,
-            'length': 60 # seconds
+            'length': 60  # seconds
         },
         'LoopDetector': {
-            'precision': 3
+            'precision': 4
         },
         'SyncTfFrames': {
             'frames': [],

@@ -25,6 +25,8 @@ class SyncConfiguration(GiskardBehavior):
         :type js_identifier: str
         """
         self.joint_state_topic = joint_state_topic
+        if not self.joint_state_topic.startswith('/'):
+            self.joint_state_topic = '/' + self.joint_state_topic
         super().__init__(str(self))
         self.mjs: Optional[JointStates] = None
         self.group_name = group_name
@@ -38,7 +40,7 @@ class SyncConfiguration(GiskardBehavior):
                 msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
                 self.lock.put(msg)
             except ROSException as e:
-                logging.logwarn(f'Waiting for topic \'/{self.joint_state_topic}\' to appear.')
+                logging.logwarn(f'Waiting for topic \'{self.joint_state_topic}\' to appear.')
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
         return super().setup(timeout)
 

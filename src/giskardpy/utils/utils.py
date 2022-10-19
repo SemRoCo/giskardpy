@@ -30,6 +30,7 @@ from rospy_message_converter.message_converter import \
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
+from giskardpy import identifier
 from giskardpy.utils import logging
 
 
@@ -389,7 +390,8 @@ def write_to_tmp(file_name: str, file_str: str) -> str:
 
 
 def to_tmp_path(file_name: str) -> str:
-    return f'/tmp/giskardpy/{file_name}'
+    path = blackboard_god_map().get_data(identifier.tmp_folder)
+    return resolve_ros_iris(f'{path}{file_name}')
 
 
 def load_from_tmp(file_name: str):
@@ -398,18 +400,6 @@ def load_from_tmp(file_name: str):
     with open(new_path, 'r') as f:
         loaded_file = f.read()
     return loaded_file
-
-
-def convert_to_stl_and_save_in_tmp(file_name: str):
-    resolved_old_path = resolve_ros_iris(file_name)
-    short_file_name = file_name.split('/')[-1][:-3]
-    tmp_path = f'/tmp/giskardpy/{short_file_name}stl'
-    if not os.path.exists(tmp_path):
-        logging.loginfo(f'Converting {file_name} to stl and saving in {tmp_path}.')
-        subprocess.check_output(['ctmconv', resolved_old_path, tmp_path])
-    else:
-        logging.loginfo(f'Found converted file in {tmp_path}.')
-    return tmp_path
 
 
 def fix_obj(file_name):
@@ -431,10 +421,15 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
+def blackboard_god_map():
+    return Blackboard().god_map
+
+
 def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
+    first_group_name = list(blackboard_god_map().get_data(identifier.world).groups.keys())[0]
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
-    decomposed_obj_file_name = f'{short_file_name}obj'
+    decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
     new_path = to_tmp_path(decomposed_obj_file_name)
     if not os.path.exists(new_path):
         mesh = trimesh.load(resolved_old_path, force='mesh')

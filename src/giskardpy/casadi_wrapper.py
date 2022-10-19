@@ -41,6 +41,8 @@ def Symbol(data):
 
 
 def jacobian(expressions, symbols, order=1):
+    if isinstance(expressions, list):
+        expressions = Matrix(expressions)
     if order == 1:
         return ca.jacobian(expressions, Matrix(symbols))
     elif order == 2:

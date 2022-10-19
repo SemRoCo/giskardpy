@@ -1,7 +1,7 @@
 <launch>
 
-  <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen" >
-    <param name="config" value="$(find giskardpy)/config/boxy.yaml" />
+  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen" >
+    <param name="config" value="Boxy" />
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

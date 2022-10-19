@@ -9,12 +9,12 @@ from sensor_msgs.msg import JointState
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
+from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OmniDrive, DiffDrive
 
 
-class SetSeedConfiguration(Goal):
+class SetSeedConfiguration(Goal, NonMotionGoal):
     # FIXME deal with prefix
     def __init__(self, seed_configuration: Dict[str, float], **kwargs):
         super().__init__(**kwargs)
@@ -28,7 +28,7 @@ class SetSeedConfiguration(Goal):
         self.world.notify_state_change()
 
 
-class SetOdometry(Goal):
+class SetOdometry(Goal, NonMotionGoal):
     def __init__(self, group_name: str, base_pose: PoseStamped, **kwargs):
         super().__init__(**kwargs)
         if self.god_map.get_data(identifier.execute) \
@@ -47,7 +47,8 @@ class SetOdometry(Goal):
                                                   base_pose.orientation.w])
         if axis[-1] < 0:
             angle = -angle
-        self.world.state[brumbrum_joint.rot_name].position = angle
+        self.world.state[brumbrum_joint.yaw_name].position = angle
+        self.world.notify_state_change()
 
 
 class JointPositionContinuous(Goal):

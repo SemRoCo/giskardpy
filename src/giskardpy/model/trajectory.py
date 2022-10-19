@@ -5,7 +5,7 @@ import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.data_types import JointStates, PrefixName
-from giskardpy.model.joints import Joint
+from giskardpy.model.joints import Joint, OmniDrive
 
 
 class Trajectory:
@@ -60,8 +60,12 @@ class Trajectory:
             p = JointTrajectoryPoint()
             p.time_from_start = rospy.Duration(time * sample_period)
             for joint in joints:
-                for free_variable in joint.free_variable_list:
-                    if free_variable.name in traj_point:
+                if isinstance(joint, OmniDrive):
+                    free_variables = joint.position_variable_names
+                else:
+                    free_variables = [v.name for v in joint.free_variable_list]
+                for free_variable in free_variables:
+                    if free_variable in traj_point:
                         if i == 0:
                             joint_name = free_variable.name
                             if isinstance(joint_name, PrefixName):
@@ -69,7 +73,7 @@ class Trajectory:
                             trajectory_msg.joint_names.append(joint_name)
                         p.positions.append(traj_point[free_variable.name].position)
                         if fill_velocity_values:
-                            p.velocities.append(traj_point[free_variable.name].velocity)
+                            p.velocities.append(traj_point[free_variable].velocity)
                     else:
                         raise NotImplementedError('generated traj does not contain all joints')
             trajectory_msg.points.append(p)

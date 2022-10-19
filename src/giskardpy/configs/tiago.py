@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from std_msgs.msg import ColorRGBA
+
 from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.configs.default_config import Giskard, ControlModes
 from giskardpy.data_types import PrefixName
@@ -8,6 +10,7 @@ from giskardpy.data_types import PrefixName
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
+        self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.collision_avoidance_config.load_moveit_self_collision_matrix(
             'package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
@@ -61,9 +64,13 @@ class TiagoBase(Giskard):
 class TiagoMujoco(TiagoBase):
     def __init__(self):
         super().__init__()
-        self.add_sync_tf_frame('map', 'odom')
-        self.add_odometry_topic('/tiago/base_footprint')
         self.add_robot_from_parameter_server()
+        self.add_sync_tf_frame('map', 'odom')
+        self.add_diff_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  translation_acceleration_limit=1,
+                                  rotation_acceleration_limit=1,
+                                  odometry_topic='/tiago/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/arm_left_controller/follow_joint_trajectory',
                                                 state_topic='/arm_left_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/arm_right_controller/follow_joint_trajectory',
@@ -76,12 +83,7 @@ class TiagoMujoco(TiagoBase):
                                                 state_topic='/right_gripper_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
                                                 state_topic='/torso_controller/state')
-        # self.add_diff_drive_interface(cmd_vel_topic='/mobile_base_controller/cmd_vel',
-        self.add_diff_drive_interface(cmd_vel_topic='/tiago/cmd_vel',
-                                      parent_link_name='odom',
-                                      child_link_name='base_footprint',
-                                      translation_acceleration_limit=1,
-                                      rotation_acceleration_limit=1)
+        self.add_base_cmd_velocity(cmd_vel_topic='/tiago/cmd_vel')
         self.qp_solver_config.joint_weights['velocity']['brumbrum'] = 0.1
 
 

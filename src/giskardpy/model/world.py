@@ -9,6 +9,8 @@ import numpy as np
 import rospy
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
+from std_msgs.msg import ColorRGBA
+from tf2_msgs.msg import TFMessage
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
@@ -25,8 +27,9 @@ from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
 from giskardpy.utils.utils import suppress_stderr, memoize
+
 
 class TravelCompanion(object):
     def link_call(self, link_name: Union[PrefixName, str]) -> bool:
@@ -47,6 +50,7 @@ class WorldTree:
     def __init__(self, root_link_name, god_map=None):
         self.root_link_name = root_link_name
         self.god_map: GodMap = god_map
+        self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
@@ -197,6 +201,7 @@ class WorldTree:
 
         def stopper(joint_name):
             return joint_name not in joints_to_exclude and self.is_joint_controlled(joint_name)
+
         child_link_name = self.joints[joint_name].child_link_name
         links, joints = self.search_branch(child_link_name,
                                            stop_at_joint_when=stopper,
@@ -323,19 +328,21 @@ class WorldTree:
                 return
             for child_joint_name, child_link_name in urdf.child_map[short_name]:
                 urdf_link = urdf.link_map[child_link_name]
-                child_link = Link.from_urdf(urdf_link, group_name)
+                child_link = Link.from_urdf(urdf_link=urdf_link,
+                                            prefix=group_name,
+                                            color=self.default_link_color)
                 self._add_link(child_link)
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
 
-                joint = URDFJoint.from_urdf(urdf_joint, group_name, self.god_map)
+                joint = URDFJoint.from_urdf(urdf_joint, group_name)
 
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
 
         helper(parsed_urdf, urdf_root_link)
 
-        #FIXME should root link be odom?
+        # FIXME should root link be odom?
         self.register_group(group_name, urdf_root_link_name, actuated=actuated)
         if self.god_map is not None:
             self.sync_with_paramserver()
@@ -349,7 +356,6 @@ class WorldTree:
         connecting_joint = FixedJoint(name=joint_name,
                                       parent_link_name=parent_link.name,
                                       child_link_name=child_link.name,
-                                      god_map=self.god_map,
                                       parent_T_child=transform)
         self._link_joint_to_links(connecting_joint)
 
@@ -582,12 +588,11 @@ class WorldTree:
                           parent_link_name=parent_link_name,
                           group_name=group_name)
         else:
-            link = Link.from_world_body(prefix=group_name, msg=msg)
+            link = Link.from_world_body(prefix=group_name, msg=msg, color=self.default_link_color)
             self._add_link(link)
             joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,
                                child_link_name=link.name,
-                               god_map=self.god_map,
                                parent_T_child=w.Matrix(msg_to_homogeneous_matrix(pose)))
             self._link_joint_to_links(joint)
             self.register_group(group_name, link.name)
@@ -618,7 +623,7 @@ class WorldTree:
             self.add_urdf(robot_config.urdf,
                           group_name=robot_config.name,
                           actuated=True)
-        self.fast_all_fks = None # TODO unnecessary?
+        self.fast_all_fks = None  # TODO unnecessary?
         self.notify_model_change()
 
     def _add_joint_and_create_child(self, joint: Joint):
@@ -666,9 +671,18 @@ class WorldTree:
 
         new_weights = {}
         for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights)) + 1):
-            def default(joint_name):
-                return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
+            class Default:
+                def __init__(self, derivative_name, god_map):
+                    self.god_map = god_map
+                    self.derivative_name = derivative_name
 
+                def __call__(self, joint_name):
+                    return self.god_map.to_symbol(identifier.joint_weights + [self.derivative_name, joint_name])
+
+            # def default(joint_name):
+            #     return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
+            # default = lambda joint_name: self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
+            default = Default(order_map[i], self.god_map)
             d = KeyDefaultDict(default)
             new_weights[i] = d
             # self._set_joint_weights(i, d)
@@ -957,6 +971,16 @@ class WorldTree:
             result[link] = fks_evaluated[self.fk_idx[link], :]
         return result
 
+    def as_tf_msg(self):
+        tf_msg = TFMessage()
+        for joint_name, joint in self.joints.items():
+            p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
+            p_T_c = make_transform(parent_frame=joint.parent_link_name,
+                                   child_frame=joint.child_link_name,
+                                   pose=p_T_c.pose)
+            tf_msg.transforms.append(p_T_c)
+        return tf_msg
+
     @profile
     def compute_all_fks_matrix(self):
         return self._fk_computer.collision_fk_matrix
@@ -1167,6 +1191,41 @@ class WorldTree:
     def get_joint_velocity_limits(self, joint_name):
         return self.compute_joint_limits(joint_name, 1)
 
+    def get_all_joint_velocity_limits(self):
+        joint_limits = {}
+        for joint_name in self.controlled_joints:
+            try:
+                joint_limits[joint_name] = self.get_joint_velocity_limits(joint_name)[1]
+            except:
+                pass
+        return joint_limits
+
+    @property
+    def free_variables(self):
+        free_variables = []
+        for joint_name in self.movable_joints:
+            free_variables.extend(self.joints[joint_name].free_variable_list)
+        return free_variables
+
+    def dye_group(self, group_name: my_string, color: ColorRGBA):
+        if group_name in self.groups:
+            for _, link in self.groups[group_name].links.items():
+                link.dye_collisions(color)
+        else:
+            raise UnknownGroupException(f'No group named {group_name}')
+
+    def dye_world(self, color: ColorRGBA):
+        for link in self.links.values():
+            link.dye_collisions(color)
+
+    def get_all_free_variable_velocity_limits(self):
+        limits = {}
+        for free_variable in self.free_variables:
+            limits[free_variable.name] = free_variable.get_upper_limit(order=1,
+                                                                       default=False,
+                                                                       evaluated=True)
+        return limits
+
     def get_all_joint_position_limits(self):
         return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
 
@@ -1339,12 +1398,8 @@ class SubWorldTree(WorldTree):
                 group.root_link_name in self.links and group.name != self.name}
 
     @cached_property
-    def links(self):
-        def helper(root_link):
-            """
-            :type root_link: Link
-            :rtype: list
-            """
+    def links(self) -> Dict[my_string, Link]:
+        def helper(root_link: Link) -> Dict[my_string, Link]:
             links = {root_link.name: root_link}
             for j in root_link.child_joint_names:
                 j = self.world.joints[j]

@@ -5,6 +5,8 @@ fk_np = world + ['compute_fk_np']
 joint_states = world + ['state']
 controlled_joints = ['controlled_joints']
 
+fill_trajectory_velocity_values = ['fill_trajectory_velocity_values']
+
 # goal_params = ['goal_params']
 trajectory = ['traj']
 debug_trajectory = ['lbA_traj']
@@ -43,7 +45,7 @@ giskard = ['giskard']
 # general options
 general_options = giskard + ['general_config']
 action_server_name = general_options + ['action_server_name']
-data_folder = general_options + ['path_to_data_folder']
+tmp_folder = general_options + ['path_to_data_folder']
 debug = general_options + ['debug']
 test_mode = general_options + ['test_mode']
 control_mode = general_options + ['control_mode']

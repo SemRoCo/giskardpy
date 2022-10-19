@@ -55,8 +55,8 @@ class PrefixName:
         return self.long_name.__contains__(item.__str__())
 
 
-goal_parameter = Union[str, float, bool, genpy.Message, dict, list, None]
 my_string = Union[str, PrefixName]
+goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, None]
 expr_symbol = Union[ca.SX, float]
 expr_matrix = ca.SX
 derivative_map = Dict[int, float]

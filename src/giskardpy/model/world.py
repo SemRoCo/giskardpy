@@ -63,9 +63,11 @@ class WorldTree:
         try:
             return PrefixName.from_string(joint_name)
         except AttributeError:
-            if group_name is None:
+            if not group_name:
                 group_name = self.get_group_containing_joint_short_name(joint_name)
-            return PrefixName(joint_name, group_name)
+                if group_name is None:
+                    return PrefixName(joint_name, None)
+            return self.groups[group_name].get_joint_short_name_match(joint_name)
 
     def get_joint(self, joint_name: my_string, group_name: Optional[str] = None) -> Joint:
         return self._joints[self.get_joint_name(joint_name, group_name)]
@@ -74,9 +76,11 @@ class WorldTree:
         try:
             return PrefixName.from_string(link_name)
         except AttributeError:
-            if group_name is None:
+            if not group_name:
                 group_name = self.get_group_containing_link_short_name(link_name)
-            return PrefixName(link_name, group_name)
+                if group_name is None:
+                    return PrefixName(link_name, None)
+            return self.groups[group_name].get_link_short_name_match(link_name)
 
     def get_link(self, link_name: str, group_name: str) -> Link:
         return self._links[self.get_link_name(link_name, group_name)]
@@ -581,8 +585,7 @@ class WorldTree:
     def add_world_body(self, group_name: str,
                        msg: WorldBody,
                        pose: Pose,
-                       parent_link_name: Union[str, PrefixName],
-                       prefix: Optional[my_string] = None):
+                       parent_link_name: Union[str, PrefixName]):
         if group_name in self.groups:
             raise DuplicateNameException(f'Group with name \'{group_name}\' already exists')
         self._raise_if_link_does_not_exist(parent_link_name)
@@ -593,7 +596,8 @@ class WorldTree:
                           parent_link_name=parent_link_name,
                           group_name=group_name)
         else:
-            link = Link.from_world_body(prefix=group_name, msg=msg, color=self.default_link_color)
+            link = Link.from_world_body(link_name=PrefixName(group_name,group_name), msg=msg,
+                                        color=self.default_link_color)
             self._add_link(link)
             joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,
@@ -928,6 +932,8 @@ class WorldTree:
 
     @memoize
     def compute_fk_pose(self, root, tip):
+        root = self.get_link_name(root)
+        tip = self.get_link_name(tip)
         homo_m = self.compute_fk_np(root, tip)
         p = PoseStamped()
         p.header.frame_id = str(root)
@@ -1355,11 +1361,11 @@ class SubWorldTree(WorldTree):
 
     def reset_cache(self):
         try:
-            del self.joints
+            del self._joints
         except:
             pass  # property wasn't called
         try:
-            del self.links
+            del self._links
         except:
             pass  # property wasn't called
         try:

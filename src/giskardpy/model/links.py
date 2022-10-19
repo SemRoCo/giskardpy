@@ -226,8 +226,7 @@ class Link:
         return link
 
     @classmethod
-    def from_world_body(cls, prefix: my_string, msg: WorldBody, color: ColorRGBA) -> Link:
-        link_name = PrefixName(prefix, None)
+    def from_world_body(cls, link_name: my_string, msg: WorldBody, color: ColorRGBA) -> Link:
         link = cls(link_name)
         geometry = LinkGeometry.from_world_body(msg=msg,
                                                 color=color)

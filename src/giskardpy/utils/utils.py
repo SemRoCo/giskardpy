@@ -523,6 +523,9 @@ def convert_ros_message_to_dictionary(message: Message) -> dict:
 def replace_prefix_name_with_str(d: dict) -> dict:
     new_d = d.copy()
     for k, v in d.items():
+        if isinstance(k, PrefixName):
+            del new_d[k]
+            new_d[str(k)] = v
         if isinstance(v, PrefixName):
             new_d[k] = str(v)
         if isinstance(v, dict):

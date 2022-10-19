@@ -63,7 +63,7 @@ def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
-    object_name = 'kitchen'
+    object_name = 'iai_kitchen'
     if better_pose.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)

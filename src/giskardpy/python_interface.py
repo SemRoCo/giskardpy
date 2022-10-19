@@ -225,7 +225,7 @@ class GiskardWrapper:
 
     def set_joint_goal(self,
                        goal_state: dict,
-                       group_name: str,
+                       group_name: Optional[str] = None,
                        weight: Optional[float] = None,
                        max_velocity: Optional[float] = None,
                        hard: bool = False,

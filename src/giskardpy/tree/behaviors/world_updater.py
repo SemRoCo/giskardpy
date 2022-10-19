@@ -223,17 +223,17 @@ class WorldUpdater(GiskardBehavior):
         # t = time()
         req = self.handle_convention(req)
         world_body = req.body
-        try:
-            global_pose = transform_pose(tf.get_tf_root(), req.pose)
-        except:
-            global_pose = req.pose
-        try:
-            group_name = self.world.get_group_containing_link_short_name(req.parent_link)
-            req.parent_link = self.world.get_link_name(req.parent_link, group_name)
-        except UnknownGroupException:
-            pass
         if req.pose.header.frame_id == '':
             raise TransformException('Frame_id in pose is not set.')
+        try:
+            global_pose = transform_pose(self.world.root_link_name, req.pose)
+        except:
+            req.pose.header.frame_id = self.world.get_link_name(req.pose.header.frame_id)
+            global_pose = self.world.transform_msg(self.world.root_link_name, req.pose)
+        try:
+            req.parent_link = self.world.get_link_name(req.parent_link, req.parent_link_group)
+        except UnknownGroupException:
+            pass
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,

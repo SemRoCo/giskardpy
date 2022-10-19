@@ -130,6 +130,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom_combined'
         super().__init__(config)
+        self.robot = self.world.groups[self.robot_name]
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
@@ -433,7 +434,7 @@ class TestConstraints:
 
     def test_JointPositionRange(self, zero_pose: PR2TestWrapper):
         # FIXME needs to be implemented like other position limits, or override limits
-        joint_name = 'head_pan_joint'
+        joint_name = zero_pose.world.get_joint_name('head_pan_joint')
         lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint_name)
         lower_limit *= 0.5
         upper_limit *= 0.5
@@ -448,8 +449,8 @@ class TestConstraints:
                                 lower_limit=lower_limit)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        assert zero_pose.robot.state[joint_name].position <= upper_limit + 3e-3
-        assert zero_pose.robot.state[joint_name].position >= lower_limit - 3e-3
+        assert zero_pose.world.state[joint_name].position <= upper_limit + 3e-3
+        assert zero_pose.world.state[joint_name].position >= lower_limit - 3e-3
 
         zero_pose.set_json_goal('JointPositionRange',
                                 joint_name=joint_name,
@@ -471,9 +472,7 @@ class TestConstraints:
         base_pose.pose.position.x = 0
         base_pose.pose.position.y = 1.5
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.set_seed_odometry(base_pose)
-        kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.EMPTY_PROBLEM])
+        kitchen_setup.teleport_base(goal_pose=base_pose)
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip
         base_pose.pose.position.x = 2.3
@@ -504,7 +503,7 @@ class TestConstraints:
         p.header.frame_id = tip
         p.point = Point(-0.4, -0.2, -0.3)
 
-        expected = tf.transform_point('map', p)
+        expected = zero_pose.transform_msg('map', p)
 
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('CartesianPosition',
@@ -512,26 +511,25 @@ class TestConstraints:
                                 tip_link=tip,
                                 goal_point=p)
         zero_pose.plan_and_execute()
-        new_pose = tf.lookup_pose('map', tip)
+        new_pose = zero_pose.world.compute_fk_pose('map', tip)
         compare_points(expected.point, new_pose.pose.position)
 
-    def test_CartesianPosition1(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
+    def test_CartesianPosition1(self, zero_pose: PR2TestWrapper):
         pocky = 'box'
         pocky_ps = PoseStamped()
         pocky_ps.header.frame_id = zero_pose.l_tip
         pocky_ps.pose.position.x = 0.05
         pocky_ps.pose.orientation.w = 1
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.l_tip, pocky_ps)
+        zero_pose.add_box(name=pocky,
+                          size=(0.1, 0.02, 0.02),
+                          parent_link=zero_pose.l_tip,
+                          pose=pocky_ps)
 
         tip = zero_pose.r_tip
-        p = PoseStamped()
+        p = PointStamped()
         p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = str(PrefixName(tip, zero_pose.world.groups[zero_pose.robot_name].prefix))
-        p.pose.position = Point(0.0, 0.5, 0.0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        p.header.frame_id = tip
+        p.point = Point(0.0, 0.5, 0.0)
 
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('CartesianPosition',
@@ -539,7 +537,7 @@ class TestConstraints:
                                 root_group=zero_pose.robot_name,
                                 tip_link=pocky,
                                 tip_group='box',
-                                goal=p)
+                                goal_point=p)
         zero_pose.plan_and_execute()
 
     def test_CartesianPosition2(self, zero_pose):
@@ -577,7 +575,6 @@ class TestConstraints:
         p.pose.position = Point(-0.4, -0.2, -0.3)
         p.pose.orientation = Quaternion(0, 0, 1, 0)
 
-        # expected = tf.transform_pose('map', p)
         expected = zero_pose.transform_msg('map', p)
 
         zero_pose.allow_all_collisions()
@@ -588,8 +585,7 @@ class TestConstraints:
                                 tip_group=zero_pose.robot_name,
                                 goal_pose=p)
         zero_pose.plan_and_execute()
-        # new_pose = tf.lookup_pose('map', tip)
-        new_pose = zero_pose.transform_msg('map', p)
+        new_pose = zero_pose.world.compute_fk_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
     def test_JointPositionRevolute(self, zero_pose: PR2TestWrapper):
@@ -656,22 +652,22 @@ class TestConstraints:
         root = 'odom_combined'
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = str(PrefixName(tip, zero_pose.world.groups[zero_pose.robot_name].prefix))
+        p.header.frame_id = tip
         p.pose.orientation = Quaternion(*quaternion_about_axis(4, [0, 0, 1]))
 
-        expected = tf.transform_pose('map', p)
+        expected = zero_pose.transform_msg('map', p)
 
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('CartesianOrientation',
                                 root_link=root,
-                                root_group=zero_pose.robot_name,
+                                root_group=None,
                                 tip_link=tip,
                                 tip_group=zero_pose.robot_name,
                                 goal_orientation=p,
                                 max_velocity=0.15
                                 )
         zero_pose.plan_and_execute()
-        new_pose = tf.lookup_pose('map', tip)
+        new_pose = zero_pose.world.compute_fk_pose('map', tip)
         compare_orientations(expected.pose.orientation, new_pose.pose.orientation)
 
     def test_CartesianPoseStraight1(self, zero_pose: PR2TestWrapper):
@@ -683,8 +679,8 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = tf.lookup_pose('map', zero_pose.l_tip)
-        map_T_goal_position = tf.transform_pose('map', goal_position)
+        start_pose = zero_pose.world.compute_fk_pose('map', zero_pose.l_tip)
+        map_T_goal_position = zero_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()
         object_pose.header.frame_id = 'map'
@@ -699,7 +695,7 @@ class TestConstraints:
         publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
         zero_pose.allow_self_collision(zero_pose.robot_name)
         goal_position_p = deepcopy(goal_position)
-        goal_position_p.header.frame_id = str(PrefixName('base_link', zero_pose.robot_name))
+        goal_position_p.header.frame_id = 'base_link'
         zero_pose.set_straight_cart_goal(goal_position_p, zero_pose.l_tip)
         zero_pose.plan_and_execute()
 
@@ -712,8 +708,8 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = tf.lookup_pose('map', better_pose.l_tip)
-        map_T_goal_position = tf.transform_pose('map', goal_position)
+        start_pose = better_pose.world.compute_fk_pose('map', better_pose.l_tip)
+        map_T_goal_position = better_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()
         object_pose.header.frame_id = 'map'
@@ -790,13 +786,13 @@ class TestConstraints:
         zero_pose.plan_and_execute()
 
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
-                                not zero_pose.robot.is_joint_continuous(j)]
+                                not zero_pose.world.is_joint_continuous(j)]
 
-        current_joint_state = zero_pose.robot.state.to_position_dict()
+        current_joint_state = zero_pose.world.state.to_position_dict()
         percentage *= 0.95  # it will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.robot.get_joint_position_limits(joint)
+            lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
@@ -806,8 +802,8 @@ class TestConstraints:
     def test_AvoidJointLimits2(self, zero_pose: PR2TestWrapper):
         percentage = 10
         joints = [j for j in zero_pose.robot.controlled_joints if
-                  not zero_pose.robot.is_joint_continuous(j)]
-        goal_state = {j: zero_pose.robot.get_joint_position_limits(j)[1] for j in joints}
+                  not zero_pose.world.is_joint_continuous(j)]
+        goal_state = {j: zero_pose.world.get_joint_position_limits(j)[1] for j in joints}
         zero_pose.set_json_goal('AvoidJointLimits',
                                 percentage=percentage)
         zero_pose.set_joint_goal(goal_state, check=False)
@@ -820,7 +816,7 @@ class TestConstraints:
         zero_pose.plan_and_execute()
 
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
-                                not zero_pose.robot.is_joint_continuous(j)]
+                                not zero_pose.world.is_joint_continuous(j)]
 
         current_joint_state = zero_pose.robot.state.to_position_dict()
         percentage *= 0.9  # it will not reach the exact percentage, because the weight is so low
@@ -2455,8 +2451,8 @@ class TestWayPoints(object):
 class TestWorldManipulation:
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
-        kitchen_setup.dye_group(kitchen_setup.get_robot_name(), (1, 0, 0, 1))
-        kitchen_setup.dye_group('kitchen', (0, 1, 0, 1))
+        kitchen_setup.dye_group(kitchen_setup.robot_name, (1, 0, 0, 1))
+        kitchen_setup.dye_group('iai_kitchen', (0, 1, 0, 1))
         kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0, 0, 1, 1))
         kitchen_setup.set_joint_goal(kitchen_setup.default_pose)
         kitchen_setup.plan_and_execute()
@@ -2479,7 +2475,7 @@ class TestWorldManipulation:
         zero_pose.plan_and_execute()
 
     def test_attach_remove_box(self, better_pose: PR2TestWrapper):
-        pocky = 'http://muh#pocky'
+        pocky = 'http:muh#pocky'
         p = PoseStamped()
         p.header.frame_id = better_pose.r_tip
         p.pose.orientation.w = 1
@@ -2490,7 +2486,7 @@ class TestWorldManipulation:
         better_pose.remove_group(pocky)
 
     def test_reattach_box(self, zero_pose: PR2TestWrapper):
-        pocky = 'http://muh#pocky'
+        pocky = 'http:muh#pocky'
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.05, 0, 0)
@@ -2595,8 +2591,8 @@ class TestWorldManipulation:
         cup_pose.pose.position = Point(0.1, 0.2, -.05)
         cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        kitchen_setup.add_cylinder(object_name, height=0.07, radius=0.04, pose=cup_pose, parent_link_group='kitchen',
-                                   parent_link='sink_area_left_middle_drawer_main')
+        kitchen_setup.add_cylinder(object_name, height=0.07, radius=0.04, pose=cup_pose,
+                                   parent_link_group='iai_kitchen', parent_link='sink_area_left_middle_drawer_main')
         kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
         kitchen_setup.plan_and_execute()
         kitchen_setup.detach_group(object_name)

@@ -1,7 +1,7 @@
 from __future__ import division
 
 import subprocess
-
+from genpy import Message
 import errno
 import inspect
 import json
@@ -32,6 +32,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
 from giskardpy.exceptions import DontPrintStackTrace
+from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
 
@@ -508,16 +509,25 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
     return pose
 
 
-def convert_ros_message_to_dictionary(message):
+def convert_ros_message_to_dictionary(message: Message) -> dict:
     # TODO there is probably a lib for that, but i'm to lazy to search
     type_str_parts = str(type(message)).split('.')
     part1 = type_str_parts[0].split('\'')[1]
     part2 = type_str_parts[-1].split('\'')[0]
-    message_type = '{}/{}'.format(part1, part2)
+    message_type = f'{part1}/{part2}'
     d = {'message_type': message_type,
          'message': original_convert_ros_message_to_dictionary(message)}
     return d
 
+
+def replace_prefix_name_with_str(d: dict) -> dict:
+    new_d = d.copy()
+    for k, v in d.items():
+        if isinstance(v, PrefixName):
+            new_d[k] = str(v)
+        if isinstance(v, dict):
+            new_d[k] = replace_prefix_name_with_str(v)
+    return new_d
 
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?

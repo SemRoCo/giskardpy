@@ -61,7 +61,7 @@ class WorldTree:
 
     def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
         try:
-            joint_name = PrefixName.from_string(joint_name)
+            return PrefixName.from_string(joint_name)
         except AttributeError:
             if group_name is None:
                 group_name = self.get_group_containing_joint_short_name(joint_name)
@@ -72,7 +72,7 @@ class WorldTree:
 
     def get_link_name(self, link_name: my_string, group_name: Optional[str] = None) -> PrefixName:
         try:
-            link_name = PrefixName.from_string(link_name)
+            return PrefixName.from_string(link_name)
         except AttributeError:
             if group_name is None:
                 group_name = self.get_group_containing_link_short_name(link_name)

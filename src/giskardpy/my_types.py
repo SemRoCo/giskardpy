@@ -20,7 +20,7 @@ class PrefixName:
         if isinstance(name, PrefixName):
             return name
         parts = name.split('/')
-        if len(parts):
+        if len(parts) != 2:
             raise AttributeError(f'{name} can not be converted to a {str(cls)}.')
         return cls(parts[1], parts[0])
 
@@ -55,7 +55,7 @@ class PrefixName:
         return self.long_name.__contains__(item.__str__())
 
 
-goal_parameter = Union[str, float, bool, genpy.Message, dict, list]
+goal_parameter = Union[str, float, bool, genpy.Message, dict, list, None]
 my_string = Union[str, PrefixName]
 expr_symbol = Union[ca.SX, float]
 expr_matrix = ca.SX

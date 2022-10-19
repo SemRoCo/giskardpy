@@ -573,21 +573,23 @@ class TestConstraints:
         tip = zero_pose.r_tip
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = str(PrefixName(tip, zero_pose.world.groups[zero_pose.robot_name].prefix))
+        p.header.frame_id = tip
         p.pose.position = Point(-0.4, -0.2, -0.3)
         p.pose.orientation = Quaternion(0, 0, 1, 0)
 
-        expected = tf.transform_pose('map', p)
+        # expected = tf.transform_pose('map', p)
+        expected = zero_pose.transform_msg('map', p)
 
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('CartesianPose',
                                 root_link=zero_pose.default_root,
-                                root_group=zero_pose.robot_name,
+                                root_group=None,
                                 tip_link=tip,
                                 tip_group=zero_pose.robot_name,
                                 goal_pose=p)
         zero_pose.plan_and_execute()
-        new_pose = tf.lookup_pose('map', tip)
+        # new_pose = tf.lookup_pose('map', tip)
+        new_pose = zero_pose.transform_msg('map', p)
         compare_points(expected.pose.position, new_pose.pose.position)
 
     def test_JointPositionRevolute(self, zero_pose: PR2TestWrapper):

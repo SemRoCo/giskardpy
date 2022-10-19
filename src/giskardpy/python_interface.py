@@ -23,8 +23,9 @@ from giskardpy.goals.goal import WEIGHT_ABOVE_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import goal_parameter
-from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary
+from giskardpy.my_types import goal_parameter, PrefixName
+from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, \
+    replace_prefix_name_with_str
 
 
 class GiskardWrapper:
@@ -430,6 +431,7 @@ class GiskardWrapper:
                 del kwargs[k]
             if isinstance(v, Message):
                 kwargs[k] = convert_ros_message_to_dictionary(v)
+        kwargs = replace_prefix_name_with_str(kwargs)
         constraint.parameter_value_pair = json.dumps(kwargs)
         self.cmd_seq[-1].constraints.append(constraint)
 

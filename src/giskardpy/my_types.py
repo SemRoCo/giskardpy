@@ -6,10 +6,11 @@ import casadi as ca
 
 
 class PrefixName:
-    def __init__(self, name, prefix, separator='/'):
+    separator = '/'
+
+    def __init__(self, name, prefix):
         self.short_name = name
         self.prefix = prefix
-        self.separator = separator
         if prefix:
             self.long_name = f'{self.prefix}{self.separator}{self.short_name}'
         else:
@@ -19,7 +20,7 @@ class PrefixName:
     def from_string(cls, name: my_string):
         if isinstance(name, PrefixName):
             return name
-        parts = name.split('/')
+        parts = name.split(cls.separator)
         if len(parts) != 2:
             raise AttributeError(f'{name} can not be converted to a {str(cls)}.')
         return cls(parts[1], parts[0])

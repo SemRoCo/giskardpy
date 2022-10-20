@@ -140,14 +140,6 @@ class BiDict(dict):
         super().__delitem__(key)
 
 
-class PrefixDefaultDict(KeyDefaultDict):
-
-    def __missing__(self, key):
-        """
-        :type key: PrefixName
-        """
-        return super().__missing__(key.prefix, cache=False)
-
 
 order_map = BiDict({
     0: 'position',

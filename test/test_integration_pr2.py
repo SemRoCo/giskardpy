@@ -2626,13 +2626,13 @@ class TestWorldManipulation:
         zero_pose.detach_group(pocky)
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose: PR2TestWrapper):
-        pocky = 'http://muh#pocky'
+        pocky = 'http:muh#pocky'
         p = PoseStamped()
         zero_pose.add_box(name=pocky,
                           size=(0.1, 0.02, 0.02),
                           pose=p,
                           parent_link='muh',
-                          expected_error_code=UpdateWorldResponse.UNKNOWN_LINK_ERROR)
+                          expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
 
     def test_reattach_unknown_object(self, zero_pose: PR2TestWrapper):
         zero_pose.update_parent_link_of_group('muh',

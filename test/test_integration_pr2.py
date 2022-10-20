@@ -1,7 +1,5 @@
 from __future__ import division
 
-import itertools
-import re
 from copy import deepcopy
 from typing import Optional
 
@@ -22,7 +20,7 @@ from giskardpy import identifier
 from giskardpy.my_types import PrefixName
 from giskardpy.configs.pr2 import PR2_Mujoco, PR2_StandAlone
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
-from utils_for_tests import PR2
+from giskardpy.utils.utils import launch_launchfile
 from giskardpy.utils.math import compare_points, compare_orientations
 from utils_for_tests import compare_poses, publish_marker_vector, \
     JointGoalChecker, GiskardTestWrapper
@@ -212,6 +210,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
+    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
     c = PR2TestWrapper()
     # c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
@@ -416,7 +415,7 @@ class TestJointGoals:
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
-    def test_open_dishwasher_apartment(self, apartment_setup: PR2TestWrapper):
+    def test_drive_into_apartment(self, apartment_setup: PR2TestWrapper):
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'base_footprint'
         base_pose.pose.position.x = 0.4
@@ -604,7 +603,7 @@ class TestConstraints:
         joint_name2 = 'sink_area_left_upper_drawer_main_joint'
         group_name = 'iai_kitchen'
         joint_goal = 0.4
-        #kitchen_setup.allow_all_collisions()
+        # kitchen_setup.allow_all_collisions()
         kitchen_setup.set_json_goal('JointPosition',
                                     joint_name=joint_name1,
                                     goal=joint_goal,
@@ -615,10 +614,12 @@ class TestConstraints:
                                     max_velocity=1)
         kitchen_setup.plan_and_execute()
         np.testing.assert_almost_equal(
-            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[PrefixName(joint_name1, group_name)].position,
+            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[
+                PrefixName(joint_name1, group_name)].position,
             joint_goal, decimal=2)
         np.testing.assert_almost_equal(
-            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[PrefixName(joint_name2, group_name)].position,
+            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[
+                PrefixName(joint_name2, group_name)].position,
             joint_goal, decimal=2)
 
     def test_CartesianOrientation(self, zero_pose: PR2TestWrapper):
@@ -831,7 +832,8 @@ class TestConstraints:
         compare_poses(new_pose.pose, old_pose.pose)
 
         assert pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1] == 1000000
-        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1], int)
+        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+                              int)
 
         updates = {
             1: {
@@ -872,7 +874,8 @@ class TestConstraints:
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
-        kitchen_setup.set_pointing_goal(tip, goal_point, root_link=kitchen_setup.default_root, pointing_axis=pointing_axis)
+        kitchen_setup.set_pointing_goal(tip, goal_point, root_link=kitchen_setup.default_root,
+                                        pointing_axis=pointing_axis)
         kitchen_setup.plan_and_execute()
 
         base_goal = PoseStamped()

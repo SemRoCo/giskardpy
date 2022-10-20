@@ -5,6 +5,7 @@ from tf.transformations import quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils import logging
+from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
 
@@ -65,6 +66,7 @@ def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     better_pose.kitchen_name = 'iai_kitchen'
     if better_pose.is_standalone():
+        launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
@@ -85,19 +87,28 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
-    object_name = 'apartment'
-    better_pose.add_urdf(name=object_name,
-                         urdf=rospy.get_param('apartment_description'),
-                         pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
-                         js_topic='/apartment_joint_states',
-                         set_js_topic='/iai_kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
+    better_pose.environment_name = 'iai_apartment'
+    if better_pose.is_standalone():
+        launch_launchfile('package://iai_apartment/launch/apartment_bringup.launch')
+        kitchen_pose = PoseStamped()
+        kitchen_pose.header.frame_id = str(better_pose.default_root)
+        kitchen_pose.pose.orientation.w = 1
+        better_pose.add_urdf(name=better_pose.environment_name,
+                             urdf=rospy.get_param('apartment_description'),
+                             pose=kitchen_pose)
+    else:
+        better_pose.add_urdf(name=better_pose.environment_name,
+                             urdf=rospy.get_param('apartment_description'),
+                             pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
+                             js_topic='/apartment_joint_states',
+                             set_js_topic='/iai_kitchen/cram_joint_states')
+    js = {str(k): 0.0 for k in better_pose.world.groups[better_pose.environment_name].movable_joints}
     better_pose.set_apartment_js(js)
     base_pose = PoseStamped()
     base_pose.header.frame_id = 'iai_apartment/side_B'
     base_pose.pose.position.x = 1.5
     base_pose.pose.position.y = 2.4
     base_pose.pose.orientation.w = 1
-    base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
+    base_pose = better_pose.transform_msg(better_pose.world.root_link_name, base_pose)
     better_pose.set_localization(base_pose)
     return better_pose

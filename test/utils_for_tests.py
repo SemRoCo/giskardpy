@@ -350,16 +350,21 @@ class GiskardTestWrapper(GiskardWrapper):
             if joint_name.short_name in joint_state:
                 np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
 
-    def set_kitchen_js(self, joint_state, object_name='kitchen'):
+    def set_kitchen_js(self, joint_state):
         if self.is_standalone():
             self.set_seed_configuration(joint_state)
             self.allow_all_collisions()
             self.plan_and_execute()
         else:
-            self.set_object_joint_state(object_name, joint_state)
+            self.set_object_joint_state(self.kitchen_name, joint_state)
 
-    def set_apartment_js(self, joint_state, object_name='apartment'):
-        self.set_object_joint_state(object_name, joint_state)
+    def set_apartment_js(self, joint_state):
+        if self.is_standalone():
+            self.set_seed_configuration(joint_state)
+            self.allow_all_collisions()
+            self.plan_and_execute()
+        else:
+            self.set_object_joint_state(self.environment_name, joint_state)
 
     def compare_joint_state(self, current_js, goal_js, decimal=2):
         """
@@ -1051,7 +1056,6 @@ class GiskardTestWrapper(GiskardWrapper):
         self.teleport_base(p)
 
 
-
 class PR2AndDonbot(GiskardTestWrapper):
     default_pose_pr2 = {'r_elbow_flex_joint': -0.15,
                         'r_forearm_roll_joint': 0,
@@ -1710,63 +1714,6 @@ class BoxyCloseLoop(BoxyTestWrapper):
 
     def reset(self):
         self.clear_world()
-        self.reset_base()
-
-
-class HSR(GiskardTestWrapper):
-    default_pose = {
-        'arm_flex_joint': 0.0,
-        'arm_lift_joint': 0.0,
-        'arm_roll_joint': 0.0,
-        'head_pan_joint': 0.0,
-        'head_tilt_joint': 0.0,
-        'odom_t': 0.0,
-        'odom_x': 0.0,
-        'odom_y': 0.0,
-        'wrist_flex_joint': 0.0,
-        'wrist_roll_joint': 0.0,
-        'hand_l_spring_proximal_joint': 0,
-        'hand_r_spring_proximal_joint': 0
-    }
-    better_pose = default_pose
-
-    def __init__(self):
-        self.tip = 'hand_gripper_tool_frame'
-        self.robot_name = 'hsr'
-        super(HSR, self).__init__('package://giskardpy/config/hsr.yaml', [self.robot_name], [''])
-
-    def move_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {'odom_x': goal_pose.pose.position.x,
-              'odom_y': goal_pose.pose.position.y,
-              'odom_t': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                goal_pose.pose.orientation.y,
-                                                                goal_pose.pose.orientation.z,
-                                                                goal_pose.pose.orientation.w]))[0]}
-        self.allow_all_collisions()
-        self.set_joint_goal(js)
-        self.plan_and_execute()
-
-    def open_gripper(self):
-        self.command_gripper(1.24)
-
-    def close_gripper(self):
-        self.command_gripper(0)
-
-    def command_gripper(self, width):
-        js = {'hand_motor_joint': width}
-        self.set_joint_goal(js)
-        self.plan_and_execute()
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        self.move_base(p)
-
-    def reset(self):
-        self.clear_world()
-        self.close_gripper()
         self.reset_base()
 
 

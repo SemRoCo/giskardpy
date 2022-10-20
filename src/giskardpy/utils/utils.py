@@ -1,6 +1,9 @@
 from __future__ import division
 
 import subprocess
+from typing import Optional
+
+import roslaunch
 from genpy import Message
 import errno
 import inspect
@@ -460,6 +463,16 @@ def memoize(function):
             return rv
 
     return wrapper
+
+
+def launch_launchfile(file_name: str):
+    launch_file = resolve_ros_iris(file_name)
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_file])
+    with suppress_stderr():
+        launch.start()
+        launch.shutdown()
 
 
 blackboard_exception_name = 'exception'

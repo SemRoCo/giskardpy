@@ -63,22 +63,22 @@ def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
-    object_name = 'iai_kitchen'
+    better_pose.kitchen_name = 'iai_kitchen'
     if better_pose.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
-        better_pose.add_urdf(name=object_name,
+        better_pose.add_urdf(name=better_pose.kitchen_name,
                              urdf=rospy.get_param('kitchen_description'),
                              pose=kitchen_pose)
     else:
         kitchen_pose = tf.lookup_pose('map', 'iai_kitchen/world')
-        better_pose.add_urdf(name=object_name,
+        better_pose.add_urdf(name=better_pose.kitchen_name,
                              urdf=rospy.get_param('kitchen_description'),
                              pose=kitchen_pose,
                              js_topic='/kitchen/joint_states',
                              set_js_topic='/kitchen/cram_joint_states')
-    js = {str(k.short_name): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
+    js = {str(k.short_name): 0.0 for k in better_pose.world.groups[better_pose.kitchen_name].movable_joints}
     better_pose.set_kitchen_js(js)
     return better_pose
 

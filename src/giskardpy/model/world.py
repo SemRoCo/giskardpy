@@ -73,10 +73,14 @@ class WorldTree:
         return self._joints[self.get_joint_name(joint_name, group_name)]
 
     def get_link_name(self, link_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        if group_name == '':
+            group_name = None
+        if link_name == '' and group_name is None:
+            return self.root_link_name
         try:
             return PrefixName.from_string(link_name)
         except AttributeError:
-            if not group_name:
+            if group_name is None:
                 group_name = self.get_group_containing_link_short_name(link_name)
                 if group_name is None:
                     return PrefixName(link_name, None)

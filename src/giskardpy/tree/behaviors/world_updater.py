@@ -196,32 +196,10 @@ class WorldUpdater(GiskardBehavior):
             self.timer_state = self.STALL
             self.service_in_use.get_nowait()
 
-    def handle_convention(self, req: UpdateWorldRequest):
-        # default to world root if all is empty
-        if req.parent_link_group == '' and req.parent_link == '':
-            req.parent_link = self.world.root_link_name
-        # if only one robot added, try to infer parent group and link from it
-        elif len(self.collision_scene.robots) == 1:
-            # default to robot group, if parent link name is not empty
-            if req.parent_link_group == '':
-                req.parent_link_group = self.collision_scene.robot_names[0]
-            if req.parent_link == '':
-               req.parent_link = self.world.groups[req.parent_link_group].root_link_name
-            req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
-        else:
-            if req.parent_link != '':
-                req.parent_link_group = self.world.get_group_containing_link_short_name(req.parent_link)
-            if req.parent_link_group == '':
-                raise UnknownGroupException('Parent link group has to be set.')
-            if req.parent_link == '':
-                req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
-        return req
-
     @profile
     def add_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        # t = time()
-        req = self.handle_convention(req)
+        req.parent_link = self.world.get_link_name(req.parent_link, req.parent_link_group)
         world_body = req.body
         if req.pose.header.frame_id == '':
             raise TransformException('Frame_id in pose is not set.')
@@ -230,10 +208,7 @@ class WorldUpdater(GiskardBehavior):
         except:
             req.pose.header.frame_id = self.world.get_link_name(req.pose.header.frame_id)
             global_pose = self.world.transform_msg(self.world.root_link_name, req.pose)
-        try:
-            req.parent_link = self.world.get_link_name(req.parent_link, req.parent_link_group)
-        except UnknownGroupException:
-            pass
+
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,
@@ -241,7 +216,7 @@ class WorldUpdater(GiskardBehavior):
                                   parent_link_name=req.parent_link)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
-        logging.loginfo(f'Added object \'{req.group_name}\' on \'{req.parent_link_group}\' at \'{req.parent_link}\'.')
+        logging.loginfo(f'Attached object \'{req.group_name}\' at \'{req.parent_link}\'.')
         if world_body.joint_state_topic:
             # plugin_name = str(PrefixName(req.group_name, 'js'))
             plugin = running_is_success(SyncConfiguration)(group_name=req.group_name,
@@ -279,7 +254,7 @@ class WorldUpdater(GiskardBehavior):
     @profile
     def update_parent_link(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req = self.handle_convention(req)
+        req.parent_link = self.world.get_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]

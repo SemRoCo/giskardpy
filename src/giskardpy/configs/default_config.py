@@ -69,7 +69,10 @@ class Giskard:
                                         group_name: Optional[str] = None, **kwargs):
         urdf = rospy.get_param(parameter_name)
         self.add_robot_urdf(urdf, name=group_name, **kwargs)
-        self.hardware_config.joint_state_topics.extend([(group_name, jst) for jst in joint_state_topics])
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        js_kwargs = [{'group_name': group_name, 'joint_state_topic': topic} for topic in joint_state_topics]
+        self.hardware_config.joint_state_topics_kwargs.extend(js_kwargs)
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         if group_name is None:
@@ -144,11 +147,10 @@ class Giskard:
                              odom_yaw_name: Optional[str] = 'odom_yaw'):
         if robot_group_name is None:
             robot_group_name = self.get_default_group_name()
-        if not isinstance(name, PrefixName):
-            name = PrefixName(name, robot_group_name)
         brumbrum_joint = OmniDrive(parent_link_name=parent_link_name,
                                    child_link_name=PrefixName(child_link_name, robot_group_name),
                                    name=name,
+                                   group_name=robot_group_name,
                                    odom_x_name=odom_x_name,
                                    odom_y_name=odom_y_name,
                                    odom_yaw_name=odom_yaw_name,

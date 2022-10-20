@@ -80,7 +80,7 @@ class HardwareConfig:
     def __init__(self):
         self.send_trajectory_to_cmd_vel_kwargs: List[dict] = []
         self.follow_joint_trajectory_interfaces_kwargs: List[dict] = []
-        self.joint_state_topics: List[str] = []
+        self.joint_state_topics_kwargs: List[dict] = []
         self.odometry_node_kwargs: List[dict] = []
 
 

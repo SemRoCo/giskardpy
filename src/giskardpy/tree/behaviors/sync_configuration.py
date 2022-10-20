@@ -18,10 +18,7 @@ from giskardpy.utils import logging
 class SyncConfiguration(GiskardBehavior):
 
     @profile
-    def __init__(self, group_name, joint_state_topic='joint_states'):
-        """
-        :type js_identifier: str
-        """
+    def __init__(self, group_name: str, joint_state_topic: str = 'joint_states'):
         self.joint_state_topic = joint_state_topic
         if not self.joint_state_topic.startswith('/'):
             self.joint_state_topic = '/' + self.joint_state_topic

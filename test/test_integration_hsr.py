@@ -3,12 +3,14 @@ from typing import Optional
 
 import numpy as np
 import pytest
+import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
 from numpy import pi
+from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.configs.hsr import HSR_StandAlone
+from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
 
@@ -71,20 +73,44 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
 
+class HSRTestWrapperMujoco(HSRTestWrapper):
+    def __init__(self):
+        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
+        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
+        self.mujoco_reset = rospy.ServiceProxy('hsrb4s/reset', Trigger)
+        self.odom_root = 'odom'
+        super().__init__(HSR_Mujoco)
+
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = tf.get_tf_root()
+        p.pose.orientation.w = 1
+        self.set_localization(p)
+        self.wait_heartbeats()
+
+    def set_localization(self, map_T_odom: PoseStamped):
+        pass
+        # super(HSRTestWrapper, self).set_localization(map_T_odom)
+
+    def reset(self):
+        self.mujoco_reset()
+        super().reset()
+
+    def command_gripper(self, width):
+        pass
+
+
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
-    c = HSRTestWrapper()
+    # launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
+    # c = HSRTestWrapper()
+    c = HSRTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
 
 @pytest.fixture()
-def box_setup(zero_pose):
-    """
-    :type pocky_pose_setup: TestPR2
-    :rtype: TestPR2
-    """
+def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
     p = PoseStamped()
     p.header.frame_id = 'map'
     p.pose.position.x = 1.2

@@ -687,9 +687,8 @@ class OpenLoop(StandAlone):
         sync.add_child(SyncTfFrames('sync tf frames',
                                     **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
         hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for group_name, joint_state_topic in hardware_config.joint_state_topics:
-            sync.add_child(running_is_success(SyncConfiguration)(group_name=group_name,
-                                                                 joint_state_topic=joint_state_topic))
+        for kwargs in hardware_config.joint_state_topics_kwargs:
+            sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
         for odometry_kwargs in hardware_config.odometry_node_kwargs:
             sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
         if self.god_map.get_data(identifier.TFPublisher_enabled):

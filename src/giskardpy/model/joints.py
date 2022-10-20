@@ -451,6 +451,7 @@ class OmniDrive(Joint):
                  parent_link_name: my_string,
                  child_link_name: my_string,
                  name: Optional[my_string] = 'brumbrum',
+                 group_name: Optional[str] = None,
                  translation_velocity_limit: Optional[float] = 0.5,
                  rotation_velocity_limit: Optional[float] = 0.6,
                  translation_acceleration_limit: Optional[float] = None,
@@ -461,25 +462,30 @@ class OmniDrive(Joint):
                  odom_y_name: Optional[str] = None,
                  odom_yaw_name: Optional[str] = None,
                  **kwargs):
+        name = PrefixName(name, group_name)
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
         self.translation_acceleration_limit = translation_acceleration_limit
         self.rotation_acceleration_limit = rotation_acceleration_limit
         self.translation_jerk_limit = translation_jerk_limit
         self.rotation_jerk_limit = rotation_jerk_limit
-        self.translation_names = ['odom_x', 'odom_y', 'odom_z']
+        self.translation_names = [PrefixName('odom_x', group_name),
+                                  PrefixName('odom_y', group_name),
+                                  PrefixName('odom_z', group_name)]
         if odom_x_name is not None:
-            self.translation_names[0] = odom_x_name
+            self.translation_names[0] = PrefixName(odom_x_name, group_name)
         if odom_y_name is not None:
-            self.translation_names[1] = odom_y_name
-        self.orientation_names = ['roll', 'pitch', 'yaw']
+            self.translation_names[1] = PrefixName(odom_y_name, group_name)
+        self.orientation_names = [PrefixName('roll', group_name),
+                                  PrefixName('pitch', group_name),
+                                  PrefixName('yaw', group_name)]
         if odom_yaw_name is not None:
-            self.orientation_names[2] = odom_yaw_name
+            self.orientation_names[2] = PrefixName(odom_yaw_name, group_name)
         # self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
         # self.rot_name = 'odom_rot'
-        self.x_vel_name = 'odom_x_vel'
-        self.y_vel_name = 'odom_y_vel'
-        self.rot_vel_name = 'odom_yaw_vel'
+        self.x_vel_name = PrefixName('odom_x_vel', group_name)
+        self.y_vel_name = PrefixName('odom_y_vel', group_name)
+        self.rot_vel_name = PrefixName('odom_yaw_vel', group_name)
         self.translation_variables: List[FreeVariable] = []
         self.orientation_variables: List[FreeVariable] = []
         super().__init__(name, parent_link_name, child_link_name, w.eye(4))

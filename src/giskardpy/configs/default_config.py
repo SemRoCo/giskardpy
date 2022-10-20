@@ -122,8 +122,9 @@ class Giskard:
     def add_follow_joint_trajectory_server(self, namespace, state_topic, group_name=None, fill_velocity_values=False):
         if group_name is None:
             group_name = self.get_default_group_name()
-        self.hardware_config.follow_joint_trajectory_interfaces_kwargs.append({'namespace': namespace,
+        self.hardware_config.follow_joint_trajectory_interfaces_kwargs.append({'action_namespace': namespace,
                                                                                'state_topic': state_topic,
+                                                                               'group_name': group_name,
                                                                                'fill_velocity_values': fill_velocity_values})
 
     def add_omni_drive_joint(self,

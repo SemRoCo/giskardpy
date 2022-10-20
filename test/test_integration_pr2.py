@@ -198,7 +198,11 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         super().__init__(PR2_Mujoco)
 
     def reset_base(self):
-        super(PR2TestWrapper, self).reset_base()
+        p = PoseStamped()
+        p.header.frame_id = tf.get_tf_root()
+        p.pose.orientation.w = 1
+        self.set_localization(p)
+        self.wait_heartbeats()
 
     def set_localization(self, map_T_odom: PoseStamped):
         super(PR2TestWrapper, self).set_localization(map_T_odom)
@@ -210,9 +214,9 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
-    c = PR2TestWrapper()
-    # c = PR2TestWrapperMujoco()
+    # launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
+    # c = PR2TestWrapper()
+    c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 

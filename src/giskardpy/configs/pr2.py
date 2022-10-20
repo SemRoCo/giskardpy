@@ -67,6 +67,7 @@ class PR2_Base(Giskard):
 
 class PR2_Mujoco(PR2_Base):
     def __init__(self):
+        self.add_robot_from_parameter_server()
         super().__init__()
         self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.add_sync_tf_frame('map', 'odom_combined')
@@ -95,6 +96,7 @@ class PR2_Mujoco(PR2_Base):
 
 class PR2_IAI(PR2_Base):
     def __init__(self):
+        self.add_robot_from_parameter_server()
         super().__init__()
         self.general_config.default_link_color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         self.add_sync_tf_frame('map', 'odom_combined')
@@ -130,6 +132,7 @@ class PR2_IAI(PR2_Base):
 
 class PR2_Unreal(PR2_Base):
     def __init__(self):
+        self.add_robot_from_parameter_server()
         super().__init__()
         # self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
         # self.collision_avoidance_config.collision_checker = self.collision_avoidance_config.collision_checker.none

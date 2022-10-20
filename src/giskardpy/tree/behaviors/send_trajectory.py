@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import control_msgs
 from rospy import ROSException
@@ -46,7 +46,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
     @profile
-    def __init__(self, group_name, action_namespace, state_topic, goal_time_tolerance=1, fill_velocity_values=True):
+    def __init__(self, action_namespace: str, state_topic: str, group_name: str,
+                 goal_time_tolerance: float = 1, fill_velocity_values: bool = True):
         self.group_name = group_name
         self.action_namespace = action_namespace
         GiskardBehavior.__init__(self, str(self))

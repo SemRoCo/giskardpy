@@ -431,7 +431,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                                  decimal=decimal))
 
     def teleport_base(self, goal_pose):
-        raise Exception()
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
         js = {'odom_x_joint': goal_pose.pose.position.x,
               'odom_y_joint': goal_pose.pose.position.y,

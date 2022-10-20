@@ -1,9 +1,11 @@
+from __future__ import annotations
 from collections import defaultdict, deque
 from copy import deepcopy
+from typing import Optional
 
 from sensor_msgs.msg import JointState
 
-from giskardpy.my_types import my_string
+from giskardpy.my_types import my_string, PrefixName
 
 
 class KeyDefaultDict(defaultdict):
@@ -82,11 +84,7 @@ class JointStates(defaultdict):
         super().__init__(_JointState, *args, **kwargs)
 
     @classmethod
-    def from_msg(cls, msg, prefix=None):
-        """
-        :type msg: JointState
-        :rtype: JointStates
-        """
+    def from_msg(cls, msg: JointState, prefix: Optional[str] = None) -> JointStates:
         self = cls()
         for i, joint_name in enumerate(msg.name):
             joint_name = PrefixName(joint_name, prefix)

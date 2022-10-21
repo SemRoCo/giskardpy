@@ -12,5 +12,5 @@ if __name__ == '__main__':
     config = rospy.get_param('~config')
     check_dependencies()
     possible_classes = get_all_classes_in_package(giskardpy.configs, Giskard)
-    giskard = possible_classes[config]()
+    giskard: Giskard = possible_classes[config]()
     giskard.live()

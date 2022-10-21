@@ -265,6 +265,10 @@ class Giskard:
         if len(self.hardware_config.send_trajectory_to_cmd_vel_kwargs) == 0:
             logging.loginfo('No cmd_vel topic has been registered.')
 
+    @property
+    def world(self) -> WorldTree:
+        return self._god_map.get_data(identifier.world)
+
     def live(self):
         self.grow()
         self._god_map.get_data(identifier.tree_manager).live()

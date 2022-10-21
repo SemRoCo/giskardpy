@@ -164,16 +164,10 @@ catkin_install_python(PROGRAMS
 	scripts/giskard.py
 	scripts/interactive_marker.py
 	scripts/joystick_e_stop.py
-	scripts/add_box.py
-	scripts/add_cylinder.py
-	scripts/add_sphere.py
-	scripts/add_urdf.py
-	scripts/attach_object.py
 	scripts/clear_world.py
 	scripts/joint_goal_publisher.py
 	scripts/move_base_simple_goal.py
 	scripts/print_joint_state.py
-	scripts/remove_object.py
 	scripts/fake_servers.py
 	scripts/move_base_simple_goal_diff_drive.py
 	scripts/base_joint_state_publisher.py

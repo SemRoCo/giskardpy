@@ -372,7 +372,6 @@ class WorldTree:
 
         helper(parsed_urdf, urdf_root_link)
 
-        # FIXME should root link be odom?
         self.register_group(group_name, urdf_root_link_name, actuated=actuated)
         if self.god_map is not None:
             self.sync_with_paramserver()

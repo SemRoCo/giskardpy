@@ -114,12 +114,12 @@ class TiagoTestWrapper(GiskardTestWrapper):
         self.clear_world()
         self.reset_base()
         self.left_gripper_group = 'left_gripper'
-        self.register_group(group_name=self.left_gripper_group,
-                            parent_group_name=self.get_robot_name(),
+        self.register_group(new_group_name=self.left_gripper_group,
+                            root_link_group_name=self.get_robot_name(),
                             root_link_name='gripper_left_link')
         self.right_gripper_group = 'right_gripper'
-        self.register_group(group_name=self.right_gripper_group,
-                            parent_group_name=self.get_robot_name(),
+        self.register_group(new_group_name=self.right_gripper_group,
+                            root_link_group_name=self.get_robot_name(),
                             root_link_name='gripper_right_link')
 
 

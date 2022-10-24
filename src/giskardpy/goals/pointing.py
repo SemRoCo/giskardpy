@@ -1,23 +1,36 @@
 from __future__ import division
 
-from geometry_msgs.msg import Vector3Stamped
+from typing import Optional
+
+from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
+from giskardpy.utils.logging import logwarn
 
 
 class Pointing(Goal):
-    def __init__(self, tip_link, goal_point, root_link, tip_group: str = None, root_group: str = None,
-                 pointing_axis=None, max_velocity=0.3, weight=WEIGHT_BELOW_CA, **kwargs):
+    def __init__(self,
+                 tip_link: str,
+                 goal_point: PointStamped,
+                 root_link: str,
+                 tip_group: Optional[str] = None,
+                 root_group: Optional[str] = None,
+                 pointing_axis: Vector3Stamped = None,
+                 max_velocity: float = 0.3,
+                 weight: float = WEIGHT_BELOW_CA,
+                 **kwargs):
         """
-        Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
-        :param tip_link: str, name of the tip of the kin chain
-        :param goal_point: PointStamped as json, where the pointing_axis will point towards
-        :param root_link: str, name of the root of the kin chain
-        :param pointing_axis: Vector3Stamped as json, default is z axis, this axis will point towards the goal_point
-        :param weight: float, default WEIGHT_BELOW_CA
+        Will orient pointing_axis at goal_point.
+        :param tip_link: tip link of the kinematic chain.
+        :param goal_point: where to point pointing_axis at.
+        :param root_link: root link of the kinematic chain.
+        :param tip_group: if tip_link is not unique, search this group for matches.
+        :param root_group: if root_link is not unique, search this group for matches.
+        :param pointing_axis: the axis of tip_link that will be used for pointing
+        :param max_velocity: rad/s
+        :param weight:
         """
         super().__init__(**kwargs)
         self.weight = weight
@@ -30,6 +43,7 @@ class Pointing(Goal):
             self.tip_V_pointing_axis = self.transform_msg(self.tip, pointing_axis)
             self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
         else:
+            logwarn(f'Deprecated warning: Please set pointing_axis.')
             self.tip_V_pointing_axis = Vector3Stamped()
             self.tip_V_pointing_axis.header.frame_id = self.tip
             self.tip_V_pointing_axis.vector.z = 1

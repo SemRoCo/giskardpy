@@ -13,6 +13,81 @@ from utils_for_tests import BoxyTestWrapper
 # TODO roslaunch iai_boxy_sim ros_control_sim.launch
 
 
+class BoxyTestWrapper(GiskardTestWrapper):
+    default_pose = {
+        'neck_shoulder_pan_joint': 0.0,
+        'neck_shoulder_lift_joint': 0.0,
+        'neck_elbow_joint': 0.0,
+        'neck_wrist_1_joint': 0.0,
+        'neck_wrist_2_joint': 0.0,
+        'neck_wrist_3_joint': 0.0,
+        'triangle_base_joint': 0.0,
+        'left_arm_0_joint': 0.0,
+        'left_arm_1_joint': 0.0,
+        'left_arm_2_joint': 0.0,
+        'left_arm_3_joint': 0.0,
+        'left_arm_4_joint': 0.0,
+        'left_arm_5_joint': 0.0,
+        'left_arm_6_joint': 0.0,
+        'right_arm_0_joint': 0.0,
+        'right_arm_1_joint': 0.0,
+        'right_arm_2_joint': 0.0,
+        'right_arm_3_joint': 0.0,
+        'right_arm_4_joint': 0.0,
+        'right_arm_5_joint': 0.0,
+        'right_arm_6_joint': 0.0,
+    }
+
+    better_pose = {
+        'neck_shoulder_pan_joint': -1.57,
+        'neck_shoulder_lift_joint': -1.88,
+        'neck_elbow_joint': -2.0,
+        'neck_wrist_1_joint': 0.139999387693,
+        'neck_wrist_2_joint': 1.56999999998,
+        'neck_wrist_3_joint': 0,
+        'triangle_base_joint': -0.24,
+        'left_arm_0_joint': -0.68,
+        'left_arm_1_joint': 1.08,
+        'left_arm_2_joint': -0.13,
+        'left_arm_3_joint': -1.35,
+        'left_arm_4_joint': 0.3,
+        'left_arm_5_joint': 0.7,
+        'left_arm_6_joint': -0.01,
+        'right_arm_0_joint': 0.68,
+        'right_arm_1_joint': -1.08,
+        'right_arm_2_joint': 0.13,
+        'right_arm_3_joint': 1.35,
+        'right_arm_4_joint': -0.3,
+        'right_arm_5_joint': -0.7,
+        'right_arm_6_joint': 0.01,
+    }
+
+    def __init__(self, config=None):
+        self.camera_tip = 'camera_link'
+        self.r_tip = 'right_gripper_tool_frame'
+        self.l_tip = 'left_gripper_tool_frame'
+        self.robot_name = 'boxy'
+        self.r_gripper_group = 'r_gripper'
+        super().__init__(Boxy)
+
+    def move_base(self, goal_pose):
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
+        js = {'odom_x_joint': goal_pose.pose.position.x,
+              'odom_y_joint': goal_pose.pose.position.y,
+              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
+        self.allow_all_collisions()
+        self.set_joint_goal(js)
+        self.plan_and_execute()
+
+    def reset(self):
+        self.clear_world()
+        self.reset_base()
+        self.register_group(self.r_gripper_group, self.get_robot_name(), 'right_arm_7_link')
+
+
 @pytest.fixture(scope='module')
 def giskard(request, ros):
     c = BoxyTestWrapper()

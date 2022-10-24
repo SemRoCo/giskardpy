@@ -6,8 +6,24 @@ from control_msgs.msg import FollowJointTrajectoryResult
 
 from giskard_msgs.msg import MoveResult, MoveFeedback
 from giskardpy.utils import logging
-from utils_for_tests import BaseBot
+from utils_for_tests import GiskardTestWrapper
 
+
+class BaseBot(GiskardTestWrapper):
+    default_pose = {
+        'joint_x': 0.0,
+        'joint_y': 0.0,
+        'rot_z': 0.0,
+    }
+
+    def __init__(self):
+        self.robot_name = 'base_bot'
+        super().__init__('package://giskardpy/config/base_bot.yaml', [self.robot_name], [''])
+
+    def reset(self):
+        self.clear_world()
+        # self.set_joint_goal(self.default_pose)
+        # self.plan_and_execute()
 
 class Clients(object):
     class cb(object):

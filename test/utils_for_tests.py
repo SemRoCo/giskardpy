@@ -1,6 +1,6 @@
 import keyword
 from collections import defaultdict
-from copy import deepcopy, copy
+from copy import deepcopy
 from multiprocessing import Queue
 from time import time
 from typing import Tuple, Optional
@@ -12,14 +12,13 @@ import numpy as np
 import rospy
 from angles import shortest_angular_distance
 from control_msgs.msg import FollowJointTrajectoryActionGoal
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped
+from geometry_msgs.msg import PoseStamped, Point, Vector3Stamped, PointStamped, QuaternionStamped
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
-from std_srvs.srv import Trigger
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
 from visualization_msgs.msg import Marker
@@ -27,23 +26,21 @@ from visualization_msgs.msg import Marker
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
-from giskardpy import identifier, RobotPrefix
-# from giskardpy.configs.boxy import Boxy
-from giskardpy.configs.data_types import CollisionAvoidanceConfig, GeneralConfig
+from giskardpy import identifier
+from giskardpy.configs.data_types import GeneralConfig
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import UnknownGroupException
-from giskardpy.goals.goal import WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
-from giskardpy.model.world import WorldTree, SubWorldTree
-from giskardpy.my_types import goal_parameter
+from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
-from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, UpdateTransform, UpdateTransformRequest
+from iai_naive_kinematics_sim.srv import SetJointStateRequest, UpdateTransform, UpdateTransformRequest
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -557,17 +554,26 @@ class GiskardTestWrapper(GiskardWrapper):
                            weight=weight,
                            **kwargs)
 
-    def set_pointing_goal(self, tip_link, goal_point, root_link=None, tip_group=None, root_group=None,
-                          pointing_axis=None, weight=None, check=False):
+    def set_pointing_goal(self,
+                          goal_point: PointStamped,
+                          tip_link: str,
+                          pointing_axis: Vector3Stamped,
+                          root_link: str,
+                          tip_group: Optional[str] = None,
+                          root_group: Optional[str] = None,
+                          max_velocity: float = 0.3,
+                          weight: float = WEIGHT_BELOW_CA,
+                          check=False):
         if root_link is None:
             root_link = self.world.root_link_name
             root_group = None
-        super().set_pointing_goal(tip_link=tip_link,
-                                  tip_group=tip_group,
-                                  goal_point=goal_point,
-                                  root_link=root_link,
-                                  root_group=root_group,
+        super().set_pointing_goal(goal_point=goal_point,
+                                  tip_link=tip_link,
                                   pointing_axis=pointing_axis,
+                                  root_link=root_link,
+                                  tip_group=tip_group,
+                                  root_group=root_group,
+                                  max_velocity=max_velocity,
                                   weight=weight)
         if check:
             full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
@@ -579,7 +585,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                     pointing_axis=pointing_axis))
 
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, tip_group=None, root_group=None,
-                              root_normal=None, max_angular_velocity=None,
+                              goal_normal=None, max_angular_velocity=None,
                               weight=None, check=False):
         if root_link is None:
             root_link = self.world.root_link_name
@@ -589,32 +595,43 @@ class GiskardTestWrapper(GiskardWrapper):
                                       root_link=root_link,
                                       root_group=root_group,
                                       tip_normal=tip_normal,
-                                      root_normal=root_normal,
+                                      goal_normal=goal_normal,
                                       max_angular_velocity=max_angular_velocity,
                                       weight=weight)
         if check:
             full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
             self.add_goal_check(
-                AlignPlanesGoalChecker(self, full_tip_link, tip_normal, full_root_link, root_normal))
+                AlignPlanesGoalChecker(self, full_tip_link, tip_normal, full_root_link, goal_normal))
 
     def add_goal_check(self, goal_checker):
         self.goal_checks[self.number_of_cmds - 1].append(goal_checker)
 
-    def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
-                               weight=None, linear_velocity=None, angular_velocity=None,
+    def set_straight_cart_goal(self,
+                               goal_pose: PoseStamped,
+                               tip_link: str,
+                               root_link: str,
+                               tip_group: Optional[str] = None,
+                               root_group: Optional[str] = None,
+                               max_linear_velocity: Optional[float] = None,
+                               max_angular_velocity: Optional[float] = None,
+                               reference_linear_velocity: Optional[float] = None,
+                               reference_angular_velocity: Optional[float] = None,
+                               weight: Optional[float] = None,
                                check=False):
         if root_link is None:
             root_link = self.world.root_link_name
             root_group = None
-        super().set_straight_cart_goal(goal_pose,
-                                       tip_link,
-                                       root_link,
+        super().set_straight_cart_goal(goal_pose=goal_pose,
+                                       tip_link=tip_link,
+                                       root_link=root_link,
                                        tip_group=tip_group,
                                        root_group=root_group,
-                                       weight=weight,
-                                       max_linear_velocity=linear_velocity,
-                                       max_angular_velocity=angular_velocity)
+                                       max_linear_velocity=max_linear_velocity,
+                                       max_angular_velocity=max_angular_velocity,
+                                       reference_linear_velocity=reference_linear_velocity,
+                                       reference_angular_velocity=reference_angular_velocity,
+                                       weight=weight)
 
         if check:
             full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
@@ -659,6 +676,8 @@ class GiskardTestWrapper(GiskardWrapper):
             self.total_time_spend_moving += len(self.god_map.get_data(identifier.trajectory).keys()) * \
                                             self.god_map.get_data(identifier.sample_period)
             logging.logwarn(f'Goal processing took {diff}')
+            error_code = MoveResult.SUCCESS
+            cmd_id = 0
             for cmd_id in range(len(r.error_codes)):
                 error_code = r.error_codes[cmd_id]
                 error_message = r.error_messages[cmd_id]
@@ -740,11 +759,11 @@ class GiskardTestWrapper(GiskardWrapper):
 
     TimeOut = 5000
 
-    def register_group(self, group_name: str, parent_group_name: str, root_link_name: str):
-        super().register_group(group_name=group_name,
-                               parent_group_name=parent_group_name,
+    def register_group(self, new_group_name: str, root_link_group_name: str, root_link_name: str):
+        super().register_group(new_group_name=new_group_name,
+                               root_link_group_name=root_link_group_name,
                                root_link_name=root_link_name)
-        assert group_name in self.get_group_names()
+        assert new_group_name in self.get_group_names()
 
     @property
     def world(self):
@@ -765,6 +784,8 @@ class GiskardTestWrapper(GiskardWrapper):
                      name: str,
                      timeout: float = TimeOut,
                      expected_response: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
+        old_link_names = []
+        old_joint_names = []
         if expected_response == UpdateWorldResponse.SUCCESS:
             old_link_names = self.world.groups[name].link_names
             old_joint_names = self.world.groups[name].joint_names
@@ -989,10 +1010,6 @@ class GiskardTestWrapper(GiskardWrapper):
         return r
 
     @property
-    def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
-        return self.god_map.unsafe_get_data(identifier.collision_avoidance_config)
-
-    @property
     def general_config(self) -> GeneralConfig:
         return self.god_map.unsafe_get_data(identifier.general_options)
 
@@ -1055,665 +1072,363 @@ class GiskardTestWrapper(GiskardWrapper):
         self.teleport_base(p)
 
 
-class PR2AndDonbot(GiskardTestWrapper):
-    default_pose_pr2 = {'r_elbow_flex_joint': -0.15,
-                        'r_forearm_roll_joint': 0,
-                        'r_shoulder_lift_joint': 0,
-                        'r_shoulder_pan_joint': 0,
-                        'r_upper_arm_roll_joint': 0,
-                        'r_wrist_flex_joint': -0.10001,
-                        'r_wrist_roll_joint': 0,
-                        'l_elbow_flex_joint': -0.15,
-                        'l_forearm_roll_joint': 0,
-                        'l_shoulder_lift_joint': 0,
-                        'l_shoulder_pan_joint': 0,
-                        'l_upper_arm_roll_joint': 0,
-                        'l_wrist_flex_joint': -0.10001,
-                        'l_wrist_roll_joint': 0,
-                        'torso_lift_joint': 0.2,
-                        'head_pan_joint': 0,
-                        'head_tilt_joint': 0}
-
-    better_pose_pr2 = {'r_shoulder_pan_joint': -1.7125,
-                       'r_shoulder_lift_joint': -0.25672,
-                       'r_upper_arm_roll_joint': -1.46335,
-                       'r_elbow_flex_joint': -2.12,
-                       'r_forearm_roll_joint': 1.76632,
-                       'r_wrist_flex_joint': -0.10001,
-                       'r_wrist_roll_joint': 0.05106,
-                       'l_shoulder_pan_joint': 1.9652,
-                       'l_shoulder_lift_joint': - 0.26499,
-                       'l_upper_arm_roll_joint': 1.3837,
-                       'l_elbow_flex_joint': -2.12,
-                       'l_forearm_roll_joint': 16.99,
-                       'l_wrist_flex_joint': - 0.10001,
-                       'l_wrist_roll_joint': 0,
-                       'torso_lift_joint': 0.2,
-
-                       'head_pan_joint': 0,
-                       'head_tilt_joint': 0,
-                       }
-
-    default_pose_donbot = {
-        'ur5_elbow_joint': 0.0,
-        'ur5_shoulder_lift_joint': 0.0,
-        'ur5_shoulder_pan_joint': 0.0,
-        'ur5_wrist_1_joint': 0.0,
-        'ur5_wrist_2_joint': 0.0,
-        'ur5_wrist_3_joint': 0.0
-    }
-
-    better_pose_donbot = {
-        'ur5_shoulder_pan_joint': -np.pi / 2,
-        'ur5_shoulder_lift_joint': -2.44177755311,
-        'ur5_elbow_joint': 2.15026930371,
-        'ur5_wrist_1_joint': 0.291547812391,
-        'ur5_wrist_2_joint': np.pi / 2,
-        'ur5_wrist_3_joint': np.pi / 2
-    }
-
-    def __init__(self):
-        self.r_tips = dict()
-        self.l_tips = dict()
-        self.r_grippers = dict()
-        self.l_grippers = dict()
-        self.set_localization_srvs = dict()
-        self.set_bases = dict()
-        self.default_roots = dict()
-        self.tf_prefix = dict()
-        self.camera_tip = 'camera_link'
-        self.gripper_tip = 'gripper_tool_frame'
-        self.gripper_pub_topic = 'wsg_50_driver/goal_position'
-        self.camera_tips = dict()
-        self.gripper_tips = dict()
-        self.gripper_pubs = dict()
-        self.default_poses = dict()
-        self.better_poses = dict()
-        self.pr2 = 'pr2'
-        self.donbot = 'donbot'
-        robot_names = [self.pr2, self.donbot]
-        super(PR2AndDonbot, self).__init__(u'package://giskardpy/config/pr2_and_donbot.yaml',
-                                           robot_names=robot_names, namespaces=robot_names)
-        for robot_name in self.collision_scene.robot_names:
-            if self.pr2 == robot_name:
-                self.r_tips[robot_name] = u'r_gripper_tool_frame'
-                self.l_tips[robot_name] = u'l_gripper_tool_frame'
-                self.tf_prefix[robot_name] = robot_name.replace('/', '')
-                self.r_grippers[robot_name] = rospy.ServiceProxy(
-                    u'/{}/r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
-                self.l_grippers[robot_name] = rospy.ServiceProxy(
-                    u'/{}/l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
-                self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
-                    '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
-                    UpdateTransform)
-                self.set_bases[robot_name] = rospy.ServiceProxy(
-                    '/{}/base_simulator/set_joint_states'.format(robot_name), SetJointState)
-                self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
-                self.default_poses[robot_name] = self.default_pose_pr2
-                self.better_poses[robot_name] = self.better_pose_pr2
-            else:
-                self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
-                self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)
-                self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
-                self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
-                    '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
-                    UpdateTransform)
-                self.gripper_pubs[robot_name] = rospy.Publisher(
-                    '/{}'.format(str(PrefixName(self.gripper_pub_topic, robot_name))),
-                    PositionCmd, queue_size=10)
-                self.default_poses[robot_name] = self.default_pose_donbot
-                self.better_poses[robot_name] = self.better_pose_donbot
-
-    def set_localization(self, map_T_odom, robot_name):
-        """
-        :type map_T_odom: PoseStamped
-        """
-        req = UpdateTransformRequest()
-        req.transform.translation = map_T_odom.pose.position
-        req.transform.rotation = map_T_odom.pose.orientation
-        assert self.set_localization_srvs[robot_name](req).success
-        self.wait_heartbeats(10)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.world.groups[robot_name].root_link_name)
-        compare_poses(p2.pose, map_T_odom.pose)
-
-    def open_gripper(self, robot_name):
-        self.set_gripper(robot_name, 0.109)
-
-    def close_gripper(self, robot_name):
-        self.set_gripper(robot_name, 0)
-
-    def set_gripper(self, robot_name, width, gripper_joint='gripper_joint'):
-        """
-        :param width: goal width in m
-        :type width: float
-        """
-        width = max(0.0065, min(0.109, width))
-        goal = PositionCmd()
-        goal.pos = width * 1000
-        rospy.sleep(0.5)
-        self.gripper_pubs[robot_name].publish(goal)
-        rospy.sleep(0.5)
-        self.wait_heartbeats()
-        np.testing.assert_almost_equal(self.world.state[PrefixName(gripper_joint, robot_name)].position, width,
-                                       decimal=3)
-
-    def reset_base(self, robot_name):
-        p = PoseStamped()
-        p.header.frame_id = self.map
-        p.pose.orientation.w = 1
-        self.set_localization(p, robot_name)
-        self.wait_heartbeats()
-        self.move_base(p, robot_name)
-
-    def clear_world(self):
-        return_val = super(GiskardTestWrapper, self).clear_world()
-        assert return_val.error_codes == UpdateWorldResponse.SUCCESS
-        assert len(self.world.groups) == 2
-        assert len(self.world.robot_names) == 2
-        assert self.original_number_of_links == len(self.world._links)
-
-    def reset(self):
-        self.clear_world()
-        for robot_name in self.namespaces:
-            self.reset_base(robot_name)
-            self.open_gripper(robot_name)
-
-    def move_base(self, goal_pose, robot_name):
-        if robot_name == self.pr2:
-            self.teleport_base(goal_pose, robot_name)
-        else:
-            goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
-            js = {'odom_x_joint': goal_pose.pose.position.x,
-                  'odom_y_joint': goal_pose.pose.position.y,
-                  'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                          goal_pose.pose.orientation.y,
-                                                                          goal_pose.pose.orientation.z,
-                                                                          goal_pose.pose.orientation.w]))[0]}
-            self.allow_all_collisions()
-            self.set_joint_goal(js, group_name=robot_name, decimal=1)
-            self.plan_and_execute()
-
-    def get_l_gripper_links(self):
-        if 'l_gripper' not in self.world.group_names:
-            self.world.register_group('l_gripper', 'l_wrist_roll_link')
-        return [str(x) for x in self.world.groups['l_gripper'].link_names_with_collisions]
-
-    def get_r_gripper_links(self):
-        if 'r_gripper' not in self.world.group_names:
-            self.world.register_group('r_gripper', 'r_wrist_roll_link')
-        return [str(x) for x in self.world.groups['r_gripper'].link_names_with_collisions]
-
-    def get_r_forearm_links(self):
-        return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',
-                u'r_forearm_link']
-
-    def get_allow_l_gripper(self, body_b=u'box'):
-        links = self.get_l_gripper_links()
-        return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, [link], body_b, []) for link in links]
-
-    def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
-        links = self.get_l_gripper_links()
-        return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
-
-    def open_r_gripper(self, robot_name):
-        sjs = SetJointStateRequest()
-        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
-                          u'r_gripper_r_finger_tip_joint']
-        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.r_grippers[robot_name].call(sjs)
-
-    def close_r_gripper(self, robot_name):
-        sjs = SetJointStateRequest()
-        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
-                          u'r_gripper_r_finger_tip_joint']
-        sjs.state.position = [0, 0, 0, 0]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.r_grippers[robot_name].call(sjs)
-
-    def open_l_gripper(self, robot_name):
-        sjs = SetJointStateRequest()
-        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
-                          u'l_gripper_r_finger_tip_joint']
-        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.l_grippers[robot_name].call(sjs)
-
-    def close_l_gripper(self, robot_name):
-        sjs = SetJointStateRequest()
-        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
-                          u'l_gripper_r_finger_tip_joint']
-        sjs.state.position = [0, 0, 0, 0]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.l_grippers[robot_name].call(sjs)
-
-    def teleport_base(self, goal_pose, robot_name):
-        goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                      goal_pose.pose.orientation.y,
-                                                                      goal_pose.pose.orientation.z,
-                                                                      goal_pose.pose.orientation.w]))[0]}
-        goal = SetJointStateRequest()
-        goal.state = position_dict_to_joint_states(js)
-        self.set_bases[robot_name].call(goal)
-        rospy.sleep(0.5)
-
-
-class PR2(GiskardTestWrapper):
-    default_pose = {'r_elbow_flex_joint': -0.15,
-                    'r_forearm_roll_joint': 0,
-                    'r_shoulder_lift_joint': 0,
-                    'r_shoulder_pan_joint': 0,
-                    'r_upper_arm_roll_joint': 0,
-                    'r_wrist_flex_joint': -0.10001,
-                    'r_wrist_roll_joint': 0,
-                    'l_elbow_flex_joint': -0.15,
-                    'l_forearm_roll_joint': 0,
-                    'l_shoulder_lift_joint': 0,
-                    'l_shoulder_pan_joint': 0,
-                    'l_upper_arm_roll_joint': 0,
-                    'l_wrist_flex_joint': -0.10001,
-                    'l_wrist_roll_joint': 0,
-                    'torso_lift_joint': 0.2,
-                    'head_pan_joint': 0,
-                    'head_tilt_joint': 0}
-
-    better_pose = {'r_shoulder_pan_joint': -1.7125,
-                   'r_shoulder_lift_joint': -0.25672,
-                   'r_upper_arm_roll_joint': -1.46335,
-                   'r_elbow_flex_joint': -2.12,
-                   'r_forearm_roll_joint': 1.76632,
-                   'r_wrist_flex_joint': -0.10001,
-                   'r_wrist_roll_joint': 0.05106,
-                   'l_shoulder_pan_joint': 1.9652,
-                   'l_shoulder_lift_joint': - 0.26499,
-                   'l_upper_arm_roll_joint': 1.3837,
-                   'l_elbow_flex_joint': -2.12,
-                   'l_forearm_roll_joint': 16.99,
-                   'l_wrist_flex_joint': - 0.10001,
-                   'l_wrist_roll_joint': 0,
-                   'torso_lift_joint': 0.2,
-
-                   'head_pan_joint': 0,
-                   'head_tilt_joint': 0,
-                   }
-
-    def __init__(self):
-        self.r_tip = 'r_gripper_tool_frame'
-        self.l_tip = 'l_gripper_tool_frame'
-        self.l_gripper_group = 'l_gripper'
-        self.r_gripper_group = 'r_gripper'
-        self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
-        self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        self.robot_name = 'pr2'
-        super(PR2, self).__init__('package://giskardpy/config/pr2.yaml', [self.robot_name], [''])
-
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
-        self.plan_and_execute()
-
-    def get_l_gripper_links(self):
-        return [str(x) for x in self.world.groups[self.l_gripper_group].link_names_with_collisions]
-
-    def get_r_gripper_links(self):
-        return [str(x) for x in self.world.groups[self.r_gripper_group].link_names_with_collisions]
-
-    def get_r_forearm_links(self):
-        return ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link', 'r_forearm_link',
-                'r_forearm_link']
-
-    def open_r_gripper(self):
-        sjs = SetJointStateRequest()
-        sjs.state.name = ['r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'r_gripper_l_finger_tip_joint',
-                          'r_gripper_r_finger_tip_joint']
-        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.r_gripper.call(sjs)
-
-    def close_r_gripper(self):
-        sjs = SetJointStateRequest()
-        sjs.state.name = ['r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'r_gripper_l_finger_tip_joint',
-                          'r_gripper_r_finger_tip_joint']
-        sjs.state.position = [0, 0, 0, 0]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.r_gripper.call(sjs)
-
-    def open_l_gripper(self):
-        sjs = SetJointStateRequest()
-        sjs.state.name = ['l_gripper_l_finger_joint', 'l_gripper_r_finger_joint', 'l_gripper_l_finger_tip_joint',
-                          'l_gripper_r_finger_tip_joint']
-        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.l_gripper.call(sjs)
-
-    def close_l_gripper(self):
-        sjs = SetJointStateRequest()
-        sjs.state.name = ['l_gripper_l_finger_joint', 'l_gripper_r_finger_joint', 'l_gripper_l_finger_tip_joint',
-                          'l_gripper_r_finger_tip_joint']
-        sjs.state.position = [0, 0, 0, 0]
-        sjs.state.velocity = [0, 0, 0, 0]
-        sjs.state.effort = [0, 0, 0, 0]
-        self.l_gripper.call(sjs)
-
-    def reset(self):
-        self.open_l_gripper()
-        self.open_r_gripper()
-        self.clear_world()
-        self.reset_base(self.robot_name)
-        self.register_group('l_gripper',
-                            parent_group_name=self.robot_name,
-                            root_link_name='l_wrist_roll_link')
-        self.register_group('r_gripper',
-                            parent_group_name=self.robot_name,
-                            root_link_name='r_wrist_roll_link')
-
-
-class PR2CloseLoop(PR2):
-
-    def __init__(self):
-        self.r_tip = 'r_gripper_tool_frame'
-        self.l_tip = 'l_gripper_tool_frame'
-        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
-        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        GiskardTestWrapper.__init__(self, 'package://giskardpy/config/pr2_closed_loop.yaml')
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        self.move_base(p)
-
-    def reset(self):
-        self.clear_world()
-        self.reset_base()
-
-
-class Donbot(GiskardTestWrapper):
-    default_pose = {
-        'ur5_elbow_joint': 0.0,
-        'ur5_shoulder_lift_joint': 0.0,
-        'ur5_shoulder_pan_joint': 0.0,
-        'ur5_wrist_1_joint': 0.0,
-        'ur5_wrist_2_joint': 0.0,
-        'ur5_wrist_3_joint': 0.0
-    }
-
-    better_pose = {
-        'ur5_shoulder_pan_joint': -np.pi / 2,
-        'ur5_shoulder_lift_joint': -2.44177755311,
-        'ur5_elbow_joint': 2.15026930371,
-        'ur5_wrist_1_joint': 0.291547812391,
-        'ur5_wrist_2_joint': np.pi / 2,
-        'ur5_wrist_3_joint': np.pi / 2
-    }
-
-    def __init__(self):
-        self.camera_tip = 'camera_link'
-        self.gripper_tip = 'gripper_tool_frame'
-        self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
-        self.robot_name = 'donbot'
-        super(Donbot, self).__init__('package://giskardpy/config/donbot.yaml', [self.robot_name], [''])
-
-    def move_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                      goal_pose.pose.orientation.y,
-                                                                      goal_pose.pose.orientation.z,
-                                                                      goal_pose.pose.orientation.w]))[0]}
-        self.allow_all_collisions()
-        self.set_joint_goal(js)
-        self.plan_and_execute()
-
-    def open_gripper(self):
-        self.set_gripper(0.109)
-
-    def close_gripper(self):
-        self.set_gripper(0)
-
-    def set_gripper(self, width, gripper_joint='gripper_joint'):
-        """
-        :param width: goal width in m
-        :type width: float
-        """
-        width = max(0.0065, min(0.109, width))
-        goal = PositionCmd()
-        goal.pos = width * 1000
-        self.gripper_pub.publish(goal)
-        rospy.sleep(0.5)
-        self.wait_heartbeats()
-        np.testing.assert_almost_equal(self.world.state[gripper_joint].position, width, decimal=3)
-
-    def reset(self):
-        self.clear_world()
-        self.reset_base()
-        self.open_gripper()
-
-
-class Donbot2(GiskardTestWrapper):
-    default_pose = {
-        'ur5_elbow_joint': 0.0,
-        'ur5_shoulder_lift_joint': 0.0,
-        'ur5_shoulder_pan_joint': 0.0,
-        'ur5_wrist_1_joint': 0.0,
-        'ur5_wrist_2_joint': 0.0,
-        'ur5_wrist_3_joint': 0.0
-    }
-
-    better_pose = {
-        'ur5_shoulder_pan_joint': -np.pi / 2,
-        'ur5_shoulder_lift_joint': -2.44177755311,
-        'ur5_elbow_joint': 2.15026930371,
-        'ur5_wrist_1_joint': 0.291547812391,
-        'ur5_wrist_2_joint': np.pi / 2,
-        'ur5_wrist_3_joint': np.pi / 2
-    }
-
-    def __init__(self):
-        self.camera_tip = 'camera_link'
-        self.gripper_tip = 'gripper_tool_frame'
-        self.gripper_pub_topic = 'wsg_50_driver/goal_position'
-        self.camera_tips = dict()
-        self.gripper_tips = dict()
-        self.gripper_pubs = dict()
-        self.default_roots = dict()
-        self.set_localization_srvs = dict()
-        self.robot_names = ['donbot_a', 'donbot_b']
-        super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml', self.robot_names,
-                                      self.robot_names)
-        for robot_name in self.namespaces:
-            self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
-            self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)
-            self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
-            self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
-                '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
-                UpdateTransform)
-            self.gripper_pubs[robot_name] = rospy.Publisher(
-                '/{}'.format(str(PrefixName(self.gripper_pub_topic, robot_name))),
-                PositionCmd, queue_size=10)
-
-    def move_base(self, robot_name, goal_pose):
-        goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                      goal_pose.pose.orientation.y,
-                                                                      goal_pose.pose.orientation.z,
-                                                                      goal_pose.pose.orientation.w]))[0]}
-        self.allow_all_collisions()
-        self.set_joint_goal(js, group_name=robot_name, decimal=1)
-        self.plan_and_execute()
-
-    def set_localization(self, map_T_odom, robot_name):
-        """
-        :type map_T_odom: PoseStamped
-        """
-        req = UpdateTransformRequest()
-        req.transform.translation = map_T_odom.pose.position
-        req.transform.rotation = map_T_odom.pose.orientation
-        assert self.set_localization_srvs[robot_name](req).success
-        self.wait_heartbeats(10)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.world.groups[robot_name].root_link_name)
-        compare_poses(p2.pose, map_T_odom.pose)
-
-    def open_gripper(self, robot_name):
-        self.set_gripper(robot_name, 0.109)
-
-    def close_gripper(self, robot_name):
-        self.set_gripper(robot_name, 0)
-
-    def set_gripper(self, robot_name, width, gripper_joint='gripper_joint'):
-        """
-        :param width: goal width in m
-        :type width: float
-        """
-        width = max(0.0065, min(0.109, width))
-        goal = PositionCmd()
-        goal.pos = width * 1000
-        self.gripper_pubs[robot_name].publish(goal)
-        rospy.sleep(0.5)
-        self.wait_heartbeats()
-        np.testing.assert_almost_equal(
-            self.world.groups[robot_name].state[str(PrefixName(gripper_joint, robot_name))].position, width, decimal=3)
-
-    def reset_base(self, robot_name):
-        p = PoseStamped()
-        p.header.frame_id = self.map
-        p.pose.orientation.w = 1
-        self.set_localization(p, robot_name)
-        self.wait_heartbeats()
-        self.move_base(robot_name, p)
-
-    def clear_world(self):
-        return_val = super(GiskardTestWrapper, self).clear_world()
-        assert return_val.error_codes == UpdateWorldResponse.SUCCESS
-        assert len(self.world.groups) == 2
-        assert len(self.robot_names) == 2
-        assert self.original_number_of_links == len(self.world._links)
-
-    def reset(self):
-        self.clear_world()
-        for robot_name in self.namespaces:
-            self.reset_base(robot_name)
-            self.open_gripper(robot_name)
-
-
-class BaseBot(GiskardTestWrapper):
-    default_pose = {
-        'joint_x': 0.0,
-        'joint_y': 0.0,
-        'rot_z': 0.0,
-    }
-
-    def __init__(self):
-        self.robot_name = 'base_bot'
-        super().__init__('package://giskardpy/config/base_bot.yaml', [self.robot_name], [''])
-
-    def reset(self):
-        self.clear_world()
-        # self.set_joint_goal(self.default_pose)
-        # self.plan_and_execute()
-
-
-class BoxyTestWrapper(GiskardTestWrapper):
-    default_pose = {
-        'neck_shoulder_pan_joint': 0.0,
-        'neck_shoulder_lift_joint': 0.0,
-        'neck_elbow_joint': 0.0,
-        'neck_wrist_1_joint': 0.0,
-        'neck_wrist_2_joint': 0.0,
-        'neck_wrist_3_joint': 0.0,
-        'triangle_base_joint': 0.0,
-        'left_arm_0_joint': 0.0,
-        'left_arm_1_joint': 0.0,
-        'left_arm_2_joint': 0.0,
-        'left_arm_3_joint': 0.0,
-        'left_arm_4_joint': 0.0,
-        'left_arm_5_joint': 0.0,
-        'left_arm_6_joint': 0.0,
-        'right_arm_0_joint': 0.0,
-        'right_arm_1_joint': 0.0,
-        'right_arm_2_joint': 0.0,
-        'right_arm_3_joint': 0.0,
-        'right_arm_4_joint': 0.0,
-        'right_arm_5_joint': 0.0,
-        'right_arm_6_joint': 0.0,
-    }
-
-    better_pose = {
-        'neck_shoulder_pan_joint': -1.57,
-        'neck_shoulder_lift_joint': -1.88,
-        'neck_elbow_joint': -2.0,
-        'neck_wrist_1_joint': 0.139999387693,
-        'neck_wrist_2_joint': 1.56999999998,
-        'neck_wrist_3_joint': 0,
-        'triangle_base_joint': -0.24,
-        'left_arm_0_joint': -0.68,
-        'left_arm_1_joint': 1.08,
-        'left_arm_2_joint': -0.13,
-        'left_arm_3_joint': -1.35,
-        'left_arm_4_joint': 0.3,
-        'left_arm_5_joint': 0.7,
-        'left_arm_6_joint': -0.01,
-        'right_arm_0_joint': 0.68,
-        'right_arm_1_joint': -1.08,
-        'right_arm_2_joint': 0.13,
-        'right_arm_3_joint': 1.35,
-        'right_arm_4_joint': -0.3,
-        'right_arm_5_joint': -0.7,
-        'right_arm_6_joint': 0.01,
-    }
-
-    def __init__(self, config=None):
-        self.camera_tip = 'camera_link'
-        self.r_tip = 'right_gripper_tool_frame'
-        self.l_tip = 'left_gripper_tool_frame'
-        self.robot_name = 'boxy'
-        self.r_gripper_group = 'r_gripper'
-        super().__init__(Boxy)
-
-    def move_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                      goal_pose.pose.orientation.y,
-                                                                      goal_pose.pose.orientation.z,
-                                                                      goal_pose.pose.orientation.w]))[0]}
-        self.allow_all_collisions()
-        self.set_joint_goal(js)
-        self.plan_and_execute()
-
-    def reset(self):
-        self.clear_world()
-        self.reset_base()
-        self.register_group(self.r_gripper_group, self.get_robot_name(), 'right_arm_7_link')
-
-
-class BoxyCloseLoop(BoxyTestWrapper):
-
-    def __init__(self, config=None):
-        super().__init__('package://giskardpy/config/boxy_closed_loop.yaml')
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        self.move_base(p)
-
-    def reset(self):
-        self.clear_world()
-        self.reset_base()
+#
+# class PR2AndDonbot(GiskardTestWrapper):
+#     default_pose_pr2 = {'r_elbow_flex_joint': -0.15,
+#                         'r_forearm_roll_joint': 0,
+#                         'r_shoulder_lift_joint': 0,
+#                         'r_shoulder_pan_joint': 0,
+#                         'r_upper_arm_roll_joint': 0,
+#                         'r_wrist_flex_joint': -0.10001,
+#                         'r_wrist_roll_joint': 0,
+#                         'l_elbow_flex_joint': -0.15,
+#                         'l_forearm_roll_joint': 0,
+#                         'l_shoulder_lift_joint': 0,
+#                         'l_shoulder_pan_joint': 0,
+#                         'l_upper_arm_roll_joint': 0,
+#                         'l_wrist_flex_joint': -0.10001,
+#                         'l_wrist_roll_joint': 0,
+#                         'torso_lift_joint': 0.2,
+#                         'head_pan_joint': 0,
+#                         'head_tilt_joint': 0}
+#
+#     better_pose_pr2 = {'r_shoulder_pan_joint': -1.7125,
+#                        'r_shoulder_lift_joint': -0.25672,
+#                        'r_upper_arm_roll_joint': -1.46335,
+#                        'r_elbow_flex_joint': -2.12,
+#                        'r_forearm_roll_joint': 1.76632,
+#                        'r_wrist_flex_joint': -0.10001,
+#                        'r_wrist_roll_joint': 0.05106,
+#                        'l_shoulder_pan_joint': 1.9652,
+#                        'l_shoulder_lift_joint': - 0.26499,
+#                        'l_upper_arm_roll_joint': 1.3837,
+#                        'l_elbow_flex_joint': -2.12,
+#                        'l_forearm_roll_joint': 16.99,
+#                        'l_wrist_flex_joint': - 0.10001,
+#                        'l_wrist_roll_joint': 0,
+#                        'torso_lift_joint': 0.2,
+#
+#                        'head_pan_joint': 0,
+#                        'head_tilt_joint': 0,
+#                        }
+#
+#     default_pose_donbot = {
+#         'ur5_elbow_joint': 0.0,
+#         'ur5_shoulder_lift_joint': 0.0,
+#         'ur5_shoulder_pan_joint': 0.0,
+#         'ur5_wrist_1_joint': 0.0,
+#         'ur5_wrist_2_joint': 0.0,
+#         'ur5_wrist_3_joint': 0.0
+#     }
+#
+#     better_pose_donbot = {
+#         'ur5_shoulder_pan_joint': -np.pi / 2,
+#         'ur5_shoulder_lift_joint': -2.44177755311,
+#         'ur5_elbow_joint': 2.15026930371,
+#         'ur5_wrist_1_joint': 0.291547812391,
+#         'ur5_wrist_2_joint': np.pi / 2,
+#         'ur5_wrist_3_joint': np.pi / 2
+#     }
+#
+#     def __init__(self):
+#         self.r_tips = dict()
+#         self.l_tips = dict()
+#         self.r_grippers = dict()
+#         self.l_grippers = dict()
+#         self.set_localization_srvs = dict()
+#         self.set_bases = dict()
+#         self.default_roots = dict()
+#         self.tf_prefix = dict()
+#         self.camera_tip = 'camera_link'
+#         self.gripper_tip = 'gripper_tool_frame'
+#         self.gripper_pub_topic = 'wsg_50_driver/goal_position'
+#         self.camera_tips = dict()
+#         self.gripper_tips = dict()
+#         self.gripper_pubs = dict()
+#         self.default_poses = dict()
+#         self.better_poses = dict()
+#         self.pr2 = 'pr2'
+#         self.donbot = 'donbot'
+#         robot_names = [self.pr2, self.donbot]
+#         super(PR2AndDonbot, self).__init__(u'package://giskardpy/config/pr2_and_donbot.yaml',
+#                                            robot_names=robot_names, namespaces=robot_names)
+#         for robot_name in self.collision_scene.robot_names:
+#             if self.pr2 == robot_name:
+#                 self.r_tips[robot_name] = u'r_gripper_tool_frame'
+#                 self.l_tips[robot_name] = u'l_gripper_tool_frame'
+#                 self.tf_prefix[robot_name] = robot_name.replace('/', '')
+#                 self.r_grippers[robot_name] = rospy.ServiceProxy(
+#                     u'/{}/r_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+#                 self.l_grippers[robot_name] = rospy.ServiceProxy(
+#                     u'/{}/l_gripper_simulator/set_joint_states'.format(robot_name), SetJointState)
+#                 self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
+#                     '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+#                     UpdateTransform)
+#                 self.set_bases[robot_name] = rospy.ServiceProxy(
+#                     '/{}/base_simulator/set_joint_states'.format(robot_name), SetJointState)
+#                 self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
+#                 self.default_poses[robot_name] = self.default_pose_pr2
+#                 self.better_poses[robot_name] = self.better_pose_pr2
+#             else:
+#                 self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
+#                 self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)
+#                 self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
+#                 self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
+#                     '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+#                     UpdateTransform)
+#                 self.gripper_pubs[robot_name] = rospy.Publisher(
+#                     '/{}'.format(str(PrefixName(self.gripper_pub_topic, robot_name))),
+#                     PositionCmd, queue_size=10)
+#                 self.default_poses[robot_name] = self.default_pose_donbot
+#                 self.better_poses[robot_name] = self.better_pose_donbot
+#
+#     def set_localization(self, map_T_odom, robot_name):
+#         """
+#         :type map_T_odom: PoseStamped
+#         """
+#         req = UpdateTransformRequest()
+#         req.transform.translation = map_T_odom.pose.position
+#         req.transform.rotation = map_T_odom.pose.orientation
+#         assert self.set_localization_srvs[robot_name](req).success
+#         self.wait_heartbeats(10)
+#         p2 = self.world.compute_fk_pose(self.world.root_link_name, self.world.groups[robot_name].root_link_name)
+#         compare_poses(p2.pose, map_T_odom.pose)
+#
+#     def open_gripper(self, robot_name):
+#         self.set_gripper(robot_name, 0.109)
+#
+#     def close_gripper(self, robot_name):
+#         self.set_gripper(robot_name, 0)
+#
+#     def set_gripper(self, robot_name, width, gripper_joint='gripper_joint'):
+#         """
+#         :param width: goal width in m
+#         :type width: float
+#         """
+#         width = max(0.0065, min(0.109, width))
+#         goal = PositionCmd()
+#         goal.pos = width * 1000
+#         rospy.sleep(0.5)
+#         self.gripper_pubs[robot_name].publish(goal)
+#         rospy.sleep(0.5)
+#         self.wait_heartbeats()
+#         np.testing.assert_almost_equal(self.world.state[PrefixName(gripper_joint, robot_name)].position, width,
+#                                        decimal=3)
+#
+#     def reset_base(self, robot_name):
+#         p = PoseStamped()
+#         p.header.frame_id = self.map
+#         p.pose.orientation.w = 1
+#         self.set_localization(p, robot_name)
+#         self.wait_heartbeats()
+#         self.move_base(p, robot_name)
+#
+#     def clear_world(self):
+#         return_val = super(GiskardTestWrapper, self).clear_world()
+#         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
+#         assert len(self.world.groups) == 2
+#         assert len(self.world.robot_names) == 2
+#         assert self.original_number_of_links == len(self.world._links)
+#
+#     def reset(self):
+#         self.clear_world()
+#         for robot_name in self.namespaces:
+#             self.reset_base(robot_name)
+#             self.open_gripper(robot_name)
+#
+#     def move_base(self, goal_pose, robot_name):
+#         if robot_name == self.pr2:
+#             self.teleport_base(goal_pose, robot_name)
+#         else:
+#             goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
+#             js = {'odom_x_joint': goal_pose.pose.position.x,
+#                   'odom_y_joint': goal_pose.pose.position.y,
+#                   'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+#                                                                           goal_pose.pose.orientation.y,
+#                                                                           goal_pose.pose.orientation.z,
+#                                                                           goal_pose.pose.orientation.w]))[0]}
+#             self.allow_all_collisions()
+#             self.set_joint_goal(js, group_name=robot_name, decimal=1)
+#             self.plan_and_execute()
+#
+#     def get_l_gripper_links(self):
+#         if 'l_gripper' not in self.world.group_names:
+#             self.world.register_group('l_gripper', 'l_wrist_roll_link')
+#         return [str(x) for x in self.world.groups['l_gripper'].link_names_with_collisions]
+#
+#     def get_r_gripper_links(self):
+#         if 'r_gripper' not in self.world.group_names:
+#             self.world.register_group('r_gripper', 'r_wrist_roll_link')
+#         return [str(x) for x in self.world.groups['r_gripper'].link_names_with_collisions]
+#
+#     def get_r_forearm_links(self):
+#         return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',
+#                 u'r_forearm_link']
+#
+#     def get_allow_l_gripper(self, body_b=u'box'):
+#         links = self.get_l_gripper_links()
+#         return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, [link], body_b, []) for link in links]
+#
+#     def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
+#         links = self.get_l_gripper_links()
+#         return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
+#
+#     def open_r_gripper(self, robot_name):
+#         sjs = SetJointStateRequest()
+#         sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+#                           u'r_gripper_r_finger_tip_joint']
+#         sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+#         sjs.state.velocity = [0, 0, 0, 0]
+#         sjs.state.effort = [0, 0, 0, 0]
+#         self.r_grippers[robot_name].call(sjs)
+#
+#     def close_r_gripper(self, robot_name):
+#         sjs = SetJointStateRequest()
+#         sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+#                           u'r_gripper_r_finger_tip_joint']
+#         sjs.state.position = [0, 0, 0, 0]
+#         sjs.state.velocity = [0, 0, 0, 0]
+#         sjs.state.effort = [0, 0, 0, 0]
+#         self.r_grippers[robot_name].call(sjs)
+#
+#     def open_l_gripper(self, robot_name):
+#         sjs = SetJointStateRequest()
+#         sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+#                           u'l_gripper_r_finger_tip_joint']
+#         sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+#         sjs.state.velocity = [0, 0, 0, 0]
+#         sjs.state.effort = [0, 0, 0, 0]
+#         self.l_grippers[robot_name].call(sjs)
+#
+#     def close_l_gripper(self, robot_name):
+#         sjs = SetJointStateRequest()
+#         sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+#                           u'l_gripper_r_finger_tip_joint']
+#         sjs.state.position = [0, 0, 0, 0]
+#         sjs.state.velocity = [0, 0, 0, 0]
+#         sjs.state.effort = [0, 0, 0, 0]
+#         self.l_grippers[robot_name].call(sjs)
+#
+#     def teleport_base(self, goal_pose, robot_name):
+#         goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
+#         js = {'odom_x_joint': goal_pose.pose.position.x,
+#               'odom_y_joint': goal_pose.pose.position.y,
+#               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+#                                                                       goal_pose.pose.orientation.y,
+#                                                                       goal_pose.pose.orientation.z,
+#                                                                       goal_pose.pose.orientation.w]))[0]}
+#         goal = SetJointStateRequest()
+#         goal.state = position_dict_to_joint_states(js)
+#         self.set_bases[robot_name].call(goal)
+#         rospy.sleep(0.5)
+
+
+# class Donbot2(GiskardTestWrapper):
+#     default_pose = {
+#         'ur5_elbow_joint': 0.0,
+#         'ur5_shoulder_lift_joint': 0.0,
+#         'ur5_shoulder_pan_joint': 0.0,
+#         'ur5_wrist_1_joint': 0.0,
+#         'ur5_wrist_2_joint': 0.0,
+#         'ur5_wrist_3_joint': 0.0
+#     }
+#
+#     better_pose = {
+#         'ur5_shoulder_pan_joint': -np.pi / 2,
+#         'ur5_shoulder_lift_joint': -2.44177755311,
+#         'ur5_elbow_joint': 2.15026930371,
+#         'ur5_wrist_1_joint': 0.291547812391,
+#         'ur5_wrist_2_joint': np.pi / 2,
+#         'ur5_wrist_3_joint': np.pi / 2
+#     }
+#
+#     def __init__(self):
+#         self.camera_tip = 'camera_link'
+#         self.gripper_tip = 'gripper_tool_frame'
+#         self.gripper_pub_topic = 'wsg_50_driver/goal_position'
+#         self.camera_tips = dict()
+#         self.gripper_tips = dict()
+#         self.gripper_pubs = dict()
+#         self.default_roots = dict()
+#         self.set_localization_srvs = dict()
+#         self.robot_names = ['donbot_a', 'donbot_b']
+#         super(Donbot2, self).__init__('package://giskardpy/config/donbot_twice.yaml', self.robot_names,
+#                                       self.robot_names)
+#         for robot_name in self.namespaces:
+#             self.camera_tips[robot_name] = PrefixName(self.camera_tip, robot_name)
+#             self.gripper_tips[robot_name] = PrefixName(self.gripper_tip, robot_name)
+#             self.default_roots[robot_name] = self.world.groups[robot_name].root_link_name
+#             self.set_localization_srvs[robot_name] = rospy.ServiceProxy(
+#                 '/{}/map_odom_transform_publisher/update_map_odom_transform'.format(robot_name),
+#                 UpdateTransform)
+#             self.gripper_pubs[robot_name] = rospy.Publisher(
+#                 '/{}'.format(str(PrefixName(self.gripper_pub_topic, robot_name))),
+#                 PositionCmd, queue_size=10)
+#
+#     def move_base(self, robot_name, goal_pose):
+#         goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)
+#         js = {'odom_x_joint': goal_pose.pose.position.x,
+#               'odom_y_joint': goal_pose.pose.position.y,
+#               'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+#                                                                       goal_pose.pose.orientation.y,
+#                                                                       goal_pose.pose.orientation.z,
+#                                                                       goal_pose.pose.orientation.w]))[0]}
+#         self.allow_all_collisions()
+#         self.set_joint_goal(js, group_name=robot_name, decimal=1)
+#         self.plan_and_execute()
+#
+#     def set_localization(self, map_T_odom, robot_name):
+#         """
+#         :type map_T_odom: PoseStamped
+#         """
+#         req = UpdateTransformRequest()
+#         req.transform.translation = map_T_odom.pose.position
+#         req.transform.rotation = map_T_odom.pose.orientation
+#         assert self.set_localization_srvs[robot_name](req).success
+#         self.wait_heartbeats(10)
+#         p2 = self.world.compute_fk_pose(self.world.root_link_name, self.world.groups[robot_name].root_link_name)
+#         compare_poses(p2.pose, map_T_odom.pose)
+#
+#     def open_gripper(self, robot_name):
+#         self.set_gripper(robot_name, 0.109)
+#
+#     def close_gripper(self, robot_name):
+#         self.set_gripper(robot_name, 0)
+#
+#     def set_gripper(self, robot_name, width, gripper_joint='gripper_joint'):
+#         """
+#         :param width: goal width in m
+#         :type width: float
+#         """
+#         width = max(0.0065, min(0.109, width))
+#         goal = PositionCmd()
+#         goal.pos = width * 1000
+#         self.gripper_pubs[robot_name].publish(goal)
+#         rospy.sleep(0.5)
+#         self.wait_heartbeats()
+#         np.testing.assert_almost_equal(
+#             self.world.groups[robot_name].state[str(PrefixName(gripper_joint, robot_name))].position, width, decimal=3)
+#
+#     def reset_base(self, robot_name):
+#         p = PoseStamped()
+#         p.header.frame_id = self.map
+#         p.pose.orientation.w = 1
+#         self.set_localization(p, robot_name)
+#         self.wait_heartbeats()
+#         self.move_base(robot_name, p)
+#
+#     def clear_world(self):
+#         return_val = super(GiskardTestWrapper, self).clear_world()
+#         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
+#         assert len(self.world.groups) == 2
+#         assert len(self.robot_names) == 2
+#         assert self.original_number_of_links == len(self.world._links)
+#
+#     def reset(self):
+#         self.clear_world()
+#         for robot_name in self.namespaces:
+#             self.reset_base(robot_name)
+#             self.open_gripper(robot_name)
 
 
 def publish_marker_sphere(position, frame_id='map', radius=0.05, id_=0):

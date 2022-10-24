@@ -178,10 +178,10 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.reset_base()
         self.clear_world()
         self.register_group('l_gripper',
-                            parent_group_name=self.robot_name,
+                            root_link_group_name=self.robot_name,
                             root_link_name='l_wrist_roll_link')
         self.register_group('r_gripper',
-                            parent_group_name=self.robot_name,
+                            root_link_group_name=self.robot_name,
                             root_link_name='r_wrist_roll_link')
 
 
@@ -214,9 +214,9 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    # launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
-    # c = PR2TestWrapper()
-    c = PR2TestWrapperMujoco()
+    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
+    c = PR2TestWrapper()
+    # c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -675,7 +675,8 @@ class TestConstraints:
         zero_pose.allow_self_collision(zero_pose.robot_name)
         goal_position_p = deepcopy(goal_position)
         goal_position_p.header.frame_id = 'base_link'
-        zero_pose.set_straight_cart_goal(goal_position_p, zero_pose.l_tip)
+        zero_pose.set_straight_cart_goal(goal_pose=goal_position_p, tip_link=zero_pose.l_tip,
+                                         root_link=zero_pose.default_root)
         zero_pose.plan_and_execute()
 
     def test_CartesianPoseStraight2(self, better_pose: PR2TestWrapper):
@@ -705,23 +706,27 @@ class TestConstraints:
         goal = deepcopy(object_pose)
         goal.pose.position.x -= 0.1
         goal.pose.position.y += 0.4
-        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
+                                           root_link=better_pose.default_root)
         better_pose.plan_and_execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.z -= 0.4
-        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
+                                           root_link=better_pose.default_root)
         better_pose.plan_and_execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.y -= 0.4
         goal.pose.position.x -= 0.2
-        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
+                                           root_link=better_pose.default_root)
         better_pose.plan_and_execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.x -= 0.4
-        better_pose.set_straight_cart_goal(goal, better_pose.l_tip)
+        better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
+                                           root_link=better_pose.default_root)
         better_pose.plan_and_execute()
 
     def test_CartesianVelocityLimit(self, zero_pose: PR2TestWrapper):
@@ -878,7 +883,7 @@ class TestConstraints:
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
-        kitchen_setup.set_pointing_goal(tip, goal_point, root_link=kitchen_setup.default_root,
+        kitchen_setup.set_pointing_goal(tip_link=tip, goal_point=goal_point, root_link=kitchen_setup.default_root,
                                         pointing_axis=pointing_axis)
         kitchen_setup.plan_and_execute()
 
@@ -886,7 +891,8 @@ class TestConstraints:
         base_goal.header.frame_id = 'pr2/base_footprint'
         base_goal.pose.position.y = 2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
-        kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis)
+        kitchen_setup.set_pointing_goal(tip_link=tip, goal_point=goal_point, pointing_axis=pointing_axis,
+                                        root_link=kitchen_setup.default_root)
         gaya_pose2 = deepcopy(kitchen_setup.better_pose)
         del gaya_pose2['head_pan_joint']
         del gaya_pose2['head_tilt_joint']
@@ -908,7 +914,8 @@ class TestConstraints:
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
-        kitchen_setup.set_pointing_goal(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
+        kitchen_setup.set_pointing_goal(tip_link=tip, goal_point=goal_point, pointing_axis=pointing_axis,
+                                        root_link=kitchen_setup.r_tip)
 
         rospy.loginfo("Starting pointing")
         r_goal = PoseStamped()
@@ -922,7 +929,10 @@ class TestConstraints:
                                                                       [1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
         r_goal.header.frame_id = kitchen_setup.r_tip
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, 'base_footprint', weight=WEIGHT_BELOW_CA)
+        kitchen_setup.set_cart_goal(goal_pose=r_goal,
+                                    tip_link=kitchen_setup.r_tip,
+                                    root_link='base_footprint',
+                                    weight=WEIGHT_BELOW_CA)
         kitchen_setup.plan_and_execute()
 
     def test_open_fridge(self, kitchen_setup: PR2TestWrapper):
@@ -960,7 +970,8 @@ class TestConstraints:
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        kitchen_setup.set_align_planes_goal(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.set_align_planes_goal(tip_link=kitchen_setup.r_tip, tip_normal=x_gripper,
+                                            goal_normal=x_goal)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
         kitchen_setup.plan_and_execute()
@@ -1018,9 +1029,9 @@ class TestConstraints:
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
 
-        kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip,
-                                            x_gripper,
-                                            root_normal=x_goal, check=False)
+        kitchen_setup.set_align_planes_goal(tip_link=kitchen_setup.l_tip,
+                                            tip_normal=x_gripper,
+                                            goal_normal=x_goal, check=False)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
@@ -1094,7 +1105,9 @@ class TestConstraints:
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        kitchen_setup.set_align_planes_goal(hand, x_gripper, root_normal=x_goal)
+        kitchen_setup.set_align_planes_goal(tip_link=hand,
+                                            tip_normal=x_gripper,
+                                            goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
 
         kitchen_setup.plan_and_execute()
@@ -1102,8 +1115,7 @@ class TestConstraints:
         kitchen_setup.set_json_goal('Open',
                                     tip_link=hand,
                                     environment_link=handle_name,
-                                    goal_joint_state=goal_angle,
-                                    )
+                                    goal_joint_state=goal_angle)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': goal_angle})
@@ -1217,8 +1229,8 @@ class TestConstraints:
         y_goal = Vector3Stamped()
         y_goal.header.frame_id = 'map'
         y_goal.vector.z = 1
-        zero_pose.set_align_planes_goal(zero_pose.r_tip, x_gripper, root_normal=x_goal)
-        zero_pose.set_align_planes_goal(zero_pose.r_tip, y_gripper, root_normal=y_goal)
+        zero_pose.set_align_planes_goal(tip_link=zero_pose.r_tip, tip_normal=x_gripper, goal_normal=x_goal)
+        zero_pose.set_align_planes_goal(tip_link=zero_pose.r_tip, tip_normal=y_gripper, goal_normal=y_goal)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -1263,7 +1275,7 @@ class TestConstraints:
         x_goal.header.frame_id = 'map'
         x_goal.vector.y = -1
         x_goal.vector = tf.normalize(x_goal.vector)
-        zero_pose.set_align_planes_goal(zero_pose.r_tip, x_gripper, root_normal=x_goal)
+        zero_pose.set_align_planes_goal(tip_link=zero_pose.r_tip, tip_normal=x_gripper, goal_normal=x_goal)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -1276,7 +1288,7 @@ class TestConstraints:
         goal_vector.header.frame_id = 'map'
         goal_vector.vector.y = -1
         goal_vector.vector = tf.normalize(goal_vector.vector)
-        zero_pose.set_align_planes_goal(tip_link='base_footprint', tip_normal=eef_vector, root_normal=goal_vector)
+        zero_pose.set_align_planes_goal(tip_link='base_footprint', tip_normal=eef_vector, goal_normal=goal_vector)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -1291,7 +1303,7 @@ class TestConstraints:
         env_axis = Vector3Stamped()
         env_axis.header.frame_id = handle_frame_id
         env_axis.vector.z = 1
-        kitchen_setup.set_align_planes_goal(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.set_align_planes_goal(tip_link=elbow, tip_normal=tip_axis, goal_normal=env_axis, weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
@@ -1323,7 +1335,7 @@ class TestConstraints:
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = 'iai_fridge_door_handle'
         x_goal.vector.x = -1
-        kitchen_setup.set_align_planes_goal(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.set_align_planes_goal(tip_link=kitchen_setup.r_tip, tip_normal=x_gripper, goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 

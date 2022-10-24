@@ -5,7 +5,14 @@ from giskardpy.utils import logging
 
 
 class SetPredictionHorizon(Goal):
-    def __init__(self, prediction_horizon, **kwargs):
+    def __init__(self,
+                 prediction_horizon: int,
+                 **kwargs):
+        """
+        Will overwrite the prediction horizon for a single goal.
+        Setting it to 1 will turn of acceleration and jerk limits.
+        :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
+        """
         super().__init__(**kwargs)
         self.new_prediction_horizon = prediction_horizon
 
@@ -33,12 +40,26 @@ class SetPredictionHorizon(Goal):
 
 
 class SetMaxTrajLength(Goal):
-    def __init__(self, new_length: int, **kwargs):
+    def __init__(self,
+                 new_length: int,
+                 **kwargs):
+        """
+        Overwrites Giskard trajectory length limit for planning.
+        If the trajectory is longer than new_length, Giskard will prempt the goal.
+        :param new_length: in seconds
+        """
         super().__init__(**kwargs)
         self.god_map.set_data(identifier.MaxTrajectoryLength + ['length'], new_length)
 
 
 class EnableVelocityTrajectoryTracking(Goal):
-    def __init__(self, enabled: bool = True, **kwargs):
+    def __init__(self,
+                 enabled: bool = True,
+                 **kwargs):
+        """
+        A hack for the PR2. This goal decides whether the velocity part of the trajectory message is filled,
+        when they are send to the robot.
+        :param enabled: If True, will the velocity part of the message.
+        """
         super().__init__(**kwargs)
         self.god_map.set_data(identifier.fill_trajectory_velocity_values, enabled)

@@ -99,7 +99,7 @@ class WorldUpdater(GiskardBehavior):
 
     @profile
     def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
-        link_name = self.world.groups[req.parent_group_name].get_link_short_name_match(req.root_link_name)
+        link_name = self.world.get_link_name(req.root_link_name, req.parent_group_name)
         self.world.register_group(req.group_name, link_name)
         res = RegisterGroupResponse()
         res.error_codes = res.SUCCESS

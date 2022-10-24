@@ -18,19 +18,18 @@ from giskardpy.utils import logging
 
 
 class CartesianPosition(Goal):
-    def __init__(self, root_link: str, tip_link: str, goal_point: PointStamped, root_group: str = None,
-                 tip_group: str = None, reference_velocity: float = None, max_velocity: float = 0.2,
+    def __init__(self, root_link: str, tip_link: str, goal_point: PointStamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 max_velocity: Optional[float] = None,
+                 reference_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
         """
-        This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link.
-        :param root_link: root link of kinematic chain
-        :param tip_link: tip link of kinematic chain
-        :param goal: the goal, orientation part will be ignored
-        :param max_velocity: m/s
-        :param reference_velocity: m/s
-        :param weight: default WEIGHT_ABOVE_CA
+        See CartesianPose.
         """
         super().__init__(**kwargs)
+        if reference_velocity is None:
+            reference_velocity = 0.2
         self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
@@ -77,13 +76,26 @@ class CartesianPosition(Goal):
 
 
 class CartesianOrientation(Goal):
-    def __init__(self, root_link: str, tip_link: str, goal_orientation: QuaternionStamped, root_group: str = None,
-                 tip_group: str = None, reference_velocity=None, max_velocity=0.5,
-                 weight=WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_orientation: QuaternionStamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 reference_velocity: Optional[float] = None,
+                 max_velocity: Optional[float] = None,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 root_link2: str = None,
+                 **kwargs):
+        """
+        See CartesianPose.
+        """
         super().__init__(**kwargs)
         self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
+        if reference_velocity is None:
+            reference_velocity = 0.5
         if isinstance(goal_orientation, PoseStamped):
             logging.logwarn('deprication warning: CartesianOrientation called with PoseStamped instead of QuaternionStamped')
             q = QuaternionStamped()
@@ -131,12 +143,24 @@ class CartesianOrientation(Goal):
 
 
 class CartesianPositionStraight(Goal):
-    def __init__(self,  root_link: str, tip_link: str, goal_point: PointStamped, root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None, reference_velocity: float = None, max_velocity: float = 0.2,
-                 weight: float = WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_point: PointStamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 reference_velocity: Optional[float] = None,
+                 max_velocity: Optional[float] = None,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 **kwargs):
+        """
+        Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
+        """
         super().__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
+        if reference_velocity is None:
+            reference_velocity = 0.2
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -196,17 +220,30 @@ class CartesianPositionStraight(Goal):
 
 
 class CartesianPose(Goal):
-    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, root_group: str = None,
-                 tip_group: str = None, max_linear_velocity: float = 0.1, max_angular_velocity: float = 0.5,
-                 weight=WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
+    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 max_linear_velocity: Optional[float] = None,
+                 max_angular_velocity: Optional[float] = None,
+                 reference_linear_velocity: Optional[float] = None,
+                 reference_angular_velocity: Optional[float] = None,
+                 weight=WEIGHT_ABOVE_CA, root_link2: Optional[str] = None, **kwargs):
         """
-        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
-        :param root_link: str, name of the root link of the kin chain
-        :param tip_link: str, name of the tip link of the kin chain
-        :param goal_pose: PoseStamped as json
-        :param max_linear_velocity: float, m/s, default 0.1
-        :param max_angular_velocity: float, rad/s, default 0.5
-        :param weight: float, default WEIGHT_ABOVE_CA
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
+        :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
+        :param max_linear_velocity: m/s
+        :param max_angular_velocity: rad/s
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: default WEIGHT_ABOVE_CA
+        :param root_link2: experimental, don't use
         """
         super().__init__(**kwargs)
         goal_point = PointStamped()
@@ -218,6 +255,7 @@ class CartesianPose(Goal):
                                                        tip_group=tip_group,
                                                        goal_point=goal_point,
                                                        max_velocity=max_linear_velocity,
+                                                       reference_velocity=reference_linear_velocity,
                                                        weight=weight,
                                                        root_link2=root_link2,
                                                        **kwargs))
@@ -230,6 +268,7 @@ class CartesianPose(Goal):
                                                           tip_group=tip_group,
                                                           goal_orientation=goal_orientation,
                                                           max_velocity=max_angular_velocity,
+                                                          reference_velocity=reference_angular_velocity,
                                                           weight=weight,
                                                           root_link2=root_link2,
                                                           **kwargs))
@@ -240,6 +279,20 @@ class DiffDriveBaseGoal(Goal):
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
                  always_forward: bool = False, **kwargs):
+        """
+        Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
+        1. orient towards goal.
+        2. drive to goal point.
+        3. reach goal orientation.
+        :param root_link: root link of the kinematic chain. typically map
+        :param tip_link: tip link of the kinematic chain. typically base_footprint or similar
+        :param goal_pose:
+        :param max_linear_velocity:
+        :param max_angular_velocity:
+        :param weight:
+        :param pointing_axis: the forward direction. default is x-axis
+        :param always_forward: if false, it will drive backwards, if it requires less rotation.
+        """
         super().__init__(**kwargs)
         self.always_forward = always_forward
         self.max_linear_velocity = max_linear_velocity
@@ -378,9 +431,17 @@ class DiffDriveBaseGoal(Goal):
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None, max_linear_velocity: float = 0.1, max_angular_velocity: float = 0.5,
+    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 max_linear_velocity: Optional[float] = None,
+                 max_angular_velocity: Optional[float] = None,
+                 reference_linear_velocity: Optional[float] = None,
+                 reference_angular_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA, **kwargs):
+        """
+        See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
+        """
         super().__init__(**kwargs)
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
@@ -391,6 +452,7 @@ class CartesianPoseStraight(Goal):
                                                                tip_group=tip_group,
                                                                goal_point=goal_point,
                                                                max_velocity=max_linear_velocity,
+                                                               reference_velocity=reference_linear_velocity,
                                                                weight=weight,
                                                                **kwargs))
         goal_orientation = QuaternionStamped()
@@ -402,6 +464,7 @@ class CartesianPoseStraight(Goal):
                                                           tip_group=tip_group,
                                                           goal_orientation=goal_orientation,
                                                           max_velocity=max_angular_velocity,
+                                                          reference_velocity=reference_angular_velocity,
                                                           weight=weight,
                                                           **kwargs))
 
@@ -410,14 +473,7 @@ class TranslationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, **kwargs):
         """
-        This goal will limit the cartesian velocity of the tip link relative to root link
-        :param root_link: str, root link of the kin chain
-        :param tip_link: str, tip link of the kin chain
-        :param weight: float, default WEIGHT_ABOVE_CA
-        :param max_linear_velocity: float, m/s, default 0.1
-        :param max_angular_velocity: float, rad/s, default 0.5
-        :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
-                                make some goal combination infeasible
+        See CartesianVelocityLimit
         """
         super().__init__(**kwargs)
         self.root_link = self.world.get_link_name(root_link, root_group)
@@ -448,14 +504,7 @@ class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, **kwargs):
         """
-        This goal will limit the cartesian velocity of the tip link relative to root link
-        :param root_link: str, root link of the kin chain
-        :param tip_link: str, tip link of the kin chain
-        :param weight: float, default WEIGHT_ABOVE_CA
-        :param max_linear_velocity: float, m/s, default 0.1
-        :param max_angular_velocity: float, rad/s, default 0.5
-        :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
-                                make some goal combination infeasible
+        See CartesianVelocityLimit
         """
         super(RotationVelocityLimit, self).__init__(**kwargs)
 
@@ -485,17 +534,27 @@ class RotationVelocityLimit(Goal):
 
 
 class CartesianVelocityLimit(Goal):
-    def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 max_linear_velocity: float = 0.1, max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA,
-                 hard: bool = False, **kwargs):
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 max_linear_velocity: float = 0.1,
+                 max_angular_velocity: float = 0.5,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 hard: bool = False,
+                 **kwargs):
         """
-        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
-        :param root_link: str, name of the root link of the kin chain
-        :param tip_link: str, name of the tip link of the kin chain
-        :param goal: PoseStamped as json
-        :param max_linear_velocity: float, m/s, default 0.1
-        :param max_angular_velocity: float, rad/s, default 0.5
-        :param weight: float, default WEIGHT_ABOVE_CA
+        This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
+        slowing down the system noticeably.
+        :param root_link: root link of the kinematic chain
+        :param tip_link: tip link of the kinematic chain
+        :param root_group: if the root_link is not unique, use this to say to which group the link belongs
+        :param tip_group: if the tip_link is not unique, use this to say to which group the link belongs
+        :param max_linear_velocity: m/s
+        :param max_angular_velocity: rad/s
+        :param weight: default WEIGHT_ABOVE_CA
+        :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
         super().__init__(**kwargs)
         self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,

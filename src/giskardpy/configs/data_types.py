@@ -260,7 +260,7 @@ class BehaviorTreeConfig:
             'velocity_threshold': 0.0,
             'cm_per_second': 2.5,
             'height_per_derivative': 6,
-            'normalize_position': True,
+            'normalize_position': False,
             'order': 4,
             'tick_stride': 0.5,
             # 'joint_filter': ['arm_left_2_joint'],

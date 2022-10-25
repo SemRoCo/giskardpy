@@ -2797,7 +2797,35 @@ class TestSelfCollisionAvoidance:
         zero_pose.send_goal()
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
 
-    def test_avoid_self_collision3(self, zero_pose: PR2TestWrapper):
+    def test_avoid_self_collision_specific_link(self, zero_pose: PR2TestWrapper):
+        goal_js = {
+            'r_shoulder_pan_joint': -0.0672581793019,
+            'r_shoulder_lift_joint': 0.429650469244,
+            'r_upper_arm_roll_joint': -0.580889703636,
+            'r_forearm_roll_joint': -101.948215412,
+            'r_elbow_flex_joint': -1.35221928696,
+            'r_wrist_flex_joint': -0.986144640142,
+            'r_wrist_roll_joint': 2.31051794404,
+        }
+        zero_pose.allow_all_collisions()
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.plan_and_execute()
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = -0.2
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(goal_pose=p, tip_link=zero_pose.r_tip, root_link='base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.register_group('forearm', root_link_name='l_forearm_link', root_link_group_name='pr2')
+        zero_pose.register_group('forearm_roll', root_link_name='l_forearm_roll_link', root_link_group_name='pr2')
+        zero_pose.avoid_collision(group1='forearm_roll', group2=zero_pose.r_gripper_group)
+        zero_pose.allow_collision(group1='forearm', group2=zero_pose.r_gripper_group)
+        zero_pose.plan_and_execute()
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
+
+    def test_avoid_self_collision_move_away(self, zero_pose: PR2TestWrapper):
         goal_js = {
             'r_shoulder_pan_joint': -0.0672581793019,
             'r_shoulder_lift_joint': 0.429650469244,

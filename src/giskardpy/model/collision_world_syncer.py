@@ -141,7 +141,7 @@ class Collisions:
         collision.link_b = new_link_b
 
         new_b_T_r = self.world.compute_fk_np(new_link_b, robot.root_link_name)
-        root_T_map = robot.get_fk(robot.root_link_name, self.world.root_link_name)
+        root_T_map = self.world.compute_fk_np(robot.root_link_name, self.world.root_link_name)
         new_b_T_map = np.dot(new_b_T_r, root_T_map)
         collision.new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
 

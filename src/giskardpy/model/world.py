@@ -904,7 +904,7 @@ class WorldTree:
         root_chain = self.compute_chain(connection, root, joints, links, fixed, non_controlled)
         if links:
             root_chain = root_chain[1:]
-        root_chain.reverse()
+        root_chain = root_chain[::-1]
         tip_chain = self.compute_chain(connection, tip, joints, links, fixed, non_controlled)
         if links:
             tip_chain = tip_chain[1:]

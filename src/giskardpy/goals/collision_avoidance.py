@@ -139,8 +139,16 @@ class ExternalCollisionAvoidance(Goal):
 
 class SelfCollisionAvoidance(Goal):
 
-    def __init__(self, link_a, link_b, robot_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
-                 num_repeller=1, **kwargs):
+    def __init__(self,
+                 link_a: my_string,
+                 link_b: my_string,
+                 robot_name: str,
+                 max_velocity: float = 0.2,
+                 hard_threshold: float = 0.0,
+                 soft_threshold: float = 0.05,
+                 idx: float = 0,
+                 num_repeller: int = 1,
+                 **kwargs):
         self.link_a = link_a
         self.link_b = link_b
         self.max_velocity = max_velocity
@@ -149,7 +157,7 @@ class SelfCollisionAvoidance(Goal):
         self.num_repeller = num_repeller
         self.idx = idx
         if self.link_a.prefix != self.link_b.prefix:
-            raise Exception('Links {} and {} have different prefix'.format(self.link_a, self.link_b))
+            raise Exception(f'Links {self.link_a} and {self.link_b} have different prefix.')
         super().__init__(**kwargs)
         self.root = self.world.root_link_name
         self.robot_name = robot_name
@@ -187,7 +195,7 @@ class SelfCollisionAvoidance(Goal):
         number_of_self_collisions = self.get_number_of_self_collisions()
         sample_period = self.sample_period
 
-        b_T_a2 = self.get_fk_evaluated(self.link_b, self.link_a)
+        # b_T_a2 = self.get_fk_evaluated(self.link_b, self.link_a)
         b_T_a = self.get_fk(self.link_b, self.link_a)
         pb_T_b = w.inverse_frame(self.get_b_T_pb())
         a_P_pa = self.get_position_on_a_in_a()
@@ -234,7 +242,6 @@ class SelfCollisionAvoidance(Goal):
     def __str__(self):
         s = super().__str__()
         return f'{s}/{self.link_a}/{self.link_b}/{self.idx}'
-
 
 
 class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_testing

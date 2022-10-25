@@ -3,7 +3,7 @@ from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
 from time import time
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 import actionlib
 import control_msgs
@@ -18,6 +18,7 @@ from hypothesis.strategies import composite
 from numpy import pi
 from rospy import Timer
 from sensor_msgs.msg import JointState
+from sortedcontainers import SortedKeyList
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
@@ -30,6 +31,7 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import GeneralConfig
 from giskardpy.configs.default_config import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
+from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
@@ -1013,51 +1015,70 @@ class GiskardTestWrapper(GiskardWrapper):
     def general_config(self) -> GeneralConfig:
         return self.god_map.unsafe_get_data(identifier.general_options)
 
-    def get_external_collisions(self, link, distance_threshold):
-        """
-        :param distance_threshold:
-        :rtype: list
-        """
-        self.collision_scene.reset_cache()
+    def get_external_collisions(self) -> Collisions:
         collision_goals = []
         for robot_name in self.robot_names:
             collision_goals.append(CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
-                                                  distance=distance_threshold,
+                                                  distance=-1,
                                                   group1=robot_name))
             collision_goals.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-                                                  distance=distance_threshold,
+                                                  distance=-1,
                                                   group1=robot_name,
                                                   group2=robot_name))
-        collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_goals,
+        return self.compute_collisions(collision_goals)
+
+    def get_self_collisions(self, group_name: Optional[str] = None) -> Collisions:
+        if group_name is None:
+            group_name = self.robot_names[0]
+        collision_entries = [CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
+                                            distance=-1,
+                                            group1=group_name,
+                                            group2=group_name)]
+        return self.compute_collisions(collision_entries)
+
+    def compute_collisions(self, collision_entries: List[CollisionEntry]) -> Collisions:
+        self.collision_scene.reset_cache()
+        collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_entries,
                                                                                     defaultdict(lambda: 0.3),
                                                                                     self.collision_scene.ignored_self_collion_pairs)
-        collisions = self.collision_scene.check_collisions(collision_matrix, 15)
-        controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link)
-        controlled_parent_link = self.world._joints[controlled_parent_joint].child_link_name
-        collision_list = collisions.get_external_collisions(controlled_parent_link)
-        for key, self_collisions in collisions.self_collisions.items():
-            if controlled_parent_link in key:
-                collision_list.update(self_collisions)
-        return collision_list
 
-    def check_cpi_geq(self, links, distance_threshold):
-        for link in links:
-            collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance >= distance_threshold, \
-                f'distance for {link}: {collisions[0].contact_distance} < {distance_threshold} ' \
-                f'({collisions[0].original_link_a} with {collisions[0].original_link_b})'
+        return self.collision_scene.check_collisions(collision_matrix, 15)
 
-    def check_cpi_leq(self, links, distance_threshold):
-        for link in links:
-            collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance <= distance_threshold, \
-                f'distance for {link}: {collisions[0].contact_distance} > {distance_threshold} ' \
-                f'({collisions[0].original_link_a} with {collisions[0].original_link_b})'
+    def compute_all_collisions(self) -> Collisions:
+        collision_entries = [CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
+                                            distance=-1)]
+        return self.compute_collisions(collision_entries)
 
-    def move_base(self, goal_pose):
-        """
-        :type goal_pose: PoseStamped
-        """
+    def check_cpi_geq(self, links, distance_threshold, check_external=True, check_self=True):
+        collisions = self.compute_all_collisions()
+        links = [self.world.get_link_name(link_name) for link_name in links]
+        for collision in collisions.all_collisions:
+            if not check_external and collision.is_external:
+                continue
+            if not check_self and not collision.is_external:
+                continue
+            if collision.original_link_a in links or collision.original_link_b in links:
+                assert collision.contact_distance >= distance_threshold, \
+                    f'{collision.contact_distance} < {distance_threshold} ' \
+                    f'({collision.original_link_a} with {collision.original_link_b})'
+
+    def check_cpi_leq(self, links, distance_threshold, check_external=True, check_self=True):
+        collisions = self.compute_all_collisions()
+        min_contact: Collision = None
+        links = [self.world.get_link_name(link_name) for link_name in links]
+        for collision in collisions.all_collisions:
+            if not check_external and collision.is_external:
+                continue
+            if not check_self and not collision.is_external:
+                continue
+            if collision.original_link_a in links or collision.original_link_b in links:
+                if min_contact is None or collision.contact_distance <= min_contact.contact_distance:
+                    min_contact = collision
+        assert min_contact.contact_distance <= distance_threshold, \
+            f'{min_contact.contact_distance} > {distance_threshold} ' \
+            f'({min_contact.original_link_a} with {min_contact.original_link_b})'
+
+    def move_base(self, goal_pose: PoseStamped):
         pass
 
     def reset(self):

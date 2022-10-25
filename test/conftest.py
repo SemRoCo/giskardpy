@@ -30,8 +30,14 @@ def ros(request):
         except Exception:
             pass
 
-    launch_launchfile('package://iai_apartment/launch/upload_apartment.launch')
-    launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
+    try:
+        rospy.get_param('kitchen_description')
+    except:
+        launch_launchfile('package://iai_apartment/launch/upload_apartment.launch')
+    try:
+        rospy.get_param('apartment_description')
+    except:
+        launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
     request.addfinalizer(kill_ros)
 
 

@@ -198,11 +198,9 @@ class Collisions:
         return c
 
     @profile
-    def get_external_collisions(self, joint_name):
+    def get_external_collisions(self, joint_name: str) -> SortedKeyList:
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
-        :type joint_name: str
-        :rtype: SortedKeyList
         """
         if joint_name in self.external_collision:
             return self.external_collision[joint_name]
@@ -484,16 +482,10 @@ class CollisionWorldSynchronizer:
                 in_collision.add((link_a_name, link_b_name))
         return in_collision
 
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
+    def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15) -> Collisions:
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
-        :type cut_off_distances: dict
-        :param self_collision_d: distances grater than this value will be ignored
-        :type self_collision_d: float
-        :type enable_self_collision: bool
-        :return: (robot_link, body_b, link_b) -> Collision
-        :rtype: Collisions
         """
         pass
 

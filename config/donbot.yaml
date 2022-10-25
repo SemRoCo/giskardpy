@@ -1,6 +1,0 @@
-parent: !include [default.yaml, robots/donbot.yaml, action_server.yaml]
-robot_interface:
-  base:
-    robot_name: pr2
-  body:
-    robot_name: pr2

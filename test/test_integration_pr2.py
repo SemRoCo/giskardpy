@@ -813,62 +813,62 @@ class TestConstraints:
             lower_limit2 = center - joint_range / 2. * (1 - percentage / 100.)
             assert upper_limit2 >= position >= lower_limit2
 
-    def test_OverwriteWeights1(self, pocky_pose_setup: PR2TestWrapper):
-        # FIXME
-        # joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
-        # old_torso_value = pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights
-        # old_odom_x_value = pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights
-
-        r_goal = PoseStamped()
-        r_goal.header.frame_id = pocky_pose_setup.r_tip
-        r_goal.pose.orientation.w = 1
-        r_goal.pose.position.x += 0.1
-        updates = {
-            1: {
-                'odom_x_joint': 1000000,
-                'odom_y_joint': 1000000,
-                'odom_z_joint': 1000000
-            },
-        }
-
-        old_pose = tf.lookup_pose('map', 'base_footprint')
-
-        pocky_pose_setup.set_overwrite_joint_weights_goal(updates)
-        pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip, check=False)
-        pocky_pose_setup.plan_and_execute()
-
-        new_pose = tf.lookup_pose('map', 'base_footprint')
-        compare_poses(new_pose.pose, old_pose.pose)
-
-        assert pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1] == 1000000
-        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
-                              int)
-
-        updates = {
-            1: {
-                'odom_x_joint': 0.0001,
-                'odom_y_joint': 0.0001,
-                'odom_z_joint': 0.0001,
-            },
-        }
-        # old_pose = tf.lookup_pose('map', 'base_footprint')
-        # old_pose.pose.position.x += 0.1
-        pocky_pose_setup.set_overwrite_joint_weights_goal(updates)
-        pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        pocky_pose_setup.plan_and_execute()
-
-        new_pose = tf.lookup_pose('map', 'base_footprint')
-
-        # compare_poses(old_pose.pose, new_pose.pose)
-        assert new_pose.pose.position.x >= 0.03
-        assert pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1] == 0.0001
-        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
-                              float)
-        pocky_pose_setup.plan_and_execute()
-        assert not isinstance(pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1],
-                              float)
-        assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
-                              float)
+    # def test_OverwriteWeights1(self, pocky_pose_setup: PR2TestWrapper):
+    #     # FIXME
+    #     # joint_velocity_weight = identifier.joint_weights + ['velocity', 'override']
+    #     # old_torso_value = pocky_pose_setup.world.joints['torso_lift_joint'].free_variable.quadratic_weights
+    #     # old_odom_x_value = pocky_pose_setup.world.joints['odom_x_joint'].free_variable.quadratic_weights
+    #
+    #     r_goal = PoseStamped()
+    #     r_goal.header.frame_id = pocky_pose_setup.r_tip
+    #     r_goal.pose.orientation.w = 1
+    #     r_goal.pose.position.x += 0.1
+    #     updates = {
+    #         1: {
+    #             'odom_x_joint': 1000000,
+    #             'odom_y_joint': 1000000,
+    #             'odom_z_joint': 1000000
+    #         },
+    #     }
+    #
+    #     old_pose = tf.lookup_pose('map', 'base_footprint')
+    #
+    #     pocky_pose_setup.set_overwrite_joint_weights_goal(updates)
+    #     pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip, check=False)
+    #     pocky_pose_setup.plan_and_execute()
+    #
+    #     new_pose = tf.lookup_pose('map', 'base_footprint')
+    #     compare_poses(new_pose.pose, old_pose.pose)
+    #
+    #     assert pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1] == 1000000
+    #     assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+    #                           int)
+    #
+    #     updates = {
+    #         1: {
+    #             'odom_x_joint': 0.0001,
+    #             'odom_y_joint': 0.0001,
+    #             'odom_z_joint': 0.0001,
+    #         },
+    #     }
+    #     # old_pose = tf.lookup_pose('map', 'base_footprint')
+    #     # old_pose.pose.position.x += 0.1
+    #     pocky_pose_setup.set_overwrite_joint_weights_goal(updates)
+    #     pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
+    #     pocky_pose_setup.plan_and_execute()
+    #
+    #     new_pose = tf.lookup_pose('map', 'base_footprint')
+    #
+    #     # compare_poses(old_pose.pose, new_pose.pose)
+    #     assert new_pose.pose.position.x >= 0.03
+    #     assert pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1] == 0.0001
+    #     assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+    #                           float)
+    #     pocky_pose_setup.plan_and_execute()
+    #     assert not isinstance(pocky_pose_setup.world._joints['odom_x_joint'].free_variable.quadratic_weights[1],
+    #                           float)
+    #     assert not isinstance(pocky_pose_setup.world._joints['torso_lift_joint'].free_variable.quadratic_weights[1],
+    #                           float)
 
     def test_pointing(self, kitchen_setup: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -1360,14 +1360,16 @@ class TestConstraints:
         env_axis = Vector3Stamped()
         env_axis.header.frame_id = handle_frame_id
         env_axis.vector.z = 1
-        kitchen_setup.set_align_planes_goal(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.set_align_planes_goal(tip_link=elbow, tip_normal=tip_axis, goal_normal=env_axis,
+                                            weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
         elbow_point = PointStamped()
         elbow_point.header.frame_id = handle_frame_id
         elbow_point.point.x += 0.1
         kitchen_setup.set_translation_goal(elbow_point, elbow)
-        kitchen_setup.set_align_planes_goal(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.set_align_planes_goal(tip_link=elbow, tip_normal=tip_axis, goal_normal=env_axis,
+                                            weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
@@ -1410,7 +1412,8 @@ class TestConstraints:
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.set_align_planes_goal(tip_link=kitchen_setup.l_tip, tip_normal=x_gripper,
+                                            goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
 
         kitchen_setup.plan_and_execute()

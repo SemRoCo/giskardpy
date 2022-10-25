@@ -472,7 +472,7 @@ def launch_launchfile(file_name: str):
     launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_file])
     with suppress_stderr():
         launch.start()
-        launch.shutdown()
+        # launch.shutdown()
 
 
 blackboard_exception_name = 'exception'

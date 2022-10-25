@@ -30,6 +30,8 @@ def ros(request):
         except Exception:
             pass
 
+    launch_launchfile('package://iai_apartment/launch/upload_apartment.launch')
+    launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
     request.addfinalizer(kill_ros)
 
 
@@ -66,7 +68,6 @@ def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     better_pose.kitchen_name = 'iai_kitchen'
     if better_pose.is_standalone():
-        launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
@@ -89,7 +90,6 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
 def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     better_pose.environment_name = 'iai_apartment'
     if better_pose.is_standalone():
-        launch_launchfile('package://iai_apartment/launch/apartment_bringup.launch')
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1

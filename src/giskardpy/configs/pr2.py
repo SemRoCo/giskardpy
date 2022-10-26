@@ -39,7 +39,8 @@ class PR2_Base(Giskard):
         self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
                                                       'head_tilt_joint'])
         self.set_default_joint_limits(velocity_limit=1,
-                                      acceleration_limit=1.5)
+                                      acceleration_limit=1.5,
+                                      jerk_limit=None)
         self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
                                              velocity_limit=2)
         self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
@@ -49,7 +50,8 @@ class PR2_Base(Giskard):
         self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
                                                  acceleration_limit=4)
         self.set_default_weights(velocity_weight=0.001,
-                                 acceleration_weight=0.001)
+                                 acceleration_weight=0.001,
+                                 jerk_weight=None)
 
 
 class PR2_Mujoco(PR2_Base):
@@ -85,7 +87,7 @@ class PR2_IAI(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
-        self._general_config.default_link_color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+        self.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
@@ -149,6 +151,7 @@ class PR2_StandAlone(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
+        self.set_default_visualization_marker_color(1, 1, 1, 0.8)
         self._general_config.control_mode = ControlModes.stand_alone
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)

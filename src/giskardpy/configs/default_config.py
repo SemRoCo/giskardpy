@@ -2,6 +2,7 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, Optional, List, Union, Tuple
 
+from std_msgs.msg import ColorRGBA
 from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
@@ -276,7 +277,11 @@ class Giskard:
         self.grow()
         self._god_map.get_data(identifier.tree_manager).live()
 
+    def set_default_visualization_marker_color(self, r, g, b, a):
+        self._general_config.default_link_color = ColorRGBA(r, g, b, a)
+
     # Collision avoidance
+
     def set_default_self_collision_avoidance(self,
                                              number_of_repeller: int = 1,
                                              soft_threshold: float = 0.05,
@@ -474,14 +479,19 @@ class Giskard:
     def set_qp_solver(self, new_solver: QPSolver):
         self._qp_solver_config.qp_solver = new_solver
 
-    def set_default_joint_limits(self, velocity_limit: float, acceleration_limit: Optional[float] = None,
-                                 jerk_limit: Optional[float] = None):
-        self._general_config.joint_limits[derivative_to_name[1]] = defaultdict(lambda: velocity_limit)
+    def set_default_joint_limits(self,
+                                 velocity_limit: float = 1,
+                                 acceleration_limit: Optional[float] = 1e3,
+                                 jerk_limit: Optional[float] = 30):
+        if jerk_limit is not None and acceleration_limit is None:
+            raise AttributeError('If jerk limits are set, acceleration limits also have to be set/')
+        self._general_config.joint_limits = {
+            derivative_to_name[1]: defaultdict(lambda: velocity_limit)
+        }
+        if acceleration_limit is not None:
+            self._general_config.joint_limits[derivative_to_name[2]] = defaultdict(lambda: acceleration_limit)
         if jerk_limit is not None:
             self._general_config.joint_limits[derivative_to_name[3]] = defaultdict(lambda: jerk_limit)
-            self._general_config.joint_limits[derivative_to_name[2]] = defaultdict(lambda: acceleration_limit)
-        elif acceleration_limit is not None:
-            self._general_config.joint_limits[derivative_to_name[2]] = defaultdict(lambda: acceleration_limit)
 
     def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
         if group_name is None:

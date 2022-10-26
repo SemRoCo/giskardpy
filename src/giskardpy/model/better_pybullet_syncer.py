@@ -95,7 +95,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a.reshape(4))
                     map_P_b = map_T_b.dot(p.point_b.reshape(4))
-                    groups_b = self.world.get_groups_containing_link(link_b)
+                    groups_b = self.world.get_group_names_containing_link(link_b)
                     if len(groups_b) == 1:
                         body_b = groups_b.pop()
                     else:

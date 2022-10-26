@@ -204,7 +204,7 @@ class WorldUpdater(GiskardBehavior):
         if req.pose.header.frame_id == '':
             raise TransformException('Frame_id in pose is not set.')
         try:
-            global_pose = transform_pose(self.world.root_link_name, req.pose)
+            global_pose = transform_pose(target_frame=self.world.root_link_name, pose=req.pose, timeout=0.5)
         except:
             req.pose.header.frame_id = self.world.get_link_name(req.pose.header.frame_id)
             global_pose = self.world.transform_msg(self.world.root_link_name, req.pose)

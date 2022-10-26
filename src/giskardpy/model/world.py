@@ -503,8 +503,8 @@ class WorldTree:
             parent = self.get_parent_group_name(ancestry[-1])
         return set(ancestry)
 
-    def get_group_containing_link(self, link_name: Union[PrefixName, str]) -> str:
-        groups = self.get_groups_containing_link(link_name)
+    def get_group_name_containing_link(self, link_name: Union[PrefixName, str]) -> str:
+        groups = self.get_group_names_containing_link(link_name)
         ret = self._get_group_from_groups(groups)
         if ret is None:
             raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
@@ -530,7 +530,7 @@ class WorldTree:
                         group = relatives[0]
             return group
 
-    def get_groups_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
+    def get_group_names_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
             if link_name in subtree.link_names:

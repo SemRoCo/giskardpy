@@ -165,22 +165,22 @@ class RosMsgToGoal(GetGoal):
         joints = [j for j in self.world.controlled_joints if j not in fixed_joints]
         for joint_name in joints:
             try:
-                robot = self.world.get_group_of_joint(joint_name)
+                robot_name = self.world.get_group_of_joint(joint_name).name
             except KeyError:
                 child_link = self.world._joints[joint_name].child_link_name
-                robot = self.world.get_group_containing_link(child_link)
+                robot_name = self.world.get_group_name_containing_link(child_link)
             child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
             if child_links:
-                number_of_repeller = configs[robot].external_collision_avoidance[joint_name].number_of_repeller
+                number_of_repeller = configs[robot_name].external_collision_avoidance[joint_name].number_of_repeller
                 for i in range(number_of_repeller):
                     child_link = self.world._joints[joint_name].child_link_name
-                    hard_threshold = configs[robot].external_collision_avoidance[joint_name].hard_threshold
+                    hard_threshold = configs[robot_name].external_collision_avoidance[joint_name].hard_threshold
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
                     else:
-                        soft_threshold = configs[robot].external_collision_avoidance[joint_name].soft_threshold
+                        soft_threshold = configs[robot_name].external_collision_avoidance[joint_name].soft_threshold
                     constraint = ExternalCollisionAvoidance(god_map=self.god_map,
-                                                            robot_name=robot,
+                                                            robot_name=robot_name,
                                                             link_name=child_link,
                                                             hard_threshold=hard_threshold,
                                                             soft_thresholds=soft_threshold,
@@ -209,7 +209,7 @@ class RosMsgToGoal(GetGoal):
                     pass
 
         for link_a, link_b in counter:
-            group_names = self.world.get_groups_containing_link(link_a)
+            group_names = self.world.get_group_names_containing_link(link_a)
             if len(group_names) != 1:
                 group_name = self.world.get_parent_group_name(group_names.pop())
             else:
@@ -237,8 +237,8 @@ class RosMsgToGoal(GetGoal):
                                          config[link_b].soft_threshold)
                     number_of_repeller = min(config[link_a].number_of_repeller,
                                              config[link_b].number_of_repeller)
-                groups_a = self.world.get_group_containing_link(link_a)
-                groups_b = self.world.get_group_containing_link(link_b)
+                groups_a = self.world.get_group_name_containing_link(link_a)
+                groups_b = self.world.get_group_name_containing_link(link_b)
                 if groups_b == groups_a:
                     robot_name = groups_a
                 else:

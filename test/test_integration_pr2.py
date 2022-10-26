@@ -2927,13 +2927,13 @@ class TestCollisionAvoidanceGoals:
 
     def test_handover(self, kitchen_setup: PR2TestWrapper):
         js = {
-            "l_shoulder_pan_joint": 1.0252138037286773,
-            "l_shoulder_lift_joint": - 0.06966848987919201,
-            "l_upper_arm_roll_joint": 1.1765832782526544,
-            "l_elbow_flex_joint": - 1.9323726623855864,
-            "l_forearm_roll_joint": 1.3824994377973336,
-            "l_wrist_flex_joint": - 1.8416233909065576,
-            "l_wrist_roll_joint": 2.907373693068033,
+            'l_shoulder_pan_joint': 1.0252138037286773,
+            'l_shoulder_lift_joint': - 0.06966848987919201,
+            'l_upper_arm_roll_joint': 1.1765832782526544,
+            'l_elbow_flex_joint': - 1.9323726623855864,
+            'l_forearm_roll_joint': 1.3824994377973336,
+            'l_wrist_flex_joint': - 1.8416233909065576,
+            'l_wrist_roll_joint': 2.907373693068033,
         }
         kitchen_setup.set_joint_goal(js)
         # kitchen_setup.allow_all_collisions()
@@ -2946,7 +2946,6 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.add_box(name='box',
                               size=(0.08, 0.16, 0.16),
                               parent_link=kitchen_setup.l_tip,
-                              parent_link_group=kitchen_setup.get_robot_name(),
                               pose=p)
         kitchen_setup.close_l_gripper()
         r_goal = PoseStamped()
@@ -2961,7 +2960,7 @@ class TestCollisionAvoidanceGoals:
                                     linear_velocity=0.2,
                                     angular_velocity=1
                                     )
-        kitchen_setup.allow_collision(group1=kitchen_setup.get_robot_name(), group2='box')
+        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2='box')
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.update_parent_link_of_group('box', kitchen_setup.r_tip)
@@ -2972,7 +2971,7 @@ class TestCollisionAvoidanceGoals:
         r_goal2.pose.orientation.w = 1
 
         kitchen_setup.set_cart_goal(r_goal2, 'box', root_link=kitchen_setup.l_tip)
-        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.allow_self_collision()
         kitchen_setup.plan_and_execute()
         # kitchen_setup.check_cart_goal('box', r_goal2)
 
@@ -3823,7 +3822,7 @@ class TestCollisionAvoidanceGoals:
 
         tray_pose = PoseStamped()
         tray_pose.header.frame_id = 'iai_kitchen/sink_area_surface'
-        tray_pose.pose.position = Point(0.1, -0.4, 0.07)
+        tray_pose.pose.position = Point(0.2, -0.4, 0.07)
         tray_pose.pose.orientation.w = 1
 
         kitchen_setup.add_box(tray_name, (.2, .4, .1), pose=tray_pose)

@@ -25,7 +25,6 @@ from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_cla
 
 
 class RosMsgToGoal(GetGoal):
-    # FIXME no error msg when constraint has missing parameter
     @profile
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
@@ -39,7 +38,6 @@ class RosMsgToGoal(GetGoal):
     @catch_and_raise_to_blackboard
     @profile
     def update(self):
-        # TODO make this interruptable
         loginfo('Parsing goal message.')
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
@@ -90,7 +88,6 @@ class RosMsgToGoal(GetGoal):
                 traceback.print_exc()
                 doc_string = C.__init__.__doc__
                 error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
-                # FIXME I don't like the doc string
                 # if doc_string is not None:
                 #     error_msg = error_msg + doc_string
                 if not isinstance(e, GiskardException):
@@ -108,7 +105,6 @@ class RosMsgToGoal(GetGoal):
         """
         Adds a constraint for each link that pushed it away from its closest point.
         """
-        # FIXME this only catches the most obvious cases
         collision_matrix = self.collision_entries_to_collision_matrix(collision_entries)
         self.god_map.set_data(identifier.collision_matrix, collision_matrix)
         self.time_collector.collision_avoidance.append(0)
@@ -132,7 +128,6 @@ class RosMsgToGoal(GetGoal):
             collision_avoidance_config = self.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance
             self_distances = collision_avoidance_config.self_collision_avoidance
-            # FIXME check all dict entries
             default_distance[robot_name] = collision_avoidance_config.cal_max_param('soft_threshold')
 
         max_distances = defaultdict(lambda: default_distance)
@@ -217,7 +212,6 @@ class RosMsgToGoal(GetGoal):
             for i in range(num_of_constraints):
                 key = f'{link_a}, {link_b}'
                 key_r = f'{link_b}, {link_a}'
-                # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
                 config = configs[group_name].self_collision_avoidance
                 if key in config:
                     hard_threshold = config[key].hard_threshold

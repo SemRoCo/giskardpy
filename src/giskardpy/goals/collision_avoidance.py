@@ -244,7 +244,7 @@ class SelfCollisionAvoidance(Goal):
         return f'{s}/{self.link_a}/{self.link_b}/{self.idx}'
 
 
-class CollisionAvoidanceHint(Goal): # fixme: broke this one with two_robots_testing
+class CollisionAvoidanceHint(Goal):
     def __init__(self, tip_link, avoidance_hint, object_link_name, object_group = None, max_linear_velocity=0.1,
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """

@@ -12,8 +12,6 @@ class CleanUp(GiskardBehavior):
     @profile
     def __init__(self, name):
         super().__init__(name)
-        # FIXME this is the smallest hack to reverse (some) update godmap changes, constraints need some kind of finalize
-        # self.rosparams = deepcopy(self.get_god_map().get_data(identifier.giskard))
 
     @profile
     def initialise(self):

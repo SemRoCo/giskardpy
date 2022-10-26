@@ -48,7 +48,6 @@ class QPSolverGurobi(QPSolver):
 
     @profile
     def init(self, H, g, A, lb, ub, lbA, ubA):
-        # TODO potential speed up by reusing model
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(lb.shape, lb=lb, ub=ub)
         # H = sparse.csc_matrix(H)
@@ -67,7 +66,6 @@ class QPSolverGurobi(QPSolver):
         self.qpProblem.setMObjective(H, None, 0.0)
 
     def print_debug(self):
-        # TODO use MinRHS etc to analyse solution
         gurobipy.setParam('LogToConsole', True)
         logging.logwarn(error_info[self.qpProblem.status])
         self.qpProblem.reset()

@@ -54,7 +54,7 @@ class Pointing(Goal):
         tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
 
         root_V_goal_axis = root_P_goal_point - w.position_of(root_T_tip)
-        root_V_goal_axis /= w.norm(root_V_goal_axis)  # FIXME avoid /0
+        root_V_goal_axis = w.scale(root_V_goal_axis, 1)
         root_V_pointing_axis = w.dot(root_T_tip, tip_V_pointing_axis)
 
         self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,

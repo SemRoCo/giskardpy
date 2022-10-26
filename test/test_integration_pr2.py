@@ -471,7 +471,6 @@ class TestConstraints:
         assert zero_pose.robot.state[joint_name].position >= lower_limit
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
-        # FIXME bouncy
         tip = 'base_footprint'
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'map'

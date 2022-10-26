@@ -101,7 +101,6 @@ def stop_pybullet():
 def start_pybullet(gui, gravity=0):
     if not p.isConnected():
         if gui:
-            # TODO expose opengl2 option for gui?
             server_id = p.connect(p.GUI, options='--opengl2')  # or p.DIRECT for non-graphical version
         else:
             server_id = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version

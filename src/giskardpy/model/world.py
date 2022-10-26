@@ -405,7 +405,6 @@ class WorldTree:
         self._link_joint_to_links(new_joint)
 
     def _set_free_variables_on_mimic_joints(self, group_name):
-        # TODO prevent this from happening twice
         for joint_name, joint in self.groups[group_name]._joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
                 joint.connect_to_existing_free_variables()
@@ -630,13 +629,12 @@ class WorldTree:
         self._clear()
         joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
         for joint in joints_to_add:
-            # todo handle if they are not in order
             self._add_joint_and_create_child(joint)
         for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
             self.add_urdf(robot_config.urdf,
                           group_name=robot_config.name,
                           actuated=True)
-        self.fast_all_fks = None  # TODO unnecessary?
+        self.fast_all_fks = None
         self.notify_model_change()
 
     def _add_joint_and_create_child(self, joint: Joint):
@@ -705,7 +703,7 @@ class WorldTree:
     def joint_constraints(self):
         joint_constraints = []
         for joint_name, joint in self._joints.items():
-            if joint.has_free_variables():  # FIXME check name clashes
+            if joint.has_free_variables():
                 joint_constraints.extend(joint.free_variable_list)
         return joint_constraints
 
@@ -798,14 +796,10 @@ class WorldTree:
         helper(joint.child_link_name)
         self.notify_model_change()
 
-    def link_order(self, link_a, link_b):
+    def link_order(self, link_a: my_string, link_b: my_string) -> bool:
         """
-        TODO find a better name
         this function is used when deciding for which order to calculate the collisions
         true if link_a < link_b
-        :type link_a: str
-        :type link_b: str
-        :rtype: bool
         """
         if self.is_link_controlled(link_a) and not self.is_link_controlled(link_b):
             return True
@@ -861,7 +855,6 @@ class WorldTree:
     @profile
     @memoize
     def compute_chain(self, root_link_name, tip_link_name, joints, links, fixed, non_controlled):
-        # FIXME memoizing this function results in weird errors...
         chain = []
         if links:
             chain.append(tip_link_name)
@@ -912,8 +905,7 @@ class WorldTree:
             fk = w.dot(fk, w.inverse_frame(self._joints[joint_name].parent_T_child))
         for joint_name in tip_chain:
             fk = w.dot(fk, self._joints[joint_name].parent_T_child)
-        # FIXME there is some reference fuckup going on, but i don't know where; deepcopy is just a quick fix
-        return deepcopy(fk)
+        return fk
 
     @profile
     def init_fast_fks(self):

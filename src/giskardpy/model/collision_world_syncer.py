@@ -219,15 +219,10 @@ class Collisions:
         return self.number_of_external_collisions[joint_name]
 
     # @profile
-    def get_self_collisions(self, link_a, link_b):
+    def get_self_collisions(self, link_a: my_string, link_b: my_string) -> SortedKeyList:
         """
         Make sure that link_a < link_b, the reverse collision is not saved.
-        :type link_a: str
-        :type link_b: str
-        :return:
-        :rtype: SortedKeyList
         """
-        # FIXME maybe check for reverse key?
         if (link_a, link_b) in self.self_collisions:
             return self.self_collisions[link_a, link_b]
         return self.default_result
@@ -552,7 +547,6 @@ class CollisionWorldSynchronizer:
                 # remove everything before the allow all, including the allow all
                 collision_goals = collision_goals[len(collision_goals) - i:]
                 break
-            # todo: error: if robot name given, allow collisions might be ignored
         else:
             # put an avoid all at the front
             ce = CollisionEntry()

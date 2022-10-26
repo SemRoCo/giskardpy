@@ -96,14 +96,6 @@ class Goal:
         key = identifier.joint_states + [joint_name, 'velocity']
         return self.god_map.to_symbol(key)
 
-    def get_object_joint_position_symbol(self, object_name, joint_name):
-        """
-        returns a symbol that referes to the given joint
-        """
-        # TODO test me
-        key = identifier.world + ['get_object', (object_name,), 'joint_state', joint_name, 'position']
-        return self.god_map.to_symbol(key)
-
     @property
     def sample_period(self):
         return self.god_map.get_data(identifier.sample_period)

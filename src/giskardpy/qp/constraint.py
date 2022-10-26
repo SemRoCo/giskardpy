@@ -63,7 +63,7 @@ class VelocityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         self.control_horizon = control_horizon
-        self.velocity_limit = velocity_limit # TODO rename
+        self.velocity_limit = velocity_limit
         if self.is_iterable(lower_velocity_limit):
             self.lower_velocity_limit = lower_velocity_limit
         else:

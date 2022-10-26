@@ -251,7 +251,6 @@ class GodMap(object):
         return r
 
     def clear_cache(self):
-        # TODO should be possible without clear cache
         self.shortcuts = {}
 
     def to_symbol(self, identifier):
@@ -405,7 +404,6 @@ class GodMap(object):
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
         :rtype: list
         """
-        # TODO potential speedup by only updating entries that have changed
         # its a trap, this function only looks slow with lineprofiler
         with self.lock:
             return self.unsafe_get_values(symbols)

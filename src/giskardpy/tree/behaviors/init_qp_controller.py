@@ -58,7 +58,6 @@ class InitQPController(GiskardBehavior):
         return constraints, vel_constraints, debug_expressions
 
     def get_active_free_symbols(self, constraints, vel_constraints):
-        # fixme shoudn't this use vel constraints as well?
         symbols = set()
         for c in chain(constraints.values(), vel_constraints.values()):
             symbols.update(str(s) for s in w.free_symbols(c.expression))

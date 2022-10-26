@@ -440,7 +440,6 @@ class A(Parent):
         #         |   sp   |   sp   |   sp   |   sp   |
         #         |      sp|      sp|      sp|      sp|
         #         |===================================|
-        # TODO possible speed improvement by creating blocks and stitching them together
         number_of_joints = self.number_of_joints
         A_soft = w.zeros(
             self.prediction_horizon * number_of_joints +  # joint position constraints
@@ -546,7 +545,6 @@ class A(Parent):
                 # I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
                 #            w.eye(J_hstack.shape[0])) * self.sample_period
                 # A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
-                # TODO multiply with control horizon instead?
             # extra slack variable for total error
             I = w.eye(J_hstack.shape[0]) * self.sample_period * self.prediction_horizon
             A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
@@ -636,7 +634,6 @@ class QPController:
         """
         :type free_variables: list
         """
-        # TODO check for empty goals
         if len(free_variables) == 0:
             raise QPSolverException('Cannot solve qp with no free variables')
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
@@ -694,7 +691,6 @@ class QPController:
         """
         :type debug_expressions: dict
         """
-        # TODO check duplicates
         self.debug_expressions.update(debug_expressions)
 
     @profile
@@ -718,7 +714,6 @@ class QPController:
         compilation_time = time() - t
         logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(compilation_time))
         self.time_collector.compilations.append(compilation_time)
-        # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):

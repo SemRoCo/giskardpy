@@ -174,7 +174,6 @@ class JointStates(defaultdict):
 
 
 class BiDict(dict):
-    # TODO test me
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.inverse = {}

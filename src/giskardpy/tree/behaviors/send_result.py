@@ -10,13 +10,8 @@ class SendResult(ActionServerBehavior):
     @profile
     def update(self):
         skip_failures = self.get_god_map().get_data(identifier.skip_failures)
-        Blackboard().set('exception', None)  # FIXME move this to reset?
+        # Blackboard().set('exception', None)  # FIXME move this to reset?
         result = self.get_god_map().get_data(identifier.result_message)
-
-        # trajectory = self.get_god_map().get_data(identifier.trajectory)
-        # sample_period = self.get_god_map().get_data(identifier.sample_period)
-        # controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
-        # result.trajectory = trajectory.to_msg(sample_period, controlled_joints, True)
 
         if result.error_codes[-1] == MoveResult.PREEMPTED:
             logging.logerr('Goal preempted')

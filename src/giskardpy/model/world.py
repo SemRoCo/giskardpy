@@ -16,8 +16,8 @@ import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import JointStates, KeyDefaultDict
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException
 from giskardpy.god_map import GodMap
@@ -521,7 +521,7 @@ class WorldTree:
                 if i + 1 == len(groups):
                     break
                 else:
-                   g_b = groups_l[i+1]
+                    g_b = groups_l[i + 1]
                 if g_a != g_b:
                     g_ancestry = self.get_parents_of_group_name(g_a)
                     group_ancestry = self.get_parents_of_group_name(g_b)
@@ -599,7 +599,7 @@ class WorldTree:
                           parent_link_name=parent_link_name,
                           group_name=group_name)
         else:
-            link = Link.from_world_body(link_name=PrefixName(group_name,group_name), msg=msg,
+            link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
                                         color=self.default_link_color)
             self._add_link(link)
             joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
@@ -612,7 +612,8 @@ class WorldTree:
 
     @cached_property
     def movable_joints(self):
-        return [j.name for j in self._joints.values() if not isinstance(j, FixedJoint) and not isinstance(j, MimicJoint)]
+        return [j.name for j in self._joints.values() if
+                not isinstance(j, FixedJoint) and not isinstance(j, MimicJoint)]
 
     @cached_property
     def movable_joints_as_set(self):
@@ -624,8 +625,6 @@ class WorldTree:
         self._joints: Dict[Union[PrefixName, str], Joint] = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
-
-
 
     def delete_all_but_robots(self):
         self._clear()
@@ -647,19 +646,14 @@ class WorldTree:
         self._add_link(child_link)
         self._link_joint_to_links(joint)
 
-    def _set_joint_limits(self, linear_limits, angular_limits, order):
-        for joint_name in self.movable_joints:  # type: OneDofJoint
-            joint = self._joints[joint_name]
-            joint.update_limits(linear_limits, angular_limits, order)
-
     @profile
     def sync_with_paramserver(self):
         new_lin_limits = {}
         new_ang_limits = {}
-        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_limits)) + 1):
-            diff = order_map[i]
+        for i in range(self.god_map.unsafe_get_data(identifier.max_derivative)):
+            derivative = Derivatives(i + 1) # to start with velocity and include max_derivative
 
-            class Linear(object):
+            class Linear:
                 def __init__(self, god_map, diff):
                     self.god_map = god_map
                     self.diff = diff
@@ -667,7 +661,7 @@ class WorldTree:
                 def __call__(self, key):
                     return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + [key])
 
-            class Angular(object):
+            class Angular:
                 def __init__(self, god_map, diff):
                     self.god_map = god_map
                     self.diff = diff
@@ -675,16 +669,18 @@ class WorldTree:
                 def __call__(self, key):
                     return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + [key])
 
-            d_linear = KeyDefaultDict(Linear(self.god_map, diff))
-            d_angular = KeyDefaultDict(Angular(self.god_map, diff))
-            new_lin_limits[i] = d_linear
-            new_ang_limits[i] = d_angular
-        for joint_name in self.movable_joints:  # type: OneDofJoint
+            d_linear = KeyDefaultDict(Linear(self.god_map, derivative))
+            d_angular = KeyDefaultDict(Angular(self.god_map, derivative))
+            new_lin_limits[derivative] = d_linear
+            new_ang_limits[derivative] = d_angular
+        for joint_name in self.movable_joints:
             joint = self._joints[joint_name]
             joint.update_limits(new_lin_limits, new_ang_limits)
 
         new_weights = {}
-        for i in range(1, len(self.god_map.unsafe_get_data(identifier.joint_weights)) + 1):
+        for i in range(self.god_map.unsafe_get_data(identifier.max_derivative)):
+            derivative = Derivatives(i + 1) # to start with velocity and include max_derivative
+
             class Default:
                 def __init__(self, derivative_name, god_map):
                     self.god_map = god_map
@@ -693,13 +689,9 @@ class WorldTree:
                 def __call__(self, joint_name):
                     return self.god_map.to_symbol(identifier.joint_weights + [self.derivative_name, joint_name])
 
-            # def default(joint_name):
-            #     return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
-            # default = lambda joint_name: self.god_map.to_symbol(identifier.joint_weights + [order_map[i], joint_name])
-            default = Default(order_map[i], self.god_map)
+            default = Default(derivative, self.god_map)
             d = KeyDefaultDict(default)
-            new_weights[i] = d
-            # self._set_joint_weights(i, d)
+            new_weights[derivative] = d
         self.overwrite_joint_weights(new_weights)
         self.notify_model_change()
 
@@ -949,7 +941,6 @@ class WorldTree:
         root_P_tip.header = root_T_tip.header
         root_P_tip.point = root_T_tip.pose.position
         return root_P_tip
-
 
     @memoize
     def compute_fk_pose_with_collision_offset(self, root, tip, collision_id):
@@ -1245,7 +1236,7 @@ class WorldTree:
     def get_all_free_variable_velocity_limits(self):
         limits = {}
         for free_variable in self.free_variables:
-            limits[free_variable.name] = free_variable.get_upper_limit(order=1,
+            limits[free_variable.name] = free_variable.get_upper_limit(derivative=1,
                                                                        default=False,
                                                                        evaluated=True)
         return limits

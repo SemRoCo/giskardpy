@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from enum import Enum, IntEnum
 from typing import Union, Dict
 import genpy
 
@@ -56,9 +58,19 @@ class PrefixName:
         return self.long_name.__contains__(item.__str__())
 
 
+class Derivatives(IntEnum):
+    position = 0
+    velocity = 1
+    acceleration = 2
+    jerk = 3
+    snap = 4
+    crackle = 5
+    pop = 6
+
+
 my_string = Union[str, PrefixName]
 goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, None]
 expr_symbol = Union[ca.SX, float]
 expr_matrix = ca.SX
-derivative_map = Dict[int, float]
-derivative_joint_map = Dict[int, Dict[my_string, float]]
+derivative_map = Dict[Derivatives, float]
+derivative_joint_map = Dict[Derivatives, Dict[my_string, float]]

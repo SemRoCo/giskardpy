@@ -2,6 +2,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Optional, List, Tuple, Dict, Union
 
+from giskardpy.data_types import Derivatives
 from giskardpy.model.utils import robot_name_from_urdf_string
 from std_msgs.msg import ColorRGBA
 
@@ -40,14 +41,15 @@ class ControlModes(Enum):
 class GeneralConfig:
     def __init__(self):
         self.control_mode: ControlModes = ControlModes.open_loop
+        self.maximum_derivative: Derivatives = Derivatives.jerk
         self.action_server_name: str = '~command'
         self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
         self.test_mode: bool = False
         self.debug: bool = False
-        self.joint_limits: Dict[str, Dict[PrefixName, float]] = {
-            'velocity': defaultdict(lambda: 1),
-            'acceleration': defaultdict(lambda: 1e3),
-            'jerk': defaultdict(lambda: 30)
+        self.joint_limits: Dict[Derivatives, Dict[PrefixName, float]] = {
+            Derivatives.velocity: defaultdict(lambda: 1),
+            Derivatives.acceleration: defaultdict(lambda: 1e3),
+            Derivatives.jerk: defaultdict(lambda: 30)
         }
         self.default_link_color = ColorRGBA(1, 1, 1, 0.5)
 
@@ -60,7 +62,7 @@ class QPSolverConfig:
                  added_slack: float = 100,
                  sample_period: float = 0.05,
                  weight_factor: float = 100,
-                 joint_weights: Optional[Dict[str, Dict[PrefixName, float]]] = None):
+                 joint_weights: Optional[Dict[Derivatives, Dict[PrefixName, float]]] = None):
         self.qp_solver = qp_solver
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
@@ -69,9 +71,9 @@ class QPSolverConfig:
         self.weight_factor = weight_factor
         if joint_weights is None:
             self.joint_weights = {
-                'velocity': defaultdict(lambda: 0.001),
-                'acceleration': defaultdict(float),
-                'jerk': defaultdict(lambda: 0.001)
+                Derivatives.velocity: defaultdict(lambda: 0.001),
+                Derivatives.acceleration: defaultdict(float),
+                Derivatives.jerk: defaultdict(lambda: 0.001)
             }
         else:
             self.joint_weights = joint_weights

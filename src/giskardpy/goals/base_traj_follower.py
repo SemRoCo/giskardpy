@@ -1,10 +1,9 @@
 from __future__ import division
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.data_types import derivative_to_name
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive
-from giskardpy.my_types import my_string, expr_symbol
+from giskardpy.my_types import my_string, expr_symbol, Derivatives
 
 
 class BaseTrajFollower(Goal):
@@ -27,11 +26,10 @@ class BaseTrajFollower(Goal):
         self.track_only_velocity = track_only_velocity
         # self.control_horizon = 1
 
-    def x_symbol(self, t: int, free_variable_name: str, derivative: int = 0) -> expr_symbol:
-        return self.god_map.to_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name,
-                                                               derivative_to_name[derivative]])
+    def x_symbol(self, t: int, free_variable_name: str, derivative: Derivatives = Derivatives.position) -> expr_symbol:
+        return self.god_map.to_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, derivative])
 
-    def current_traj_point(self, free_variable_name: str, start_t: float, derivative: int = 0) -> expr_symbol:
+    def current_traj_point(self, free_variable_name: str, start_t: float, derivative: Derivatives = Derivatives.position) -> expr_symbol:
         time = self.god_map.to_expr(identifier.time)
         # self.add_debug_expr('time', time)
         b_result_cases = []
@@ -43,7 +41,7 @@ class BaseTrajFollower(Goal):
                                   b_result_cases=b_result_cases,
                                   else_result=self.x_symbol(self.trajectory_length - 1, free_variable_name, derivative))
 
-    def make_odom_T_base_footprint_goal(self, t: float, derivative: int = 0):
+    def make_odom_T_base_footprint_goal(self, t: float, derivative: Derivatives = Derivatives.position):
         x = self.current_traj_point(self.joint.x_name, t, derivative)
         if isinstance(self.joint, OmniDrive) or derivative == 0:
             y = self.current_traj_point(self.joint.y_name, t, derivative)
@@ -98,9 +96,9 @@ class BaseTrajFollower(Goal):
             base_footprint_T_base_footprint_goal = w.dot(base_footprint_T_odom, odom_T_base_footprint_goal)
             # errors_x.append(w.position_of(base_footprint_T_base_footprint_goal)[0])
             # errors_y.append(w.position_of(base_footprint_T_base_footprint_goal)[1])
-            x = self.current_traj_point(self.joint.x_vel_name, t * self.sample_period, 1)
+            x = self.current_traj_point(self.joint.x_vel_name, t * self.sample_period, Derivatives.velocity)
             if isinstance(self.joint, OmniDrive):
-                y = self.current_traj_point(self.joint.y_vel_name, t * self.sample_period, 1)
+                y = self.current_traj_point(self.joint.y_vel_name, t * self.sample_period, Derivatives.velocity)
             else:
                 y = 0
             base_footprint_P_vel = w.vector3(x, y, 0)
@@ -197,7 +195,7 @@ class BaseTrajFollower(Goal):
     def add_rot_constraints(self):
         errors = []
         for t in range(self.prediction_horizon):
-            errors.append(self.current_traj_point(self.joint.yaw_name, t * self.sample_period, 1))
+            errors.append(self.current_traj_point(self.joint.yaw_name, t * self.sample_period, Derivatives.velocity))
             if t == 0 and not self.track_only_velocity:
                 errors[-1] += self.rot_error_at(t)
         self.add_velocity_constraint(lower_velocity_limit=errors,

@@ -4,6 +4,7 @@ from std_msgs.msg import ColorRGBA
 
 from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_config import Giskard
+from giskardpy.my_types import Derivatives
 
 
 class PR2_Base(Giskard):
@@ -38,6 +39,7 @@ class PR2_Base(Giskard):
                                              'fr_caster_l_wheel_link', 'fr_caster_r_wheel_link'])
         self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
                                                       'head_tilt_joint'])
+        self.set_maximum_derivative(Derivatives.acceleration)
         self.set_default_joint_limits(velocity_limit=1,
                                       acceleration_limit=1.5,
                                       jerk_limit=None)

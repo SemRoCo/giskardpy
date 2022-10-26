@@ -263,29 +263,29 @@ class BA(Parent):
                         self.round_to2)
                     if self.default_limits:
                         if self.order >= 4:
-                            lower_vel = w.min(v.get_upper_limit(order=1,
+                            lower_vel = w.min(v.get_upper_limit(derivative=1,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(order=3,
+                                              v.get_upper_limit(derivative=3,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 3)
-                            upper_vel = w.max(v.get_lower_limit(order=1,
+                            upper_vel = w.max(v.get_lower_limit(derivative=1,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(order=3,
+                                              v.get_lower_limit(derivative=3,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 3)
                         else:
-                            lower_vel = w.min(v.get_upper_limit(order=1,
+                            lower_vel = w.min(v.get_upper_limit(derivative=1,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(order=2,
+                                              v.get_upper_limit(derivative=2,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 2)
-                            upper_vel = w.max(v.get_lower_limit(order=1,
+                            upper_vel = w.max(v.get_lower_limit(derivative=1,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(order=2,
+                                              v.get_lower_limit(derivative=2,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 2)
                         lower_bound = w.if_greater(normal_lower_bound, 0,

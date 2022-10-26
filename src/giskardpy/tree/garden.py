@@ -14,7 +14,6 @@ import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, HardwareConfig
-from giskardpy.data_types import order_map
 from giskardpy.god_map import GodMap
 from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
@@ -814,30 +813,6 @@ class ClosedLoop(OpenLoop):
 # def sanity_check(god_map):
 #     check_velocity_limits_reachable(god_map)
 
-
-def sanity_check_derivatives(god_map):
-    for robot_name in god_map.get_data(identifier.rosparam + ['namespaces']):
-        weights = god_map.get_data(identifier.joint_weights[robot_name])
-        limits = god_map.get_data(identifier.joint_limits[robot_name])
-        check_derivatives(weights, 'Weights')
-        check_derivatives(limits, 'Limits')
-        if len(weights) != len(limits):
-            raise AttributeError('Weights and limits are not defined for the same number of derivatives')
-
-
-def check_derivatives(entries, name):
-    """
-    :type entries: dict
-    """
-    allowed_derivates = list(order_map.values())[1:]
-    for weight in entries:
-        if weight not in allowed_derivates:
-            raise AttributeError(
-                '{} set for unknown derivative: {} not in {}'.format(name, weight, list(allowed_derivates)))
-    weight_ids = [order_map.inverse[x] for x in entries]
-    if max(weight_ids) != len(weight_ids):
-        raise AttributeError(
-            '{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
 
 # def check_velocity_limits_reachable(god_map):
 #     # TODO a more general version of this

@@ -14,13 +14,12 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
     TfPublishingModes, CollisionAvoidanceConfigEntry
-from giskardpy.data_types import derivative_to_name
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string, PrefixName
+from giskardpy.my_types import my_string, PrefixName, Derivatives
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
@@ -204,6 +203,11 @@ class Giskard:
         if odometry_topic is not None:
             self.add_odometry_topic(odometry_topic=odometry_topic,
                                     joint_name=brumbrum_joint.name)
+
+    def set_maximum_derivative(self, new_value: Derivatives = Derivatives.jerk):
+        self._general_config.maximum_derivative = new_value
+
+
 
     def add_base_cmd_velocity(self,
                               cmd_vel_topic: str,
@@ -486,44 +490,44 @@ class Giskard:
         if jerk_limit is not None and acceleration_limit is None:
             raise AttributeError('If jerk limits are set, acceleration limits also have to be set/')
         self._general_config.joint_limits = {
-            derivative_to_name[1]: defaultdict(lambda: velocity_limit)
+            Derivatives.velocity: defaultdict(lambda: velocity_limit)
         }
         if acceleration_limit is not None:
-            self._general_config.joint_limits[derivative_to_name[2]] = defaultdict(lambda: acceleration_limit)
+            self._general_config.joint_limits[Derivatives.acceleration] = defaultdict(lambda: acceleration_limit)
         if jerk_limit is not None:
-            self._general_config.joint_limits[derivative_to_name[3]] = defaultdict(lambda: jerk_limit)
+            self._general_config.joint_limits[Derivatives.jerk] = defaultdict(lambda: jerk_limit)
 
     def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.get_default_group_name()
         joint_name = PrefixName(joint_name, group_name)
-        self._general_config.joint_limits[derivative_to_name[1]][joint_name] = velocity_limit
+        self._general_config.joint_limits[Derivatives.velocity][joint_name] = velocity_limit
 
     def overwrite_joint_acceleration_limits(self, joint_name, acceleration_limit: float,
                                             group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.get_default_group_name()
         joint_name = PrefixName(joint_name, group_name)
-        self._general_config.joint_limits[derivative_to_name[2]][joint_name] = acceleration_limit
+        self._general_config.joint_limits[Derivatives.acceleration][joint_name] = acceleration_limit
 
     def overwrite_joint_jerk_limits(self, joint_name, jerk_limit: float, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.get_default_group_name()
         joint_name = PrefixName(joint_name, group_name)
-        self._general_config.joint_limits[derivative_to_name[3]][joint_name] = jerk_limit
+        self._general_config.joint_limits[Derivatives.jerk][joint_name] = jerk_limit
 
     def set_default_weights(self,
                             velocity_weight: float = 0.001,
                             acceleration_weight: Optional[float] = None,
                             jerk_weight: Optional[float] = 0.001):
         self._qp_solver_config.joint_weights = {
-            derivative_to_name[1]: defaultdict(lambda: velocity_weight)
+            Derivatives.velocity: defaultdict(lambda: velocity_weight)
         }
         if jerk_weight is not None:
-            self._qp_solver_config.joint_weights[derivative_to_name[2]] = defaultdict(lambda: acceleration_weight)
-            self._qp_solver_config.joint_weights[derivative_to_name[3]] = defaultdict(lambda: jerk_weight)
+            self._qp_solver_config.joint_weights[Derivatives.acceleration] = defaultdict(lambda: acceleration_weight)
+            self._qp_solver_config.joint_weights[Derivatives.jerk] = defaultdict(lambda: jerk_weight)
         elif acceleration_weight is not None:
-            self._qp_solver_config.joint_weights[derivative_to_name[2]] = defaultdict(lambda: acceleration_weight)
+            self._qp_solver_config.joint_weights[Derivatives.acceleration] = defaultdict(lambda: acceleration_weight)
 
     def overwrite_joint_velocity_weight(self,
                                         joint_name: str,
@@ -532,7 +536,7 @@ class Giskard:
         if group_name is None:
             group_name = self.get_default_group_name()
         joint_name = PrefixName(joint_name, group_name)
-        self._qp_solver_config.joint_weights[derivative_to_name[1]][joint_name] = velocity_weight
+        self._qp_solver_config.joint_weights[Derivatives.velocity][joint_name] = velocity_weight
 
     def overwrite_joint_acceleration_weight(self,
                                             joint_name: str,
@@ -541,7 +545,7 @@ class Giskard:
         if group_name is None:
             group_name = self.get_default_group_name()
         joint_name = PrefixName(joint_name, group_name)
-        self._qp_solver_config.joint_weights[derivative_to_name[2]][joint_name] = acceleration_weight
+        self._qp_solver_config.joint_weights[Derivatives.acceleration][joint_name] = acceleration_weight
 
     def overwrite_joint_jerk_weight(self,
                                     joint_name: str,
@@ -550,4 +554,4 @@ class Giskard:
         if group_name is None:
             group_name = self.get_default_group_name()
         joint_name = PrefixName(joint_name, group_name)
-        self._qp_solver_config.joint_weights[derivative_to_name[3]][joint_name] = jerk_weight
+        self._qp_solver_config.joint_weights[Derivatives.jerk][joint_name] = jerk_weight

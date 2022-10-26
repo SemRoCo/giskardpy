@@ -44,6 +44,7 @@ giskard = ['giskard']
 # config file
 # general options
 general_options = giskard + ['_general_config']
+max_derivative = general_options + ['maximum_derivative']
 action_server_name = general_options + ['action_server_name']
 tmp_folder = general_options + ['path_to_data_folder']
 debug = general_options + ['debug']

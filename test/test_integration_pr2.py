@@ -1306,7 +1306,8 @@ class TestConstraints:
         env_axis = Vector3Stamped()
         env_axis.header.frame_id = handle_frame_id
         env_axis.vector.z = 1
-        kitchen_setup.set_align_planes_goal(tip_link=elbow, tip_normal=tip_axis, goal_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.set_align_planes_goal(tip_link=elbow, tip_normal=tip_axis, goal_normal=env_axis,
+                                            weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
@@ -3055,9 +3056,23 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x += 0.5
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         box_setup.teleport_base(p)
-        box_setup.avoid_collision(min_distance=0.15, group1=box_setup.robot_name, group2='box')
+        box_setup.allow_self_collision()
+        box_setup.avoid_collision(min_distance=0.25, group1=box_setup.robot_name, group2='box')
         box_setup.plan_and_execute()
-        box_setup.check_cpi_geq(['base_link'], 0.149)
+        box_setup.check_cpi_geq(['base_link'], distance_threshold=0.25, check_self=False)
+
+    def test_ignore_all_collisions_of_links(self, box_setup: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = box_setup.default_root
+        p.pose.position.x += 0.5
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        box_setup.teleport_base(p)
+        box_setup.check_cpi_geq(['bl_caster_l_wheel_link', 'bl_caster_r_wheel_link',
+                                 'fl_caster_l_wheel_link', 'fl_caster_r_wheel_link',
+                                 'br_caster_l_wheel_link', 'br_caster_r_wheel_link',
+                                 'fr_caster_l_wheel_link', 'fr_caster_r_wheel_link'],
+                                distance_threshold=0.25,
+                                check_self=False)
 
     def test_avoid_collision_go_around_corner(self, fake_table_setup: PR2TestWrapper):
         r_goal = PoseStamped()
@@ -3793,7 +3808,6 @@ class TestCollisionAvoidanceGoals:
 
         # spawn cup
 
-
     def test_ease_spoon(self, kitchen_setup: PR2TestWrapper):
         spoon_name = 'spoon'
         percentage = 40
@@ -3971,7 +3985,6 @@ class TestCollisionAvoidanceGoals:
     #     kitchen_setup.send_goal()
     #
     #     # kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
-
 
 
 class TestInfoServices:

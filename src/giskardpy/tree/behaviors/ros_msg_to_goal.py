@@ -121,10 +121,9 @@ class RosMsgToGoal(GetGoal):
     def collision_entries_to_collision_matrix(self, collision_entries: List[CollisionEntry]):
         self.collision_scene.sync()
         max_distances = self.make_max_distances()
-        ignored_collisions = self.collision_scene.ignored_self_collion_pairs
+        # ignored_collisions = self.collision_scene.ignored_self_collion_pairs
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                    max_distances,
-                                                                                    ignored_collisions)
+                                                                                    max_distances)
         return collision_matrix
 
     def make_max_distances(self):

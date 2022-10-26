@@ -44,7 +44,7 @@ class GeneralConfig:
         self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
         self.test_mode: bool = False
         self.debug: bool = False
-        self.joint_limits: Dict[str, Dict[str, float]] = {
+        self.joint_limits: Dict[str, Dict[PrefixName, float]] = {
             'velocity': defaultdict(lambda: 1),
             'acceleration': defaultdict(lambda: 1e3),
             'jerk': defaultdict(lambda: 30)
@@ -60,7 +60,7 @@ class QPSolverConfig:
                  added_slack: float = 100,
                  sample_period: float = 0.05,
                  weight_factor: float = 100,
-                 joint_weights: Optional[Dict[str, Dict[str, float]]] = None):
+                 joint_weights: Optional[Dict[str, Dict[PrefixName, float]]] = None):
         self.qp_solver = qp_solver
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints

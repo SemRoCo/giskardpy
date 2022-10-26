@@ -32,39 +32,31 @@ class PR2_Base(Giskard):
             self.overwrite_external_collision_avoidance(joint_name,
                                                         soft_threshold=0.025,
                                                         hard_threshold=0.0)
+        self.ignore_all_collisions_of_links(['bl_caster_l_wheel_link', 'bl_caster_r_wheel_link',
+                                             'fl_caster_l_wheel_link', 'fl_caster_r_wheel_link',
+                                             'br_caster_l_wheel_link', 'br_caster_r_wheel_link',
+                                             'fr_caster_l_wheel_link', 'fr_caster_r_wheel_link'])
         self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
                                                       'head_tilt_joint'])
-        # self.general_config.joint_limits = {
-        #     'velocity': defaultdict(lambda: 0.5),
-        #     'acceleration': defaultdict(lambda: 1e3),
-        #     'jerk': defaultdict(lambda: 10)
-        # }
-        # self.qp_solver_config.joint_weights = {
-        #     'velocity': defaultdict(lambda: 0.001),
-        #     'acceleration': defaultdict(float),
-        #     'jerk': defaultdict(lambda: 0.001)
-        # }
-        self.general_config.joint_limits = {
-            'velocity': defaultdict(lambda: 1),
-            'acceleration': defaultdict(lambda: 1.5),
-        }
-        self.qp_solver_config.joint_weights = {
-            'velocity': defaultdict(lambda: 0.001),
-            'acceleration': defaultdict(lambda: 0.001),
-        }
-        self.general_config.joint_limits['velocity']['head_pan_joint'] = 2
-        self.general_config.joint_limits['velocity']['head_tilt_joint'] = 2
-        self.general_config.joint_limits['acceleration']['head_pan_joint'] = 4
-        self.general_config.joint_limits['acceleration']['head_tilt_joint'] = 4
-        # self.general_config.joint_limits['jerk']['head_pan_joint'] = 30
-        # self.general_config.joint_limits['jerk']['head_tilt_joint'] = 30
+        self.set_default_joint_limits(velocity_limit=1,
+                                      acceleration_limit=1.5)
+        self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
+                                             velocity_limit=2)
+        self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
+                                                 acceleration_limit=4)
+        self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
+                                             velocity_limit=2)
+        self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
+                                                 acceleration_limit=4)
+        self.set_default_weights(velocity_weight=0.001,
+                                 acceleration_weight=0.001)
 
 
 class PR2_Mujoco(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
-        self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
+        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
@@ -84,16 +76,16 @@ class PR2_Mujoco(PR2_Base):
         self.add_base_cmd_velocity(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
                                    track_only_velocity=True)
         self.overwrite_external_collision_avoidance('brumbrum',
-                                                                               number_of_repeller=2,
-                                                                               soft_threshold=0.2,
-                                                                               hard_threshold=0.1)
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)
 
 
 class PR2_IAI(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
-        self.general_config.default_link_color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+        self._general_config.default_link_color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
@@ -120,9 +112,9 @@ class PR2_IAI(PR2_Base):
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
         self.overwrite_external_collision_avoidance('brumbrum',
-                                                                               number_of_repeller=2,
-                                                                               soft_threshold=0.2,
-                                                                               hard_threshold=0.1)
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)
 
 
 class PR2_Unreal(PR2_Base):
@@ -148,16 +140,16 @@ class PR2_Unreal(PR2_Base):
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
         self.overwrite_external_collision_avoidance('brumbrum',
-                                                                               number_of_repeller=2,
-                                                                               soft_threshold=0.2,
-                                                                               hard_threshold=0.1)
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)
 
 
 class PR2_StandAlone(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
-        self.general_config.control_mode = ControlModes.stand_alone
+        self._general_config.control_mode = ControlModes.stand_alone
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)

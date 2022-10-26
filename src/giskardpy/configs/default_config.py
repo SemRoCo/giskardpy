@@ -13,12 +13,14 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
     TfPublishingModes, CollisionAvoidanceConfigEntry
+from giskardpy.data_types import derivative_to_name
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName
+from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
@@ -27,9 +29,9 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 class Giskard:
     def __init__(self):
-        self.collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
-        self.general_config: GeneralConfig = GeneralConfig()
-        self.qp_solver_config: QPSolverConfig = QPSolverConfig()
+        self._collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
+        self._general_config: GeneralConfig = GeneralConfig()
+        self._qp_solver_config: QPSolverConfig = QPSolverConfig()
         self.behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
         self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
         self._god_map = GodMap.init_from_paramserver()
@@ -64,7 +66,6 @@ class Giskard:
     def configure_CollisionMarker(self, enabled=True, in_planning_loop=False):
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
-
 
     def add_robot_from_parameter_server(self, parameter_name: str = 'robot_description',
                                         joint_state_topics: List[str] = ('/joint_states',),
@@ -216,8 +217,8 @@ class Giskard:
             setattr(self, parameter, deepcopy(value))
 
     def _create_parameter_backup(self):
-        self._backup = {'qp_solver_config': deepcopy(self.qp_solver_config),
-                        'general_config': deepcopy(self.general_config)}
+        self._backup = {'qp_solver_config': deepcopy(self._qp_solver_config),
+                        'general_config': deepcopy(self._general_config)}
 
     def grow(self):
         if len(self.robot_interface_configs) == 0:
@@ -229,31 +230,31 @@ class Giskard:
         world.delete_all_but_robots()
         world.register_controlled_joints(self._controlled_joints)
 
-        if self.collision_checker == CollisionCheckerLib.bpb:
+        if self._collision_checker == CollisionCheckerLib.bpb:
             logging.loginfo('Using bpb for collision checking.')
             from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
             collision_scene = BetterPyBulletSyncer(world)
-        elif self.collision_checker == CollisionCheckerLib.pybullet:
+        elif self._collision_checker == CollisionCheckerLib.pybullet:
             logging.loginfo('Using pybullet for collision checking.')
             from giskardpy.model.pybullet_syncer import PyBulletSyncer
             collision_scene = PyBulletSyncer(world)
-        elif self.collision_checker == CollisionCheckerLib.none:
+        elif self._collision_checker == CollisionCheckerLib.none:
             logging.logwarn('Using no collision checking.')
             from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
             collision_scene = CollisionWorldSynchronizer(world)
         else:
-            raise KeyError(f'Unknown collision checker {self.collision_checker}. '
+            raise KeyError(f'Unknown collision checker {self._collision_checker}. '
                            f'Collision avoidance is disabled')
-        self._god_map.set_data(identifier.collision_checker, self.collision_checker)
+        self._god_map.set_data(identifier.collision_checker, self._collision_checker)
         self._god_map.set_data(identifier.collision_scene, collision_scene)
-        if self.general_config.control_mode == ControlModes.open_loop:
+        if self._general_config.control_mode == ControlModes.open_loop:
             self._tree = OpenLoop(self._god_map)
-        elif self.general_config.control_mode == ControlModes.close_loop:
+        elif self._general_config.control_mode == ControlModes.close_loop:
             self._tree = ClosedLoop(self._god_map)
-        elif self.general_config.control_mode == ControlModes.stand_alone:
+        elif self._general_config.control_mode == ControlModes.stand_alone:
             self._tree = StandAlone(self._god_map)
         else:
-            raise KeyError(f'Robot interface mode \'{self.general_config.control_mode}\' is not supported.')
+            raise KeyError(f'Robot interface mode \'{self._general_config.control_mode}\' is not supported.')
 
         self._controlled_joints_sanity_check()
 
@@ -274,7 +275,6 @@ class Giskard:
     def live(self):
         self.grow()
         self._god_map.get_data(identifier.tree_manager).live()
-
 
     # Collision avoidance
     def set_default_self_collision_avoidance(self,
@@ -338,6 +338,8 @@ class Giskard:
         :param hard_threshold: distance threshold not allowed to be violated
         :param max_velocity: how fast it will move away from collisions
         """
+        if group_name is None:
+            group_name = self.get_default_group_name()
         config = self.get_collision_avoidance_config(group_name)
         joint_name = PrefixName(joint_name, group_name)
         if number_of_repeller is not None:
@@ -364,6 +366,8 @@ class Giskard:
         :param hard_threshold: distance threshold not allowed to be violated
         :param max_velocity: how fast it will move away from collisions
         """
+        if group_name is None:
+            group_name = self.get_default_group_name()
         config = self.get_collision_avoidance_config(group_name)
         link_name = PrefixName(link_name, group_name)
         if number_of_repeller is not None:
@@ -448,3 +452,92 @@ class Giskard:
         link_name1 = PrefixName(link_name1, group_name)
         link_name2 = PrefixName(link_name2, group_name)
         config.add_self_collisions.append((link_name1, link_name2))
+
+    def set_collision_checker(self, new_collision_checker: CollisionCheckerLib):
+        self._collision_checker = new_collision_checker
+
+    def ignore_all_collisions_of_links(self, link_names: List[str], group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        link_names = [PrefixName(link_name, group_name) for link_name in link_names]
+        self._collision_avoidance_configs[group_name].ignored_collisions.extend(link_names)
+
+    # QP stuff
+
+    def set_prediction_horizon(self, new_prediction_horizon: float):
+        """
+        Set the prediction horizon for the MPC. If set to 1, it will turn off acceleration and jerk limits.
+        :param new_prediction_horizon: should be 1 or >= 5
+        """
+        self._qp_solver_config.prediction_horizon = new_prediction_horizon
+
+    def set_qp_solver(self, new_solver: QPSolver):
+        self._qp_solver_config.qp_solver = new_solver
+
+    def set_default_joint_limits(self, velocity_limit: float, acceleration_limit: Optional[float] = None,
+                                 jerk_limit: Optional[float] = None):
+        self._general_config.joint_limits[derivative_to_name[1]] = defaultdict(lambda: velocity_limit)
+        if jerk_limit is not None:
+            self._general_config.joint_limits[derivative_to_name[3]] = defaultdict(lambda: jerk_limit)
+            self._general_config.joint_limits[derivative_to_name[2]] = defaultdict(lambda: acceleration_limit)
+        elif acceleration_limit is not None:
+            self._general_config.joint_limits[derivative_to_name[2]] = defaultdict(lambda: acceleration_limit)
+
+    def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        joint_name = PrefixName(joint_name, group_name)
+        self._general_config.joint_limits[derivative_to_name[1]][joint_name] = velocity_limit
+
+    def overwrite_joint_acceleration_limits(self, joint_name, acceleration_limit: float,
+                                            group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        joint_name = PrefixName(joint_name, group_name)
+        self._general_config.joint_limits[derivative_to_name[2]][joint_name] = acceleration_limit
+
+    def overwrite_joint_jerk_limits(self, joint_name, jerk_limit: float, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        joint_name = PrefixName(joint_name, group_name)
+        self._general_config.joint_limits[derivative_to_name[3]][joint_name] = jerk_limit
+
+    def set_default_weights(self,
+                            velocity_weight: float = 0.001,
+                            acceleration_weight: Optional[float] = None,
+                            jerk_weight: Optional[float] = 0.001):
+        self._qp_solver_config.joint_weights = {
+            derivative_to_name[1]: defaultdict(lambda: velocity_weight)
+        }
+        if jerk_weight is not None:
+            self._qp_solver_config.joint_weights[derivative_to_name[2]] = defaultdict(lambda: acceleration_weight)
+            self._qp_solver_config.joint_weights[derivative_to_name[3]] = defaultdict(lambda: jerk_weight)
+        elif acceleration_weight is not None:
+            self._qp_solver_config.joint_weights[derivative_to_name[2]] = defaultdict(lambda: acceleration_weight)
+
+    def overwrite_joint_velocity_weight(self,
+                                        joint_name: str,
+                                        velocity_weight: float,
+                                        group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        joint_name = PrefixName(joint_name, group_name)
+        self._qp_solver_config.joint_weights[derivative_to_name[1]][joint_name] = velocity_weight
+
+    def overwrite_joint_acceleration_weight(self,
+                                            joint_name: str,
+                                            acceleration_weight: float,
+                                            group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        joint_name = PrefixName(joint_name, group_name)
+        self._qp_solver_config.joint_weights[derivative_to_name[2]][joint_name] = acceleration_weight
+
+    def overwrite_joint_jerk_weight(self,
+                                    joint_name: str,
+                                    jerk_weight: float,
+                                    group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        joint_name = PrefixName(joint_name, group_name)
+        self._qp_solver_config.joint_weights[derivative_to_name[3]][joint_name] = jerk_weight

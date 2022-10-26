@@ -9,7 +9,7 @@ class Donbot(Giskard):
 
     def __init__(self):
         super().__init__()
-        self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
+        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.collision_avoidance_config.load_moveit_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
         self.add_sync_tf_frame('map', 'odom')
         # self.set_odometry_topic('/donbot/base_footprint')
@@ -42,11 +42,11 @@ class Donbot(Giskard):
             self.collision_avoidance_config.overwrite_self_collision_avoidance(link_name,
                                                                                soft_threshold=0.00001,
                                                                                hard_threshold=0.0)
-        self.general_config.joint_limits = {
+        self._general_config.joint_limits = {
             'velocity': defaultdict(lambda: 0.5),
             'acceleration': defaultdict(lambda: 1e3),
             'jerk': defaultdict(lambda: 15),
         }
-        self.general_config.joint_limits['velocity']['odom_x_joint'] = 0.1
-        self.general_config.joint_limits['velocity']['odom_y_joint'] = 0.1
-        self.general_config.joint_limits['velocity']['odom_z_joint'] = 0.05
+        self._general_config.joint_limits['velocity']['odom_x_joint'] = 0.1
+        self._general_config.joint_limits['velocity']['odom_y_joint'] = 0.1
+        self._general_config.joint_limits['velocity']['odom_z_joint'] = 0.05

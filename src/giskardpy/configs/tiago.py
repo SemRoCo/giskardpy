@@ -10,7 +10,7 @@ from giskardpy.my_types import PrefixName
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
-        self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
+        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.collision_avoidance_config.load_moveit_self_collision_matrix(
             'package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
         self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
@@ -84,7 +84,7 @@ class TiagoMujoco(TiagoBase):
         self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
                                                 state_topic='/torso_controller/state')
         self.add_base_cmd_velocity(cmd_vel_topic='/tiago/cmd_vel')
-        self.qp_solver_config.joint_weights['velocity']['brumbrum'] = 0.1
+        self._qp_solver_config.joint_weights['velocity']['brumbrum'] = 0.1
 
 
 class IAI_Tiago(TiagoBase):
@@ -123,7 +123,7 @@ class IAI_Tiago(TiagoBase):
 class TiagoStandAlone(TiagoBase):
     def __init__(self):
         super().__init__()
-        self.general_config.control_mode = ControlModes.stand_alone
+        self._general_config.control_mode = ControlModes.stand_alone
         self.root_link_name = 'map'
         # self.collision_avoidance_config.collision_checker = CollisionCheckerLib.none
         # self.disable_visualization()

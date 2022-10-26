@@ -1039,8 +1039,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def compute_collisions(self, collision_entries: List[CollisionEntry]) -> Collisions:
         self.collision_scene.reset_cache()
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(collision_entries,
-                                                                                    defaultdict(lambda: 0.3),
-                                                                                    self.collision_scene.ignored_self_collion_pairs)
+                                                                                    defaultdict(lambda: 0.3))
 
         return self.collision_scene.check_collisions(collision_matrix, 15)
 

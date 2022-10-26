@@ -43,7 +43,7 @@ giskard = ['giskard']
 
 # config file
 # general options
-general_options = giskard + ['general_config']
+general_options = giskard + ['_general_config']
 action_server_name = general_options + ['action_server_name']
 tmp_folder = general_options + ['path_to_data_folder']
 debug = general_options + ['debug']
@@ -60,7 +60,7 @@ joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk']
 
 
 # qp solver
-qp_solver_config = giskard + ['qp_solver_config']
+qp_solver_config = giskard + ['_qp_solver_config']
 sample_period = qp_solver_config + ['sample_period']
 qp_controller = giskard + ['qp_controller']
 joint_weights = qp_solver_config + ['joint_weights']

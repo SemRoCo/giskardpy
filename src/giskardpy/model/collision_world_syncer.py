@@ -335,12 +335,12 @@ class CollisionWorldSynchronizer:
                 continue
             try:
                 if link_a == link_b \
-                        or link_a.short_name in self.links_to_ignore \
-                        or link_b.short_name in self.links_to_ignore \
-                        or link_a.short_name in self.ignored_self_collion_pairs \
-                        or link_b.short_name in self.ignored_self_collion_pairs \
-                        or (link_a.short_name, link_b.short_name) in self.ignored_self_collion_pairs \
-                        or (link_b.short_name, link_a.short_name) in self.ignored_self_collion_pairs \
+                        or link_a in self.links_to_ignore \
+                        or link_b in self.links_to_ignore \
+                        or link_a in self.ignored_self_collion_pairs \
+                        or link_b in self.ignored_self_collion_pairs \
+                        or (link_a, link_b) in self.ignored_self_collion_pairs \
+                        or (link_b, link_a) in self.ignored_self_collion_pairs \
                         or group.are_linked(link_a, link_b, non_controlled=non_controlled, exception=self.fixed_joints) \
                         or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
                     self.add_black_list_entry(*link_combination)
@@ -500,8 +500,7 @@ class CollisionWorldSynchronizer:
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
-                                            min_dist: dict,
-                                            ignored_collisions: Set[str]) -> dict:
+                                            min_dist: dict) -> dict:
         """
         :param collision_goals: list of CollisionEntry
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
@@ -518,10 +517,10 @@ class CollisionWorldSynchronizer:
             else:
                 group2_links = self.world.groups[collision_entry.group2].link_names_with_collisions
             for link1 in group1_links:
-                if link1 in ignored_collisions:
+                if link1 in self.links_to_ignore:
                     continue
                 for link2 in group2_links:
-                    if link2 in ignored_collisions:
+                    if link2 in self.links_to_ignore:
                         continue
                     key = self.world.sort_links(link1, link2)
                     r_key = (key[1], key[0])

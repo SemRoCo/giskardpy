@@ -9,7 +9,7 @@ class Boxy(Giskard):
 
     def __init__(self):
         super().__init__()
-        self.general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
+        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
         self.add_sync_tf_frame('map', 'odom')
         # self.set_odometry_topic('/donbot/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',

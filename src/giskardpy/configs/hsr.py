@@ -43,18 +43,18 @@ class HSR_Base(Giskard):
         #     'acceleration': defaultdict(float),
         #     'jerk': defaultdict(lambda: 0.001)
         # }
-        self.general_config.joint_limits = {
+        self._general_config.joint_limits = {
             'velocity': defaultdict(lambda: 1),
             'acceleration': defaultdict(lambda: 1.5),
         }
-        self.qp_solver_config.joint_weights = {
+        self._qp_solver_config.joint_weights = {
             'velocity': defaultdict(lambda: 0.001),
             'acceleration': defaultdict(lambda: 0.001),
         }
-        self.general_config.joint_limits['velocity']['head_pan_joint'] = 2
-        self.general_config.joint_limits['velocity']['head_tilt_joint'] = 2
-        self.general_config.joint_limits['acceleration']['head_pan_joint'] = 4
-        self.general_config.joint_limits['acceleration']['head_tilt_joint'] = 4
+        self._general_config.joint_limits['velocity']['head_pan_joint'] = 2
+        self._general_config.joint_limits['velocity']['head_tilt_joint'] = 2
+        self._general_config.joint_limits['acceleration']['head_pan_joint'] = 4
+        self._general_config.joint_limits['acceleration']['head_tilt_joint'] = 4
         # self.general_config.joint_limits['jerk']['head_pan_joint'] = 30
         # self.general_config.joint_limits['jerk']['head_tilt_joint'] = 30
 
@@ -85,7 +85,7 @@ class HSR_StandAlone(HSR_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
-        self.general_config.control_mode = ControlModes.stand_alone
+        self._general_config.control_mode = ControlModes.stand_alone
         self.publish_all_tf()
         self.root_link_name = 'map'
         self.add_fixed_joint(parent_link='map', child_link='odom')

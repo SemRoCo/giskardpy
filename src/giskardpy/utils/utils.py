@@ -361,11 +361,9 @@ def resolve_ros_iris_in_urdf(input_urdf):
 rospack = rospkg.RosPack()
 
 
-def resolve_ros_iris(path):
+def resolve_ros_iris(path: str) -> str:
     """
     e.g. 'package://giskardpy/data'
-    :param path:
-    :return:
     """
     if 'package://' in path:
         split = path.split('package://')
@@ -374,7 +372,7 @@ def resolve_ros_iris(path):
         for suffix in split[1:]:
             package_name, suffix = suffix.split('/', 1)
             real_path = rospack.get_path(package_name)
-            result += '{}/{}'.format(real_path, suffix)
+            result += f'{real_path}/{suffix}'
         return result
     else:
         return path

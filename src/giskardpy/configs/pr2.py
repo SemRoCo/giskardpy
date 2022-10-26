@@ -4,41 +4,36 @@ from std_msgs.msg import ColorRGBA
 
 from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_config import Giskard
-from giskardpy.my_types import PrefixName
 
 
 class PR2_Base(Giskard):
     def __init__(self):
         super().__init__()
-        self.collision_avoidance_config.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
-        self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
-                                                                                 hard_threshold=0.0)
-        for joint_name in [PrefixName('r_wrist_roll_joint', self.get_default_group_name()),
-                           PrefixName('l_wrist_roll_joint', self.get_default_group_name())]:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=4,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
-        for joint_name in [PrefixName('r_wrist_flex_joint', self.get_default_group_name()),
-                           PrefixName('l_wrist_flex_joint', self.get_default_group_name())]:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=2,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
-        for joint_name in [PrefixName('r_elbow_flex_joint', self.get_default_group_name()),
-                           PrefixName('l_elbow_flex_joint', self.get_default_group_name())]:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0)
-        for joint_name in [PrefixName('r_forearm_roll_joint', self.get_default_group_name()),
-                           PrefixName('l_forearm_roll_joint', self.get_default_group_name())]:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.025,
-                                                                                   hard_threshold=0.0)
-        self.collision_avoidance_config.fix_joints_for_self_collision_avoidance(['head_pan_joint',
-                                                                                 'head_tilt_joint'])
+        self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
+        self.set_default_external_collision_avoidance(soft_threshold=0.1,
+                                                      hard_threshold=0.0)
+        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=4,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
+        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=2,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
+        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0)
+        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.025,
+                                                        hard_threshold=0.0)
+        self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
+                                                      'head_tilt_joint'])
         # self.general_config.joint_limits = {
         #     'velocity': defaultdict(lambda: 0.5),
         #     'acceleration': defaultdict(lambda: 1e3),
@@ -88,7 +83,7 @@ class PR2_Mujoco(PR2_Base):
                                                 state_topic='/pr2/r_gripper_l_finger_controller/state')
         self.add_base_cmd_velocity(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
                                    track_only_velocity=True)
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
+        self.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
                                                                                hard_threshold=0.1)
@@ -124,7 +119,7 @@ class PR2_IAI(PR2_Base):
                                                 fill_velocity_values=fill_velocity_values)
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
+        self.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
                                                                                hard_threshold=0.1)
@@ -152,7 +147,7 @@ class PR2_Unreal(PR2_Base):
                                                 fill_velocity_values=fill_velocity_values)
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
+        self.overwrite_external_collision_avoidance('brumbrum',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
                                                                                hard_threshold=0.1)
@@ -197,7 +192,7 @@ class PR2_StandAlone(PR2_Base):
             'l_wrist_roll_joint',
             'brumbrum'
         ])
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
-                                                                               number_of_repeller=2,
-                                                                               soft_threshold=0.2,
-                                                                               hard_threshold=0.1)
+        self.overwrite_external_collision_avoidance('brumbrum',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)

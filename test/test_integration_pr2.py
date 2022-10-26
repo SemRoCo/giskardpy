@@ -3050,19 +3050,14 @@ class TestCollisionAvoidanceGoals:
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.088)
 
     def test_collision_override(self, box_setup: PR2TestWrapper):
-        # FIXME
         p = PoseStamped()
         p.header.frame_id = box_setup.default_root
         p.pose.position.x += 0.5
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         box_setup.teleport_base(p)
-        # ce = CollisionEntry()
-        # ce.type = CollisionEntry.AVOID_COLLISION
-        # ce.body_b = 'box'
-        # ce.min_dist = 0.05
-        # box_setup.add_collision_entries([ce])
+        box_setup.avoid_collision(min_distance=0.15, group1=box_setup.robot_name, group2='box')
         box_setup.plan_and_execute()
-        box_setup.check_cpi_geq(['base_link'], 0.099)
+        box_setup.check_cpi_geq(['base_link'], 0.149)
 
     def test_avoid_collision_go_around_corner(self, fake_table_setup: PR2TestWrapper):
         r_goal = PoseStamped()
@@ -3188,7 +3183,7 @@ class TestCollisionAvoidanceGoals:
         assert ('box', 'bl') not in pocky_pose_setup.collision_scene.black_list
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_group_info('r_gripper').links, 0.04)
 
-    def test_avoid_collision_two_sticks(self, pocky_pose_setup: PR2TestWrapper):
+    def test_avoid_collision_box_between_cylinders(self, pocky_pose_setup: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
@@ -3211,71 +3206,8 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.z = 0
         p.pose.orientation.w = 1
         pocky_pose_setup.add_cylinder('br', height=0.2, radius=0.01, pose=p)
-        pocky_pose_setup.allow_self_collision()
+
         pocky_pose_setup.plan_and_execute()
-
-    def test_avoid_collision5_cut_off(self, pocky_pose_setup: PR2TestWrapper):
-        p = PoseStamped()
-        p.header.frame_id = pocky_pose_setup.r_tip
-        p.pose.position.x = 0.08
-        p.pose.orientation = Quaternion(*quaternion_about_axis(0.01, [1, 0, 0]).tolist())
-        pocky_pose_setup.add_box(name='box',
-                                 size=(0.2, 0.05, 0.05),
-                                 parent_link=pocky_pose_setup.r_tip,
-                                 pose=p)
-        p = PoseStamped()
-        p.header.frame_id = pocky_pose_setup.r_tip
-        p.pose.position.x = 0.12
-        p.pose.position.y = 0.04
-        p.pose.position.z = 0
-        p.pose.orientation.w = 1
-        pocky_pose_setup.add_cylinder('bl', height=0.2, radius=0.01, pose=p)
-        p = PoseStamped()
-        p.header.frame_id = pocky_pose_setup.r_tip
-        p.pose.position.x = 0.12
-        p.pose.position.y = -0.04
-        p.pose.position.z = 0
-        p.pose.orientation.w = 1
-        pocky_pose_setup.add_cylinder('br', height=0.2, radius=0.01, pose=p)
-
-        pocky_pose_setup.send_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING)
-
-    # def test_avoid_collision6(self, fake_table_setup: PR2TestWrapper):
-    #     #fixme
-    #     js = {
-    #         'r_shoulder_pan_joint': -0.341482794236,
-    #         'r_shoulder_lift_joint': 0.0301123643508,
-    #         'r_upper_arm_roll_joint': -2.67555547662,
-    #         'r_forearm_roll_joint': -0.472653283346,
-    #         'r_elbow_flex_joint': -0.149999999999,
-    #         'r_wrist_flex_joint': -1.40685144215,
-    #         'r_wrist_roll_joint': 2.87855178783,
-    #         'odom_x_joint': 0.0708087929675,
-    #         'odom_y_joint': 0.052896931145,
-    #         'odom_z_joint': 0.0105784287694,
-    #         'torso_lift_joint': 0.277729421077,
-    #     }
-    #     # fake_table_setup.allow_all_collisions()
-    #     fake_table_setup.send_and_check_joint_goal(js, weight=WEIGHT_ABOVE_CA)
-    #     fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.048)
-    #     fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
-    #     fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
-
-    def test_avoid_collision7(self, kitchen_setup: PR2TestWrapper):
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = 'map'
-        base_pose.pose.position.x = 0.8
-        base_pose.pose.position.y = 1
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_pose)
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = 'map'
-        base_pose.pose.position.x = 0.64
-        base_pose.pose.position.y = 0.64
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
-        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.set_cart_goal(base_pose, 'base_footprint')
-        kitchen_setup.plan_and_execute()
 
     def test_avoid_collision_at_kitchen_corner(self, kitchen_setup: PR2TestWrapper):
         base_pose = PoseStamped()
@@ -3286,25 +3218,8 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)  # , weight=WEIGHT_ABOVE_CA)
-        kitchen_setup.set_rotation_goal(base_pose, 'base_footprint')
-        kitchen_setup.set_translation_goal(base_pose, 'base_footprint', weight=WEIGHT_BELOW_CA)
-        kitchen_setup.plan_and_execute()
-
-    def test_avoid_collision8(self, kitchen_setup: PR2TestWrapper):
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = 'map'
-        base_pose.pose.position.x = 0.8
-        base_pose.pose.position.y = 0.9
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_pose)
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = 'map'
-        base_pose.pose.position.x = 0.64
-        base_pose.pose.position.y = 0.64
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
-        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.set_cart_goal(base_pose, 'base_footprint')
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose, weight=WEIGHT_ABOVE_CA, check=False)
+        kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link='base_footprint', root_link='map', check=False)
         kitchen_setup.plan_and_execute()
 
     def test_avoid_collision_drive_under_drawer(self, kitchen_setup: PR2TestWrapper):
@@ -3322,41 +3237,6 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         kitchen_setup.set_cart_goal(base_pose, tip_link='base_footprint')
         kitchen_setup.plan_and_execute()
-
-    def test_avoid_collision_with_far_object(self, pocky_pose_setup: PR2TestWrapper):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.x = 25
-        p.pose.position.y = 25
-        p.pose.position.z = 25
-        p.pose.orientation.w = 1
-        pocky_pose_setup.add_box(name='box', size=(1, 1, 1), pose=p)
-        p = PoseStamped()
-        p.header.frame_id = pocky_pose_setup.r_tip
-        p.pose.position = Point(0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
-
-        pocky_pose_setup.avoid_collision(0.05, pocky_pose_setup.get_robot_name(), 'box')
-
-        pocky_pose_setup.plan_and_execute()
-        pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
-        pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_r_gripper_links(), 0.048)
-
-    def test_avoid_collision_touch(self, box_setup: PR2TestWrapper):
-        p = PoseStamped()
-        p.header.frame_id = box_setup.r_tip
-        p.pose.position = Point(0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, check=False)
-
-        box_setup.avoid_all_collisions(0.05)
-
-        box_setup.plan_and_execute()
-
-        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
-        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), -0.008)
-        box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.04)
 
     def test_get_out_of_collision(self, box_setup: PR2TestWrapper):
         p = PoseStamped()
@@ -3552,18 +3432,6 @@ class TestCollisionAvoidanceGoals:
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_leq([pocky], 0.0)
-
-    def test_avoid_collision_gripper(self, box_setup: PR2TestWrapper):
-        box_setup.allow_all_collisions()
-        box_setup.avoid_collision(0.05, box_setup.l_gripper_group, 'box')
-        p = PoseStamped()
-        p.header.frame_id = box_setup.l_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position.x = 0.15
-        p.pose.orientation.w = 1
-        box_setup.set_cart_goal(p, box_setup.l_tip, box_setup.default_root, check=False)
-        box_setup.plan_and_execute()
-        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), -1e-3)
 
     def test_attached_two_items(self, zero_pose: PR2TestWrapper):
         box1_name = 'box1'

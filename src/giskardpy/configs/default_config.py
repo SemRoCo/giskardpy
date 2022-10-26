@@ -12,10 +12,9 @@ from py_trees import Blackboard
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
-    TfPublishingModes
+    TfPublishingModes, CollisionAvoidanceConfigEntry
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
@@ -23,6 +22,7 @@ from giskardpy.my_types import my_string, PrefixName
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
+from giskardpy.utils.utils import resolve_ros_iris
 
 
 class Giskard:
@@ -31,7 +31,7 @@ class Giskard:
         self.general_config: GeneralConfig = GeneralConfig()
         self.qp_solver_config: QPSolverConfig = QPSolverConfig()
         self.behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
-        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
+        self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
         self._god_map = GodMap.init_from_paramserver()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
@@ -40,6 +40,11 @@ class Giskard:
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self._backup = {}
+
+    def get_collision_avoidance_config(self, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        return self._collision_avoidance_configs[group_name]
 
     def add_robot_urdf(self, urdf: str, name: str, **kwargs):
         if not hasattr(self, 'robot_interface_configs'):
@@ -60,9 +65,6 @@ class Giskard:
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
 
-    @property
-    def collision_avoidance_config(self):
-        return self.collision_avoidance_configs[self.get_default_group_name()]
 
     def add_robot_from_parameter_server(self, parameter_name: str = 'robot_description',
                                         joint_state_topics: List[str] = ('/joint_states',),
@@ -272,3 +274,177 @@ class Giskard:
     def live(self):
         self.grow()
         self._god_map.get_data(identifier.tree_manager).live()
+
+
+    # Collision avoidance
+    def set_default_self_collision_avoidance(self,
+                                             number_of_repeller: int = 1,
+                                             soft_threshold: float = 0.05,
+                                             hard_threshold: float = 0.0,
+                                             max_velocity: float = 0.2,
+                                             group_name: Optional[str] = None):
+        """
+        Sets the default self collision configuration. The default of this function are set automatically.
+        If they are fine, you don't need to use this function.
+        :param number_of_repeller: how many constraints are added for a particular link pair
+        :param soft_threshold: will try to stay out of this threshold, but can violate
+        :param hard_threshold: distance threshold not allowed to be violated
+        :param max_velocity: how fast it will move away from collisions
+        :param group_name: name of the group this default will be applied to
+        """
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        new_default = CollisionAvoidanceConfigEntry(
+            number_of_repeller=number_of_repeller,
+            soft_threshold=soft_threshold,
+            hard_threshold=hard_threshold,
+            max_velocity=max_velocity
+        )
+        self._collision_avoidance_configs[group_name].self_collision_avoidance.default_factory = lambda: new_default
+
+    def set_default_external_collision_avoidance(self,
+                                                 number_of_repeller: int = 1,
+                                                 soft_threshold: float = 0.05,
+                                                 hard_threshold: float = 0.0,
+                                                 max_velocity: float = 0.2):
+        """
+        Sets the default external collision configuration. The default of this function are set automatically.
+        If they are fine, you don't need to use this function.
+        :param number_of_repeller: How many constraints are added for a joint to avoid collisions
+        :param soft_threshold: will try to stay out of this threshold, but can violate
+        :param hard_threshold: distance threshold not allowed to be violated
+        :param max_velocity: how fast it will move away from collisions
+        """
+        for config in self._collision_avoidance_configs.values():
+            config.external_collision_avoidance.default_factory = lambda: CollisionAvoidanceConfigEntry(
+                number_of_repeller=number_of_repeller,
+                soft_threshold=soft_threshold,
+                hard_threshold=hard_threshold,
+                max_velocity=max_velocity
+            )
+
+    def overwrite_external_collision_avoidance(self,
+                                               joint_name: str,
+                                               group_name: Optional[str] = None,
+                                               number_of_repeller: Optional[int] = None,
+                                               soft_threshold: Optional[float] = None,
+                                               hard_threshold: Optional[float] = None,
+                                               max_velocity: Optional[float] = None):
+        """
+        :param joint_name:
+        :param group_name: if there is only one robot, it will default to it
+        :param number_of_repeller: How many constraints are added for a joint to avoid collisions
+        :param soft_threshold: will try to stay out of this threshold, but can violate
+        :param hard_threshold: distance threshold not allowed to be violated
+        :param max_velocity: how fast it will move away from collisions
+        """
+        config = self.get_collision_avoidance_config(group_name)
+        joint_name = PrefixName(joint_name, group_name)
+        if number_of_repeller is not None:
+            config.external_collision_avoidance[joint_name].number_of_repeller = number_of_repeller
+        if soft_threshold is not None:
+            config.external_collision_avoidance[joint_name].soft_threshold = soft_threshold
+        if hard_threshold is not None:
+            config.external_collision_avoidance[joint_name].hard_threshold = hard_threshold
+        if max_velocity is not None:
+            config.external_collision_avoidance[joint_name].max_velocity = max_velocity
+
+    def overwrite_self_collision_avoidance(self,
+                                           link_name: str,
+                                           group_name: Optional[str] = None,
+                                           number_of_repeller: Optional[int] = None,
+                                           soft_threshold: Optional[float] = None,
+                                           hard_threshold: Optional[float] = None,
+                                           max_velocity: Optional[float] = None):
+        """
+        :param link_name:
+        :param group_name: if there is only one robot, it will default to it
+        :param number_of_repeller: How many constraints are added for a joint to avoid collisions
+        :param soft_threshold: will try to stay out of this threshold, but can violate
+        :param hard_threshold: distance threshold not allowed to be violated
+        :param max_velocity: how fast it will move away from collisions
+        """
+        config = self.get_collision_avoidance_config(group_name)
+        link_name = PrefixName(link_name, group_name)
+        if number_of_repeller is not None:
+            config.self_collision_avoidance[link_name].number_of_repeller = number_of_repeller
+        if soft_threshold is not None:
+            config.self_collision_avoidance[link_name].soft_threshold = soft_threshold
+        if hard_threshold is not None:
+            config.self_collision_avoidance[link_name].hard_threshold = hard_threshold
+        if max_velocity is not None:
+            config.self_collision_avoidance[link_name].max_velocity = max_velocity
+
+    def load_moveit_self_collision_matrix(self, path_to_srdf: str, group_name: Optional[str] = None):
+        """
+        Giskard only has a limited ability to compute a self collision matrix. With this function you can load one
+        from Moveit.
+        :param path_to_srdf: path to the srdf, can handle ros package paths
+        :param group_name: name of the robot for which it will be applied, only needs to be set if there are multiple robots.
+        """
+        import lxml.etree as ET
+        path_to_srdf = resolve_ros_iris(path_to_srdf)
+        srdf = ET.parse(path_to_srdf)
+        srdf_root = srdf.getroot()
+        for child in srdf_root:
+            if hasattr(child, 'tag') and child.tag == 'disable_collisions':
+                link1 = child.attrib['link1']
+                link2 = child.attrib['link2']
+                reason = child.attrib['reason']
+                if reason in ['Never', 'Adjacent', 'Default']:
+                    self.ignore_self_collisions_of_pair(link1, link2, group_name)
+        logging.loginfo(f'loaded {path_to_srdf} for self collision avoidance matrix')
+
+    def ignore_all_self_collisions_of_link(self, link_name: str, group_name: Optional[str] = None):
+        """
+        Completely turn off self collision avoidance for this link.
+        """
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        config = self.get_collision_avoidance_config(group_name)
+        link_name = PrefixName(link_name, group_name)
+        config.ignored_self_collisions.append(link_name)
+
+    def fix_joints_for_self_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
+        """
+        Flag some joints as fixed for self collision avoidance. These joints will not be moved to avoid self
+        collisions.
+        """
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        config = self.get_collision_avoidance_config(group_name)
+        joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
+        config.fixed_joints_for_self_collision_avoidance.extend(joint_names)
+
+    def fix_joints_for_external_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
+        """
+        Flag some joints ad fixed for external collision avoidance. These joints will not be moved to avoid
+        external collisions.
+        """
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        config = self.get_collision_avoidance_config(group_name)
+        joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
+        config.fixed_joints_for_external_collision_avoidance.extend(joint_names)
+
+    def ignore_self_collisions_of_pair(self, link_name1: str, link_name2: str, group_name: Optional[str] = None):
+        """
+        Ignore a certain pair of links for self collision avoidance.
+        """
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        config = self.get_collision_avoidance_config(group_name)
+        link_name1 = PrefixName(link_name1, group_name)
+        link_name2 = PrefixName(link_name2, group_name)
+        config.ignored_self_collisions.append((link_name1, link_name2))
+
+    def add_self_collision(self, link_name1: str, link_name2: str, group_name: Optional[str] = None):
+        """
+        Specifically add a link pair for self collision avoidance.
+        """
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        config = self.get_collision_avoidance_config(group_name)
+        link_name1 = PrefixName(link_name1, group_name)
+        link_name2 = PrefixName(link_name2, group_name)
+        config.add_self_collisions.append((link_name1, link_name2))

@@ -2870,8 +2870,7 @@ class TestSelfCollisionAvoidance:
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.send_goal()
-        zero_pose.send_goal()
-        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
+        zero_pose.send_goal(expected_error_codes=[MoveResult.SELF_COLLISION_VIOLATED])
 
 
 class TestCollisionAvoidanceGoals:

@@ -33,11 +33,17 @@ def ros(request):
     try:
         rospy.get_param('kitchen_description')
     except:
-        launch_launchfile('package://iai_apartment/launch/upload_apartment.launch')
+        try:
+            launch_launchfile('package://iai_apartment/launch/upload_apartment.launch')
+        except:
+            logging.logwarn('iai_apartment not found')
     try:
         rospy.get_param('apartment_description')
     except:
-        launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
+        try:
+            launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
+        except:
+            logging.logwarn('iai_kitchen not found')
     request.addfinalizer(kill_ros)
 
 

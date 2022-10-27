@@ -283,6 +283,9 @@ class Giskard:
     def set_default_visualization_marker_color(self, r, g, b, a):
         self._general_config.default_link_color = ColorRGBA(r, g, b, a)
 
+    def set_control_mode(self, mode: ControlModes):
+        self._general_config.control_mode = mode
+
     # Collision avoidance
 
     def set_default_self_collision_avoidance(self,

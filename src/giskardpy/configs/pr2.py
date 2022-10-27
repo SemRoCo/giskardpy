@@ -154,7 +154,7 @@ class PR2_StandAlone(PR2_Base):
         self.add_robot_from_parameter_server()
         super().__init__()
         self.set_default_visualization_marker_color(1, 1, 1, 0.8)
-        self._general_config.control_mode = ControlModes.stand_alone
+        self.set_control_mode(ControlModes.stand_alone)
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)

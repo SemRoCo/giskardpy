@@ -14,13 +14,14 @@ from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 class DiffDriveTangentialToPoint(Goal):
 
     def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
+                 group_name: Optional[str] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.goal_point = self.transform_msg(self.world.root_link_name, goal_point)
         self.goal_point.point.z = 0
         self.weight = weight
-        self.tip = 'base_footprint'
-        self.root = 'map'
+        self.tip = self.world.get_link_name('base_footprint', group_name)
+        self.root = self.world.root_link_name
         self.drive = drive
         if forward is not None:
             self.tip_V_pointing_axis = tf.transform_vector(self.tip, forward)
@@ -30,14 +31,13 @@ class DiffDriveTangentialToPoint(Goal):
             self.tip_V_pointing_axis.header.frame_id = self.tip
             self.tip_V_pointing_axis.vector.x = 1
 
-
     def make_constraints(self):
         map_P_center = w.ros_msg_to_matrix(self.goal_point)
         map_T_base = self.get_fk(self.root, self.tip)
         map_P_base = w.position_of(map_T_base)
         map_V_base_to_center = map_P_center - map_P_base
         map_V_base_to_center = w.scale(map_V_base_to_center, 1)
-        map_V_up = w.Matrix([0,0,1,0])
+        map_V_up = w.Matrix([0, 0, 1, 0])
         map_V_tangent = w.cross(map_V_base_to_center, map_V_up)
         tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
         map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)
@@ -52,7 +52,7 @@ class DiffDriveTangentialToPoint(Goal):
                                 name_suffix='/rot')
         else:
             # angle = w.abs(w.angle_between_vector(w.vector3(1,0,0), map_V_tangent))
-            map_R_goal = w.rotation_matrix_from_vectors(x=map_V_tangent, y=None, z=w.vector3(0,0,1))
+            map_R_goal = w.rotation_matrix_from_vectors(x=map_V_tangent, y=None, z=w.vector3(0, 0, 1))
             goal_angle = w.angle_from_matrix(map_R_goal, lambda axis: axis[2])
             map_R_base = w.rotation_of(map_T_base)
             axis, map_current_angle = w.axis_angle_from_matrix(map_R_base)
@@ -64,7 +64,6 @@ class DiffDriveTangentialToPoint(Goal):
                                 weight=self.weight,
                                 expression=map_current_angle,
                                 name_suffix='/rot')
-
 
 
 class PointingDiffDriveEEF(Goal):
@@ -118,16 +117,17 @@ class PointingDiffDriveEEF(Goal):
 
 class KeepHandInWorkspace(Goal):
     def __init__(self, tip_link, base_footprint=None, map_frame=None, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
+                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, **kwargs):
         super().__init__(**kwargs)
         if base_footprint is None:
             base_footprint = 'base_footprint'
+        base_footprint = self.world.get_link_name(base_footprint, group_name)
         if map_frame is None:
             map_frame = self.world.root_link_name
         self.weight = weight
         self.max_velocity = max_velocity
         self.map_frame = map_frame
-        self.tip_link = tip_link
+        self.tip_link = self.world.get_link_name(tip_link, group_name)
         self.base_footprint = base_footprint
 
         if pointing_axis is not None:
@@ -158,8 +158,8 @@ class KeepHandInWorkspace(Goal):
         angle_error = w.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
         # self.add_debug_expr('rot', angle_error)
         self.add_constraint(reference_velocity=0.5,
-                            lower_error=-angle_error-0.2,
-                            upper_error=-angle_error+0.2,
+                            lower_error=-angle_error - 0.2,
+                            upper_error=-angle_error + 0.2,
                             weight=weight,
                             expression=angle_error,
                             name_suffix='/rot')

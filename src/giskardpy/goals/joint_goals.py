@@ -458,6 +458,7 @@ class AvoidJointLimits(Goal):
     def __init__(self,
                  percentage: float = 15,
                  joint_list: Optional[List[str]] = None,
+                 group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  **kwargs):
         """
@@ -467,19 +468,27 @@ class AvoidJointLimits(Goal):
         :param weight:
         """
         super().__init__(**kwargs)
-        if joint_list is None:
+        if joint_list is not None:
+            for joint_name in joint_list:
+                joint_name = self.world.get_joint_name(joint_name, group_name)
+                if self.world.is_joint_prismatic(joint_name) or self.world.is_joint_revolute(joint_name):
+                    self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
+                                                                        group_name=group_name,
+                                                                        percentage=percentage,
+                                                                        weight=weight, **kwargs))
+        else:
             joint_list = self.god_map.get_data(identifier.controlled_joints)
-        for joint_name in joint_list:
-            try:
-                group_name = self.world.get_group_of_joint(joint_name).name
-            except KeyError:
-                child_link = self.world._joints[joint_name].child_link_name
-                group_name = self.world.get_group_name_containing_link(child_link)
-            if self.world.is_joint_prismatic(joint_name) or self.world.is_joint_revolute(joint_name):
-                self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
-                                                                    group_name=group_name,
-                                                                    percentage=percentage,
-                                                                    weight=weight, **kwargs))
+            for joint_name in joint_list:
+                try:
+                    group_name = self.world.get_group_of_joint(joint_name).name
+                except KeyError:
+                    child_link = self.world._joints[joint_name].child_link_name
+                    group_name = self.world.get_group_name_containing_link(child_link)
+                if self.world.is_joint_prismatic(joint_name) or self.world.is_joint_revolute(joint_name):
+                    self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
+                                                                        group_name=group_name,
+                                                                        percentage=percentage,
+                                                                        weight=weight, **kwargs))
 
 
 class JointPositionList(Goal):

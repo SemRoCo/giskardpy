@@ -136,31 +136,6 @@ class TiagoTestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
 
-# @pytest.fixture()
-# def apartment_setup(better_pose: TiagoTestWrapper) -> TiagoTestWrapper:
-#     object_name = 'apartment'
-#     apartment_pose = PoseStamped()
-#     apartment_pose.header.frame_id = 'map'
-#     apartment_pose.pose.orientation.w = 1
-#     better_pose.add_urdf(name=object_name,
-#                          urdf=rospy.get_param('apartment_description'),
-#                          pose=apartment_pose)
-#     js = {str(k): 0.0 for k in better_pose.world.groups[object_name].movable_joints}
-#     better_pose.set_json_goal('SetSeedConfiguration',
-#                               seed_configuration=js)
-#     base_pose = PoseStamped()
-#     base_pose.header.frame_id = 'side_B'
-#     base_pose.pose.position.x = 1.5
-#     base_pose.pose.position.y = 2.4
-#     base_pose.pose.orientation.w = 1
-#     better_pose.set_json_goal('SetOdometry',
-#                               group_name='tiago_dual',
-#                               base_pose=base_pose)
-#     better_pose.allow_all_collisions()
-#     better_pose.move_base(base_pose)
-#     return better_pose
-
-
 class TestCartGoals:
 
     def test_drive_topright_bottom_left(self, zero_pose: TiagoTestWrapper):
@@ -356,7 +331,7 @@ class TestCollisionAvoidance:
 
     def test_avoid_all(self, zero_pose: TiagoTestWrapper):
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.avoid_collision(0.1, group1=zero_pose.get_robot_name())
+        zero_pose.avoid_collision(0.1, group1=zero_pose.robot_name)
         zero_pose.plan_and_execute()
 
     def test_attach_object(self, better_pose):
@@ -370,13 +345,13 @@ class TestCollisionAvoidance:
                             (0.1, 0.1, 0.1),
                             pose=box_pose,
                             parent_link=parent_link,
-                            parent_link_group=better_pose.get_robot_name())
+                            parent_link_group=better_pose.robot_name)
         better_pose.set_joint_goal(better_pose.default_pose)
         better_pose.plan_and_execute()
 
     def test_demo1(self, apartment_setup: TiagoTestWrapper):
         # setup
-        apartment_name = 'apartment'
+        apartment_name = apartment_setup.environment_name
         l_tcp = 'gripper_left_grasping_frame'
         r_tcp = 'gripper_right_grasping_frame'
         handle_name = 'handle_cab1_top_door'
@@ -443,130 +418,6 @@ class TestCollisionAvoidance:
                         'arm_left_7_joint'])
         apartment_setup.plan_and_execute()
 
-        # grasp cup
-        apartment_setup.set_joint_goal(apartment_setup.better_pose, check=False)
-        apartment_setup.plan_and_execute()
-        apartment_setup.move_base(start_base_pose)
-
-        grasp_pose = PoseStamped()
-        grasp_pose.header.frame_id = cup_name
-        grasp_pose.pose.position.x = grasp_offset
-        grasp_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                          [0, -1, 0, 0],
-                                                                          [0, 0, 1, 0],
-                                                                          [0, 0, 0, 1]]))
-        apartment_setup.set_cart_goal(goal_pose=grasp_pose,
-                                      tip_link=l_tcp,
-                                      root_link=apartment_setup.default_root)
-        apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
-        apartment_setup.plan_and_execute()
-        apartment_setup.update_parent_link_of_group(cup_name, l_tcp)
-
-        # place cup
-        apartment_setup.set_joint_goal(apartment_setup.better_pose, check=False)
-        apartment_setup.plan_and_execute()
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = countertop_frame
-        base_pose.pose.position.x = 1.3
-        base_pose.pose.position.y = -0.3
-        base_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [0, 0, 1, 0],
-                                                                         [0, 0, 0, 1]]))
-        base_pose = apartment_setup.transform_msg(apartment_setup.default_root, base_pose)
-        base_pose.pose.position.z = 0
-        apartment_setup.move_base(base_pose)
-
-        cup_place_pose = PoseStamped()
-        cup_place_pose.header.frame_id = countertop_frame
-        cup_place_pose.pose.position.x = 0.25
-        # cup_place_pose.pose.position.y = 0.
-        cup_place_pose.pose.position.z = 0.02
-        cup_place_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                              [0, -1, 0, 0],
-                                                                              [0, 0, 1, 0],
-                                                                              [0, 0, 0, 1]]))
-        apartment_setup.set_cart_goal(goal_pose=cup_place_pose,
-                                      tip_link=cup_name,
-                                      root_link=apartment_setup.default_root)
-        apartment_setup.plan_and_execute()
-
-    def test_close_cabinet(self, apartment_setup: TiagoTestWrapper):
-        # setup
-        apartment_name = 'apartment'
-        l_tcp = 'gripper_left_grasping_frame'
-        r_tcp = 'gripper_right_grasping_frame'
-        handle_name = 'handle_cab1_top_door'
-        handle_name_frame = 'handle_cab1_top_door'
-        cupboard_floor_frame = 'cabinet1_coloksu_level4'
-        cupboard_floor = 'cabinet1_coloksu_level4'
-        base_footprint = 'base_footprint'
-        countertop_frame = 'island_countertop'
-        countertop = 'island_countertop'
-        grasp_offset = 0.1
-        goal_angle = np.pi / 2
-        start_base_pose = apartment_setup.world.compute_fk_pose(apartment_setup.default_root, base_footprint)
-        start_base_pose.pose.position.y -= 1
-        start_base_pose.pose.position.x += 0.3
-        start_base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi * 3 / 4, [0, 0, 1]))
-        apartment_setup.set_seed_odometry(start_base_pose)
-
-        apartment_state = {
-            'cabinet1_door_top_left_joint': goal_angle
-        }
-        apartment_setup.set_seed_configuration(apartment_state)
-        apartment_setup.set_seed_configuration(apartment_setup.better_pose2)
-
-        left_pose = PoseStamped()
-        left_pose.header.frame_id = handle_name_frame
-        left_pose.pose.position.x = -grasp_offset
-        left_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [0, 0, -1, 0],
-                                                                         [0, 0, 0, 1]]))
-        apartment_setup.set_cart_goal(left_pose,
-                                      tip_link=l_tcp,
-                                      root_link=apartment_setup.default_root,
-                                      weight=WEIGHT_ABOVE_CA * 10,
-                                      check=False)
-        goal_point = PointStamped()
-        goal_point.header.frame_id = 'cabinet1_door_top_left'
-        goal_point = apartment_setup.transform_msg('map', goal_point)
-        # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
-        apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
-        # apartment_setup.avoid_joint_limits(50)
-        # apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
-        apartment_setup.plan_and_execute()
-
-        pointing_point = PointStamped()
-        pointing_point.header.frame_id = 'gripper_left_grasping_frame'
-        apartment_setup.set_pointing_goal(tip_link='xtion_optical_frame',
-                                          root_link='gripper_left_grasping_frame',
-                                          goal_point=pointing_point,
-                                          check=False)
-
-        apartment_setup.set_cart_goal(left_pose,
-                                      tip_link=l_tcp,
-                                      root_link=apartment_setup.default_root,
-                                      weight=WEIGHT_ABOVE_CA * 10,
-                                      check=False)
-        # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
-        # apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
-        # apartment_setup.avoid_joint_limits(50)
-        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
-        apartment_setup.plan_and_execute()
-        # type: "DiffDriveTangentialToPoint"
-        # parameter_value_pair: "{\"goal_point\":{\"message_type\":\"geometry_msgs/PointStamped\",\"message\":{\"\
-        # header\":{\"stamp\":{\"secs\":0,\"nsecs\":0.0},\"frame_id\":\"map\",\"seq\":0},\"\
-        # point\":{\"x\":0.563000037094409,\"y\":1.1559999675637478,\"z\":1.39499994913737}}}}"
-        apartment_setup.set_json_goal('Close',
-                                      tip_link=l_tcp,
-                                      environment_link=handle_name)
-        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
-        apartment_setup.set_avoid_joint_limits_goal(
-            joint_list=['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
-                        'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint'])
-        apartment_setup.plan_and_execute()
 
     def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
         js = {
@@ -673,7 +524,7 @@ class TestCollisionAvoidance:
                           size=(0.1, 0.1, 0.01),
                           pose=box_pose,
                           parent_link='base_link',
-                          parent_link_group=zero_pose.get_robot_name())
+                          parent_link_group=zero_pose.robot_name)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'base_link'
         box_pose.pose.position.x = 0.6
@@ -684,7 +535,7 @@ class TestCollisionAvoidance:
                           size=(0.1, 0.01, 0.1),
                           pose=box_pose,
                           parent_link='base_link',
-                          parent_link_group=zero_pose.get_robot_name())
+                          parent_link_group=zero_pose.robot_name)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'base_link'
         box_pose.pose.position.x = 0.6
@@ -695,7 +546,7 @@ class TestCollisionAvoidance:
                           size=(0.1, 0.01, 0.1),
                           pose=box_pose,
                           parent_link='base_link',
-                          parent_link_group=zero_pose.get_robot_name())
+                          parent_link_group=zero_pose.robot_name)
         # box_pose = PoseStamped()
         # box_pose.header.frame_id = 'base_link'
         # box_pose.pose.position.x = 0.6
@@ -755,123 +606,6 @@ class TestCollisionAvoidance:
         apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
-    def test_open_cabinet_right(self, apartment_setup: TiagoTestWrapper):
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = 'iai_apartment/side_B'
-        base_pose.pose.position.x = 1.6
-        base_pose.pose.position.y = 3.1
-        base_pose.pose.orientation.w = 1
-        base_pose = tf.transform_pose(tf.get_tf_root(), base_pose)
-        apartment_setup.set_localization(base_pose)
-        tcp = 'gripper_right_grasping_frame'
-        handle_name = 'handle_cab1_top_door'
-        handle_name_frame = 'iai_apartment/handle_cab1_top_door'
-        goal_angle = np.pi / 2
-        left_pose = PoseStamped()
-        left_pose.header.frame_id = handle_name_frame
-        left_pose.pose.position.x = -0.1
-        left_pose.pose.orientation.w = 1
-        apartment_setup.set_cart_goal(left_pose,
-                                      tip_link=tcp,
-                                      root_link=tf.get_tf_root(),
-                                      check=False)
-        apartment_setup.set_json_goal('KeepHandInWorkspace',
-                                      map_frame='map',
-                                      base_footprint='base_footprint',
-                                      tip_link=tcp)
-        goal_point = PointStamped()
-        goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
-        # apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-        #                               goal_point=goal_point)
-        apartment_setup.set_avoid_joint_limits_goal(50)
-        apartment_setup.plan_and_execute()
-
-        apartment_setup.set_json_goal('Open',
-                                      tip_link=tcp,
-                                      environment_link=handle_name,
-                                      goal_joint_state=goal_angle)
-        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-                                      goal_point=goal_point)
-        apartment_setup.set_avoid_joint_limits_goal(50)
-        apartment_setup.plan_and_execute()
-
-        apartment_setup.set_json_goal('Open',
-                                      tip_link=tcp,
-                                      environment_link=handle_name,
-                                      goal_joint_state=0)
-        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-                                      goal_point=goal_point)
-        apartment_setup.set_avoid_joint_limits_goal(50)
-        apartment_setup.plan_and_execute()
-
-    def test_dishwasher(self, apartment_setup: TiagoTestWrapper):
-        dishwasher_middle = 'dishwasher_drawer_middle'
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = dishwasher_middle
-        base_pose.pose.position.x = -1
-        base_pose.pose.position.y = -0.25
-        base_pose.pose.orientation.w = 1
-        base_pose = apartment_setup.transform_msg(apartment_setup.default_root, base_pose)
-        base_pose.pose.position.z = 0
-        apartment_setup.set_seed_odometry(base_pose)
-
-        tcp = 'gripper_left_grasping_frame'
-        handle_name = 'handle_cab7'
-        handle_name_frame = 'handle_cab7'
-        goal_angle = np.pi / 2
-        left_pose = PoseStamped()
-        left_pose.header.frame_id = handle_name_frame
-        left_pose.pose.position.x = -0.1
-        left_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [0, 0, -1, 0],
-                                                                         [0, 0, 0, 1]]))
-        apartment_setup.set_cart_goal(left_pose,
-                                      tip_link=tcp,
-                                      root_link=apartment_setup.default_root,
-                                      check=False)
-        apartment_setup.plan_and_execute()
-
-        apartment_setup.set_json_goal('Open',
-                                      tip_link=tcp,
-                                      environment_link=handle_name,
-                                      goal_joint_state=goal_angle)
-        # apartment_setup.set_json_goal('KeepHandInWorkspace',
-        #                               map_frame='map',
-        #                               base_footprint='base_footprint',
-        #                               tip_link=tcp)
-        # apartment_setup.allow_all_collisions()
-        apartment_setup.plan_and_execute()
-        # apartment_setup.set_apartment_js({joint_name: goal_angle})
-
-        apartment_setup.set_json_goal('Open',
-                                      tip_link=tcp,
-                                      environment_link=handle_name,
-                                      goal_joint_state=0)
-        # apartment_setup.set_json_goal('KeepHandInWorkspace',
-        #                               map_frame='map',
-        #                               base_footprint='base_footprint',
-        #                               tip_link=tcp)
-        # apartment_setup.allow_all_collisions()
-        apartment_setup.plan_and_execute()
-        # apartment_setup.set_apartment_js({joint_name: 0})
-
-    def test_hand_in_cabinet(self, apartment_setup: TiagoTestWrapper):
-        tcp = 'gripper_left_grasping_frame'
-        handle_name_frame = 'iai_apartment/cabinet1'
-        left_pose = PoseStamped()
-        left_pose.header.frame_id = handle_name_frame
-        # left_pose.pose.position.x = 0.1
-        left_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                         [0, 0, -1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [0, 0, 0, 1]]))
-        apartment_setup.set_cart_goal(left_pose,
-                                      tip_link=tcp,
-                                      root_link=tf.get_tf_root(),
-                                      check=False)
-        apartment_setup.plan_and_execute()
-
 
 class TestConstraints:
     def test_DiffDriveTangentialToPoint(self, apartment_setup):
@@ -913,7 +647,8 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
         joint_name = PrefixName('arm_right_5_joint', zero_pose.robot_name)
         lower_limit, upper_limit = zero_pose.world._joints[joint_name].get_limit_expressions(0)
-        assert lower_limit <= zero_pose.world.state[PrefixName('arm_right_5_joint', zero_pose.robot_name)].position <= upper_limit
+        assert lower_limit <= zero_pose.world.state[
+            PrefixName('arm_right_5_joint', zero_pose.robot_name)].position <= upper_limit
 
     def test_out_of_joint_soft_limits6(self, zero_pose: TiagoTestWrapper):
         js = {

@@ -101,10 +101,9 @@ class Giskard:
                         homo_transform: Optional[np.ndarray] = None):
         if homo_transform is None:
             homo_transform = np.eye(4)
-        if isinstance(parent_link, str):
-            parent_link = PrefixName(parent_link, None)
-        if isinstance(child_link, str):
-            child_link = PrefixName(child_link, None)
+
+        parent_link = PrefixName.from_string(parent_link, set_none_if_no_slash=True)
+        child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
         joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
         joint = FixedJoint(name=joint_name,
                            parent_link_name=parent_link,

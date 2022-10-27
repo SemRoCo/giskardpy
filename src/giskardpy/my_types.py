@@ -19,12 +19,15 @@ class PrefixName:
             self.long_name = name
 
     @classmethod
-    def from_string(cls, name: my_string):
+    def from_string(cls, name: my_string, set_none_if_no_slash: bool = False):
         if isinstance(name, PrefixName):
             return name
         parts = name.split(cls.separator)
         if len(parts) != 2:
-            raise AttributeError(f'{name} can not be converted to a {str(cls)}.')
+            if set_none_if_no_slash:
+                return cls(parts[0], None)
+            else:
+                raise AttributeError(f'{name} can not be converted to a {str(cls)}.')
         return cls(parts[1], parts[0])
 
     def __str__(self):

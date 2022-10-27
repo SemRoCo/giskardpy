@@ -1,7 +1,9 @@
 <launch>
 
-  <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen" >
-    <param name="config" value="$(find giskardpy)/config/boxy_sim.yaml" />
+  <include file="$(find iai_boxy_description)/launch/upload_boxy.launch"/>
+
+  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
+    <param name="config" value="Boxy_StandAlone"/>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
@@ -18,3 +20,4 @@
   </node>
 
 </launch>
+

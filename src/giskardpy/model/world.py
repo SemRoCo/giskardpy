@@ -333,7 +333,11 @@ class WorldTree:
     def joint_names_as_set(self):
         return set(self._joints.keys())
 
-    def add_urdf(self, urdf, group_name=None, parent_link_name=None, actuated=False):
+    def add_urdf(self,
+                 urdf: str,
+                 group_name: Optional[str] = None,
+                 parent_link_name: Optional[str] = None,
+                 actuated: bool = False):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name in self.groups:

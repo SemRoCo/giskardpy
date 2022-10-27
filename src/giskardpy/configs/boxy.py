@@ -1,57 +1,52 @@
-from collections import defaultdict
-
 from std_msgs.msg import ColorRGBA
 
+from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_giskard import Giskard
 
 
-class Boxy(Giskard):
-
+class Boxy_Base(Giskard):
     def __init__(self):
         super().__init__()
-        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
-        self.add_sync_tf_frame('map', 'odom')
-        # self.set_odometry_topic('/donbot/base_footprint')
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/base/state',
-                                                fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/left_arm/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/left_arm/state',
-                                                fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/right_arm/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/right_arm/state',
-                                                fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/neck/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/neck/state',
-                                                fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/torso/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/torso/state',
-                                                fill_velocity_values=True)
-        # self.add_omni_drive_interface(cmd_vel_topic='/donbot/cmd_vel',
-        #                               parent_link_name='odom',
-        #                               child_link_name='base_footprint')
-        self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
-                                                                                 hard_threshold=0.0)
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('odom_z_joint',
-                                                                               number_of_repeller=2,
-                                                                               soft_threshold=0.1,
-                                                                               hard_threshold=0.05)
-        # close_links = ['ur5_wrist_1_link', 'ur5_wrist_2_link', 'ur5_wrist_3_link', 'ur5_forearm_link',
-        #                'ur5_upper_arm_link']
-        # for link_name in close_links:
-        #     self.collision_avoidance_config.overwrite_self_collision_avoidance(link_name,
-        #                                                                        soft_threshold=0.02,
-        #                                                                        hard_threshold=0.005)
-        # super_close_links = ['gripper_gripper_left_link', 'gripper_gripper_right_link']
-        # for link_name in super_close_links:
-        #     self.collision_avoidance_config.overwrite_self_collision_avoidance(link_name,
-        #                                                                        soft_threshold=0.00001,
-        #                                                                        hard_threshold=0.0)
-        # self.general_config.joint_limits = {
-        #     'velocity': defaultdict(lambda: 0.5),
-        #     'acceleration': defaultdict(lambda: 1e3),
-        #     'jerk': defaultdict(lambda: 15),
-        # }
-        # self.general_config.joint_limits['velocity']['odom_x_joint'] = 0.1
-        # self.general_config.joint_limits['velocity']['odom_y_joint'] = 0.1
-        # self.general_config.joint_limits['velocity']['odom_z_joint'] = 0.05
+
+
+class Boxy_StandAlone(Boxy_Base):
+    def __init__(self):
+        self.add_robot_from_parameter_server()
+        super().__init__()
+        self.set_default_visualization_marker_color(1, 1, 1, 1)
+        self._general_config.control_mode = ControlModes.stand_alone
+        self.publish_all_tf()
+        self.configure_VisualizationBehavior(in_planning_loop=True)
+        self.configure_CollisionMarker(in_planning_loop=True)
+        self.root_link_name = 'map'
+        self.add_fixed_joint(parent_link='map', child_link='boxy_description/odom')
+        self.register_controlled_joints([
+            'neck_shoulder_pan_joint',
+            'neck_shoulder_lift_joint',
+            'neck_elbow_joint',
+            'neck_wrist_1_joint',
+            'neck_wrist_2_joint',
+            'neck_wrist_3_joint',
+            'triangle_base_joint',
+            'left_arm_0_joint',
+            'left_arm_1_joint',
+            'left_arm_2_joint',
+            'left_arm_3_joint',
+            'left_arm_4_joint',
+            'left_arm_5_joint',
+            'left_arm_6_joint',
+            'right_arm_0_joint',
+            'right_arm_1_joint',
+            'right_arm_2_joint',
+            'right_arm_3_joint',
+            'right_arm_4_joint',
+            'right_arm_5_joint',
+            'right_arm_6_joint',
+            'odom_x_joint',
+            'odom_y_joint',
+            'odom_z_joint',
+        ])
+        self.overwrite_external_collision_avoidance('odom_z_joint',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)

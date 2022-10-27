@@ -9,54 +9,30 @@ from giskardpy.configs.default_config import Giskard
 class HSR_Base(Giskard):
     def __init__(self):
         super().__init__()
-        self.collision_avoidance_config.set_default_external_collision_avoidance(soft_threshold=0.1,
-                                                                                 hard_threshold=0.0)
+        self.set_default_external_collision_avoidance(soft_threshold=0.1,
+                                                      hard_threshold=0.0)
         for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=4,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=4,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
         for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   number_of_repeller=2,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0,
-                                                                                   max_velocity=0.2)
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=2,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
         for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.05,
-                                                                                   hard_threshold=0.0)
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0)
         for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
-            self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
-                                                                                   soft_threshold=0.025,
-                                                                                   hard_threshold=0.0)
-        self.collision_avoidance_config.fix_joints_for_self_collision_avoidance(['head_pan_joint',
-                                                                                 'head_tilt_joint'])
-        # self.general_config.joint_limits = {
-        #     'velocity': defaultdict(lambda: 0.5),
-        #     'acceleration': defaultdict(lambda: 1e3),
-        #     'jerk': defaultdict(lambda: 10)
-        # }
-        # self.qp_solver_config.joint_weights = {
-        #     'velocity': defaultdict(lambda: 0.001),
-        #     'acceleration': defaultdict(float),
-        #     'jerk': defaultdict(lambda: 0.001)
-        # }
-        self._general_config.joint_limits = {
-            'velocity': defaultdict(lambda: 1),
-            'acceleration': defaultdict(lambda: 1.5),
-        }
-        self._qp_solver_config.joint_weights = {
-            'velocity': defaultdict(lambda: 0.001),
-            'acceleration': defaultdict(lambda: 0.001),
-        }
-        self._general_config.joint_limits['velocity']['head_pan_joint'] = 2
-        self._general_config.joint_limits['velocity']['head_tilt_joint'] = 2
-        self._general_config.joint_limits['acceleration']['head_pan_joint'] = 4
-        self._general_config.joint_limits['acceleration']['head_tilt_joint'] = 4
-        # self.general_config.joint_limits['jerk']['head_pan_joint'] = 30
-        # self.general_config.joint_limits['jerk']['head_tilt_joint'] = 30
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.025,
+                                                        hard_threshold=0.0)
+        self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
+                                                      'head_tilt_joint'])
 
 
 class HSR_Mujoco(HSR_Base):

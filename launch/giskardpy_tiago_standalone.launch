@@ -1,7 +1,9 @@
 <launch>
 
+    <include file="$(find iai_tiago_description)/launch/upload.launch"/>
+
     <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-        <param name="config" value="IAI_Tiago"/>
+        <param name="config" value="Tiago_Standalone"/>
     </node>
 
     <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
@@ -14,7 +16,5 @@
     </node>
 
     <node pkg="giskardpy" type="move_base_simple_goal_diff_drive.py" name="my_move_base" output="screen" />
-
-    <node pkg="iai_tiago_tools" type="giskard_e_stop.py" name="giskard_e_stop" output="screen" />
 
 </launch>

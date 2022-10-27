@@ -175,6 +175,7 @@ class Giskard:
     def add_diff_drive_joint(self,
                              parent_link_name: str,
                              child_link_name: str,
+                             robot_group_name: Optional[str] = None,
                              name: Optional[str] = 'brumbrum',
                              odometry_topic: Optional[str] = None,
                              translation_velocity_limit: Optional[float] = 0.2,
@@ -186,9 +187,12 @@ class Giskard:
                              odom_x_name: Optional[str] = 'odom_x',
                              odom_y_name: Optional[str] = 'odom_y',
                              odom_yaw_name: Optional[str] = 'odom_yaw'):
+        if robot_group_name is None:
+            robot_group_name = self.get_default_group_name()
         brumbrum_joint = DiffDrive(parent_link_name=parent_link_name,
-                                   child_link_name=child_link_name,
+                                   child_link_name=PrefixName(child_link_name, robot_group_name),
                                    name=name,
+                                   group_name=robot_group_name,
                                    odom_x_name=odom_x_name,
                                    odom_y_name=odom_y_name,
                                    odom_yaw_name=odom_yaw_name,

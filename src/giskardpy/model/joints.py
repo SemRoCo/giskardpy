@@ -1195,6 +1195,7 @@ class DiffDrive(Joint):
     def __init__(self,
                  parent_link_name: my_string,
                  child_link_name: my_string,
+                 group_name: Optional[str] = None,
                  name: Optional[my_string] = 'brumbrum',
                  translation_velocity_limit: Optional[float] = 0.5,
                  rotation_velocity_limit: Optional[float] = 0.6,
@@ -1208,17 +1209,18 @@ class DiffDrive(Joint):
                  x_vel_name: Optional[str] = 'base_footprint_x_vel',
                  rot_vel_name: Optional[str] = 'base_footprint_rot_vel',
                  **kwargs):
+        name = PrefixName(name, group_name)
         self.translation_velocity_limit = translation_velocity_limit
         self.rotation_velocity_limit = rotation_velocity_limit
         self.translation_acceleration_limit = translation_acceleration_limit
         self.rotation_acceleration_limit = rotation_acceleration_limit
         self.translation_jerk_limit = translation_jerk_limit
         self.rotation_jerk_limit = rotation_jerk_limit
-        self.x_name = x_name
-        self.y_name = y_name
-        self.yaw_name = yaw_name
-        self.x_vel_name = x_vel_name
-        self.rot_vel_name = rot_vel_name
+        self.x_name = PrefixName(x_name, group_name)
+        self.y_name = PrefixName(y_name, group_name)
+        self.yaw_name = PrefixName(yaw_name, group_name)
+        self.x_vel_name = PrefixName(x_vel_name, group_name)
+        self.rot_vel_name = PrefixName(rot_vel_name, group_name)
         super().__init__(name, parent_link_name, child_link_name, w.eye(4))
 
     def create_free_variables(self):

@@ -10,55 +10,42 @@ from giskardpy.my_types import PrefixName
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
-        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
-        self.collision_avoidance_config.load_moveit_self_collision_matrix(
-            'package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('brumbrum',
-                                                                               number_of_repeller=2,
-                                                                               soft_threshold=0.2,
-                                                                               hard_threshold=0.1)
-        self.collision_avoidance_config.ignored_collisions = ['wheel_left_link',
-                                                              'wheel_right_link',
-                                                              'caster_back_left_2_link',
-                                                              'caster_back_right_2_link',
-                                                              'caster_front_left_2_link',
-                                                              'caster_front_right_2_link']
-        self.collision_avoidance_config.fix_joints_for_self_collision_avoidance(['head_1_joint',
-                                                                                 'head_2_joint',
-                                                                                 'gripper_left_left_finger_joint',
-                                                                                 'gripper_left_right_finger_joint',
-                                                                                 'gripper_right_left_finger_joint',
-                                                                                 'gripper_right_right_finger_joint'])
-        self.collision_avoidance_config.fix_joints_for_external_collision_avoidance(['gripper_left_left_finger_joint',
-                                                                                     'gripper_left_right_finger_joint',
-                                                                                     'gripper_right_left_finger_joint',
-                                                                                     'gripper_right_right_finger_joint'])
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('arm_right_7_joint',
-                                                                               number_of_repeller=4,
-                                                                               soft_threshold=0.05,
-                                                                               hard_threshold=0.0,
-                                                                               max_velocity=0.2)
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('arm_left_7_joint',
-                                                                               number_of_repeller=4,
-                                                                               soft_threshold=0.05,
-                                                                               hard_threshold=0.0,
-                                                                               max_velocity=0.2)
-        self.collision_avoidance_config.set_default_self_collision_avoidance(hard_threshold=0.04,
-                                                                             soft_threshold=0.08)
-        self.collision_avoidance_config.set_default_external_collision_avoidance(hard_threshold=0.03,
-                                                                                 soft_threshold=0.08)
-        # self.general_config.joint_limits['jerk'] = defaultdict(lambda: 60)
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_lift_link')
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_lift_link')
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_lift_link')
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_lift_link')
-        #
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_3_link', 'torso_fixed_column_link')
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_3_link', 'torso_fixed_column_link')
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_right_2_link', 'torso_fixed_column_link')
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_fixed_column_link')
-        #
-        # self.collision_avoidance_config.ignore_self_collisions_of_pair('arm_left_2_link', 'torso_fixed_column_link')
+        self.set_default_visualization_marker_color(1, 1, 1, 0.7)
+        self.load_moveit_self_collision_matrix('package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
+        self.overwrite_external_collision_avoidance('brumbrum',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)
+        self.ignored_collisions = ['wheel_left_link',
+                                   'wheel_right_link',
+                                   'caster_back_left_2_link',
+                                   'caster_back_right_2_link',
+                                   'caster_front_left_2_link',
+                                   'caster_front_right_2_link']
+        self.fix_joints_for_self_collision_avoidance(['head_1_joint',
+                                                      'head_2_joint',
+                                                      'gripper_left_left_finger_joint',
+                                                      'gripper_left_right_finger_joint',
+                                                      'gripper_right_left_finger_joint',
+                                                      'gripper_right_right_finger_joint'])
+        self.fix_joints_for_external_collision_avoidance(['gripper_left_left_finger_joint',
+                                                          'gripper_left_right_finger_joint',
+                                                          'gripper_right_left_finger_joint',
+                                                          'gripper_right_right_finger_joint'])
+        self.overwrite_external_collision_avoidance('arm_right_7_joint',
+                                                    number_of_repeller=4,
+                                                    soft_threshold=0.05,
+                                                    hard_threshold=0.0,
+                                                    max_velocity=0.2)
+        self.overwrite_external_collision_avoidance('arm_left_7_joint',
+                                                    number_of_repeller=4,
+                                                    soft_threshold=0.05,
+                                                    hard_threshold=0.0,
+                                                    max_velocity=0.2)
+        self.set_default_self_collision_avoidance(hard_threshold=0.04,
+                                                  soft_threshold=0.08)
+        self.set_default_external_collision_avoidance(hard_threshold=0.03,
+                                                      soft_threshold=0.08)
 
 
 class TiagoMujoco(TiagoBase):
@@ -120,17 +107,23 @@ class IAI_Tiago(TiagoBase):
                                       rotation_acceleration_limit=None)
 
 
-class TiagoStandAlone(TiagoBase):
+class Tiago_Standalone(TiagoBase):
     def __init__(self):
+        self.add_robot_from_parameter_server()
         super().__init__()
-        self._general_config.control_mode = ControlModes.stand_alone
+        self.set_default_visualization_marker_color(1, 1, 1, 1)
+        self.set_control_mode(ControlModes.stand_alone)
+        self.publish_all_tf()
+        self.configure_VisualizationBehavior(in_planning_loop=True)
+        self.configure_CollisionMarker(in_planning_loop=True)
         self.root_link_name = 'map'
-        # self.collision_avoidance_config.collision_checker = CollisionCheckerLib.none
-        # self.disable_visualization()
-        self.disable_tf_publishing()
         self.add_fixed_joint(parent_link='map', child_link='odom')
-        self.add_robot_from_parameter_server('robot_description')
-        self.register_controlled_joints(['torso_lift_joint', 'head_1_joint', 'head_2_joint'])
+        self.add_diff_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  name='brumbrum',
+                                  translation_velocity_limit=0.19,
+                                  rotation_velocity_limit=0.19)
+        self.register_controlled_joints(['torso_lift_joint', 'head_1_joint', 'head_2_joint', 'brumbrum'])
         self.register_controlled_joints(['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
                                          'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint'])
         self.register_controlled_joints(['arm_right_1_joint', 'arm_right_2_joint', 'arm_right_3_joint',
@@ -138,7 +131,3 @@ class TiagoStandAlone(TiagoBase):
                                          'arm_right_7_joint'])
         self.register_controlled_joints(['gripper_right_left_finger_joint', 'gripper_right_right_finger_joint',
                                          'gripper_left_left_finger_joint', 'gripper_left_right_finger_joint'])
-        self.add_diff_drive_interface(parent_link_name='odom',
-                                      child_link_name='base_footprint',
-                                      translation_velocity_limit=0.19,
-                                      rotation_velocity_limit=0.19)

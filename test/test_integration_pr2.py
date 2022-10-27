@@ -25,8 +25,6 @@ from giskardpy.utils.math import compare_points, compare_orientations
 from utils_for_tests import compare_poses, publish_marker_vector, \
     JointGoalChecker, GiskardTestWrapper
 
-# TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
-# TODO roslaunch iai_kitchen upload_kitchen_obj.launch
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -405,7 +403,7 @@ class TestJointGoals:
                    'head_pan_joint': head_pan_joint_limits[0] - 0.2}
         zero_pose.set_joint_goal(goal_js, check=False)
         zero_pose.plan_and_execute()
-        js = {u'torso_lift_joint': 0.32}
+        js = {'torso_lift_joint': 0.32}
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
@@ -415,8 +413,6 @@ class TestJointGoals:
 
         zero_pose.set_joint_goal(goal_js, check=False)
         zero_pose.plan_and_execute()
-
-    # TODO test goal for unknown joint
 
 
 class TestConstraints:
@@ -1022,7 +1018,7 @@ class TestConstraints:
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
-                                    bar_length=0.4)  # TODO: check for real length
+                                    bar_length=0.4)
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = str(PrefixName(kitchen_setup.l_tip, 'pr2'))
         x_gripper.vector.x = 1
@@ -1063,8 +1059,6 @@ class TestConstraints:
         # Update kitchen object
         kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.0})
 
-        # TODO: calculate real and desired value and compare
-        pass
 
     def test_open_close_dishwasher(self, kitchen_setup: PR2TestWrapper):
         p = PoseStamped()
@@ -1129,93 +1123,6 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0})
-
-    # def test_open_close_dishwasher_palm(self, kitchen_setup: PR2):
-    #     # FIXME
-    #     handle_frame_id = 'iai_kitchen/sink_area_dish_washer_door_handle'
-    #     handle_name = 'sink_area_dish_washer_door_handle'
-    #     hand = kitchen_setup.r_tip
-    #     goal_angle = np.pi / 3.5
-    #
-    #     p = PoseStamped()
-    #     p.header.frame_id = 'map'
-    #     p.pose.orientation.w = 1
-    #     p.pose.position.x = 0.5
-    #     p.pose.position.y = 0.2
-    #     kitchen_setup.teleport_base(p)
-    #
-    #     kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0.})
-    #
-    #     hand_goal = PoseStamped()
-    #     hand_goal.header.frame_id = handle_frame_id
-    #     hand_goal.pose.position.x -= 0.03
-    #     hand_goal.pose.position.z = 0.03
-    #     hand_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-    #                                                                      [0, -1, 0, 0],
-    #                                                                      [1, 0, 0, 0],
-    #                                                                      [0, 0, 0, 1]]))
-    #     # kitchen_setup.allow_all_collisions()
-    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
-    #                                 root_link='odom_combined',
-    #                                 tip_link='base_footprint',
-    #                                 max_linear_velocity=0.05,
-    #                                 max_angular_velocity=0.08,
-    #                                 )
-    #     kitchen_setup.set_cart_goal(hand_goal, hand)
-    #     kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING)
-    #
-    #     kitchen_setup.set_json_goal('Open',
-    #                                 tip_link=hand,
-    #                                 object_name='kitchen',
-    #                                 handle_link=handle_name,
-    #                                 goal_joint_state=goal_angle,
-    #                                 )
-    #
-    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
-    #                                 root_link='odom_combined',
-    #                                 tip_link='base_footprint',
-    #                                 max_linear_velocity=0.05,
-    #                                 max_angular_velocity=0.1,
-    #                                 )
-    #
-    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
-    #                                 root_link='odom_combined',
-    #                                 tip_link='r_forearm_link',
-    #                                 max_linear_velocity=0.1,
-    #                                 max_angular_velocity=0.5,
-    #                                 )
-    #
-    #     # kitchen_setup.allow_all_collisions()
-    #     kitchen_setup.plan_and_execute()
-    #     kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': goal_angle})
-    #
-    #     kitchen_setup.set_json_goal('Open',
-    #                                 tip_link=hand,
-    #                                 object_name='kitchen',
-    #                                 handle_link=handle_name,
-    #                                 goal_joint_state=0,
-    #                                 )
-    #
-    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
-    #                                 root_link='odom_combined',
-    #                                 tip_link='base_footprint',
-    #                                 max_linear_velocity=0.05,
-    #                                 max_angular_velocity=0.1,
-    #                                 )
-    #
-    #     kitchen_setup.set_json_goal('CartesianVelocityLimit',
-    #                                 root_link='odom_combined',
-    #                                 tip_link='r_forearm_link',
-    #                                 max_linear_velocity=0.05,
-    #                                 max_angular_velocity=0.1,
-    #                                 )
-    #
-    #     # kitchen_setup.allow_all_collisions()
-    #     kitchen_setup.plan_and_execute()
-    #     kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0})
-    #
-    #     kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-    #     kitchen_setup.plan_and_execute()
 
     def test_align_planes1(self, zero_pose: PR2TestWrapper):
         x_gripper = Vector3Stamped()
@@ -2194,8 +2101,6 @@ class TestWayPoints:
         else:  # if no break
             assert False, 'pocky pose not in trajectory'
 
-    # TODO test translation and orientation goal in different frame
-
 
 # class TestShaking(object):
 #     def test_wiggle_prismatic_joint_neglectable_shaking(self, kitchen_setup: PR2TestWrapper):
@@ -2621,7 +2526,6 @@ class TestWorldManipulation:
         zero_pose.update_group_pose('asdf', p, expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
         zero_pose.update_group_pose(group_name, p)
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        # TODO test that attached object moved?
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -3135,7 +3039,6 @@ class TestCollisionAvoidanceGoals:
         pocky_pose_setup.allow_self_collision()
 
         pocky_pose_setup.plan_and_execute()
-        # TODO check traj length?
         pocky_pose_setup.check_cpi_geq(['box'], 0.048)
 
     def test_avoid_collision_box_between_3_boxes(self, pocky_pose_setup: PR2TestWrapper):

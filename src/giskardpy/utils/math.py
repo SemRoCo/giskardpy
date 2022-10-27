@@ -68,8 +68,6 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    # TODO don't split this into 3 matrices
-
     rx = np.array([[1, 0, 0, 0],
                    [0, np.cos(roll), -np.sin(roll), 0],
                    [0, np.sin(roll), np.cos(roll), 0],

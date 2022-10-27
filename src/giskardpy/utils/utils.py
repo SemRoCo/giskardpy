@@ -521,7 +521,6 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
 
 
 def convert_ros_message_to_dictionary(message: Message) -> dict:
-    # TODO there is probably a lib for that, but i'm to lazy to search
     type_str_parts = str(type(message)).split('.')
     part1 = type_str_parts[0].split('\'')[1]
     part2 = type_str_parts[-1].split('\'')[0]

@@ -17,8 +17,6 @@ from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector
 
 class TestCASWrapper(unittest.TestCase):
 
-    # TODO test free symbols
-
     def test_is_matrix(self):
         self.assertFalse(w.is_matrix(w.Symbol('a')))
         self.assertTrue(w.is_matrix(w.Matrix([[0, 0]])))
@@ -547,15 +545,6 @@ class TestCASWrapper(unittest.TestCase):
         q4 = w.compile_and_execute(w.quaternion_diff, [q1, q2])
         self.assertTrue(np.isclose(q3, q4).all() or np.isclose(q3, -q4).all(), msg='{} != {}'.format(q1, q4))
 
-    # @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()],
-    #                             min_length=2, max_length=50))
-    # FIXME there appears to be a bug in scipy cosine, when values are very large, that my implementation doesn't have
-    # def test_cosine_distance(self, vectors):
-    #     v1, v2 = vectors
-    #     expected = cosine(v1, v2)
-    #     actual = w.compile_and_execute(w.cosine_distance, [v1, v2])
-    #     self.assertTrue(np.isclose(expected, actual, atol=1e-6, equal_nan=True))
-
     @given(quaternion(),
            quaternion(),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
@@ -651,7 +640,6 @@ class TestCASWrapper(unittest.TestCase):
     @given(unit_vector(4),
            unit_vector(4))
     def test_entrywise_product(self, q1, q2):
-        # TODO use real matrices
         m1 = quat2mat(q1)
         m2 = quat2mat(q2)
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])

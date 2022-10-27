@@ -789,7 +789,6 @@ class ClosedLoop(OpenLoop):
             C = behaviors[params['plugin']]
             del params['plugin']
             planning_4.add_child(C(execution_action_server_name, **params))
-        # todo: fixme
         #planning_4.add_child(SyncConfiguration2('update robot configuration',
         #                                         self.god_map.unsafe_get_data(identifier.robot_group_name)))
         planning_4.add_child(LogTrajPlugin('log'))
@@ -815,7 +814,6 @@ class ClosedLoop(OpenLoop):
 
 
 # def check_velocity_limits_reachable(god_map):
-#     # TODO a more general version of this
 #     robot = god_map.get_data(identifier.robot)
 #     sample_period = god_map.get_data(identifier.sample_period)
 #     prediction_horizon = god_map.get_data(identifier.prediction_horizon)

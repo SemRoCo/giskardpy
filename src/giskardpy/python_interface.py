@@ -1,10 +1,8 @@
 import json
 from typing import Dict, Tuple, Optional, Union, List
-import giskardpy.utils.tfwrapper as tf
 import rospy
 from actionlib import SimpleActionClient
 from genpy import Message
-from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
 from rospy import ServiceException
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
@@ -251,7 +249,7 @@ class GiskardWrapper:
         :param goal_state: maps joint_name to goal position
         :param group_name: if joint_name is not unique, search in this group for matches.
         :param weight:
-        :param max_velocity: will be applied to all joints, you should group prismatic and non prismatic joints if using this.
+        :param max_velocity: will be applied to all joints
         :param hard: turns this into a hard constraint.
         """
         self.set_json_goal(constraint_type='JointPositionList',
@@ -418,12 +416,12 @@ class GiskardWrapper:
                            weight=weight)
 
     def set_close_container_goal(self,
-                                tip_link: str,
-                                environment_link: str,
-                                tip_group: Optional[str] = None,
-                                environment_group: Optional[str] = None,
-                                goal_joint_state: Optional[float] = None,
-                                weight=WEIGHT_ABOVE_CA, ):
+                                 tip_link: str,
+                                 environment_link: str,
+                                 tip_group: Optional[str] = None,
+                                 environment_group: Optional[str] = None,
+                                 goal_joint_state: Optional[float] = None,
+                                 weight=WEIGHT_ABOVE_CA, ):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
@@ -542,8 +540,6 @@ class GiskardWrapper:
         """
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
-        :param percentage:
-        :param weight:
         """
         self.set_json_goal(constraint_type='AvoidJointLimits',
                            percentage=percentage,
@@ -691,12 +687,12 @@ class GiskardWrapper:
         Removes a group and all links and joints it contains from the world.
         Be careful, you can remove parts of the robot like that.
         """
-        object = WorldBody()
+        world_body = WorldBody()
         req = UpdateWorldRequest()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.REMOVE
         req.timeout = timeout
-        req.body = object
+        req.body = world_body
         return self._update_world_srv.call(req)
 
     def add_box(self,
@@ -737,15 +733,15 @@ class GiskardWrapper:
         """
         See add_box.
         """
-        object = WorldBody()
-        object.type = WorldBody.PRIMITIVE_BODY
-        object.shape.type = SolidPrimitive.SPHERE
-        object.shape.dimensions.append(radius)
+        world_body = WorldBody()
+        world_body.type = WorldBody.PRIMITIVE_BODY
+        world_body.shape.type = SolidPrimitive.SPHERE
+        world_body.shape.dimensions.append(radius)
         req = UpdateWorldRequest()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
         req.timeout = timeout
-        req.body = object
+        req.body = world_body
         req.pose = pose
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
@@ -761,16 +757,17 @@ class GiskardWrapper:
                  timeout: float = 0) -> UpdateWorldResponse:
         """
         See add_box.
-        :param mesh: path to the mesh location, can be ros package path, e.g., package://giskardpy/test/urdfs/meshes/bowl_21.obj
+        :param mesh: path to the mesh location, can be ros package path, e.g.,
+                        package://giskardpy/test/urdfs/meshes/bowl_21.obj
         """
-        object = WorldBody()
-        object.type = WorldBody.MESH_BODY
-        object.mesh = mesh
+        world_body = WorldBody()
+        world_body.type = WorldBody.MESH_BODY
+        world_body.mesh = mesh
         req = UpdateWorldRequest()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
         req.timeout = timeout
-        req.body = object
+        req.body = world_body
         req.pose = pose
         req.body.scale.x = scale[0]
         req.body.scale.y = scale[1]
@@ -790,17 +787,17 @@ class GiskardWrapper:
         """
         See add_box.
         """
-        object = WorldBody()
-        object.type = WorldBody.PRIMITIVE_BODY
-        object.shape.type = SolidPrimitive.CYLINDER
-        object.shape.dimensions = [0, 0]
-        object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
-        object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
+        world_body = WorldBody()
+        world_body.type = WorldBody.PRIMITIVE_BODY
+        world_body.shape.type = SolidPrimitive.CYLINDER
+        world_body.shape.dimensions = [0, 0]
+        world_body.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
+        world_body.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
         req = UpdateWorldRequest()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
         req.timeout = timeout
-        req.body = object
+        req.body = world_body
         req.pose = pose
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
@@ -886,7 +883,6 @@ class GiskardWrapper:
         If add_urdf was used with a set_js_topic, you can use this to send out a message.
         :param object_name: name of the group
         :param joint_states: joint state message or a dict that maps joint name to position
-        :return: UpdateWorldResponse
         """
         if isinstance(joint_states, dict):
             joint_states = position_dict_to_joint_states(joint_states)

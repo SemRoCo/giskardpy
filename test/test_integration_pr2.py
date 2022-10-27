@@ -3552,7 +3552,12 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.y = 1
+        base_pose.pose.position.x = .1
+        base_pose.pose.orientation.w = 1
+        kitchen_setup.move_base(base_pose)
 
         # grasp bowl
         l_goal = deepcopy(bowl_pose)

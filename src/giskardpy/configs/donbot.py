@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from std_msgs.msg import ColorRGBA
 
-from giskardpy.configs.default_config import Giskard
+from giskardpy.configs.default_giskard import Giskard
 
 
 class Donbot(Giskard):

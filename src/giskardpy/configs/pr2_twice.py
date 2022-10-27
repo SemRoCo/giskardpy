@@ -1,4 +1,4 @@
-from giskardpy.configs.default_config import Giskard
+from giskardpy.configs.default_giskard import Giskard
 from giskardpy.my_types import PrefixName
 
 

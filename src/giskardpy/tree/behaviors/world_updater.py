@@ -118,8 +118,8 @@ class WorldUpdater(GiskardBehavior):
         res.error_codes = GetGroupInfoResponse.SUCCESS
         try:
             group = self.world.groups[req.group_name]  # type: SubWorldTree
-            res.controlled_joints = [str(j) for j in group.controlled_joints]
-            res.links = list(sorted(str(x) for x in group.link_names))
+            res.controlled_joints = [str(j.short_name) for j in group.controlled_joints]
+            res.links = list(sorted(str(x.short_name) for x in group.link_names))
             res.child_groups = list(sorted(str(x) for x in group.groups.keys()))
             # tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             # node_name = str(PrefixName(req.group_name, 'js'))

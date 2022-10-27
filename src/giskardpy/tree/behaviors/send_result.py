@@ -10,7 +10,7 @@ class SendResult(ActionServerBehavior):
     @profile
     def update(self):
         skip_failures = self.get_god_map().get_data(identifier.skip_failures)
-        # Blackboard().set('exception', None)  # FIXME move this to reset?
+        Blackboard().set('exception', None)  # FIXME move this to reset?
         result = self.get_god_map().get_data(identifier.result_message)
 
         if result.error_codes[-1] == MoveResult.PREEMPTED:

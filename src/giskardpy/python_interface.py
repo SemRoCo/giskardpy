@@ -698,7 +698,8 @@ class GiskardWrapper:
         req.body = world_body
         result: UpdateWorldResponse = self._update_world_srv.call(req)
         if result.error_codes == UpdateWorldResponse.SUCCESS:
-            del self._object_js_topics[name]
+            if name in self._object_js_topics:
+                del self._object_js_topics[name]
         return result
 
     def add_box(self,

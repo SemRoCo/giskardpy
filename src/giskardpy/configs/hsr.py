@@ -1,7 +1,3 @@
-from collections import defaultdict
-
-from std_msgs.msg import ColorRGBA
-
 from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_giskard import Giskard
 
@@ -9,7 +5,8 @@ from giskardpy.configs.default_giskard import Giskard
 class HSR_Base(Giskard):
     def __init__(self):
         super().__init__()
-        self.set_default_external_collision_avoidance(soft_threshold=0.1,
+        self.load_moveit_self_collision_matrix('package://giskardpy/config/hsrb.srdf')
+        self.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                       hard_threshold=0.0)
         for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
             self.overwrite_external_collision_avoidance(joint_name,
@@ -55,14 +52,21 @@ class HSR_Mujoco(HSR_Base):
         self.add_follow_joint_trajectory_server(namespace='/omni_pose_follower/follow_joint_trajectory',
                                                 state_topic='/omni_pose_follower/state',
                                                 fill_velocity_values=True)
+        self.overwrite_external_collision_avoidance(joint_name='brumbrum',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.1,
+                                                    hard_threshold=0.03)
 
 
 class HSR_StandAlone(HSR_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
-        self._general_config.control_mode = ControlModes.stand_alone
+        self.set_control_mode(ControlModes.stand_alone)
+        self.set_default_visualization_marker_color(1, 1, 1, 1)
         self.publish_all_tf()
+        self.configure_VisualizationBehavior(in_planning_loop=True)
+        self.configure_CollisionMarker(in_planning_loop=True)
         self.root_link_name = 'map'
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_omni_drive_joint(parent_link_name='odom',
@@ -81,3 +85,7 @@ class HSR_StandAlone(HSR_Base):
             'wrist_roll_joint',
             'brumbrum'
         ])
+        self.overwrite_external_collision_avoidance(joint_name='brumbrum',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.1,
+                                                    hard_threshold=0.03)

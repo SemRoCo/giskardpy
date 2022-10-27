@@ -25,7 +25,6 @@ from giskardpy.utils.math import compare_points, compare_orientations
 from utils_for_tests import compare_poses, publish_marker_vector, \
     JointGoalChecker, GiskardTestWrapper
 
-
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
               'r_forearm_roll_joint': -0.0301682323805,
@@ -67,8 +66,6 @@ pick_up_pose = {
     'r_wrist_roll_joint': 0.0509923457388,
     'torso_lift_joint': 0.261791330751,
 }
-
-folder_name = 'tmp_data/'
 
 
 class PR2TestWrapper(GiskardTestWrapper):
@@ -1058,7 +1055,6 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.0})
-
 
     def test_open_close_dishwasher(self, kitchen_setup: PR2TestWrapper):
         p = PoseStamped()
@@ -2443,7 +2439,7 @@ class TestWorldManipulation:
             js_topic = ''
             set_js_topic = ''
         else:
-            js_topic = '/kitchen/joint_states',
+            js_topic = '/kitchen/joint_states'
             set_js_topic = '/kitchen/cram_joint_states'
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
@@ -2451,6 +2447,7 @@ class TestWorldManipulation:
                                js_topic=js_topic,
                                set_js_topic=set_js_topic)
         kitchen_setup.remove_group(object_name)
+        kitchen_setup.set_kitchen_js({})
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
                                pose=p,

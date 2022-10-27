@@ -335,7 +335,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_object_joint_state(self, object_name, joint_state):
         super().set_object_joint_state(object_name, joint_state)
-        self.wait_heartbeats(2)
+        self.wait_heartbeats(3)
         current_js = self.world.groups[object_name].state
         joint_names_with_prefix = set(j.long_name for j in current_js)
         joint_state_names = list()

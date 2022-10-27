@@ -678,7 +678,10 @@ class GiskardWrapper:
         req = UpdateWorldRequest()
         req.operation = UpdateWorldRequest.REMOVE_ALL
         req.timeout = timeout
-        return self._update_world_srv.call(req)
+        result: UpdateWorldResponse = self._update_world_srv.call(req)
+        if result.error_codes == UpdateWorldResponse.SUCCESS:
+            self._object_js_topics = {}
+        return result
 
     def remove_group(self,
                      name: str,
@@ -693,7 +696,10 @@ class GiskardWrapper:
         req.operation = UpdateWorldRequest.REMOVE
         req.timeout = timeout
         req.body = world_body
-        return self._update_world_srv.call(req)
+        result: UpdateWorldResponse = self._update_world_srv.call(req)
+        if result.error_codes == UpdateWorldResponse.SUCCESS:
+            del self._object_js_topics[name]
+        return result
 
     def add_box(self,
                 name: str,

@@ -330,9 +330,6 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
     def free_variable_list(self) -> List[FreeVariable]:
         return [self.free_variable]
 
-    def delete_limits(self):
-        pass
-
     def delete_weights(self):
         pass
 
@@ -341,9 +338,6 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
     def update_weights(self, weights: Dict[int, Dict[my_string, float]]):
         pass
-
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
-        return None
 
 
 class PrismaticJoint(OneDofJoint):

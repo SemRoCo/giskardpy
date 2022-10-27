@@ -11,6 +11,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis, ro
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco
+from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
 
@@ -24,8 +25,6 @@ class HSRTestWrapper(GiskardTestWrapper):
         'head_tilt_joint': 0.0,
         'wrist_flex_joint': 0.0,
         'wrist_roll_joint': 0.0,
-        'hand_l_spring_proximal_joint': 0,
-        'hand_r_spring_proximal_joint': 0
     }
     better_pose = default_pose
 
@@ -88,6 +87,9 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
         self.set_localization(p)
         self.wait_heartbeats()
 
+    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
+        self.move_base(goal_pose)
+
     def set_localization(self, map_T_odom: PoseStamped):
         pass
         # super(HSRTestWrapper, self).set_localization(map_T_odom)
@@ -117,19 +119,13 @@ def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
     p.pose.position.y = 0
     p.pose.position.z = 0.1
     p.pose.orientation.w = 1
-    zero_pose.add_box(name='box', size=[1, 1, 1], pose=p)
+    zero_pose.add_box(name='box', size=(1, 1, 1), pose=p)
     return zero_pose
 
 
 class TestJointGoals:
-    def test_move_base(self, zero_pose: HSRTestWrapper):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.y = -0.3
-        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
-        zero_pose.move_base(p)
-
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
+        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
@@ -138,12 +134,13 @@ class TestJointGoals:
         js = {'torso_lift_joint': 0.1}
         zero_pose.set_joint_goal(js, check=False)
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.world.state['arm_lift_joint'].position, 0.2, decimal=2)
+        np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.2, decimal=2)
         base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, zero_pose: HSRTestWrapper):
+        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
@@ -157,12 +154,13 @@ class TestJointGoals:
         zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.world.state['arm_lift_joint'].position, 0.2, decimal=2)
+        np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.2, decimal=2)
         base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, zero_pose: HSRTestWrapper):
+        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
@@ -176,13 +174,14 @@ class TestJointGoals:
         zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.world.state['arm_lift_joint'].position, 0.3, decimal=2)
+        np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.3, decimal=2)
         base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
 
 class TestCartGoals:
+
     def test_move_base(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()
         map_T_odom.pose.position.x = 1
@@ -244,25 +243,25 @@ class TestConstraints:
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        kitchen_setup.set_align_planes_goal(kitchen_setup.tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.set_align_planes_goal(tip_link=kitchen_setup.tip,
+                                            tip_normal=x_gripper,
+                                            goal_normal=x_goal)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.set_json_goal('Open',
-                                    tip_link=kitchen_setup.tip,
-                                    environment_link=handle_name,
-                                    goal_joint_state=1.5)
+        kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
+                                              environment_link=handle_name,
+                                              goal_joint_state=1.5)
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits')
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 1.5})
 
-        kitchen_setup.set_json_goal('Open',
-                                    tip_link=kitchen_setup.tip,
-                                    environment_link=handle_name,
-                                    goal_joint_state=0)
+        kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
+                                              environment_link=handle_name,
+                                              goal_joint_state=0)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
         kitchen_setup.plan_and_execute()
@@ -271,10 +270,47 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.allow_self_collision()
         kitchen_setup.plan_and_execute()
 
 
 class TestCollisionAvoidanceGoals:
+
+    def test_add_urdf_body(self, kitchen_setup: HSRTestWrapper):
+        object_name = kitchen_setup.kitchen_name
+        kitchen_setup.clear_world()
+        try:
+            GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
+        except KeyError:
+            pass
+        else:
+            raise 'expected error'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        if kitchen_setup.is_standalone():
+            js_topic = ''
+            set_js_topic = ''
+        else:
+            js_topic = '/kitchen/joint_states'
+            set_js_topic = '/kitchen/cram_joint_states'
+        kitchen_setup.add_urdf(name=object_name,
+                               urdf=rospy.get_param('kitchen_description'),
+                               pose=p,
+                               js_topic=js_topic,
+                               set_js_topic=set_js_topic)
+        kitchen_setup.remove_group(object_name)
+        try:
+            GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
+        except KeyError:
+            pass
+        else:
+            raise 'expected error'
+        kitchen_setup.add_urdf(name=object_name,
+                               urdf=rospy.get_param('kitchen_description'),
+                               pose=p,
+                               js_topic=js_topic,
+                               set_js_topic=set_js_topic)
 
     def test_self_collision_avoidance(self, zero_pose: HSRTestWrapper):
         r_goal = PoseStamped()
@@ -312,7 +348,7 @@ class TestCollisionAvoidanceGoals:
         box_pose.pose.position = Point(0.85, 0.3, .66)
         box_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        box_setup.add_box(box_name, [0.07, 0.04, 0.1], box_pose)
+        box_setup.add_box(box_name, (0.07, 0.04, 0.1), box_pose)
         box_setup.open_gripper()
 
         grasp_pose = deepcopy(box_pose)
@@ -342,7 +378,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.y = 0
         p.pose.position.z = 0.5
         p.pose.orientation.w = 1
-        zero_pose.add_box(name='box', size=[1, 1, 0.01], pose=p)
+        zero_pose.add_box(name='box', size=(1, 1, 0.01), pose=p)
 
         js = {'arm_flex_joint': 0}
         zero_pose.set_joint_goal(js, check=False)

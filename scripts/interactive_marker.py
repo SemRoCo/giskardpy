@@ -53,8 +53,8 @@ class IMServer(object):
 
 
         for root, tip in zip(self.roots, self.tips):
-            root = str(PrefixName(root, self.robot_name))
-            tip = str(PrefixName(tip, self.robot_name))
+            root = root
+            tip = tip
             int_marker = self.make_6dof_marker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
             self.server.insert(int_marker,
                                self.process_feedback(self.server,

@@ -4,10 +4,12 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class IF(GiskardBehavior):
+    @profile
     def __init__(self, name, identifier):
-        super(IF, self).__init__(name)
+        super().__init__(name)
         self.identifier = identifier
 
+    @profile
     def update(self):
         if self.get_god_map().get_data(self.identifier):
             return Status.SUCCESS
@@ -15,10 +17,12 @@ class IF(GiskardBehavior):
 
 
 class IfFunction(GiskardBehavior):
+    @profile
     def __init__(self, name, function):
-        super(IfFunction, self).__init__(name)
+        super().__init__(name)
         self.function = function
 
+    @profile
     def update(self):
         if self.function():
             return Status.SUCCESS

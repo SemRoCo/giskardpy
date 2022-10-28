@@ -12,7 +12,7 @@ class UpdateGodMap(Goal):
         """
         Modifies the core data structure of giskard, only use it if you know what you are doing
         """
-        super(UpdateGodMap, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.update_god_map([], updates)
 
     def update_god_map(self, identifier, updates):

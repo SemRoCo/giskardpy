@@ -1,25 +1,36 @@
 from time import time
+from typing import Dict
 
 from py_trees import Behaviour, Blackboard
 
 from giskardpy import identifier
+from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.time_collector import TimeCollector
+from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
+import giskardpy.utils.tfwrapper as tf
 
 
 class GiskardBehavior(Behaviour):
     time_collector: TimeCollector
 
     def __init__(self, name):
-        self.god_map = Blackboard().god_map  # type: GodMap
+        self.god_map: GodMap = Blackboard().god_map
         self.time_collector = self.god_map.unsafe_get_data(identifier.timer_collector)
-        self.world = self.get_god_map().unsafe_get_data(identifier.world)  # type: WorldTree
-        super(GiskardBehavior, self).__init__(name)
+        self.world: WorldTree = self.get_god_map().unsafe_get_data(identifier.world)
+        super().__init__(name)
+
+    def __str__(self):
+        return f'{self.__class__.__name__}'
 
     @property
     def traj_time_in_sec(self):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
+
+    @property
+    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceConfig]:
+        return self.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
 
     def get_god_map(self):
         """
@@ -48,12 +59,20 @@ class GiskardBehavior(Behaviour):
     def collision_scene(self, value):
         self.god_map.unsafe_set_data(identifier.collision_scene, value)
 
-    @property
-    def robot(self):
+    def robot(self, robot_name=''):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+        return self.collision_scene.robot(robot_name=robot_name)
+
+    def robot_names(self):
+        return self.collision_scene.robot_names
+
+    def robot_namespaces(self):
+        """
+        :rtype: list of str
+        """
+        return self.collision_scene.robot_namespaces
 
     def get_world(self):
         """
@@ -67,26 +86,23 @@ class GiskardBehavior(Behaviour):
         """
         return self.world
 
-    def get_robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.robot
-
-    def unsafe_get_robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.robot
-
     def raise_to_blackboard(self, exception):
         Blackboard().set('exception', exception)
 
     def get_blackboard(self):
         return Blackboard()
 
+    def has_blackboard_exception(self):
+        return has_blackboard_exception()
+
     def get_blackboard_exception(self):
-        return self.get_blackboard().get('exception')
+        return get_blackboard_exception()
 
     def clear_blackboard_exception(self):
-        self.get_blackboard().set('exception', None)
+        clear_blackboard_exception()
+
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return self.world.transform_msg(target_frame, msg)
+        except KeyError as e:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)

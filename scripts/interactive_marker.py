@@ -15,6 +15,7 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
+from giskardpy.my_types import PrefixName
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging
 from giskardpy.utils.math import qv_mult
@@ -37,6 +38,7 @@ class IMServer(object):
         """
         self.enable_self_collision = rospy.get_param('~enable_self_collision', True)
         self.giskard = GiskardWrapper()
+        self.robot_name = self.giskard.robot_name
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
         else:
@@ -51,6 +53,8 @@ class IMServer(object):
 
 
         for root, tip in zip(self.roots, self.tips):
+            root = str(PrefixName(root, self.robot_name))
+            tip = str(PrefixName(tip, self.robot_name))
             int_marker = self.make_6dof_marker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
             self.server.insert(int_marker,
                                self.process_feedback(self.server,
@@ -185,13 +189,14 @@ class IMServer(object):
                 p.header.frame_id = feedback.header.frame_id
                 p.pose = feedback.pose
                 # self.giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-                self.giskard.set_cart_goal(root_link=self.root_link,
+                self.giskard.set_straight_cart_goal(root_link=self.root_link,
                                            tip_link=self.tip_link,
                                            goal_pose=p)
 
                 if not self.enable_self_collision:
                     self.giskard.allow_self_collision()
                 self.giskard.plan_and_execute(wait=False)
+                # self.giskard.plan(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)
                 self.i_server.setPose(self.marker_name, Pose())
             self.i_server.applyChanges()

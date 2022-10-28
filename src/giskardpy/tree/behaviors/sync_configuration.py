@@ -1,7 +1,8 @@
+from typing import Optional
+
 from rospy import ROSException
 
 from giskardpy.data_types import JointStates
-from giskardpy.model.world import SubWorldTree
 
 from queue import Queue, Empty
 
@@ -15,26 +16,15 @@ from giskardpy.utils import logging
 
 
 class SyncConfiguration(GiskardBehavior):
-    """
-    Listens to a joint state topic, transforms it into a dict and writes it to the got map.
-    Gets replace with a kinematic sim plugin during a parallel universe.
-    """
 
     @profile
-    def __init__(self, name, group_name, joint_state_topic='joint_states', tf_root_link_name=None):
-        """
-        :type js_identifier: str
-        """
-        super(SyncConfiguration, self).__init__(name)
-        self.mjs = None
-        self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
+    def __init__(self, group_name: str, joint_state_topic: str = 'joint_states'):
         self.joint_state_topic = joint_state_topic
+        if not self.joint_state_topic.startswith('/'):
+            self.joint_state_topic = '/' + self.joint_state_topic
+        super().__init__(str(self))
+        self.mjs: Optional[JointStates] = None
         self.group_name = group_name
-        self.group = self.world.groups[self.group_name]  # type: SubWorldTree
-        if tf_root_link_name is None:
-            self.tf_root_link_name = self.group.root_link_name
-        else:
-            self.tf_root_link_name = tf_root_link_name
         self.lock = Queue(maxsize=1)
 
     @profile
@@ -45,9 +35,9 @@ class SyncConfiguration(GiskardBehavior):
                 msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
                 self.lock.put(msg)
             except ROSException as e:
-                logging.logwarn('Waiting for topic \'/{}\' to appear.'.format(self.joint_state_topic))
+                logging.logwarn(f'Waiting for topic \'{self.joint_state_topic}\' to appear.')
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
-        return super(SyncConfiguration, self).setup(timeout)
+        return super().setup(timeout)
 
     def cb(self, data):
         try:
@@ -63,10 +53,14 @@ class SyncConfiguration(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = JointStates.from_msg(js, None)
+            self.mjs = JointStates.from_msg(js, self.group_name)
         except Empty:
             pass
 
         self.get_world().state.update(self.mjs)
         self.world.notify_state_change()
         return Status.RUNNING
+
+    def __str__(self):
+        return f'{super().__str__()} ({self.joint_state_topic})'
+

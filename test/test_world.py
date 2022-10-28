@@ -7,16 +7,17 @@ from geometry_msgs.msg import Pose
 from hypothesis import given
 
 from giskard_msgs.msg import CollisionEntry
-from giskardpy import identifier, RobotName, RobotPrefix
+from giskardpy import identifier, RobotPrefix
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.god_map import GodMap
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
-from giskardpy.utils.config_loader import ros_load_robot_config
+from giskardpy.utils.config_loader import ros_load_robot_config, get_namespaces
 from giskardpy.utils.utils import suppress_stderr
 from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, rnd_joint_state, hsr_urdf
 
+RobotName = 'pr2'
 
 @pytest.fixture(scope='module')
 def module_setup(request):
@@ -86,7 +87,12 @@ def avoid_all_entry(min_dist):
 
 def world_with_robot(urdf, prefix, config='package://giskardpy/config/default.yaml'):
     god_map = GodMap()
+<<<<<<< HEAD
+    god_map.set_data(identifier.giskard, ros_load_robot_config(config))
+=======
     god_map.set_data(identifier.rosparam, ros_load_robot_config(config))
+    god_map.set_data(identifier.rosparam + ['namespaces'], [prefix])
+>>>>>>> a018cd7d105dd186f3940076d6fa666a95610d18
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.add_urdf(urdf, prefix=prefix, group_name=RobotName)
@@ -163,7 +169,7 @@ class TestWorldTree(object):
 
     def test_link_urdf_str(self):
         world = create_world_with_pr2()
-        world.links['base_footprint'].as_urdf()
+        world._links['base_footprint'].as_urdf()
 
     def test_load_pr2(self):
         world = create_world_with_pr2()
@@ -192,34 +198,41 @@ class TestWorldTree(object):
             assert link_name.short_name in pr21.link_names
         for joint_name in pr22.joint_names:
             assert joint_name.short_name in pr21.joint_names
-        assert len(world.links) == len(pr21.links) + len(pr22.links) + 1
+        assert len(world._links) == len(pr21._links) + len(pr22._links) + 1
 
     def test_add_box(self):
         world = create_world_with_pr2()
         box = make_world_body_box()
-        box_name = box.name
+        box_name = box.position_name
         pose = Pose()
         pose.orientation.w = 1
         world.add_world_body(box, pose)
-        assert box.name in world.groups
-        assert box_name in world.links
-        assert PrefixName(box_name, world.connection_prefix) in world.joints
+        assert box.position_name in world.groups
+        assert box_name in world._links
+        assert PrefixName(box_name, world.connection_prefix) in world._joints
 
     def test_attach_box(self):
+<<<<<<< HEAD
         world = create_world_with_pr2()
         box = make_world_body_box()
-        box_name = PrefixName(box.name, None)
+        box_name = PrefixName(box.position_name, None)
+=======
+        RobotPrefix = 'pr2'
+        world = create_world_with_pr2(RobotPrefix)
+        box_name = PrefixName('box', None)
+        box = make_world_body_box(str(box_name))
+>>>>>>> a018cd7d105dd186f3940076d6fa666a95610d18
         pose = Pose()
         pose.orientation.w = 1
         world.add_world_body(box, pose)
         new_parent_link_name = PrefixName('r_gripper_tool_frame', RobotPrefix)
         old_fk = world.compute_fk_pose(world.root_link_name, box_name)
 
-        world.move_group(box.name, new_parent_link_name)
+        world.move_group(box.position_name, new_parent_link_name)
 
         new_fk = world.compute_fk_pose(world.root_link_name, box_name)
         assert box_name in world.groups[RobotName].link_names
-        assert world.joints[world.links[box_name].parent_joint_name].parent_link_name == new_parent_link_name
+        assert world._joints[world._links[box_name].parent_joint_name].parent_link_name == new_parent_link_name
         compare_poses(old_fk.pose, new_fk.pose)
 
         assert box_name in world.groups[RobotName].groups
@@ -231,7 +244,7 @@ class TestWorldTree(object):
         parsed_urdf = self.parsed_hsr_urdf()
         assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
         assert set(world.joint_names) == set(
-            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.name, world.connection_prefix)])
+            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.position_name, world.connection_prefix)])
 
     def test_group_pr2_hand(self):
         world = create_world_with_pr2()

@@ -46,7 +46,6 @@
   <exec_depend condition="$ROS_PYTHON_VERSION == 2">cython</exec_depend>
   <exec_depend condition="$ROS_PYTHON_VERSION == 3">cython3</exec_depend>
   <exec_depend>urdfdom_py</exec_depend>
-  <exec_depend>qpoases</exec_depend>
   <exec_depend>giskard_msgs</exec_depend>
   <exec_depend>control_msgs</exec_depend>
   <exec_depend>py_trees</exec_depend>

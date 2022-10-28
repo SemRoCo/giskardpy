@@ -1,13 +1,16 @@
 import errno
 import os
 import pickle
+from typing import List, Tuple, Union
 
 import casadi as ca
 import numpy as np
-from casadi import sign, cos, sin, sqrt, atan2, acos, substitute
+from casadi import sign, cos, sin, sqrt, atan2, acos
 from numpy import pi
 
+from giskardpy.my_types import expr_symbol, expr_matrix
 from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
 pathSeparator = '_'
 
@@ -32,12 +35,14 @@ def diag(*args):
 
 
 def Symbol(data):
-    if isinstance(data, str) or isinstance(data, unicode):
+    if isinstance(data, str):
         return ca.SX.sym(data)
     return ca.SX(data)
 
 
 def jacobian(expressions, symbols, order=1):
+    if isinstance(expressions, list):
+        expressions = Matrix(expressions)
     if order == 1:
         return ca.jacobian(expressions, Matrix(symbols))
     elif order == 2:
@@ -59,6 +64,10 @@ def free_symbols(expression):
 
 def is_matrix(expression):
     return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
+
+
+def is_homo_vector(expression):
+    return is_matrix(expression) and expression.shape == (4, 1) and expression[-1] == 0
 
 
 def is_symbol(expression):
@@ -131,13 +140,16 @@ def Matrix(data):
         return m
 
 
+def ros_msg_to_matrix(msg):
+    return Matrix(msg_to_homogeneous_matrix(msg))
+
+
 def matrix_to_list(m):
     try:
         len(m)
         return m
     except:
         return [m[i] for i in range(m.shape[0])]
-
 
 
 def zeros(x, y):
@@ -148,12 +160,7 @@ def ones(x, y):
     return ca.SX.ones(x, y)
 
 
-def abs(x):
-    """
-    :type x: Union[float, Symbol]
-    :return: abs(x)
-    :rtype: Union[float, Symbol]
-    """
+def abs(x: Union[float, expr_symbol]) -> expr_symbol:
     return ca.fabs(x)
 
 
@@ -161,7 +168,7 @@ def max(x, y):
     return ca.fmax(x, y)
 
 
-def min(x, y):
+def min(x: expr_symbol, y: expr_symbol) -> expr_symbol:
     """
     !gets very imprecise if inputs outside of [-1e7,1e7]!
     :type x: Union[float, Symbol]
@@ -176,21 +183,37 @@ def limit(x, lower_limit, upper_limit):
     return max(lower_limit, min(upper_limit, x))
 
 
+def if_else(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+    return ca.if_else(condition, if_result, else_result)
+
+
+def logic_and(*args: List[expr_symbol]):
+    assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    if len(args) == 2:
+        return ca.logic_and(args[0], args[1])
+    else:
+        return ca.logic_and(args[0], logic_and(*args[1:]))
+
+
+def logic_or(*args: List[expr_symbol]):
+    assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    if len(args) == 2:
+        return ca.logic_or(args[0], args[1])
+    else:
+        return ca.logic_or(args[0], logic_and(*args[1:]))
+
+
 def if_greater(a, b, if_result, else_result):
-    return ca.if_else(ca.gt(a, b), if_result, else_result)
+    return if_else(ca.gt(a, b), if_result, else_result)
 
 
 def if_less(a, b, if_result, else_result):
-    return ca.if_else(ca.lt(a, b), if_result, else_result)
+    return if_else(ca.lt(a, b), if_result, else_result)
 
 
-def if_greater_zero(condition, if_result, else_result):
+def if_greater_zero(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if condition > 0 else else_result
-    :rtype: Union[float, Symbol]
     """
     _condition = sign(condition)  # 1 or -1
     _if = max(0, _condition) * if_result  # 0 or if_result
@@ -198,61 +221,63 @@ def if_greater_zero(condition, if_result, else_result):
     return _if + _else + (1 - abs(_condition)) * else_result  # if_result or else_result
 
 
-def if_greater_eq_zero(condition, if_result, else_result):
+def if_greater_eq_zero(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if condition >= 0 else else_result
-    :rtype: Union[float, Symbol]
     """
     return if_greater_eq(condition, 0, if_result, else_result)
 
 
-def if_greater_eq(a, b, if_result, else_result):
+def if_greater_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type a: Union[float, Symbol]
-    :type b: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if a >= b else else_result
-    :rtype: Union[float, Symbol]
     """
-    return ca.if_else(ca.ge(a, b), if_result, else_result)
+    return if_else(ca.ge(a, b), if_result, else_result)
 
 
-def if_less_eq(a, b, if_result, else_result):
+def if_less_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type a: Union[float, Symbol]
-    :type b: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if a <= b else else_result
-    :rtype: Union[float, Symbol]
     """
     return if_greater_eq(b, a, if_result, else_result)
 
 
 def if_eq_zero(condition, if_result, else_result):
     """
-    A short expression which can be compiled quickly.
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
     :return: if_result if condition == 0 else else_result
-    :rtype: Union[float, Symbol]
     """
-    return ca.if_else(condition, else_result, if_result)
+    return if_else(condition, else_result, if_result)
 
 
-def if_eq(a, b, if_result, else_result):
-    return ca.if_else(ca.eq(a, b), if_result, else_result)
+def if_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+    return if_else(ca.eq(a, b), if_result, else_result)
+
+
+def if_eq_cases(a: expr_symbol, b_result_cases: Union[List[Tuple[expr_symbol, expr_symbol]], expr_matrix],
+                else_result: expr_symbol) -> expr_symbol:
+    result = else_result
+    if isinstance(b_result_cases, list):
+        b_result_cases = Matrix(b_result_cases)
+    for i in range(b_result_cases.shape[0]):
+        b = b_result_cases[i, 0]
+        b_result = b_result_cases[i, 1]
+        result = if_eq(a, b, b_result, result)
+    return result
+
+
+def if_less_eq_cases(a: expr_symbol, b_result_cases: List[Tuple[expr_symbol, expr_symbol]],
+                     else_result: expr_symbol) -> expr_symbol:
+    """
+    This only works if b_result_cases is sorted in an ascending order.
+    """
+    result = else_result
+    if isinstance(b_result_cases, list):
+        b_result_cases = Matrix(b_result_cases)
+    for i in reversed(range(b_result_cases.shape[0] - 1)):
+        b = b_result_cases[i, 0]
+        b_result = b_result_cases[i, 1]
+        result = if_less_eq(a, b, b_result, result)
+    return result
 
 
 def safe_compiled_function(f, file_name):
@@ -325,7 +350,15 @@ def cross(u, v):
     :return: 1d Matrix. If u and v have length 4, it ignores the last entry and adds a zero to the result.
     :rtype: Matrix
     """
-    return ca.cross(u, v)
+    if is_homo_vector(u):
+        u = u[:-1]
+    if is_homo_vector(v):
+        v = v[:-1]
+    result = ca.cross(u, v)
+    return Matrix([result[0],
+                   result[1],
+                   result[2],
+                   0])
 
 
 def vector3(x, y, z):
@@ -348,30 +381,15 @@ def point3(x, y, z):
     return Matrix([x, y, z, 1])
 
 
-def norm(v):
-    """
-    :type v: Matrix
-    :return: |v|_2
-    :rtype: Union[float, Symbol]
-    """
+def norm(v: expr_matrix) -> expr_symbol:
     return ca.norm_2(v)
 
 
-def scale(v, a):
-    """
-    :type v: Matrix
-    :type a: Union[float, Symbol]
-    :rtype: Matrix
-    """
+def scale(v: expr_matrix, a: Union[float, expr_symbol]) -> expr_matrix:
     return save_division(v, norm(v)) * a
 
 
-def dot(*matrices):
-    """
-    :type a: Matrix
-    :type b: Matrix
-    :rtype: Union[float, Symbol]
-    """
+def dot(*matrices: expr_matrix) -> expr_matrix:
     return ca.mtimes(matrices)
 
 
@@ -392,6 +410,31 @@ def translation3(x, y, z):
     r[1, 3] = y
     r[2, 3] = z
     return r
+
+
+def rotation_matrix_from_vectors(x=None, y=None, z=None):
+    if x is not None:
+        x = scale(x, 1)
+    if y is not None:
+        y = scale(y, 1)
+    if z is not None:
+        z = scale(z, 1)
+    if x is not None and y is not None and z is None:
+        z = cross(x, y)
+        z = scale(z, 1)
+    elif x is not None and y is None and z is not None:
+        y = cross(z, x)
+        y = scale(y, 1)
+    elif x is None and y is not None and z is not None:
+        x = cross(y, z)
+        x = scale(x, 1)
+    else:
+        raise AttributeError(f'only one vector can be None')
+    R = Matrix([[x[0], y[0], z[0], 0],
+                [x[1], y[1], z[1], 0],
+                [x[2], y[2], z[2], 0],
+                [0, 0, 0, 1]])
+    return R
 
 
 def rotation_matrix_from_rpy(roll, pitch, yaw):
@@ -513,6 +556,13 @@ def frame_quaternion(x, y, z, qx, qy, qz, qw):
     return dot(translation3(x, y, z), rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
 
+def frame_from_x_y_rot(x: expr_symbol, y: expr_symbol, rot: expr_symbol) -> expr_matrix:
+    parent_P_link = translation3(x, y, 0)
+    link_R_child = rotation_matrix_from_axis_angle(vector3(0, 0, 1),
+                                                   rot)
+    return dot(parent_P_link, link_R_child)
+
+
 def eye(size):
     return ca.SX.eye(size)
 
@@ -608,26 +658,11 @@ def hstack(list_of_matrices):
     return ca.horzcat(*list_of_matrices)
 
 
-def asdf(a_R_b, a_R_c):
-    """
-    :param a_R_b: 4x4 or 3x3 Matrix
-    :type a_R_b: Matrix
-    :param a_R_c: 4x4 or 3x3 Matrix
-    :type a_R_c: Matrix
-    :return: angle of axis angle representation of b_R_c
-    :rtype: Union[float, Symbol]
-    """
-    difference = dot(a_R_b.T, a_R_c)
-    return axis_angle_from_matrix(difference)[0]
-
-
-def axis_angle_from_matrix(rotation_matrix):
+def axis_angle_from_matrix(rotation_matrix: expr_matrix) -> Tuple[expr_matrix, expr_symbol]:
     """
     MAKE SURE MATRIX IS NORMALIZED
     :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
     :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
     """
     q = quaternion_from_matrix(rotation_matrix)
     return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
@@ -672,6 +707,15 @@ def normalize_axis_angle(axis, angle):
     axis = if_less(angle, 0, -axis, axis)
     angle = abs(angle)
     return axis, angle
+
+
+def normalize_rotation_matrix(R: Matrix) -> Matrix:
+    """Scales each of the axes to the length of one."""
+    scale_v = 1.0
+    R[:3, 0] = scale(R[:3, 0], scale_v)
+    R[:3, 1] = scale(R[:3, 1], scale_v)
+    R[:3, 2] = scale(R[:3, 2], scale_v)
+    return R
 
 
 def quaternion_from_axis_angle(axis, angle):
@@ -1085,6 +1129,13 @@ def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+
+
+def angle_from_matrix(R, hint):
+    axis, angle = axis_angle_from_matrix(R)
+    return normalize_angle(if_greater_zero(hint(axis),
+                                           if_result=angle,
+                                           else_result=-angle))
 
 
 def velocity_limit_from_position_limit(acceleration_limit, position_limit, current_position, step_size, eps=1e-5):

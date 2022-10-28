@@ -1,3 +1,6 @@
+class DontPrintStackTrace:
+    pass
+
 class GiskardException(Exception):
     pass
 
@@ -17,13 +20,15 @@ class InfeasibleException(QPSolverException):
     pass
 
 
-# int64 OUT_OF_JOINT_LIMITS=3
 class OutOfJointLimitsException(InfeasibleException):
     pass
 
 
-# int64 HARD_CONSTRAINTS_VIOLATED=4 # conflicting hard constraints, prob because of collision avoidance
 class HardConstraintsViolatedException(InfeasibleException):
+    pass
+
+
+class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
     pass
 
 
@@ -94,6 +99,9 @@ class ShakingException(PlanningException):
 class UnreachableException(PlanningException):
     pass
 
+
+class SelfCollisionViolatedException(PlanningException):
+    pass
 
 # errors during execution
 # int64 EXECUTION_ERROR # if no execution code fits

@@ -1,47 +1,63 @@
+from typing import Optional
+
+from geometry_msgs.msg import Vector3Stamped
+
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 from giskardpy import casadi_wrapper as w
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.utils.logging import logwarn
+
 
 class AlignPlanes(Goal):
-    def __init__(self, root_link, tip_link, root_normal, tip_normal,
-                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_normal: Vector3Stamped,
+                 tip_normal: Vector3Stamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 max_angular_velocity: float = 0.5,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 **kwargs):
         """
-        This Goal will use the kinematic chain between tip and root normal to align both
-        :param root_link: str, name of the root link for the kinematic chain
-        :param tip_link: str, name of the tip link for the kinematic chain
-        :param tip_normal: Vector3Stamped as json, normal at the tip of the kin chain
-        :param root_normal: Vector3Stamped as json, normal at the root of the kin chain
-        :param max_angular_velocity: float, rad/s, default 0.5
-        :param weight: float, default is WEIGHT_ABOVE_CA
-        :param goal_constraint: bool, default False
+        This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
+        :param root_link: root link of the kinematic chain
+        :param tip_link: tip link of the kinematic chain
+        :param goal_normal:
+        :param tip_normal:
+        :param root_group: if root_link is not unique, search in this group for matches.
+        :param tip_group: if tip_link is not unique, search in this group for matches.
+        :param max_angular_velocity: rad/s
+        :param weight:
         """
-        super(AlignPlanes, self).__init__(**kwargs)
-        self.root = root_link
-        self.tip = tip_link
+        super().__init__(**kwargs)
+        if 'root_normal' in kwargs:
+            logwarn('Deprecated warning: use goal_normal instead of root_normal')
+            goal_normal = kwargs['root_normal']
+        self.root = self.world.get_link_name(root_link, root_group)
+        self.tip = self.world.get_link_name(tip_link, tip_group)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 
         self.tip_V_tip_normal = self.transform_msg(self.tip, tip_normal)
         self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
 
-        self.root_V_root_normal = self.transform_msg(self.root, root_normal)
+        self.root_V_root_normal = self.transform_msg(self.root, goal_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
-
     def __str__(self):
-        s = super(AlignPlanes, self).__str__()
-        return '{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
-                                                 self.tip_V_tip_normal.vector.x,
-                                                 self.tip_V_tip_normal.vector.y,
-                                                 self.tip_V_tip_normal.vector.z)
+        s = super().__str__()
+        return f'{s}/{self.root}/{self.tip}' \
+               f'_X:{self.tip_V_tip_normal.vector.x}' \
+               f'_Y:{self.tip_V_tip_normal.vector.y}' \
+               f'_Z:{self.tip_V_tip_normal.vector.z}'
 
     def make_constraints(self):
-        tip_V_tip_normal = self.get_parameter_as_symbolic_expression('tip_V_tip_normal')
+        tip_V_tip_normal = w.ros_msg_to_matrix(self.tip_V_tip_normal)
         root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
-        root_V_root_normal = self.get_parameter_as_symbolic_expression('root_V_root_normal')
+        root_V_root_normal = w.ros_msg_to_matrix(self.root_V_root_normal)
         self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_root_normal,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-

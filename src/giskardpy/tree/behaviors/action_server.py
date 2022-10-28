@@ -80,7 +80,7 @@ class ActionServerBehavior(GiskardBehavior):
         if self.as_handler is None:
             self.as_handler = ActionServerHandler(self.as_name, self.action_type)
             Blackboard().set(self.as_name, self.as_handler)
-        super(ActionServerBehavior, self).__init__(name)
+        super().__init__(name)
 
     def get_as(self):
         """

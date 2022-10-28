@@ -19,8 +19,8 @@ from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface import DEFAULT_WORLD_TIMEOUT
 from giskardpy.utils import logging
-from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
-    JointGoalChecker, PR2CloseLoop, BoxyCloseLoop
+from utils_for_tests import TestPR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
+    JointGoalChecker, TestPR2CloseLoop, BoxyCloseLoop
 
 
 @pytest.fixture(scope='module')
@@ -33,7 +33,7 @@ def giskard(request, ros):
 class TestJointGoals(object):
     def test_joint_movement1(self, resetted_giskard):
         """
-        :type zero_pose: PR2
+        :type zero_pose: TestPR2
         """
         resetted_giskard.allow_all_collisions()
         # resetted_giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)

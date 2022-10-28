@@ -8,6 +8,6 @@ if __name__ == '__main__':
     giskard = GiskardWrapper()
     result = giskard.clear_world()
     if result.error_codes == result.SUCCESS:
-        logging.loginfo('clear world')
+        logging.loginfo('World cleared.')
     else:
-        logging.logwarn('failed to clear world {}'.format(result))
+        logging.logwarn(f'Failed to clear world {result}.')

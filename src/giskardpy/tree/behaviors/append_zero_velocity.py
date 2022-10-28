@@ -1,27 +1,23 @@
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import JointStates
+from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
-class AppendZeroVelocity(GiskardBehavior):
-    def initialise(self):
-        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
-        super(AppendZeroVelocity, self).initialise()
+class SetZeroVelocity(GiskardBehavior):
+    @profile
+    def __init__(self, name=None):
+        if name is None:
+            name = 'set velocity to zero'
+        super().__init__(name)
 
     @profile
     def update(self):
-        # FIXME we do we need this plugin?
-        motor_commands = self.get_god_map().get_data(identifier.qp_solver_solution)
-        current_js = self.get_god_map().get_data(identifier.joint_states)
-        next_js = None
-        if motor_commands:
-            next_js = JointStates()
-            for joint_name, sjs in current_js.items():
-                next_js[joint_name].position = sjs.position
-        if next_js is not None:
-            self.get_god_map().set_data(identifier.joint_states, next_js)
-        else:
-            self.get_god_map().set_data(identifier.joint_states, current_js)
+        for free_variable, state in self.world.state.items():
+            for derivative in Derivatives:
+                if derivative == Derivatives.position:
+                    continue
+                self.world.state[free_variable].set_derivative(derivative, 0)
+        self.world.notify_state_change()
         return Status.SUCCESS

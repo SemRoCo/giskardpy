@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 
 import numpy as np
@@ -7,20 +8,25 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy.data_types import PrefixName
+from giskard_msgs.msg import WorldBody
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
+from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import resolve_ros_iris
 
 
-class LinkGeometry(object):
-    def __init__(self, link_T_geometry):
-        self.color = ColorRGBA(1.0, 1.0, 1.0, 0.5)
+class LinkGeometry:
+    def __init__(self, link_T_geometry: np.ndarray, color: ColorRGBA = None):
+        if color is None:
+            self.color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
+        else:
+            self.color = color
         self.link_T_geometry = link_T_geometry
 
     @classmethod
-    def from_urdf(cls, urdf_thing):
+    def from_urdf(cls, urdf_thing, color) -> LinkGeometry:
         urdf_geometry = urdf_thing.geometry
         if urdf_thing.origin is None:
             link_T_geometry = np.eye(4)
@@ -30,46 +36,61 @@ class LinkGeometry(object):
             link_T_geometry[1, 3] = urdf_thing.origin.xyz[1]
             link_T_geometry[2, 3] = urdf_thing.origin.xyz[2]
         if isinstance(urdf_geometry, up.Mesh):
-            geometry = MeshGeometry(link_T_geometry, urdf_geometry.filename, urdf_geometry.scale)
+            geometry = MeshGeometry(link_T_geometry=link_T_geometry,
+                                    file_name=urdf_geometry.filename,
+                                    color=color,
+                                    scale=urdf_geometry.scale)
         elif isinstance(urdf_geometry, up.Box):
-            geometry = BoxGeometry(link_T_geometry, *urdf_geometry.size)
+            geometry = BoxGeometry(link_T_geometry=link_T_geometry,
+                                   depth=urdf_geometry.size[0],
+                                   width=urdf_geometry.size[1],
+                                   height=urdf_geometry.size[2],
+                                   color=color)
         elif isinstance(urdf_geometry, up.Cylinder):
-            geometry = CylinderGeometry(link_T_geometry, urdf_geometry.length, urdf_geometry.radius)
+            geometry = CylinderGeometry(link_T_geometry=link_T_geometry,
+                                        height=urdf_geometry.length,
+                                        radius=urdf_geometry.radius,
+                                        color=color)
         elif isinstance(urdf_geometry, up.Sphere):
-            geometry = SphereGeometry(link_T_geometry, urdf_geometry.radius)
+            geometry = SphereGeometry(link_T_geometry=link_T_geometry,
+                                      radius=urdf_geometry.radius,
+                                      color=color)
         else:
-            NotImplementedError('{} geometry is not supported'.format(type(urdf_geometry)))
+            NotImplementedError(f'{type(urdf_geometry)} geometry is not supported')
         return geometry
 
     @classmethod
-    def from_world_body(cls, msg):
-        """
-        :type msg: giskard_msgs.msg._WorldBody.WorldBody
-        """
+    def from_world_body(cls, msg: WorldBody, color: ColorRGBA) -> LinkGeometry:
         if msg.type == msg.URDF_BODY:
             raise NotImplementedError()
         elif msg.type == msg.PRIMITIVE_BODY:
             if msg.shape.type == msg.shape.BOX:
-                geometry = BoxGeometry(np.eye(4),
+                geometry = BoxGeometry(link_T_geometry=np.eye(4),
                                        depth=msg.shape.dimensions[msg.shape.BOX_X],
                                        width=msg.shape.dimensions[msg.shape.BOX_Y],
-                                       height=msg.shape.dimensions[msg.shape.BOX_Z])
+                                       height=msg.shape.dimensions[msg.shape.BOX_Z],
+                                       color=color)
             elif msg.shape.type == msg.shape.CYLINDER:
-                geometry = CylinderGeometry(np.eye(4),
+                geometry = CylinderGeometry(link_T_geometry=np.eye(4),
                                             height=msg.shape.dimensions[msg.shape.CYLINDER_HEIGHT],
-                                            radius=msg.shape.dimensions[msg.shape.CYLINDER_RADIUS])
+                                            radius=msg.shape.dimensions[msg.shape.CYLINDER_RADIUS],
+                                            color=color)
             elif msg.shape.type == msg.shape.SPHERE:
-                geometry = SphereGeometry(np.eye(4),
-                                          radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS])
+                geometry = SphereGeometry(link_T_geometry=np.eye(4),
+                                          radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS],
+                                          color=color)
             else:
                 raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
         elif msg.type == msg.MESH_BODY:
-            geometry = MeshGeometry(np.eye(4), msg.mesh)
+            geometry = MeshGeometry(link_T_geometry=np.eye(4),
+                                    file_name=msg.mesh,
+                                    scale=[msg.scale.x, msg.scale.y, msg.scale.z],
+                                    color=color)
         else:
             raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
-    def as_visualization_marker(self):
+    def as_visualization_marker(self) -> Marker:
         marker = Marker()
         marker.color = self.color
 
@@ -77,47 +98,47 @@ class LinkGeometry(object):
         marker.pose = np_to_pose(self.link_T_geometry)
         return marker
 
-    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return False
 
 
 class MeshGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, file_name, scale=None):
-        super(MeshGeometry, self).__init__(link_T_geometry)
+    def __init__(self, link_T_geometry: np.ndarray, file_name: str, color: ColorRGBA, scale=None):
+        super().__init__(link_T_geometry, color)
         self.file_name = file_name
         if not os.path.isfile(resolve_ros_iris(file_name)):
-            raise CorruptShapeException('Can\'t find file {}'.format(self.file_name))
+            raise CorruptShapeException(f'Can\'t find file {self.file_name}')
         if scale is None:
             self.scale = [1, 1, 1]
         else:
             self.scale = scale
 
-    def as_visualization_marker(self):
-        marker = super(MeshGeometry, self).as_visualization_marker()
+    def as_visualization_marker(self) -> Marker:
+        marker = super().as_visualization_marker()
         marker.type = Marker.MESH_RESOURCE
         marker.mesh_resource = self.file_name
         marker.scale.x = self.scale[0]
-        marker.scale.z = self.scale[1]
-        marker.scale.y = self.scale[2]
-        marker.mesh_use_embedded_materials = True
+        marker.scale.y = self.scale[1]
+        marker.scale.z = self.scale[2]
+        marker.mesh_use_embedded_materials = False
         return marker
 
     def as_urdf(self):
         return up.Mesh(self.file_name, self.scale)
 
-    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold:float = 0.00061) -> bool:
         return True
 
 
 class BoxGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, depth, width, height):
-        super(BoxGeometry, self).__init__(link_T_geometry)
+    def __init__(self, link_T_geometry, depth, width, height, color):
+        super().__init__(link_T_geometry, color)
         self.depth = depth
         self.width = width
         self.height = height
 
     def as_visualization_marker(self):
-        marker = super(BoxGeometry, self).as_visualization_marker()
+        marker = super().as_visualization_marker()
         marker.type = Marker.CUBE
         marker.scale.x = self.depth
         marker.scale.y = self.width
@@ -133,13 +154,13 @@ class BoxGeometry(LinkGeometry):
 
 
 class CylinderGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, height, radius):
-        super(CylinderGeometry, self).__init__(link_T_geometry)
+    def __init__(self, link_T_geometry, height, radius, color):
+        super().__init__(link_T_geometry, color)
         self.height = height
         self.radius = radius
 
     def as_visualization_marker(self):
-        marker = super(CylinderGeometry, self).as_visualization_marker()
+        marker = super().as_visualization_marker()
         marker.type = Marker.CYLINDER
         marker.scale.x = self.radius * 2
         marker.scale.y = self.radius * 2
@@ -155,12 +176,12 @@ class CylinderGeometry(LinkGeometry):
 
 
 class SphereGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, radius):
-        super(SphereGeometry, self).__init__(link_T_geometry)
+    def __init__(self, link_T_geometry, radius, color):
+        super().__init__(link_T_geometry, color)
         self.radius = radius
 
     def as_visualization_marker(self):
-        marker = super(SphereGeometry, self).as_visualization_marker()
+        marker = super().as_visualization_marker()
         marker.type = Marker.SPHERE
         marker.scale.x = self.radius * 2
         marker.scale.y = self.radius * 2
@@ -174,33 +195,41 @@ class SphereGeometry(LinkGeometry):
         return sphere_volume(self.radius) > volume_threshold
 
 
-class Link(object):
-    def __init__(self, name):
-        self.name = name  # type: PrefixName
+class Link:
+    def __init__(self, name: my_string):
+        if isinstance(name, str):
+            name = PrefixName(name, None)
+        self.name = name
         self.visuals = []
         self.collisions = []
         self.parent_joint_name = None
         self.child_joint_names = []
 
+    def name_with_collision_id(self, collision_id):
+        if collision_id > len(self.collisions):
+            raise AttributeError(f'Link {self.name} only has {len(self.collisions)} collisions, '
+                                 f'asking for {collision_id}.')
+        if collision_id == 0:
+            return self.name
+        return f'{self.name}/\\{collision_id}'
+
     @classmethod
-    def from_urdf(cls, urdf_link, prefix):
+    def from_urdf(cls, urdf_link, prefix, color) -> Link:
         link_name = PrefixName(urdf_link.name, prefix)
         link = cls(link_name)
         for urdf_collision in urdf_link.collisions:
-            link.collisions.append(LinkGeometry.from_urdf(urdf_collision))
+            link.collisions.append(LinkGeometry.from_urdf(urdf_thing=urdf_collision,
+                                                          color=color))
         for urdf_visual in urdf_link.visuals:
-            link.visuals.append(LinkGeometry.from_urdf(urdf_visual))
+            link.visuals.append(LinkGeometry.from_urdf(urdf_thing=urdf_visual,
+                                                       color=color))
         return link
 
     @classmethod
-    def from_world_body(cls, prefix, msg):
-        """
-        :type msg: giskard_msgs.msg._WorldBody.WorldBody
-        :type pose: Pose
-        """
-        link_name = PrefixName(prefix, None)
+    def from_world_body(cls, link_name: my_string, msg: WorldBody, color: ColorRGBA) -> Link:
         link = cls(link_name)
-        geometry = LinkGeometry.from_world_body(msg)
+        geometry = LinkGeometry.from_world_body(msg=msg,
+                                                color=color)
         link.collisions.append(geometry)
         link.visuals.append(geometry)
         return link

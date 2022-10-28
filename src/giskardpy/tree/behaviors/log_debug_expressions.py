@@ -6,20 +6,21 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class LogDebugExpressionsPlugin(GiskardBehavior):
+    @profile
     def __init__(self, name):
-        super(LogDebugExpressionsPlugin, self).__init__(name)
+        super().__init__(name)
         self.number_of_joints = len(self.world.controlled_joints)
-        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
+        self.sample_period = self.god_map.get_data(identifier.sample_period)
 
     @profile
     def initialise(self):
-        self.trajectory = self.get_god_map().get_data(identifier.debug_trajectory)
+        self.trajectory = self.god_map.get_data(identifier.debug_trajectory)
 
     @profile
     def update(self):
-        debug_data = self.get_god_map().get_data(identifier.debug_expressions_evaluated)
+        debug_data = self.god_map.get_data(identifier.debug_expressions_evaluated)
         if len(debug_data) > 0:
-            time = self.get_god_map().get_data(identifier.time) - 1
+            time = self.god_map.get_data(identifier.time) - 1
             last_mjs = None
             if time >= 1:
                 last_mjs = self.trajectory.get_exact(time-1)

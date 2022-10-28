@@ -2,7 +2,7 @@ import copy
 import numbers
 from collections import defaultdict
 from copy import copy, deepcopy
-from multiprocessing import Lock
+from multiprocessing import RLock
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
@@ -11,7 +11,6 @@ from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, V
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.model.utils import robot_name_from_urdf_string
-from giskardpy.utils.config_loader import upload_config_file_to_paramserver
 
 
 def set_default_in_override_block(block_identifier, god_map):
@@ -194,41 +193,12 @@ class GodMap(object):
         self.expr_to_key = {}
         self.last_expr_values = {}
         self.shortcuts = {}
-        self.lock = Lock()
+        self.lock = RLock()
 
     @classmethod
     @profile
-    def init_from_paramserver(cls, node_name, upload_config=True):
-        import rospy
-        from giskardpy.data_types import order_map
-
-        if upload_config:
-            upload_config_file_to_paramserver()
-
+    def init_from_paramserver(cls):
         self = cls()
-        self.set_data(identifier.rosparam, rospy.get_param(node_name))
-        robot_urdf = rospy.get_param('robot_description')
-        self.set_data(identifier.robot_description, robot_urdf)
-        self.set_data(identifier.robot_group_name, robot_name_from_urdf_string(robot_urdf))
-
-
-        path_to_data_folder = self.get_data(identifier.data_folder)
-        # fix path to data folder
-        if not path_to_data_folder.endswith('/'):
-            path_to_data_folder += '/'
-        self.set_data(identifier.data_folder, path_to_data_folder)
-
-        set_default_in_override_block(identifier.external_collision_avoidance, self)
-        set_default_in_override_block(identifier.self_collision_avoidance, self)
-        # weights
-        for i, key in enumerate(self.get_data(identifier.joint_weights), start=1):
-            set_default_in_override_block(identifier.joint_weights + [order_map[i], 'override'], self)
-
-        # limits
-        for i, key in enumerate(self.get_data(identifier.joint_limits), start=1):
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'linear', 'override'], self)
-            set_default_in_override_block(identifier.joint_limits + [order_map[i], 'angular', 'override'], self)
-
         return self
 
     def __copy__(self):
@@ -266,16 +236,21 @@ class GodMap(object):
                 return result
             return self.shortcuts[identifier].c(self._data)
         except Exception as e:
-            e2 = type(e)('{}; path: {}'.format(e, identifier))
+            e2 = type(e)(f'{e}; path: {identifier}')
             raise e2
 
-    def get_data(self, identifier):
+    def get_data(self, identifier, default=None):
         with self.lock:
-            r = self.unsafe_get_data(identifier)
+            try:
+                r = self.unsafe_get_data(identifier)
+            except KeyError:
+                if default is not None:
+                    self.unsafe_set_data(identifier, default)
+                    return default
+                raise
         return r
 
     def clear_cache(self):
-        # TODO should be possible without clear cache
         self.shortcuts = {}
 
     def to_symbol(self, identifier):
@@ -297,7 +272,10 @@ class GodMap(object):
         return self.key_to_expr[identifier]
 
     def to_expr(self, identifier):
-        data = self.get_data(identifier)
+        try:
+            data = self.get_data(identifier)
+        except KeyError as e:
+            raise KeyError(f'to_expr only works, when there is already data at the path: {e}')
         if isinstance(data, np.ndarray):
             data = data.tolist()
         if isinstance(data, numbers.Number):
@@ -426,7 +404,6 @@ class GodMap(object):
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
         :rtype: list
         """
-        # TODO potential speedup by only updating entries that have changed
         # its a trap, this function only looks slow with lineprofiler
         with self.lock:
             return self.unsafe_get_values(symbols)
@@ -439,6 +416,8 @@ class GodMap(object):
         return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
     def evaluate_expr(self, expr):
+        if isinstance(expr, (int, float)):
+            return expr
         fs = w.free_symbols(expr)
         fss = [str(s) for s in fs]
         f = w.speed_up(expr, fs)

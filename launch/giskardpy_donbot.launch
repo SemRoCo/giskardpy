@@ -1,8 +1,8 @@
 <launch>
 
-    <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen" >
-        <param name="config" value="$(find giskardpy)/config/donbot.yaml" />
-    </node>
+    <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
+    <param name="config" value="Donbot"/>
+  </node>
 
     <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
         <rosparam param="enable_self_collision">False</rosparam>

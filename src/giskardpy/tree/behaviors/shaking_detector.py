@@ -11,8 +11,9 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class WiggleCancel(GiskardBehavior):
+    @profile
     def __init__(self, name):
-        super(WiggleCancel, self).__init__(name)
+        super().__init__(name)
         self.amplitude_threshold = self.get_god_map().get_data(identifier.amplitude_threshold)
         self.num_samples_in_fft = self.get_god_map().get_data(identifier.num_samples_in_fft)
         self.frequency_range = self.get_god_map().get_data(identifier.frequency_range)
@@ -32,7 +33,7 @@ class WiggleCancel(GiskardBehavior):
 
     @profile
     def initialise(self):
-        super(WiggleCancel, self).initialise()
+        super().initialise()
         self.js_samples = []
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         self.max_detectable_freq = 1 / (2 * self.sample_period)
@@ -40,7 +41,8 @@ class WiggleCancel(GiskardBehavior):
         self.keys = []
         self.thresholds = []
         self.velocity_limits = []
-        for joint_name, threshold in zip(self.get_robot().controlled_joints,
+        # FIXME check for free variables and not joints
+        for joint_name, threshold in zip(self.world.controlled_joints,
                                          self.make_velocity_threshold()):
             _, velocity_limit = self.world.get_joint_velocity_limits(joint_name)
             if self.world.is_joint_prismatic(joint_name):
@@ -58,6 +60,9 @@ class WiggleCancel(GiskardBehavior):
 
     @profile
     def update(self):
+        prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
+        if prediction_horizon > 1:
+            return Status.RUNNING
         latest_points = self.get_god_map().get_data(identifier.joint_states)
 
         for i, key in enumerate(self.keys):
@@ -86,7 +91,7 @@ class WiggleCancel(GiskardBehavior):
                     logging.loginfo(str(e))
                     logging.loginfo('cutting off last second')
                     return Status.SUCCESS
-            raise e
+            raise
 
         return Status.RUNNING
 

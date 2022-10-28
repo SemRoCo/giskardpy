@@ -1,29 +1,41 @@
 from __future__ import division
 
+import subprocess
+from typing import Optional
+
+import roslaunch
+from genpy import Message
 import errno
 import inspect
 import json
 import os
 import pkgutil
 import sys
+import traceback
 from collections import OrderedDict
 from contextlib import contextmanager
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
-
+import pybullet
 import matplotlib.colors as mcolors
 import numpy as np
 import pylab as plt
 import rospkg
 import rospy
+import trimesh
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
+from py_trees import Status, Blackboard
 from rospy_message_converter.message_converter import \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
 from sensor_msgs.msg import JointState
+from visualization_msgs.msg import Marker, MarkerArray
 
+from giskardpy import identifier
+from giskardpy.exceptions import DontPrintStackTrace
+from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
 
@@ -117,7 +129,7 @@ def print_joint_state(joint_msg):
 def print_dict(d):
     print('{')
     for key, value in d.items():
-        print("\'{}\': {},".format(key, value))
+        print(f'{key}: {value},')
     print('}')
 
 
@@ -312,7 +324,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
             axs[i].grid()
 
         file_name = path_to_data_folder + file_name
-        last_file_name = file_name.replace('.pdf', '{}.pdf'.format(history))
+        last_file_name = file_name.replace('.pdf', f'{history}.pdf')
 
         if os.path.isfile(file_name):
             if os.path.isfile(last_file_name):
@@ -321,13 +333,14 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
                 if i == 1:
                     previous_file_name = file_name
                 else:
-                    previous_file_name = file_name.replace('.pdf', '{}.pdf'.format(i - 1))
-                current_file_name = file_name.replace('.pdf', '{}.pdf'.format(i))
+                    previous_file_name = file_name.replace('.pdf', f'{i - 1}.pdf')
+                current_file_name = file_name.replace('.pdf', f'{i}.pdf')
                 try:
                     os.rename(previous_file_name, current_file_name)
                 except FileNotFoundError:
                     pass
         plt.savefig(file_name, bbox_inches="tight")
+        logging.loginfo(f'saved {file_name}')
 
 
 def resolve_ros_iris_in_urdf(input_urdf):
@@ -348,11 +361,9 @@ def resolve_ros_iris_in_urdf(input_urdf):
 rospack = rospkg.RosPack()
 
 
-def resolve_ros_iris(path):
+def resolve_ros_iris(path: str) -> str:
     """
     e.g. 'package://giskardpy/data'
-    :param path:
-    :return:
     """
     if 'package://' in path:
         split = path.split('package://')
@@ -361,26 +372,76 @@ def resolve_ros_iris(path):
         for suffix in split[1:]:
             package_name, suffix = suffix.split('/', 1)
             real_path = rospack.get_path(package_name)
-            result += '{}/{}'.format(real_path, suffix)
+            result += f'{real_path}/{suffix}'
         return result
     else:
         return path
 
 
-def write_to_tmp(filename, urdf_string):
+def write_to_tmp(file_name: str, file_str: str) -> str:
     """
     Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
-    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
-    :type filename: str
-    :param urdf_string: URDF as an XML string that shall be written to disc.
-    :type urdf_string: str
+    :param file_name: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
+    :param file_str: URDF as an XML string that shall be written to disc.
     :return: Complete path to where the urdfs was written, e.g. '/tmp/pr2.urdfs'
-    :rtype: str
     """
-    new_path = '/tmp/giskardpy/{}'.format(filename)
+    new_path = to_tmp_path(file_name)
     create_path(new_path)
-    with open(new_path, 'w') as o:
-        o.write(urdf_string)
+    with open(new_path, 'w') as f:
+        f.write(file_str)
+    return new_path
+
+
+def to_tmp_path(file_name: str) -> str:
+    path = blackboard_god_map().get_data(identifier.tmp_folder)
+    return resolve_ros_iris(f'{path}{file_name}')
+
+
+def load_from_tmp(file_name: str):
+    new_path = to_tmp_path(file_name)
+    create_path(new_path)
+    with open(new_path, 'r') as f:
+        loaded_file = f.read()
+    return loaded_file
+
+
+def fix_obj(file_name):
+    logging.loginfo(f'Attempting to fix {file_name}.')
+    with open(file_name, 'r') as f:
+        lines = f.readlines()
+        fixed_obj = ''
+        for line in lines:
+            if line.startswith('f '):
+                new_line = 'f '
+                for part in line.split(' ')[1:]:
+                    f_number = part.split('//')[0]
+                    new_part = '//'.join([f_number, f_number])
+                    new_line += ' ' + new_part
+                fixed_obj += new_line + '\n'
+            else:
+                fixed_obj += line
+        with open(file_name, 'w') as f:
+            f.write(fixed_obj)
+
+
+def blackboard_god_map():
+    return Blackboard().god_map
+
+
+def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
+    first_group_name = list(blackboard_god_map().get_data(identifier.world).groups.keys())[0]
+    resolved_old_path = resolve_ros_iris(file_name)
+    short_file_name = file_name.split('/')[-1][:-3]
+    decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
+    new_path = to_tmp_path(decomposed_obj_file_name)
+    if not os.path.exists(new_path):
+        mesh = trimesh.load(resolved_old_path, force='mesh')
+        obj_str = trimesh.exchange.obj.export_obj(mesh)
+        write_to_tmp(decomposed_obj_file_name, obj_str)
+        logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
+        # if not trimesh.convex.is_convex(mesh):
+        #     pybullet.vhacd(new_path, new_path, log_path)
+
     return new_path
 
 
@@ -402,26 +463,84 @@ def memoize(function):
     return wrapper
 
 
+def launch_launchfile(file_name: str):
+    launch_file = resolve_ros_iris(file_name)
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_file])
+    with suppress_stderr():
+        launch.start()
+        # launch.shutdown()
+
+
+blackboard_exception_name = 'exception'
+
+
+def raise_to_blackboard(exception):
+    Blackboard().set(blackboard_exception_name, exception)
+
+
+def has_blackboard_exception():
+    return hasattr(Blackboard(), blackboard_exception_name) \
+           and getattr(Blackboard(), blackboard_exception_name) is not None
+
+
+def get_blackboard_exception():
+    return Blackboard().get(blackboard_exception_name)
+
+
+def clear_blackboard_exception():
+    raise_to_blackboard(None)
+
+
+def catch_and_raise_to_blackboard(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        if has_blackboard_exception():
+            return Status.FAILURE
+        try:
+            r = function(*args, **kwargs)
+        except Exception as e:
+            if not isinstance(e, DontPrintStackTrace):
+                traceback.print_exc()
+            raise_to_blackboard(e)
+            return Status.FAILURE
+        return r
+
+    return wrapper
+
+
 def make_pose_from_parts(pose, frame_id, position, orientation):
     if pose is None:
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id) if frame_id is not None else 'map'
+        pose.header.frame_id = str(frame_id)
         pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
         pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
     return pose
 
 
-def convert_ros_message_to_dictionary(message):
-    # TODO there is probably a lib for that, but i'm to lazy to search
+def convert_ros_message_to_dictionary(message: Message) -> dict:
     type_str_parts = str(type(message)).split('.')
     part1 = type_str_parts[0].split('\'')[1]
     part2 = type_str_parts[-1].split('\'')[0]
-    message_type = '{}/{}'.format(part1, part2)
+    message_type = f'{part1}/{part2}'
     d = {'message_type': message_type,
          'message': original_convert_ros_message_to_dictionary(message)}
     return d
 
+
+def replace_prefix_name_with_str(d: dict) -> dict:
+    new_d = d.copy()
+    for k, v in d.items():
+        if isinstance(k, PrefixName):
+            del new_d[k]
+            new_d[str(k)] = v
+        if isinstance(v, PrefixName):
+            new_d[k] = str(v)
+        if isinstance(v, dict):
+            new_d[k] = replace_prefix_name_with_str(v)
+    return new_d
 
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?
@@ -445,3 +564,25 @@ def trajectory_to_np(tj, joint_names):
     velocity = np.array(velocity)
     times = np.array(times)
     return names, position, velocity, times
+
+_pose_publisher = None
+def publish_pose(pose: PoseStamped):
+    global _pose_publisher
+    if _pose_publisher is None:
+        _pose_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray)
+        rospy.sleep(1)
+    m = Marker()
+    m.header = pose.header
+    m.pose = pose.pose
+    m.action = m.ADD
+    m.type = m.ARROW
+    m.id = 1337
+    m.ns = 'giskard_debug_poses'
+    m.scale.x = 0.1
+    m.scale.y = 0.05
+    m.scale.z = 0.025
+    m.color.r = 1
+    m.color.a = 1
+    ms = MarkerArray()
+    ms.markers.append(m)
+    _pose_publisher.publish(ms)

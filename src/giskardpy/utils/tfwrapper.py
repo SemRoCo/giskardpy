@@ -3,18 +3,22 @@ from copy import copy
 import PyKDL
 import numpy as np
 import rospy
+import yaml
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped, QuaternionStamped, Transform
 from std_msgs.msg import ColorRGBA
 from tf.transformations import quaternion_from_matrix, quaternion_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
-from tf2_kdl import transform_to_kdl
+from tf2_kdl import transform_to_kdl as transform_stamped_to_kdl
 from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
-tfBuffer = None  # type: Buffer
-tf_listener = None
+from giskardpy.utils import logging
+from giskardpy.utils.utils import memoize
+
+tfBuffer: Buffer = None
+tf_listener: TransformListener = None
 
 
 def init(tf_buffer_size=15):
@@ -27,32 +31,58 @@ def init(tf_buffer_size=15):
     tfBuffer = Buffer(rospy.Duration(tf_buffer_size))
     tf_listener = TransformListener(tfBuffer)
     rospy.sleep(5.0)
+    try:
+        get_tf_root()
+    except AssertionError as e:
+        logging.logwarn(e)
 
 
-def get_full_frame_name(frame_name):
+def get_tf_buffer():
+    global tfBuffer
+    if tfBuffer is None:
+        init()
+    return tfBuffer
+
+
+@memoize
+def get_tf_root() -> str:
+    tfBuffer = get_tf_buffer()
+    frames = yaml.safe_load(tfBuffer.all_frames_as_yaml())
+    frames_with_parent = set(frames.keys())
+    frame_parents = set(x['parent'] for x in frames.values())
+    tf_roots = frame_parents.difference(frames_with_parent)
+    assert len(tf_roots) < 2, f'There are more than one tf tree: {tf_roots}.'
+    assert len(tf_roots) > 0, 'There is no tf tree.'
+    return tf_roots.pop()
+
+
+def get_full_frame_names(frame_name):
     """
     Gets the full tf frame name if the frame with the name frame_name
     is in a separate namespace.
 
     :rtype: str
     """
-    global tfBuffer
+    tfBuffer = get_tf_buffer()
+    ret = list()
     tf_frames = tfBuffer._getFrameStrings()
     for tf_frame in tf_frames:
         try:
             frame = tf_frame[tf_frame.index("/") + 1:]
             if frame == frame_name or frame_name == tf_frame:
-                return tf_frame
+                ret.append(tf_frame)
         except ValueError:
             continue
-    raise KeyError('Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
-
+    if len(ret) == 0:
+        raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
+    return ret
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
-    global tfBuller
+    tfBuffer = get_tf_buffer()
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
+@profile
 def transform_msg(target_frame, msg, timeout=5):
     if isinstance(msg, PoseStamped):
         return transform_pose(target_frame, msg, timeout)
@@ -63,7 +93,7 @@ def transform_msg(target_frame, msg, timeout=5):
     elif isinstance(msg, QuaternionStamped):
         return transform_quaternion(target_frame, msg, timeout)
     else:
-        raise NotImplementedError('tf transform message of type \'{}\''.format(type(msg)))
+        raise NotImplementedError(f'tf transform message of type \'{type(msg)}\'')
 
 
 def transform_pose(target_frame, pose, timeout=5.0):
@@ -86,13 +116,23 @@ def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
         raise InvalidArgumentException('source frame can not be empty')
     if time is None:
         time = rospy.Time()
-    global tfBuffer
-    if tfBuffer is None:
-        init()
+    tfBuffer = get_tf_buffer()
     return tfBuffer.lookup_transform(str(target_frame),
                                      str(source_frame),  # source frame
                                      time,
                                      rospy.Duration(timeout))
+
+
+def make_transform(parent_frame, child_frame, pose):
+    tf = TransformStamped()
+    tf.header.frame_id = str(parent_frame)
+    tf.header.stamp = rospy.get_rostime()
+    tf.child_frame_id = str(child_frame)
+    tf.transform.translation.x = pose.position.x
+    tf.transform.translation.y = pose.position.y
+    tf.transform.translation.z = pose.position.z
+    tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
+    return tf
 
 
 def transform_vector(target_frame, vector, timeout=5):
@@ -167,6 +207,12 @@ def lookup_point(target_frame, source_frame, time=None):
     return p
 
 
+def transform_to_kdl(transform):
+    ts = TransformStamped()
+    ts.transform = transform
+    return transform_stamped_to_kdl(ts)
+
+
 def pose_to_kdl(pose):
     """Convert a geometry_msgs Transform message to a PyKDL Frame.
 
@@ -219,6 +265,8 @@ def twist_to_kdl(twist):
 
 def msg_to_kdl(msg):
     if isinstance(msg, TransformStamped):
+        return transform_stamped_to_kdl(msg)
+    elif isinstance(msg, Transform):
         return transform_to_kdl(msg)
     elif isinstance(msg, PoseStamped):
         return pose_to_kdl(msg.pose)
@@ -260,6 +308,24 @@ def normalize(msg):
         return Vector3(*tmp)
 
 
+def kdl_to_transform(frame):
+    t = Transform()
+    t.translation.x = frame.p[0]
+    t.translation.y = frame.p[1]
+    t.translation.z = frame.p[2]
+    t.rotation = normalize(Quaternion(*frame.M.GetQuaternion()))
+    return t
+
+
+def kdl_to_transform_stamped(frame, frame_id, child_frame_id):
+    t = TransformStamped()
+    t.header.frame_id = frame_id
+    t.header.stamp = rospy.get_rostime()
+    t.child_frame_id = child_frame_id
+    t.transform = kdl_to_transform(frame)
+    return t
+
+
 def kdl_to_pose(frame):
     """
     :type frame: PyKDL.Frame
@@ -271,6 +337,15 @@ def kdl_to_pose(frame):
     p.position.z = frame.p[2]
     p.orientation = normalize(Quaternion(*frame.M.GetQuaternion()))
     return p
+
+
+def kdl_to_transform(frame: PyKDL.Frame) -> Transform:
+    t = Transform()
+    t.translation.x = frame.p[0]
+    t.translation.y = frame.p[1]
+    t.translation.z = frame.p[2]
+    t.rotation = normalize(Quaternion(*frame.M.GetQuaternion()))
+    return t
 
 
 def kdl_to_pose_stamped(frame, frame_id):
@@ -356,18 +431,17 @@ def kdl_to_np(kdl_thing):
                          [0, 0, 0, 1]])
 
 
-def np_to_pose(matrix):
-    """
-    :type matrix: np.ndarray
-    :rtype: Pose
-    """
+def np_to_pose(matrix: np.ndarray) -> Pose:
     return kdl_to_pose(np_to_kdl(matrix))
+
+
+def np_to_transform(matrix: np.ndarray) -> Transform:
+    return kdl_to_transform(np_to_kdl(matrix))
 
 
 def pose_to_np(msg):
     p = np.array([msg.position.x, msg.position.y, msg.position.z])
-    q = np.array([msg.orientation.x, msg.orientation.y,
-                  msg.orientation.z, msg.orientation.w])
+    q = np.array([msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
     T = quaternion_matrix(q)
     T[0:3, -1] = p
     return T
@@ -375,6 +449,15 @@ def pose_to_np(msg):
 
 def pose_stamped_to_np(msg):
     return pose_to_np(msg.pose)
+
+
+def quaternion_to_np(msg: Quaternion) -> np.ndarray:
+    q = np.array([msg.x, msg.y, msg.z, msg.w])
+    return quaternion_matrix(q)
+
+
+def quaternion_stamped_to_np(msg: QuaternionStamped) -> np.ndarray:
+    return quaternion_to_np(msg.quaternion)
 
 
 def transform_to_np(msg):
@@ -405,6 +488,10 @@ def msg_to_homogeneous_matrix(msg):
         return vector_to_np(msg)
     elif isinstance(msg, Vector3Stamped):
         return vector_stamped_to_np(msg)
+    elif isinstance(msg, Quaternion):
+        return quaternion_to_np(msg)
+    elif isinstance(msg, QuaternionStamped):
+        return quaternion_stamped_to_np(msg)
     else:
         raise TypeError("Invalid type for conversion to SE(3)")
 

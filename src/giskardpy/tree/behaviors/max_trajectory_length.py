@@ -6,9 +6,12 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class MaxTrajectoryLength(GiskardBehavior):
+    @profile
     def __init__(self, name, enabled, length):
-        super(MaxTrajectoryLength, self).__init__(name)
-        self.length = length
+        super().__init__(name)
+
+    def initialise(self):
+        self.length = self.god_map.get_data(identifier.MaxTrajectoryLength + ['length'])
 
     @profile
     def update(self):
@@ -16,6 +19,6 @@ class MaxTrajectoryLength(GiskardBehavior):
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         t = t * sample_period
         if t > self.length:
-            raise PlanningException('Aborted because trajectory is longer than {}'.format(self.length))
+            raise PlanningException(f'Aborted because trajectory is longer than {self.length}')
 
         return Status.RUNNING

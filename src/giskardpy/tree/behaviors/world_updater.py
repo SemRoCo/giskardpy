@@ -1,6 +1,8 @@
 import traceback
+from collections import defaultdict
 from itertools import product
 from queue import Queue
+from time import time
 from xml.etree.ElementTree import ParseError
 
 import rospy
@@ -8,19 +10,19 @@ from py_trees import Status
 from py_trees.meta import running_is_success
 from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
-
+import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup
-from giskardpy.data_types import PrefixName
+from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_localization import SyncLocalization
+from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
 
@@ -65,12 +67,11 @@ class WorldUpdater(GiskardBehavior):
     BUSY = 1
     STALL = 2
 
-    # TODO reject changes if plugin not active or something
+    @profile
     def __init__(self, name: str):
-        self.added_plugin_names = []
-        super(WorldUpdater, self).__init__(name)
-        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
-        self.original_link_names = self.robot.link_names
+        self.added_plugin_names = defaultdict(list)
+        super().__init__(name)
+        self.original_link_names = self.world.link_names
         self.service_in_use = Queue(maxsize=1)
         self.work_permit = Queue(maxsize=1)
         self.update_ticked = Queue(maxsize=1)
@@ -88,43 +89,44 @@ class WorldUpdater(GiskardBehavior):
         return super(WorldUpdater, self).setup(timeout)
 
     def dye_group(self, req):
-        group_name = req.group_name
         res = DyeGroupResponse()
-        if group_name in self.world.groups:
-            for _, link in self.world.groups[req.group_name].links.items():
-                link.dye_collisions(req.color)
+        try:
+            self.world.dye_group(req.group_name, req.color)
             res.error_codes = DyeGroupResponse.SUCCESS
-        else:
+        except UnknownGroupException:
             res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
         return res
 
+    @profile
     def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
-        link_name = self.world.groups[req.parent_group_name].get_link_short_name_match(req.root_link_name)
+        link_name = self.world.get_link_name(req.root_link_name, req.parent_group_name)
         self.world.register_group(req.group_name, link_name)
         res = RegisterGroupResponse()
         res.error_codes = res.SUCCESS
         return res
 
+    @profile
     def get_group_names_cb(self, req: GetGroupNamesRequest) -> GetGroupNamesResponse:
         group_names = self.world.group_names
         res = GetGroupNamesResponse()
-        res.group_names = group_names
+        res.group_names = list(group_names)
         return res
 
+    @profile
     def get_group_info_cb(self, req: GetGroupInfoRequest) -> GetGroupInfoResponse:
         res = GetGroupInfoResponse()
         res.error_codes = GetGroupInfoResponse.SUCCESS
         try:
             group = self.world.groups[req.group_name]  # type: SubWorldTree
-            res.controlled_joints = group.controlled_joints
-            res.links = list(sorted(str(x) for x in group.link_names))
-            res.child_groups = list(group.groups.keys())
+            res.controlled_joints = [str(j.short_name) for j in group.controlled_joints]
+            res.links = list(sorted(str(x.short_name) for x in group.link_names))
+            res.child_groups = list(sorted(str(x) for x in group.groups.keys()))
             # tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             # node_name = str(PrefixName(req.group_name, 'js'))
             # if node_name in tree.tree_nodes:
             #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
+            res.root_link_pose.header.frame_id = self.world.root_link_name
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
@@ -152,13 +154,12 @@ class WorldUpdater(GiskardBehavior):
             if self.update_ticked.empty():
                 self.update_ticked.put(1)
 
-    def update_world_cb(self, req):
+    @profile
+    def update_world_cb(self, req: UpdateWorldRequest) -> UpdateWorldResponse:
         """
         Callback function of the ROS service to update the internal giskard world.
         :param req: Service request as received from the service client.
-        :type req: UpdateWorldRequest
         :return: Service response, reporting back any runtime errors that occurred.
-        :rtype UpdateWorldResponse
         """
         self.service_in_use.put('muh')
         try:
@@ -195,24 +196,19 @@ class WorldUpdater(GiskardBehavior):
             self.timer_state = self.STALL
             self.service_in_use.get_nowait()
 
-    def handle_convention(self, req: UpdateWorldRequest):
-        # default to world root if all is empty
-        if req.parent_link_group == '' and req.parent_link == '':
-            req.parent_link = self.world.root_link_name
-        # default to robot group, if parent link name is not empty
-        else:
-            if req.parent_link_group == '':
-                req.parent_link_group = self.god_map.unsafe_get_data(identifier.robot_group_name)
-            elif req.parent_link == '':
-                req.parent_link = self.world.groups[req.parent_link_group].root_link_name
-            req.parent_link = self.world.groups[req.parent_link_group].get_link_short_name_match(req.parent_link)
-        return req
-
+    @profile
     def add_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req = self.handle_convention(req)
+        req.parent_link = self.world.get_link_name(req.parent_link, req.parent_link_group)
         world_body = req.body
-        global_pose = transform_pose(self.world.root_link_name, req.pose)
+        if req.pose.header.frame_id == '':
+            raise TransformException('Frame_id in pose is not set.')
+        try:
+            global_pose = transform_pose(target_frame=self.world.root_link_name, pose=req.pose, timeout=0.5)
+        except:
+            req.pose.header.frame_id = self.world.get_link_name(req.pose.header.frame_id)
+            global_pose = self.world.transform_msg(self.world.root_link_name, req.pose)
+
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
         self.world.add_world_body(group_name=req.group_name,
                                   msg=world_body,
@@ -220,33 +216,34 @@ class WorldUpdater(GiskardBehavior):
                                   parent_link_name=req.parent_link)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
-        logging.loginfo(f'Added object \'{req.group_name}\' at \'{req.parent_link_group}/{req.parent_link}\'.')
+        logging.loginfo(f'Attached object \'{req.group_name}\' at \'{req.parent_link}\'.')
         if world_body.joint_state_topic:
-            plugin_name = str(PrefixName(req.group_name, 'js'))
-            plugin = running_is_success(SyncConfiguration)(plugin_name,
-                                                           group_name=req.group_name,
+            # plugin_name = str(PrefixName(req.group_name, 'js'))
+            plugin = running_is_success(SyncConfiguration)(group_name=req.group_name,
                                                            joint_state_topic=world_body.joint_state_topic)
             self.tree.insert_node(plugin, 'Synchronize', 1)
-            self.added_plugin_names.append(plugin_name)
+            self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
+            raise NotImplementedError('tf_root_link_name is not implemented')
             plugin_name = str(PrefixName(world_body.name, 'localization'))
-            plugin = SyncLocalization(plugin_name,
-                                      group_name=req.group_name,
-                                      tf_root_link_name=world_body.tf_root_link_name)
+            plugin = SyncTfFrames(plugin_name,
+                                  frames=world_body.tf_root_link_name)
             self.tree.insert_node(plugin, 'Synchronize', 1)
-            self.added_plugin_names.append(plugin_name)
+            self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
         parent_group = self.world.get_parent_group_name(req.group_name)
         self.collision_scene.update_group_blacklist(parent_group)
         self.collision_scene.blacklist_inter_group_collisions()
+        # logging.logwarn(f'adding took {time() - t:03}')
 
+    @profile
     def update_group_pose(self, req: UpdateWorldRequest):
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
-        pose = self.world.transform_pose(self.world.joints[joint_name].parent_link_name, req.pose).pose
+        pose = self.world.transform_pose(self.world._joints[joint_name].parent_link_name, req.pose).pose
         pose = w.Matrix(msg_to_homogeneous_matrix(pose))
         self.world.update_joint_parent_T_child(joint_name, pose)
         # self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
@@ -254,9 +251,10 @@ class WorldUpdater(GiskardBehavior):
         #     link_combinations=set(product(group.link_names_with_collisions,
         #                                   self.world.link_names_with_collisions)))
 
+    @profile
     def update_parent_link(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req = self.handle_convention(req)
+        req.parent_link = self.world.get_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]
@@ -271,29 +269,29 @@ class WorldUpdater(GiskardBehavior):
         else:
             logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
 
+    @profile
     def remove_object(self, name):
         # assumes that parent has god map lock
         if name not in self.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
         self.collision_scene.remove_black_list_entries(set(self.world.groups[name].link_names_with_collisions))
         self.world.delete_group(name)
-        self._remove_plugin(str(PrefixName(name, 'js')))
-        self._remove_plugin(str(PrefixName(name, 'localization')))
-        logging.loginfo('Deleted \'{}\''.format(name))
+        self._remove_plugins_of_group(name)
+        logging.loginfo(f'Deleted \'{name}\'.')
 
-    def _remove_plugin(self, name):
-        tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
-        if name in tree.tree_nodes:
-            tree.remove_node(name)
-            self.added_plugin_names.remove(name)
+    def _remove_plugins_of_group(self, group_name):
+        for plugin_name in self.added_plugin_names[group_name]:
+            self.tree.remove_node(plugin_name)
+        del self.added_plugin_names[group_name]
 
+    @profile
     def clear_world(self):
         # assumes that parent has god map lock
         self.collision_scene.reset_collision_blacklist()
-        self.world.delete_all_but_robot()
-        for plugin_name in self.added_plugin_names:
-            self.tree.remove_node(plugin_name)
-        self.added_plugin_names = []
+        self.world.delete_all_but_robots()
+        for group_name in list(self.added_plugin_names.keys()):
+            self._remove_plugins_of_group(group_name)
+        self.added_plugin_names = defaultdict(list)
         logging.loginfo('Cleared world.')
 
     def clear_markers(self):

@@ -5,6 +5,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class ExceptionToExecute(GiskardBehavior):
+    @profile
     def update(self):
         if self.get_blackboard_exception() is not None:
             self.clear_blackboard_exception()

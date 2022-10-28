@@ -19,8 +19,8 @@ from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface import DEFAULT_WORLD_TIMEOUT
 from giskardpy.utils import logging
-from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
-    JointGoalChecker, PR2CloseLoop
+from utils_for_tests import TestPR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
+    JointGoalChecker, TestPR2CloseLoop
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -70,7 +70,7 @@ pick_up_pose = {
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    c = PR2CloseLoop()
+    c = TestPR2CloseLoop()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -78,7 +78,7 @@ def giskard(request, ros):
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard):
     """
-    :type resetted_giskard: PR2
+    :type resetted_giskard: TestPR2
     """
     resetted_giskard.set_joint_goal(pocky_pose)
     resetted_giskard.allow_all_collisions()
@@ -89,8 +89,8 @@ def pocky_pose_setup(resetted_giskard):
 @pytest.fixture()
 def box_setup(pocky_pose_setup):
     """
-    :type pocky_pose_setup: PR2
-    :rtype: PR2
+    :type pocky_pose_setup: TestPR2
+    :rtype: TestPR2
     """
     p = PoseStamped()
     p.header.frame_id = 'map'
@@ -105,8 +105,8 @@ def box_setup(pocky_pose_setup):
 @pytest.fixture()
 def fake_table_setup(pocky_pose_setup):
     """
-    :type pocky_pose_setup: PR2
-    :rtype: PR2
+    :type pocky_pose_setup: TestPR2
+    :rtype: TestPR2
     """
     p = PoseStamped()
     p.header.frame_id = 'map'
@@ -121,7 +121,7 @@ def fake_table_setup(pocky_pose_setup):
 class TestJointGoals(object):
     def test_joint_movement1(self, resetted_giskard):
         """
-        :type zero_pose: PR2
+        :type zero_pose: TestPR2
         """
         resetted_giskard.allow_all_collisions()
         # resetted_giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)

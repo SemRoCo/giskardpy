@@ -11,11 +11,13 @@ from giskardpy.utils.utils import plot_trajectory
 class PlotTrajectory(GiskardBehavior):
     plot_thread: Thread
 
-    def __init__(self, name, enabled, wait=False, **kwargs):
-        super(PlotTrajectory, self).__init__(name)
+    @profile
+    def __init__(self, name, enabled, wait=False, joint_filter=None, **kwargs):
+        super().__init__(name)
         self.wait = wait
         self.kwargs = kwargs
-        self.path_to_data_folder = self.get_god_map().get_data(identifier.data_folder)
+        self.joint_filter = joint_filter
+        self.path_to_data_folder = self.get_god_map().get_data(identifier.tmp_folder)
 
     @profile
     def initialise(self):
@@ -26,13 +28,15 @@ class PlotTrajectory(GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         if trajectory:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
-            controlled_joints = list(trajectory.get_exact(0).keys())
+            if self.joint_filter is not None:
+                controlled_joints = self.joint_filter
+            else:
+                controlled_joints = list(trajectory.get_exact(0).keys())
             try:
                 plot_trajectory(tj=trajectory,
                                 controlled_joints=controlled_joints,
                                 path_to_data_folder=self.path_to_data_folder,
                                 sample_period=sample_period,
-                                diff_after=2,
                                 **self.kwargs)
             except Exception as e:
                 logwarn(e)
@@ -41,5 +45,5 @@ class PlotTrajectory(GiskardBehavior):
     @profile
     def update(self):
         if self.wait and self.plot_thread.is_alive():
-                return Status.RUNNING
+            return Status.RUNNING
         return Status.SUCCESS

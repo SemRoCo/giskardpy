@@ -9,7 +9,7 @@ from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-
+import giskardpy.utils.tfwrapper as tf
 
 class SyncConfiguration2(GiskardBehavior):
     """
@@ -17,13 +17,14 @@ class SyncConfiguration2(GiskardBehavior):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
+    @profile
     def __init__(self, name, group_name, joint_state_topic='joint_states', tf_root_link_name=None):
         """
         :type js_identifier: str
         """
         super().__init__(name)
         self.mjs = None
-        self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
+        self.map_frame = tf.get_tf_root()
         self.joint_state_topic = joint_state_topic
         self.group_name = group_name
         self.group = self.world.groups[self.group_name]  # type: SubWorldTree
@@ -33,6 +34,7 @@ class SyncConfiguration2(GiskardBehavior):
             self.tf_root_link_name = tf_root_link_name
         self.lock = Queue(maxsize=1)
 
+    @profile
     def setup(self, timeout=0.0):
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
         return super().setup(timeout)

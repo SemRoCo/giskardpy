@@ -5,6 +5,7 @@ from giskardpy.tree.behaviors.action_server import ActionServerBehavior
 
 
 class PublishFeedback(ActionServerBehavior):
+    @profile
     def __init__(self, name, as_name, feedback):
         super().__init__(name, as_name)
         self.feedback = feedback

@@ -1,13 +1,18 @@
+from typing import Optional
+
 import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose, Vector3Stamped, PointStamped
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from std_srvs.srv import Trigger
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix, rotation_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, CollisionEntry
+from giskardpy import identifier
+from giskardpy.configs.donbot import Donbot_Standalone
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from utils_for_tests import Donbot, compare_poses
+from utils_for_tests import compare_poses, GiskardTestWrapper
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
@@ -31,19 +36,84 @@ self_collision_js = {
 }
 
 
+class DonbotTestWrapper(GiskardTestWrapper):
+    default_pose = {
+        'ur5_elbow_joint': 0.0,
+        'ur5_shoulder_lift_joint': 0.0,
+        'ur5_shoulder_pan_joint': 0.0,
+        'ur5_wrist_1_joint': 0.0,
+        'ur5_wrist_2_joint': 0.0,
+        'ur5_wrist_3_joint': 0.0
+    }
+
+    better_pose = {
+        'ur5_shoulder_pan_joint': -np.pi / 2,
+        'ur5_shoulder_lift_joint': -2.44177755311,
+        'ur5_elbow_joint': 2.15026930371,
+        'ur5_wrist_1_joint': 0.291547812391,
+        'ur5_wrist_2_joint': np.pi / 2,
+        'ur5_wrist_3_joint': np.pi / 2
+    }
+
+    def __init__(self, config=None):
+        if config is None:
+            config = Donbot_Standalone
+        # from iai_wsg_50_msgs.msg import PositionCmd
+        self.camera_tip = 'camera_link'
+        self.gripper_tip = 'gripper_tool_frame'
+        # self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
+        # self.mujoco_reset = rospy.ServiceProxy('donbot/reset', Trigger)
+        super().__init__(config)
+
+    def open_gripper(self):
+        self.set_gripper(0.109)
+
+    def close_gripper(self):
+        self.set_gripper(0)
+
+    def set_gripper(self, width: float, gripper_joint: str = 'gripper_joint'):
+        width = max(0.0065, min(0.109, width))
+        js = {gripper_joint: width}
+        self.set_joint_goal(js)
+        self.plan_and_execute()
+
+    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
+        goal_pose = tf.transform_pose(self.default_root, goal_pose)
+        js = {'odom_x_joint': goal_pose.pose.position.x,
+              'odom_y_joint': goal_pose.pose.position.y,
+              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                      goal_pose.pose.orientation.y,
+                                                                      goal_pose.pose.orientation.z,
+                                                                      goal_pose.pose.orientation.w]))[0]}
+        self.allow_all_collisions()
+        self.set_seed_configuration(js)
+        self.plan_and_execute()
+
+    def move_base(self, goal_pose):
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom')
+        self.plan_and_execute()
+
+    def set_localization(self, map_T_odom: PoseStamped):
+        self.teleport_base(map_T_odom)
+
+    def reset(self):
+        self.open_gripper()
+        self.reset_base()
+        self.clear_world()
+        # self.register_group('gripper',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='l_wrist_roll_link')
+
+
 @pytest.fixture(scope='module')
-def giskard(request, ros):
-    c = Donbot()
+def giskard(request, ros) -> DonbotTestWrapper:
+    c = DonbotTestWrapper()
     request.addfinalizer(c.tear_down)
     return c
 
 
 @pytest.fixture()
-def self_collision_pose(resetted_giskard):
-    """
-    :type resetted_giskard: Donbot
-    :rtype: Donbot
-    """
+def self_collision_pose(resetted_giskard: DonbotTestWrapper) -> DonbotTestWrapper:
     resetted_giskard.set_joint_goal(self_collision_js)
     resetted_giskard.allow_all_collisions()
     resetted_giskard.plan_and_execute()
@@ -51,34 +121,24 @@ def self_collision_pose(resetted_giskard):
 
 
 @pytest.fixture()
-def fake_table_setup(zero_pose):
-    """
-    :type zero_pose: Donbot
-    :rtype: Donbot
-    """
+def fake_table_setup(zero_pose: DonbotTestWrapper) -> DonbotTestWrapper:
     p = PoseStamped()
     p.header.frame_id = 'map'
     p.pose.position.x = 0.9
     p.pose.position.y = 0
     p.pose.position.z = 0.2
     p.pose.orientation.w = 1
-    zero_pose.add_box(name='box', size=[1, 1, 1], pose=p)
+    zero_pose.add_box(name='box', size=(1, 1, 1), pose=p)
     return zero_pose
 
 
-class TestJointGoals(object):
-    def test_joint_movement1(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+class TestJointGoals:
+    def test_joint_movement1(self, zero_pose: DonbotTestWrapper):
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(floor_detection_js)
         zero_pose.plan_and_execute()
 
-    def test_joint_movement_gaya(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+    def test_joint_movement_gaya(self, zero_pose: DonbotTestWrapper):
         js1 = {"ur5_shoulder_pan_joint": 1.475476861000061,
                "ur5_shoulder_lift_joint": -1.664506737385885,
                "ur5_elbow_joint": -2.0976365248309534,
@@ -98,10 +158,7 @@ class TestJointGoals(object):
         zero_pose.set_joint_goal(js1)
         zero_pose.plan_and_execute()
 
-    def test_empty_joint_goal(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+    def test_empty_joint_goal(self, zero_pose: DonbotTestWrapper):
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal({
             'ur5_shoulder_pan_joint': -0.15841275850404912,
@@ -112,12 +169,9 @@ class TestJointGoals(object):
             'ur5_wrist_3_joint': -2.5249870459186,
         })
         zero_pose.set_joint_goal({})
-        zero_pose.plan_and_execute()
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
-    def test_joint_movement2(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+    def test_joint_movement2(self, zero_pose: DonbotTestWrapper):
         js = {
             'ur5_shoulder_pan_joint': -1.5438225905,
             'ur5_shoulder_lift_joint': -1.20804578463,
@@ -142,10 +196,7 @@ class TestJointGoals(object):
         zero_pose.set_joint_goal(js2)
         zero_pose.plan_and_execute()
 
-    def test_joint_movement3(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+    def test_joint_movement3(self, zero_pose: DonbotTestWrapper):
         js = {
             'odom_x_joint': 1,
             'odom_y_joint': 1,
@@ -161,40 +212,36 @@ class TestJointGoals(object):
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
-    def test_partial_joint_state_goal1(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+    def test_partial_joint_state_goal1(self, zero_pose: DonbotTestWrapper):
         zero_pose.allow_self_collision()
         js = dict(list(floor_detection_js.items())[:3])
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
 
-class TestConstraints(object):
-    def test_pointing(self, better_pose):
-        """
-        :type better_pose: Donbot
-        """
+class TestConstraints:
+    def test_pointing(self, better_pose: DonbotTestWrapper):
         tip = 'rs_camera_link'
-        goal_point = tf.lookup_point('map', 'base_footprint')
-        better_pose.set_pointing_goal(tip, goal_point)
+        goal_point = better_pose.world.compute_fk_point('map', 'base_footprint')
+        z = Vector3Stamped()
+        z.header.frame_id = 'rs_camera_link'
+        z.vector.z = 1
+        better_pose.set_pointing_goal(goal_point=goal_point, tip_link=tip, pointing_axis=z,
+                                      root_link=better_pose.default_root)
         better_pose.plan_and_execute()
 
-        goal_point = tf.lookup_point('map', tip)
-        better_pose.set_pointing_goal(tip, goal_point, root_link=tip)
+        goal_point = better_pose.world.compute_fk_point('map', tip)
+        better_pose.set_pointing_goal(goal_point=goal_point, tip_link=tip, pointing_axis=z,
+                                      root_link=tip)
 
-    def test_open_fridge(self, kitchen_setup):
-        """
-        :type kitchen_setup: Donbot
-        """
+    def test_open_fridge(self, kitchen_setup: DonbotTestWrapper):
         handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
         base_goal.pose.position = Point(0.3, -0.5, 0)
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.teleport_base(base_goal)
 
         bar_axis = Vector3Stamped()
@@ -208,13 +255,12 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.gripper_tip
         tip_grasp_axis.vector.y = -1
 
-        kitchen_setup.set_json_goal('GraspBar',
-                                    root_link=kitchen_setup.default_root,
-                                    tip_link=kitchen_setup.gripper_tip,
-                                    tip_grasp_axis=tip_grasp_axis,
-                                    bar_center=bar_center,
-                                    bar_axis=bar_axis,
-                                    bar_length=.4)
+        kitchen_setup.set_grasp_bar_goal(root_link=kitchen_setup.default_root,
+                                         tip_link=kitchen_setup.gripper_tip,
+                                         tip_grasp_axis=tip_grasp_axis,
+                                         bar_center=bar_center,
+                                         bar_axis=bar_axis,
+                                         bar_length=.4)
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.gripper_tip
         x_gripper.vector.z = 1
@@ -222,27 +268,28 @@ class TestConstraints(object):
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        kitchen_setup.set_align_planes_goal(kitchen_setup.gripper_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.set_align_planes_goal(tip_link=kitchen_setup.gripper_tip,
+                                            tip_normal=x_gripper,
+                                            goal_normal=x_goal,
+                                            root_link=kitchen_setup.default_root)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.set_json_goal('Open',
-                                    tip_link=kitchen_setup.gripper_tip,
-                                    environment_link=handle_name,
-                                    goal_joint_state=1.5)
-        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+        kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.gripper_tip,
+                                              environment_link=handle_name,
+                                              goal_joint_state=1.5)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=40)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits')
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 1.5})
 
-        kitchen_setup.set_json_goal('Open',
-                                    tip_link=kitchen_setup.gripper_tip,
-                                    environment_link=handle_name,
-                                    goal_joint_state=0)
+        kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.gripper_tip,
+                                              environment_link=handle_name,
+                                              goal_joint_state=0)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=40)
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 0})
 
@@ -251,11 +298,9 @@ class TestConstraints(object):
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
-class TestCartGoals(object):
-    def test_cart_goal_1eef(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+
+class TestCartGoals:
+    def test_cart_goal_1eef(self, zero_pose: DonbotTestWrapper):
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = zero_pose.gripper_tip
@@ -265,10 +310,7 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(p, zero_pose.gripper_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
-    def test_cart_goal2(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+    def test_cart_goal2(self, zero_pose: DonbotTestWrapper):
         js = {
             'ur5_shoulder_pan_joint': 3.141554832458496,
             'ur5_shoulder_lift_joint': -1.3695076147662562,
@@ -283,15 +325,15 @@ class TestCartGoals(object):
         p.header.frame_id = 'camera_link'
         p.pose.position = Point(0, 1, 0)
         p.pose.orientation.w = 1
-        zero_pose.allow_self_collision()
-        zero_pose.set_translation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_BELOW_CA)
-        zero_pose.set_rotation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_ABOVE_CA)
+        # zero_pose.allow_self_collision()
+        zero_pose.set_straight_cart_goal(goal_pose=p,
+                                         tip_link=zero_pose.camera_tip,
+                                         root_link='ur5_shoulder_link')
+        # zero_pose.set_translation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_BELOW_CA)
+        # zero_pose.set_rotation_goal(p, zero_pose.camera_tip, 'ur5_shoulder_link', weight=WEIGHT_ABOVE_CA)
         zero_pose.plan_and_execute()
 
-    def test_endless_wiggling1(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
+    def test_endless_wiggling1(self, zero_pose: DonbotTestWrapper):
         start_pose = {
             'ur5_elbow_joint': 2.14547738764,
             'ur5_shoulder_lift_joint': -1.177280122,
@@ -319,11 +361,7 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(goal_pose, zero_pose.camera_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
-    def test_endless_wiggling2(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
-
+    def test_endless_wiggling2(self, zero_pose: DonbotTestWrapper):
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'base_link'
         goal_pose.pose.position.x = 0.212
@@ -338,10 +376,7 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(goal_pose, zero_pose.gripper_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
-    def test_elbow_singularity(self, better_pose):
-        """
-        :type better_pose: Donbot
-        """
+    def test_elbow_singularity(self, better_pose: DonbotTestWrapper):
         hand_goal = PoseStamped()
         hand_goal.header.frame_id = better_pose.gripper_tip
         hand_goal.pose.position.z = 1
@@ -356,10 +391,7 @@ class TestCartGoals(object):
         better_pose.plan_and_execute()
         pass
 
-    def test_elbow_singularity2(self, zero_pose):
-        """
-        :type better_pose: Donbot
-        """
+    def test_elbow_singularity2(self, zero_pose: DonbotTestWrapper):
         tip = 'ur5_wrist_1_link'
         hand_goal = PoseStamped()
         hand_goal.header.frame_id = tip
@@ -373,11 +405,11 @@ class TestCartGoals(object):
         hand_goal.pose.position.x = -0.6
         hand_goal.pose.orientation.w = 1
         zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-        zero_pose.set_cart_goal(hand_goal, tip, 'base_footprint', weight=WEIGHT_BELOW_CA/2)
+        zero_pose.set_cart_goal(hand_goal, tip, 'base_footprint', weight=WEIGHT_BELOW_CA / 2)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
-    def test_base_driving(self, zero_pose):
+    def test_base_driving(self, zero_pose: DonbotTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
@@ -388,12 +420,10 @@ class TestCartGoals(object):
         p.pose.orientation.w = 1
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         zero_pose.set_cart_goal(p, 'base_footprint')
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
-    def test_shoulder_singularity(self, better_pose):
-        """
-        :type better_pose: Donbot
-        """
+    def test_shoulder_singularity(self, better_pose: DonbotTestWrapper):
         hand_goal = PoseStamped()
         hand_goal.header.frame_id = 'ur5_base_link'
         hand_goal.pose.position.x = 0.05
@@ -415,227 +445,3 @@ class TestCartGoals(object):
         # better_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         better_pose.set_cart_goal(hand_goal, 'ur5_wrist_2_link', 'base_footprint', weight=WEIGHT_BELOW_CA)
         better_pose.plan_and_execute()
-        pass
-
-
-class TestCollisionAvoidanceGoals(object):
-    # kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
-
-    def test_open_gripper(self, kitchen_setup):
-        """
-        :type kitchen_setup: Donbot
-        """
-        kitchen_setup.open_gripper()
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.x = 0.1
-        p.pose.orientation.w = 1
-        kitchen_setup.move_base(p)
-
-    def test_open_gripper2(self, better_pose):
-        """
-        :type better_pose: Donbot
-        """
-        better_pose.open_gripper()
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        better_pose.add_box(name='box',
-                            size=[1,1,1],
-                            pose=p)
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.x = 0.1
-        p.pose.orientation.w = 1
-        better_pose.move_base(p)
-
-    def test_attach_box(self, better_pose):
-        """
-        :type zero_pose: Donbot
-        """
-        pocky = 'http://muh#pocky'
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0.05
-        p.pose.orientation.w = 1
-        better_pose.attach_box(pocky, [0.1, 0.02, 0.02], better_pose.gripper_tip, p)
-
-    def test_avoid_collision(self, better_pose):
-        """
-        :type zero_pose: Donbot
-        """
-        box = 'box'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.position.y = -0.75
-        p.pose.position.z = 0.5
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-
-        better_pose.add_box(box, [1, 0.5, 2], p)
-        better_pose.plan_and_execute()
-
-    def test_avoid_collision2(self, better_pose):
-        """
-        :type box_setup: PR2
-        """
-        # FIXME check if out of collision at the
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.z = 0.08
-        p.pose.orientation.w = 1
-        better_pose.attach_box(name='box',
-                               size=[0.05, 0.05, 0.2],
-                               parent_link=better_pose.gripper_tip,
-                               pose=p)
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0
-        p.pose.position.z = 0.15
-        p.pose.position.y = -0.04
-        p.pose.orientation.w = 1
-        better_pose.add_box('br', [0.2, 0.01, 0.1], p)
-
-        better_pose.allow_self_collision()
-        better_pose.plan_and_execute()
-        better_pose.check_cpi_geq(['box'], 0.025)
-
-    def test_avoid_collision3(self, better_pose):
-        """
-        :type box_setup: PR2
-        """
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.z = 0.08
-        p.pose.orientation.w = 1
-        better_pose.attach_box(name='box',
-                               size=[0.05, 0.05, 0.2],
-                               parent_link=better_pose.gripper_tip,
-                               pose=p)
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0
-        p.pose.position.z = 0.15
-        p.pose.position.y = 0.04
-        p.pose.orientation.w = 1
-        better_pose.add_box('bl', [0.2, 0.01, 0.1], p)
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0
-        p.pose.position.z = 0.15
-        p.pose.position.y = -0.04
-        p.pose.orientation.w = 1
-        better_pose.add_box('br', [0.2, 0.01, 0.1], p)
-
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position = Point(0, 0, -0.15)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        better_pose.set_cart_goal(p, better_pose.gripper_tip, better_pose.default_root)
-
-        better_pose.plan_and_execute()
-        # TODO check traj length?
-        better_pose.check_cpi_geq(['box'], 0.045)
-
-    def test_avoid_collision4(self, better_pose):
-        """
-        :type better_pose: Donbot
-        """
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.z = 0.08
-        p.pose.orientation.w = 1
-        better_pose.attach_cylinder(name='cylinder',
-                                    height=0.3,
-                                    radius=0.025,
-                                    parent_link=better_pose.gripper_tip,
-                                    pose=p)
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0
-        p.pose.position.z = 0.25
-        p.pose.position.y = 0.04
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
-        better_pose.add_cylinder('fdown', height=0.2, radius=0.01, pose=p)
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0
-        p.pose.position.z = 0.25
-        p.pose.position.y = -0.07
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
-        better_pose.add_cylinder('fup', height=0.2, radius=0.01, pose=p)
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0
-        p.pose.position.z = 0.15
-        p.pose.position.y = 0.07
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
-        better_pose.add_cylinder('bdown', height=0.2, radius=0.01, pose=p)
-        p = PoseStamped()
-        p.header.frame_id = better_pose.gripper_tip
-        p.pose.position.x = 0
-        p.pose.position.z = 0.15
-        p.pose.position.y = -0.04
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
-        better_pose.add_cylinder('bup', height=0.2, radius=0.01, pose=p)
-
-        eef_goal = PoseStamped()
-        eef_goal.header.frame_id = 'cylinder'
-        eef_goal.pose.position.z -= 0.2
-        eef_goal.pose.orientation.w = 1
-        better_pose.set_cart_goal(eef_goal, 'cylinder', weight=WEIGHT_BELOW_CA)
-        better_pose.plan_and_execute()
-
-    def test_allow_self_collision2(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
-        goal_js = {
-            'ur5_shoulder_lift_joint': .5,
-        }
-        zero_pose.set_joint_goal(goal_js, check=False)
-        zero_pose.plan_and_execute()
-
-        arm_goal = PoseStamped()
-        arm_goal.header.frame_id = zero_pose.gripper_tip
-        arm_goal.pose.position.y = -.1
-        arm_goal.pose.orientation.w = 1
-        zero_pose.set_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
-
-    def test_avoid_self_collision(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
-        goal_js = {
-            'ur5_shoulder_lift_joint': .5,
-        }
-        # zero_pose.wrapper.set_self_collision_distance(0.025)
-        zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(goal_js)
-        zero_pose.plan_and_execute()
-
-        arm_goal = PoseStamped()
-        arm_goal.header.frame_id = zero_pose.gripper_tip
-        arm_goal.pose.position.y = -.1
-        arm_goal.pose.orientation.w = 1
-        # zero_pose.wrapper.set_self_collision_distance(0.025)
-        zero_pose.set_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
-
-    def test_avoid_self_collision2(self, self_collision_pose):
-        self_collision_pose.plan_and_execute()
-        map_T_root = tf.lookup_pose('map', 'base_footprint')
-        expected_pose = Pose()
-        expected_pose.orientation.w = 1
-        compare_poses(map_T_root.pose, expected_pose)
-
-    def test_unknown_body_b(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.AVOID_COLLISION
-        ce.body_b = 'asdf'
-        zero_pose._set_collision_entries([ce])
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_OBJECT])
-        zero_pose.plan_and_execute()

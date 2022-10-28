@@ -4,20 +4,23 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
+from giskardpy.utils import logging
 from giskardpy.utils.logging import logwarn
 from giskardpy.utils.utils import plot_trajectory
 
 
 class PlotDebugExpressions(PlotTrajectory):
-    def __init__(self, name, enabled, wait=False, **kwargs):
-        super(PlotDebugExpressions, self).__init__(name=name,
-                                                   enabled=enabled,
-                                                   velocity_threshold=None,
-                                                   normalize_position=False,
-                                                   wait=wait,
-                                                   **kwargs)
+    @profile
+    def __init__(self, name, enabled, wait=True, **kwargs):
+        super().__init__(name=name,
+                         enabled=enabled,
+                         velocity_threshold=None,
+                         normalize_position=False,
+                         wait=wait,
+                         **kwargs)
 
     def plot(self):
+        logging.loginfo('plot debug called')
         trajectory = self.get_god_map().get_data(identifier.debug_trajectory)
         if trajectory and len(trajectory.items()) > 0:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
@@ -32,4 +35,3 @@ class PlotDebugExpressions(PlotTrajectory):
             except Exception:
                 traceback.print_exc()
                 logwarn('failed to save debug.pdf')
-

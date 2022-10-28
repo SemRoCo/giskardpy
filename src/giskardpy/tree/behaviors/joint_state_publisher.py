@@ -8,9 +8,10 @@ from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 
 
 class JointStatePublisher(CommandPublisher):
+    @profile
     def __init__(self, name, namespace, hz=100):
         self.namespace = namespace
-        self.cmd_topic = '{}/command'.format(self.namespace)
+        self.cmd_topic = f'{self.namespace}/command'
         self.cmd_pub = rospy.Publisher(self.cmd_topic, JointState, queue_size=10)
         self.joint_names = rospy.get_param('{}/controlled_joints'.format(self.namespace))
         super().__init__(name, hz)

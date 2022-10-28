@@ -3,17 +3,20 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveResult
 from giskardpy.exceptions import *
+from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class SetErrorCode(GiskardBehavior):
 
+    @profile
     def __init__(self, name, context, print=True):
         self.reachability_threshold = 0.001
         self.print = print
         self.context = context
-        super(SetErrorCode, self).__init__(name)
+        super().__init__(name)
 
     @profile
     def update(self):
@@ -25,17 +28,21 @@ class SetErrorCode(GiskardBehavior):
         error_code, error_message = self.exception_to_error_code(e)
         result.error_codes[cmd_id] = error_code
         result.error_messages[cmd_id] = error_message
+        trajectory = self.god_map.get_data(identifier.trajectory)
+        joints = [self.world._joints[joint_name] for joint_name in self.world.movable_joints]
+        sample_period = self.god_map.get_data(identifier.sample_period)
+        result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if error_code == MoveResult.PREEMPTED:
             for i in range(len(result.error_codes) - cmd_id):
                 result.error_codes[cmd_id + i] = error_code
                 result.error_messages[cmd_id + i] = error_message
-            logging.logwarn('Goal preempted: \'{}\'.'.format(error_message))
+            logging.logwarn(f'Goal preempted: \'{error_message}\'.')
         else:
             if self.print:
                 if error_code == MoveResult.SUCCESS:
-                    logging.loginfo('{} succeeded.'.format(self.context))
+                    logging.loginfo(f'{self.context} succeeded.')
                 else:
-                    logging.logwarn('{} failed: {}.'.format(self.context, error_message))
+                    logging.logwarn(f'{self.context} failed: {error_message}.')
         self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
 
@@ -59,6 +66,14 @@ class SetErrorCode(GiskardBehavior):
                 error_code = MoveResult.OUT_OF_JOINT_LIMITS
             elif isinstance(exception, HardConstraintsViolatedException):
                 error_code = MoveResult.HARD_CONSTRAINTS_VIOLATED
+            elif isinstance(exception, EmptyProblemException):
+                goals = list(self.god_map.get_data(identifier.goals).values())
+                non_motion_goals = [x for x in goals if isinstance(x, NonMotionGoal)]
+                if len(non_motion_goals) == 0:
+                    error_code = MoveResult.EMPTY_PROBLEM
+                else:
+                    error_code = MoveResult.SUCCESS
+                    error_message = ''
         # world exceptions
         elif isinstance(exception, PhysicsWorldException):
             error_code = MoveResult.WORLD_ERROR
@@ -78,6 +93,8 @@ class SetErrorCode(GiskardBehavior):
             error_code = MoveResult.PLANNING_ERROR
             if isinstance(exception, ShakingException):
                 error_code = MoveResult.SHAKING
+            elif isinstance(exception, SelfCollisionViolatedException):
+                error_code = MoveResult.SELF_COLLISION_VIOLATED
             elif isinstance(exception, UnreachableException):
                 if self.get_god_map().get_data(identifier.check_reachability):
                     error_code = MoveResult.UNREACHABLE

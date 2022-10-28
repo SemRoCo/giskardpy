@@ -13,11 +13,6 @@ class SendResult(ActionServerBehavior):
         Blackboard().set('exception', None)  # FIXME move this to reset?
         result = self.get_god_map().get_data(identifier.result_message)
 
-        # trajectory = self.get_god_map().get_data(identifier.trajectory)
-        # sample_period = self.get_god_map().get_data(identifier.sample_period)
-        # controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
-        # result.trajectory = trajectory.to_msg(sample_period, controlled_joints, True)
-
         if result.error_codes[-1] == MoveResult.PREEMPTED:
             logging.logerr('Goal preempted')
             self.get_as().send_preempted(result)

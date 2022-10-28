@@ -5,6 +5,13 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
 class TimePlugin(GiskardBehavior):
+
+    @profile
+    def __init__(self, name=None):
+        if name is None:
+            name = 'increase time'
+        super().__init__(name)
+
     @profile
     def update(self):
         with self.god_map:

@@ -204,6 +204,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         super(PR2TestWrapper, self).set_localization(map_T_odom)
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
+        self.allow_all_collisions()
         self.move_base(goal_pose)
 
     def reset(self):
@@ -2875,7 +2876,7 @@ class TestCollisionAvoidanceGoals:
         box_setup.avoid_collision(min_distance=0.05, group1=box_setup.robot_name)
         box_setup.avoid_collision(min_distance=0.15, group1=box_setup.l_gripper_group, group2='box')
         box_setup.avoid_collision(min_distance=0.10, group1=box_setup.r_gripper_group, group2='box')
-        box_setup.allow_self_collision(robot_name=box_setup.robot_name)
+        box_setup.allow_self_collision()
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.148)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.088)

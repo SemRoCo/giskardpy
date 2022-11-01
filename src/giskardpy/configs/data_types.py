@@ -215,9 +215,8 @@ class BehaviorTreeConfig:
 
 
 class RobotInterfaceConfig:
-    def __init__(self, urdf: str, name: Optional[str] = None, joint_state_topic: str = '/joint_states'):
+    def __init__(self, urdf: str, name: Optional[str] = None):
         if name is None:
             name = robot_name_from_urdf_string(urdf)
         self.urdf = urdf
         self.name = name
-        self.joint_state_topic = joint_state_topic

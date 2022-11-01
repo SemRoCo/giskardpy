@@ -67,7 +67,7 @@ class HSR_StandAlone(HSR_Base):
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.root_link_name = 'map'
+        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_omni_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',

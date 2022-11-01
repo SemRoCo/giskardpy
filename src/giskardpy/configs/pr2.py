@@ -64,7 +64,7 @@ class PR2_Mujoco(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
         super().__init__()
-        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
+        self.set_default_visualization_marker_color(1, 1, 1, 0.7)
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
@@ -162,7 +162,7 @@ class PR2_StandAlone(PR2_Base):
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.root_link_name = 'map'
+        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',

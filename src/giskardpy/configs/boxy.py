@@ -18,7 +18,7 @@ class Boxy_StandAlone(Boxy_Base):
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.root_link_name = 'map'
+        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='boxy_description/odom')
         self.register_controlled_joints([
             'neck_shoulder_pan_joint',

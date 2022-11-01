@@ -78,7 +78,7 @@ class IAI_Tiago(TiagoBase):
     def __init__(self):
         super().__init__()
         self.add_sync_tf_frame('map', 'odom')
-        self.add_odometry_topic('/mobile_base_controller/odom')
+        self._add_odometry_topic('/mobile_base_controller/odom')
         self.add_robot_from_parameter_server()
         self.add_follow_joint_trajectory_server(
             namespace='/arm_left_impedance_controller/follow_joint_trajectory',
@@ -116,7 +116,7 @@ class Tiago_Standalone(TiagoBase):
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.root_link_name = 'map'
+        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_diff_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',

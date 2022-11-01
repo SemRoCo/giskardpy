@@ -170,7 +170,6 @@ class WorldUpdater(GiskardBehavior):
             self.update_ticked.get()
             self.work_permit.get(timeout=req.timeout)
             with self.get_god_map():
-                self.clear_markers()
                 try:
                     if req.operation == UpdateWorldRequest.ADD:
                         self.add_object(req)
@@ -196,6 +195,7 @@ class WorldUpdater(GiskardBehavior):
         finally:
             self.timer_state = self.STALL
             self.service_in_use.get_nowait()
+            self.clear_markers()
 
     @profile
     def add_object(self, req: UpdateWorldRequest):

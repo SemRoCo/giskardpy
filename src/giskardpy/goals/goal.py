@@ -56,7 +56,11 @@ class Goal:
             added_checks[key] = distance
 
     def save_self_on_god_map(self):
-        self.god_map.set_data(self._get_identifier(), self)
+        try:
+            self.god_map.get_data(self._get_identifier())
+            raise ConstraintInitalizationException(f'Constraint named {str(self)} already exists.')
+        except KeyError:
+            self.god_map.set_data(self._get_identifier(), self)
 
     def make_constraints(self):
         pass

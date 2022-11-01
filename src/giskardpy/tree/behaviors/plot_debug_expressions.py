@@ -20,7 +20,6 @@ class PlotDebugExpressions(PlotTrajectory):
                          **kwargs)
 
     def plot(self):
-        logging.loginfo('plot debug called')
         trajectory = self.get_god_map().get_data(identifier.debug_trajectory)
         if trajectory and len(trajectory.items()) > 0:
             sample_period = self.get_god_map().get_data(identifier.sample_period)

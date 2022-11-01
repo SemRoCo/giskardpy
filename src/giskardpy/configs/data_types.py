@@ -158,7 +158,7 @@ class BehaviorTreeConfig:
             'expression_filter': None
         },
         'PlotTrajectory': {
-            'enabled': True,
+            'enabled': False,
             'history': 5,
             'velocity_threshold': 0.0,
             'cm_per_second': 2.5,
@@ -170,7 +170,7 @@ class BehaviorTreeConfig:
             'diff_after': 4,
         },
         'PlotDebugExpressions': {
-            'enabled': True,
+            'enabled': False,
             'history': 5,
             'cm_per_second': 2.5,
             'height_per_derivative': 6,

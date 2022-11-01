@@ -1369,6 +1369,21 @@ class TestConstraints:
 
 
 class TestCartGoals:
+    def test_two_eef_goal(self, zero_pose: PR2TestWrapper):
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = 'r_gripper_tool_frame'
+        r_goal.pose.position = Point(-0.2, -0.2, 0.2)
+        r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(root_link='map', tip_link='r_gripper_tool_frame', goal_pose=r_goal)
+
+        l_goal = PoseStamped()
+        l_goal.header.frame_id = 'l_gripper_tool_frame'
+        l_goal.pose.position = Point(0.2, 0.2, 0.2)
+        l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(root_link='map', tip_link='l_gripper_tool_frame', goal_pose=l_goal)
+
+        zero_pose.plan_and_execute()
+
     def test_move_base_forward(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'

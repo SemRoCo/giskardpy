@@ -245,6 +245,8 @@ class CartesianPose(Goal):
         :param weight: default WEIGHT_ABOVE_CA
         :param root_link2: experimental, don't use
         """
+        self.root_link = root_link
+        self.tip_link = tip_link
         super().__init__(**kwargs)
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
@@ -272,6 +274,10 @@ class CartesianPose(Goal):
                                                           weight=weight,
                                                           root_link2=root_link2,
                                                           **kwargs))
+
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class DiffDriveBaseGoal(Goal):

@@ -38,10 +38,13 @@ class Giskard:
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
         self._controlled_joints = []
-        self.root_link_name = None
+        self._root_link_name = None
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self._backup = {}
+
+    def set_root_link_name(self, link_name: str):
+        self._root_link_name = link_name
 
     def get_collision_avoidance_config(self, group_name: Optional[str] = None):
         if group_name is None:
@@ -232,9 +235,9 @@ class Giskard:
         if len(self.robot_interface_configs) == 0:
             self.add_robot_from_parameter_server()
         self._create_parameter_backup()
-        if self.root_link_name is None:
-            self.root_link_name = tf.get_tf_root()
-        world = WorldTree(self.root_link_name, self._god_map)
+        if self._root_link_name is None:
+            self._root_link_name = tf.get_tf_root()
+        world = WorldTree(self._root_link_name, self._god_map)
         world.delete_all_but_robots()
         world.register_controlled_joints(self._controlled_joints)
 

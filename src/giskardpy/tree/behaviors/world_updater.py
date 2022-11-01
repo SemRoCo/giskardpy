@@ -1,5 +1,6 @@
 import traceback
 from collections import defaultdict
+from copy import deepcopy
 from itertools import product
 from queue import Queue
 from time import time
@@ -288,10 +289,13 @@ class WorldUpdater(GiskardBehavior):
     def clear_world(self):
         # assumes that parent has god map lock
         self.collision_scene.reset_collision_blacklist()
+        tmp_state = deepcopy(self.world.state)
         self.world.delete_all_but_robots()
         for group_name in list(self.added_plugin_names.keys()):
             self._remove_plugins_of_group(group_name)
         self.added_plugin_names = defaultdict(list)
+        self.world.state = tmp_state
+        self.world.notify_state_change()
         logging.loginfo('Cleared world.')
 
     def clear_markers(self):

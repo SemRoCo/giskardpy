@@ -671,7 +671,7 @@ class GiskardWrapper:
             raise TimeoutError('Timeout while waiting for goal.')
         return self._client.get_result()
 
-    def clear_world(self, timeout: float = 0) -> UpdateWorldResponse:
+    def clear_world(self, timeout: float = 2) -> UpdateWorldResponse:
         """
         Resets the world to what it was when Giskard was launched.
         """
@@ -685,7 +685,7 @@ class GiskardWrapper:
 
     def remove_group(self,
                      name: str,
-                     timeout: float = 0) -> UpdateWorldResponse:
+                     timeout: float = 2) -> UpdateWorldResponse:
         """
         Removes a group and all links and joints it contains from the world.
         Be careful, you can remove parts of the robot like that.
@@ -708,7 +708,7 @@ class GiskardWrapper:
                 pose: PoseStamped,
                 parent_link: str = '',
                 parent_link_group: str = '',
-                timeout: float = 1) -> UpdateWorldResponse:
+                timeout: float = 2) -> UpdateWorldResponse:
         """
         Adds a new box to the world tree and attaches it to parent_link.
         If parent_link_group and parent_link are empty, the box will be attached to the world root link, e.g., map.
@@ -736,7 +736,7 @@ class GiskardWrapper:
                    pose: PoseStamped,
                    parent_link: str = '',
                    parent_link_group: str = '',
-                   timeout: float = 0) -> UpdateWorldResponse:
+                   timeout: float = 2) -> UpdateWorldResponse:
         """
         See add_box.
         """
@@ -761,7 +761,7 @@ class GiskardWrapper:
                  parent_link: str = '',
                  parent_link_group: str = '',
                  scale: Tuple[float, float, float] = (1, 1, 1),
-                 timeout: float = 0) -> UpdateWorldResponse:
+                 timeout: float = 2) -> UpdateWorldResponse:
         """
         See add_box.
         :param mesh: path to the mesh location, can be ros package path, e.g.,
@@ -790,7 +790,7 @@ class GiskardWrapper:
                      pose: PoseStamped,
                      parent_link: str = '',
                      parent_link_group: str = '',
-                     timeout: float = 0) -> UpdateWorldResponse:
+                     timeout: float = 2) -> UpdateWorldResponse:
         """
         See add_box.
         """
@@ -813,8 +813,8 @@ class GiskardWrapper:
     def update_parent_link_of_group(self,
                                     name: str,
                                     parent_link: str,
-                                    parent_link_group: str,
-                                    timeout: float = 0) -> UpdateWorldResponse:
+                                    parent_link_group: Optional[str] = '',
+                                    timeout: float = 2) -> UpdateWorldResponse:
         """
         Removes the joint connecting the root link of a group and attaches it to a parent_link.
         The object will not move relative to the world's root link in this process.
@@ -832,7 +832,7 @@ class GiskardWrapper:
         req.timeout = timeout
         return self._update_world_srv.call(req)
 
-    def detach_group(self, object_name: str, timeout: float = 0):
+    def detach_group(self, object_name: str, timeout: float = 2):
         """
         A wrapper for update_parent_link_of_group which set parent_link to the root link of the world.
         """
@@ -850,7 +850,7 @@ class GiskardWrapper:
                  parent_link_group: str = '',
                  js_topic: Optional[str] = '',
                  set_js_topic: Optional[str] = '',
-                 timeout: float = 0) -> UpdateWorldResponse:
+                 timeout: float = 2) -> UpdateWorldResponse:
         """
         Adds a urdf to the world.
         :param name: name the group containing the urdf will have.
@@ -928,7 +928,7 @@ class GiskardWrapper:
         """
         return self.get_group_info(group_name).controlled_joints
 
-    def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 0) -> UpdateWorldResponse:
+    def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 2) -> UpdateWorldResponse:
         """
         Overwrites the pose specified in the joint that connects the two groups.
         :param group_name: Name of the group that will move

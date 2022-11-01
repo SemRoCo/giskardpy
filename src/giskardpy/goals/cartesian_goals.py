@@ -97,7 +97,8 @@ class CartesianOrientation(Goal):
         if reference_velocity is None:
             reference_velocity = 0.5
         if isinstance(goal_orientation, PoseStamped):
-            logging.logwarn('deprication warning: CartesianOrientation called with PoseStamped instead of QuaternionStamped')
+            logging.logwarn(
+                'deprication warning: CartesianOrientation called with PoseStamped instead of QuaternionStamped')
             q = QuaternionStamped()
             q.header = goal_orientation.header
             q.quaternion = goal_orientation.pose.orientation
@@ -217,6 +218,10 @@ class CartesianPositionStraight(Goal):
             self.add_translational_velocity_limit(frame_P_current=root_P_tip,
                                                   max_velocity=self.max_velocity,
                                                   weight=self.weight)
+
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class CartesianPose(Goal):
@@ -448,6 +453,8 @@ class CartesianPoseStraight(Goal):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
         """
+        self.root_link = root_link
+        self.tip_link = tip_link
         super().__init__(**kwargs)
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
@@ -473,6 +480,10 @@ class CartesianPoseStraight(Goal):
                                                           reference_velocity=reference_angular_velocity,
                                                           weight=weight,
                                                           **kwargs))
+
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class TranslationVelocityLimit(Goal):
@@ -562,6 +573,8 @@ class CartesianVelocityLimit(Goal):
         :param weight: default WEIGHT_ABOVE_CA
         :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
+        self.root_link = root_link
+        self.tip_link = tip_link
         super().__init__(**kwargs)
         self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
                                                               root_group=root_group,
@@ -579,3 +592,7 @@ class CartesianVelocityLimit(Goal):
                                                            weight=weight,
                                                            hard=hard,
                                                            **kwargs))
+
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'

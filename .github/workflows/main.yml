@@ -39,6 +39,11 @@ jobs:
         path: 'ros_ws/src/qpOASES'
         repository: SemRoCo/qpOASES
         ref: noetic
+    - name: Checkout qpoases
+      uses: actions/checkout@v2
+      with:
+        path: 'ros_ws/src/iai_pr2'
+        repository: code-iai/iai_pr2
     - name: Setup Giskard workspace
       uses: betwo/github-setup-catkin@master
       env:

@@ -79,10 +79,15 @@ jobs:
       shell: bash
       run: |
         export ROS_HOSTNAME=localhost
-        roscore &
         source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
-        cd $GITHUB_WORKSPACE/ros_ws/src/giskardpy
+        roscore &
+        roscd iai_pr2_description
+        cd launch
+        ls
+        roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestConstraints::test_align_planes1
+    - name: Setup upterm session
+      uses: lhotari/action-upterm@v1
 #     - name: Report plunit results as Github Actions Annotations
 #       uses: daniel86/junit-report-annotations-action@master
 #       with:

@@ -95,6 +95,6 @@ jobs:
         ls
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestConstraints::test_align_planes1
-    - name: Setup upterm session
-      if: always()
-      uses: lhotari/action-upterm@v1
+#     - name: Setup upterm session
+#       if: always()
+#       uses: lhotari/action-upterm@v1

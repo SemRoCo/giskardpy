@@ -3,7 +3,6 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import product
 from queue import Queue
-from time import time
 from xml.etree.ElementTree import ParseError
 
 import rospy
@@ -11,16 +10,15 @@ from py_trees import Status
 from py_trees.meta import running_is_success
 from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
-import giskardpy.utils.tfwrapper as tf
+
 import giskardpy.casadi_wrapper as w
-import giskardpy.identifier as identifier
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup
-from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.model.world import SubWorldTree
+from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames

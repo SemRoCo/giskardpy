@@ -1,12 +1,9 @@
-import numbers
 import traceback
-from copy import deepcopy
 from functools import cached_property
 from itertools import combinations
 from typing import Dict, Union, Tuple, Set, Optional, List
 
 import numpy as np
-import rospy
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
 from std_msgs.msg import ColorRGBA
@@ -17,7 +14,6 @@ from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates, KeyDefaultDict
-from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException
 from giskardpy.god_map import GodMap
@@ -25,6 +21,7 @@ from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
     PrismaticJoint, RevoluteJoint, ContinuousJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform

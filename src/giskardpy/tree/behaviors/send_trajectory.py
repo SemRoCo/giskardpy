@@ -1,17 +1,16 @@
-from typing import List, Optional
+from typing import List
 
 import control_msgs
 from rospy import ROSException
 from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 
-from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
 from giskardpy.model.joints import OneDofJoint, MimicJoint, OmniDrive
-from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy.my_types import PrefixName
 
 try:
     import pr2_controllers_msgs.msg
@@ -28,7 +27,7 @@ import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard, \
+from giskardpy.utils.utils import raise_to_blackboard, \
     catch_and_raise_to_blackboard
 
 

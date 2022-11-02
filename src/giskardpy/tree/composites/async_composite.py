@@ -4,11 +4,10 @@ from threading import RLock, Thread
 from time import time
 
 import rospy
-from py_trees import Status, Blackboard
+from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
 from giskardpy.utils.utils import raise_to_blackboard
 
 

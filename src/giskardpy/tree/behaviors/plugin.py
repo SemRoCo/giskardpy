@@ -3,13 +3,13 @@ from typing import Dict
 
 from py_trees import Behaviour, Blackboard
 
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
-import giskardpy.utils.tfwrapper as tf
 
 
 class GiskardBehavior(Behaviour):

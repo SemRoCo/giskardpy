@@ -6,7 +6,6 @@ from giskardpy.exceptions import *
 from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class SetErrorCode(GiskardBehavior):

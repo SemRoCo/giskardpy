@@ -1,9 +1,9 @@
+import re
+
+import pkg_resources
 import rospkg
 
 from giskardpy.utils import logging
-import pkg_resources
-import re
-
 from giskardpy.utils.config_loader import get_ros_pkg_path
 
 r = rospkg.RosPack()

@@ -4,11 +4,9 @@ from typing import Optional
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
-from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.god_map import GodMap
-from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
+from giskardpy import casadi_wrapper as w
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 
 
 class DiffDriveTangentialToPoint(Goal):

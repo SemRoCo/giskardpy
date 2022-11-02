@@ -3,10 +3,8 @@ from multiprocessing import Lock
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-import giskardpy.utils.tfwrapper as tf
 from giskardpy.exceptions import SelfCollisionViolatedException
 from giskardpy.model.collision_world_syncer import Collisions
-from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard, catch_and_raise_to_blackboard
 

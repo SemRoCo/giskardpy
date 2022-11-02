@@ -1,6 +1,8 @@
-from giskard_msgs.msg import WorldBody
-from shape_msgs.msg import SolidPrimitive
 import numpy as np
+from shape_msgs.msg import SolidPrimitive
+
+from giskard_msgs.msg import WorldBody
+
 
 def robot_name_from_urdf_string(urdf_string):
     return urdf_string.split('robot name="')[1].split('"')[0]

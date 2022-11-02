@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from enum import Enum, IntEnum
+from enum import IntEnum
 from typing import Union, Dict
-import genpy
 
 import casadi as ca
+import genpy
 
 
 class PrefixName:

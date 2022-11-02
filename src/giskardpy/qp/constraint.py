@@ -1,5 +1,6 @@
 from collections import namedtuple
 from typing import List, Union, Optional, Callable
+
 import giskardpy.casadi_wrapper as w
 from giskardpy.my_types import expr_symbol
 

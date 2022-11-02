@@ -1,10 +1,6 @@
 from typing import List, Tuple
 
-import numpy as np
-import rospy
 from py_trees import Status
-from tf.transformations import rotation_from_matrix
-from tf2_py import LookupException
 
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.math import compare_poses

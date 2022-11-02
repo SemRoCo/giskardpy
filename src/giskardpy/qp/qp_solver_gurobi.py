@@ -1,10 +1,10 @@
-import numpy as np
 import gurobipy
+import numpy as np
 from scipy import sparse
 
 from giskardpy.exceptions import QPSolverException, InfeasibleException
-from giskardpy.utils import logging
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.utils import logging
 
 gurobipy.setParam('LogToConsole', False)
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import os
 
 import numpy as np
@@ -9,9 +10,9 @@ from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskard_msgs.msg import WorldBody
-from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
+from giskardpy.my_types import PrefixName
 from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import resolve_ros_iris

@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import numpy as np
-from geometry_msgs.msg import Quaternion, Point, Twist
+from geometry_msgs.msg import Quaternion, Point
 from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
 
 

@@ -1,7 +1,7 @@
 import py_trees
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
-import giskardpy.utils.tfwrapper as tf
+
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 

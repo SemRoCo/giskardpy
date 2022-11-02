@@ -1,17 +1,14 @@
 from itertools import chain
-from time import time
 from typing import Dict
 
 from py_trees import Status
 
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
-from giskardpy.exceptions import GiskardException, EmptyProblemException
-from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.joint_goals import SetSeedConfiguration, SetOdometry
+from giskardpy.exceptions import EmptyProblemException
+from giskardpy.goals.goal import Goal
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 

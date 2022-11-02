@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 from collections import defaultdict, deque
 from copy import deepcopy
 from typing import Optional, Dict
 
 from sensor_msgs.msg import JointState
 
-from giskardpy.my_types import my_string, PrefixName, Derivatives
+from giskardpy.my_types import PrefixName, Derivatives
 
 
 class KeyDefaultDict(defaultdict):

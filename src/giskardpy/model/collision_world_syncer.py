@@ -1,7 +1,7 @@
 from collections import defaultdict
 from itertools import product, combinations_with_replacement, combinations
 from time import time
-from typing import List, Dict, Tuple, Optional, Set
+from typing import List, Dict, Optional
 
 import numpy as np
 from sortedcontainers import SortedKeyList
@@ -12,7 +12,6 @@ from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
-from giskardpy.model.links import Link
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string

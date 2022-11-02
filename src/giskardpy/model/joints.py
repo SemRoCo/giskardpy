@@ -4,15 +4,12 @@ from typing import Dict, Tuple, Optional, List
 
 import numpy as np
 import urdf_parser_py.urdf as up
-from tf.transformations import quaternion_about_axis, quaternion_multiply
 
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.my_types import PrefixName
-from giskardpy.god_map import GodMap
 from giskardpy.my_types import my_string, expr_symbol, expr_matrix, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.utils.math import axis_angle_from_quaternion, quaternion_from_axis_angle, qv_mult
 from giskardpy.utils.utils import blackboard_god_map
 
 

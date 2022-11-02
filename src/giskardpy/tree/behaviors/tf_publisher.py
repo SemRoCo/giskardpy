@@ -1,12 +1,8 @@
-from enum import Enum
-
 import rospy
 from geometry_msgs.msg import TransformStamped
 from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
-import giskardpy.identifier as identifier
-import giskardpy.utils.tfwrapper as tf
 from giskardpy.configs.data_types import TfPublishingModes
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg

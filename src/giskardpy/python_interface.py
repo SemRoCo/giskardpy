@@ -1,17 +1,18 @@
 import json
 from typing import Dict, Tuple, Optional, Union, List
+
 import rospy
 from actionlib import SimpleActionClient
 from genpy import Message
-from rospy import ServiceException
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
-from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
+from rospy import ServiceException
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, MoveFeedback
+from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
 from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \

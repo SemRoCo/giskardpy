@@ -1,10 +1,5 @@
 from __future__ import division
 
-import subprocess
-from typing import Optional
-
-import roslaunch
-from genpy import Message
 import errno
 import inspect
 import json
@@ -17,13 +12,15 @@ from contextlib import contextmanager
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
-import pybullet
+
 import matplotlib.colors as mcolors
 import numpy as np
 import pylab as plt
+import roslaunch
 import rospkg
 import rospy
 import trimesh
+from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import Status, Blackboard

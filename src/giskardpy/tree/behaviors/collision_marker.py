@@ -2,12 +2,11 @@ from typing import List, Set, Union
 
 import numpy as np
 import rospy
-from colour import Color
 from geometry_msgs.msg import Point, Vector3
 from py_trees import Status
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
-import giskardpy.utils.tfwrapper as tf
+
 import giskardpy.identifier as identifier
 from giskardpy.model.collision_world_syncer import Collision, Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

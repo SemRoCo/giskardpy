@@ -44,14 +44,17 @@ jobs:
       with:
         # Version range or exact version of ROS version to use, using SemVer's version range syntax. 
         ros-version: noetic
+        build-tool: 'catkin_tools'
         # Root directory of the catkin workspace
         workspace: $GITHUB_WORKSPACE/ros_ws
     - name: Build Giskard workspace
       shell: bash
       run: |
-        sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada catkin-tools pytest
+        sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada pytest
         sudo apt install python3-dev ros-noetic-pr2-description
         cd ros_ws
+        python -m pytest --version
+        dpkg -l | grep tf
         catkin build
     - name: Run Giskard
       shell: bash

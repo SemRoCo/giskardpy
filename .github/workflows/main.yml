@@ -49,8 +49,8 @@ jobs:
     - name: Build KnowRob workspace
       shell: bash
       run: |
-        sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada catkin-tools
-        sudo apt install python3-dev 
+        sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada catkin-tools pytest
+        sudo apt install python3-dev ros-noetic-pr2-description
         cd ros_ws
         catkin build
     - name: Run Giskard
@@ -60,7 +60,7 @@ jobs:
         roscore &
         source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
         cd $GITHUB_WORKSPACE/ros_ws/src/giskardpy
-        py.test -s test/test_integration_pr2.py::TestConstraints::test_align_planes1
+        pytest -s test/test_integration_pr2.py::TestConstraints::test_align_planes1
 #     - name: Report plunit results as Github Actions Annotations
 #       uses: daniel86/junit-report-annotations-action@master
 #       with:

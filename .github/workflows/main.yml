@@ -26,6 +26,8 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: 'ros_ws/src/giskardpy' 
+        repository: SemRoCo/giskardpy
+        ref: devel
     - name: Checkout giskard msgs
       uses: actions/checkout@v2
       with:

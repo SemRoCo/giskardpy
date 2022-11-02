@@ -35,7 +35,8 @@ jobs:
       uses: actions/checkout@v2
       with:
         path: 'ros_ws/src/qpOASES'
-        repository: SemRoCo/qpOASES/tree/noetic
+        repository: SemRoCo/qpOASES
+        ref: noetic
     - name: Setup Giskard workspace
       uses: betwo/github-setup-catkin@master
       env:

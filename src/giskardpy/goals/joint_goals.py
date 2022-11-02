@@ -1,18 +1,16 @@
 from __future__ import division
 
-from typing import Union, Dict, Optional, List
+from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped
 from pybullet import getAxisAngleFromQuaternion
-from sensor_msgs.msg import JointState
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.default_giskard import ControlModes
-from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
-from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OmniDrive, DiffDrive
+from giskardpy.my_types import PrefixName
 
 
 class SetSeedConfiguration(Goal, NonMotionGoal):

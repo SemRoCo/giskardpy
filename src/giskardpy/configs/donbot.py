@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 from std_msgs.msg import ColorRGBA
 
 from giskardpy.configs.data_types import ControlModes

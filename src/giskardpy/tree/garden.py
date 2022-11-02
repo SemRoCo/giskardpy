@@ -5,7 +5,7 @@ from typing import Type, TypeVar, Union
 import py_trees
 import pydot
 import rospy
-from py_trees import Behaviour, Chooser, common, Composite
+from py_trees import Chooser, common, Composite
 from py_trees import Selector, Sequence
 from py_trees_ros.trees import BehaviourTree
 from sortedcontainers import SortedList
@@ -50,11 +50,9 @@ from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
-from giskardpy.tree.behaviors.shaking_detector import WiggleCancel
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
-from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
+from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.time_real import RosTime
@@ -63,11 +61,7 @@ from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
-from giskardpy.utils.config_loader import get_namespaces
-from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
-from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import create_path
-from giskardpy.utils.utils import create_path, resolve_ros_iris
 from giskardpy.utils.utils import get_all_classes_in_package
 
 T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])

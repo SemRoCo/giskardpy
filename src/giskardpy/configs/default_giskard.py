@@ -1,24 +1,23 @@
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict, Optional, List, Union, Tuple
+from typing import Dict, Optional, List
 
+import numpy as np
+import rospy
 from numpy.typing import NDArray
+from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
 from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
-import numpy as np
-import rospy
-from py_trees import Blackboard
-
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
     TfPublishingModes, CollisionAvoidanceConfigEntry
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
-from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives
 from giskardpy.qp.qp_solver import QPSolver

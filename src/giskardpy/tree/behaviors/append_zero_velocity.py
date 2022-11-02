@@ -1,6 +1,5 @@
 from py_trees import Status
 
-import giskardpy.identifier as identifier
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 

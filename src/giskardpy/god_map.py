@@ -8,9 +8,8 @@ import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
     Quaternion
 
-from giskardpy import casadi_wrapper as w, identifier
+from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import KeyDefaultDict
-from giskardpy.model.utils import robot_name_from_urdf_string
 
 
 def set_default_in_override_block(block_identifier, god_map):

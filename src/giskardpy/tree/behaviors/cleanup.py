@@ -1,10 +1,7 @@
-from copy import deepcopy
-
 from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.model.collision_world_syncer import Collisions
-from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 

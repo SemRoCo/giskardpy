@@ -3,9 +3,11 @@ import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.utils import logging
 from giskardpy.exceptions import ShakingException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils import logging
+
+
 # fast
 # from giskardpy.tree.goal_reached import make_velocity_threshold
 

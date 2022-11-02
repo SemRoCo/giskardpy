@@ -3,18 +3,14 @@ from __future__ import division
 from typing import Optional
 
 import numpy as np
-from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped, Vector3Stamped
-from copy import deepcopy
-
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
+from geometry_msgs.msg import Vector3Stamped
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.god_map import GodMap
-from giskardpy.model.joints import DiffDrive
-from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix, normalize
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.model.joints import DiffDrive
 from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import normalize
 
 
 class CartesianPosition(Goal):

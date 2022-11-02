@@ -3,8 +3,8 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.utils import logging
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils import logging
 
 
 # fast

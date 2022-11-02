@@ -3,7 +3,6 @@ from __future__ import division
 from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped
-from pybullet import getAxisAngleFromQuaternion
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.default_giskard import ControlModes
@@ -11,6 +10,7 @@ from giskardpy.exceptions import ConstraintException, ConstraintInitalizationExc
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.my_types import PrefixName
+from giskardpy.utils.math import axis_angle_from_quaternion
 
 
 class SetSeedConfiguration(Goal, NonMotionGoal):
@@ -51,10 +51,10 @@ class SetOdometry(Goal, NonMotionGoal):
         base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
         self.world.state[brumbrum_joint.x_name].position = base_pose.position.x
         self.world.state[brumbrum_joint.y_name].position = base_pose.position.y
-        axis, angle = getAxisAngleFromQuaternion([base_pose.orientation.x,
-                                                  base_pose.orientation.y,
-                                                  base_pose.orientation.z,
-                                                  base_pose.orientation.w])
+        axis, angle = axis_angle_from_quaternion(base_pose.orientation.x,
+                                                 base_pose.orientation.y,
+                                                 base_pose.orientation.z,
+                                                 base_pose.orientation.w)
         if axis[-1] < 0:
             angle = -angle
         self.world.state[brumbrum_joint.yaw_name].position = angle

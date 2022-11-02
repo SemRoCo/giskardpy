@@ -30,12 +30,12 @@ jobs:
       uses: actions/checkout@v2
       with:
         path: 'ros_ws/src/giskard_msgs'
-        repository: https://github.com/SemRoCo/giskard_msgs
+        repository: SemRoCo/giskard_msgs
     - name: Checkout qpoases
       uses: actions/checkout@v2
       with:
         path: 'ros_ws/src/qpOASES'
-        repository: https://github.com/SemRoCo/qpOASES/tree/noetic
+        repository: SemRoCo/qpOASES/tree/noetic
     - name: Setup Giskard workspace
       uses: betwo/github-setup-catkin@master
       env:

@@ -51,6 +51,7 @@
   <exec_depend>py_trees</exec_depend>
   <exec_depend>py_trees_ros</exec_depend>
   <exec_depend>tf</exec_depend>
+  <exec_depend>tf2</exec_depend>
   <exec_depend>python3-pykdl</exec_depend>
   <exec_depend>rospy_message_converter</exec_depend>
   <exec_depend condition="$ROS_PYTHON_VERSION == 2">python-pytest</exec_depend>

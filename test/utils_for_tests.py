@@ -18,7 +18,6 @@ from hypothesis.strategies import composite
 from numpy import pi
 from rospy import Timer
 from sensor_msgs.msg import JointState
-from sortedcontainers import SortedKeyList
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
@@ -42,7 +41,6 @@ from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
-from iai_naive_kinematics_sim.srv import SetJointStateRequest, UpdateTransform, UpdateTransformRequest
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -232,8 +230,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
-        self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-                                                       UpdateTransform)
+        # self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+        #                                                UpdateTransform)
 
         self.giskard = config_file()
         self.giskard.grow()
@@ -273,14 +271,15 @@ class GiskardTestWrapper(GiskardWrapper):
                            seed_configuration=seed_configuration)
 
     def set_localization(self, map_T_odom: PoseStamped):
-        map_T_odom.pose.position.z = 0
-        req = UpdateTransformRequest()
-        req.transform.translation = map_T_odom.pose.position
-        req.transform.rotation = map_T_odom.pose.orientation
-        assert self.set_localization_srv(req).success
-        self.wait_heartbeats(15)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
-        compare_poses(p2.pose, map_T_odom.pose)
+        pass
+        # map_T_odom.pose.position.z = 0
+        # req = UpdateTransformRequest()
+        # req.transform.translation = map_T_odom.pose.position
+        # req.transform.rotation = map_T_odom.pose.orientation
+        # assert self.set_localization_srv(req).success
+        # self.wait_heartbeats(15)
+        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+        # compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
@@ -430,17 +429,18 @@ class GiskardTestWrapper(GiskardWrapper):
                                                  decimal=decimal))
 
     def teleport_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                      goal_pose.pose.orientation.y,
-                                                                      goal_pose.pose.orientation.z,
-                                                                      goal_pose.pose.orientation.w]))[0]}
-        goal = SetJointStateRequest()
-        goal.state = position_dict_to_joint_states(js)
-        # self.set_base.call(goal)
-        rospy.sleep(0.5)
+        pass
+        # goal_pose = tf.transform_pose(self.default_root, goal_pose)
+        # js = {'odom_x_joint': goal_pose.pose.position.x,
+        #       'odom_y_joint': goal_pose.pose.position.y,
+        #       'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+        #                                                               goal_pose.pose.orientation.y,
+        #                                                               goal_pose.pose.orientation.z,
+        #                                                               goal_pose.pose.orientation.w]))[0]}
+        # goal = SetJointStateRequest()
+        # goal.state = position_dict_to_joint_states(js)
+        # # self.set_base.call(goal)
+        # rospy.sleep(0.5)
 
     def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, tip_group=None, root_group=None,
                           weight=None, max_velocity=None, check=False,

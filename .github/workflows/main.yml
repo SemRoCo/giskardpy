@@ -56,7 +56,7 @@ jobs:
     - name: install python deps
       shell: bash
       run: |
-        sudo pip3 install numpy==1.22.2 scipy casadi sortedcontainers hypothesis pandas trimesh colour pycollada pytest catkin_tools matplotlib
+        sudo pip3 install numpy==1.22.2 scipy casadi sortedcontainers hypothesis pandas trimesh colour pycollada pytest catkin_tools
         python -m pytest --version
     - name: install Giskard deps
       shell: bash

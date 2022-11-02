@@ -49,7 +49,6 @@
   <exec_depend>giskard_msgs</exec_depend>
   <exec_depend>control_msgs</exec_depend>
   <exec_depend>py_trees</exec_depend>
-  <exec_depend>py_trees</exec_depend>
   <exec_depend>py_trees_ros</exec_depend>
   <exec_depend>tf</exec_depend>
   <exec_depend>tf2</exec_depend>

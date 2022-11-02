@@ -60,11 +60,16 @@ jobs:
       shell: bash
       run: |
         sudo apt install python3-dev ros-noetic-pr2-description
+    - name: ros dep
+      shell: bash
+      run: |
         cd ros_ws
         rosdep install --ignore-src --from-paths .
+        dpkg -l | grep tree
     - name: build Giskard
       shell: bash
       run: |
+        cd ros_ws
         catkin build
     - name: Run Giskard
       shell: bash

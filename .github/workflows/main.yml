@@ -9,7 +9,7 @@ on:
       logLevel:
         description: 'Log level'
         required: true
-        default: 'warning'
+        default: 'info'
         type: choice
         options:
         - info
@@ -47,14 +47,24 @@ jobs:
         build-tool: 'catkin_tools'
         # Root directory of the catkin workspace
         workspace: $GITHUB_WORKSPACE/ros_ws
-    - name: Build Giskard workspace
+#     - name: Setup ROS noetic environment
+#       uses: ros-tooling/setup-ros@0.4.1
+#       with:
+#         required-ros-distributions: noetic
+    - name: install python deps
       shell: bash
       run: |
-        sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada pytest
+        sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada pytest catkin_tools
+        python -m pytest --version
+    - name: install Giskard deps
+      shell: bash
+      run: |
         sudo apt install python3-dev ros-noetic-pr2-description
         cd ros_ws
-        python -m pytest --version
-        dpkg -l | grep tf
+        rosdep install --ignore-src --from-paths .
+    - name: build Giskard
+      shell: bash
+      run: |
         catkin build
     - name: Run Giskard
       shell: bash

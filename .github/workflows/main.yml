@@ -81,6 +81,8 @@ jobs:
       shell: bash
       run: |
         cd ros_ws
+        touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
+        touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
         catkin build
     - name: Run Giskard
       shell: bash

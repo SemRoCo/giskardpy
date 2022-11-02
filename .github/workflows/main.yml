@@ -53,14 +53,21 @@ jobs:
 #       uses: ros-tooling/setup-ros@0.4.1
 #       with:
 #         required-ros-distributions: noetic
+#     - name: Checkout iai_pr2
+#       shell: bash
+#       run: |
+#         cd $GITHUB_WORKSPACE/ros_ws/src/
+#         git clone https://github.com/code-iai/iai_pr2.git
+#         git checkout 
+#         touch iai_pr2/iai_pr2_sim/CATKIN_IGNORE
+#         touch iai_pr2/iai_pr2_bringup/CATKIN_IGNORE
+#         touch iai_pr2/iai_pr2_controller_configuration/CATKIN_IGNORE
     - name: Checkout iai_pr2
-      shell: bash
-      run: |
-        cd $GITHUB_WORKSPACE/ros_ws/src/
-        git clone https://github.com/code-iai/iai_pr2.git
-        touch iai_pr2/iai_pr2_sim/CATKIN_IGNORE
-        touch iai_pr2/iai_pr2_bringup/CATKIN_IGNORE
-        touch iai_pr2/iai_pr2_controller_configuration/CATKIN_IGNORE
+      uses: actions/checkout@v2
+      with:
+        path: 'ros_ws/src/iai_pr2'
+        repository: code-iai/iai_pr2
+        ref: mujoco_sim_setup
     - name: install python deps
       shell: bash
       run: |
@@ -75,8 +82,6 @@ jobs:
       run: |
         cd ros_ws
         catkin build
-    - name: Setup upterm session
-      uses: lhotari/action-upterm@v1
     - name: Run Giskard
       shell: bash
       run: |
@@ -88,3 +93,6 @@ jobs:
         ls
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestConstraints::test_align_planes1
+    - name: Setup upterm session
+      if: always()
+      uses: lhotari/action-upterm@v1

@@ -8,7 +8,7 @@ Giskard is an open source motion planning framework for ROS, which uses constrai
 sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada catkin-tools
 sudo apt install python3-dev 
 ```
-
+test
 #### Gurobi
 This step is optional but recommanded because Gurobi is significantly faster than QPOases, but it requires a license.
 If Gurobi is not installed, Giskard will use QPOases automatically as a backup.

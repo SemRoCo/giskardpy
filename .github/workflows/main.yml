@@ -23,6 +23,9 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
+    - name: Setup upterm session
+      if: always()
+      uses: lhotari/action-upterm@v1
     - uses: actions/checkout@v2
       with:
         path: 'ros_ws/src/giskardpy' 
@@ -95,9 +98,6 @@ jobs:
 #       run: |
 #         mkdir betterpybullet
 #         ./scripts/build_better_pybullet.sh /betterpybullet
-    - name: Setup upterm session
-      if: always()
-      uses: lhotari/action-upterm@v1
 #     - name: Run Giskard
 #       shell: bash
 #       run: |

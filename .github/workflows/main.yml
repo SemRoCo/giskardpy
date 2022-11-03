@@ -60,7 +60,7 @@ jobs:
       with:
         path: 'ros_ws/src/iai_maps'
         repository: code-iai/iai_maps
-        ref: mujoco_sim_setup
+        ref: master
 #     - name: install python deps
 #       shell: bash
 #       run: |

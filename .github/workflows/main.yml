@@ -1,9 +1,9 @@
 name: CI
 on:
-  push:
-    branches: [ devel ]
-  pull_request:
-    branches: [ devel ]
+#   push:
+#     branches: [ devel ]
+#   pull_request:
+#     branches: [ devel ]
   workflow_dispatch:
     inputs:
       logLevel:
@@ -23,9 +23,6 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
-    - name: Setup upterm session
-      if: always()
-      uses: lhotari/action-upterm@v1
     - uses: actions/checkout@v2
       with:
         path: 'ros_ws/src/giskardpy' 
@@ -52,19 +49,6 @@ jobs:
         build-tool: 'catkin_tools'
         # Root directory of the catkin workspace
         workspace: $GITHUB_WORKSPACE/ros_ws
-#     - name: Setup ROS noetic environment
-#       uses: ros-tooling/setup-ros@0.4.1
-#       with:
-#         required-ros-distributions: noetic
-#     - name: Checkout iai_pr2
-#       shell: bash
-#       run: |
-#         cd $GITHUB_WORKSPACE/ros_ws/src/
-#         git clone https://github.com/code-iai/iai_pr2.git
-#         git checkout 
-#         touch iai_pr2/iai_pr2_sim/CATKIN_IGNORE
-#         touch iai_pr2/iai_pr2_bringup/CATKIN_IGNORE
-#         touch iai_pr2/iai_pr2_controller_configuration/CATKIN_IGNORE
     - name: Checkout iai_pr2
       uses: actions/checkout@v2
       with:
@@ -77,11 +61,11 @@ jobs:
         path: 'ros_ws/src/iai_maps'
         repository: code-iai/iai_maps
         ref: mujoco_sim_setup
-    - name: install python deps
-      shell: bash
-      run: |
-        sudo pip3 install numpy==1.22.2 scipy casadi sortedcontainers hypothesis pandas trimesh colour pycollada pytest catkin_tools
-        python -m pytest --version
+#     - name: install python deps
+#       shell: bash
+#       run: |
+#         sudo pip3 install numpy==1.22.2 scipy casadi sortedcontainers hypothesis pandas trimesh colour pycollada pytest catkin_tools
+#         python -m pytest --version
     - name: install Giskard deps
       shell: bash
       run: |
@@ -98,17 +82,17 @@ jobs:
 #       run: |
 #         mkdir betterpybullet
 #         ./scripts/build_better_pybullet.sh /betterpybullet
-#     - name: Run Giskard
-#       shell: bash
-#       run: |
-#         export ROS_HOSTNAME=localhost
-#         source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
-#         roscore &
-#         roscd iai_pr2_description
-#         cd launch
-#         ls
-#         roscd giskardpy
-#         python3 -m pytest -s test/test_integration_pr2.py::TestConstraints
+    - name: Run Giskard
+      shell: bash
+      run: |
+        export ROS_HOSTNAME=localhost
+        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+        roscore &
+        roscd iai_pr2_description
+        cd launch
+        ls
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_pr2.py::TestConstraints::test_open_fridge
     - name: Setup upterm session
       if: always()
       uses: lhotari/action-upterm@v1

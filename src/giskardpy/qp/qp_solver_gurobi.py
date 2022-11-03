@@ -40,8 +40,10 @@ error_info = {
                                  "bound), and that limit has been reached.",
 }
 
+
 class QPSolverGurobi(QPSolver):
-    STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if '__' not in name}
+    STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if
+                         '__' not in name}
 
     def __init__(self):
         self.started = False
@@ -92,18 +94,18 @@ class QPSolverGurobi(QPSolver):
                     logging.logwarn('warning, suboptimal!')
                 self.xdot_full = np.array(self.qpProblem.X)
                 break
-            elif success in {gurobipy.GRB.NUMERIC} and i < tries-1:
+            elif success in {gurobipy.GRB.NUMERIC} and i < tries - 1:
                 self.print_debug()
                 logging.logwarn('Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
                     self.STATUS_VALUE_DICT[success],
                     decimal_places
                 ))
-                H = self.round(H,decimal_places)
-                A = self.round(A,decimal_places)
-                lb = self.round(lb,decimal_places)
-                ub = self.round(ub,decimal_places)
-                lbA = self.round(lbA,decimal_places)
-                ubA = self.round(ubA,decimal_places)
+                H = self.round(H, decimal_places)
+                A = self.round(A, decimal_places)
+                lb = self.round(lb, decimal_places)
+                ub = self.round(ub, decimal_places)
+                lbA = self.round(lbA, decimal_places)
+                ubA = self.round(ubA, decimal_places)
         else:
             # self.print_debug()
             self.started = False

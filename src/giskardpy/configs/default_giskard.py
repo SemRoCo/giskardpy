@@ -13,14 +13,13 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
-    TfPublishingModes, CollisionAvoidanceConfigEntry
+    TfPublishingModes, CollisionAvoidanceConfigEntry, SupportedQPSolver
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives
-from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
@@ -91,7 +90,7 @@ class Giskard:
         urdf = rospy.get_param(parameter_name)
         self.add_robot_urdf(urdf, group_name=group_name, joint_state_topics=joint_state_topics)
 
-    def configure_VisualizationBehavior(self, enabled=True, in_planning_loop=False):
+    def configure_VisualizationBehavior(self, enabled: bool = True, in_planning_loop: bool = False):
         """
         :param enabled: whether Giskard should publish markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
@@ -100,7 +99,7 @@ class Giskard:
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
 
-    def configure_CollisionMarker(self, enabled=True, in_planning_loop=False):
+    def configure_CollisionMarker(self, enabled: bool = True, in_planning_loop: bool = False):
         """
         :param enabled: whether Giskard should publish collision markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
@@ -108,6 +107,14 @@ class Giskard:
         """
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
+
+    def configure_trajectory_plotting(self, enabled: bool = False, normalize_position: bool = False):
+        self.behavior_tree_config.plugin_config['PlotTrajectory']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
+
+    def configure_debug_trajectory_plotting(self, enabled: bool = False, normalize_position: bool = False):
+        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['normalize_position'] = normalize_position
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """
@@ -589,7 +596,7 @@ class Giskard:
         """
         self._qp_solver_config.prediction_horizon = new_prediction_horizon
 
-    def set_qp_solver(self, new_solver: QPSolver):
+    def set_qp_solver(self, new_solver: SupportedQPSolver):
         self._qp_solver_config.qp_solver = new_solver
 
     def set_default_joint_limits(self,

@@ -109,7 +109,7 @@ class QPSolverQPOases(QPSolver):
                 nWSR = None
                 self.started = False
             else:
-                logging.loginfo(f'{self.STATUS_VALUE_DICT[success]}; retying with default mode.')
+                logging.loginfo(f'{self.STATUS_VALUE_DICT[success]}; retrying with default mode.')
                 self.default = True
                 self.started = False
         else:  # if not break

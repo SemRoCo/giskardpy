@@ -39,16 +39,6 @@ jobs:
         path: 'ros_ws/src/qpOASES'
         repository: SemRoCo/qpOASES
         ref: noetic
-    - name: Setup Giskard workspace
-      uses: betwo/github-setup-catkin@master
-      env:
-            ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-      with:
-        # Version range or exact version of ROS version to use, using SemVer's version range syntax. 
-        ros-version: noetic
-        build-tool: 'catkin_tools'
-        # Root directory of the catkin workspace
-        workspace: $GITHUB_WORKSPACE/ros_ws
     - name: Checkout iai_pr2
       uses: actions/checkout@v2
       with:
@@ -61,6 +51,16 @@ jobs:
         path: 'ros_ws/src/iai_maps'
         repository: code-iai/iai_maps
         ref: master
+    - name: Setup Giskard workspace
+      uses: betwo/github-setup-catkin@master
+      env:
+            ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      with:
+        # Version range or exact version of ROS version to use, using SemVer's version range syntax. 
+        ros-version: noetic
+        build-tool: 'catkin_tools'
+        # Root directory of the catkin workspace
+        workspace: $GITHUB_WORKSPACE/ros_ws
 #     - name: install python deps
 #       shell: bash
 #       run: |

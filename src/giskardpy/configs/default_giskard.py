@@ -326,6 +326,31 @@ class Giskard:
         self._backup = {'qp_solver_config': deepcopy(self._qp_solver_config),
                         'general_config': deepcopy(self._general_config)}
 
+    def _create_collision_checker(self, world):
+        if self._collision_checker == CollisionCheckerLib.bpb:
+            logging.loginfo('Using betterpybullet for collision checking.')
+            try:
+                from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
+                return BetterPyBulletSyncer(world)
+            except ImportError as e:
+                logging.logerr(f'{e}; turning of collision avoidance.')
+                self._collision_checker = CollisionCheckerLib.none
+        if self._collision_checker == CollisionCheckerLib.pybullet:
+            logging.loginfo('Using pybullet for collision checking.')
+            try:
+                from giskardpy.model.pybullet_syncer import PyBulletSyncer
+                return PyBulletSyncer(world)
+            except ImportError as e:
+                logging.logerr(f'{e}; turning of collision avoidance.')
+                self._collision_checker = CollisionCheckerLib.none
+        if self._collision_checker == CollisionCheckerLib.none:
+            logging.logwarn('Using no collision checking.')
+            from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+            return CollisionWorldSynchronizer(world)
+        if self._collision_checker not in CollisionCheckerLib:
+            raise KeyError(f'Unknown collision checker {self._collision_checker}. '
+                           f'Collision avoidance is disabled')
+
     def grow(self):
         """
         Initialize the behavior tree and world. You usually don't need to call this.
@@ -339,21 +364,7 @@ class Giskard:
         world.delete_all_but_robots()
         world.register_controlled_joints(self._controlled_joints)
 
-        if self._collision_checker == CollisionCheckerLib.bpb:
-            logging.loginfo('Using bpb for collision checking.')
-            from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-            collision_scene = BetterPyBulletSyncer(world)
-        elif self._collision_checker == CollisionCheckerLib.pybullet:
-            logging.loginfo('Using pybullet for collision checking.')
-            from giskardpy.model.pybullet_syncer import PyBulletSyncer
-            collision_scene = PyBulletSyncer(world)
-        elif self._collision_checker == CollisionCheckerLib.none:
-            logging.logwarn('Using no collision checking.')
-            from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-            collision_scene = CollisionWorldSynchronizer(world)
-        else:
-            raise KeyError(f'Unknown collision checker {self._collision_checker}. '
-                           f'Collision avoidance is disabled')
+        collision_scene = self._create_collision_checker(world)
         self._god_map.set_data(identifier.collision_checker, self._collision_checker)
         self._god_map.set_data(identifier.collision_scene, collision_scene)
         if self._general_config.control_mode == ControlModes.open_loop:

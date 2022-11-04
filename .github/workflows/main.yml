@@ -61,11 +61,11 @@ jobs:
         build-tool: 'catkin_tools'
         # Root directory of the catkin workspace
         workspace: $GITHUB_WORKSPACE/ros_ws
-#     - name: install python deps
-#       shell: bash
-#       run: |
-#         sudo pip3 install numpy==1.22.2 scipy casadi sortedcontainers hypothesis pandas trimesh colour pycollada pytest catkin_tools
-#         python -m pytest --version
+    - name: install python deps
+      shell: bash
+      run: |
+        sudo pip3 install numpy==1.23.4 pandas
+        python -m pytest --version
 #    - name: install Giskard deps
 #      shell: bash
 #      run: |

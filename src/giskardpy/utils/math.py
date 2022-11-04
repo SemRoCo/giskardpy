@@ -98,7 +98,7 @@ def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[
     if w2 == 0:
         angle = 0
     else:
-        angle = (2 * np.arccos(np.min(np.max(-1, w), 1)))
+        angle = (2 * np.arccos(min(max(-1, w), 1)))
     if w2 == 0:
         x = 0
         y = 0

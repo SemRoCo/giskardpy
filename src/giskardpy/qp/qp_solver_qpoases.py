@@ -94,8 +94,13 @@ class QPSolverQPOases(QPSolver):
                 continue
             else:
                 logging.loginfo('{}; retrying with A rounded to 5 decimal places'.format(self.STATUS_VALUE_DICT[success]))
-                r = 5
-                A = np.round(A, r)
+                decimal_places = 5
+                H = np.round(H, decimal_places)
+                A = np.round(A, decimal_places)
+                lb = np.round(lb, decimal_places)
+                ub = np.round(ub, decimal_places)
+                lbA = np.round(lbA, decimal_places)
+                ubA = np.round(ubA, decimal_places)
                 nWSR = None
                 self.started = False
         else:  # if not break

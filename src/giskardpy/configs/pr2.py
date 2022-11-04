@@ -1,4 +1,4 @@
-from giskardpy.configs.data_types import ControlModes
+from giskardpy.configs.data_types import ControlModes, SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard
 from giskardpy.my_types import Derivatives
 
@@ -6,6 +6,8 @@ from giskardpy.my_types import Derivatives
 class PR2_Base(Giskard):
     def __init__(self):
         super().__init__()
+        self.set_qp_solver(SupportedQPSolver.qp_oases)
+        self.configure_trajectory_plotting(enabled=True)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                       hard_threshold=0.0)

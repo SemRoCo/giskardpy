@@ -81,6 +81,8 @@ jobs:
       shell: bash
       run: |
         mkdir betterpybullet
+        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+        roscd giskardpy
         ./scripts/build_better_pybullet.sh /betterpybullet
     - name: Run Giskard
       shell: bash

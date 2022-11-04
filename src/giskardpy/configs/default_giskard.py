@@ -333,7 +333,7 @@ class Giskard:
                 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
                 return BetterPyBulletSyncer(world)
             except ImportError as e:
-                logging.logerr(f'{e}; turning of collision avoidance.')
+                logging.logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
         if self._collision_checker == CollisionCheckerLib.pybullet:
             logging.loginfo('Using pybullet for collision checking.')
@@ -341,7 +341,7 @@ class Giskard:
                 from giskardpy.model.pybullet_syncer import PyBulletSyncer
                 return PyBulletSyncer(world)
             except ImportError as e:
-                logging.logerr(f'{e}; turning of collision avoidance.')
+                logging.logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
         if self._collision_checker == CollisionCheckerLib.none:
             logging.logwarn('Using no collision checking.')

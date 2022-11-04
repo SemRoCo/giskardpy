@@ -91,6 +91,6 @@ jobs:
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestConstraints::test_open_fridge
     - name: Setup upterm session
-#      if: always()
-      if: failure()
+      if: always()
+#       if: failure()
       uses: lhotari/action-upterm@v1

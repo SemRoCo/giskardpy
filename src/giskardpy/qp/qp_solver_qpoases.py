@@ -18,12 +18,16 @@ class QPSolverQPOases(QPSolver):
         :type int
         """
         self.started = False
+        self.default = False
         self.shape = (0,0)
 
     def init(self, dim_a, dim_b):
         self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)
         options = qpoases.PyOptions()
-        options.setToMPC()
+        if self.default:
+            options.setToDefault()
+        else:
+            options.setToMPC()
         options.printLevel = qpoases.PyPrintLevel.NONE
         self.qpProblem.setOptions(options)
         self.xdot_full = np.zeros(dim_a)
@@ -41,6 +45,7 @@ class QPSolverQPOases(QPSolver):
         ub = ub.copy()
         if A.shape != self.shape:
             self.started = False
+            self.default = False
             self.shape = A.shape
 
         number_of_retries = 2
@@ -92,8 +97,8 @@ class QPSolverQPOases(QPSolver):
                 self.started = False
                 number_of_retries += 1
                 continue
-            else:
-                logging.loginfo('{}; retrying with A rounded to 5 decimal places'.format(self.STATUS_VALUE_DICT[success]))
+            elif number_of_retries == 1:
+                logging.loginfo(f'{self.STATUS_VALUE_DICT[success]}; retrying with A rounded to 5 decimal places')
                 decimal_places = 5
                 H = np.round(H, decimal_places)
                 A = np.round(A, decimal_places)
@@ -102,6 +107,10 @@ class QPSolverQPOases(QPSolver):
                 lbA = np.round(lbA, decimal_places)
                 ubA = np.round(ubA, decimal_places)
                 nWSR = None
+                self.started = False
+            else:
+                logging.loginfo(f'{self.STATUS_VALUE_DICT[success]}; retying with default mode.')
+                self.default = True
                 self.started = False
         else:  # if not break
             self.started = False

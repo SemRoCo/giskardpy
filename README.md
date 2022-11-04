@@ -5,7 +5,7 @@ Giskard is an open source motion planning framework for ROS, which uses constrai
 
 #### Python dependencies
 ```
-sudo pip3 install scipy casadi sortedcontainers hypothesis pandas numpy trimesh colour pycollada catkin-tools
+sudo pip3 install pandas numpy==1.23.4
 sudo apt install python3-dev 
 ```
 #### Gurobi

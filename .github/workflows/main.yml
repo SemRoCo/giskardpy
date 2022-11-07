@@ -77,13 +77,13 @@ jobs:
         touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
         touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
         catkin build
-    - name: build betterpybullet
-      shell: bash
-      run: |
-        mkdir betterpybullet
-        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
-        roscd giskardpy
-        ./scripts/build_better_pybullet.sh /betterpybullet
+#    - name: build betterpybullet
+#      shell: bash
+#      run: |
+#        mkdir betterpybullet
+#        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+#        roscd giskardpy
+#        ./scripts/build_better_pybullet.sh /betterpybullet
 #  pr2-TestConstraints:
     - name: Run Giskard
       shell: bash

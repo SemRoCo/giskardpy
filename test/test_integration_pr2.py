@@ -169,10 +169,10 @@ class PR2TestWrapper(GiskardTestWrapper):
         # compare_poses(p2.pose, map_T_odom.pose)
 
     def reset(self):
+        self.clear_world()
         self.open_l_gripper()
         self.open_r_gripper()
         self.reset_base()
-        self.clear_world()
         self.register_group('l_gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='l_wrist_roll_link')

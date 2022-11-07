@@ -294,6 +294,7 @@ class WorldUpdater(GiskardBehavior):
         self.added_plugin_names = defaultdict(list)
         self.world.state = tmp_state
         self.world.notify_state_change()
+        self.clear_markers()
         logging.loginfo('Cleared world.')
 
     def clear_markers(self):

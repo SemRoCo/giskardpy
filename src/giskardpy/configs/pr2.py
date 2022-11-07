@@ -8,7 +8,7 @@ class PR2_Base(Giskard):
         super().__init__()
         # self.set_collision_checker(CollisionCheckerLib.none)
         self.set_qp_solver(SupportedQPSolver.qp_oases)
-        self.configure_trajectory_plotting(enabled=True)
+        # self.configure_trajectory_plotting(enabled=True)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                       hard_threshold=0.0)

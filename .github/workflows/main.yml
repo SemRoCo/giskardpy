@@ -89,7 +89,7 @@ jobs:
         source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
         roscore &
         roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestConstraints::test_open_fridge
+        python3 -m pytest -s test/test_integration_pr2.py::TestConstraints
     - name: Setup upterm session
 #      if: always()
       if: failure()

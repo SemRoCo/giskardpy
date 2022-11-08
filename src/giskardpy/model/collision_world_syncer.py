@@ -525,7 +525,10 @@ class CollisionWorldSynchronizer:
                             del min_allowed_distance[r_key]
                     elif self.is_avoid_collision(collision_entry):
                         if key not in self.black_list:
-                            min_allowed_distance[key] = max(min_dist[key[0]], collision_entry.distance)
+                            if collision_entry.distance == -1:
+                                min_allowed_distance[key] = min_dist[key[0]]
+                            else:
+                                min_allowed_distance[key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
         return min_allowed_distance

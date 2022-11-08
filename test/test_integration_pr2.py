@@ -1723,41 +1723,6 @@ class TestCartGoals:
 
 
 class TestActionServerEvents:
-    def test_interrupt1(self, zero_pose: PR2TestWrapper):
-        p = PoseStamped()
-        p.header.frame_id = 'base_footprint'
-        p.pose.position = Point(1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, 'base_footprint')
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=1)
-
-    def test_interrupt2(self, zero_pose: PR2TestWrapper):
-        p = PoseStamped()
-        p.header.frame_id = 'base_footprint'
-        p.pose.position = Point(2, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, 'base_footprint')
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=6)
-
-    def test_undefined_type(self, zero_pose: PR2TestWrapper):
-        zero_pose.allow_all_collisions()
-        zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED,
-                            expected_error_codes=[MoveResult.INVALID_GOAL])
-
-    def test_empty_goal(self, zero_pose: PR2TestWrapper):
-        zero_pose.cmd_seq = []
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.INVALID_GOAL])
-
-    def test_plan_only(self, zero_pose: PR2TestWrapper):
-        zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(pocky_pose, check=False)
-        zero_pose.add_goal_check(JointGoalChecker(zero_pose, zero_pose.default_pose))
-        zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)
-
-
-class TestWayPoints:
     def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):
         # FIXME
         p = PoseStamped()
@@ -1801,6 +1766,41 @@ class TestWayPoints:
 
         zero_pose.plan_and_execute()
 
+    def test_interrupt1(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position = Point(1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=1)
+
+    def test_interrupt2(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position = Point(2, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=6)
+
+    def test_undefined_type(self, zero_pose: PR2TestWrapper):
+        zero_pose.allow_all_collisions()
+        zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED,
+                            expected_error_codes=[MoveResult.INVALID_GOAL])
+
+    def test_empty_goal(self, zero_pose: PR2TestWrapper):
+        zero_pose.cmd_seq = []
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.INVALID_GOAL])
+
+    def test_plan_only(self, zero_pose: PR2TestWrapper):
+        zero_pose.allow_self_collision()
+        zero_pose.set_joint_goal(pocky_pose, check=False)
+        zero_pose.add_goal_check(JointGoalChecker(zero_pose, zero_pose.default_pose))
+        zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)
+
+
+class TestWayPoints:
     def test_waypoints2(self, zero_pose: PR2TestWrapper):
         zero_pose.set_joint_goal(pocky_pose, check=False)
         zero_pose.allow_all_collisions()
@@ -2893,9 +2893,24 @@ class TestCollisionAvoidanceGoals:
         box_setup.avoid_collision(min_distance=0.15, group1=box_setup.l_gripper_group, group2='box')
         box_setup.avoid_collision(min_distance=0.10, group1=box_setup.r_gripper_group, group2='box')
         box_setup.allow_self_collision()
-        box_setup.plan_and_execute()
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = box_setup.default_root
+        base_goal.pose.orientation.w = 1
+        box_setup.move_base(base_goal)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.148)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.088)
+
+    def test_avoid_collision_lower_soft_threshold(self, box_setup: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = box_setup.default_root
+        base_goal.pose.position.x = 0.35
+        base_goal.pose.orientation.z = 1
+        box_setup.teleport_base(base_goal)
+        box_setup.avoid_collision(min_distance=0.05, group1=box_setup.robot_name)
+        box_setup.allow_self_collision()
+        box_setup.plan_and_execute()
+        box_setup.check_cpi_geq(['base_link'], 0.048)
+        box_setup.check_cpi_leq(['base_link'], 0.06)
 
     def test_collision_override(self, box_setup: PR2TestWrapper):
         p = PoseStamped()
@@ -3253,7 +3268,7 @@ class TestCollisionAvoidanceGoals:
                           parent_link=box_setup.r_tip,
                           pose=p)
         box_setup.plan_and_execute()
-        box_setup.check_cpi_geq([attached_link_name], 0.049)
+        box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.detach_group(attached_link_name)
 
     def test_attached_collision_with_box(self, box_setup: PR2TestWrapper):
@@ -3433,6 +3448,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.plan_and_execute()
 
     def test_bowl_and_cup(self, kitchen_setup: PR2TestWrapper):
+        # FIXME
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
         bowl_name = 'bowl'
         cup_name = 'cup'
@@ -3503,6 +3519,7 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.position.x = .1
         base_pose.pose.orientation.w = 1
         kitchen_setup.move_base(base_pose)
+        kitchen_setup.plan_and_execute()
 
         # grasp bowl
         l_goal = deepcopy(bowl_pose)
@@ -3541,6 +3558,7 @@ class TestCollisionAvoidanceGoals:
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
+        kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)
@@ -3568,6 +3586,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(goal_pose=bowl_goal, tip_link=bowl_name, root_link=kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
+        kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.detach_group(name=bowl_name)
@@ -3576,50 +3595,6 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
-
-    def test_ease_grasp_bowl(self, kitchen_setup: PR2TestWrapper):
-        percentage = 40
-
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = 'map'
-        base_pose.pose.position = Point(0.314, 0.818, 0.000)
-        base_pose.pose.orientation = Quaternion(-0.001, 0.000, 0.037, 0.999)
-        kitchen_setup.teleport_base(base_pose)
-
-        js = {
-            'torso_lift_joint': 0.262156255996,
-            'head_pan_joint': 0.0694220762479,
-            'head_tilt_joint': 1.01903547689,
-            'r_upper_arm_roll_joint': -1.5717499752,
-            'r_shoulder_pan_joint': -0.00156068057783,
-            'r_shoulder_lift_joint': 0.252786184819,
-            'r_forearm_roll_joint': -89.673490548,
-            'r_elbow_flex_joint': -0.544166310929,
-            'r_wrist_flex_joint': -1.32591140165,
-            'r_wrist_roll_joint': 65.7348048877,
-            'l_upper_arm_roll_joint': 1.38376171392,
-            'l_shoulder_pan_joint': 1.59536261129,
-            'l_shoulder_lift_joint': -0.0236488517104,
-            'l_forearm_roll_joint': 23.2795803857,
-            'l_elbow_flex_joint': -1.72694302293,
-            'l_wrist_flex_joint': -0.48001173639,
-            'l_wrist_roll_joint': -6.28312737965,
-        }
-        kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_joint_goal(js)
-        kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.45})
-
-        r_goal = PoseStamped()
-        r_goal.header.frame_id = kitchen_setup.r_tip
-        r_goal.pose.position.x += 0.25
-        r_goal.pose.orientation.w = 1
-
-        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
-        kitchen_setup.set_cart_goal(r_goal, tip_link=kitchen_setup.r_tip)
-        kitchen_setup.plan_and_execute()
-
-        # spawn cup
 
     def test_ease_spoon(self, kitchen_setup: PR2TestWrapper):
         spoon_name = 'spoon'
@@ -3819,9 +3794,7 @@ class TestInfoServices:
                     'r_upper_arm_roll_joint',
                     'r_wrist_flex_joint',
                     'r_wrist_roll_joint',
-                    'torso_lift_joint',
-                    'r_gripper_l_finger_joint',
-                    'l_gripper_l_finger_joint'}
+                    'torso_lift_joint'}
         assert set(result.controlled_joints) == expected
 
 # time: *[1-9].[1-9]* s

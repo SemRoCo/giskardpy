@@ -8,9 +8,15 @@ from giskardpy.my_types import my_string
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, link_name, robot_name, max_velocity=0.2, hard_threshold=0.0,
-                 soft_thresholds: Optional[Dict[my_string, float]] = None, idx=0,
-                 num_repeller=1, **kwargs):
+    def __init__(self,
+                 link_name: my_string,
+                 robot_name: str,
+                 max_velocity: float = 0.2,
+                 hard_threshold: float = 0.0,
+                 soft_thresholds: Optional[Dict[my_string, float]] = None,
+                 idx: int = 0,
+                 num_repeller: int = 1,
+                 **kwargs):
         """
         Don't use me
         """
@@ -95,18 +101,18 @@ class ExternalCollisionAvoidance(Goal):
                 link_b_hash = k[1].__hash__()
                 soft_threshold = w.if_eq(actual_link_b_hash, link_b_hash, v, soft_threshold)
 
+        hard_threshold = w.min(self.hard_threshold, soft_threshold / 2)
         lower_limit = soft_threshold - actual_distance
 
         lower_limit_limited = w.limit(lower_limit,
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, self.hard_threshold,
-                                   w.limit(soft_threshold - self.hard_threshold,
+        upper_slack = w.if_greater(actual_distance, hard_threshold,
+                                   w.limit(soft_threshold - hard_threshold,
                                            -qp_limits_for_lba,
                                            qp_limits_for_lba),
                                    lower_limit_limited)
-
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
 
@@ -191,6 +197,7 @@ class SelfCollisionAvoidance(Goal):
                                                                   (self.link_a, self.link_b)])
 
     def make_constraints(self):
+        hard_threshold = w.min(self.hard_threshold, self.soft_threshold / 2)
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
         sample_period = self.sample_period
@@ -218,8 +225,8 @@ class SelfCollisionAvoidance(Goal):
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, self.hard_threshold,
-                                   w.limit(self.soft_threshold - self.hard_threshold,
+        upper_slack = w.if_greater(actual_distance, hard_threshold,
+                                   w.limit(self.soft_threshold - hard_threshold,
                                            -qp_limits_for_lba,
                                            qp_limits_for_lba),
                                    lower_limit_limited)

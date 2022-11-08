@@ -112,13 +112,12 @@ class Giskard:
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
 
-    def configure_trajectory_plotting(self, enabled: bool = False, normalize_position: bool = False):
+    def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False):
         self.behavior_tree_config.plugin_config['PlotTrajectory']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
 
-    def configure_debug_trajectory_plotting(self, enabled: bool = False, normalize_position: bool = False):
+    def configure_PlotDebugExpressions(self, enabled: bool = False):
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
-        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['normalize_position'] = normalize_position
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """

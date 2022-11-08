@@ -364,15 +364,11 @@ class GiskardTestWrapper(GiskardWrapper):
         else:
             self.set_object_joint_state(self.environment_name, joint_state)
 
-    def compare_joint_state(self, current_js, goal_js, decimal=2):
-        """
-        :type current_js: dict
-        :type goal_js: dict
-        :type decimal: int
-        """
+    def compare_joint_state(self, current_js: dict, goal_js: dict, decimal: int = 2):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
+            joint_name = self.world.get_joint_name(joint_name)
             if self.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,

@@ -62,12 +62,10 @@ jobs:
         # Root directory of the catkin workspace
         workspace: $GITHUB_WORKSPACE/ros_ws
     - name: install python deps
-      shell: bash
       run: |
         sudo pip3 install numpy==1.23.4 pandas
         python -m pytest --version
     - name: build Giskard
-      shell: bash
       run: |
         cd ros_ws
         touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
@@ -76,6 +74,9 @@ jobs:
         echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
         echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
         echo 'echo asdf' >> ~/.bashrc
+    - name: start roscore
+      run: |
+        roscore &
 #    - name: build betterpybullet
 #      shell: bash
 #      run: |
@@ -100,8 +101,6 @@ jobs:
     - name: PR2 TestJointGoals
       shell: bash
       run: |
-        . ~/.bashrc
-        roscore &
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestJointGoals
 #    - name: PR2 TestCartGoals
@@ -121,8 +120,6 @@ jobs:
     - name: PR2 TestInfoServices
       shell: bash
       run: |
-        . ~/.bashrc
-        roscore &
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestInfoServices
 #    - name: PR2 TestSelfCollisionAvoidance

@@ -80,7 +80,34 @@ jobs:
         source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
         roscd giskardpy
         ./scripts/build_better_pybullet.sh /betterpybullet
-    - name: Run Giskard
+    - name: PR2 TestConstraints
+      shell: bash
+      run: |
+        export ROS_HOSTNAME=localhost
+        . ~/.bashrc
+        . $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+        roscore &
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_pr2.py::TestConstraints
+    - name: PR2 TestWorldManipulation
+      shell: bash
+      run: |
+        export ROS_HOSTNAME=localhost
+        . ~/.bashrc
+        . $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+        roscore &
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_pr2.py::TestWorldManipulation
+    - name: PR2 TestJointGoals
+      shell: bash
+      run: |
+        export ROS_HOSTNAME=localhost
+        . ~/.bashrc
+        . $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+        roscore &
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_pr2.py::TestJointGoals
+    - name: PR2 TestConstraints
       shell: bash
       run: |
         export ROS_HOSTNAME=localhost

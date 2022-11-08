@@ -80,6 +80,7 @@ jobs:
     - name: test2
       run: |
         source ~/.bashrc
+        cat ~/.bashrc
         l
         ls
     - name: test3

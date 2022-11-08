@@ -6,7 +6,7 @@ from typing import Optional
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped
 from numpy import pi
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -512,13 +512,10 @@ class TestConstraints:
         expected = zero_pose.transform_msg('map', p)
 
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('CartesianPosition',
-                                root_link=zero_pose.default_root,
-                                tip_link=tip,
-                                goal_point=p)
+        zero_pose.set_translation_goal(root_link=zero_pose.default_root,
+                                       tip_link=tip,
+                                       goal_point=p)
         zero_pose.plan_and_execute()
-        new_pose = zero_pose.world.compute_fk_pose('map', tip)
-        compare_points(expected.point, new_pose.pose.position)
 
     def test_CartesianPosition1(self, zero_pose: PR2TestWrapper):
         pocky = 'box'
@@ -538,12 +535,11 @@ class TestConstraints:
         p.point = Point(0.0, 0.5, 0.0)
 
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('CartesianPosition',
-                                root_link=tip,
-                                root_group=zero_pose.robot_name,
-                                tip_link=pocky,
-                                tip_group='box',
-                                goal_point=p)
+        zero_pose.set_translation_goal(root_link=tip,
+                                       root_group=zero_pose.robot_name,
+                                       tip_link=pocky,
+                                       tip_group='box',
+                                       goal_point=p)
         zero_pose.plan_and_execute()
 
     def test_CartesianPose(self, zero_pose: PR2TestWrapper):
@@ -632,25 +628,20 @@ class TestConstraints:
     def test_CartesianOrientation(self, zero_pose: PR2TestWrapper):
         tip = 'base_footprint'
         root = 'odom_combined'
-        p = PoseStamped()
-        p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = tip
-        p.pose.orientation = Quaternion(*quaternion_about_axis(4, [0, 0, 1]))
+        q = QuaternionStamped()
+        q.header.frame_id = tip
+        q.quaternion = Quaternion(*quaternion_about_axis(4, [0, 0, 1]))
 
-        expected = zero_pose.transform_msg('map', p)
+        expected = zero_pose.transform_msg('map', q)
 
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('CartesianOrientation',
-                                root_link=root,
-                                root_group=None,
-                                tip_link=tip,
-                                tip_group=zero_pose.robot_name,
-                                goal_orientation=p,
-                                max_velocity=0.15
-                                )
+        zero_pose.set_rotation_goal(root_link=root,
+                                    root_group=None,
+                                    tip_link=tip,
+                                    tip_group=zero_pose.robot_name,
+                                    goal_orientation=q,
+                                    max_velocity=0.15)
         zero_pose.plan_and_execute()
-        new_pose = zero_pose.world.compute_fk_pose('map', tip)
-        compare_orientations(expected.pose.orientation, new_pose.pose.orientation)
 
     def test_CartesianPoseStraight1(self, zero_pose: PR2TestWrapper):
         zero_pose.close_l_gripper()
@@ -1666,10 +1657,10 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.l_tip
         r_goal.pose.position.x = 0.2
-        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1,0,0,0],
-                                                                      [0,-1,0,0],
-                                                                      [0,0,1,0],
-                                                                      [0,0,0,1]]))
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                      [0, -1, 0, 0],
+                                                                      [0, 0, 1, 0],
+                                                                      [0, 0, 0, 1]]))
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(goal_pose=r_goal,
                                 tip_link=zero_pose.r_tip,
@@ -2251,7 +2242,8 @@ class TestWorldManipulation:
         assert color_robot.b == 0
         assert color_robot.a == 1
         kitchen_setup.dye_group('iai_kitchen', (0, 1, 0, 1))
-        color_kitchen = kitchen_setup.world.groups['iai_kitchen'].get_link('iai_kitchen/sink_area_sink').collisions[0].color
+        color_kitchen = kitchen_setup.world.groups['iai_kitchen'].get_link('iai_kitchen/sink_area_sink').collisions[
+            0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
         assert color_robot.b == 0
@@ -2261,7 +2253,8 @@ class TestWorldManipulation:
         assert color_kitchen.b == 0
         assert color_kitchen.a == 1
         kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0, 0, 1, 1))
-        color_hand = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('r_gripper_palm_link').collisions[0].color
+        color_hand = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('r_gripper_palm_link').collisions[
+            0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
         assert color_robot.b == 0

@@ -94,7 +94,7 @@ class CartesianOrientation(Goal):
             reference_velocity = 0.5
         if isinstance(goal_orientation, PoseStamped):
             logging.logwarn(
-                'deprication warning: CartesianOrientation called with PoseStamped instead of QuaternionStamped')
+                'deprecated warning: CartesianOrientation called with PoseStamped instead of QuaternionStamped')
             q = QuaternionStamped()
             q.header = goal_orientation.header
             q.quaternion = goal_orientation.pose.orientation

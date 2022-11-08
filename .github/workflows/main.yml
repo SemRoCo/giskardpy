@@ -74,7 +74,7 @@ jobs:
         touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
         catkin build
         echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
-        echo '$GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
+        echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
 #    - name: build betterpybullet
 #      shell: bash
 #      run: |

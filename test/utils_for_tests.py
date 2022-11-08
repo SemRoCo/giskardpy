@@ -438,8 +438,15 @@ class GiskardTestWrapper(GiskardWrapper):
         # # self.set_base.call(goal)
         # rospy.sleep(0.5)
 
-    def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, tip_group=None, root_group=None,
-                          weight=None, max_velocity=None, check=False,
+    def set_rotation_goal(self,
+                          goal_orientation: QuaternionStamped,
+                          tip_link: str,
+                          root_link: Optional[str] = None,
+                          tip_group: Optional[str] = None,
+                          root_group: Optional[str] = None,
+                          weight: Optional[float] = None,
+                          max_velocity: Optional[float] = None,
+                          check: bool = False,
                           **kwargs):
         if root_link is None:
             root_link = self.world.root_link_name

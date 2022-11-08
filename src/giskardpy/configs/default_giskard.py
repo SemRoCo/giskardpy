@@ -90,6 +90,10 @@ class Giskard:
         urdf = rospy.get_param(parameter_name)
         self.add_robot_urdf(urdf, group_name=group_name, joint_state_topics=joint_state_topics)
 
+    def configure_MaxTrajectoryLength(self, enabled: bool = True, length: float = 30):
+        self.behavior_tree_config.plugin_config['MaxTrajectoryLength']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['MaxTrajectoryLength']['length'] = length
+
     def configure_VisualizationBehavior(self, enabled: bool = True, in_planning_loop: bool = False):
         """
         :param enabled: whether Giskard should publish markers during planning
@@ -323,8 +327,8 @@ class Giskard:
             setattr(self, parameter, deepcopy(value))
 
     def _create_parameter_backup(self):
-        self._backup = {'qp_solver_config': deepcopy(self._qp_solver_config),
-                        'general_config': deepcopy(self._general_config)}
+        self._backup = {'_qp_solver_config': deepcopy(self._qp_solver_config),
+                        '_general_config': deepcopy(self._general_config)}
 
     def _create_collision_checker(self, world):
         if self._collision_checker == CollisionCheckerLib.bpb:

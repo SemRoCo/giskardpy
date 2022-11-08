@@ -83,7 +83,7 @@ class WorldTree:
                     return PrefixName(link_name, None)
             return self.groups[group_name].get_link_short_name_match(link_name)
 
-    def get_link(self, link_name: str, group_name: str) -> Link:
+    def get_link(self, link_name: str, group_name:  Optional[str] = None) -> Link:
         return self._links[self.get_link_name(link_name, group_name)]
 
     @property
@@ -1290,6 +1290,12 @@ class SubWorldTree(WorldTree):
         self.root_link_name = root_link_name
         self.world = world
         self.actuated = actuated
+
+    def get_link(self, link_name: str) -> Link:
+        return self.world.get_link(link_name, self.name)
+
+    def get_joint(self, joint_name: my_string) -> Joint:
+        return self.world.get_joint(joint_name, self.name)
 
     @property
     def controlled_joints(self):

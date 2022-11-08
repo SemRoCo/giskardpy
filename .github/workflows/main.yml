@@ -81,6 +81,7 @@ jobs:
       run: |
         source ~/.bashrc
         cat ~/.bashrc
+        source ~/.bashrc && l
         l
         ls
     - name: test3

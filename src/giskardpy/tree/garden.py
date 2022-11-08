@@ -556,7 +556,8 @@ class StandAlone(TreeManager):
         if self.god_map.get_data(identifier.TFPublisher_enabled):
             sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
-        sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+            sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
 
     def grow_process_goal(self):

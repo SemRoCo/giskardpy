@@ -27,7 +27,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
-from giskardpy.configs.data_types import GeneralConfig
+from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver
 from giskardpy.configs.default_giskard import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
@@ -41,6 +41,8 @@ from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
+import os
+
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -234,6 +236,13 @@ class GiskardTestWrapper(GiskardWrapper):
         #                                                UpdateTransform)
 
         self.giskard = config_file()
+        if 'GITHUB_WORKFLOW' in os.environ:
+            logging.loginfo('Inside github workflow, turning off visualization')
+            self.giskard.configure_VisualizationBehavior(enabled=False)
+            self.giskard.configure_CollisionMarker(enabled=False)
+            self.giskard.set_qp_solver(SupportedQPSolver.qp_oases)
+            self.giskard.configure_PlotTrajectory(enabled=False)
+            self.giskard.configure_PlotDebugExpressions(enabled=False)
         self.giskard.grow()
         self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)

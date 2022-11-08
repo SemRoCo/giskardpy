@@ -77,9 +77,12 @@ jobs:
     - name: test1
       run: |
         echo 'echo asdf' >> ~/.bashrc
+        echo 'export ASDF=1' >> ~/.bashrc
     - name: test2
       run: |
+        echo $ASDF
         source ~/.bashrc
+        echo $ASDF
         cat ~/.bashrc
         source ~/.bashrc && l
         l

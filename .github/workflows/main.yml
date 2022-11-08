@@ -26,77 +26,59 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
-#    - uses: actions/checkout@v2
-#      with:
-#        path: 'ros_ws/src/giskardpy'
-#        repository: ichumuh/giskardpy
-#        ref: devel
-#    - name: Checkout giskard msgs
-#      uses: actions/checkout@v2
-#      with:
-#        path: 'ros_ws/src/giskard_msgs'
-#        repository: SemRoCo/giskard_msgs
-#    - name: Checkout qpoases
-#      uses: actions/checkout@v2
-#      with:
-#        path: 'ros_ws/src/qpOASES'
-#        repository: SemRoCo/qpOASES
-#        ref: noetic
-#    - name: Checkout iai_pr2
-#      uses: actions/checkout@v2
-#      with:
-#        path: 'ros_ws/src/iai_pr2'
-#        repository: code-iai/iai_pr2
-#        ref: mujoco_sim_setup
-#    - name: Checkout iai_maps
-#      uses: actions/checkout@v2
-#      with:
-#        path: 'ros_ws/src/iai_maps'
-#        repository: code-iai/iai_maps
-#        ref: master
-#    - name: Setup Giskard workspace
-#      uses: betwo/github-setup-catkin@master
-#      env:
-#            ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-#      with:
-#        # Version range or exact version of ROS version to use, using SemVer's version range syntax.
-#        ros-version: noetic
-#        build-tool: 'catkin_tools'
-#        # Root directory of the catkin workspace
-#        workspace: $GITHUB_WORKSPACE/ros_ws
-#    - name: install python deps
-#      run: |
-#        sudo pip3 install numpy==1.23.4 pandas
-#        python -m pytest --version
-#    - name: build Giskard
-#      run: |
-#        cd ros_ws
-#        touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
-#        touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
-#        catkin build
-#        echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
-#        echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
-#        echo 'echo asdf' >> ~/.bashrc
-    - name: test1
+    - uses: actions/checkout@v2
+      with:
+        path: 'ros_ws/src/giskardpy'
+        repository: ichumuh/giskardpy
+        ref: devel
+    - name: Checkout giskard msgs
+      uses: actions/checkout@v2
+      with:
+        path: 'ros_ws/src/giskard_msgs'
+        repository: SemRoCo/giskard_msgs
+    - name: Checkout qpoases
+      uses: actions/checkout@v2
+      with:
+        path: 'ros_ws/src/qpOASES'
+        repository: SemRoCo/qpOASES
+        ref: noetic
+    - name: Checkout iai_pr2
+      uses: actions/checkout@v2
+      with:
+        path: 'ros_ws/src/iai_pr2'
+        repository: code-iai/iai_pr2
+        ref: mujoco_sim_setup
+    - name: Checkout iai_maps
+      uses: actions/checkout@v2
+      with:
+        path: 'ros_ws/src/iai_maps'
+        repository: code-iai/iai_maps
+        ref: master
+    - name: Setup Giskard workspace
+      uses: betwo/github-setup-catkin@master
+      env:
+            ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      with:
+        # Version range or exact version of ROS version to use, using SemVer's version range syntax.
+        ros-version: noetic
+        build-tool: 'catkin_tools'
+        # Root directory of the catkin workspace
+        workspace: $GITHUB_WORKSPACE/ros_ws
+    - name: install python deps
       run: |
-        echo 'echo asdf' >> ~/.bashrc
-        echo 'export ASDF=1' >> ~/.bashrc
-    - name: test2
+        sudo pip3 install numpy==1.23.4 pandas
+        python -m pytest --version
+    - name: build Giskard
       run: |
-        echo $ASDF
-        source ~/.bashrc
-        echo $ASDF
-        cat ~/.bashrc
-        source ~/.bashrc && l
-        l
-        ls
-    - name: test3
+        cd ros_ws
+        touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
+        touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
+        catkin build
+        echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
+        echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
+    - name: start roscore
       run: |
-        l
-        ls
-#    - name: start roscore
-#      run: |
-#        roscore &
+        roscore &
 #    - name: build betterpybullet
 #      shell: bash
 #      run: |
@@ -118,11 +100,11 @@ jobs:
 #        roscore &
 #        roscd giskardpy
 #        python3 -m pytest -s test/test_integration_pr2.py::TestWorldManipulation
-#    - name: PR2 TestJointGoals
-#      shell: bash
-#      run: |
-#        roscd giskardpy
-#        python3 -m pytest -s test/test_integration_pr2.py::TestJointGoals
+    - name: PR2 TestJointGoals
+      shell: bash
+      run: |
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_pr2.py::TestJointGoals
 #    - name: PR2 TestCartGoals
 #      shell: bash
 #      run: |
@@ -137,11 +119,11 @@ jobs:
 #        roscore &
 #        roscd giskardpy
 #        python3 -m pytest -s test/test_integration_pr2.py::TestWayPoints
-#    - name: PR2 TestInfoServices
-#      shell: bash
-#      run: |
-#        roscd giskardpy
-#        python3 -m pytest -s test/test_integration_pr2.py::TestInfoServices
+    - name: PR2 TestInfoServices
+      shell: bash
+      run: |
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_pr2.py::TestInfoServices
 #    - name: PR2 TestSelfCollisionAvoidance
 #      shell: bash
 #      run: |

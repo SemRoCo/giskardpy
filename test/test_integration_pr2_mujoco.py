@@ -56,7 +56,6 @@ class TestJointGoalsMujoco(TestJointGoals):
 
 class TestActionServerEvents:
     def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):
-        # FIXME
         p = PoseStamped()
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(0, 0, 0)

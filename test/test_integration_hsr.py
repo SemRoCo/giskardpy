@@ -107,7 +107,7 @@ def giskard(request, ros):
     launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
     c = HSRTestWrapper()
     # c = HSRTestWrapperMujoco()
-    # request.addfinalizer(c.tear_down)
+    request.addfinalizer(c.tear_down)
     return c
 
 
@@ -128,23 +128,36 @@ class TestJointGoals:
         arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
-        hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_expected = PoseStamped()
+        hand_T_finger_expected.header.frame_id = 'hand_palm_link'
+        hand_T_finger_expected.pose.position.x = -0.01675
+        hand_T_finger_expected.pose.position.y = -0.0907
+        hand_T_finger_expected.pose.position.z = 0.0052
+        hand_T_finger_expected.pose.orientation.x = -0.0434
+        hand_T_finger_expected.pose.orientation.y = 0.0
+        hand_T_finger_expected.pose.orientation.z = 0.0
+        hand_T_finger_expected.pose.orientation.w = 0.999
         compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
 
         js = {'torso_lift_joint': 0.1}
         zero_pose.set_joint_goal(js, check=False)
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.2, decimal=2)
-        base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
+        base_T_torso = PoseStamped()
+        base_T_torso.header.frame_id = 'base_footprint'
+        base_T_torso.pose.position.x = 0
+        base_T_torso.pose.position.y = 0
+        base_T_torso.pose.position.z = 0.8518
+        base_T_torso.pose.orientation.x = 0
+        base_T_torso.pose.orientation.y = 0
+        base_T_torso.pose.orientation.z = 0
+        base_T_torso.pose.orientation.w = 1
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, zero_pose: HSRTestWrapper):
         arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
-        hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
-        hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
-        compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
 
         tip = 'hand_gripper_tool_frame'
         p = PoseStamped()
@@ -155,17 +168,21 @@ class TestJointGoals:
                                 root_link='base_footprint')
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.2, decimal=2)
-        base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
+        base_T_torso = PoseStamped()
+        base_T_torso.header.frame_id = 'base_footprint'
+        base_T_torso.pose.position.x = 0
+        base_T_torso.pose.position.y = 0
+        base_T_torso.pose.position.z = 0.8518
+        base_T_torso.pose.orientation.x = 0
+        base_T_torso.pose.orientation.y = 0
+        base_T_torso.pose.orientation.z = 0
+        base_T_torso.pose.orientation.w = 1
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, zero_pose: HSRTestWrapper):
         arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
-        hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
-        hand_T_finger_expected = tf.lookup_pose('hand_palm_link', 'hand_l_distal_link')
-        compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
-
         tip = 'head_pan_link'
         p = PoseStamped()
         p.header.frame_id = tip
@@ -175,7 +192,15 @@ class TestJointGoals:
                                 root_link='base_footprint')
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.3, decimal=2)
-        base_T_torso = tf.lookup_pose('base_footprint', 'torso_lift_link')
+        base_T_torso = PoseStamped()
+        base_T_torso.header.frame_id = 'base_footprint'
+        base_T_torso.pose.position.x = 0
+        base_T_torso.pose.position.y = 0
+        base_T_torso.pose.position.z = 0.902
+        base_T_torso.pose.orientation.x = 0
+        base_T_torso.pose.orientation.y = 0
+        base_T_torso.pose.orientation.z = 0
+        base_T_torso.pose.orientation.w = 1
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 

@@ -1,4 +1,4 @@
-name: CI
+name: CI PR2 standalone
 defaults:
   run:
     shell: bash -ieo pipefail {0}
@@ -26,30 +26,30 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         path: 'ros_ws/src/giskardpy'
         repository: ichumuh/giskardpy
         ref: devel
     - name: Checkout giskard msgs
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: 'ros_ws/src/giskard_msgs'
         repository: SemRoCo/giskard_msgs
     - name: Checkout qpoases
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: 'ros_ws/src/qpOASES'
         repository: SemRoCo/qpOASES
         ref: noetic
     - name: Checkout iai_pr2
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: 'ros_ws/src/iai_pr2'
         repository: code-iai/iai_pr2
         ref: mujoco_sim_setup
     - name: Checkout iai_maps
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: 'ros_ws/src/iai_maps'
         repository: code-iai/iai_maps

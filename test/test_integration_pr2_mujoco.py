@@ -54,6 +54,13 @@ class TestJointGoalsMujoco(TestJointGoals):
     pass
 
 
+class TestConstraints:
+
+    def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
+        zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
+
 class TestActionServerEvents:
     def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()

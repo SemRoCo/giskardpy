@@ -420,6 +420,11 @@ class TestJointGoals:
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
+    def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
+        zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan()
+
     def test_drive_into_apartment(self, apartment_setup: PR2TestWrapper):
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'base_footprint'

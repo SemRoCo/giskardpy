@@ -53,7 +53,7 @@ jobs:
       with:
         path: 'ros_ws/src/iai_tiago'
         repository: code-iai/iai_tiago
-        ref: master
+        ref: main
         submodules: recursive
     - name: Setup Giskard workspace
       uses: betwo/github-setup-catkin@master

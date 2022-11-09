@@ -68,12 +68,6 @@ jobs:
       run: |
         sudo pip3 install numpy==1.23.4 pandas
         python -m pytest --version
-    - name: build betterpybullet
-      run: |
-        mkdir betterpybullet
-        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
-        roscd giskardpy
-        ./scripts/build_better_pybullet.sh /betterpybullet
     - name: build Giskard
       run: |
         cd ros_ws
@@ -82,6 +76,12 @@ jobs:
         catkin build
         echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
         echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
+    - name: build betterpybullet
+      run: |
+        mkdir betterpybullet
+        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+        roscd giskardpy
+        ./scripts/build_better_pybullet.sh /betterpybullet
     - name: start roscore
       run: |
         roscore &

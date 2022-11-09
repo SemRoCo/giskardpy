@@ -301,42 +301,6 @@ class TestConstraints:
 
 class TestCollisionAvoidanceGoals:
 
-    def test_add_urdf_body(self, kitchen_setup: HSRTestWrapper):
-        object_name = kitchen_setup.kitchen_name
-        kitchen_setup.clear_world()
-        try:
-            GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
-        except KeyError:
-            pass
-        else:
-            raise 'expected error'
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        if kitchen_setup.is_standalone():
-            js_topic = ''
-            set_js_topic = ''
-        else:
-            js_topic = '/kitchen/joint_states'
-            set_js_topic = '/kitchen/cram_joint_states'
-        kitchen_setup.add_urdf(name=object_name,
-                               urdf=rospy.get_param('kitchen_description'),
-                               pose=p,
-                               js_topic=js_topic,
-                               set_js_topic=set_js_topic)
-        kitchen_setup.remove_group(object_name)
-        try:
-            GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
-        except KeyError:
-            pass
-        else:
-            raise 'expected error'
-        kitchen_setup.add_urdf(name=object_name,
-                               urdf=rospy.get_param('kitchen_description'),
-                               pose=p,
-                               js_topic=js_topic,
-                               set_js_topic=set_js_topic)
-
     def test_self_collision_avoidance(self, zero_pose: HSRTestWrapper):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip

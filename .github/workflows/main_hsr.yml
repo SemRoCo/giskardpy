@@ -78,12 +78,12 @@ jobs:
         catkin build
         echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
         echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
-#    - name: build betterpybullet
-#      run: |
-#        mkdir betterpybullet
-#        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
-#        roscd giskardpy
-#        ./scripts/build_better_pybullet.sh /betterpybullet
+    - name: build betterpybullet
+      run: |
+        mkdir betterpybullet
+        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
+        roscd giskardpy
+        ./scripts/build_better_pybullet.sh /betterpybullet
     - name: start roscore
       run: |
         roscore &
@@ -91,6 +91,18 @@ jobs:
       run: |
         roscd giskardpy
         python3 -m pytest -s test/test_integration_hsr.py::TestJointGoals
+    - name: HSR TestCartGoals
+      run: |
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_hsr.py::TestCartGoals
+    - name: HSR TestCollisionAvoidanceGoals
+      run: |
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_hsr.py::TestCollisionAvoidanceGoals
+    - name: HSR TestConstraints
+      run: |
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_hsr.py::TestConstraints
     - name: Setup upterm session
 #      if: always()
       if: failure()

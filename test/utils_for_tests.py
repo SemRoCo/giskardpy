@@ -40,7 +40,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
 import os
 
 
@@ -137,7 +137,8 @@ def pr2_joint_state(draw):
 
 
 def pr2_urdf():
-    with open('urdfs/pr2_with_base.urdf', 'r') as f:
+    path = resolve_ros_iris('package://giskardpy/test/urdfs/pr2_with_base.urdf')
+    with open(path, 'r') as f:
         urdf_string = f.read()
     return urdf_string
 

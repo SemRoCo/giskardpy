@@ -30,7 +30,7 @@ jobs:
       with:
         path: 'ros_ws/src/giskardpy'
         repository: ichumuh/giskardpy
-        ref: devel
+        ref: master
     - name: Checkout giskard msgs
       uses: actions/checkout@v3
       with:

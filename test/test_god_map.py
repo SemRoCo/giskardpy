@@ -1,20 +1,17 @@
 import numpy as np
 
 import giskardpy
-from giskardpy.data_types import PrefixName
 
 giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 
 from geometry_msgs.msg import PoseStamped
 from hypothesis import given, assume
 import hypothesis.strategies as st
 from giskardpy import casadi_wrapper as w
-from giskardpy.god_map import GodMap, get_default, override_default
+from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length
-
-PKG = 'giskardpy'
 
 
 class TestGodMap(unittest.TestCase):
@@ -338,80 +335,6 @@ class TestGodMap(unittest.TestCase):
         data = [1, 2, 3]
         gm.set_data(['muh'], data)
         expr = gm.to_expr(['muh'])
-        data[0]
-        data[1]
-        data[2]
-
-    def test_get_default1(self):
-        gm = GodMap()
-        gm.set_data(['bla'], {'default': 1, 'override': 2})
-        block_id_over = ['bla', 'override']
-        assert get_default([block_id_over], gm) == 1
-
-    def test_get_default2(self):
-        gm = GodMap()
-        gm.set_data(['bla'], {'default': {'a': 0, 'b': 1}, 'override': {'b': 2}})
-        block_id_over = ['bla', 'override']
-        assert get_default([block_id_over], gm) == {'a': 0, 'b': 1}
-
-    def test_get_default3(self):
-        gm = GodMap()
-        gm.set_data(['default'], {'a': 0, 'b': 1})
-        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'b': 3}})
-        block_id_over = ['bla', 'override']
-        assert get_default([[], block_id_over], gm) == {'a': 0, 'b': 2}
-
-    def test_get_default4(self):
-        gm = GodMap()
-        gm.set_data(['default'], {'a': 0, 'b': 1})
-        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'b': 3}})
-        block_id_over = ['bla', 'override']
-        assert get_default([[], block_id_over], gm, prefix='p') == {PrefixName('a', 'p'): 0, PrefixName('b', 'p'): 2}
-
-    def test_get_default5(self):
-        gm = GodMap()
-        gm.set_data(['default'], -1)
-        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'something': {'b': 3}}})
-        block_id_over = ['bla', 'override']
-        with self.assertRaises(TypeError) as _:
-            default = get_default([[], block_id_over], gm, prefix='p')
-
-    def test_override_default1(self):
-        gm = GodMap()
-        gm.set_data(['default'], {'a': 0, 'b': 1})
-        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'b': 3}})
-        block_id_over = ['bla', 'override']
-        default = get_default([[], block_id_over], gm, prefix='p')
-        assert default == {PrefixName('a', 'p'): 0, PrefixName('b', 'p'): 2}
-        assert {'p/b': 3} == override_default(default, [block_id_over], gm, prefix='p')
-
-    def test_override_default2(self):
-        gm = GodMap()
-        gm.set_data(['default'], {'a': 0, 'b': 1})
-        gm.set_data(['bla'], {'default': {'b': 2}, 'override': {'something': {'b': 3}}})
-        block_id_over = ['bla', 'override']
-        default = get_default([[], block_id_over], gm, prefix='p')
-        assert default == {PrefixName('a', 'p'): 0, PrefixName('b', 'p'): 2}
-        res = override_default(default, [block_id_over], gm, prefix='p')
-        assert res['p/something']['p/b'] == 3
-        assert res['p/something']['p/a'] == 0
-        assert res['p/something'].default_factory('p/b') == 2
-
-    def test_override_default3(self):
-        gm = GodMap()
-        gm.set_data(['default'], -1)
-        gm.set_data(['bla'], {'override': {'something': {'b': 3}}})
-        block_id_over = ['bla', 'override']
-        default = get_default([[], block_id_over], gm, prefix='p')
-        assert default == -1
-        overwritten = override_default(default, [block_id_over], gm, prefix='p')
-        assert overwritten['p/something']['p/b'] == 3
-        assert overwritten['p/something']['p/a'] == -1
-        assert overwritten['p/something'].default_factory('p/b') == -1
-
-if __name__ == '__main__':
-    import rosunit
-
-    rosunit.unitrun(package=PKG,
-                    test_name='TestDataBus',
-                    test=TestGodMap)
+        assert gm.evaluate_expr(expr)[0][0] == data[0]
+        assert gm.evaluate_expr(expr)[1][0] == data[1]
+        assert gm.evaluate_expr(expr)[2][0] == data[2]

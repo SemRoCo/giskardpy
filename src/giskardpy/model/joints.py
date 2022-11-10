@@ -627,8 +627,8 @@ class OmniDrive(Joint):
                 # can't do "if in", because the dict may be a defaultdict
                 pass
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
-        pass
+    def get_limit_expressions(self, order: int) -> Tuple[Optional[expr_symbol], Optional[expr_symbol]]:
+        return None, None
 
     def has_free_variables(self) -> bool:
         return True

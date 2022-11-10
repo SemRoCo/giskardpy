@@ -57,6 +57,8 @@ class WorldTree:
         self._clear()
 
     def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        if group_name == '':
+            group_name = None
         try:
             return PrefixName.from_string(joint_name)
         except AttributeError:
@@ -475,10 +477,10 @@ class WorldTree:
             return None
         ret = self._get_group_from_groups(groups)
         if ret is None and groups_size > 0:
-            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {joint_name}.'
-                                        f'Please define a group name for link {joint_name}.')
+            raise UnknownGroupException(f'Found multiple seperated groups {groups} for joint_name {joint_name}.'
+                                        f'Please define a group name for joint {joint_name}.')
         elif ret is None:
-            raise UnknownGroupException(f'Did not find any group containing the link {joint_name}.')
+            raise UnknownGroupException(f'Did not find any group containing the joint {joint_name}.')
         return ret
 
     def get_groups_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Set[str]:
@@ -1156,9 +1158,9 @@ class WorldTree:
         except KeyError:
             # joint has no limits for this derivative
             return None, None
-        if not isinstance(lower_limit, (int, float)):
+        if not isinstance(lower_limit, (int, float)) and lower_limit is not None:
             lower_limit = self.god_map.evaluate_expr(lower_limit)
-        if not isinstance(upper_limit, (int, float)):
+        if not isinstance(upper_limit, (int, float)) and upper_limit is not None:
             upper_limit = self.god_map.evaluate_expr(upper_limit)
         return lower_limit, upper_limit
 

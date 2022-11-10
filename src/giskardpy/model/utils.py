@@ -7,6 +7,7 @@ from giskard_msgs.msg import WorldBody
 def robot_name_from_urdf_string(urdf_string):
     return urdf_string.split('robot name="')[1].split('"')[0]
 
+
 def hacky_urdf_parser_fix(urdf_str):
     # TODO this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
     fixed_urdf = ''
@@ -24,7 +25,8 @@ def hacky_urdf_parser_fix(urdf_str):
             fixed_urdf += line + '\n'
     return fixed_urdf
 
-def make_world_body_box(x_length=1, y_length=1, z_length=1):
+
+def make_world_body_box(x_length: float = 1, y_length: float = 1, z_length: float = 1) -> WorldBody:
     box = WorldBody()
     box.type = WorldBody.PRIMITIVE_BODY
     box.shape.type = SolidPrimitive.BOX
@@ -111,4 +113,3 @@ def cylinder_surface(r, h):
     :rtype: float
     """
     return 2 * np.pi * r * (h + r)
-

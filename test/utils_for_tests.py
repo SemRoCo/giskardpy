@@ -231,6 +231,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
+        self._alive = True
 
         # self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
         #                                                UpdateTransform)
@@ -248,7 +249,7 @@ class GiskardTestWrapper(GiskardWrapper):
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
-        self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
+        self.heart = Timer(period=rospy.Duration(self.tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces
         self.robot_names = [c.name for c in self.god_map.get_data(identifier.robot_interface_configs)]
         super().__init__(node_name='tests')
@@ -326,7 +327,14 @@ class GiskardTestWrapper(GiskardWrapper):
         assert res.error_codes in expected_error_codes
 
     def heart_beat(self, timer_thing):
-        self.tree.tick()
+        if self._alive:
+            self.tree.tick()
+
+    def induce_cardioplegia(self):
+        self._alive = False
+
+    def resuscitate(self):
+        self._alive = True
 
     def tear_down(self):
         self.god_map.unsafe_get_data(identifier.timer_collector).print()

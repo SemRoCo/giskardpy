@@ -50,6 +50,7 @@ def ros(request):
 @pytest.fixture()
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     logging.loginfo('resetting giskard')
+    giskard.resuscitate()
     if giskard.is_standalone():
         zero = PoseStamped()
         zero.header.frame_id = 'map'

@@ -33,7 +33,7 @@ class Giskard:
         self._qp_solver_config: QPSolverConfig = QPSolverConfig()
         self.behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
         self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
-        self._god_map = GodMap.init_from_paramserver()
+        self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
         self._controlled_joints = []

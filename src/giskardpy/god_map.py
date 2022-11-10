@@ -194,12 +194,6 @@ class GodMap(object):
         self.shortcuts = {}
         self.lock = RLock()
 
-    @classmethod
-    @profile
-    def init_from_paramserver(cls):
-        self = cls()
-        return self
-
     def __copy__(self):
         god_map_copy = GodMap()
         god_map_copy._data = copy(self._data)

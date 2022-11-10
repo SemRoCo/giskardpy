@@ -5,8 +5,8 @@ defaults:
 on:
    push:
      branches:
-      - master
-      - devel
+       - master
+       - devel
    pull_request:
      branches:
        - master

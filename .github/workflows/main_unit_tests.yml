@@ -1,4 +1,4 @@
-name: CI PR2 standalone
+name: CI unit tests
 defaults:
   run:
     shell: bash -ieo pipefail {0}

@@ -3,10 +3,10 @@ defaults:
   run:
     shell: bash -ieo pipefail {0}
 on:
-#   push:
-#     branches: [ devel ]
-#   pull_request:
-#     branches: [ devel ]
+   push:
+     branches: [ master, devel ]
+   pull_request:
+     branches: [ master, devel ]
   workflow_dispatch:
     inputs:
       logLevel:
@@ -30,7 +30,6 @@ jobs:
       with:
         path: 'ros_ws/src/giskardpy'
         repository: ichumuh/giskardpy
-        ref: master
     - name: Checkout giskard msgs
       uses: actions/checkout@v3
       with:

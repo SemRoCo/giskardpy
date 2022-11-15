@@ -1,8 +1,6 @@
-import rospy
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import KeyDefaultDict
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 

@@ -1,16 +1,12 @@
-from typing import Optional
-
-from rospy import ROSException
-
-from giskardpy.data_types import JointStates
-
 from queue import Queue, Empty
+from typing import Optional
 
 import rospy
 from py_trees import Status
+from rospy import ROSException
 from sensor_msgs.msg import JointState
 
-import giskardpy.identifier as identifier
+from giskardpy.data_types import JointStates
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 

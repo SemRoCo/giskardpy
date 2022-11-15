@@ -2,12 +2,11 @@ from collections import defaultdict
 from enum import Enum
 from typing import Optional, List, Tuple, Dict, Union
 
-from giskardpy.data_types import Derivatives
-from giskardpy.model.utils import robot_name_from_urdf_string
 from std_msgs.msg import ColorRGBA
 
+from giskardpy.data_types import Derivatives
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.my_types import PrefixName
-from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
 
 

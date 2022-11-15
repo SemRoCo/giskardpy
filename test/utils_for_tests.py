@@ -18,7 +18,6 @@ from hypothesis.strategies import composite
 from numpy import pi
 from rospy import Timer
 from sensor_msgs.msg import JointState
-from sortedcontainers import SortedKeyList
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException
@@ -28,7 +27,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
-from giskardpy.configs.data_types import GeneralConfig
+from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver
 from giskardpy.configs.default_giskard import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
@@ -41,8 +40,9 @@ from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
-from iai_naive_kinematics_sim.srv import SetJointStateRequest, UpdateTransform, UpdateTransformRequest
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
+import os
+
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -137,7 +137,8 @@ def pr2_joint_state(draw):
 
 
 def pr2_urdf():
-    with open('urdfs/pr2_with_base.urdf', 'r') as f:
+    path = resolve_ros_iris('package://giskardpy/test/urdfs/pr2_with_base.urdf')
+    with open(path, 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
@@ -231,17 +232,25 @@ class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
+        self._alive = True
 
-        self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-                                                       UpdateTransform)
+        # self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+        #                                                UpdateTransform)
 
         self.giskard = config_file()
+        if 'GITHUB_WORKFLOW' in os.environ:
+            logging.loginfo('Inside github workflow, turning off visualization')
+            self.giskard.configure_VisualizationBehavior(enabled=False)
+            self.giskard.configure_CollisionMarker(enabled=False)
+            self.giskard.set_qp_solver(SupportedQPSolver.qp_oases)
+            self.giskard.configure_PlotTrajectory(enabled=False)
+            self.giskard.configure_PlotDebugExpressions(enabled=False)
         self.giskard.grow()
         self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
-        self.heart = Timer(rospy.Duration(self.tick_rate), self.heart_beat)
+        self.heart = Timer(period=rospy.Duration(self.tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces
         self.robot_names = [c.name for c in self.god_map.get_data(identifier.robot_interface_configs)]
         super().__init__(node_name='tests')
@@ -273,14 +282,15 @@ class GiskardTestWrapper(GiskardWrapper):
                            seed_configuration=seed_configuration)
 
     def set_localization(self, map_T_odom: PoseStamped):
-        map_T_odom.pose.position.z = 0
-        req = UpdateTransformRequest()
-        req.transform.translation = map_T_odom.pose.position
-        req.transform.rotation = map_T_odom.pose.orientation
-        assert self.set_localization_srv(req).success
-        self.wait_heartbeats(15)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
-        compare_poses(p2.pose, map_T_odom.pose)
+        pass
+        # map_T_odom.pose.position.z = 0
+        # req = UpdateTransformRequest()
+        # req.transform.translation = map_T_odom.pose.position
+        # req.transform.rotation = map_T_odom.pose.orientation
+        # assert self.set_localization_srv(req).success
+        # self.wait_heartbeats(15)
+        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+        # compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
@@ -318,7 +328,14 @@ class GiskardTestWrapper(GiskardWrapper):
         assert res.error_codes in expected_error_codes
 
     def heart_beat(self, timer_thing):
-        self.tree.tick()
+        if self._alive:
+            self.tree.tick()
+
+    def induce_cardioplegia(self):
+        self._alive = False
+
+    def resuscitate(self):
+        self._alive = True
 
     def tear_down(self):
         self.god_map.unsafe_get_data(identifier.timer_collector).print()
@@ -365,15 +382,11 @@ class GiskardTestWrapper(GiskardWrapper):
         else:
             self.set_object_joint_state(self.environment_name, joint_state)
 
-    def compare_joint_state(self, current_js, goal_js, decimal=2):
-        """
-        :type current_js: dict
-        :type goal_js: dict
-        :type decimal: int
-        """
+    def compare_joint_state(self, current_js: dict, goal_js: dict, decimal: int = 2):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
+            joint_name = self.world.get_joint_name(joint_name)
             if self.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
@@ -430,20 +443,28 @@ class GiskardTestWrapper(GiskardWrapper):
                                                  decimal=decimal))
 
     def teleport_base(self, goal_pose):
-        goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        js = {'odom_x_joint': goal_pose.pose.position.x,
-              'odom_y_joint': goal_pose.pose.position.y,
-              'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                      goal_pose.pose.orientation.y,
-                                                                      goal_pose.pose.orientation.z,
-                                                                      goal_pose.pose.orientation.w]))[0]}
-        goal = SetJointStateRequest()
-        goal.state = position_dict_to_joint_states(js)
-        # self.set_base.call(goal)
-        rospy.sleep(0.5)
+        pass
+        # goal_pose = tf.transform_pose(self.default_root, goal_pose)
+        # js = {'odom_x_joint': goal_pose.pose.position.x,
+        #       'odom_y_joint': goal_pose.pose.position.y,
+        #       'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+        #                                                               goal_pose.pose.orientation.y,
+        #                                                               goal_pose.pose.orientation.z,
+        #                                                               goal_pose.pose.orientation.w]))[0]}
+        # goal = SetJointStateRequest()
+        # goal.state = position_dict_to_joint_states(js)
+        # # self.set_base.call(goal)
+        # rospy.sleep(0.5)
 
-    def set_rotation_goal(self, goal_orientation, tip_link, root_link=None, tip_group=None, root_group=None,
-                          weight=None, max_velocity=None, check=False,
+    def set_rotation_goal(self,
+                          goal_orientation: QuaternionStamped,
+                          tip_link: str,
+                          root_link: Optional[str] = None,
+                          tip_group: Optional[str] = None,
+                          root_group: Optional[str] = None,
+                          weight: Optional[float] = None,
+                          max_velocity: Optional[float] = None,
+                          check: bool = False,
                           **kwargs):
         if root_link is None:
             root_link = self.world.root_link_name

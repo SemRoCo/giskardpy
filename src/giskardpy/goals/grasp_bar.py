@@ -4,9 +4,9 @@ from typing import Optional
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
-import giskardpy.utils.tfwrapper as tf
 
 
 class GraspBar(Goal):

@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import numpy as np
-from geometry_msgs.msg import Quaternion, Point, Twist
+from geometry_msgs.msg import Quaternion, Point
 from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
 
 
@@ -83,6 +83,27 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     return np.dot(rz, ry, rx)
 
 
+def rotation_matrix_from_quaternion(x, y, z, w):
+    """
+    Unit quaternion to 4x4 rotation matrix according to:
+    https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :type z: Union[float, Symbol]
+    :type w: Union[float, Symbol]
+    :return: 4x4 Matrix
+    :rtype: Matrix
+    """
+    x2 = x * x
+    y2 = y * y
+    z2 = z * z
+    w2 = w * w
+    return np.array([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                     [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                     [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                     [0, 0, 0, 1]])
+
+
 def quaternion_from_rpy(roll, pitch, yaw):
     return quaternion_from_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
 
@@ -98,11 +119,11 @@ def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[
     if w2 == 0:
         angle = 0
     else:
-        angle = (2 * np.arccos(np.min(np.max(-1, w), 1)))
+        angle = (2 * np.arccos(min(max(-1, w), 1)))
     if w2 == 0:
         x = 0
         y = 0
-        z = 0
+        z = 1
     else:
         x = x / m
         y = y / m
@@ -205,9 +226,9 @@ def point_to_single_caster_angle(px, py, caster_v, forward_velocity):
     angle = angle_between_vector(x[:-1], c_V_goal)
     radius = np.linalg.norm(c_V_p)
     if radius > 0.01:
-        circumference = 2*np.pi*radius
-        number_of_revolutions = forward_velocity/circumference
-        angular_velocity = number_of_revolutions/(2*np.pi)
+        circumference = 2 * np.pi * radius
+        number_of_revolutions = forward_velocity / circumference
+        angular_velocity = number_of_revolutions / (2 * np.pi)
         angular_velocity = min(max(angular_velocity, -max_angular_velocity), max_angular_velocity)
     else:
         angular_velocity = max_angular_velocity

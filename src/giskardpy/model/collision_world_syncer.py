@@ -1,7 +1,7 @@
 from collections import defaultdict
 from itertools import product, combinations_with_replacement, combinations
 from time import time
-from typing import List, Dict, Tuple, Optional, Set
+from typing import List, Dict, Optional
 
 import numpy as np
 from sortedcontainers import SortedKeyList
@@ -12,7 +12,6 @@ from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
-from giskardpy.model.links import Link
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string
@@ -526,7 +525,10 @@ class CollisionWorldSynchronizer:
                             del min_allowed_distance[r_key]
                     elif self.is_avoid_collision(collision_entry):
                         if key not in self.black_list:
-                            min_allowed_distance[key] = max(min_dist[key[0]], collision_entry.distance)
+                            if collision_entry.distance == -1:
+                                min_allowed_distance[key] = min_dist[key[0]]
+                            else:
+                                min_allowed_distance[key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
         return min_allowed_distance

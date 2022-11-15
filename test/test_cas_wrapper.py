@@ -8,12 +8,13 @@ from hypothesis import given, assume
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
-from transforms3d.quaternions import quat2mat, quat2axangle
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.utils.math import compare_orientations
+from giskardpy.casadi_wrapper import rotation_matrix_from_quaternion
+from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
 from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, sq_matrix
+
 
 class TestCASWrapper(unittest.TestCase):
 
@@ -239,7 +240,7 @@ class TestCASWrapper(unittest.TestCase):
            vector(3))
     def test_cross(self, u, v):
         np.testing.assert_array_almost_equal(
-            w.compile_and_execute(w.cross, [u, v]),
+            w.compile_and_execute(w.cross, [u, v])[:3],
             np.cross(u, v))
 
     @given(vector(3))
@@ -354,15 +355,16 @@ class TestCASWrapper(unittest.TestCase):
         np.testing.assert_array_almost_equal(w.compile_and_execute(w.frame_quaternion, [x, y, z] + q.tolist()),
                                              r2)
 
-    @given(float_no_nan_no_inf(outer_limit=1e100),
-           float_no_nan_no_inf(outer_limit=1e100),
-           float_no_nan_no_inf(outer_limit=1e100),
+    @given(float_no_nan_no_inf(outer_limit=1000),
+           float_no_nan_no_inf(outer_limit=1000),
+           float_no_nan_no_inf(outer_limit=1000),
            quaternion())
     def test_inverse_frame(self, x, y, z, q):
         f = quaternion_matrix(q)
         f[0, 3] = x
         f[1, 3] = y
         f[2, 3] = z
+        r = w.compile_and_execute(w.inverse_frame, [f])
 
         r2 = PyKDL.Frame()
         r2.M = PyKDL.Rotation.Quaternion(q[0], q[1], q[2], q[3])
@@ -371,8 +373,7 @@ class TestCASWrapper(unittest.TestCase):
         r2.p[2] = z
         r2 = r2.Inverse()
         r2 = pykdl_frame_to_numpy(r2)
-        self.assertTrue(np.isclose(w.compile_and_execute(w.inverse_frame, [f]),
-                                   r2, atol=1.e-4, rtol=1.e-4).all())
+        self.assertTrue(np.isclose(r, r2, atol=1.e-4, rtol=1.e-4).all())
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -478,14 +479,14 @@ class TestCASWrapper(unittest.TestCase):
 
     @given(quaternion())
     def test_axis_angle_from_quaternion(self, q):
-        axis2, angle2 = quat2axangle([q[-1], q[0], q[1], q[2]])
+        axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
         axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q)
         angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q)
         compare_axis_angle(angle, axis, angle2, axis2, 2)
 
     def test_axis_angle_from_quaternion2(self):
         q = [0, 0, 0, 1.0000001]
-        axis2, angle2 = quat2axangle([q[-1], q[0], q[1], q[2]])
+        axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
         axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q)
         angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q)
         compare_axis_angle(angle, axis, angle2, axis2, 2)
@@ -640,8 +641,8 @@ class TestCASWrapper(unittest.TestCase):
     @given(unit_vector(4),
            unit_vector(4))
     def test_entrywise_product(self, q1, q2):
-        m1 = quat2mat(q1)
-        m2 = quat2mat(q2)
+        m1 = rotation_matrix_from_quaternion(q1[0], q1[1], q1[2], q1[3])
+        m2 = rotation_matrix_from_quaternion(q1[0], q1[1], q1[2], q1[3])
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])
         r2 = m1 * m2
         np.testing.assert_array_almost_equal(r1, r2)

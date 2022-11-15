@@ -3,8 +3,8 @@ from threading import Thread
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.utils.logging import logwarn
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.logging import logwarn
 from giskardpy.utils.utils import plot_trajectory
 
 

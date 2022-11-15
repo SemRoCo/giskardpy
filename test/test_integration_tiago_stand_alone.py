@@ -478,7 +478,8 @@ class TestCollisionAvoidance:
             'head_2_joint': 0.4333201391595926,
         }
 
-        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.set_seed_configuration(js)
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.set_joint_goal(zero_pose.better_pose2)
         zero_pose.plan_and_execute()
@@ -611,8 +612,7 @@ class TestConstraints:
     def test_DiffDriveTangentialToPoint(self, apartment_setup):
         goal_point = PointStamped()
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
-        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-                                      goal_point=goal_point)
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.plan_and_execute()
 
 
@@ -759,20 +759,6 @@ class TestJointGoals:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
-    def test_SetSeedConfiguration(self, zero_pose: TiagoTestWrapper):
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=zero_pose.better_pose)
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan()
-
-    def test_SetSeedConfiguration2(self, zero_pose: TiagoTestWrapper):
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=zero_pose.better_pose)
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        if zero_pose.is_standalone():
-            zero_pose.plan_and_execute()
-        else:
-            zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {

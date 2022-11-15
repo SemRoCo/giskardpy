@@ -1,12 +1,12 @@
 from collections import OrderedDict
-from typing import List, Optional, Union
+from typing import List, Union
 
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.data_types import JointStates
-from giskardpy.my_types import PrefixName
 from giskardpy.model.joints import Joint, OmniDrive
+from giskardpy.my_types import PrefixName
 
 
 class Trajectory:

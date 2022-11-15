@@ -1,6 +1,5 @@
 from giskardpy import identifier
 from giskardpy.goals.goal import Goal
-from giskardpy.god_map import GodMap
 from giskardpy.utils import logging
 
 

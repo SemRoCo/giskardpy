@@ -1,17 +1,12 @@
-from collections import defaultdict
-
-from std_msgs.msg import ColorRGBA
-
-from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard, ControlModes
-from giskardpy.my_types import PrefixName
 
 
 class TiagoBase(Giskard):
     def __init__(self):
         super().__init__()
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
-        self.load_moveit_self_collision_matrix('package://tiago_dual_moveit_config/config/srdf/tiago.srdf')
+        self.load_moveit_self_collision_matrix('package://giskardpy/config/tiago.srdf')
         self.overwrite_external_collision_avoidance('brumbrum',
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,

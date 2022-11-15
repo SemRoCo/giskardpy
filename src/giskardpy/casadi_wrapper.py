@@ -696,7 +696,7 @@ def axis_angle_from_quaternion(x, y, z, w):
     x, y, z, w = x / l, y / l, z / l, w / l
     w2 = sqrt(1 - w ** 2)
     m = if_eq_zero(w2, 1, w2)  # avoid /0
-    angle = if_eq_zero(w2, 0, (2 * acos(min(max(-1, w), 1))))
+    angle = if_eq_zero(w2, 0, (2 * acos(limit(w, -1, 1))))
     x = if_eq_zero(w2, 0, x / m)
     y = if_eq_zero(w2, 0, y / m)
     z = if_eq_zero(w2, 1, z / m)

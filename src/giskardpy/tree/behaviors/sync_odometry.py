@@ -2,21 +2,16 @@ from queue import Queue, Empty
 from typing import Optional
 
 import rospy
-import rostopic
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from py_trees import Status
-from pybullet import getAxisAngleFromQuaternion
-from rospy import ROSException, AnyMsg
+from rospy import ROSException
 
-import giskardpy.utils.tfwrapper as tf
-from giskardpy.casadi_wrapper import rotation_matrix_from_rpy
 from giskardpy.data_types import JointStates
-from giskardpy.exceptions import GiskardException
 from giskardpy.model.joints import OmniDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-from giskardpy.utils.math import quaternion_from_axis_angle, rpy_from_matrix, rpy_from_quaternion, quaternion_from_rpy
+from giskardpy.utils.math import rpy_from_quaternion
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 

@@ -1,7 +1,7 @@
-from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils import logging

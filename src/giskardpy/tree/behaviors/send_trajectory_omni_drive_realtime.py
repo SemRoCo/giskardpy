@@ -1,8 +1,7 @@
-import abc
 from abc import ABC
-from threading import Thread
 from typing import List, Optional
 
+import numpy as np
 import rospy
 import rostopic
 from geometry_msgs.msg import Twist
@@ -19,7 +18,6 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
-import numpy as np
 
 
 class SendTrajectoryToCmdVel(GiskardBehavior, ABC):

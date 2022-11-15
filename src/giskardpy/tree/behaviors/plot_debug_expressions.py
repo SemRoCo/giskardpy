@@ -1,10 +1,7 @@
 import traceback
 
-from py_trees import Status
-
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
-from giskardpy.utils import logging
 from giskardpy.utils.logging import logwarn
 from giskardpy.utils.utils import plot_trajectory
 

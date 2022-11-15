@@ -11,7 +11,6 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.utils import logging
-from test_world import create_world_with_pr2, create_world_with_donbot, allow_all_entry, avoid_all_entry
 
 folder_name = 'tmp_data/'
 
@@ -424,11 +423,7 @@ class TestPyBulletSyncer(object):
         assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
-<<<<<<< HEAD
-            if body_b != donbot_world.robot.position_name:
-=======
             if body_b != donbot_world.robot().name:
->>>>>>> a018cd7d105dd186f3940076d6fa666a95610d18
                 assert body_b_link == name or body_b_link == name2
             assert robot_link in robot_link_names
             if body_b == name2:
@@ -445,11 +440,7 @@ class TestPyBulletSyncer(object):
         collision_entry.robot_links = ['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link',
                                        'l_gripper_l_finger_link', 'l_gripper_r_finger_link',
                                        'l_gripper_r_finger_link', 'l_gripper_palm_link']
-<<<<<<< HEAD
-        collision_entry.body_b = pr2_world.robot.position_name
-=======
         collision_entry.body_b = pr2_world.robot().name
->>>>>>> a018cd7d105dd186f3940076d6fa666a95610d18
         collision_entry.link_bs = ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link',
                                    'r_forearm_link', 'r_forearm_link']
         ces.append(collision_entry)

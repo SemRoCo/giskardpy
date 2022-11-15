@@ -1,27 +1,25 @@
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict, Optional, List, Union, Tuple
+from typing import Dict, Optional, List
 
+import numpy as np
+import rospy
 from numpy.typing import NDArray
+from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
 from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
-import numpy as np
-import rospy
-from py_trees import Blackboard
-
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
-    TfPublishingModes, CollisionAvoidanceConfigEntry
+    TfPublishingModes, CollisionAvoidanceConfigEntry, SupportedQPSolver
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
-from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
+from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives
-from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
@@ -35,7 +33,7 @@ class Giskard:
         self._qp_solver_config: QPSolverConfig = QPSolverConfig()
         self.behavior_tree_config: BehaviorTreeConfig = BehaviorTreeConfig()
         self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
-        self._god_map = GodMap.init_from_paramserver()
+        self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
         self._controlled_joints = []
@@ -92,7 +90,11 @@ class Giskard:
         urdf = rospy.get_param(parameter_name)
         self.add_robot_urdf(urdf, group_name=group_name, joint_state_topics=joint_state_topics)
 
-    def configure_VisualizationBehavior(self, enabled=True, in_planning_loop=False):
+    def configure_MaxTrajectoryLength(self, enabled: bool = True, length: float = 30):
+        self.behavior_tree_config.plugin_config['MaxTrajectoryLength']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['MaxTrajectoryLength']['length'] = length
+
+    def configure_VisualizationBehavior(self, enabled: bool = True, in_planning_loop: bool = False):
         """
         :param enabled: whether Giskard should publish markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
@@ -101,7 +103,7 @@ class Giskard:
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
 
-    def configure_CollisionMarker(self, enabled=True, in_planning_loop=False):
+    def configure_CollisionMarker(self, enabled: bool = True, in_planning_loop: bool = False):
         """
         :param enabled: whether Giskard should publish collision markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
@@ -109,6 +111,13 @@ class Giskard:
         """
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
+
+    def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False):
+        self.behavior_tree_config.plugin_config['PlotTrajectory']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
+
+    def configure_PlotDebugExpressions(self, enabled: bool = False):
+        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """
@@ -317,13 +326,39 @@ class Giskard:
             setattr(self, parameter, deepcopy(value))
 
     def _create_parameter_backup(self):
-        self._backup = {'qp_solver_config': deepcopy(self._qp_solver_config),
-                        'general_config': deepcopy(self._general_config)}
+        self._backup = {'_qp_solver_config': deepcopy(self._qp_solver_config),
+                        '_general_config': deepcopy(self._general_config)}
+
+    def _create_collision_checker(self, world):
+        if self._collision_checker == CollisionCheckerLib.bpb:
+            logging.loginfo('Using betterpybullet for collision checking.')
+            try:
+                from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
+                return BetterPyBulletSyncer(world)
+            except ImportError as e:
+                logging.logerr(f'{e}; turning off collision avoidance.')
+                self._collision_checker = CollisionCheckerLib.none
+        if self._collision_checker == CollisionCheckerLib.pybullet:
+            logging.loginfo('Using pybullet for collision checking.')
+            try:
+                from giskardpy.model.pybullet_syncer import PyBulletSyncer
+                return PyBulletSyncer(world)
+            except ImportError as e:
+                logging.logerr(f'{e}; turning off collision avoidance.')
+                self._collision_checker = CollisionCheckerLib.none
+        if self._collision_checker == CollisionCheckerLib.none:
+            logging.logwarn('Using no collision checking.')
+            from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+            return CollisionWorldSynchronizer(world)
+        if self._collision_checker not in CollisionCheckerLib:
+            raise KeyError(f'Unknown collision checker {self._collision_checker}. '
+                           f'Collision avoidance is disabled')
 
     def grow(self):
         """
         Initialize the behavior tree and world. You usually don't need to call this.
         """
+        self._qp_solver_check()
         if len(self.robot_interface_configs) == 0:
             self.add_robot_from_parameter_server()
         self._create_parameter_backup()
@@ -333,21 +368,7 @@ class Giskard:
         world.delete_all_but_robots()
         world.register_controlled_joints(self._controlled_joints)
 
-        if self._collision_checker == CollisionCheckerLib.bpb:
-            logging.loginfo('Using bpb for collision checking.')
-            from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-            collision_scene = BetterPyBulletSyncer(world)
-        elif self._collision_checker == CollisionCheckerLib.pybullet:
-            logging.loginfo('Using pybullet for collision checking.')
-            from giskardpy.model.pybullet_syncer import PyBulletSyncer
-            collision_scene = PyBulletSyncer(world)
-        elif self._collision_checker == CollisionCheckerLib.none:
-            logging.logwarn('Using no collision checking.')
-            from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-            collision_scene = CollisionWorldSynchronizer(world)
-        else:
-            raise KeyError(f'Unknown collision checker {self._collision_checker}. '
-                           f'Collision avoidance is disabled')
+        collision_scene = self._create_collision_checker(world)
         self._god_map.set_data(identifier.collision_checker, self._collision_checker)
         self._god_map.set_data(identifier.collision_scene, collision_scene)
         if self._general_config.control_mode == ControlModes.open_loop:
@@ -360,6 +381,19 @@ class Giskard:
             raise KeyError(f'Robot interface mode \'{self._general_config.control_mode}\' is not supported.')
 
         self._controlled_joints_sanity_check()
+
+    def _qp_solver_check(self):
+        try:
+            if self._qp_solver_config.qp_solver == SupportedQPSolver.gurobi:
+                from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
+            elif self._qp_solver_config.qp_solver == SupportedQPSolver.cplex:
+                from giskardpy.qp.qp_solver_cplex import QPSolverCplex
+            elif self._qp_solver_config.qp_solver not in SupportedQPSolver:
+                raise KeyError(f'Solver \'{self._qp_solver_config.qp_solver}\' not supported.')
+        except Exception as e:
+            logging.logwarn(e)
+            logging.logwarn('Defaulting back to qpoases.')
+            self._qp_solver_config.qp_solver = SupportedQPSolver.qp_oases
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)
@@ -590,7 +624,7 @@ class Giskard:
         """
         self._qp_solver_config.prediction_horizon = new_prediction_horizon
 
-    def set_qp_solver(self, new_solver: QPSolver):
+    def set_qp_solver(self, new_solver: SupportedQPSolver):
         self._qp_solver_config.qp_solver = new_solver
 
     def set_default_joint_limits(self,

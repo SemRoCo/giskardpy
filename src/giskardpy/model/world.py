@@ -1,12 +1,9 @@
-import numbers
 import traceback
-from copy import deepcopy
 from functools import cached_property
 from itertools import combinations
 from typing import Dict, Union, Tuple, Set, Optional, List
 
 import numpy as np
-import rospy
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
 from std_msgs.msg import ColorRGBA
@@ -17,7 +14,6 @@ from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates, KeyDefaultDict
-from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException
 from giskardpy.god_map import GodMap
@@ -25,6 +21,7 @@ from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
     PrismaticJoint, RevoluteJoint, ContinuousJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, expr_matrix
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
@@ -60,6 +57,8 @@ class WorldTree:
         self._clear()
 
     def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        if group_name == '':
+            group_name = None
         try:
             return PrefixName.from_string(joint_name)
         except AttributeError:
@@ -86,7 +85,7 @@ class WorldTree:
                     return PrefixName(link_name, None)
             return self.groups[group_name].get_link_short_name_match(link_name)
 
-    def get_link(self, link_name: str, group_name: str) -> Link:
+    def get_link(self, link_name: str, group_name:  Optional[str] = None) -> Link:
         return self._links[self.get_link_name(link_name, group_name)]
 
     @property
@@ -478,10 +477,10 @@ class WorldTree:
             return None
         ret = self._get_group_from_groups(groups)
         if ret is None and groups_size > 0:
-            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {joint_name}.'
-                                        f'Please define a group name for link {joint_name}.')
+            raise UnknownGroupException(f'Found multiple seperated groups {groups} for joint_name {joint_name}.'
+                                        f'Please define a group name for joint {joint_name}.')
         elif ret is None:
-            raise UnknownGroupException(f'Did not find any group containing the link {joint_name}.')
+            raise UnknownGroupException(f'Did not find any group containing the joint {joint_name}.')
         return ret
 
     def get_groups_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Set[str]:
@@ -1159,9 +1158,9 @@ class WorldTree:
         except KeyError:
             # joint has no limits for this derivative
             return None, None
-        if not isinstance(lower_limit, (int, float)):
+        if not isinstance(lower_limit, (int, float)) and lower_limit is not None:
             lower_limit = self.god_map.evaluate_expr(lower_limit)
-        if not isinstance(upper_limit, (int, float)):
+        if not isinstance(upper_limit, (int, float)) and upper_limit is not None:
             upper_limit = self.god_map.evaluate_expr(upper_limit)
         return lower_limit, upper_limit
 
@@ -1293,6 +1292,12 @@ class SubWorldTree(WorldTree):
         self.root_link_name = root_link_name
         self.world = world
         self.actuated = actuated
+
+    def get_link(self, link_name: str) -> Link:
+        return self.world.get_link(link_name, self.name)
+
+    def get_joint(self, joint_name: my_string) -> Joint:
+        return self.world.get_joint(joint_name, self.name)
 
     @property
     def controlled_joints(self):

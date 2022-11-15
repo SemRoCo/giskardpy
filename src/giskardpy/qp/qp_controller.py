@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Type
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,6 +18,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.my_types import expr_symbol
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import memoize, create_path, suppress_stdout, blackboard_god_map
@@ -495,14 +496,14 @@ class A(Parent):
         # constraints
         # TODO i don't need vel checks for the last 2 entries because the have to be zero with current B's
         # velocity limits
-        for order in range(self.order-1):
+        for order in range(self.order - 1):
             J_vel_tmp = J_vel[order]
             J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel_tmp)
             horizontal_offset = J_vel_limit_block.shape[1]
             if order == 0:
                 next_vertical_offset = vertical_offset + J_vel_limit_block.shape[0]
             A_soft[vertical_offset:next_vertical_offset,
-                   horizontal_offset*order:horizontal_offset*(order+1)] = J_vel_limit_block
+            horizontal_offset * order:horizontal_offset * (order + 1)] = J_vel_limit_block
         # velocity constraint slack
         I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
         if J_err[0].shape[0] > 0:
@@ -528,7 +529,7 @@ class A(Parent):
 
         # J stack for total error
         if len(self.constraints) > 0:
-            for order in range(self.order-1):
+            for order in range(self.order - 1):
                 J_hstack = w.hstack([J_err[order] for _ in range(self.prediction_horizon)])
                 if order == 0:
                     vertical_offset = next_vertical_offset
@@ -539,7 +540,7 @@ class A(Parent):
                     J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
                 horizontal_offset = J_hstack.shape[1]
                 A_soft[vertical_offset:next_vertical_offset,
-                       horizontal_offset*(order):horizontal_offset*(order+1)] = J_hstack
+                horizontal_offset * (order):horizontal_offset * (order + 1)] = J_hstack
 
                 # sum of vel slack for total error
                 # I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
@@ -608,25 +609,21 @@ class QPController:
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        try:
-            if solver_name == SupportedQPSolver.gurobi:
-                from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-                self.qp_solver = QPSolverGurobi()
-            elif solver_name == SupportedQPSolver.cplex:
-                from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-                self.qp_solver = QPSolverCplex()
-            elif solver_name == SupportedQPSolver.qp_oases:
-                from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
-                self.qp_solver = QPSolverQPOases()
-            elif not solver_name == SupportedQPSolver.qp_oases:
-                raise KeyError(f'Solver \'{solver_name}\' not supported')
-        except Exception as e:
-            logging.logwarn(e)
-            logging.logwarn('defaulting back to qpoases')
-            solver_name = SupportedQPSolver.qp_oases
-        if solver_name == SupportedQPSolver.qp_oases:
+        qp_solver_class: Type[QPSolver]
+        if solver_name == SupportedQPSolver.gurobi:
+            from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
+            qp_solver_class = QPSolverGurobi
+        elif solver_name == SupportedQPSolver.cplex:
+            from giskardpy.qp.qp_solver_cplex import QPSolverCplex
+            qp_solver_class = QPSolverCplex
+        else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
-            self.qp_solver = QPSolverQPOases()
+            qp_solver_class = QPSolverQPOases
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
+        self.qp_solver = qp_solver_class(num_non_slack=num_non_slack,
+                                         retry_added_slack=self.retry_added_slack,
+                                         retry_weight_factor=self.retry_weight_factor,
+                                         retries_with_relaxed_constraints=self.retries_with_relaxed_constraints)
         logging.loginfo(f'Using QP Solver \'{solver_name}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
 
@@ -751,8 +748,8 @@ class QPController:
                 '../tmp_data')
         else:
             save_pandas(
-                [self.p_weights, self.p_A, self.p_Ax, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
-                ['weights', 'A', 'Ax', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
+                [self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
+                ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
                 '../tmp_data')
 
     def _is_inf_in_data(self):
@@ -921,7 +918,7 @@ class QPController:
         filtered_stuff = self.evaluate_and_split(substitutions)
         try:
             # self.__swap_compiled_matrices()
-            self.xdot_full = self.qp_solver.solve(*filtered_stuff)
+            self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
         except Exception as e_original:
@@ -939,18 +936,7 @@ class QPController:
                     raise OutOfJointLimitsException(joint_limits_violated_msg)
                 finally:
                     self.__swap_compiled_matrices()
-            if self.retries_with_relaxed_constraints:
-                try:
-                    logging.logwarn('Failed to solve QP, retrying with relaxed hard constraints.')
-                    self.get_cmd_relaxed_hard_constraints(*filtered_stuff)
-                    self.retries_with_relaxed_constraints -= 1
-                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
-                except Exception as e_relaxed:
-                    logging.logerr('Relaxing hard constraints failed.')
-                    logging.loginfo('current sate:')
-                    self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
-            else:
-                logging.logwarn('Ran out of allowed retries with relaxed hard constraints.')
+            #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
             self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
             self._is_inf_in_data()
             raise
@@ -968,22 +954,6 @@ class QPController:
         filters = self.make_filters()
         filtered_stuff = self.filter_zero_weight_stuff(*filters)
         return filtered_stuff
-
-    def get_cmd_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
-        num_of_slack = len(lb) - num_non_slack
-        lb_relaxed = lb.copy()
-        ub_relaxed = ub.copy()
-        lb_relaxed[-num_of_slack:] = -self.retry_added_slack
-        ub_relaxed[-num_of_slack:] = self.retry_added_slack
-        self.xdot_full = self.qp_solver.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
-        upper_violations = ub < self.xdot_full
-        lower_violations = lb > self.xdot_full
-        if np.any(upper_violations) or np.any(lower_violations):
-            weights[upper_violations | lower_violations] *= self.retry_weight_factor
-            self.xdot_full = self.qp_solver.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
-            return True
-        return False
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
         num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)

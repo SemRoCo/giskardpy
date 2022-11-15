@@ -1,3 +1,4 @@
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard, ControlModes
 
 

@@ -45,7 +45,9 @@ class QPSolverGurobi(QPSolver):
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if
                          '__' not in name}
 
-    def __init__(self):
+    def __init__(self, num_non_slack: int, retry_added_slack: float, retry_weight_factor: float,
+                 retries_with_relaxed_constraints: int):
+        super().__init__(num_non_slack, retry_added_slack, retry_weight_factor, retries_with_relaxed_constraints)
         self.started = False
 
     @profile
@@ -79,39 +81,40 @@ class QPSolverGurobi(QPSolver):
     def round(self, data, decimal_places):
         return np.round(data, decimal_places)
 
-    @profile
-    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=1, decimal_places=4):
-        H = np.diag(H)
-        for i in range(tries):
-            if self.started:
-                self.update(H, g, A, lb, ub, lbA, ubA)
-            else:
-                self.init(H, g, A, lb, ub, lbA, ubA)
-            self.qpProblem.optimize()
-            success = self.qpProblem.status
-            if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
-                if success == gurobipy.GRB.SUBOPTIMAL:
-                    logging.logwarn('warning, suboptimal!')
-                self.xdot_full = np.array(self.qpProblem.X)
-                break
-            elif success in {gurobipy.GRB.NUMERIC} and i < tries - 1:
-                self.print_debug()
-                logging.logwarn('Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
-                    self.STATUS_VALUE_DICT[success],
-                    decimal_places
-                ))
-                H = self.round(H, decimal_places)
-                A = self.round(A, decimal_places)
-                lb = self.round(lb, decimal_places)
-                ub = self.round(ub, decimal_places)
-                lbA = self.round(lbA, decimal_places)
-                ubA = self.round(ubA, decimal_places)
-        else:
-            # self.print_debug()
-            self.started = False
-            error_message = '{}'.format(self.STATUS_VALUE_DICT[success])
-            if success == gurobipy.GRB.INFEASIBLE:
-                raise InfeasibleException(error_message)
-            raise QPSolverException(error_message)
+    def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
+              ubA: np.ndarray) -> np.ndarray:
+        H = np.diag(weights)
+        self.init(H, g, A, lb, ub, lbA, ubA)
+        self.qpProblem.optimize()
+        success = self.qpProblem.status
+        if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
+            if success == gurobipy.GRB.SUBOPTIMAL:
+                logging.logwarn('warning, suboptimal solution!')
+            return np.array(self.qpProblem.X)
+        if success == gurobipy.GRB.INFEASIBLE:
+            raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
+        raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
 
-        return self.xdot_full
+    @profile
+    def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
+        exception = None
+        for i in range(2):
+            try:
+                return self.solve(weights, g, A, lb, ub, lbA, ubA)
+            except QPSolverException as e:
+                exception = e
+                # if e.error_code == gurobipy.GRB.NUMERIC:
+                #     logging.logwarn(f'Solver returned \'{e}\', '
+                #                     f'retrying with data rounded to \'{self.on_fail_round_to}\' decimal places')
+                #     weights = self.round(weights, self.on_fail_round_to)
+                #     A = self.round(A, self.on_fail_round_to)
+                #     lb = self.round(lb, self.on_fail_round_to)
+                #     ub = self.round(ub, self.on_fail_round_to)
+                #     lbA = self.round(lbA, self.on_fail_round_to)
+                #     ubA = self.round(ubA, self.on_fail_round_to)
+                #     continue
+                # if isinstance(e, InfeasibleException):
+                logging.loginfo(f'{e}; retrying with relaxed hard constraints')
+                weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
+                continue
+        raise exception

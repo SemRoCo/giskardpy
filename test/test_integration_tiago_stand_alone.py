@@ -478,7 +478,8 @@ class TestCollisionAvoidance:
             'head_2_joint': 0.4333201391595926,
         }
 
-        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.set_seed_configuration(js)
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.set_joint_goal(zero_pose.better_pose2)
         zero_pose.plan_and_execute()

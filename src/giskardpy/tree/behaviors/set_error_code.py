@@ -59,9 +59,7 @@ class SetErrorCode(GiskardBehavior):
         # qp exceptions
         if isinstance(exception, QPSolverException):
             error_code = MoveResult.QP_SOLVER_ERROR
-            if isinstance(exception, MAX_NWSR_REACHEDException):
-                error_code = MoveResult.MAX_NWSR_REACHED
-            elif isinstance(exception, OutOfJointLimitsException):
+            if isinstance(exception, OutOfJointLimitsException):
                 error_code = MoveResult.OUT_OF_JOINT_LIMITS
             elif isinstance(exception, HardConstraintsViolatedException):
                 error_code = MoveResult.HARD_CONSTRAINTS_VIOLATED

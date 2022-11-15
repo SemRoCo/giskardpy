@@ -2792,7 +2792,7 @@ class TestCollisionAvoidanceGoals:
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
-    def test_infeasible(self, kitchen_setup: PR2TestWrapper):
+    def test_hard_constraints_violated(self, kitchen_setup: PR2TestWrapper):
         pose = PoseStamped()
         pose.header.frame_id = 'map'
         pose.pose.position = Point(2, 0, 0)

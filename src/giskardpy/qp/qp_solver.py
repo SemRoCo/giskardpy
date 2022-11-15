@@ -4,6 +4,8 @@ from typing import Tuple
 
 import numpy as np
 
+from giskardpy.exceptions import HardConstraintsViolatedException
+
 
 class QPSolver(ABC):
 
@@ -45,6 +47,9 @@ class QPSolver(ABC):
 
     def compute_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        self.retries_with_relaxed_constraints -= 1
+        if self.retries_with_relaxed_constraints <= 0:
+            raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
         num_of_slack = len(lb) - self.num_non_slack
         lb_relaxed = lb.copy()
         ub_relaxed = ub.copy()

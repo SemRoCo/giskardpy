@@ -12,7 +12,7 @@ import pandas as pd
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import OutOfJointLimitsException, \
-    HardConstraintsViolatedException, QPSolverException
+    HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import expr_symbol
@@ -921,7 +921,7 @@ class QPController:
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
-        except Exception as e_original:
+        except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas()
             joint_limits_violated_msg = self._are_joint_limits_violated()

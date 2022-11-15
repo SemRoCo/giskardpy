@@ -1431,10 +1431,6 @@ class SubWorldTree(WorldTree):
     def parent_link_of_root(self) -> PrefixName:
         return self.world.get_parent_link_of_link(self.world.groups[self.name].root_link_name)
 
-    # @property
-    # def _fk_computer(self):
-    #     return self.world._fk_computer
-
     def delete_all_but_robot(self):
         raise NotImplementedError('Can\'t hard reset a SubWorldTree.')
 
@@ -1442,17 +1438,9 @@ class SubWorldTree(WorldTree):
     def base_pose(self) -> PoseStamped:
         return self.world.compute_fk_pose(self.world.root_link_name, self.root_link_name).pose
 
-    # @property
-    # def _fks(self):
-    #     return self.world._fks
-
     @property
     def state(self) -> JointStates:
         return JointStates({j: self.world.state[j] for j in self._joints if j in self.world.state})
-
-    @state.setter
-    def state(self, value):
-        self.world.state = value
 
     def notify_model_change(self):
         raise NotImplementedError()

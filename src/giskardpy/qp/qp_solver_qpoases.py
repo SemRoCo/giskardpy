@@ -4,7 +4,7 @@ import numpy as np
 import qpoases
 from qpoases import PyReturnValue
 
-from giskardpy.exceptions import QPSolverException, InfeasibleException
+from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 
@@ -95,9 +95,13 @@ class QPSolverQPOases(QPSolver):
                     ubA = np.round(ubA, self.on_fail_round_to)
                 elif isinstance(e, InfeasibleException) and not relaxed:
                     logging.loginfo(f'{e}; retrying with relaxed hard constraints')
-                    lb, ub, weights = self.compute_relaxed_hard_constraints(weights=weights, g=g, A=A, lb=lb, ub=ub,
-                                                                            lbA=lbA, ubA=ubA)
-                    relaxed = True
+                    try:
+                        weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
+                        relaxed = True
+                    except InfeasibleException as e2:
+                        if isinstance(e2, HardConstraintsViolatedException):
+                            raise e2
+                        raise e
                 else:
                     self.mode = QPoasesModes(self.mode + 1)
                     logging.loginfo(f'{e}; retrying with {repr(self.mode)} mode.')

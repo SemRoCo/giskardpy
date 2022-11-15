@@ -922,6 +922,8 @@ class QPController:
             # self.__swap_compiled_matrices()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
         except InfeasibleException as e_original:
+            if isinstance(e_original, HardConstraintsViolatedException):
+                raise
             self.xdot_full = None
             self._create_debug_pandas()
             joint_limits_violated_msg = self._are_joint_limits_violated()

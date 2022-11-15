@@ -2,7 +2,7 @@ import gurobipy
 import numpy as np
 from scipy import sparse
 
-from giskardpy.exceptions import QPSolverException, InfeasibleException
+from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 
@@ -114,7 +114,12 @@ class QPSolverGurobi(QPSolver):
                 #     ubA = self.round(ubA, self.on_fail_round_to)
                 #     continue
                 # if isinstance(e, InfeasibleException):
-                logging.loginfo(f'{e}; retrying with relaxed hard constraints')
-                weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
+                try:
+                    weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
+                    logging.loginfo(f'{e}; retrying with relaxed hard constraints')
+                except InfeasibleException as e2:
+                    if isinstance(e2, HardConstraintsViolatedException):
+                        raise e2
+                    raise e
                 continue
         raise exception

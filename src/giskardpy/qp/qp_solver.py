@@ -4,7 +4,7 @@ from typing import Tuple
 
 import numpy as np
 
-from giskardpy.exceptions import HardConstraintsViolatedException
+from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 
 
 class QPSolver(ABC):
@@ -55,8 +55,15 @@ class QPSolver(ABC):
         ub_relaxed = ub.copy()
         lb_relaxed[-num_of_slack:] = -self.retry_added_slack
         ub_relaxed[-num_of_slack:] = self.retry_added_slack
-        xdot_full = self.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
+        try:
+            xdot_full = self.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
+        except QPSolverException as e:
+            self.retries_with_relaxed_constraints += 1
+            raise e
         upper_violations = ub < xdot_full
         lower_violations = lb > xdot_full
-        weights[upper_violations | lower_violations] *= self.retry_weight_factor
-        return weights, lb_relaxed, ub_relaxed
+        if np.any(upper_violations) or np.any(lower_violations):
+            weights[upper_violations | lower_violations] *= self.retry_weight_factor
+            return weights, lb_relaxed, ub_relaxed
+        self.retries_with_relaxed_constraints += 1
+        raise InfeasibleException('')

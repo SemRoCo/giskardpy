@@ -35,7 +35,7 @@ class SetPredictionHorizon(Goal):
             if 'jerk' in self.god_map.get_data(identifier.joint_limits):
                 del self.god_map.get_data(identifier.joint_limits)['snap']
         self.god_map.set_data(identifier.prediction_horizon, self.prediction_horizon)
-        self.world.sync_with_paramserver()
+        self.world.apply_default_limits_and_weights()
 
 
 class SetMaxTrajLength(Goal):

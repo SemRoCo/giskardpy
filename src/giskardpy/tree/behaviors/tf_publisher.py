@@ -16,7 +16,7 @@ class TFPublisher(GiskardBehavior):
     @profile
     def __init__(self, name: str, mode: TfPublishingModes, tf_topic: str, enabled: bool):
         super().__init__(name)
-        self.original_links = set(self.world.link_names)
+        self.original_links = set(self.world.link_names_as_set)
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.mode = mode
         self.robot_names = self.collision_scene.robot_names
@@ -42,7 +42,7 @@ class TFPublisher(GiskardBehavior):
                     tf_msg = TFMessage()
                     if self.mode in [TfPublishingModes.attached_objects, TfPublishingModes.attached_and_world_objects]:
                         for robot_name in self.robot_names:
-                            robot_links = set(self.world.groups[robot_name].link_names)
+                            robot_links = set(self.world.groups[robot_name].link_names_as_set)
                         attached_links = robot_links - self.original_links
                         if attached_links:
                             get_fk = self.world.compute_fk_pose

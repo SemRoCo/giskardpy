@@ -26,8 +26,8 @@ class SyncTfFrames(GiskardBehavior):
                     # raise Exception()
                 except:
                     parent_T_child = msg_to_homogeneous_matrix(parent_T_child)
-                    chain = self.world.compute_chain(parent_link, child_link, joints=True, links=False, fixed=True,
-                                                     non_controlled=True)
+                    chain = self.world.compute_chain(parent_link, child_link, add_joints=True, add_links=False, add_fixed_joints=True,
+                                                     add_non_controlled_joints=True)
                     if len(chain) > 1:
                         raise Exception('todo')
                     joint_name = chain[0]

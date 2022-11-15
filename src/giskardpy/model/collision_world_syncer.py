@@ -99,7 +99,7 @@ class Collisions:
     def get_robot_from_self_collision(self, collision):
         link_a, link_b = collision.link_a, collision.link_b
         for robot in self.collision_scene.robots:
-            if link_a in robot.link_names and link_b in robot.link_names:
+            if link_a in robot.link_names_as_set and link_b in robot.link_names_as_set:
                 return robot
 
     @profile
@@ -335,7 +335,8 @@ class CollisionWorldSynchronizer:
                         or link_b in self.ignored_self_collion_pairs \
                         or (link_a, link_b) in self.ignored_self_collion_pairs \
                         or (link_b, link_a) in self.ignored_self_collion_pairs \
-                        or group.are_linked(link_a, link_b, non_controlled=non_controlled, exception=self.fixed_joints) \
+                        or group.are_linked(link_a, link_b, do_not_ignore_non_controlled_joints=non_controlled,
+                                            joints_to_be_assumed_fixed=self.fixed_joints) \
                         or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
                     self.add_black_list_entry(*link_combination)
             except Exception as e:

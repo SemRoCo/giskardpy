@@ -109,7 +109,7 @@ class DebugTFPublisher(GiskardBehavior):
         # Add points
         points = self.filter_points(p_debug)
         for k, pos in points.items():
-            map_T_k0 = np_to_kdl(self.world.get_fk('map', k[0]))
+            map_T_k0 = np_to_kdl(self.world.compute_fk_np('map', k[0]))
             k0_P_k1 = point_to_kdl(pos)
             map_P_k1 = kdl_to_point(map_T_k0 * k0_P_k1)
             tf_msg.transforms.append(self.make_transform('map', k[1], [map_P_k1.x,
@@ -119,15 +119,15 @@ class DebugTFPublisher(GiskardBehavior):
         # Add rotations
         rotations = self.filter_rotations(p_debug)
         for k, q in rotations.items():
-            map_T_k0 = np_to_kdl(self.world.get_fk('map', k[0]))
-            k0_T_k0 = np_to_kdl(self.world.get_fk(k[0], k[0]))
+            map_T_k0 = np_to_kdl(self.world.compute_fk_np('map', k[0]))
+            k0_T_k0 = np_to_kdl(self.world.compute_fk_np(k[0], k[0]))
             map_P_k1 = kdl_to_transform_stamped(map_T_k0 * k0_T_k0 * quaternion_to_kdl(q), 'map', k[1])
             tf_msg.transforms.append(map_P_k1)
 
         # Add Transforms
         transforms = self.filter_transforms(p_debug)
         for k, t in transforms.items():
-            map_T_k0 = np_to_kdl(self.world.get_fk('map', k[0]))
+            map_T_k0 = np_to_kdl(self.world.compute_fk_np('map', k[0]))
             k0_T_k1 = transform_to_kdl(t)
             map_P_k1 = kdl_to_transform_stamped(map_T_k0 * k0_T_k1, 'map', k[1])
             tf_msg.transforms.append(map_P_k1)

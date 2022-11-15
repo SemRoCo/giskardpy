@@ -269,7 +269,7 @@ def pocky_pose_setup(resetted_giskard) -> PR22TestWrapper:
 class TestFk(object):
     def test_fk(self, zero_pose):
         for robot_name in zero_pose.robot_names:
-            for root, tip in itertools.product(zero_pose.world.groups[robot_name].link_names, repeat=2):
+            for root, tip in itertools.product(zero_pose.world.groups[robot_name].link_names_as_set, repeat=2):
                 fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
                 fk2 = tf.lookup_pose(str(root), str(tip))
                 compare_poses(fk1.pose, fk2.pose)
@@ -287,7 +287,7 @@ class TestFk(object):
             zero_pose.add_box(robot_name + pocky, (0.1, 0.02, 0.02), ps,
                               parent_link=zero_pose.r_tips[robot_name],
                               parent_link_group=robot_name)
-            for root, tip in itertools.product(zero_pose.world.groups[robot_name].link_names, [robot_name + pocky]):
+            for root, tip in itertools.product(zero_pose.world.groups[robot_name].link_names_as_set, [robot_name + pocky]):
                 fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
                 fk2 = tf.lookup_pose(str(root), str(tip))
                 compare_poses(fk1.pose, fk2.pose)

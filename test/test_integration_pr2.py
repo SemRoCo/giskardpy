@@ -3765,7 +3765,7 @@ class TestWorld:
         world_setup.move_group(box_name, new_parent_link_name)
 
         new_fk = world_setup.compute_fk_pose(world_setup.root_link_name, box_name)
-        assert world_setup.get_link_name(box_name) in world_setup.groups[world_setup.robot_names[0]].link_names
+        assert world_setup.get_link_name(box_name) in world_setup.groups[world_setup.robot_names[0]].link_names_as_set
         assert world_setup.get_parent_link_of_link(world_setup.get_link_name(box_name)) == new_parent_link_name
         compare_poses(old_fk.pose, new_fk.pose)
 
@@ -3791,22 +3791,22 @@ class TestWorld:
                                                                  world_setup.get_joint_name(
                                                                      'r_gripper_r_finger_tip_joint'),
                                                                  world_setup.get_joint_name('r_gripper_joint')}
-        assert set(world_setup.groups['r_hand'].link_names) == {world_setup.get_link_name('r_wrist_roll_link'),
-                                                                world_setup.get_link_name('r_gripper_palm_link'),
-                                                                world_setup.get_link_name('r_gripper_led_frame'),
-                                                                world_setup.get_link_name(
+        assert set(world_setup.groups['r_hand'].link_names_as_set) == {world_setup.get_link_name('r_wrist_roll_link'),
+                                                                       world_setup.get_link_name('r_gripper_palm_link'),
+                                                                       world_setup.get_link_name('r_gripper_led_frame'),
+                                                                       world_setup.get_link_name(
                                                                     'r_gripper_motor_accelerometer_link'),
-                                                                world_setup.get_link_name('r_gripper_tool_frame'),
-                                                                world_setup.get_link_name(
+                                                                       world_setup.get_link_name('r_gripper_tool_frame'),
+                                                                       world_setup.get_link_name(
                                                                     'r_gripper_motor_slider_link'),
-                                                                world_setup.get_link_name('r_gripper_motor_screw_link'),
-                                                                world_setup.get_link_name('r_gripper_l_finger_link'),
-                                                                world_setup.get_link_name(
+                                                                       world_setup.get_link_name('r_gripper_motor_screw_link'),
+                                                                       world_setup.get_link_name('r_gripper_l_finger_link'),
+                                                                       world_setup.get_link_name(
                                                                     'r_gripper_l_finger_tip_link'),
-                                                                world_setup.get_link_name('r_gripper_r_finger_link'),
-                                                                world_setup.get_link_name(
+                                                                       world_setup.get_link_name('r_gripper_r_finger_link'),
+                                                                       world_setup.get_link_name(
                                                                     'r_gripper_r_finger_tip_link'),
-                                                                world_setup.get_link_name(
+                                                                       world_setup.get_link_name(
                                                                     'r_gripper_l_finger_tip_frame')}
 
     def test_get_chain(self, world_setup: WorldTree):
@@ -3818,10 +3818,10 @@ class TestWorld:
         tip_link = 'r_gripper_tool_frame'
         real = world_setup.compute_chain(root_link_name=world_setup.get_link_name(root_link),
                                          tip_link_name=world_setup.get_link_name(tip_link),
-                                         joints=True,
-                                         links=True,
-                                         fixed=True,
-                                         non_controlled=True)
+                                         add_joints=True,
+                                         add_links=True,
+                                         add_fixed_joints=True,
+                                         add_non_controlled_joints=True)
         expected = parsed_urdf.get_chain(root_link, tip_link, True, True, True)
         assert {x.short_name for x in real} == set(expected)
 

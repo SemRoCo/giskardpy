@@ -415,13 +415,13 @@ class GiskardTestWrapper(GiskardWrapper):
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
         if root_group is None:
             try:
-                root_group = self.world.get_group_containing_link_short_name(root_link)
+                root_group = self.world._get_group_containing_link_short_name(root_link)
             except UnknownGroupException:
                 pass
         root_link = PrefixName(root_link, root_group)
         if tip_group is None:
             try:
-                tip_group = self.world.get_group_containing_link_short_name(tip_link)
+                tip_group = self.world._get_group_containing_link_short_name(tip_link)
             except UnknownGroupException:
                 pass
         tip_link = PrefixName(tip_link, tip_group)
@@ -810,7 +810,7 @@ class GiskardTestWrapper(GiskardWrapper):
         old_link_names = []
         old_joint_names = []
         if expected_response == UpdateWorldResponse.SUCCESS:
-            old_link_names = self.world.groups[name].link_names
+            old_link_names = self.world.groups[name].link_names_as_set
             old_joint_names = self.world.groups[name].joint_names
         r = super(GiskardTestWrapper, self).remove_group(name, timeout=timeout)
         assert r.error_codes == expected_response, \
@@ -820,7 +820,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert name not in self.get_group_names()
         if expected_response == UpdateWorldResponse.SUCCESS:
             for old_link_name in old_link_names:
-                assert old_link_name not in self.world.link_names
+                assert old_link_name not in self.world.link_names_as_set
             for old_joint_name in old_joint_names:
                 assert old_joint_name not in self.world.joint_names
         return r
@@ -864,7 +864,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 if parent_link == '':
                     parent_link = self.world.root_link_name
                 else:
-                    parent_link_group = self.world.get_group_containing_link_short_name(parent_link)
+                    parent_link_group = self.world._get_group_containing_link_short_name(parent_link)
                     parent_link = PrefixName(parent_link, parent_link_group)
                 assert parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
         else:
@@ -1587,7 +1587,7 @@ class JointGoalChecker(GoalChecker):
         :type decimal: int
         """
         for joint_name in goal_js:
-            group_name = self.world.get_group_containing_joint_short_name(joint_name)
+            group_name = self.world._get_group_containing_joint_short_name(joint_name)
             full_joint_name = PrefixName(joint_name, group_name)
             goal = goal_js[joint_name]
             current = current_js[full_joint_name].position

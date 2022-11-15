@@ -70,7 +70,7 @@ class WorldUpdater(GiskardBehavior):
     def __init__(self, name: str):
         self.added_plugin_names = defaultdict(list)
         super().__init__(name)
-        self.original_link_names = self.world.link_names
+        self.original_link_names = self.world.link_names_as_set
         self.service_in_use = Queue(maxsize=1)
         self.work_permit = Queue(maxsize=1)
         self.update_ticked = Queue(maxsize=1)
@@ -118,7 +118,7 @@ class WorldUpdater(GiskardBehavior):
         try:
             group = self.world.groups[req.group_name]  # type: SubWorldTree
             res.controlled_joints = [str(j.short_name) for j in group.controlled_joints]
-            res.links = list(sorted(str(x.short_name) for x in group.link_names))
+            res.links = list(sorted(str(x.short_name) for x in group.link_names_as_set))
             res.child_groups = list(sorted(str(x) for x in group.groups.keys()))
             # tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             # node_name = str(PrefixName(req.group_name, 'js'))

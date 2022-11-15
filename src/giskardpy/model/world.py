@@ -1,7 +1,8 @@
+from __future__ import annotations
 import traceback
 from functools import cached_property
 from itertools import combinations
-from typing import Dict, Union, Tuple, Set, Optional, List
+from typing import Dict, Union, Tuple, Set, Optional, List, Callable
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -21,21 +22,22 @@ from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
     PrismaticJoint, RevoluteJoint, ContinuousJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, expr_symbol
 from giskardpy.my_types import my_string, expr_matrix
+from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
 from giskardpy.utils.utils import suppress_stderr, memoize
 
 
-class TravelCompanion(object):
-    def link_call(self, link_name: Union[PrefixName, str]) -> bool:
+class TravelCompanion:
+    def link_call(self, link_name: PrefixName) -> bool:
         """
         :return: return True to stop climbing up the branch
         """
         return False
 
-    def joint_call(self, joint_name: Union[PrefixName, str]) -> bool:
+    def joint_call(self, joint_name: PrefixName) -> bool:
         """
         :return: return True to stop climbing up the branch
         """
@@ -44,9 +46,9 @@ class TravelCompanion(object):
 
 class WorldTree:
 
-    def __init__(self, root_link_name, god_map=None):
+    def __init__(self, root_link_name: PrefixName, god_map: GodMap):
         self.root_link_name = root_link_name
-        self.god_map: GodMap = god_map
+        self.god_map = god_map
         self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
@@ -57,21 +59,34 @@ class WorldTree:
         self._clear()
 
     def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        """
+        Will seach the worlds joint for one that matches joint_name. group_name is only needed if there are multiple
+        joints with the same name.
+        :param joint_name: a joint name e.g. torso_lift_joint
+        :param group_name: only needed if there are name conflicts, e.g., when there are 2 torso_lift_joints
+        :return: how the joint is called inside of the world tree e.g. pr2/torso_lift_joint
+        """
         if group_name == '':
             group_name = None
         try:
             return PrefixName.from_string(joint_name)
         except AttributeError:
             if not group_name:
-                group_name = self.get_group_containing_joint_short_name(joint_name)
+                group_name = self._get_group_containing_joint_short_name(joint_name)
                 if group_name is None:
                     return PrefixName(joint_name, None)
-            return self.groups[group_name].get_joint_short_name_match(joint_name)
+            return self.groups[group_name]._get_joint_short_name_match(joint_name)
 
     def get_joint(self, joint_name: my_string, group_name: Optional[str] = None) -> Joint:
+        """
+        Like get_joint_name, but returns the actual joint.
+        """
         return self._joints[self.get_joint_name(joint_name, group_name)]
 
     def get_link_name(self, link_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        """
+        Like get_joint_name but for links.
+        """
         if group_name == '':
             group_name = None
         if link_name == '' and group_name is None:
@@ -80,24 +95,38 @@ class WorldTree:
             return PrefixName.from_string(link_name)
         except AttributeError:
             if group_name is None:
-                group_name = self.get_group_containing_link_short_name(link_name)
+                group_name = self._get_group_containing_link_short_name(link_name)
                 if group_name is None:
                     return PrefixName(link_name, None)
             return self.groups[group_name].get_link_short_name_match(link_name)
 
-    def get_link(self, link_name: str, group_name:  Optional[str] = None) -> Link:
+    def get_link(self, link_name: str, group_name: Optional[str] = None) -> Link:
+        """
+        Like get_joint but for links.
+        """
         return self._links[self.get_link_name(link_name, group_name)]
 
     @property
-    def version(self):
+    def version(self) -> Tuple[int, int]:
+        """
+        Can be used to determine if the world has changed
+        :return: tuple of model and state version. The first number indicates if the world itself has changed.
+                    and the second number says if the it's state has changed.
+        """
         return self._model_version, self._state_version
 
     @property
-    def model_version(self):
+    def model_version(self) -> int:
+        """
+        :return: number that increased every time the world model has changed
+        """
         return self._model_version
 
     @property
-    def state_version(self):
+    def state_version(self) -> int:
+        """
+        :return: number that increases every time the world state has changed.
+        """
         return self._state_version
 
     def _clear_memo(self, f):
@@ -111,6 +140,10 @@ class WorldTree:
 
     @profile
     def notify_state_change(self):
+        """
+        If you have changed the state of the world, call this function to trigger necessary events and increase
+        the state version.
+        """
         self._clear_memo(self.compute_fk_pose)
         self._clear_memo(self.compute_fk_pose_with_collision_offset)
         self._recompute_fks()
@@ -120,7 +153,7 @@ class WorldTree:
         for group in self.groups.values():
             group.reset_cache()
         try:
-            del self.link_names
+            del self.link_names_as_set
         except:
             pass  # property wasn't called
         try:
@@ -149,13 +182,24 @@ class WorldTree:
 
     @profile
     def notify_model_change(self):
+        """
+        Call this function if you have changed the model of the world to trigger necessary events and increase
+        the model version number.
+        """
         with self.god_map:
             self.reset_cache()
             self.init_all_fks()
             self.notify_state_change()
             self._model_version += 1
 
-    def travel_branch(self, link_name, companion: TravelCompanion):
+    def travel_branch(self, link_name: PrefixName, companion: TravelCompanion):
+        """
+        Do a depth first search on a branch starting at link_name.
+        Use companion to do whatever you want. It link_call and joint_call are called on every link/joint it sees.
+        The traversion is stopped once they return False.
+        :param link_name: starting point of the search
+        :param companion: payload. Implement your own Travelcompanion for your purpose.
+        """
         link = self._links[link_name]
         if not companion.link_call(link_name):
             for child_joint_name in link.child_joint_names:
@@ -164,17 +208,21 @@ class WorldTree:
                 child_link_name = self._joints[child_joint_name].child_link_name
                 self.travel_branch(child_link_name, companion)
 
-    def search_branch(self, link_name,
-                      stop_at_joint_when=None, stop_at_link_when=None,
-                      collect_joint_when=None, collect_link_when=None):
+    def search_branch(self,
+                      link_name: PrefixName,
+                      stop_at_joint_when: Optional[Callable[[PrefixName], bool]] = None,
+                      stop_at_link_when: Optional[Callable[[PrefixName], bool]] = None,
+                      collect_joint_when: Optional[Callable[[PrefixName], bool]] = None,
+                      collect_link_when: Optional[Callable[[PrefixName], bool]] = None) -> \
+            Tuple[List[PrefixName], List[PrefixName]]:
         """
-
-        :param joint_name:
+        Do a depth first search starting at link_name.
+        :param link_name: starting point of the search
         :param stop_at_joint_when: If None, 'lambda joint_name: False' is used.
         :param stop_at_link_when: If None, 'lambda link_name: False' is used.
         :param collect_joint_when: If None, 'lambda joint_name: False' is used.
         :param collect_link_when: If None, 'lambda link_name: False' is used.
-        :return: Collected links and joints. Might include 'link_name'
+        :return: Collected link names and joint names. Might include 'link_name'
         """
 
         class CollectorCompanion(TravelCompanion):
@@ -220,9 +268,16 @@ class WorldTree:
 
     @memoize
     def get_directly_controlled_child_links_with_collisions(self,
-                                                            joint_name: my_string,
+                                                            joint_name: PrefixName,
                                                             joints_to_exclude: Optional[Tuple] = None) \
-            -> List[my_string]:
+            -> List[PrefixName]:
+        """
+        Collect all links with collisions that are connected to joint_name by fixed joints or joints in
+        joints_to_exclude.
+        :param joint_name:
+        :param joints_to_exclude: List of joints to be considered as fixed for this search
+        :return:
+        """
         if joints_to_exclude is None:
             joints_to_exclude = set()
         else:
@@ -232,17 +287,17 @@ class WorldTree:
             return joint_name not in joints_to_exclude and self.is_joint_controlled(joint_name)
 
         child_link_name = self._joints[joint_name].child_link_name
-        links, joints = self.search_branch(child_link_name,
+        links, joints = self.search_branch(link_name=child_link_name,
                                            stop_at_joint_when=stopper,
                                            collect_link_when=self.has_link_collisions)
         return links
 
-    def get_siblings_with_collisions(self, joint_name):
+    def get_siblings_with_collisions(self, joint_name: PrefixName) -> List[PrefixName]:
         """
         Goes up the tree until the first controlled joint and then down again until another controlled joint or
         the joint_name is reached again. Collects all links with collision along the way.
         :param joint_name:
-        :return:
+        :return: list of link names
         """
         try:
             parent_joint = self.search_for_parent_joint(joint_name, stop_when=self.is_joint_controlled)
@@ -253,16 +308,22 @@ class WorldTree:
             return joint_name == other_joint_name or self.is_joint_controlled(other_joint_name)
 
         child_link_name = self._joints[parent_joint].child_link_name
-        links, joints = self.search_branch(child_link_name,
-                                           stop_at_joint_when=stop_at_joint_when,
-                                           collect_link_when=self.has_link_collisions)
-        return links
+        link_names, joint_names = self.search_branch(link_name=child_link_name,
+                                                     stop_at_joint_when=stop_at_joint_when,
+                                                     collect_link_when=self.has_link_collisions)
+        return link_names
 
-    def register_group(self, name, root_link_name, actuated=False):
+    def register_group(self, name: str, root_link_name: PrefixName, actuated: bool = False):
+        """
+        Create a new subgroup at root_link_name.
+        :param name:
+        :param root_link_name:
+        :param actuated: Whether this group is controlled by giskard. Important for self collision avoidance
+        """
         if root_link_name not in self._links:
-            raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
+            raise KeyError(f'World doesn\'t have link \'{root_link_name}\'')
         if name in self.groups:
-            raise DuplicateNameException('Group with name {} already exists'.format(name))
+            raise DuplicateNameException(f'Group with name {name} already exists')
         new_group = SubWorldTree(name, root_link_name, self, actuated=actuated)
         # if the group is a subtree of a subtree, register it for the subtree as well
         for group in self.groups.values():
@@ -270,33 +331,30 @@ class WorldTree:
                 group.groups[name] = new_group
         self.groups[name] = new_group
 
-    def robot(self, robot_name=''):
-        """
-        :rtype: SubWorldTree
-        """
-        for robot in self.robots:
-            if robot.name == robot_name:
-                return robot
-        raise KeyError('')
-
     @property
-    def robots(self):
+    def robots(self) -> List[SubWorldTree]:
         """
-        :rtype: list of SubWorldTree
+        :return: All actuated groups
         """
         return [self.groups[group_name] for group_name in list(self.group_names)
                 if self.groups[group_name].actuated]
 
     @property
-    def robot_names(self):
+    def robot_names(self) -> List[str]:
+        """
+        :return: The names of all actuated groups
+        """
         return [r.name for r in self.robots]
 
     @property
-    def group_names(self):
+    def group_names(self) -> Set[str]:
         return set(self.groups.keys())
 
     @property
-    def minimal_group_names(self):
+    def minimal_group_names(self) -> Set[str]:
+        """
+        :return: All groups that are not part of another group.
+        """
         group_names = self.group_names
         for group in self.groups.values():
             for group_name in group.group_names:
@@ -305,40 +363,50 @@ class WorldTree:
         return group_names
 
     @property
-    def root_link(self):
+    def root_link(self) -> Link:
         return self._links[self.root_link_name]
 
+    def link_names(self) -> List[PrefixName]:
+        return list(self._links.keys())
+
     @cached_property
-    def link_names(self):
+    def link_names_as_set(self) -> Set[PrefixName]:
         return set(self._links.keys())
 
     @property
-    def link_names_with_visuals(self):
+    def link_names_with_visuals(self) -> Set[PrefixName]:
         return set(link.name for link in self._links.values() if link.has_visuals())
 
     @cached_property
-    def link_names_with_collisions(self):
+    def link_names_with_collisions(self) -> Set[PrefixName]:
         return set(link.name for link in self._links.values() if link.has_collisions())
 
     @cached_property
-    def link_names_without_collisions(self):
-        return self.link_names.difference(self.link_names_with_collisions)
+    def link_names_without_collisions(self) -> Set[PrefixName]:
+        return self.link_names_as_set.difference(self.link_names_with_collisions)
 
     @property
-    def joint_names(self):
+    def joint_names(self) -> List[PrefixName]:
         return list(self._joints.keys())
 
     @property
-    def joint_names_as_set(self):
+    def joint_names_as_set(self) -> Set[PrefixName]:
         return set(self._joints.keys())
 
     def add_urdf(self,
                  urdf: str,
                  group_name: Optional[str] = None,
-                 parent_link_name: Optional[str] = None,
+                 parent_link_name: Optional[PrefixName] = None,
                  actuated: bool = False):
+        """
+        Add a urdf to the world at parent_link_name and create a SubWorldTree named group_name for it.
+        :param urdf: urdf as str, not a file path
+        :param group_name: name of the group that will be created. default is name in urdf.
+        :param parent_link_name: where the urdf will be attached
+        :param actuated: if the urdf is controlled by Giskard, important for self collision avoidance
+        """
         with suppress_stderr():
-            parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
+            parsed_urdf: up.Robot = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
         if group_name in self.groups:
             raise DuplicateNameException(
                 f'Failed to add group \'{group_name}\' because one with such a name already exists')
@@ -377,7 +445,7 @@ class WorldTree:
 
         self.register_group(group_name, urdf_root_link_name, actuated=actuated)
         if self.god_map is not None:
-            self.sync_with_paramserver()
+            self.apply_default_limits_and_weights()
         self._set_free_variables_on_mimic_joints(group_name)
 
     def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None, transform=None):
@@ -395,8 +463,9 @@ class WorldTree:
         child_link = new_joint.child_link_name
         parent_link = new_joint.parent_link_name
 
-        for i, link_or_joint in enumerate(self.compute_chain(parent_link, child_link, joints=True, links=True,
-                                                             fixed=True, non_controlled=True)[1:-1]):
+        for i, link_or_joint in enumerate(self.compute_chain(parent_link, child_link, add_joints=True, add_links=True,
+                                                             add_fixed_joints=True, add_non_controlled_joints=True)[
+                                          1:-1]):
             if i == 0:
                 parent_link = self._joints[link_or_joint].parent_link_name
                 self._links[parent_link].child_joint_names.remove(link_or_joint)
@@ -407,15 +476,15 @@ class WorldTree:
 
         self._link_joint_to_links(new_joint)
 
-    def _set_free_variables_on_mimic_joints(self, group_name):
+    def _set_free_variables_on_mimic_joints(self, group_name: str):
         for joint_name, joint in self.groups[group_name]._joints.items():  # type: (PrefixName, MimicJoint)
             if self.is_joint_mimic(joint_name):
                 joint.connect_to_existing_free_variables()
 
-    def get_parent_link_of_link(self, link_name: Union[PrefixName, str]) -> PrefixName:
+    def get_parent_link_of_link(self, link_name: PrefixName) -> PrefixName:
         return self._joints[self._links[link_name].parent_joint_name].parent_link_name
 
-    def get_group_of_joint(self, joint_name: Union[PrefixName, str]):
+    def get_group_of_joint(self, joint_name: PrefixName):
         ret = set()
         for group_name, subtree in self.groups.items():
             if joint_name in subtree._joints:
@@ -427,7 +496,7 @@ class WorldTree:
         else:
             return ret.pop()
 
-    def get_robots_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
+    def _get_robots_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
             if subtree.actuated:
@@ -438,8 +507,8 @@ class WorldTree:
                 groups.add(group_name)
         return groups
 
-    def get_group_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Optional[str]:
-        groups = self.get_groups_containing_link_short_name(link_name)
+    def _get_group_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Optional[str]:
+        groups = self._get_groups_containing_link_short_name(link_name)
         groups_size = len(groups)
         if groups_size == 0 and link_name in self._links:
             return None
@@ -451,7 +520,7 @@ class WorldTree:
             raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
         return ret
 
-    def get_groups_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
+    def _get_groups_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
             try:
@@ -461,17 +530,17 @@ class WorldTree:
             groups.add(group_name)
         return groups
 
-    def get_group_of_joint_short_names(self, joint_names: [PrefixName, str]) -> Union[PrefixName, str]:
+    def _get_group_of_joint_short_names(self, joint_names: [PrefixName, str]) -> Union[PrefixName, str]:
         if len(joint_names) > 0:
-            groups = [self.get_group_containing_joint_short_name(j_n) for j_n in joint_names]
+            groups = [self._get_group_containing_joint_short_name(j_n) for j_n in joint_names]
             if all(map(lambda e: e == groups[0], groups)):
                 return groups[0]
             else:
                 raise Exception(f'Containing different group names {groups} '
                                 f'for given list of joint_names {joint_names}.')
 
-    def get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Optional[str]:
-        groups = self.get_groups_containing_joint_short_name(joint_name)
+    def _get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Optional[str]:
+        groups = self._get_groups_containing_joint_short_name(joint_name)
         groups_size = len(groups)
         if groups_size == 0 and joint_name in self._joints:
             return None
@@ -483,17 +552,17 @@ class WorldTree:
             raise UnknownGroupException(f'Did not find any group containing the joint {joint_name}.')
         return ret
 
-    def get_groups_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Set[str]:
+    def _get_groups_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
             try:
-                subtree.get_joint_short_name_match(joint_name)
+                subtree._get_joint_short_name_match(joint_name)
             except KeyError:
                 continue
             groups.add(group_name)
         return groups
 
-    def get_parents_of_group_name(self, group_name: str) -> Set[str]:
+    def _get_parents_of_group_name(self, group_name: str) -> Set[str]:
         ancestry = list()
         traversed = False
         parent = self.get_parent_group_name(group_name)
@@ -505,14 +574,14 @@ class WorldTree:
             parent = self.get_parent_group_name(ancestry[-1])
         return set(ancestry)
 
-    def get_group_name_containing_link(self, link_name: Union[PrefixName, str]) -> str:
+    def _get_group_name_containing_link(self, link_name: Union[PrefixName, str]) -> str:
         groups = self.get_group_names_containing_link(link_name)
         ret = self._get_group_from_groups(groups)
         if ret is None:
             raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
         return ret
 
-    def _get_group_from_groups(self, groups: Set[Union[PrefixName, str]]) -> str:
+    def _get_group_from_groups(self, groups: Set[str]) -> str:
         if len(groups) == 1:
             return list(groups)[0]
         else:
@@ -525,8 +594,8 @@ class WorldTree:
                 else:
                     g_b = groups_l[i + 1]
                 if g_a != g_b:
-                    g_ancestry = self.get_parents_of_group_name(g_a)
-                    group_ancestry = self.get_parents_of_group_name(g_b)
+                    g_ancestry = self._get_parents_of_group_name(g_a)
+                    group_ancestry = self._get_parents_of_group_name(g_b)
                     relatives = list(g_ancestry & group_ancestry)
                     if relatives and relatives[0] in groups:
                         group = relatives[0]
@@ -535,29 +604,39 @@ class WorldTree:
     def get_group_names_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
-            if link_name in subtree.link_names:
+            if link_name in subtree.link_names_as_set:
                 groups.add(group_name)
         return groups
 
-    def get_robots_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
+    def _get_robots_containing_link(self, link_name: Union[PrefixName, str]) -> Set[str]:
         groups = set()
         for group_name, subtree in self.groups.items():
             if subtree.actuated:
-                if link_name in subtree.link_names:
+                if link_name in subtree.link_names_as_set:
                     groups.add(group_name)
         return groups
 
     @memoize
     def compute_chain_reduced_to_controlled_joints(self,
-                                                   link_a: my_string,
-                                                   link_b: my_string,
+                                                   link_a: PrefixName,
+                                                   link_b: PrefixName,
                                                    joints_to_exclude: Optional[tuple] = None) \
-            -> Tuple[my_string, my_string]:
+            -> Tuple[PrefixName, PrefixName]:
+        """
+        1. Compute kinematic chain of links between link_a and link_b.
+        2. Remove all entries from link_a downward until one is connected with a non fixed joint.
+        2. Remove all entries from link_b upward until one is connected with a non fixed joint.
+        :param link_a:
+        :param link_b:
+        :param joints_to_exclude: non fixed joints to be assumed as fixed.
+        :return: start and end link of the reduced chain
+        """
         if joints_to_exclude is None:
             joints_to_exclude = set()
         joint_list = [j for j in self.controlled_joints if j not in joints_to_exclude]
-        chain1, connection, chain2 = self.compute_split_chain(link_b, link_a, joints=True, links=True, fixed=True,
-                                                              non_controlled=True)
+        chain1, connection, chain2 = self.compute_split_chain(link_b, link_a, add_joints=True, add_links=True,
+                                                              add_fixed_joints=True,
+                                                              add_non_controlled_joints=True)
         chain = chain1 + connection + chain2
         for i, thing in enumerate(chain):
             if i % 2 == 1 and thing in joint_list:
@@ -574,23 +653,31 @@ class WorldTree:
         return new_link_a, new_link_b
 
     @memoize
-    def get_movable_parent_joint(self, link_name):
+    def get_movable_parent_joint(self, link_name: PrefixName) -> PrefixName:
         joint = self._links[link_name].parent_joint_name
         while not self.is_joint_movable(joint):
             joint = self._links[self._joints[joint].parent_link_name].parent_joint_name
         return joint
 
-    def get_parent_group_name(self, group_name):
+    def get_parent_group_name(self, group_name: str) -> str:
         for potential_parent_group in self.minimal_group_names:
             if group_name in self.groups[potential_parent_group].groups:
                 return potential_parent_group
         return group_name
 
     @profile
-    def add_world_body(self, group_name: str,
+    def add_world_body(self,
+                       group_name: str,
                        msg: WorldBody,
                        pose: Pose,
-                       parent_link_name: Union[str, PrefixName]):
+                       parent_link_name: PrefixName):
+        """
+        Add a WorldBody to the world.
+        :param group_name: Name of the SubWorldTree that will be created.
+        :param msg:
+        :param pose: pose of WorldBody relative to parent_link_name
+        :param parent_link_name: where the WorldBody will be attached
+        """
         if group_name in self.groups:
             raise DuplicateNameException(f'Group with name \'{group_name}\' already exists')
         self._raise_if_link_does_not_exist(parent_link_name)
@@ -600,6 +687,7 @@ class WorldTree:
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link_name,
                           group_name=group_name)
+            self.notify_model_change()
         else:
             link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
                                         color=self.default_link_color)
@@ -613,12 +701,12 @@ class WorldTree:
             self.notify_model_change()
 
     @cached_property
-    def movable_joints(self):
+    def movable_joints(self) -> List[PrefixName]:
         return [j.name for j in self._joints.values() if
                 not isinstance(j, FixedJoint) and not isinstance(j, MimicJoint)]
 
     @cached_property
-    def movable_joints_as_set(self):
+    def movable_joints_as_set(self) -> Set[PrefixName]:
         return set(self.movable_joints)
 
     def _clear(self):
@@ -629,6 +717,9 @@ class WorldTree:
         self.reset_cache()
 
     def delete_all_but_robots(self):
+        """
+        Resets Giskard to the state from when it was started.
+        """
         self._clear()
         joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
         for joint in joints_to_add:
@@ -648,11 +739,11 @@ class WorldTree:
         self._link_joint_to_links(joint)
 
     @profile
-    def sync_with_paramserver(self):
+    def apply_default_limits_and_weights(self):
         new_lin_limits = {}
         new_ang_limits = {}
         for i in range(self.god_map.unsafe_get_data(identifier.max_derivative)):
-            derivative = Derivatives(i + 1) # to start with velocity and include max_derivative
+            derivative = Derivatives(i + 1)  # to start with velocity and include max_derivative
 
             class Linear:
                 def __init__(self, god_map, diff):
@@ -680,7 +771,7 @@ class WorldTree:
 
         new_weights = {}
         for i in range(self.god_map.unsafe_get_data(identifier.max_derivative)):
-            derivative = Derivatives(i + 1) # to start with velocity and include max_derivative
+            derivative = Derivatives(i + 1)  # to start with velocity and include max_derivative
 
             class Default:
                 def __init__(self, derivative_name, god_map):
@@ -696,14 +787,14 @@ class WorldTree:
         self.overwrite_joint_weights(new_weights)
         self.notify_model_change()
 
-    def overwrite_joint_weights(self, new_weights):
+    def overwrite_joint_weights(self, new_weights: derivative_joint_map):
         for joint_name in self.movable_joints:
             joint = self._joints[joint_name]
             if not self.is_joint_mimic(joint_name):
                 joint.update_weights(new_weights)
 
     @property
-    def joint_constraints(self):
+    def joint_constraints(self) -> List[FreeVariable]:
         joint_constraints = []
         for joint_name, joint in self._joints.items():
             if joint.has_free_variables():
@@ -738,12 +829,11 @@ class WorldTree:
             raise DuplicateNameException(f'Joint \'{joint_name}\' does already exist.')
 
     @profile
-    def move_branch(self, joint_name, new_parent_link_name):
+    def move_branch(self, joint_name: PrefixName, new_parent_link_name: PrefixName):
         """
-        Takes joint_name and changes its parent
+        Removed joint_name and creates a fixed joint between the old parent and child link.
         :param joint_name:
         :param new_parent_link_name:
-        :return:
         """
         if not self.is_joint_fixed(joint_name):
             raise NotImplementedError('Can only change fixed joints')
@@ -759,30 +849,42 @@ class WorldTree:
         self.notify_model_change()
 
     @profile
-    def update_joint_parent_T_child(self, joint_name: my_string, new_parent_T_child: expr_matrix, notify: bool = True):
+    def update_joint_parent_T_child(self, joint_name: PrefixName, new_parent_T_child: expr_matrix, notify: bool = True):
         joint = self._joints[joint_name]
         joint.parent_T_child = new_parent_T_child
         if notify:
             self.notify_model_change()
 
-    def move_group(self, group_name, new_parent_link_name):
+    def move_group(self, group_name: str, new_parent_link_name: PrefixName):
+        """
+        Removed the joint connecting group_name to the world and attach it to new_parent_link_name.
+        The pose relative to the self.root_link does not change.
+        """
         group = self.groups[group_name]
         joint_name = self._links[group.root_link_name].parent_joint_name
         if self._joints[joint_name].parent_link_name == new_parent_link_name:
-            raise DuplicateNameException(
-                '\'{}\' is already attached to \'{}\''.format(group_name, new_parent_link_name))
+            raise DuplicateNameException(f'\'{group_name}\' is already attached to \'{new_parent_link_name}\'')
         self.move_branch(joint_name, new_parent_link_name)
 
-    def delete_group(self, group_name):
+    def delete_group(self, group_name: str):
+        """
+        Delete the group and all links and joints contained in it.
+        """
         if group_name not in self.groups:
             raise UnknownGroupException(f'Can\'t delete unknown group: \'{group_name}\'')
         self.delete_branch(self.groups[group_name].root_link_name)
 
-    def delete_branch(self, link_name):
+    def delete_branch(self, link_name: PrefixName):
+        """
+        Delete every link and joint from link_name downward, including the link.
+        """
         self.delete_branch_at_joint(self._links[link_name].parent_joint_name)
 
     @profile
-    def delete_branch_at_joint(self, joint_name):
+    def delete_branch_at_joint(self, joint_name: PrefixName):
+        """
+        Delete every link and joint from joint_name downward, including the joint.
+        """
         joint = self._joints.pop(joint_name)  # type: Joint
         self._links[joint.parent_link_name].child_joint_names.remove(joint_name)
 
@@ -791,7 +893,7 @@ class WorldTree:
             for group_name in list(self.groups.keys()):
                 if self.groups[group_name].root_link_name == link_name:
                     del self.groups[group_name]
-                    logging.loginfo('Deleted group \'{}\', because it\'s root link got removed.'.format(group_name))
+                    logging.loginfo(f'Deleted group \'{group_name}\', because it\'s root link got removed.')
             for child_joint_name in link.child_joint_names:
                 child_joint = self._joints.pop(child_joint_name)  # type: Joint
                 helper(child_joint.child_link_name)
@@ -799,7 +901,7 @@ class WorldTree:
         helper(joint.child_link_name)
         self.notify_model_change()
 
-    def link_order(self, link_a: my_string, link_b: my_string) -> bool:
+    def link_order(self, link_a: PrefixName, link_b: PrefixName) -> bool:
         """
         this function is used when deciding for which order to calculate the collisions
         true if link_a < link_b
@@ -810,20 +912,25 @@ class WorldTree:
             return False
         return link_a < link_b
 
-    def sort_links(self, link_a: Union[PrefixName, str], link_b: Union[PrefixName, str]) \
-            -> Tuple[Union[PrefixName, str], Union[PrefixName, str]]:
+    def sort_links(self, link_a: PrefixName, link_b: PrefixName) -> Tuple[PrefixName, PrefixName]:
+        """
+        A deterministic way of sorting links, not necessary dependent on the alphabetical order.
+        """
         if self.link_order(link_a, link_b):
             return link_a, link_b
         return link_b, link_a
 
     @property
-    def controlled_joints(self):
+    def controlled_joints(self) -> List[PrefixName]:
         try:
             return self.god_map.unsafe_get_data(identifier.controlled_joints)
         except KeyError:
             return []
 
     def register_controlled_joints(self, controlled_joints: List[str]):
+        """
+        Flag these joints as controlled.
+        """
         old_controlled_joints = set(self.controlled_joints)
         new_controlled_joints = set(controlled_joints)
         double_joints = old_controlled_joints.intersection(new_controlled_joints)
@@ -836,17 +943,19 @@ class WorldTree:
         self.god_map.set_data(identifier.controlled_joints, list(sorted(old_controlled_joints)))
 
     @memoize
-    def get_controlled_parent_joint_of_link(self, link_name):
+    def get_controlled_parent_joint_of_link(self, link_name: PrefixName) -> PrefixName:
         joint = self._links[link_name].parent_joint_name
         if self.is_joint_controlled(joint):
             return joint
         return self.get_controlled_parent_joint_of_joint(joint)
 
     @memoize
-    def get_controlled_parent_joint_of_joint(self, joint_name):
+    def get_controlled_parent_joint_of_joint(self, joint_name: PrefixName) -> PrefixName:
         return self.search_for_parent_joint(joint_name, self.is_joint_controlled)
 
-    def search_for_parent_joint(self, joint_name, stop_when=None):
+    def search_for_parent_joint(self,
+                                joint_name: PrefixName,
+                                stop_when: Optional[Callable[[PrefixName], bool]] = None) -> PrefixName:
         try:
             joint = self._links[self._joints[joint_name].parent_link_name].parent_joint_name
             while stop_when is not None and not stop_when(joint):
@@ -857,9 +966,26 @@ class WorldTree:
 
     @profile
     @memoize
-    def compute_chain(self, root_link_name, tip_link_name, joints, links, fixed, non_controlled):
+    def compute_chain(self,
+                      root_link_name: PrefixName,
+                      tip_link_name: PrefixName,
+                      add_joints: bool,
+                      add_links: bool,
+                      add_fixed_joints: bool,
+                      add_non_controlled_joints: bool) -> List[PrefixName]:
+        """
+        Computes a chain between root_link_name and tip_link_name. Only works if root_link_name is above tip_link_name
+        in the world tree.
+        :param root_link_name:
+        :param tip_link_name:
+        :param add_joints:
+        :param add_links:
+        :param add_fixed_joints: only used if add_joints == True
+        :param add_non_controlled_joints: only used if add_joints == True
+        :return:
+        """
         chain = []
-        if links:
+        if add_links:
             chain.append(tip_link_name)
         link = self._links[tip_link_name]
         while link.name != root_link_name:
@@ -867,58 +993,77 @@ class WorldTree:
                 raise ValueError(f'{root_link_name} and {tip_link_name} are not connected')
             parent_joint = self._joints[link.parent_joint_name]
             parent_link = self._links[parent_joint.parent_link_name]
-            if joints:
-                if (fixed or not isinstance(parent_joint, FixedJoint)) and \
-                        (non_controlled or parent_joint.name in self.controlled_joints):
+            if add_joints:
+                if (add_fixed_joints or not isinstance(parent_joint, FixedJoint)) and \
+                        (add_non_controlled_joints or parent_joint.name in self.controlled_joints):
                     chain.append(parent_joint.name)
-            if links:
+            if add_links:
                 chain.append(parent_link.name)
             link = parent_link
         chain.reverse()
         return chain
 
     @memoize
-    def compute_split_chain(self, root, tip, joints, links, fixed, non_controlled):
-        if root == tip:
+    def compute_split_chain(self,
+                            root_link_name: PrefixName,
+                            tip_link_name: PrefixName,
+                            add_joints: bool,
+                            add_links: bool,
+                            add_fixed_joints: bool,
+                            add_non_controlled_joints: bool) \
+            -> Tuple[List[PrefixName], List[PrefixName], List[PrefixName]]:
+        """
+        Computes the chain between root_link_name and tip_link_name. Can handle chains that start and end anywhere
+        in the tree.
+        :param root_link_name:
+        :param tip_link_name:
+        :param add_joints:
+        :param add_links:
+        :param add_fixed_joints: only used if add_joints == True
+        :param add_non_controlled_joints: only used if add_joints == True
+        :return: tuple containing
+                    1. chain from root_link_name to the connecting link
+                    2. the connecting link, if add_lins is True
+                    3. chain from connecting link to tip_link_name
+        """
+        if root_link_name == tip_link_name:
             return [], [], []
-        root_chain = self.compute_chain(self.root_link_name, root, False, True, True, True)
-        tip_chain = self.compute_chain(self.root_link_name, tip, False, True, True, True)
+        root_chain = self.compute_chain(self.root_link_name, root_link_name, False, True, True, True)
+        tip_chain = self.compute_chain(self.root_link_name, tip_link_name, False, True, True, True)
         for i in range(min(len(root_chain), len(tip_chain))):
             if root_chain[i] != tip_chain[i]:
                 break
         else:
             i += 1
         connection = tip_chain[i - 1]
-        root_chain = self.compute_chain(connection, root, joints, links, fixed, non_controlled)
-        if links:
+        root_chain = self.compute_chain(connection, root_link_name, add_joints, add_links, add_fixed_joints,
+                                        add_non_controlled_joints)
+        if add_links:
             root_chain = root_chain[1:]
         root_chain = root_chain[::-1]
-        tip_chain = self.compute_chain(connection, tip, joints, links, fixed, non_controlled)
-        if links:
+        tip_chain = self.compute_chain(connection, tip_link_name, add_joints, add_links, add_fixed_joints,
+                                       add_non_controlled_joints)
+        if add_links:
             tip_chain = tip_chain[1:]
-        return root_chain, [connection] if links else [], tip_chain
+        return root_chain, [connection] if add_links else [], tip_chain
 
     @memoize
     @profile
-    def compose_fk_expression(self, root_link, tip_link):
+    def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> expr_matrix:
+        """
+        Multiplies all transformation matrices in the chain between root_link and tip_link
+        :param root_link:
+        :param tip_link:
+        :return: 4x4 homogenous transformation matrix
+        """
         fk = w.eye(4)
-        root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, joints=True, links=False, fixed=True,
-                                                            non_controlled=True)
+        root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, add_joints=True, add_links=False,
+                                                            add_fixed_joints=True, add_non_controlled_joints=True)
         for joint_name in root_chain:
             fk = w.dot(fk, w.inverse_frame(self._joints[joint_name].parent_T_child))
         for joint_name in tip_chain:
             fk = w.dot(fk, self._joints[joint_name].parent_T_child)
         return fk
-
-    @profile
-    def init_fast_fks(self):
-        def f(key):
-            root, tip = key
-            fk = self.compose_fk_expression(root, tip)
-            m = w.speed_up(fk, w.free_symbols(fk))
-            return m
-
-        self._fks = KeyDefaultDict(f)
 
     @memoize
     def compute_fk_pose(self, root: my_string, tip: my_string) -> PoseStamped:
@@ -938,7 +1083,8 @@ class WorldTree:
         return root_P_tip
 
     @memoize
-    def compute_fk_pose_with_collision_offset(self, root, tip, collision_id):
+    def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName,
+                                              collision_id: int) -> PoseStamped:
         try:
             root_T_tip = self.compute_fk_np(root, tip)
             tip_link = self._links[tip]
@@ -951,9 +1097,6 @@ class WorldTree:
             traceback.print_exc()
             pass
         return p
-
-    def compute_fk_np(self, root, tip):
-        return self.get_fk(root, tip)
 
     @profile
     def compute_all_fks(self):
@@ -982,6 +1125,9 @@ class WorldTree:
         return result
 
     def as_tf_msg(self):
+        """
+        Create a tfmessage for the whole world tree.
+        """
         tf_msg = TFMessage()
         for joint_name, joint in self._joints.items():
             p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
@@ -1016,7 +1162,7 @@ class WorldTree:
 
             @profile
             def compile_fks(self):
-                all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names])
+                all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
                 collision_fks = []
                 collision_ids = []
                 for link_name in self.world.link_names_with_collisions:
@@ -1031,18 +1177,18 @@ class WorldTree:
                 self.collision_link_order = list(collision_ids)
                 self.fast_all_fks = w.speed_up(all_fks, w.free_symbols(all_fks))
                 self.fast_collision_fks = w.speed_up(collision_fks, w.free_symbols(collision_fks))
-                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names)}
+                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
 
             @profile
             def recompute(self):
-                self.get_fk.memo.clear()
+                self.compute_fk_np.memo.clear()
                 self.fks = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
                 self.collision_fk_matrix = self.fast_collision_fks.call2(
                     self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
 
             @memoize
             @profile
-            def get_fk(self, root, tip):
+            def compute_fk_np(self, root, tip):
                 if root == self.world.root_link_name:
                     map_T_root = np.eye(4)
                 else:
@@ -1064,36 +1210,36 @@ class WorldTree:
         self._fk_computer.recompute()
 
     @profile
-    def get_fk(self, root, tip):
-        return self._fk_computer.get_fk(root, tip)
+    def compute_fk_np(self, root: PrefixName, tip: PrefixName) -> np.ndarray:
+        return self._fk_computer.compute_fk_np(root, tip)
 
     @memoize
     @profile
-    def are_linked(self, link_a, link_b, non_controlled=False, fixed=False, exception=None):
+    def are_linked(self, link_a: PrefixName, link_b: PrefixName,
+                   do_not_ignore_non_controlled_joints: bool = False,
+                   joints_to_be_assumed_fixed: bool = None):
         """
         Return True if all joints between link_a and link_b are fixed.
         """
-        chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=True, links=False, fixed=fixed,
-                                                              non_controlled=non_controlled)
-        if exception is not None:
-            chain1 = [x for x in chain1 if x not in exception]
-            chain2 = [x for x in chain2 if x not in exception]
+        chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, add_joints=True, add_links=False,
+                                                              add_fixed_joints=False,
+                                                              add_non_controlled_joints=do_not_ignore_non_controlled_joints)
+        if joints_to_be_assumed_fixed is not None:
+            chain1 = [x for x in chain1 if x not in joints_to_be_assumed_fixed]
+            chain2 = [x for x in chain2 if x not in joints_to_be_assumed_fixed]
         return not chain1 and not connection and not chain2
 
     def _add_link(self, link: Link):
         self._raise_if_link_exists(link.name)
         self._links[link.name] = link
 
-    def _delete_joint_limits(self):
-        for joint_name in self.movable_joints:  # type: OneDofJoint
-            joint = self._joints[joint_name]
-            joint.delete_limits()
-            joint.delete_weights()
-
-    def joint_limit_expr(self, joint_name, order):
+    def joint_limit_expr(self, joint_name: PrefixName, order: Derivatives) \
+            -> Tuple[Optional[expr_symbol], Optional[expr_symbol]]:
         return self._joints[joint_name].get_limit_expressions(order)
 
-    def transform_msg(self, target_frame, msg):
+    def transform_msg(self, target_frame: PrefixName,
+                      msg: Union[PointStamped, PoseStamped, Vector3Stamped, QuaternionStamped]) \
+            -> Union[PointStamped, PoseStamped, Vector3Stamped, QuaternionStamped]:
         if isinstance(msg, PoseStamped):
             return self.transform_pose(target_frame, msg)
         elif isinstance(msg, PointStamped):
@@ -1105,7 +1251,7 @@ class WorldTree:
         else:
             raise NotImplementedError(f'World can\'t transform message of type \'{type(msg)}\'')
 
-    def transform_pose(self, target_frame: my_string, pose: PoseStamped) -> PoseStamped:
+    def transform_pose(self, target_frame: PrefixName, pose: PoseStamped) -> PoseStamped:
         f_T_p = msg_to_homogeneous_matrix(pose.pose)
         t_T_f = self.compute_fk_np(target_frame, pose.header.frame_id)
         t_T_p = np.dot(t_T_f, f_T_p)
@@ -1114,7 +1260,7 @@ class WorldTree:
         result.pose = np_to_pose(t_T_p)
         return result
 
-    def transform_quaternion(self, target_frame: str, quaternion: QuaternionStamped) -> QuaternionStamped:
+    def transform_quaternion(self, target_frame: PrefixName, quaternion: QuaternionStamped) -> QuaternionStamped:
         p = PoseStamped()
         p.header = quaternion.header
         p.pose.orientation = quaternion.quaternion
@@ -1124,12 +1270,7 @@ class WorldTree:
         new_quaternion.quaternion = new_pose.pose.orientation
         return new_quaternion
 
-    def transform_point(self, target_frame, point):
-        """
-        :type target_frame: Union[str, PrefixName]
-        :type point: PointStamped
-        :rtype: PointStamped
-        """
+    def transform_point(self, target_frame: PrefixName, point: PointStamped) -> PointStamped:
         f_P_p = msg_to_homogeneous_matrix(point)
         t_T_f = self.compute_fk_np(target_frame, point.header.frame_id)
         t_P_p = np.dot(t_T_f, f_P_p)
@@ -1138,12 +1279,7 @@ class WorldTree:
         result.point = Point(*t_P_p[:3])
         return result
 
-    def transform_vector(self, target_frame, vector):
-        """
-        :type target_frame: Union[str, PrefixName]
-        :type vector: Vector3Stamped
-        :rtype: Vector3Stamped
-        """
+    def transform_vector(self, target_frame: PrefixName, vector: Vector3Stamped) -> Vector3Stamped:
         f_V_p = msg_to_homogeneous_matrix(vector)
         t_T_f = self.compute_fk_np(target_frame, vector.header.frame_id)
         t_V_p = np.dot(t_T_f, f_V_p)
@@ -1152,7 +1288,8 @@ class WorldTree:
         result.vector = Vector3(*t_V_p[:3])
         return result
 
-    def compute_joint_limits(self, joint_name, order):
+    def compute_joint_limits(self, joint_name: PrefixName, order: Derivatives) \
+            -> Tuple[Optional[expr_symbol], Optional[expr_symbol]]:
         try:
             lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
         except KeyError:
@@ -1170,10 +1307,7 @@ class WorldTree:
             links = self.link_names_with_collisions
         else:
             links = self.groups[group_name].link_names_with_collisions
-        try:
-            link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
-        except Exception:
-            pass
+        link_combinations = {self.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
         for link_name in links:
             direct_children = set()
             for child_joint_name in self._links[link_name].child_joint_names:
@@ -1192,32 +1326,23 @@ class WorldTree:
                 self.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
 
-    def get_joint_position_limits(self, joint_name: my_string) -> Tuple[float, float]:
+    def get_joint_position_limits(self, joint_name: my_string) -> Tuple[Optional[float], Optional[float]]:
         """
         :return: minimum position, maximum position as float
         """
-        return self.compute_joint_limits(joint_name, 0)
+        return self.compute_joint_limits(joint_name, Derivatives.position)
 
-    def get_joint_velocity_limits(self, joint_name):
-        return self.compute_joint_limits(joint_name, 1)
-
-    def get_all_joint_velocity_limits(self):
-        joint_limits = {}
-        for joint_name in self.controlled_joints:
-            try:
-                joint_limits[joint_name] = self.get_joint_velocity_limits(joint_name)[1]
-            except:
-                pass
-        return joint_limits
+    def get_joint_velocity_limits(self, joint_name) -> Tuple[float, float]:
+        return self.compute_joint_limits(joint_name, Derivatives.velocity)
 
     @property
-    def free_variables(self):
+    def free_variables(self) -> List[FreeVariable]:
         free_variables = []
         for joint_name in self.movable_joints:
             free_variables.extend(self._joints[joint_name].free_variable_list)
         return free_variables
 
-    def dye_group(self, group_name: my_string, color: ColorRGBA):
+    def dye_group(self, group_name: str, color: ColorRGBA):
         if group_name in self.groups:
             for _, link in self.groups[group_name]._links.items():
                 link.dye_collisions(color)
@@ -1228,109 +1353,101 @@ class WorldTree:
         for link in self._links.values():
             link.dye_collisions(color)
 
-    def get_all_free_variable_velocity_limits(self):
+    def get_all_free_variable_velocity_limits(self) -> Dict[str, float]:
         limits = {}
         for free_variable in self.free_variables:
-            limits[free_variable.name] = free_variable.get_upper_limit(derivative=1,
+            limits[free_variable.name] = free_variable.get_upper_limit(derivative=Derivatives.velocity,
                                                                        default=False,
                                                                        evaluated=True)
         return limits
 
-    def get_all_joint_position_limits(self):
+    def get_all_joint_position_limits(self) -> Dict[PrefixName, Tuple[Optional[float], Optional[float]]]:
         return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
 
-    def is_joint_prismatic(self, joint_name):
+    def is_joint_prismatic(self, joint_name: PrefixName) -> bool:
         return isinstance(self._joints[joint_name], PrismaticJoint)
 
-    def is_joint_fixed(self, joint_name):
+    def is_joint_fixed(self, joint_name: PrefixName) -> bool:
         return isinstance(self._joints[joint_name], FixedJoint)
 
-    def is_joint_movable(self, joint_name):
+    def is_joint_movable(self, joint_name: PrefixName) -> bool:
         return not self.is_joint_fixed(joint_name)
 
-    def is_joint_controlled(self, joint_name):
+    def is_joint_controlled(self, joint_name: PrefixName) -> bool:
         return joint_name in self.controlled_joints
 
     @memoize
-    def is_link_controlled(self, link_name):
+    def is_link_controlled(self, link_name: PrefixName) -> bool:
         try:
             self.get_controlled_parent_joint_of_link(link_name)
             return True
         except KeyError as e:
             return False
 
-    def is_joint_revolute(self, joint_name):
+    def is_joint_revolute(self, joint_name: PrefixName) -> bool:
         return isinstance(self._joints[joint_name], RevoluteJoint) and not self.is_joint_continuous(joint_name)
 
-    def is_joint_continuous(self, joint_name):
+    def is_joint_continuous(self, joint_name: PrefixName) -> bool:
         return isinstance(self._joints[joint_name], ContinuousJoint)
 
-    def is_joint_mimic(self, joint_name):
+    def is_joint_mimic(self, joint_name: PrefixName) -> bool:
         return isinstance(self._joints[joint_name], MimicJoint)
 
-    def is_joint_rotational(self, joint_name):
+    def is_joint_rotational(self, joint_name: PrefixName) -> bool:
         return self.is_joint_revolute(joint_name) or self.is_joint_continuous(joint_name)
 
-    def has_joint(self, joint_name):
+    def has_joint(self, joint_name: PrefixName) -> bool:
         return joint_name in self._joints
 
-    def has_link_collisions(self, link_name) -> bool:
+    def has_link_collisions(self, link_name: PrefixName) -> bool:
         return self._links[link_name].has_collisions()
 
-    def has_link_visuals(self, link_name):
+    def has_link_visuals(self, link_name: PrefixName) -> bool:
         return self._links[link_name].has_visuals()
 
 
 class SubWorldTree(WorldTree):
-    def __init__(self, name, root_link_name, world, actuated=False):
-        """
-        :type name: str
-        :type root_link_name: PrefixName
-        :type world: WorldTree
-        """
+    def __init__(self, name: str, root_link_name: PrefixName, world: WorldTree, actuated: bool = False):
         self.name = name
         self.root_link_name = root_link_name
         self.world = world
         self.actuated = actuated
 
-    def get_link(self, link_name: str) -> Link:
+    def get_link(self, link_name: my_string) -> Link:
         return self.world.get_link(link_name, self.name)
 
     def get_joint(self, joint_name: my_string) -> Joint:
         return self.world.get_joint(joint_name, self.name)
 
     @property
-    def controlled_joints(self):
+    def controlled_joints(self) -> List[PrefixName]:
         return [j for j in self.god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
 
     @property
-    def attachment_joint_name(self):
+    def attachment_joint_name(self) -> PrefixName:
         return self.world._links[self.root_link_name].parent_joint_name
 
     @property
-    def parent_link_of_root(self):
+    def parent_link_of_root(self) -> PrefixName:
         return self.world.get_parent_link_of_link(self.world.groups[self.name].root_link_name)
 
-    @property
-    def _fk_computer(self):
-        return self.world._fk_computer
+    # @property
+    # def _fk_computer(self):
+    #     return self.world._fk_computer
 
     def delete_all_but_robot(self):
         raise NotImplementedError('Can\'t hard reset a SubWorldTree.')
 
     @property
-    def base_pose(self):
+    def base_pose(self) -> PoseStamped:
         return self.world.compute_fk_pose(self.world.root_link_name, self.root_link_name).pose
 
-    @property
-    def _fks(self):
-        return self.world._fks
+    # @property
+    # def _fks(self):
+    #     return self.world._fks
 
     @property
-    def state(self):
-        """
-        :rtype: JointStates
-        """
+    def state(self) -> JointStates:
         return JointStates({j: self.world.state[j] for j in self._joints if j in self.world.state})
 
     @state.setter
@@ -1340,9 +1457,9 @@ class SubWorldTree(WorldTree):
     def notify_model_change(self):
         raise NotImplementedError()
 
-    def get_link_short_name_match(self, link_name):
+    def get_link_short_name_match(self, link_name: my_string) -> PrefixName:
         matches = []
-        for link_name2 in self.link_names:
+        for link_name2 in self.link_names_as_set:
             if link_name == link_name2 or link_name == link_name2.short_name:
                 matches.append(link_name2)
         if len(matches) > 1:
@@ -1351,7 +1468,7 @@ class SubWorldTree(WorldTree):
             raise UnknownLinkException(f'Found no link match for \'{link_name}\'.')
         return matches[0]
 
-    def get_joint_short_name_match(self, joint_name):
+    def _get_joint_short_name_match(self, joint_name: my_string) -> PrefixName:
         matches = []
         for joint_name2 in self.joint_names:
             if joint_name == joint_name2 or joint_name == joint_name2.short_name:
@@ -1372,7 +1489,7 @@ class SubWorldTree(WorldTree):
         except:
             pass  # property wasn't called
         try:
-            del self.link_names
+            del self.link_names_as_set
         except:
             pass  # property wasn't called
         try:
@@ -1385,20 +1502,16 @@ class SubWorldTree(WorldTree):
             pass  # property wasn't called
 
     @property
-    def god_map(self):
+    def god_map(self) -> GodMap:
         return self.world.god_map
 
     @property
-    def root_link(self):
+    def root_link(self) -> Link:
         return self.world._links[self.root_link_name]
 
     @cached_property
-    def _joints(self):
-        def helper(root_link):
-            """
-            :type root_link: Link
-            :rtype: dict
-            """
+    def _joints(self) -> Dict[PrefixName, Joint]:
+        def helper(root_link: Link) -> Dict[PrefixName, Joint]:
             joints = {j: self.world._joints[j] for j in root_link.child_joint_names}
             for j in root_link.child_joint_names:  # type: Joint
                 j = self.world._joints[j]
@@ -1409,12 +1522,12 @@ class SubWorldTree(WorldTree):
         return helper(self.root_link)
 
     @cached_property
-    def groups(self):
+    def groups(self) -> Dict[str, SubWorldTree]:
         return {group_name: group for group_name, group in self.world.groups.items() if
                 group.root_link_name in self._links and group.name != self.name}
 
     @cached_property
-    def _links(self) -> Dict[my_string, Link]:
+    def _links(self) -> Dict[PrefixName, Link]:
         def helper(root_link: Link) -> Dict[my_string, Link]:
             links = {root_link.name: root_link}
             for j in root_link.child_joint_names:
@@ -1425,13 +1538,14 @@ class SubWorldTree(WorldTree):
 
         return helper(self.root_link)
 
-    def compute_fk_pose(self, root, tip):
+    def compute_fk_pose(self, root: PrefixName, tip: PrefixName) -> PoseStamped:
         return self.world.compute_fk_pose(root, tip)
 
-    def compute_fk_pose_with_collision_offset(self, root, tip):
-        return self.world.compute_fk_pose_with_collision_offset(root, tip)
+    def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName, collision_id: int) \
+            -> PoseStamped:
+        return self.world.compute_fk_pose_with_collision_offset(root, tip, collision_id)
 
-    def register_group(self, name, root_link_name):
+    def register_group(self, name: str, root_link_name: PrefixName):
         raise NotImplementedError()
 
     def _link_joint_to_links(self, connecting_joint, child_link):
@@ -1443,5 +1557,5 @@ class SubWorldTree(WorldTree):
     def delete_branch(self, parent_joint):
         raise NotImplementedError()
 
-    def is_link_controlled(self, link_name):
+    def is_link_controlled(self, link_name: PrefixName) -> bool:
         return self.world.is_link_controlled(link_name)

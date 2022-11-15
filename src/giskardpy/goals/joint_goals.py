@@ -481,7 +481,7 @@ class AvoidJointLimits(Goal):
                     group_name = self.world.get_group_of_joint(joint_name).name
                 except KeyError:
                     child_link = self.world._joints[joint_name].child_link_name
-                    group_name = self.world.get_group_name_containing_link(child_link)
+                    group_name = self.world._get_group_name_containing_link(child_link)
                 if self.world.is_joint_prismatic(joint_name) or self.world.is_joint_revolute(joint_name):
                     self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
                                                                         group_name=group_name,

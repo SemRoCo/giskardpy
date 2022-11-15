@@ -197,7 +197,7 @@ def sq_matrix(draw):
 
 def unit_vector(length, elements=None):
     if elements is None:
-        elements = float_no_nan_no_inf(min_dist_to_zero=1e-10)
+        elements = float_no_nan_no_inf(min_dist_to_zero=1e-5)
     vector = st.lists(elements,
                       min_size=length,
                       max_size=length).filter(lambda x: SMALL_NUMBER < np.linalg.norm(x) < BIG_NUMBER)

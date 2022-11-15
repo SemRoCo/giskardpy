@@ -431,7 +431,7 @@ class TestCASWrapper(unittest.TestCase):
         m1 = quaternion_matrix(q1)
         m2 = quaternion_matrix(q2)
         actual_angle = w.compile_and_execute(w.rotation_distance, [m1, m2])
-        expected_angle, _, _ = rotation_from_matrix(m1.T.dot(m2))
+        _, expected_angle = axis_angle_from_quaternion(*quaternion_from_matrix(m1.T.dot(m2)))
         expected_angle = expected_angle
         try:
             self.assertAlmostEqual(shortest_angular_distance(actual_angle, expected_angle), 0, places=3)
@@ -509,7 +509,7 @@ class TestCASWrapper(unittest.TestCase):
         pitch = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[1], [matrix])
         yaw = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[2], [matrix])
         r1 = w.compile_and_execute(w.rotation_matrix_from_rpy, [roll, pitch, yaw])
-        self.assertTrue(np.isclose(r1, matrix).all(), msg='{} != {}'.format(r1, matrix))
+        self.assertTrue(np.isclose(r1, matrix, atol=1.e-4).all(), msg='{} != {}'.format(r1, matrix))
 
     @given(angle(),
            angle(),

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import rospy
 
 from giskardpy.configs.data_types import ControlModes

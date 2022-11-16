@@ -19,8 +19,7 @@ class Pointing(Goal):
                  root_group: Optional[str] = None,
                  pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
-                 weight: float = WEIGHT_BELOW_CA,
-                 **kwargs):
+                 weight: float = WEIGHT_BELOW_CA):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.
@@ -32,7 +31,7 @@ class Pointing(Goal):
         :param max_velocity: rad/s
         :param weight:
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.weight = weight
         self.max_velocity = max_velocity
         self.root = self.world.get_link_name(root_link, root_group)

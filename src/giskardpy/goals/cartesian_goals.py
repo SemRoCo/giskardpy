@@ -19,11 +19,11 @@ class CartesianPosition(Goal):
                  tip_group: Optional[str] = None,
                  max_velocity: Optional[float] = None,
                  reference_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA, root_link2: str = None, **kwargs):
+                 weight: float = WEIGHT_ABOVE_CA, root_link2: str = None):
         """
         See CartesianPose.
         """
-        super().__init__(**kwargs)
+        super().__init__()
         if reference_velocity is None:
             reference_velocity = 0.2
         self.root_link2 = root_link2
@@ -51,8 +51,7 @@ class CartesianPosition(Goal):
                                                                   tip_group=tip_group,
                                                                   weight=weight,
                                                                   max_velocity=max_velocity,
-                                                                  hard=False,
-                                                                  **kwargs))
+                                                                  hard=False))
 
     def make_constraints(self):
         r_P_g = w.ros_msg_to_matrix(self.goal_point)
@@ -81,12 +80,11 @@ class CartesianOrientation(Goal):
                  reference_velocity: Optional[float] = None,
                  max_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
-                 root_link2: str = None,
-                 **kwargs):
+                 root_link2: str = None):
         """
         See CartesianPose.
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
@@ -148,12 +146,11 @@ class CartesianPositionStraight(Goal):
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
                  max_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 **kwargs):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
         """
-        super().__init__(**kwargs)
+        super().__init__()
         if reference_velocity is None:
             reference_velocity = max_velocity
         if reference_velocity is None:
@@ -206,9 +203,9 @@ class CartesianPositionStraight(Goal):
                                    upper_errors=[dist, 0, 0],
                                    weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
                                    expressions=expr_p[:3],
-                                   name_suffixes=['{}/x'.format('line'),
-                                                  '{}/y'.format('line'),
-                                                  '{}/z'.format('line')])
+                                   names=['line/x',
+                                          'line/y',
+                                          'line/z'])
 
         if self.max_velocity is not None:
             self.add_translational_velocity_limit(frame_P_current=root_P_tip,
@@ -228,7 +225,7 @@ class CartesianPose(Goal):
                  max_angular_velocity: Optional[float] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
-                 weight=WEIGHT_ABOVE_CA, root_link2: Optional[str] = None, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, root_link2: Optional[str] = None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
@@ -248,7 +245,7 @@ class CartesianPose(Goal):
         """
         self.root_link = root_link
         self.tip_link = tip_link
-        super().__init__(**kwargs)
+        super().__init__()
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
         goal_point.point = goal_pose.pose.position
@@ -260,8 +257,7 @@ class CartesianPose(Goal):
                                                        max_velocity=max_linear_velocity,
                                                        reference_velocity=reference_linear_velocity,
                                                        weight=weight,
-                                                       root_link2=root_link2,
-                                                       **kwargs))
+                                                       root_link2=root_link2))
         goal_orientation = QuaternionStamped()
         goal_orientation.header = goal_pose.header
         goal_orientation.quaternion = goal_pose.pose.orientation
@@ -273,8 +269,10 @@ class CartesianPose(Goal):
                                                           max_velocity=max_angular_velocity,
                                                           reference_velocity=reference_angular_velocity,
                                                           weight=weight,
-                                                          root_link2=root_link2,
-                                                          **kwargs))
+                                                          root_link2=root_link2))
+
+    def make_constraints(self):
+        pass
 
     def __str__(self):
         s = super().__str__()
@@ -285,7 +283,7 @@ class DiffDriveBaseGoal(Goal):
 
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
-                 always_forward: bool = False, **kwargs):
+                 always_forward: bool = False):
         """
         Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
         1. orient towards goal.
@@ -300,7 +298,7 @@ class DiffDriveBaseGoal(Goal):
         :param pointing_axis: the forward direction. default is x-axis
         :param always_forward: if false, it will drive backwards, if it requires less rotation.
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.always_forward = always_forward
         self.max_linear_velocity = max_linear_velocity
         self.max_angular_velocity = max_angular_velocity
@@ -420,7 +418,7 @@ class DiffDriveBaseGoal(Goal):
                             upper_error=rotate_to_goal_error,
                             weight=weight_rotate_to_goal,
                             expression=map_current_angle,
-                            name_suffix='/rot1')
+                            name='/rot1')
         self.add_point_goal_constraints(frame_P_current=map_P_base_footprint,
                                         frame_P_goal=map_P_base_footprint_goal,
                                         reference_velocity=self.max_linear_velocity,
@@ -430,7 +428,7 @@ class DiffDriveBaseGoal(Goal):
                             upper_error=final_rotation_error,
                             weight=weight_final_rotation,
                             expression=map_current_angle,
-                            name_suffix='/rot2')
+                            name='/rot2')
 
     def __str__(self):
         s = super().__str__()
@@ -445,13 +443,13 @@ class CartesianPoseStraight(Goal):
                  max_angular_velocity: Optional[float] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA, **kwargs):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
         """
         self.root_link = root_link
         self.tip_link = tip_link
-        super().__init__(**kwargs)
+        super().__init__()
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
         goal_point.point = goal_pose.pose.position
@@ -462,8 +460,7 @@ class CartesianPoseStraight(Goal):
                                                                goal_point=goal_point,
                                                                max_velocity=max_linear_velocity,
                                                                reference_velocity=reference_linear_velocity,
-                                                               weight=weight,
-                                                               **kwargs))
+                                                               weight=weight))
         goal_orientation = QuaternionStamped()
         goal_orientation.header = goal_pose.header
         goal_orientation.quaternion = goal_pose.pose.orientation
@@ -474,8 +471,10 @@ class CartesianPoseStraight(Goal):
                                                           goal_orientation=goal_orientation,
                                                           max_velocity=max_angular_velocity,
                                                           reference_velocity=reference_angular_velocity,
-                                                          weight=weight,
-                                                          **kwargs))
+                                                          weight=weight))
+
+    def make_constraints(self):
+        pass
 
     def __str__(self):
         s = super().__str__()
@@ -484,11 +483,11 @@ class CartesianPoseStraight(Goal):
 
 class TranslationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True):
         """
         See CartesianVelocityLimit
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.root_link = self.world.get_link_name(root_link, root_group)
         self.tip_link = self.world.get_link_name(tip_link, tip_group)
         self.hard = hard
@@ -515,19 +514,18 @@ class TranslationVelocityLimit(Goal):
 
 class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True):
         """
         See CartesianVelocityLimit
         """
-        super(RotationVelocityLimit, self).__init__(**kwargs)
 
+        super().__init__()
         self.root_link = self.world.get_link_name(root_link, root_group)
         self.tip_link = self.world.get_link_name(tip_link, tip_group)
         self.hard = hard
 
         self.weight = weight
         self.max_velocity = max_velocity
-        super().__init__(**kwargs)
 
     def make_constraints(self):
         r_R_c = w.rotation_of(self.get_fk(self.root_link, self.tip_link))
@@ -555,8 +553,7 @@ class CartesianVelocityLimit(Goal):
                  max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
-                 hard: bool = False,
-                 **kwargs):
+                 hard: bool = False):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
         slowing down the system noticeably.
@@ -571,23 +568,24 @@ class CartesianVelocityLimit(Goal):
         """
         self.root_link = root_link
         self.tip_link = tip_link
-        super().__init__(**kwargs)
+        super().__init__()
         self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
                                                               root_group=root_group,
                                                               tip_link=tip_link,
                                                               tip_group=tip_group,
                                                               max_velocity=max_linear_velocity,
                                                               weight=weight,
-                                                              hard=hard,
-                                                              **kwargs))
+                                                              hard=hard))
         self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
                                                            root_group=root_group,
                                                            tip_link=tip_link,
                                                            tip_group=tip_group,
                                                            max_velocity=max_angular_velocity,
                                                            weight=weight,
-                                                           hard=hard,
-                                                           **kwargs))
+                                                           hard=hard))
+
+    def make_constraints(self):
+        pass
 
     def __str__(self):
         s = super().__str__()

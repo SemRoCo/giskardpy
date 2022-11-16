@@ -14,8 +14,7 @@ class Open(Goal):
                  tip_group: Optional[str] = None,
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
-                 weight=WEIGHT_ABOVE_CA,
-                 **kwargs):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -28,7 +27,7 @@ class Open(Goal):
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.weight = weight
         self.tip_link = self.world.get_link_name(tip_link, tip_group)
         self.handle_link = self.world.get_link_name(environment_link, environment_group)
@@ -47,12 +46,14 @@ class Open(Goal):
                                                    tip_link=tip_link,
                                                    tip_group=tip_group,
                                                    goal_pose=self.handle_T_tip,
-                                                   weight=self.weight*100, **kwargs))
+                                                   weight=self.weight * 100))
         self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name.short_name,
                                                    group_name=self.joint_group.name,
                                                    goal=goal_joint_state,
-                                                   weight=weight,
-                                                   **kwargs))
+                                                   weight=weight))
+
+    def make_constraints(self):
+        pass
 
     def __str__(self):
         return f'{super().__str__()}/{self.tip_link}/{self.handle_link}'
@@ -65,12 +66,13 @@ class Close(Goal):
                  tip_group: Optional[str] = None,
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
-                 weight=WEIGHT_ABOVE_CA,
-                 **kwargs):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
-        super().__init__(**kwargs)
+        super().__init__()
+        self.tip_link = tip_link
+        self.environment_link = environment_link
         handle_link = self.world.get_link_name(environment_link, environment_group)
         joint_name = self.world.get_movable_parent_joint(handle_link)
         min_position, _ = self.world.get_joint_position_limits(joint_name)
@@ -83,5 +85,10 @@ class Close(Goal):
                                           environment_link=environment_link,
                                           environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
-                                          weight=weight,
-                                          **kwargs))
+                                          weight=weight))
+
+    def make_constraints(self):
+        pass
+
+    def __str__(self):
+        return f'{super().__str__()}/{self.tip_link}/{self.environment_link}'

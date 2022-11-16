@@ -464,7 +464,8 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     return dot(rz, ry, rx)
 
 
-def rotation_matrix_from_axis_angle(axis, angle):
+def rotation_matrix_from_axis_angle(axis: Union[Tuple[expr_symbol, expr_symbol, expr_symbol], expr_matrix],
+                                    angle: expr_symbol):
     """
     Conversion of unit axis and angle to 4x4 rotation matrix according to:
     http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
@@ -1265,7 +1266,8 @@ def to_str(expression):
     pass
 
 
-def total_derivative(expr, symbols, symbols_dot):
+def total_derivative(expr: Union[expr_symbol, expr_matrix], symbols: expr_matrix, symbols_dot: expr_matrix) \
+        -> Union[expr_symbol, expr_matrix]:
     expr_jacobian = jacobian(expr, symbols)
     last_velocities = Matrix(symbols_dot)
     velocity = dot(expr_jacobian, last_velocities)

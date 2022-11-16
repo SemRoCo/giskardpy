@@ -30,7 +30,7 @@ class AlignPlanes(Goal):
         :param max_angular_velocity: rad/s
         :param weight:
         """
-        super().__init__(**kwargs)
+        super().__init__()
         if 'root_normal' in kwargs:
             logwarn('Deprecated warning: use goal_normal instead of root_normal')
             goal_normal = kwargs['root_normal']

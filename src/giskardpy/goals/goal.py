@@ -1,7 +1,11 @@
-from __future__ import division
+from __future__ import annotations
 
+import abc
+from abc import ABC
 from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List, Union
+from typing import Optional, Tuple, Dict, List, Union, Callable
+
+from genpy import Message
 
 import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
@@ -10,8 +14,9 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import ConstraintInitalizationException, GiskardException, UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string, expr_matrix, expr_symbol
+from giskardpy.my_types import my_string, expr_matrix, expr_symbol, transformable_message, PrefixName, Derivatives
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
+from giskardpy.utils.utils import blackboard_god_map
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
@@ -20,22 +25,43 @@ WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
-class NonMotionGoal:
-    pass
+class Goal(ABC):
 
-class Goal:
-    def __init__(self, god_map: GodMap, control_horizon: int = None, **kwargs):
-        self.god_map = god_map
+    @abc.abstractmethod
+    def __init__(self):
+        """
+        This is where you specify goal parameters and save them as self attributes.
+        """
+        self.god_map = blackboard_god_map()
         self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
         self._test_mode = self.god_map.get_data(identifier.test_mode)
         # last 2 velocities are 0 anyway
-        if control_horizon is None:
-            control_horizon = self.prediction_horizon
-        self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
+        self.control_horizon = max(self.prediction_horizon - 2, 1)
         self._sub_goals: List[Goal] = []
         self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
 
-    def add_collision_check(self, link_a, link_b, distance):
+    @abc.abstractmethod
+    def make_constraints(self):
+        """
+        This is where you create your constraints using casadi_wrapper.
+        Use self.add_constraint.
+        """
+
+    @abc.abstractmethod
+    def __str__(self) -> str:
+        """
+        Make sure the returns a unique identifier, in case multiple goals of the same type are added.
+        Usage of 'self.__class__.__name__' is recommended.
+        """
+        return str(self.__class__.__name__)
+
+    def add_collision_check(self, link_a: PrefixName, link_b: PrefixName, distance: float):
+        """
+        Tell Giskard to check this collision, even if it got disabled through other means such as allow_all_collisions.
+        :param link_a:
+        :param link_b:
+        :param distance: distance threshold for the collision check. Only distances smaller than this value can be detected.
+        """
         if self.world.link_order(link_a, link_b):
             key = (link_a, link_b)
         else:
@@ -52,15 +78,12 @@ class Goal:
         else:
             added_checks[key] = distance
 
-    def save_self_on_god_map(self):
+    def _save_self_on_god_map(self):
         try:
             self.god_map.get_data(self._get_identifier())
             raise ConstraintInitalizationException(f'Constraint named {str(self)} already exists.')
         except KeyError:
             self.god_map.set_data(self._get_identifier(), self)
-
-    def make_constraints(self):
-        pass
 
     def _get_identifier(self):
         try:
@@ -69,10 +92,16 @@ class Goal:
             raise AttributeError(
                 f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
-    def get_world_object_pose(self, object_name, link_name):
-        pass
-
-    def transform_msg(self, target_frame, msg, timeout=1):
+    def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
+            -> transformable_message:
+        """
+        First tries to transform the message using the worlds internal kinematic tree.
+        If it fails, it uses tf as a backup.
+        :param target_frame:
+        :param msg:
+        :param tf_timeout: for how long Giskard should wait for tf.
+        :return: message relative to target frame
+        """
         try:
             try:
                 msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
@@ -80,9 +109,9 @@ class Goal:
                 pass
             return self.world.transform_msg(target_frame, msg)
         except KeyError as e:
-            return tf.transform_msg(target_frame, msg, timeout=timeout)
+            return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
-    def get_joint_position_symbol(self, joint_name: my_string) -> expr_symbol:
+    def get_joint_position_symbol(self, joint_name: PrefixName) -> expr_symbol:
         """
         returns a symbol that refers to the given joint
         """
@@ -90,64 +119,58 @@ class Goal:
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
         return self.world._joints[joint_name].position_expression
 
-    def get_joint_velocity_symbols(self, joint_name):
-        """
-        returns a symbol that referes to the given joint
-        """
-        key = identifier.joint_states + [joint_name, 'velocity']
-        return self.god_map.to_symbol(key)
-
     @property
-    def sample_period(self):
+    def sample_period(self) -> float:
         return self.god_map.get_data(identifier.sample_period)
 
-    def get_sampling_period_symbol(self):
+    def get_sampling_period_symbol(self) -> expr_symbol:
         return self.god_map.to_symbol(identifier.sample_period)
 
-    def __str__(self):
-        return self.__class__.__name__
-
-    def get_fk(self, root: my_string, tip: my_string) -> expr_matrix:
+    def get_fk(self, root: PrefixName, tip: PrefixName) -> expr_matrix:
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
         """
         return self.world.compose_fk_expression(root, tip)
 
-    def get_fk_evaluated(self, root: my_string, tip: my_string) -> expr_matrix:
+    def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> expr_matrix:
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
-        It is not dependent on the joint state.
+        This means that the derivative towards the joint symbols will be 0.
         """
         return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
 
     def get_parameter_as_symbolic_expression(self, name: str) -> Union[expr_symbol, expr_matrix]:
         """
-        Returns a symbols that references a class attribute.
+        :param name: name of a class attribute, e.g. self.muh
+        :return: a symbol (or matrix of symbols) that refers to self.muh
         """
         if not hasattr(self, name):
             raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
         return self.god_map.to_expr(self._get_identifier() + [name])
 
-    def get_expr_velocity(self, expr):
+    def get_expr_velocity(self, expr: Union[expr_symbol, expr_matrix]) -> expr_symbol:
+        """
+        Creates an expressions that computes the total derivative of expr
+        """
         return w.total_derivative(expr,
                                   self.joint_position_symbols,
                                   self.joint_velocity_symbols)
 
     @property
-    def joint_position_symbols(self):
+    def joint_position_symbols(self) -> List[expr_symbol]:
         position_symbols = []
         for joint in self.world.controlled_joints:
             position_symbols.extend(self.world._joints[joint].free_variable_list)
-        return [x.get_symbol(0) for x in position_symbols]
+        return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
-    def joint_velocity_symbols(self):
+    def joint_velocity_symbols(self) -> List[expr_symbol]:
         position_symbols = []
         for joint in self.world.controlled_joints:
             position_symbols.extend(self.world._joints[joint].free_variable_list)
-        return [x.get_symbol(1) for x in position_symbols]
+        return [x.get_symbol(Derivatives.velocity) for x in position_symbols]
 
-    def get_fk_velocity(self, root, tip):
+    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> expr_matrix:
         r_T_t = self.get_fk(root, tip)
         r_R_t = w.rotation_of(r_T_t)
         axis, angle = w.axis_angle_from_matrix(r_R_t)
@@ -167,7 +190,7 @@ class Goal:
         self._debug_expressions = OrderedDict()
         self.make_constraints()
         for sub_goal in self._sub_goals:
-            sub_goal.save_self_on_god_map()
+            sub_goal._save_self_on_god_map()
             c, c_vel, debug_expressions = sub_goal.get_constraints()
             # TODO check for duplicates
             self._constraints.update(_prepend_prefix(self.__class__.__name__, c))
@@ -175,12 +198,34 @@ class Goal:
             self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))
         return self._constraints, self._velocity_constraints, self._debug_expressions
 
-    def add_constraints_of_goal(self, goal):
+    def add_constraints_of_goal(self, goal: Goal):
         self._sub_goals.append(goal)
 
-    def add_velocity_constraint(self, lower_velocity_limit, upper_velocity_limit, weight, expression,
-                                velocity_limit, name_suffix=None, lower_slack_limit=-1e4, upper_slack_limit=1e4,
-                                horizon_function=None):
+    def add_velocity_constraint(self,
+                                lower_velocity_limit: expr_symbol,
+                                upper_velocity_limit: expr_symbol,
+                                weight: expr_symbol,
+                                expression: expr_symbol,
+                                velocity_limit: expr_symbol,
+                                name_suffix: Optional[str] = None,
+                                lower_slack_limit: expr_symbol = -1e4,
+                                upper_slack_limit: expr_symbol = 1e4,
+                                horizon_function: Optional[Callable[[float, int], float]] = None):
+        """
+        Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
+        velocity stays within the given bounds.
+        :param lower_velocity_limit:
+        :param upper_velocity_limit:
+        :param weight:
+        :param expression:
+        :param velocity_limit:
+        :param name_suffix:
+        :param lower_slack_limit:
+        :param upper_slack_limit:
+        :param horizon_function: A function that can takes 'weight' and the id within the horizon as input and computes
+                                    a new weight. Can be used to give points towards the end of the horizon a different
+                                    weight
+        """
         name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
         if name in self._velocity_constraints:
@@ -202,19 +247,31 @@ class Goal:
                        upper_error: expr_symbol,
                        weight: expr_symbol,
                        expression: expr_symbol,
-                       name_suffix: Optional[str] = None,
+                       name: Optional[str] = None,
                        lower_slack_limit: Optional[expr_symbol] = None,
-                       upper_slack_limit: Optional[expr_symbol] = None,
-                       control_horizon: Optional[int] = None):
+                       upper_slack_limit: Optional[expr_symbol] = None):
+        """
+        Add a task constraint to the motion problem. This should be used for most constraints.
+        It will not strictly stick to the reference velocity, but requires only a single constraint in the final
+        optimization problem and is therefore faster.
+        :param reference_velocity: used by Giskard to limit the error and normalize the weight, will not be strictly enforced.
+        :param lower_error: lower bound for the error of expression
+        :param upper_error: upper bound for the error of expression
+        :param weight:
+        :param expression: defines the task function
+        :param name: give this constraint a name, required if you add more than one in the same goal
+        :param lower_slack_limit: how much the lower error can be violated, don't use unless you know what you are doing
+        :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
+        """
         if expression.shape != (1, 1):
             raise GiskardException(f'expression must have shape (1,1), has {expression.shape}')
-        name_suffix = name_suffix if name_suffix else ''
-        name = str(self) + name_suffix
+        name = name if name else ''
+        name = str(self) + name
         if name in self._constraints:
-            raise KeyError(f'a constraint with name \'{name}\' already exists')
+            raise KeyError(f'A constraint with name \'{name}\' already exists. '
+                           f'You need to set a name, if you add multiple constraints.')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
-        control_horizon = control_horizon if control_horizon is not None else self.control_horizon
         self._constraints[name] = Constraint(name=name,
                                              expression=expression,
                                              lower_error=lower_error,
@@ -223,10 +280,20 @@ class Goal:
                                              quadratic_weight=weight,
                                              lower_slack_limit=lower_slack_limit,
                                              upper_slack_limit=upper_slack_limit,
-                                             control_horizon=control_horizon)
+                                             control_horizon=self.control_horizon)
 
-    def add_constraint_vector(self, reference_velocities, lower_errors, upper_errors, weights, expressions,
-                              name_suffixes=None, lower_slack_limits=None, upper_slack_limits=None):
+    def add_constraint_vector(self,
+                              reference_velocities: List[expr_symbol],
+                              lower_errors: List[expr_symbol],
+                              upper_errors: List[expr_symbol],
+                              weights: List[expr_symbol],
+                              expressions: List[expr_symbol],
+                              names: List[str],
+                              lower_slack_limits: Optional[List[expr_symbol]] = None,
+                              upper_slack_limits: Optional[List[expr_symbol]] = None):
+        """
+        Calls add_constraint for a list of expressions.
+        """
         reference_velocities = w.matrix_to_list(reference_velocities)
         lower_errors = w.matrix_to_list(lower_errors)
         upper_errors = w.matrix_to_list(upper_errors)
@@ -240,12 +307,12 @@ class Goal:
                 or len(lower_errors) != len(expressions) \
                 or len(lower_errors) != len(reference_velocities) \
                 or len(lower_errors) != len(weights) \
-                or (name_suffixes is not None and len(lower_errors) != len(name_suffixes)) \
+                or (names is not None and len(lower_errors) != len(names)) \
                 or (lower_slack_limits is not None and len(lower_errors) != len(lower_slack_limits)) \
                 or (upper_slack_limits is not None and len(lower_errors) != len(upper_slack_limits)):
             raise ConstraintInitalizationException('All parameters must have the same length.')
         for i in range(len(lower_errors)):
-            name_suffix = name_suffixes[i] if name_suffixes else None
+            name_suffix = names[i] if names else None
             lower_slack_limit = lower_slack_limits[i] if lower_slack_limits else None
             upper_slack_limit = upper_slack_limits[i] if upper_slack_limits else None
             self.add_constraint(reference_velocity=reference_velocities[i],
@@ -253,55 +320,92 @@ class Goal:
                                 upper_error=upper_errors[i],
                                 weight=weights[i],
                                 expression=expressions[i],
-                                name_suffix=name_suffix,
+                                name=name_suffix,
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
 
     def add_debug_expr(self, name: str, expr: expr_symbol):
         """
-        Adds a constraint with weight 0 to the qp problem.
-        Used to inspect subexpressions for debugging.
-        :param name: a name to identify the expression
+        Add any expression for debug purposes. They will be evaluated as well and can be plotted by activating
+        the debug plotter in this Giskard config.
+        :param name:
+        :param expr:
         """
-        name = '{}/{}'.format(self, name)
+        name = f'{self}/{name}'
         self._debug_expressions[name] = expr
 
-    def add_debug_matrix(self, name, matrix_expr):
+    def add_debug_matrix(self, name: str, matrix_expr: expr_matrix):
+        """
+        Calls add_debug_expr for a matrix.
+        """
         for x in range(matrix_expr.shape[0]):
             for y in range(matrix_expr.shape[1]):
-                self.add_debug_expr('{}/{},{}'.format(name, x, y), matrix_expr[x, y])
+                self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
 
-    def add_debug_vector(self, name, vector_expr):
+    def add_debug_vector(self, name: str, vector_expr: expr_symbol):
+        """
+        Calls add_debug_expr for a vector.
+        """
         for x in range(vector_expr.shape[0]):
-            self.add_debug_expr('{}/{}'.format(name, x), vector_expr[x])
+            self.add_debug_expr(f'{name}/{x}', vector_expr[x])
 
-    def add_position_constraint(self, expr_current, expr_goal, reference_velocity, weight=WEIGHT_BELOW_CA,
-                                name_suffix=''):
-
+    def add_position_constraint(self,
+                                expr_current: expr_symbol,
+                                expr_goal: expr_symbol,
+                                reference_velocity: expr_symbol,
+                                weight: expr_symbol = WEIGHT_BELOW_CA,
+                                name: str = ''):
+        """
+        A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
+        """
         error = expr_goal - expr_current
         self.add_constraint(reference_velocity=reference_velocity,
                             lower_error=error,
                             upper_error=error,
                             weight=weight,
                             expression=expr_current,
-                            name_suffix=name_suffix)
+                            name=name)
 
-    def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=''):
+    def add_point_goal_constraints(self,
+                                   frame_P_current: expr_matrix,
+                                   frame_P_goal: expr_matrix,
+                                   reference_velocity: expr_symbol,
+                                   weight: expr_symbol,
+                                   name: str = ''):
+        """
+        Adds three constraints to move frame_P_current to frame_P_goal.
+        Make sure that both points are expressed relative to the same frame!
+        :param frame_P_current: a vector describing a 3D point
+        :param frame_P_goal: a vector describing a 3D point
+        :param reference_velocity: m/s
+        :param weight:
+        :param name:
+        """
         error = frame_P_goal[:3] - frame_P_current[:3]
-        # self.add_debug_expr('error', w.norm(error))
-        # self.add_debug_vector('goal', frame_P_goal[:3])
-        # self.add_debug_vector('current', frame_P_current[:3])
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
                                    weights=[weight] * 3,
                                    expressions=frame_P_current[:3],
-                                   name_suffixes=['{}/x'.format(name_suffix),
-                                                  '{}/y'.format(name_suffix),
-                                                  '{}/z'.format(name_suffix)])
+                                   names=[f'{name}/x',
+                                          f'{name}/y',
+                                          f'{name}/z'])
 
-    def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4,
-                                         name_suffix=''):
+    def add_translational_velocity_limit(self,
+                                         frame_P_current: expr_matrix,
+                                         max_velocity: expr_symbol,
+                                         weight: expr_symbol,
+                                         max_violation: expr_symbol = 1e4,
+                                         name=''):
+        """
+        Adds constraints to limit the translational velocity of frame_P_current. Be aware that the velocity is relative
+        to frame.
+        :param frame_P_current: a vector describing a 3D point
+        :param max_velocity:
+        :param weight:
+        :param max_violation: m/s
+        :param name:
+        """
         trans_error = w.norm(frame_P_current)
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
                                      lower_velocity_limit=-max_velocity,
@@ -310,14 +414,23 @@ class Goal:
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      velocity_limit=max_velocity,
-                                     name_suffix=f'{name_suffix}/vel')
-        # if self._test_mode:
-        #     # self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
-        #     self.add_debug_expr('trans_error', trans_error)
+                                     name_suffix=f'{name}/vel')
 
-    def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
-                                    weight=WEIGHT_BELOW_CA, name_suffix=''):
-
+    def add_vector_goal_constraints(self,
+                                    frame_V_current: expr_matrix,
+                                    frame_V_goal: expr_matrix,
+                                    reference_velocity: expr_symbol,
+                                    weight: expr_symbol = WEIGHT_BELOW_CA,
+                                    name: str = ''):
+        """
+        Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
+        relative to the same frame.
+        :param frame_V_current: a vector describing a 3D vector
+        :param frame_V_goal: a vector describing a 3D vector
+        :param reference_velocity: rad/s
+        :param weight:
+        :param name:
+        """
         angle = w.save_acos(w.dot(frame_V_current.T, frame_V_goal)[0])
         # avoid singularity by staying away from pi
         angle_limited = w.min(w.max(angle, -reference_velocity), reference_velocity)
@@ -331,13 +444,29 @@ class Goal:
                                    upper_errors=error[:3],
                                    weights=[weight] * 3,
                                    expressions=frame_V_current[:3],
-                                   name_suffixes=['{}/trans/x'.format(name_suffix),
-                                                  '{}/trans/y'.format(name_suffix),
-                                                  '{}/trans/z'.format(name_suffix)])
+                                   names=[f'{name}/trans/x',
+                                          f'{name}/trans/y',
+                                          f'{name}/trans/z'])
 
-    def add_rotation_goal_constraints(self, frame_R_current, frame_R_goal, current_R_frame_eval, reference_velocity,
-                                      weight, name_suffix=''):
-        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+    def add_rotation_goal_constraints(self,
+                                      frame_R_current: expr_matrix,
+                                      frame_R_goal: expr_matrix,
+                                      current_R_frame_eval: expr_matrix,
+                                      reference_velocity: expr_symbol,
+                                      weight: expr_symbol,
+                                      name: str = ''):
+        """
+        Adds constraints to move frame_R_current to frame_R_goal. Make sure that both are expressed relative to the same
+        frame.
+        :param frame_R_current: current rotation as rotation matrix
+        :param frame_R_goal: goal rotation as rotation matrix
+        :param current_R_frame_eval: an expression that computes the reverse of frame_R_current.
+                                        Use self.get_fk_evaluated for this.
+        :param reference_velocity: rad/s
+        :param weight:
+        :param name:
+        """
+        hack = w.rotation_matrix_from_axis_angle((0, 0, 1), 0.0001)
         frame_R_current = w.dot(frame_R_current, hack)  # hack to avoid singularity
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(current_R_frame_eval, frame_R_current))
         tip_R_goal = w.dot(current_R_frame_eval, frame_R_goal)
@@ -353,13 +482,25 @@ class Goal:
                                    upper_errors=tip_Q_goal[:3],
                                    weights=[weight] * 3,
                                    expressions=expr[:3],
-                                   name_suffixes=['{}/rot/x'.format(name_suffix),
-                                                  '{}/rot/y'.format(name_suffix),
-                                                  '{}/rot/z'.format(name_suffix)])
-        # if self._test_mode:
-        #     self.add_debug_expr('rot', w.axis_angle_from_quaternion(tip_Q_goal[0], tip_Q_goal[1], tip_Q_goal[2], tip_Q_goal[3])[1])
+                                   names=[f'{name}/rot/x',
+                                          f'{name}/rot/y',
+                                          f'{name}/rot/z'])
 
-    def add_rotational_velocity_limit(self, frame_R_current, max_velocity, weight, max_violation=1e4, name_suffix=''):
+    def add_rotational_velocity_limit(self,
+                                      frame_R_current: expr_matrix,
+                                      max_velocity: expr_symbol,
+                                      weight: expr_symbol,
+                                      max_violation: expr_symbol = 1e4,
+                                      name: str = ''):
+        """
+        Add velocity constraints to limit the velocity of frame_R_current. Be aware that the velocity is relative to
+        frame.
+        :param frame_R_current: Rotation matrix describing the current rotation.
+        :param max_velocity: rad/s
+        :param weight:
+        :param max_violation:
+        :param name:
+        """
         root_Q_tipCurrent = w.quaternion_from_matrix(frame_R_current)
         angle_error = w.quaternion_angle(root_Q_tipCurrent)
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
@@ -368,17 +509,26 @@ class Goal:
                                      expression=angle_error,
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
-                                     name_suffix='{}/q/vel'.format(name_suffix),
+                                     name_suffix='{}/q/vel'.format(name),
                                      velocity_limit=max_velocity)
 
 
 def _prepend_prefix(prefix, d):
     new_dict = OrderedDict()
     for key, value in d.items():
-        new_key = '{}/{}'.format(prefix, key)
+        new_key = f'{prefix}/{key}'
         try:
-            value.name = '{}/{}'.format(prefix, value.name)
+            value.name = f'{prefix}/{value.name}'
         except AttributeError:
             pass
         new_dict[new_key] = value
     return new_dict
+
+
+class NonMotionGoal(Goal):
+    """
+    Inherit from this goal, if the goal does not add any constraints.
+    """
+
+    def make_constraints(self):
+        pass

@@ -8,11 +8,11 @@ from giskardpy.goals.goal import Goal
 
 class UpdateGodMap(Goal):
 
-    def __init__(self, updates, **kwargs):
+    def __init__(self, updates):
         """
         Modifies the core data structure of giskard, only use it if you know what you are doing
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.update_god_map([], updates)
 
     def update_god_map(self, identifier, updates):

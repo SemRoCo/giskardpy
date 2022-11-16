@@ -5,6 +5,7 @@ from typing import Union, Dict
 
 import casadi as ca
 import genpy
+from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
 
 
 class PrefixName:
@@ -77,3 +78,4 @@ expr_symbol = Union[ca.SX, float]
 expr_matrix = ca.SX
 derivative_map = Dict[Derivatives, float]
 derivative_joint_map = Dict[Derivatives, Dict[my_string, float]]
+transformable_message = Union[PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped]

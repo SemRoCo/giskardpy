@@ -13,13 +13,13 @@ class DiffDriveTangentialToPoint(Goal):
 
     def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
                  group_name: Optional[str] = None,
-                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False, **kwargs):
-        super().__init__(**kwargs)
+                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False):
+        super().__init__()
+        self.tip = self.world.get_link_name('base_footprint', group_name)
+        self.root = self.world.root_link_name
         self.goal_point = self.transform_msg(self.world.root_link_name, goal_point)
         self.goal_point.point.z = 0
         self.weight = weight
-        self.tip = self.world.get_link_name('base_footprint', group_name)
-        self.root = self.world.root_link_name
         self.drive = drive
         if forward is not None:
             self.tip_V_pointing_axis = tf.transform_vector(self.tip, forward)
@@ -47,7 +47,7 @@ class DiffDriveTangentialToPoint(Goal):
                                 upper_error=-angle,
                                 weight=self.weight,
                                 expression=angle,
-                                name_suffix='/rot')
+                                name='/rot')
         else:
             # angle = w.abs(w.angle_between_vector(w.vector3(1,0,0), map_V_tangent))
             map_R_goal = w.rotation_matrix_from_vectors(x=map_V_tangent, y=None, z=w.vector3(0, 0, 1))
@@ -61,13 +61,16 @@ class DiffDriveTangentialToPoint(Goal):
                                 upper_error=angle_error,
                                 weight=self.weight,
                                 expression=map_current_angle,
-                                name_suffix='/rot')
+                                name='/rot')
+
+    def __str__(self) -> str:
+        return f'{super().__str__()}/{self.root}/{self.tip}'
 
 
 class PointingDiffDriveEEF(Goal):
     def __init__(self, base_tip, base_root, eef_tip, eef_root, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_ABOVE_CA, **kwargs):
-        super().__init__(**kwargs)
+                 weight=WEIGHT_ABOVE_CA):
+        super().__init__()
         self.weight = weight
         self.max_velocity = max_velocity
         self.base_tip = base_tip
@@ -115,8 +118,8 @@ class PointingDiffDriveEEF(Goal):
 
 class KeepHandInWorkspace(Goal):
     def __init__(self, tip_link, base_footprint=None, map_frame=None, pointing_axis=None, max_velocity=0.3,
-                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, **kwargs):
-        super().__init__(**kwargs)
+                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA):
+        super().__init__()
         if base_footprint is None:
             base_footprint = 'base_footprint'
         base_footprint = self.world.get_link_name(base_footprint, group_name)
@@ -160,7 +163,7 @@ class KeepHandInWorkspace(Goal):
                             upper_error=-angle_error + 0.2,
                             weight=weight,
                             expression=angle_error,
-                            name_suffix='/rot')
+                            name='/rot')
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=base_footprint_V_tip,
         #                                  reference_velocity=0.5)

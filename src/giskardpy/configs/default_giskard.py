@@ -15,6 +15,7 @@ from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
     BehaviorTreeConfig, QPSolverConfig, CollisionAvoidanceConfig, ControlModes, RobotInterfaceConfig, HardwareConfig, \
     TfPublishingModes, CollisionAvoidanceConfigEntry, SupportedQPSolver
 from giskardpy.exceptions import GiskardException
+from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.utils import robot_name_from_urdf_string
@@ -23,7 +24,7 @@ from giskardpy.my_types import my_string, PrefixName, Derivatives
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 
 class Giskard:
@@ -41,6 +42,14 @@ class Giskard:
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self._backup = {}
+        self.goal_package_paths = ['giskardpy.goals']
+
+    def add_goal_package_name(self, package_name: str):
+        new_goals = get_all_classes_in_package(package_name, Goal)
+        if len(new_goals) == 0:
+            raise GiskardException(f'No classes of type \'Goal\' found in {package_name}')
+        logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
+        self.goal_package_paths.append(package_name)
 
     def set_root_link_name(self, link_name: str):
         """

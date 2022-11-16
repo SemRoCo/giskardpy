@@ -7,7 +7,7 @@ from giskardpy.my_types import my_string, expr_symbol, Derivatives
 
 
 class BaseTrajFollower(Goal):
-    def __init__(self, joint_name: my_string, track_only_velocity: bool = False, weight: float = WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, joint_name: my_string, track_only_velocity: bool = False, weight: float = WEIGHT_ABOVE_CA):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link.
         :param root_link: root link of kinematic chain
@@ -17,7 +17,7 @@ class BaseTrajFollower(Goal):
         :param reference_velocity: m/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.weight = weight
         self.joint_name = joint_name
         self.joint: OmniDrive = self.world._joints[joint_name]

@@ -15,8 +15,7 @@ class ExternalCollisionAvoidance(Goal):
                  hard_threshold: float = 0.0,
                  soft_thresholds: Optional[Dict[my_string, float]] = None,
                  idx: int = 0,
-                 num_repeller: int = 1,
-                 **kwargs):
+                 num_repeller: int = 1):
         """
         Don't use me
         """
@@ -26,7 +25,7 @@ class ExternalCollisionAvoidance(Goal):
         self.num_repeller = num_repeller
         self.link_name = link_name
         self.idx = idx
-        super().__init__(**kwargs)
+        super().__init__()
         self.root = self.world.root_link_name
         self.robot_name = robot_name
 
@@ -153,8 +152,7 @@ class SelfCollisionAvoidance(Goal):
                  hard_threshold: float = 0.0,
                  soft_threshold: float = 0.05,
                  idx: float = 0,
-                 num_repeller: int = 1,
-                 **kwargs):
+                 num_repeller: int = 1):
         self.link_a = link_a
         self.link_b = link_b
         self.max_velocity = max_velocity
@@ -164,7 +162,7 @@ class SelfCollisionAvoidance(Goal):
         self.idx = idx
         if self.link_a.prefix != self.link_b.prefix:
             raise Exception(f'Links {self.link_a} and {self.link_b} have different prefix.')
-        super().__init__(**kwargs)
+        super().__init__()
         self.root = self.world.root_link_name
         self.robot_name = robot_name
 
@@ -253,7 +251,7 @@ class SelfCollisionAvoidance(Goal):
 
 class CollisionAvoidanceHint(Goal):
     def __init__(self, tip_link, avoidance_hint, object_link_name, object_group = None, max_linear_velocity=0.1,
-                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
+                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.
@@ -268,7 +266,7 @@ class CollisionAvoidanceHint(Goal):
                                         sprint_threshold to max_threshold linearly, to smooth motions
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super().__init__(**kwargs)
+        super().__init__()
         self.link_name = self.world.get_link_name(tip_link)
         self.link_b = self.world.get_link_name(object_link_name)
         self.key = (self.link_name, None, self.link_b)
@@ -335,7 +333,7 @@ class CollisionAvoidanceHint(Goal):
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
         # self.add_debug_expr('dist', actual_distance)
-        self.add_constraint(name_suffix='avoidance_hint',
+        self.add_constraint(name='avoidance_hint',
                             reference_velocity=max_velocity,
                             lower_error=max_velocity,
                             upper_error=max_velocity,

@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
+from typing import Type, Optional, Dict
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -70,12 +71,13 @@ class NullContextManager(object):
         pass
 
 
-def get_all_classes_in_package(package, parent_class=None):
+def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] = None) -> Dict[str, Type]:
     classes = {}
+    package = __import__(package_name, fromlist="dummy")
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-        module = __import__('{}.{}'.format(package.__name__, modname), fromlist="dummy")
+        module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
         for name2, value2 in inspect.getmembers(module, inspect.isclass):
-            if parent_class is None or issubclass(value2, parent_class):
+            if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
                 classes[name2] = value2
     return classes
 

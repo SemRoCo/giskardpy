@@ -32,7 +32,7 @@ class Goal(ABC):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
-        self.god_map = blackboard_god_map()
+        self.god_map: GodMap = blackboard_god_map()
         self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
         self._test_mode = self.god_map.get_data(identifier.test_mode)
         # last 2 velocities are 0 anyway

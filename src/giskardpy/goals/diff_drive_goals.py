@@ -46,7 +46,7 @@ class DiffDriveTangentialToPoint(Goal):
                                 lower_error=-angle,
                                 upper_error=-angle,
                                 weight=self.weight,
-                                expression=angle,
+                                task_expression=angle,
                                 name='/rot')
         else:
             # angle = w.abs(w.angle_between_vector(w.vector3(1,0,0), map_V_tangent))
@@ -60,7 +60,7 @@ class DiffDriveTangentialToPoint(Goal):
                                 lower_error=angle_error,
                                 upper_error=angle_error,
                                 weight=self.weight,
-                                expression=map_current_angle,
+                                task_expression=map_current_angle,
                                 name='/rot')
 
     def __str__(self) -> str:
@@ -162,7 +162,7 @@ class KeepHandInWorkspace(Goal):
                             lower_error=-angle_error - 0.2,
                             upper_error=-angle_error + 0.2,
                             weight=weight,
-                            expression=angle_error,
+                            task_expression=angle_error,
                             name='/rot')
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=base_footprint_V_tip,

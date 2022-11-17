@@ -202,7 +202,7 @@ class CartesianPositionStraight(Goal):
                                    lower_errors=[dist, 0, 0],
                                    upper_errors=[dist, 0, 0],
                                    weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
-                                   expressions=expr_p[:3],
+                                   task_expression=expr_p[:3],
                                    names=['line/x',
                                           'line/y',
                                           'line/z'])
@@ -417,7 +417,7 @@ class DiffDriveBaseGoal(Goal):
                             lower_error=rotate_to_goal_error,
                             upper_error=rotate_to_goal_error,
                             weight=weight_rotate_to_goal,
-                            expression=map_current_angle,
+                            task_expression=map_current_angle,
                             name='/rot1')
         self.add_point_goal_constraints(frame_P_current=map_P_base_footprint,
                                         frame_P_goal=map_P_base_footprint_goal,
@@ -427,7 +427,7 @@ class DiffDriveBaseGoal(Goal):
                             lower_error=final_rotation_error,
                             upper_error=final_rotation_error,
                             weight=weight_final_rotation,
-                            expression=map_current_angle,
+                            task_expression=map_current_angle,
                             name='/rot2')
 
     def __str__(self):

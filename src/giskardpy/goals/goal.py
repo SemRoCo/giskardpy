@@ -205,7 +205,7 @@ class Goal(ABC):
                                 lower_velocity_limit: expr_symbol,
                                 upper_velocity_limit: expr_symbol,
                                 weight: expr_symbol,
-                                expression: expr_symbol,
+                                task_expression: expr_symbol,
                                 velocity_limit: expr_symbol,
                                 name_suffix: Optional[str] = None,
                                 lower_slack_limit: expr_symbol = -1e4,
@@ -217,7 +217,7 @@ class Goal(ABC):
         :param lower_velocity_limit:
         :param upper_velocity_limit:
         :param weight:
-        :param expression:
+        :param task_expression:
         :param velocity_limit:
         :param name_suffix:
         :param lower_slack_limit:
@@ -231,7 +231,7 @@ class Goal(ABC):
         if name in self._velocity_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self._velocity_constraints[name] = VelocityConstraint(name=name,
-                                                              expression=expression,
+                                                              expression=task_expression,
                                                               lower_velocity_limit=lower_velocity_limit,
                                                               upper_velocity_limit=upper_velocity_limit,
                                                               quadratic_weight=weight,
@@ -246,7 +246,7 @@ class Goal(ABC):
                        lower_error: expr_symbol,
                        upper_error: expr_symbol,
                        weight: expr_symbol,
-                       expression: expr_symbol,
+                       task_expression: expr_symbol,
                        name: Optional[str] = None,
                        lower_slack_limit: Optional[expr_symbol] = None,
                        upper_slack_limit: Optional[expr_symbol] = None):
@@ -258,13 +258,13 @@ class Goal(ABC):
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
         :param weight:
-        :param expression: defines the task function
+        :param task_expression: defines the task function
         :param name: give this constraint a name, required if you add more than one in the same goal
         :param lower_slack_limit: how much the lower error can be violated, don't use unless you know what you are doing
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
-        if expression.shape != (1, 1):
-            raise GiskardException(f'expression must have shape (1,1), has {expression.shape}')
+        if task_expression.shape != (1, 1):
+            raise GiskardException(f'expression must have shape (1,1), has {task_expression.shape}')
         name = name if name else ''
         name = str(self) + name
         if name in self._constraints:
@@ -273,7 +273,7 @@ class Goal(ABC):
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
         self._constraints[name] = Constraint(name=name,
-                                             expression=expression,
+                                             expression=task_expression,
                                              lower_error=lower_error,
                                              upper_error=upper_error,
                                              velocity_limit=reference_velocity,
@@ -287,7 +287,7 @@ class Goal(ABC):
                               lower_errors: List[expr_symbol],
                               upper_errors: List[expr_symbol],
                               weights: List[expr_symbol],
-                              expressions: List[expr_symbol],
+                              task_expression: List[expr_symbol],
                               names: List[str],
                               lower_slack_limits: Optional[List[expr_symbol]] = None,
                               upper_slack_limits: Optional[List[expr_symbol]] = None):
@@ -298,13 +298,13 @@ class Goal(ABC):
         lower_errors = w.matrix_to_list(lower_errors)
         upper_errors = w.matrix_to_list(upper_errors)
         weights = w.matrix_to_list(weights)
-        expressions = w.matrix_to_list(expressions)
+        task_expression = w.matrix_to_list(task_expression)
         if lower_slack_limits is not None:
             lower_slack_limits = w.matrix_to_list(lower_slack_limits)
         if upper_slack_limits is not None:
             upper_slack_limits = w.matrix_to_list(upper_slack_limits)
         if len(lower_errors) != len(upper_errors) \
-                or len(lower_errors) != len(expressions) \
+                or len(lower_errors) != len(task_expression) \
                 or len(lower_errors) != len(reference_velocities) \
                 or len(lower_errors) != len(weights) \
                 or (names is not None and len(lower_errors) != len(names)) \
@@ -319,7 +319,7 @@ class Goal(ABC):
                                 lower_error=lower_errors[i],
                                 upper_error=upper_errors[i],
                                 weight=weights[i],
-                                expression=expressions[i],
+                                task_expression=task_expression[i],
                                 name=name_suffix,
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
@@ -363,7 +363,7 @@ class Goal(ABC):
                             lower_error=error,
                             upper_error=error,
                             weight=weight,
-                            expression=expr_current,
+                            task_expression=expr_current,
                             name=name)
 
     def add_point_goal_constraints(self,
@@ -386,7 +386,7 @@ class Goal(ABC):
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
                                    weights=[weight] * 3,
-                                   expressions=frame_P_current[:3],
+                                   task_expression=frame_P_current[:3],
                                    names=[f'{name}/x',
                                           f'{name}/y',
                                           f'{name}/z'])
@@ -410,7 +410,7 @@ class Goal(ABC):
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
                                      lower_velocity_limit=-max_velocity,
                                      weight=weight,
-                                     expression=trans_error,
+                                     task_expression=trans_error,
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      velocity_limit=max_velocity,
@@ -443,7 +443,7 @@ class Goal(ABC):
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
                                    weights=[weight] * 3,
-                                   expressions=frame_V_current[:3],
+                                   task_expression=frame_V_current[:3],
                                    names=[f'{name}/trans/x',
                                           f'{name}/trans/y',
                                           f'{name}/trans/z'])
@@ -481,7 +481,7 @@ class Goal(ABC):
                                    lower_errors=tip_Q_goal[:3],
                                    upper_errors=tip_Q_goal[:3],
                                    weights=[weight] * 3,
-                                   expressions=expr[:3],
+                                   task_expression=expr[:3],
                                    names=[f'{name}/rot/x',
                                           f'{name}/rot/y',
                                           f'{name}/rot/z'])
@@ -506,7 +506,7 @@ class Goal(ABC):
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
                                      lower_velocity_limit=-max_velocity,
                                      weight=weight,
-                                     expression=angle_error,
+                                     task_expression=angle_error,
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix='{}/q/vel'.format(name),

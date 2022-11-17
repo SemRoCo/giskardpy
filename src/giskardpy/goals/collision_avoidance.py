@@ -133,7 +133,7 @@ class ExternalCollisionAvoidance(Goal):
                             lower_error=lower_limit,
                             upper_error=100,
                             weight=weight,
-                            expression=dist,
+                            task_expression=dist,
                             lower_slack_limit=-1e4,
                             upper_slack_limit=upper_slack)
 
@@ -240,7 +240,7 @@ class SelfCollisionAvoidance(Goal):
                             lower_error=lower_limit,
                             upper_error=100,
                             weight=weight,
-                            expression=dist,
+                            task_expression=dist,
                             lower_slack_limit=-1e4,
                             upper_slack_limit=upper_slack)
 
@@ -338,7 +338,7 @@ class CollisionAvoidanceHint(Goal):
                             lower_error=max_velocity,
                             upper_error=max_velocity,
                             weight=weight,
-                            expression=expr)
+                            task_expression=expr)
 
     def __str__(self):
         s = super().__str__()

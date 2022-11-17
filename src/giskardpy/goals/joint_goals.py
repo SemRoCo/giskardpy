@@ -108,7 +108,7 @@ class JointPositionContinuous(Goal):
                                 lower_error=error,
                                 upper_error=error,
                                 weight=self.weight,
-                                expression=current_joint,
+                                task_expression=current_joint,
                                 lower_slack_limit=0,
                                 upper_slack_limit=0)
         else:
@@ -116,7 +116,7 @@ class JointPositionContinuous(Goal):
                                 lower_error=error,
                                 upper_error=error,
                                 weight=self.weight,
-                                expression=current_joint)
+                                task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -167,7 +167,7 @@ class JointPositionPrismatic(Goal):
                                 lower_error=error,
                                 upper_error=error,
                                 weight=self.weight,
-                                expression=current_joint,
+                                task_expression=current_joint,
                                 upper_slack_limit=0,
                                 lower_slack_limit=0)
         else:
@@ -175,7 +175,7 @@ class JointPositionPrismatic(Goal):
                                 lower_error=error,
                                 upper_error=error,
                                 weight=self.weight,
-                                expression=current_joint)
+                                task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -219,7 +219,7 @@ class JointVelocityRevolute(Goal):
             self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
                                          upper_velocity_limit=max_velocity,
                                          weight=self.weight,
-                                         expression=current_joint,
+                                         task_expression=current_joint,
                                          velocity_limit=max_velocity,
                                          lower_slack_limit=0,
                                          upper_slack_limit=0)
@@ -227,7 +227,7 @@ class JointVelocityRevolute(Goal):
             self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
                                          upper_velocity_limit=max_velocity,
                                          weight=self.weight,
-                                         expression=current_joint,
+                                         task_expression=current_joint,
                                          velocity_limit=max_velocity)
 
     def __str__(self):
@@ -277,7 +277,7 @@ class JointPositionRevolute(Goal):
                                 lower_error=error,
                                 upper_error=error,
                                 weight=weight,
-                                expression=current_joint,
+                                task_expression=current_joint,
                                 upper_slack_limit=0,
                                 lower_slack_limit=0)
         else:
@@ -285,7 +285,7 @@ class JointPositionRevolute(Goal):
                                 lower_error=error,
                                 upper_error=error,
                                 weight=weight,
-                                expression=current_joint)
+                                task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -337,7 +337,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
                             upper_error=capped_err,
                             reference_velocity=max_velocity,
                             weight=weight,
-                            expression=current_joint)
+                            task_expression=current_joint)
 
     def __str__(self):
         s = super(ShakyJointPositionRevoluteOrPrismatic, self).__str__()
@@ -389,7 +389,7 @@ class ShakyJointPositionContinuous(Goal):
                             upper_error=capped_err,
                             reference_velocity=max_velocity,
                             weight=weight,
-                            expression=current_joint)
+                            task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -447,7 +447,7 @@ class AvoidSingleJointLimits(Goal):
                             lower_error=lower_err,
                             upper_error=upper_err,
                             weight=weight,
-                            expression=joint_symbol)
+                            task_expression=joint_symbol)
 
     def __str__(self):
         s = super().__str__()
@@ -612,7 +612,7 @@ class JointPositionRange(Goal):
                                 lower_error=self.lower_limit - joint_position,
                                 upper_error=self.upper_limit - joint_position,
                                 weight=WEIGHT_BELOW_CA,
-                                expression=joint_position,
+                                task_expression=joint_position,
                                 lower_slack_limit=0,
                                 upper_slack_limit=0)
         else:
@@ -620,7 +620,7 @@ class JointPositionRange(Goal):
                                 lower_error=self.lower_limit - joint_position,
                                 upper_error=self.upper_limit - joint_position,
                                 weight=WEIGHT_BELOW_CA,
-                                expression=joint_position)
+                                task_expression=joint_position)
 
     def __str__(self):
         s = super().__str__()

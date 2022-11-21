@@ -1,28 +1,23 @@
 import errno
 import os
 import pickle
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Callable, Iterable, Optional
 
 import casadi as ca
 import numpy as np
+import rospy
 from casadi import sign, cos, sin, sqrt, atan2, acos
 from numpy import pi
 
-from giskardpy.my_types import expr_symbol, expr_matrix
+from giskardpy.my_types import expr_symbol, expr_matrix, any_expr
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
-pathSeparator = '_'
 
-# VERY_SMALL_NUMBER = 2.22507385851e-308
-VERY_SMALL_NUMBER = 1e-100
-SMALL_NUMBER = 1e-10
-
-
-def var(variables_names):
+def var(variables_names: str) -> List[expr_symbol]:
     """
-    :type variables_names: str
-    :return:
+    :param variables_names: e.g. 'a b c'
+    :return: e.g. [Symbol('a'), Symbol('b'), Symbol('c')]
     """
     symbols = []
     for v in variables_names.split(' '):
@@ -30,17 +25,17 @@ def var(variables_names):
     return symbols
 
 
-def diag(*args):
+def diag(args: Union[List[expr_symbol], expr_matrix]) -> expr_matrix:
     return ca.diag(Matrix(args))
 
 
-def Symbol(data):
+def Symbol(data: str) -> ca.SX:
     if isinstance(data, str):
         return ca.SX.sym(data)
     return ca.SX(data)
 
 
-def jacobian(expressions, symbols, order=1):
+def jacobian(expressions: expr_matrix, symbols: Union[List[ca.SX], expr_matrix], order: float = 1) -> expr_matrix:
     if isinstance(expressions, list):
         expressions = Matrix(expressions)
     if order == 1:
@@ -54,31 +49,32 @@ def jacobian(expressions, symbols, order=1):
         raise NotImplementedError('jacobian only supports order 1 and 2')
 
 
-def equivalent(expression1, expression2):
+def equivalent(expression1: any_expr, expression2: any_expr) -> bool:
     return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
 
 
-def free_symbols(expression):
+def free_symbols(expression: any_expr) -> List[ca.SX]:
     return ca.symvar(expression)
 
 
-def is_matrix(expression):
+def is_matrix(expression: any_expr) -> bool:
     return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
 
 
-def is_homo_vector(expression):
+def is_homo_vector(expression: any_expr):
     return is_matrix(expression) and expression.shape == (4, 1) and expression[-1] == 0
 
 
-def is_symbol(expression):
+def is_symbol(expression: any_expr) -> bool:
     return expression.shape[0] * expression.shape[1] == 1
 
 
-def create_symbols(names):
+def create_symbols(names: List[str]) -> List[ca.SX]:
     return [Symbol(x) for x in names]
 
 
-def compile_and_execute(f, params):
+def compile_and_execute(f: Callable, params: Union[List[Union[float, np.ndarray]], np.ndarray]) \
+        -> Union[float, np.ndarray]:
     input = []
     symbol_params = []
     symbol_params2 = []
@@ -115,12 +111,16 @@ def compile_and_execute(f, params):
         return result
 
 
-def Matrix(data):
+def Matrix(data: Union[Iterable[expr_symbol],
+                       Iterable[Iterable[expr_symbol]],
+                       np.ndarray,
+                       expr_matrix]) -> expr_matrix:
     try:
         return ca.SX(data)
     except NotImplementedError:
         if hasattr(data, 'shape'):
             m = ca.SX(*data.shape)
+            y = data.shape[1]
         else:
             x = len(data)
             if isinstance(data[0], list) or isinstance(data[0], tuple):
@@ -140,11 +140,11 @@ def Matrix(data):
         return m
 
 
-def ros_msg_to_matrix(msg):
+def ros_msg_to_matrix(msg: rospy.Message) -> expr_matrix:
     return Matrix(msg_to_homogeneous_matrix(msg))
 
 
-def matrix_to_list(m):
+def matrix_to_list(m: expr_matrix) -> List[expr_symbol]:
     try:
         len(m)
         return m
@@ -152,34 +152,27 @@ def matrix_to_list(m):
         return [m[i] for i in range(m.shape[0])]
 
 
-def zeros(x, y):
+def zeros(x: int, y: int) -> expr_matrix:
     return ca.SX.zeros(x, y)
 
 
-def ones(x, y):
+def ones(x: int, y: int) -> expr_matrix:
     return ca.SX.ones(x, y)
 
 
-def abs(x: Union[float, expr_symbol]) -> expr_symbol:
+def abs(x: expr_symbol) -> expr_symbol:
     return ca.fabs(x)
 
 
-def max(x, y):
+def max(x: expr_symbol, y: expr_symbol) -> expr_symbol:
     return ca.fmax(x, y)
 
 
 def min(x: expr_symbol, y: expr_symbol) -> expr_symbol:
-    """
-    !gets very imprecise if inputs outside of [-1e7,1e7]!
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :return: min(x, y)
-    :rtype: Union[float, Symbol]
-    """
     return ca.fmin(x, y)
 
 
-def limit(x, lower_limit, upper_limit):
+def limit(x: expr_symbol, lower_limit: expr_symbol, upper_limit: expr_symbol) -> expr_symbol:
     return max(lower_limit, min(upper_limit, x))
 
 
@@ -187,7 +180,7 @@ def if_else(condition: expr_symbol, if_result: expr_symbol, else_result: expr_sy
     return ca.if_else(condition, if_result, else_result)
 
 
-def logic_and(*args: List[expr_symbol]):
+def logic_and(*args: List[expr_symbol]) -> expr_symbol:
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
         return ca.logic_and(args[0], args[1])
@@ -195,7 +188,7 @@ def logic_and(*args: List[expr_symbol]):
         return ca.logic_and(args[0], logic_and(*args[1:]))
 
 
-def logic_or(*args: List[expr_symbol]):
+def logic_or(*args: List[expr_symbol]) -> expr_symbol:
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
         return ca.logic_or(args[0], args[1])
@@ -203,11 +196,11 @@ def logic_or(*args: List[expr_symbol]):
         return ca.logic_or(args[0], logic_and(*args[1:]))
 
 
-def if_greater(a, b, if_result, else_result):
+def if_greater(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     return if_else(ca.gt(a, b), if_result, else_result)
 
 
-def if_less(a, b, if_result, else_result):
+def if_less(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     return if_else(ca.lt(a, b), if_result, else_result)
 
 
@@ -242,7 +235,7 @@ def if_less_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_resu
     return if_greater_eq(b, a, if_result, else_result)
 
 
-def if_eq_zero(condition, if_result, else_result):
+def if_eq_zero(condition:expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
     """
     :return: if_result if condition == 0 else else_result
     """
@@ -253,7 +246,7 @@ def if_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: e
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
-def if_eq_cases(a: expr_symbol, b_result_cases: Union[List[Tuple[expr_symbol, expr_symbol]], expr_matrix],
+def if_eq_cases(a: expr_symbol, b_result_cases: Union[Iterable[Tuple[expr_symbol, expr_symbol]], expr_matrix],
                 else_result: expr_symbol) -> expr_symbol:
     result = else_result
     if isinstance(b_result_cases, list):
@@ -265,7 +258,7 @@ def if_eq_cases(a: expr_symbol, b_result_cases: Union[List[Tuple[expr_symbol, ex
     return result
 
 
-def if_less_eq_cases(a: expr_symbol, b_result_cases: List[Tuple[expr_symbol, expr_symbol]],
+def if_less_eq_cases(a: expr_symbol, b_result_cases: Iterable[Tuple[expr_symbol, expr_symbol]],
                      else_result: expr_symbol) -> expr_symbol:
     """
     This only works if b_result_cases is sorted in an ascending order.
@@ -303,8 +296,8 @@ def load_compiled_function(file_name):
             logging.logerr('{} deleted because it was corrupted'.format(file_name))
 
 
-class CompiledFunction(object):
-    def __init__(self, str_params, fast_f, l, shape):
+class CompiledFunction:
+    def __init__(self, str_params: Iterable[str], fast_f: ca.Function, shape: Tuple[int, int]):
         self.str_params = str_params
         self.fast_f = fast_f
         self.shape = shape
@@ -312,15 +305,13 @@ class CompiledFunction(object):
         self.out = np.zeros(self.shape, order='F')
         self.buf.set_res(0, memoryview(self.out))
 
-    def __call__(self, **kwargs):
+    def __call__(self, **kwargs) -> np.ndarray:
         filtered_args = [kwargs[k] for k in self.str_params]
         return self.call2(filtered_args)
 
-    def call2(self, filtered_args):
+    def call2(self, filtered_args: Iterable[float]) -> np.ndarray:
         """
         :param filtered_args: parameter values in the same order as in self.str_params
-        :type filtered_args: list
-        :return:
         """
 
         filtered_args = np.array(filtered_args, dtype=float)
@@ -338,17 +329,14 @@ def speed_up(function, parameters, backend='clang') -> CompiledFunction:
         f = ca.Function('f', [Matrix(parameters)], ca.densify(function))
         # except:
         #     f = ca.Function('f', parameters, [ca.densify(function)])
-    return CompiledFunction(str_params, f, 0, function.shape)
+    return CompiledFunction(str_params, f, function.shape)
 
 
-def cross(u, v):
+def cross(u: expr_matrix, v: expr_matrix) -> expr_matrix:
     """
     :param u: 1d matrix
-    :type u: Matrix
     :param v: 1d matrix
-    :type v: Matrix
     :return: 1d Matrix. If u and v have length 4, it ignores the last entry and adds a zero to the result.
-    :rtype: Matrix
     """
     if is_homo_vector(u):
         u = u[:-1]
@@ -361,23 +349,11 @@ def cross(u, v):
                    0])
 
 
-def vector3(x, y, z):
-    """
-    :param x: Union[float, Symbol]
-    :param y: Union[float, Symbol]
-    :param z: Union[float, Symbol]
-    :rtype: Matrix
-    """
+def vector3(x: expr_symbol, y: expr_symbol, z: expr_symbol) -> expr_matrix:
     return Matrix([x, y, z, 0])
 
 
-def point3(x, y, z):
-    """
-    :param x: Union[float, Symbol]
-    :param y: Union[float, Symbol]
-    :param z: Union[float, Symbol]
-    :rtype: Matrix
-    """
+def point3(x: expr_symbol, y: expr_symbol, z: expr_symbol) -> expr_matrix:
     return Matrix([x, y, z, 1])
 
 
@@ -385,7 +361,7 @@ def norm(v: expr_matrix) -> expr_symbol:
     return ca.norm_2(v)
 
 
-def scale(v: expr_matrix, a: Union[float, expr_symbol]) -> expr_matrix:
+def scale(v: expr_matrix, a: expr_symbol) -> expr_matrix:
     return save_division(v, norm(v)) * a
 
 
@@ -393,17 +369,13 @@ def dot(*matrices: expr_matrix) -> expr_matrix:
     return ca.mtimes(matrices)
 
 
-def translation3(x, y, z):
+def translation3(x: expr_symbol, y: expr_symbol, z: expr_symbol) -> expr_matrix:
     """
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :type z: Union[float, Symbol]
     :return: 4x4 Matrix
         [[1,0,0,x],
          [0,1,0,y],
          [0,0,1,z],
          [0,0,0,1]]
-    :rtype: Matrix
     """
     r = eye(4)
     r[0, 3] = x
@@ -412,7 +384,9 @@ def translation3(x, y, z):
     return r
 
 
-def rotation_matrix_from_vectors(x=None, y=None, z=None):
+def rotation_matrix_from_vectors(x: Optional[expr_matrix] = None,
+                                 y: Optional[expr_matrix] = None,
+                                 z: Optional[expr_matrix] = None) -> expr_matrix:
     if x is not None:
         x = scale(x, 1)
     if y is not None:
@@ -437,15 +411,11 @@ def rotation_matrix_from_vectors(x=None, y=None, z=None):
     return R
 
 
-def rotation_matrix_from_rpy(roll, pitch, yaw):
+def rotation_matrix_from_rpy(roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) -> expr_matrix:
     """
     Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
-    :type roll: Union[float, Symbol]
-    :type pitch: Union[float, Symbol]
-    :type yaw: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     # TODO don't split this into 3 matrices
 
@@ -465,15 +435,12 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
 
 
 def rotation_matrix_from_axis_angle(axis: Union[Tuple[expr_symbol, expr_symbol, expr_symbol], expr_matrix],
-                                    angle: expr_symbol):
+                                    angle: expr_symbol) -> expr_matrix:
     """
     Conversion of unit axis and angle to 4x4 rotation matrix according to:
     http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
     :param axis: 3x1 Matrix
-    :type axis: Matrix
-    :type angle: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     ct = ca.cos(angle)
     st = ca.sin(angle)
@@ -493,16 +460,11 @@ def rotation_matrix_from_axis_angle(axis: Union[Tuple[expr_symbol, expr_symbol, 
                    [0, 0, 0, 1]])
 
 
-def rotation_matrix_from_quaternion(x, y, z, w):
+def rotation_matrix_from_quaternion(x: expr_symbol, y: expr_symbol, z: expr_symbol, w: expr_symbol) -> expr_matrix:
     """
     Unit quaternion to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :type z: Union[float, Symbol]
-    :type w: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     x2 = x * x
     y2 = y * y
@@ -514,45 +476,26 @@ def rotation_matrix_from_quaternion(x, y, z, w):
                    [0, 0, 0, 1]])
 
 
-def frame_axis_angle(x, y, z, axis, angle):
+def frame_axis_angle(x: expr_symbol, y: expr_symbol, z: expr_symbol, axis: expr_matrix, angle: expr_symbol) -> expr_matrix:
     """
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :type z: Union[float, Symbol]
     :param axis: 3x1 Matrix
-    :type axis: Matrix
-    :type angle: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     return dot(translation3(x, y, z), rotation_matrix_from_axis_angle(axis, angle))
 
 
-def frame_rpy(x, y, z, roll, pitch, yaw):
+def frame_rpy(x: expr_symbol, y: expr_symbol, z: expr_symbol, roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) \
+        -> expr_matrix:
     """
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :type z: Union[float, Symbol]
-    :type roll: Union[float, Symbol]
-    :type pitch: Union[float, Symbol]
-    :type yaw: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     return dot(translation3(x, y, z), rotation_matrix_from_rpy(roll, pitch, yaw))
 
 
-def frame_quaternion(x, y, z, qx, qy, qz, qw):
+def frame_quaternion(x: expr_symbol, y: expr_symbol, z: expr_symbol, qx: expr_symbol, qy: expr_symbol, qz: expr_symbol,
+                     qw: expr_symbol) -> expr_matrix:
     """
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :type z: Union[float, Symbol]
-    :type qx: Union[float, Symbol]
-    :type qy: Union[float, Symbol]
-    :type qz: Union[float, Symbol]
-    :type qw: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     return dot(translation3(x, y, z), rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
@@ -564,20 +507,18 @@ def frame_from_x_y_rot(x: expr_symbol, y: expr_symbol, rot: expr_symbol) -> expr
     return dot(parent_P_link, link_R_child)
 
 
-def eye(size):
+def eye(size: int) -> expr_symbol:
     return ca.SX.eye(size)
 
 
-def kron(m1, m2):
+def kron(m1: expr_matrix, m2: expr_matrix) -> expr_matrix:
     return ca.kron(m1, m2)
 
 
-def inverse_frame(frame):
+def inverse_frame(frame: expr_matrix) -> expr_matrix:
     """
     :param frame: 4x4 Matrix
-    :type frame: Matrix
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     inv = eye(4)
     inv[:3, :3] = frame[:3, :3].T
@@ -585,22 +526,18 @@ def inverse_frame(frame):
     return inv
 
 
-def position_of(frame):
+def position_of(frame: expr_matrix) -> expr_matrix:
     """
     :param frame: 4x4 Matrix
-    :type frame: Matrix
     :return: 4x1 Matrix; the translation part of a frame in form of a point
-    :rtype: Matrix
     """
     return frame[:4, 3:]
 
 
-def translation_of(frame):
+def translation_of(frame: expr_matrix) -> expr_matrix:
     """
     :param frame: 4x4 Matrix
-    :type frame: Matrix
     :return: 4x4 Matrix; sets the rotation part of a frame to identity
-    :rtype: Matrix
     """
     r = eye(4)
     r[0, 3] = frame[0, 3]
@@ -609,12 +546,10 @@ def translation_of(frame):
     return r
 
 
-def rotation_of(frame):
+def rotation_of(frame: expr_matrix) ->expr_matrix:
     """
     :param frame: 4x4 Matrix
-    :type frame: Matrix
     :return: 4x4 Matrix; sets the translation part of a frame to 0
-    :rtype: Matrix
     """
     r = eye(4)
     for i in range(3):
@@ -623,25 +558,18 @@ def rotation_of(frame):
     return r
 
 
-def trace(matrix):
-    """
-    :type matrix: Matrix
-    :rtype: Union[float, Symbol]
-    """
+def trace(matrix: expr_matrix) -> expr_symbol:
     s = 0
     for i in range(matrix.shape[0]):
         s += matrix[i, i]
     return s
 
 
-def rotation_distance(a_R_b, a_R_c):
+def rotation_distance(a_R_b: expr_matrix, a_R_c: expr_matrix) -> expr_symbol:
     """
     :param a_R_b: 4x4 or 3x3 Matrix
-    :type a_R_b: Matrix
     :param a_R_c: 4x4 or 3x3 Matrix
-    :type a_R_c: Matrix
     :return: angle of axis angle representation of b_R_c
-    :rtype: Union[float, Symbol]
     """
     difference = dot(a_R_b.T, a_R_c)
     # return axis_angle_from_matrix(difference)[1]
@@ -651,11 +579,11 @@ def rotation_distance(a_R_b, a_R_c):
     return acos(angle)
 
 
-def vstack(list_of_matrices):
+def vstack(list_of_matrices: List[expr_matrix]) -> expr_matrix:
     return ca.vertcat(*list_of_matrices)
 
 
-def hstack(list_of_matrices):
+def hstack(list_of_matrices: List[expr_matrix]) -> expr_matrix:
     return ca.horzcat(*list_of_matrices)
 
 
@@ -667,31 +595,12 @@ def axis_angle_from_matrix(rotation_matrix: expr_matrix) -> Tuple[expr_matrix, e
     """
     q = quaternion_from_matrix(rotation_matrix)
     return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
-    # TODO use 'if' to make angle always positive?
-    rm = rotation_matrix
-    cos_angle = (trace(rm[:3, :3]) - 1) / 2
-    cos_angle = min(cos_angle, 1)
-    cos_angle = max(cos_angle, -1)
-    angle = acos(cos_angle)
-    x = (rm[2, 1] - rm[1, 2])
-    y = (rm[0, 2] - rm[2, 0])
-    z = (rm[1, 0] - rm[0, 1])
-    n = sqrt(x * x + y * y + z * z)
-
-    axis = Matrix([if_eq(abs(cos_angle), 1, 0, x / n),
-                   if_eq(abs(cos_angle), 1, 0, y / n),
-                   if_eq(abs(cos_angle), 1, 1, z / n)])
-    return axis, angle
 
 
-def axis_angle_from_quaternion(x, y, z, w):
+def axis_angle_from_quaternion(x: expr_symbol, y: expr_symbol, z: expr_symbol, w: expr_symbol) \
+        -> Tuple[expr_matrix, expr_symbol]:
     """
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :type z: Union[float, Symbol]
-    :type w: Union[float, Symbol]
     :return: 4x1 Matrix
-    :rtype: Matrix
     """
     l = norm(Matrix([x, y, z, w]))
     x, y, z, w = x / l, y / l, z / l, w / l
@@ -704,13 +613,13 @@ def axis_angle_from_quaternion(x, y, z, w):
     return Matrix([x, y, z]), angle
 
 
-def normalize_axis_angle(axis, angle):
+def normalize_axis_angle(axis: expr_matrix, angle: expr_symbol) -> Tuple[expr_matrix, expr_symbol]:
     axis = if_less(angle, 0, -axis, axis)
     angle = abs(angle)
     return axis, angle
 
 
-def normalize_rotation_matrix(R: Matrix) -> Matrix:
+def normalize_rotation_matrix(R: expr_symbol) -> expr_symbol:
     """Scales each of the axes to the length of one."""
     scale_v = 1.0
     R[:3, 0] = scale(R[:3, 0], scale_v)
@@ -719,13 +628,10 @@ def normalize_rotation_matrix(R: Matrix) -> Matrix:
     return R
 
 
-def quaternion_from_axis_angle(axis, angle):
+def quaternion_from_axis_angle(axis: expr_matrix, angle: expr_symbol) -> expr_matrix:
     """
     :param axis: 3x1 Matrix
-    :type axis: Matrix
-    :type angle: Union[float, Symbol]
     :return: 4x1 Matrix
-    :rtype: Matrix
     """
     half_angle = angle / 2
     return Matrix([axis[0] * sin(half_angle),
@@ -734,13 +640,9 @@ def quaternion_from_axis_angle(axis, angle):
                    cos(half_angle)])
 
 
-def axis_angle_from_rpy(roll, pitch, yaw):
+def axis_angle_from_rpy(roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) -> Tuple[expr_matrix, expr_symbol]:
     """
-    :type roll: Union[float, Symbol]
-    :type pitch: Union[float, Symbol]
-    :type yaw: Union[float, Symbol]
     :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
     """
     q = quaternion_from_rpy(roll, pitch, yaw)
     return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
@@ -749,13 +651,10 @@ def axis_angle_from_rpy(roll, pitch, yaw):
 _EPS = np.finfo(float).eps * 4.0
 
 
-def rpy_from_matrix(rotation_matrix):
+def rpy_from_matrix(rotation_matrix: expr_matrix) -> Tuple[expr_symbol, expr_symbol, expr_symbol]:
     """
-    !takes time to compile!
     :param rotation_matrix: 4x4 Matrix
-    :type rotation_matrix: Matrix
     :return: roll, pitch, yaw
-    :rtype: (Union[float, Symbol], Union[float, Symbol], Union[float, Symbol])
     """
     i = 0
     j = 1
@@ -775,13 +674,9 @@ def rpy_from_matrix(rotation_matrix):
     return ax, ay, az
 
 
-def quaternion_from_rpy(roll, pitch, yaw):
+def quaternion_from_rpy(roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) -> expr_matrix:
     """
-    :type roll: Union[float, Symbol]
-    :type pitch: Union[float, Symbol]
-    :type yaw: Union[float, Symbol]
     :return: 4x1 Matrix
-    :type: Matrix
     """
     roll_half = roll / 2.0
     pitch_half = pitch / 2.0
@@ -807,13 +702,10 @@ def quaternion_from_rpy(roll, pitch, yaw):
     return Matrix([x, y, z, w])
 
 
-def quaternion_from_matrix(matrix):
+def quaternion_from_matrix(matrix: expr_matrix) -> expr_matrix:
     """
-    !takes a loooong time to compile!
     :param matrix: 4x4 or 3x3 Matrix
-    :type matrix: Matrix
     :return: 4x1 Matrix
-    :rtype: Matrix
     """
     q = Matrix([0, 0, 0, 0])
     if isinstance(matrix, np.ndarray):
@@ -868,14 +760,11 @@ def quaternion_from_matrix(matrix):
     return q
 
 
-def quaternion_multiply(q1, q2):
+def quaternion_multiply(q1: expr_matrix, q2: expr_matrix) -> expr_matrix:
     """
     :param q1: 4x1 Matrix
-    :type q1: Matrix
     :param q2: 4x1 Matrix
-    :type q2: Matrix
     :return: 4x1 Matrix
-    :rtype: Matrix
     """
     x0 = q2[0]
     y0 = q2[1]
@@ -891,61 +780,45 @@ def quaternion_multiply(q1, q2):
                    -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0])
 
 
-def quaternion_conjugate(quaternion):
+def quaternion_conjugate(quaternion: expr_matrix) -> expr_matrix:
     """
     :param quaternion: 4x1 Matrix
-    :type quaternion: Matrix
     :return: 4x1 Matrix
-    :rtype: Matrix
     """
     return Matrix([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
 
 
-def quaternion_diff(q0, q1):
+def quaternion_diff(q0: expr_matrix, q1: expr_matrix) -> expr_matrix:
     """
     :param q0: 4x1 Matrix
-    :type q0: Matrix
     :param q1: 4x1 Matrix
-    :type q1: Matrix
     :return: 4x1 Matrix p, such that q1*p=q2
-    :rtype: Matrix
     """
     return quaternion_multiply(quaternion_conjugate(q0), q1)
 
 
-def cosine_distance(v0, v1):
+def cosine_distance(v0: expr_matrix, v1: expr_matrix) -> expr_symbol:
     """
     cosine distance ranging from 0 to 2
     :param v0: nx1 Matrix
-    :type v0: Matrix
     :param v1: nx1 Matrix
-    :type v1: Matrix
-    :rtype: Union[float, Symbol]
     """
     return 1 - ((dot(v0.T, v1))[0] / (norm(v0) * norm(v1)))
 
 
-def euclidean_distance(v1, v2):
+def euclidean_distance(v1: expr_matrix, v2: expr_matrix) -> expr_symbol:
     """
     :param v1: nx1 Matrix
-    :type v1: Matrix
     :param v2: nx1 Matrix
-    :type v2: Matrix
-    :rtype: Union[float, Symbol]
     """
     return norm(v1 - v2)
 
 
-# def floor(a):
-#     a += VERY_SMALL_NUMBER
-#     return (a - 0.5) - (sp.atan(sp.tan(np.pi * (a - 0.5)))) / (pi)
-
-
-def fmod(a, b):
+def fmod(a: expr_symbol, b: expr_symbol) -> expr_symbol:
     return ca.fmod(a, b)
 
 
-def normalize_angle_positive(angle):
+def normalize_angle_positive(angle: expr_symbol) -> expr_symbol:
     """
     Normalizes the angle to be 0 to 2*pi
     It takes and returns radians.
@@ -953,38 +826,33 @@ def normalize_angle_positive(angle):
     return fmod(fmod(angle, 2.0 * pi) + 2.0 * pi, 2.0 * pi)
 
 
-def normalize_angle(angle):
+def normalize_angle(angle: expr_symbol) -> expr_symbol:
     """
     Normalizes the angle to be -pi to +pi
     It takes and returns radians.
     """
     a = normalize_angle_positive(angle)
     return if_greater(a, pi, a - 2.0 * pi, a)
-    # return Piecewise([, a > pi], [a, True])
 
 
-def shortest_angular_distance(from_angle, to_angle):
+def shortest_angular_distance(from_angle: expr_symbol, to_angle: expr_symbol) -> expr_matrix:
     """
     Given 2 angles, this returns the shortest angular
-    difference.  The inputs and ouputs are of course radians.
+    difference.  The inputs and outputs are of course radians.
 
     The result would always be -pi <= result <= pi. Adding the result
-    to "from" will always get you an equivelent angle to "to".
+    to "from" will always get you an equivalent angle to "to".
     """
     return normalize_angle(to_angle - from_angle)
 
 
-def quaternion_slerp(q1, q2, t):
+def quaternion_slerp(q1: expr_matrix, q2: expr_matrix, t: expr_symbol) -> expr_matrix:
     """
     spherical linear interpolation that takes into account that q == -q
     :param q1: 4x1 Matrix
-    :type q1: Matrix
     :param q2: 4x1 Matrix
-    :type q2: Matrix
     :param t: float, 0-1
-    :type t:  Union[float, Symbol]
     :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
-    :rtype: Matrix
     """
     cos_half_theta = dot(q1.T, q2)
 
@@ -1012,22 +880,21 @@ def quaternion_slerp(q1, q2, t):
                                               ratio_a * q1 + ratio_b * q2))
 
 
-def scale_quaternion(q, angle):
+def scale_quaternion(q: expr_matrix, angle: expr_symbol) -> expr_matrix:
     axis, _ = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
     return quaternion_from_axis_angle(axis, angle)
 
 
-def quaternion_angle(q):
+def quaternion_angle(q: expr_matrix) -> expr_symbol:
     return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])[1]
 
 
-def slerp(v1, v2, t):
+def slerp(v1: expr_matrix, v2: expr_matrix, t: float) -> expr_matrix:
     """
     spherical linear interpolation
     :param v1: any vector
     :param v2: vector of same length as v1
     :param t: value between 0 and 1. 0 is v1 and 1 is v2
-    :return:
     """
     angle = save_acos(dot(v1.T, v2)[0])
     angle2 = if_eq(angle, 0, 1, angle)
@@ -1036,26 +903,21 @@ def slerp(v1, v2, t):
                  (sin((1 - t) * angle2) / sin(angle2)) * v1 + (sin(t * angle2) / sin(angle2)) * v2)
 
 
-def to_numpy(matrix):
+def to_numpy(matrix: expr_matrix) -> np.ndarray:
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
 
 
-def save_division(nominator, denominator, if_nan=0):
+def save_division(nominator: any_expr, denominator: expr_symbol, if_nan: expr_symbol = 0) -> any_expr:
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 
 
-def save_acos(angle):
+def save_acos(angle: expr_symbol) -> expr_symbol:
     angle = limit(angle, -1, 1)
     return acos(angle)
 
 
-def entrywise_product(matrix1, matrix2):
-    """
-    :type matrix1: se.Matrix
-    :type matrix2: se.Matrix
-    :return:
-    """
+def entrywise_product(matrix1: expr_matrix, matrix2: expr_matrix) -> expr_matrix:
     assert matrix1.shape == matrix2.shape
     result = zeros(*matrix1.shape)
     for i in range(matrix1.shape[0]):
@@ -1064,54 +926,52 @@ def entrywise_product(matrix1, matrix2):
     return result
 
 
-def floor(x):
+def floor(x: expr_symbol) -> expr_symbol:
     return ca.floor(x)
 
 
-def ceil(x):
+def ceil(x: expr_symbol) -> expr_symbol:
     return ca.ceil(x)
 
 
-def round_up(x, decimal_places):
+def round_up(x: expr_symbol, decimal_places: expr_symbol) -> expr_symbol:
     f = 10 ** (decimal_places)
     return ceil(x * f) / f
 
 
-def round_down(x, decimal_places):
+def round_down(x: expr_symbol, decimal_places: expr_symbol) -> expr_symbol:
     f = 10 ** (decimal_places)
     return floor(x * f) / f
 
 
-def sum(matrix):
+def sum(matrix: expr_matrix) -> expr_symbol:
     """
     the equivalent to np.sum(matrix)
     """
     return ca.sum1(ca.sum2(matrix))
 
 
-def sum_row(matrix):
+def sum_row(matrix: expr_matrix) -> expr_matrix:
     """
     the equivalent to np.sum(matrix, axis=0)
     """
     return ca.sum1(matrix)
 
 
-def sum_column(matrix):
+def sum_column(matrix: expr_matrix) -> expr_matrix:
     """
     the equivalent to np.sum(matrix, axis=1)
     """
     return ca.sum2(matrix)
 
 
-def distance_point_to_line_segment(point, line_start, line_end):
+def distance_point_to_line_segment(point: expr_matrix, line_start: expr_matrix, line_end: expr_matrix) \
+        -> Tuple[expr_symbol, expr_matrix]:
     """
     :param point: current position of an object (i. e.) gripper tip
-    :type point: 4x1 matrix
     :param line_start: start of the approached line
-    :type line_start: 4x1 matrix
     :param line_end: end of the approached line
-    :type line_end: 4x1 matrix
-    :return:
+    :return: distance to line, the nearest point on the line
     """
     line_vec = line_end - line_start
     pnt_vec = point - line_start
@@ -1126,25 +986,34 @@ def distance_point_to_line_segment(point, line_start, line_end):
     return dist, nearest
 
 
-def angle_between_vector(v1, v2):
+def angle_between_vector(v1: expr_matrix, v2: expr_matrix) -> expr_symbol:
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
 
 
-def angle_from_matrix(R, hint):
+def angle_from_matrix(R: expr_matrix, hint: Callable) -> expr_symbol:
+    """
+    :param R:
+    :param hint: A function who's sign of the result will be used to to determine if angle should be positive or
+                    negative
+    :return:
+    """
     axis, angle = axis_angle_from_matrix(R)
     return normalize_angle(if_greater_zero(hint(axis),
                                            if_result=angle,
                                            else_result=-angle))
 
 
-def velocity_limit_from_position_limit(acceleration_limit, position_limit, current_position, step_size, eps=1e-5):
+def velocity_limit_from_position_limit(acceleration_limit: expr_symbol,
+                                       position_limit: expr_symbol,
+                                       current_position: expr_symbol,
+                                       step_size: expr_symbol,
+                                       eps: float = 1e-5) -> expr_symbol:
     """
     Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
     :param acceleration_limit:
-    :param distance_to_position_limit: 
-    :param step_size: 
+    :param step_size:
     :param eps: 
     :return: 
     """
@@ -1169,88 +1038,87 @@ def velocity_limit_from_position_limit(acceleration_limit, position_limit, curre
     return velocity_limit
 
 
-def position_with_max_velocity(velocity_limit, jerk_limit):
-    t = np.sqrt(np.abs(velocity_limit / jerk_limit))
-    return -t * velocity_limit
+# def position_with_max_velocity(velocity_limit: expr_symbol, jerk_limit: expr_symbol) -> expr_symbol:
+#     t = np.sqrt(np.abs(velocity_limit / jerk_limit))
+#     return -t * velocity_limit
 
 
-def t_til_pos2(position_error, jerk_limit):
-    return (position_error / (2 * jerk_limit)) ** (1 / 3)
+# def t_til_pos2(position_error, jerk_limit):
+#     return (position_error / (2 * jerk_limit)) ** (1 / 3)
 
 
-def position_till_b(jerk_limit, t):
-    return (1 / 6) * jerk_limit * t ** 3
+# def position_till_b(jerk_limit, t):
+#     return (1 / 6) * jerk_limit * t ** 3
 
 
-def position_till_a(jerk_limit, t, t_offset, velocity_limit):
-    return (
-                   1 / 6) * jerk_limit * t ** 3 - 0.5 * jerk_limit * t_offset * t ** 2 + 0.5 * jerk_limit * t_offset ** 2 * t + velocity_limit * t
+# def position_till_a(jerk_limit, t, t_offset, velocity_limit):
+#     return (1 / 6) * jerk_limit * t ** 3 - 0.5 * jerk_limit * t_offset * t ** 2 + 0.5 * jerk_limit * t_offset ** 2 * t + velocity_limit * t
 
 
-def velocity(velocity_limit, jerk_limit, t):
-    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
-    t_a = t_b * 2
-    if t < t_b:
-        return velocity_limit + 0.5 * jerk_limit * t ** 2
-    if t < t_a:
-        t -= t_a
-        return -0.5 * jerk_limit * t ** 2
-    return velocity_limit
+# def velocity(velocity_limit, jerk_limit, t):
+#     t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+#     t_a = t_b * 2
+#     if t < t_b:
+#         return velocity_limit + 0.5 * jerk_limit * t ** 2
+#     if t < t_a:
+#         t -= t_a
+#         return -0.5 * jerk_limit * t ** 2
+#     return velocity_limit
 
 
-def position(jerk_limit, t, velocity_limit):
-    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
-    t_a = t_b * 2
-    if t < t_b:
-        return (1 / 6) * jerk_limit * t ** 3 + velocity_limit * t - velocity_limit * t_b
-    if t < t_a:
-        t -= t_a
-        return -(1 / 6) * jerk_limit * t ** 3
-    return velocity_limit * t
+# def position(jerk_limit, t, velocity_limit):
+#     t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+#     t_a = t_b * 2
+#     if t < t_b:
+#         return (1 / 6) * jerk_limit * t ** 3 + velocity_limit * t - velocity_limit * t_b
+#     if t < t_a:
+#         t -= t_a
+#         return -(1 / 6) * jerk_limit * t ** 3
+#     return velocity_limit * t
 
 
-def compute_t_from_position(jerk_limit, position_error, velocity_limit):
-    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
-    a = position_with_max_velocity(velocity_limit, jerk_limit)
-    b = -(1 / 6) * jerk_limit * (-t_b) ** 3
-    t_a = t_b * 2
-    if position_error < b:
-        asdf = (-(6 * position_error) / jerk_limit)
-        return np.sign(asdf) * np.abs(asdf) ** (1 / 3) + t_a
-    if position_error < a:
-        return np.real(-1.44224957030741 * (-0.5 - 0.866025403784439j) * \
-                       (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
-                               8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j) + (1 / 6) *
-                        (-6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (1 / 3) \
-                       + 1.38672254870127 * velocity_limit * (-0.5 + 0.866025403784439j) / \
-                       (jerk_limit * (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
-                               8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j)
-                                      + (1 / 6) * (
-                                              -6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (
-                                1 / 3)))
-    return 0
+# def compute_t_from_position(jerk_limit, position_error, velocity_limit):
+#     t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+#     a = position_with_max_velocity(velocity_limit, jerk_limit)
+#     b = -(1 / 6) * jerk_limit * (-t_b) ** 3
+#     t_a = t_b * 2
+#     if position_error < b:
+#         asdf = (-(6 * position_error) / jerk_limit)
+#         return np.sign(asdf) * np.abs(asdf) ** (1 / 3) + t_a
+#     if position_error < a:
+#         return np.real(-1.44224957030741 * (-0.5 - 0.866025403784439j) * \
+#                        (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
+#                                8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j) + (1 / 6) *
+#                         (-6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (1 / 3) \
+#                        + 1.38672254870127 * velocity_limit * (-0.5 + 0.866025403784439j) / \
+#                        (jerk_limit * (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
+#                                8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j)
+#                                       + (1 / 6) * (
+#                                               -6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (
+#                                 1 / 3)))
+#     return 0
 
 
-def jerk_limits_from_everything(position_limit, velocity_limit, jerk_limit, current_position, current_velocity,
-                                current_acceleration, t, step_size, eps=1e-5):
-    """
-    Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
-    :param acceleration_limit:
-    :param distance_to_position_limit:
-    :param step_size:
-    :param eps:
-    :return:
-    """
-    # p(t) describes slowdown with max vel/jerk down to 0
-    # 1. get t from p(t)=position_limit - current_position
-    # 2. plug t into v(t) to get vel limit
+# def jerk_limits_from_everything(position_limit, velocity_limit, jerk_limit, current_position, current_velocity,
+#                                 current_acceleration, t, step_size, eps=1e-5):
+#     """
+#     Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
+#     :param acceleration_limit:
+#     :param distance_to_position_limit:
+#     :param step_size:
+#     :param eps:
+#     :return:
+#     """
+#     # p(t) describes slowdown with max vel/jerk down to 0
+#     # 1. get t from p(t)=position_limit - current_position
+#     # 2. plug t into v(t) to get vel limit
+#
+#     a = position_with_max_velocity(velocity_limit, jerk_limit)
+#     t_b = t_til_pos2(a, jerk_limit)
+#     t_a = t_b * 2
 
-    a = position_with_max_velocity(velocity_limit, jerk_limit)
-    t_b = t_til_pos2(a, jerk_limit)
-    t_a = t_b * 2
 
-
-def to_str(expression):
+def to_str(expression: expr_symbol) -> str:
     """
     Turns expression into a more or less readable string.
     """
@@ -1266,8 +1134,8 @@ def to_str(expression):
     pass
 
 
-def total_derivative(expr: Union[expr_symbol, expr_matrix], symbols: expr_matrix, symbols_dot: expr_matrix) \
-        -> Union[expr_symbol, expr_matrix]:
+def total_derivative(expr: any_expr, symbols: expr_matrix, symbols_dot: expr_matrix) \
+        -> any_expr:
     expr_jacobian = jacobian(expr, symbols)
     last_velocities = Matrix(symbols_dot)
     velocity = dot(expr_jacobian, last_velocities)

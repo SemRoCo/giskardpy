@@ -13,10 +13,16 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.casadi_wrapper import rotation_matrix_from_quaternion
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
 from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
-    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, sq_matrix
+    pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix
 
 
 class TestCASWrapper(unittest.TestCase):
+
+    def test_free_symbols(self):
+        m = w.Matrix(w.var('a b c d'))
+        assert len(w.free_symbols(m)) == 4
+        a = w.Symbol('a')
+        assert w.equivalent(a, w.free_symbols(a)[0])
 
     def test_is_matrix(self):
         self.assertFalse(w.is_matrix(w.Symbol('a')))
@@ -41,6 +47,27 @@ class TestCASWrapper(unittest.TestCase):
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
+
+    def test_var(self):
+        result = w.var('a b c')
+        assert str(result[0]) == 'a'
+        assert str(result[1]) == 'b'
+        assert str(result[2]) == 'c'
+
+    def test_diag(self):
+        result = w.diag([1, 2, 3])
+        assert result[0, 0] == 1
+        assert result[0, 1] == 0
+        assert result[0, 2] == 0
+
+        assert result[1, 0] == 0
+        assert result[1, 1] == 2
+        assert result[1, 2] == 0
+
+        assert result[2, 0] == 0
+        assert result[2, 1] == 0
+        assert result[2, 2] == 3
+        assert w.equivalent(w.diag(w.Matrix([1, 2, 3])), w.diag([1, 2, 3]))
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
@@ -74,7 +101,7 @@ class TestCASWrapper(unittest.TestCase):
     @given(st.integers(min_value=1, max_value=10),
            st.integers(min_value=1, max_value=10))
     def test_matrix2(self, x_dim, y_dim):
-        data = [[(i) + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
+        data = [[i + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
         m = w.Matrix(data)
         self.assertEqual(float(m[0, 0]), 0)
         self.assertEqual(float(m[x_dim - 1, y_dim - 1]), (x_dim * y_dim) - 1)
@@ -142,9 +169,9 @@ class TestCASWrapper(unittest.TestCase):
                           (0.5, 0.5),
                           (-0.5, -0.5)]
 
-        def reference(a, b_result_cases, else_result):
-            for b, if_result in b_result_cases:
-                if a == b:
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ == b:
                     return if_result
             return else_result
 
@@ -163,9 +190,9 @@ class TestCASWrapper(unittest.TestCase):
             (4, 4),
         ]
 
-        def reference(a, b_result_cases, else_result):
-            for b, if_result in b_result_cases:
-                if a <= b:
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ <= b:
                     return if_result
             return else_result
 
@@ -230,7 +257,7 @@ class TestCASWrapper(unittest.TestCase):
 
     # fails if numbers too big or too small
     @given(unit_vector(length=3),
-           angle())
+           random_angle())
     def test_speed_up_matrix_from_axis_angle(self, axis, angle):
         np.testing.assert_array_almost_equal(
             w.compile_and_execute(w.rotation_matrix_from_axis_angle, [axis, angle]),
@@ -297,16 +324,16 @@ class TestCASWrapper(unittest.TestCase):
         r2[2, 3] = z
         self.assertTrue(np.isclose(r1, r2).all(), msg='{} != {}'.format(r1, r2))
 
-    @given(angle(),
-           angle(),
-           angle())
+    @given(random_angle(),
+           random_angle(),
+           random_angle())
     def test_rotation_matrix_from_rpy(self, roll, pitch, yaw):
         m1 = w.compile_and_execute(w.rotation_matrix_from_rpy, [roll, pitch, yaw])
         m2 = euler_matrix(roll, pitch, yaw)
         np.testing.assert_array_almost_equal(m1, m2)
 
     @given(unit_vector(length=3),
-           angle())
+           random_angle())
     def test_rotation3_axis_angle(self, axis, angle):
         np.testing.assert_array_almost_equal(w.compile_and_execute(w.rotation_matrix_from_axis_angle, [axis, angle]),
                                              rotation_matrix(angle, np.array(axis)))
@@ -320,7 +347,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            unit_vector(length=3),
-           angle())
+           random_angle())
     def test_frame3_axis_angle(self, x, y, z, axis, angle):
         r2 = rotation_matrix(angle, np.array(axis))
         r2[0, 3] = x
@@ -332,9 +359,9 @@ class TestCASWrapper(unittest.TestCase):
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
-           angle(),
-           angle(),
-           angle())
+           random_angle(),
+           random_angle(),
+           random_angle())
     def test_frame3_rpy(self, x, y, z, roll, pitch, yaw):
         r2 = euler_matrix(roll, pitch, yaw)
         r2[0, 3] = x
@@ -419,6 +446,9 @@ class TestCASWrapper(unittest.TestCase):
         self.assertTrue(f[0, 3], 1)
         self.assertTrue(f[0, 3], 2)
         self.assertTrue(f[0, 3], 3)
+        self.assertTrue(r[0, 0], 1)
+        self.assertTrue(r[1, 1], 1)
+        self.assertTrue(r[2, 2], 1)
 
     @given(unit_vector(4))
     def test_trace(self, q):
@@ -456,15 +486,15 @@ class TestCASWrapper(unittest.TestCase):
         compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis)
 
     @given(unit_vector(length=3),
-           angle())
+           random_angle())
     def test_quaternion_from_axis_angle1(self, axis, angle):
         r2 = quaternion_about_axis(angle, axis)
         self.assertTrue(np.isclose(w.compile_and_execute(w.quaternion_from_axis_angle, [axis, angle]),
                                    r2).all())
 
-    @given(angle(),
-           angle(),
-           angle())
+    @given(random_angle(),
+           random_angle(),
+           random_angle())
     def test_axis_angle_from_rpy(self, roll, pitch, yaw):
         angle2, axis2, _ = rotation_from_matrix(euler_matrix(roll, pitch, yaw))
         axis = w.compile_and_execute(lambda r, p, y: w.axis_angle_from_rpy(r, p, y)[0], [roll, pitch, yaw])
@@ -511,9 +541,9 @@ class TestCASWrapper(unittest.TestCase):
         r1 = w.compile_and_execute(w.rotation_matrix_from_rpy, [roll, pitch, yaw])
         self.assertTrue(np.isclose(r1, matrix, atol=1.e-4).all(), msg='{} != {}'.format(r1, matrix))
 
-    @given(angle(),
-           angle(),
-           angle())
+    @given(random_angle(),
+           random_angle(),
+           random_angle())
     def test_quaternion_from_rpy(self, roll, pitch, yaw):
         q = w.compile_and_execute(w.quaternion_from_rpy, [roll, pitch, yaw])
         q2 = quaternion_from_euler(roll, pitch, yaw)
@@ -642,7 +672,7 @@ class TestCASWrapper(unittest.TestCase):
            unit_vector(4))
     def test_entrywise_product(self, q1, q2):
         m1 = rotation_matrix_from_quaternion(q1[0], q1[1], q1[2], q1[3])
-        m2 = rotation_matrix_from_quaternion(q1[0], q1[1], q1[2], q1[3])
+        m2 = rotation_matrix_from_quaternion(q2[0], q2[1], q2[2], q2[3])
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])
         r2 = m1 * m2
         np.testing.assert_array_almost_equal(r1, r2)
@@ -668,7 +698,7 @@ class TestCASWrapper(unittest.TestCase):
         position = j
         i = 0
         start_sign = np.sign(velocity)
-        while (np.sign(velocity) == start_sign and i < 100000):
+        while np.sign(velocity) == start_sign and i < 100000:
             position += velocity * step_size
             velocity -= np.sign(desired_result - j) * acceleration * step_size
             i += 1
@@ -704,6 +734,9 @@ class TestCASWrapper(unittest.TestCase):
         distance = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
         nearest = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
         assert distance == 1
+        assert nearest[0] == 0
+        assert nearest[1] == 0
+        assert nearest[2] == 0.5
 
     def test_distance_point_to_line_segment3(self):
         p = np.array([0, 1, 2])
@@ -712,9 +745,14 @@ class TestCASWrapper(unittest.TestCase):
         distance = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
         nearest = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
         assert distance == 1.4142135623730951
+        assert nearest[0] == 0
+        assert nearest[1] == 0
+        assert nearest[2] == 1
 
     def test_to_str(self):
         expr = w.norm(w.quaternion_from_axis_angle(w.Matrix(w.create_symbols(['v1', 'v2', 'v3'])),
                                                    w.Symbol('alpha')))
-        assert w.to_str(
-            expr) == 'sqrt((((sq((v1*sin((alpha/2))))+sq((v2*sin((alpha/2)))))+sq((v3*sin((alpha/2)))))+sq(cos((alpha/2)))))'
+        assert w.to_str(expr) == 'sqrt((((sq((v1*sin((alpha/2))))' \
+                                 '+sq((v2*sin((alpha/2)))))' \
+                                 '+sq((v3*sin((alpha/2)))))' \
+                                 '+sq(cos((alpha/2)))))'

@@ -76,6 +76,7 @@ my_string = Union[str, PrefixName]
 goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, None]
 expr_symbol = Union[ca.SX, float]
 expr_matrix = ca.SX
+any_expr = Union[expr_symbol, expr_matrix]
 derivative_map = Dict[Derivatives, float]
 derivative_joint_map = Dict[Derivatives, Dict[my_string, float]]
 transformable_message = Union[PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped]

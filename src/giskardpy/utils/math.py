@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 from geometry_msgs.msg import Quaternion, Point
@@ -185,7 +185,9 @@ def compare_points(actual_point: Point, desired_point: Point, decimal: float = 2
     np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
 
 
-def compare_orientations(actual_orientation: Quaternion, desired_orientation: Quaternion, decimal: float = 2):
+def compare_orientations(actual_orientation: Union[Quaternion, np.ndarray],
+                         desired_orientation: Union[Quaternion, np.ndarray],
+                         decimal: float = 2):
     if isinstance(actual_orientation, Quaternion):
         q1 = np.array([actual_orientation.x,
                        actual_orientation.y,

@@ -5,16 +5,15 @@ from abc import ABC
 from collections import OrderedDict
 from typing import Optional, Tuple, Dict, List, Union, Callable
 
-from genpy import Message
-
 import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import Constraint as Constraint_msg
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import ConstraintInitalizationException, GiskardException, UnknownGroupException
 from giskardpy.god_map import GodMap
+from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string, expr_matrix, expr_symbol, transformable_message, PrefixName, Derivatives
+from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.utils.utils import blackboard_god_map
 
@@ -111,35 +110,38 @@ class Goal(ABC):
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
-    def get_joint_position_symbol(self, joint_name: PrefixName) -> expr_symbol:
+    def get_joint_position_symbol(self, joint_name: PrefixName) -> Union[w.Symbol, float]:
         """
         returns a symbol that refers to the given joint
         """
         if not self.world.has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        return self.world._joints[joint_name].position_expression
+        joint = self.world._joints[joint_name]
+        if isinstance(joint, OneDofJoint):
+            return joint.position_expression
+        raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
     @property
     def sample_period(self) -> float:
         return self.god_map.get_data(identifier.sample_period)
 
-    def get_sampling_period_symbol(self) -> expr_symbol:
+    def get_sampling_period_symbol(self) -> Union[w.Symbol, float]:
         return self.god_map.to_symbol(identifier.sample_period)
 
-    def get_fk(self, root: PrefixName, tip: PrefixName) -> expr_matrix:
+    def get_fk(self, root: PrefixName, tip: PrefixName) -> w.Matrix:
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
         """
         return self.world.compose_fk_expression(root, tip)
 
-    def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> expr_matrix:
+    def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> w.Matrix:
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
         This means that the derivative towards the joint symbols will be 0.
         """
         return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
 
-    def get_parameter_as_symbolic_expression(self, name: str) -> Union[expr_symbol, expr_matrix]:
+    def get_parameter_as_symbolic_expression(self, name: str) -> Union[Union[w.Symbol, float], w.Matrix]:
         """
         :param name: name of a class attribute, e.g. self.muh
         :return: a symbol (or matrix of symbols) that refers to self.muh
@@ -148,7 +150,7 @@ class Goal(ABC):
             raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
         return self.god_map.to_expr(self._get_identifier() + [name])
 
-    def get_expr_velocity(self, expr: Union[expr_symbol, expr_matrix]) -> expr_symbol:
+    def get_expr_velocity(self, expr: Union[Union[w.Symbol, float], w.Matrix]) -> Union[w.Symbol, float]:
         """
         Creates an expressions that computes the total derivative of expr
         """
@@ -157,20 +159,20 @@ class Goal(ABC):
                                   self.joint_velocity_symbols)
 
     @property
-    def joint_position_symbols(self) -> List[expr_symbol]:
+    def joint_position_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
         for joint in self.world.controlled_joints:
             position_symbols.extend(self.world._joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
-    def joint_velocity_symbols(self) -> List[expr_symbol]:
+    def joint_velocity_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
         for joint in self.world.controlled_joints:
             position_symbols.extend(self.world._joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.velocity) for x in position_symbols]
 
-    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> expr_matrix:
+    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Matrix:
         r_T_t = self.get_fk(root, tip)
         r_R_t = w.rotation_of(r_T_t)
         axis, angle = w.axis_angle_from_matrix(r_R_t)
@@ -184,7 +186,7 @@ class Goal(ABC):
                        r_R_t_axis_angle[2]])
         return self.get_expr_velocity(fk)
 
-    def get_constraints(self) -> Tuple[Dict[str, Constraint], Dict[str, VelocityConstraint], Dict[str, expr_symbol]]:
+    def get_constraints(self) -> Tuple[Dict[str, Constraint], Dict[str, VelocityConstraint], Dict[str, Union[w.Symbol, float]]]:
         self._constraints = OrderedDict()
         self._velocity_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
@@ -202,14 +204,14 @@ class Goal(ABC):
         self._sub_goals.append(goal)
 
     def add_velocity_constraint(self,
-                                lower_velocity_limit: expr_symbol,
-                                upper_velocity_limit: expr_symbol,
-                                weight: expr_symbol,
-                                task_expression: expr_symbol,
-                                velocity_limit: expr_symbol,
+                                lower_velocity_limit: Union[w.Symbol, float],
+                                upper_velocity_limit: Union[w.Symbol, float],
+                                weight: Union[w.Symbol, float],
+                                task_expression: Union[w.Symbol, float],
+                                velocity_limit: Union[w.Symbol, float],
                                 name_suffix: Optional[str] = None,
-                                lower_slack_limit: expr_symbol = -1e4,
-                                upper_slack_limit: expr_symbol = 1e4,
+                                lower_slack_limit: Union[w.Symbol, float] = -1e4,
+                                upper_slack_limit: Union[w.Symbol, float] = 1e4,
                                 horizon_function: Optional[Callable[[float, int], float]] = None):
         """
         Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
@@ -242,14 +244,14 @@ class Goal(ABC):
                                                               horizon_function=horizon_function)
 
     def add_constraint(self,
-                       reference_velocity: expr_symbol,
-                       lower_error: expr_symbol,
-                       upper_error: expr_symbol,
-                       weight: expr_symbol,
-                       task_expression: expr_symbol,
+                       reference_velocity: Union[w.Symbol, float],
+                       lower_error: Union[w.Symbol, float],
+                       upper_error: Union[w.Symbol, float],
+                       weight: Union[w.Symbol, float],
+                       task_expression: Union[w.Symbol, float],
                        name: Optional[str] = None,
-                       lower_slack_limit: Optional[expr_symbol] = None,
-                       upper_slack_limit: Optional[expr_symbol] = None):
+                       lower_slack_limit: Optional[Union[w.Symbol, float]] = None,
+                       upper_slack_limit: Optional[Union[w.Symbol, float]] = None):
         """
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final
@@ -283,14 +285,14 @@ class Goal(ABC):
                                              control_horizon=self.control_horizon)
 
     def add_constraint_vector(self,
-                              reference_velocities: List[expr_symbol],
-                              lower_errors: List[expr_symbol],
-                              upper_errors: List[expr_symbol],
-                              weights: List[expr_symbol],
-                              task_expression: List[expr_symbol],
+                              reference_velocities: List[Union[w.Symbol, float]],
+                              lower_errors: List[Union[w.Symbol, float]],
+                              upper_errors: List[Union[w.Symbol, float]],
+                              weights: List[Union[w.Symbol, float]],
+                              task_expression: List[Union[w.Symbol, float]],
                               names: List[str],
-                              lower_slack_limits: Optional[List[expr_symbol]] = None,
-                              upper_slack_limits: Optional[List[expr_symbol]] = None):
+                              lower_slack_limits: Optional[List[Union[w.Symbol, float]]] = None,
+                              upper_slack_limits: Optional[List[Union[w.Symbol, float]]] = None):
         """
         Calls add_constraint for a list of expressions.
         """
@@ -324,7 +326,7 @@ class Goal(ABC):
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
 
-    def add_debug_expr(self, name: str, expr: expr_symbol):
+    def add_debug_expr(self, name: str, expr: Union[w.Symbol, float]):
         """
         Add any expression for debug purposes. They will be evaluated as well and can be plotted by activating
         the debug plotter in this Giskard config.
@@ -334,7 +336,7 @@ class Goal(ABC):
         name = f'{self}/{name}'
         self._debug_expressions[name] = expr
 
-    def add_debug_matrix(self, name: str, matrix_expr: expr_matrix):
+    def add_debug_matrix(self, name: str, matrix_expr: w.Matrix):
         """
         Calls add_debug_expr for a matrix.
         """
@@ -342,7 +344,7 @@ class Goal(ABC):
             for y in range(matrix_expr.shape[1]):
                 self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
 
-    def add_debug_vector(self, name: str, vector_expr: expr_symbol):
+    def add_debug_vector(self, name: str, vector_expr: Union[w.Symbol, float]):
         """
         Calls add_debug_expr for a vector.
         """
@@ -350,10 +352,10 @@ class Goal(ABC):
             self.add_debug_expr(f'{name}/{x}', vector_expr[x])
 
     def add_position_constraint(self,
-                                expr_current: expr_symbol,
-                                expr_goal: expr_symbol,
-                                reference_velocity: expr_symbol,
-                                weight: expr_symbol = WEIGHT_BELOW_CA,
+                                expr_current: Union[w.Symbol, float],
+                                expr_goal: Union[w.Symbol, float],
+                                reference_velocity: Union[w.Symbol, float],
+                                weight: Union[w.Symbol, float] = WEIGHT_BELOW_CA,
                                 name: str = ''):
         """
         A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
@@ -367,10 +369,10 @@ class Goal(ABC):
                             name=name)
 
     def add_point_goal_constraints(self,
-                                   frame_P_current: expr_matrix,
-                                   frame_P_goal: expr_matrix,
-                                   reference_velocity: expr_symbol,
-                                   weight: expr_symbol,
+                                   frame_P_current: w.Matrix,
+                                   frame_P_goal: w.Matrix,
+                                   reference_velocity: Union[w.Symbol, float],
+                                   weight: Union[w.Symbol, float],
                                    name: str = ''):
         """
         Adds three constraints to move frame_P_current to frame_P_goal.
@@ -392,10 +394,10 @@ class Goal(ABC):
                                           f'{name}/z'])
 
     def add_translational_velocity_limit(self,
-                                         frame_P_current: expr_matrix,
-                                         max_velocity: expr_symbol,
-                                         weight: expr_symbol,
-                                         max_violation: expr_symbol = 1e4,
+                                         frame_P_current: w.Matrix,
+                                         max_velocity: Union[w.Symbol, float],
+                                         weight: Union[w.Symbol, float],
+                                         max_violation: Union[w.Symbol, float] = 1e4,
                                          name=''):
         """
         Adds constraints to limit the translational velocity of frame_P_current. Be aware that the velocity is relative
@@ -417,10 +419,10 @@ class Goal(ABC):
                                      name_suffix=f'{name}/vel')
 
     def add_vector_goal_constraints(self,
-                                    frame_V_current: expr_matrix,
-                                    frame_V_goal: expr_matrix,
-                                    reference_velocity: expr_symbol,
-                                    weight: expr_symbol = WEIGHT_BELOW_CA,
+                                    frame_V_current: w.Matrix,
+                                    frame_V_goal: w.Matrix,
+                                    reference_velocity: Union[w.Symbol, float],
+                                    weight: Union[w.Symbol, float] = WEIGHT_BELOW_CA,
                                     name: str = ''):
         """
         Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
@@ -449,11 +451,11 @@ class Goal(ABC):
                                           f'{name}/trans/z'])
 
     def add_rotation_goal_constraints(self,
-                                      frame_R_current: expr_matrix,
-                                      frame_R_goal: expr_matrix,
-                                      current_R_frame_eval: expr_matrix,
-                                      reference_velocity: expr_symbol,
-                                      weight: expr_symbol,
+                                      frame_R_current: w.Matrix,
+                                      frame_R_goal: w.Matrix,
+                                      current_R_frame_eval: w.Matrix,
+                                      reference_velocity: Union[w.Symbol, float],
+                                      weight: Union[w.Symbol, float],
                                       name: str = ''):
         """
         Adds constraints to move frame_R_current to frame_R_goal. Make sure that both are expressed relative to the same
@@ -487,10 +489,10 @@ class Goal(ABC):
                                           f'{name}/rot/z'])
 
     def add_rotational_velocity_limit(self,
-                                      frame_R_current: expr_matrix,
-                                      max_velocity: expr_symbol,
-                                      weight: expr_symbol,
-                                      max_violation: expr_symbol = 1e4,
+                                      frame_R_current: w.Matrix,
+                                      max_velocity: Union[w.Symbol, float],
+                                      weight: Union[w.Symbol, float],
+                                      max_violation: Union[w.Symbol, float] = 1e4,
                                       name: str = ''):
         """
         Add velocity constraints to limit the velocity of frame_R_current. Be aware that the velocity is relative to

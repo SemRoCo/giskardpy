@@ -1,14 +1,14 @@
 import abc
 from abc import ABC
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Union
 
 import numpy as np
 import urdf_parser_py.urdf as up
 
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
-from giskardpy.my_types import PrefixName
-from giskardpy.my_types import my_string, expr_symbol, expr_matrix, derivative_joint_map, derivative_map
+from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils.utils import blackboard_god_map
 
@@ -18,13 +18,13 @@ class Joint(ABC):
                  name: my_string,
                  parent_link_name: my_string,
                  child_link_name: my_string,
-                 parent_T_child: expr_matrix):
+                 parent_T_child: w.Matrix):
         if isinstance(name, str):
             name = PrefixName(name, None)
         self.name: my_string = name
         self.parent_link_name: my_string = parent_link_name
         self.child_link_name: my_string = child_link_name
-        self.parent_T_child: expr_matrix = parent_T_child
+        self.parent_T_child: w.Matrix = parent_T_child
         self.create_free_variables()
 
     @property
@@ -84,7 +84,7 @@ class Joint(ABC):
         """
 
     @abc.abstractmethod
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
         """
         """
 
@@ -115,12 +115,12 @@ class DependentJoint(Joint, ABC):
 class FixedJoint(Joint):
 
     def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
-                 parent_T_child: Optional[expr_matrix] = None):
+                 parent_T_child: Optional[w.Matrix] = None):
         if parent_T_child is None:
             parent_T_child = w.eye(4)
         super().__init__(name, parent_link_name, child_link_name, parent_T_child)
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
         return None
 
     def update_limits(self, linear_limits, angular_limits):
@@ -240,7 +240,7 @@ class OneDofJoint(Joint, ABC):
     axis: Tuple[float, float, float]
 
     def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
-                 parent_T_child: expr_matrix,
+                 parent_T_child: w.Matrix,
                  axis: Tuple[float, float, float], lower_limits, upper_limits):
         self.axis = axis
         self.lower_limits = lower_limits
@@ -267,8 +267,8 @@ class OneDofJoint(Joint, ABC):
             world.state[self.name].jerk = jerk
 
     @property
-    def position_expression(self) -> expr_symbol:
-        return self.free_variable.get_symbol(0)
+    def position_expression(self) -> Union[w.Symbol, float]:
+        return self.free_variable.get_symbol(Derivatives.position)
 
     def delete_limits(self):
         for i in range(1, len(self.free_variable.lower_limits)):
@@ -284,7 +284,7 @@ class OneDofJoint(Joint, ABC):
                 # can't do if in, because the dict may be a defaultdict
                 pass
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
         return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
 
     def has_free_variables(self) -> bool:
@@ -311,7 +311,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
                              lower_limits, upper_limits)
 
     @property
-    def position_expression(self) -> expr_symbol:
+    def position_expression(self) -> Union[w.Symbol, float]:
         multiplier = 1 if self.multiplier is None else self.multiplier
         offset = 0 if self.offset is None else self.offset
         return self.free_variable.get_symbol(0) * multiplier + offset
@@ -627,7 +627,7 @@ class OmniDrive(Joint):
                 # can't do "if in", because the dict may be a defaultdict
                 pass
 
-    def get_limit_expressions(self, order: int) -> Tuple[Optional[expr_symbol], Optional[expr_symbol]]:
+    def get_limit_expressions(self, order: int) -> Tuple[Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
         return None, None
 
     def has_free_variables(self) -> bool:
@@ -691,7 +691,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
     def update_weights(self, weights: derivative_joint_map):
         pass
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
         pass
 
     def has_free_variables(self) -> bool:
@@ -1313,7 +1313,7 @@ class DiffDrive(Joint):
                 # can't do if in, because the dict may be a defaultdict
                 pass
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[expr_symbol, expr_symbol]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
         pass
 
     def has_free_variables(self) -> bool:

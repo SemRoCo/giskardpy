@@ -22,8 +22,8 @@ from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
     PrismaticJoint, RevoluteJoint, ContinuousJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, expr_symbol
-from giskardpy.my_types import my_string, expr_matrix
+from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map
+from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
@@ -849,7 +849,7 @@ class WorldTree:
         self.notify_model_change()
 
     @profile
-    def update_joint_parent_T_child(self, joint_name: PrefixName, new_parent_T_child: expr_matrix, notify: bool = True):
+    def update_joint_parent_T_child(self, joint_name: PrefixName, new_parent_T_child: w.Matrix, notify: bool = True):
         joint = self._joints[joint_name]
         joint.parent_T_child = new_parent_T_child
         if notify:
@@ -1049,7 +1049,7 @@ class WorldTree:
 
     @memoize
     @profile
-    def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> expr_matrix:
+    def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> w.Matrix:
         """
         Multiplies all transformation matrices in the chain between root_link and tip_link
         :param root_link:
@@ -1234,7 +1234,7 @@ class WorldTree:
         self._links[link.name] = link
 
     def joint_limit_expr(self, joint_name: PrefixName, order: Derivatives) \
-            -> Tuple[Optional[expr_symbol], Optional[expr_symbol]]:
+            -> Tuple[Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
         return self._joints[joint_name].get_limit_expressions(order)
 
     def transform_msg(self, target_frame: PrefixName,
@@ -1289,7 +1289,7 @@ class WorldTree:
         return result
 
     def compute_joint_limits(self, joint_name: PrefixName, order: Derivatives) \
-            -> Tuple[Optional[expr_symbol], Optional[expr_symbol]]:
+            -> Tuple[Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
         try:
             lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
         except KeyError:

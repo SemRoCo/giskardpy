@@ -1,7 +1,8 @@
+from __future__ import annotations
 import errno
 import os
 import pickle
-from typing import List, Tuple, Union, Callable, Iterable, Optional
+from typing import List, Tuple, Union, Callable, Iterable, Optional, overload
 
 import casadi as ca
 import numpy as np
@@ -9,12 +10,523 @@ import rospy
 from casadi import sign, cos, sin, sqrt, atan2, acos
 from numpy import pi
 
-from giskardpy.my_types import expr_symbol, expr_matrix, any_expr
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
 
-def var(variables_names: str) -> List[expr_symbol]:
+class Symbol(ca.SX):
+    def __init__(self, name):
+        s = ca.SX.sym(name)
+        super().__init__(s)
+
+
+class Matrix(ca.SX):
+    def __init__(self, data: Union[Iterable[Union[Symbol, float]],
+                                   Iterable[Iterable[Union[Symbol, float]]],
+                                   np.ndarray,
+                                   Matrix]):
+        try:
+            super().__init__(data)
+        except NotImplementedError:
+            if hasattr(data, 'shape'):
+                super().__init__(*data.shape)
+                y = data.shape[1]
+            else:
+                x = len(data)
+                if isinstance(data[0], list) or isinstance(data[0], tuple):
+                    y = len(data[0])
+                else:
+                    y = 1
+                super().__init__(x, y)
+            for i in range(self.shape[0]):
+                if y > 1:
+                    for j in range(self.shape[1]):
+                        try:
+                            self[i, j] = data[i][j]
+                        except:
+                            self[i, j] = data[i, j]
+                else:
+                    self[i] = data[i]
+
+
+class TransformationMatrix(Matrix):
+    def __init__(self, data: Union[Iterable[Union[Symbol, float]],
+                                   Iterable[Iterable[Union[Symbol, float]]],
+                                   np.ndarray,
+                                   Matrix]):
+        super().__init__(data)
+        if self.shape[0] != 4 or self.shape[1] != 4:
+            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
+        self[3, 0] = 0
+        self[3, 1] = 0
+        self[3, 2] = 0
+        self[3, 3] = 1
+
+    @classmethod
+    def translation3(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]) \
+            -> TransformationMatrix:
+        """
+        :return: 4x4 Matrix
+            [[1,0,0,x],
+             [0,1,0,y],
+             [0,0,1,z],
+             [0,0,0,1]]
+        """
+        r = eye(4)
+        r[0, 3] = x
+        r[1, 3] = y
+        r[2, 3] = z
+        return cls(r)
+
+    @classmethod
+    def frame_axis_angle(cls,
+                         x: Union[Symbol, float],
+                         y: Union[Symbol, float],
+                         z: Union[Symbol, float],
+                         axis: Vector3,
+                         angle: Union[Symbol, float]) -> TransformationMatrix:
+        a_T_b = TransformationMatrix.translation3(x, y, z)
+        a_R_b = RotationMatrix.from_axis_angle(axis, angle)
+        return dot(a_T_b, a_R_b)
+
+    @overload
+    def dot(self, other: Point3) -> Point3:
+        ...
+
+    @overload
+    def dot(self, other: Vector3) -> Vector3:
+        ...
+
+    @overload
+    def dot(self, other: TransformationMatrix) -> TransformationMatrix:
+        ...
+
+    def dot(self, other):
+        result = super().__mul__(other)
+        if isinstance(other, Point3):
+            return Point3.from_matrix(result)
+        if isinstance(other, Vector3):
+            return Vector3.from_matrix(result)
+        return self.__class__(result)
+
+    def inverse(self) -> Matrix:
+        inv = eye(4)
+        inv[:3, :3] = self[:3, :3].T
+        inv[:3, 3] = dot(-inv[:3, :3], self[:3, 3])
+        return self.__class__(inv)
+
+    @classmethod
+    def from_rpy(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float],
+                 roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
+            -> TransformationMatrix:
+        a_T_b = TransformationMatrix.translation3(x, y, z)
+        a_R_b = RotationMatrix.from_rpy(roll, pitch, yaw)
+        return cls(dot(a_T_b, a_R_b))
+
+    @classmethod
+    def from_x_y_rot(cls, x: Union[Symbol, float], y: Union[Symbol, float], yaw: Union[Symbol, float]) \
+            -> TransformationMatrix:
+        axis = Vector3(0, 0, 1)
+        return cls.frame_axis_angle(x, y, 0, axis, yaw)
+
+    @classmethod
+    def from_quaternion(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float],
+                        q: Quaternion) -> Matrix:
+        """
+        :return: 4x4 Matrix
+        """
+        a_T_b = TransformationMatrix.translation3(x, y, z)
+        a_R_b = RotationMatrix.from_quaternion(q)
+        return cls(dot(a_T_b, a_R_b))
+
+    def position(self):
+        return Point3.from_matrix(self[:4, 3:])
+
+    def to_translation(self) -> TransformationMatrix:
+        """
+        :return: sets the rotation part of a frame to identity
+        """
+        r = eye(4)
+        r[0, 3] = self[0, 3]
+        r[1, 3] = self[1, 3]
+        r[2, 3] = self[2, 3]
+        return TransformationMatrix(r)
+
+    def to_rotation(self) -> RotationMatrix:
+        return RotationMatrix(self)
+
+
+class RotationMatrix(TransformationMatrix):
+    def __init__(self, data: Union[Iterable[Union[Symbol, float]],
+                                   Iterable[Iterable[Union[Symbol, float]]],
+                                   np.ndarray,
+                                   Matrix]):
+        super().__init__(data)
+        self[0, 3] = 0
+        self[1, 3] = 0
+        self[2, 3] = 0
+
+    @classmethod
+    def from_axis_angle(cls, axis: Vector3, angle: Union[Symbol, float]) -> RotationMatrix:
+        """
+        Conversion of unit axis and angle to 4x4 rotation matrix according to:
+        http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
+        """
+        ct = ca.cos(angle)
+        st = ca.sin(angle)
+        vt = 1 - ct
+        m_vt_0 = vt * axis[0]
+        m_vt_1 = vt * axis[1]
+        m_vt_2 = vt * axis[2]
+        m_st_0 = axis[0] * st
+        m_st_1 = axis[1] * st
+        m_st_2 = axis[2] * st
+        m_vt_0_1 = m_vt_0 * axis[1]
+        m_vt_0_2 = m_vt_0 * axis[2]
+        m_vt_1_2 = m_vt_1 * axis[2]
+        return cls([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
+                    [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
+                    [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
+                    [0, 0, 0, 1]])
+
+    @classmethod
+    def from_quaternion(cls, q: Quaternion) -> RotationMatrix:
+        """
+        Unit quaternion to 4x4 rotation matrix according to:
+        https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
+        """
+        x = q[0]
+        y = q[1]
+        z = q[2]
+        w = q[3]
+        x2 = x * x
+        y2 = y * y
+        z2 = z * z
+        w2 = w * w
+        return cls([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                    [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                    [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                    [0, 0, 0, 1]])
+
+    def to_axis_angle(self) -> Tuple[Vector3, Union[Symbol, float]]:
+        return self.to_quaternion().to_axis_angle()
+
+    def to_angle(self, hint: Callable) -> Symbol:
+        """
+        :param hint: A function who's sign of the result will be used to to determine if angle should be positive or
+                        negative
+        :return:
+        """
+        axis, angle = self.to_axis_angle()
+        return normalize_angle(if_greater_zero(hint(axis),
+                                               if_result=angle,
+                                               else_result=-angle))
+
+    @classmethod
+    def from_vectors(cls,
+                     x: Optional[Vector3] = None,
+                     y: Optional[Vector3] = None,
+                     z: Optional[Vector3] = None) -> RotationMatrix:
+        if x is not None:
+            x = scale(x, 1)
+        if y is not None:
+            y = scale(y, 1)
+        if z is not None:
+            z = scale(z, 1)
+        if x is not None and y is not None and z is None:
+            z = cross(x, y)
+            z = scale(z, 1)
+        elif x is not None and y is None and z is not None:
+            y = cross(z, x)
+            y = scale(y, 1)
+        elif x is None and y is not None and z is not None:
+            x = cross(y, z)
+            x = scale(x, 1)
+        else:
+            raise AttributeError(f'only one vector can be None')
+        R = Matrix([[x[0], y[0], z[0], 0],
+                    [x[1], y[1], z[1], 0],
+                    [x[2], y[2], z[2], 0],
+                    [0, 0, 0, 1]])
+        return R
+
+    @classmethod
+    def from_rpy(cls, roll: Union[Symbol, float], pitch: Union[Symbol, float],
+                 yaw: Union[Symbol, float]) -> Matrix:
+        """
+        Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
+        https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
+        """
+        rx = RotationMatrix([[1, 0, 0, 0],
+                             [0, ca.cos(roll), -ca.sin(roll), 0],
+                             [0, ca.sin(roll), ca.cos(roll), 0],
+                             [0, 0, 0, 1]])
+        ry = RotationMatrix([[ca.cos(pitch), 0, ca.sin(pitch), 0],
+                             [0, 1, 0, 0],
+                             [-ca.sin(pitch), 0, ca.cos(pitch), 0],
+                             [0, 0, 0, 1]])
+        rz = RotationMatrix([[ca.cos(yaw), -ca.sin(yaw), 0, 0],
+                             [ca.sin(yaw), ca.cos(yaw), 0, 0],
+                             [0, 0, 1, 0],
+                             [0, 0, 0, 1]])
+        return cls(dot(rz, ry, rx))
+
+    def to_rpy(self) -> Tuple[Union[Symbol, float], Union[Symbol, float], Union[Symbol, float]]:
+        """
+        :return: roll, pitch, yaw
+        """
+        i = 0
+        j = 1
+        k = 2
+
+        cy = sqrt(self[i, i] * self[i, i] + self[j, i] * self[j, i])
+        if0 = cy - _EPS
+        ax = if_greater_zero(if0,
+                             atan2(self[k, j], self[k, k]),
+                             atan2(-self[j, k], self[j, j]))
+        ay = if_greater_zero(if0,
+                             atan2(-self[k, i], cy),
+                             atan2(-self[k, i], cy))
+        az = if_greater_zero(if0,
+                             atan2(self[j, i], self[i, i]),
+                             0)
+        return ax, ay, az
+
+    def to_quaternion(self) -> Quaternion:
+        return Quaternion.from_rotation_matrix(self)
+
+
+class Point3(Matrix):
+    def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
+        super().__init__([x, y, z, 1])
+
+    @classmethod
+    def from_matrix(cls, m: Matrix):
+        return cls(m[0], m[1], m[2])
+
+    @property
+    def x(self):
+        return self[0]
+
+    @x.setter
+    def x(self, value):
+        self[0] = value
+
+    def __add__(self, other: Union[Point3, Vector3]):
+        result = super().__add__(other)
+        return Point3.from_matrix(result)
+
+    def __sub__(self, other: Union[Point3, Vector3]):
+        result = super().__sub__(other)
+        if isinstance(other, Point3):
+            return Vector3.from_matrix(result)
+        return Point3.from_matrix(result)
+
+    def __mul__(self, other: Union[Symbol, float]):
+        result = super().__mul__(other)
+        return Point3.from_matrix(result)
+
+    def __truediv__(self, other: Union[Symbol, float]):
+        result = super().__truediv__(other)
+        return Point3.from_matrix(result)
+
+
+class Vector3(Matrix):
+    def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
+        super().__init__([x, y, z, 0])
+
+    @classmethod
+    def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Matrix]) -> Vector3:
+        return cls(m[0], m[1], m[2])
+
+    def __add__(self, other: Union[Point3, Vector3]):
+        result = super().__add__(other)
+        if isinstance(other, Point3):
+            return Point3.from_matrix(result)
+        return Vector3.from_matrix(result)
+
+    def __sub__(self, other: Vector3):
+        result = super().__sub__(other)
+        return Vector3.from_matrix(result)
+
+    def __mul__(self, other: Union[Symbol, float]):
+        result = super().__mul__(other)
+        return Vector3.from_matrix(result)
+
+    def __truediv__(self, other: Union[Symbol, float]):
+        result = super().__truediv__(other)
+        return Vector3.from_matrix(result)
+
+    def cross(self, v: Vector3) -> Vector3:
+        result = ca.cross(self[:3], v[:3])
+        return Vector3.from_matrix(result)
+
+    def norm(self) -> Symbol:
+        return ca.norm_2(self)
+
+    def scale(self, a: Union[Symbol, float]) -> Vector3:
+        return save_division(self, self.norm()) * a
+
+
+class Quaternion(Matrix):
+    def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float],
+                 z: Union[Symbol, float], w: Union[Symbol, float]):
+        super().__init__([x, y, z, w])
+
+    @property
+    def x(self):
+        return self[0]
+
+    @x.setter
+    def x(self, value):
+        self[0] = value
+
+    @property
+    def y(self):
+        return self[1]
+
+    @y.setter
+    def y(self, value):
+        self[1] = value
+
+    @property
+    def z(self):
+        return self[2]
+
+    @z.setter
+    def z(self, value):
+        self[2] = value
+
+    @property
+    def w(self):
+        return self[3]
+
+    @w.setter
+    def w(self, value):
+        self[3] = value
+
+    @classmethod
+    def from_matrix(cls, m: Matrix) -> Quaternion:
+        return cls(m[0], m[1], m[2], m[3])
+
+    @classmethod
+    def from_axis_angle(cls, axis: Vector3, angle: Union[Symbol, float]) -> Quaternion:
+        half_angle = angle / 2
+        return cls(axis[0] * sin(half_angle),
+                   axis[1] * sin(half_angle),
+                   axis[2] * sin(half_angle),
+                   cos(half_angle))
+
+    @classmethod
+    def from_rpy(cls, roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
+            -> Quaternion:
+        roll_half = roll / 2.0
+        pitch_half = pitch / 2.0
+        yaw_half = yaw / 2.0
+
+        c_roll = cos(roll_half)
+        s_roll = sin(roll_half)
+        c_pitch = cos(pitch_half)
+        s_pitch = sin(pitch_half)
+        c_yaw = cos(yaw_half)
+        s_yaw = sin(yaw_half)
+
+        cc = c_roll * c_yaw
+        cs = c_roll * s_yaw
+        sc = s_roll * c_yaw
+        ss = s_roll * s_yaw
+
+        x = c_pitch * sc - s_pitch * cs
+        y = c_pitch * ss + s_pitch * cc
+        z = c_pitch * cs - s_pitch * sc
+        w = c_pitch * cc + s_pitch * ss
+
+        return cls(x, y, z, w)
+
+    @classmethod
+    def from_rotation_matrix(cls, r: RotationMatrix) -> Quaternion:
+        q = cls(0, 0, 0, 0)
+        t = trace(r)
+
+        if0 = t - r[3, 3]
+
+        if1 = r[1, 1] - r[0, 0]
+
+        m_i_i = if_greater_zero(if1, r[1, 1], r[0, 0])
+        m_i_j = if_greater_zero(if1, r[1, 2], r[0, 1])
+        m_i_k = if_greater_zero(if1, r[1, 0], r[0, 2])
+
+        m_j_i = if_greater_zero(if1, r[2, 1], r[1, 0])
+        m_j_j = if_greater_zero(if1, r[2, 2], r[1, 1])
+        m_j_k = if_greater_zero(if1, r[2, 0], r[1, 2])
+
+        m_k_i = if_greater_zero(if1, r[0, 1], r[2, 0])
+        m_k_j = if_greater_zero(if1, r[0, 2], r[2, 1])
+        m_k_k = if_greater_zero(if1, r[0, 0], r[2, 2])
+
+        if2 = r[2, 2] - m_i_i
+
+        m_i_i = if_greater_zero(if2, r[2, 2], m_i_i)
+        m_i_j = if_greater_zero(if2, r[2, 0], m_i_j)
+        m_i_k = if_greater_zero(if2, r[2, 1], m_i_k)
+
+        m_j_i = if_greater_zero(if2, r[0, 2], m_j_i)
+        m_j_j = if_greater_zero(if2, r[0, 0], m_j_j)
+        m_j_k = if_greater_zero(if2, r[0, 1], m_j_k)
+
+        m_k_i = if_greater_zero(if2, r[1, 2], m_k_i)
+        m_k_j = if_greater_zero(if2, r[1, 0], m_k_j)
+        m_k_k = if_greater_zero(if2, r[1, 1], m_k_k)
+
+        t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + r[3, 3])
+        q[0] = if_greater_zero(if0, r[2, 1] - r[1, 2],
+                               if_greater_zero(if2, m_i_j + m_j_i,
+                                               if_greater_zero(if1, m_k_i + m_i_k, t)))
+        q[1] = if_greater_zero(if0, r[0, 2] - r[2, 0],
+                               if_greater_zero(if2, m_k_i + m_i_k,
+                                               if_greater_zero(if1, t, m_i_j + m_j_i)))
+        q[2] = if_greater_zero(if0, r[1, 0] - r[0, 1],
+                               if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i,
+                                                                       m_k_i + m_i_k)))
+        q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
+
+        q *= 0.5 / sqrt(t * r[3, 3])
+        return cls.from_matrix(q)
+
+    def conjugate(self) -> Quaternion:
+        return Quaternion(-self[0], -self[1], -self[2], self[3])
+
+    def multiply(self, q: Quaternion) -> Quaternion:
+        return Quaternion(x=self.x * q.w + self.y * q.z - self.z * q.y + self.w * q.x,
+                          y=-self.x * q.z + self.y * q.w + self.z * q.x + self.w * q.y,
+                          z=self.x * q.y - self.y * q.x + self.z * q.w + self.w * q.z,
+                          w=-self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w)
+
+    def diff(self, q: Quaternion) -> Quaternion:
+        """
+        :return: quaternion p, such that self*p=q
+        """
+        return self.conjugate().multiply(q)
+
+    def to_axis_angle(self) -> Tuple[Vector3, Union[Symbol, float]]:
+        l = norm(self)
+        x, y, z, w = self[0] / l, self[1] / l, self[2] / l, self[3] / l
+        w2 = sqrt(1 - w ** 2)
+        m = if_eq_zero(w2, 1, w2)  # avoid /0
+        angle = if_eq_zero(w2, 0, (2 * acos(limit(w, -1, 1))))
+        x = if_eq_zero(w2, 0, x / m)
+        y = if_eq_zero(w2, 0, y / m)
+        z = if_eq_zero(w2, 1, z / m)
+        return Vector3(x, y, z), angle
+
+    def to_rotation_matrix(self):
+        return RotationMatrix.from_quaternion(self)
+
+    def to_rpy(self):
+        return self.to_rotation_matrix().to_rpy()
+
+
+def var(variables_names: str) -> List[Union[Symbol, float]]:
     """
     :param variables_names: e.g. 'a b c'
     :return: e.g. [Symbol('a'), Symbol('b'), Symbol('c')]
@@ -25,17 +537,17 @@ def var(variables_names: str) -> List[expr_symbol]:
     return symbols
 
 
-def diag(args: Union[List[expr_symbol], expr_matrix]) -> expr_matrix:
+def diag(args: Union[List[Union[Symbol, float]], Matrix]) -> Matrix:
     return ca.diag(Matrix(args))
 
 
-def Symbol(data: str) -> ca.SX:
-    if isinstance(data, str):
-        return ca.SX.sym(data)
-    return ca.SX(data)
+# def Symbol(data: str) -> ca.SX:
+#     if isinstance(data, str):
+#         return ca.SX.sym(data)
+#     return ca.SX(data)
 
 
-def jacobian(expressions: expr_matrix, symbols: Union[List[ca.SX], expr_matrix], order: float = 1) -> expr_matrix:
+def jacobian(expressions: Matrix, symbols: Union[List[ca.SX], Matrix], order: float = 1) -> Matrix:
     if isinstance(expressions, list):
         expressions = Matrix(expressions)
     if order == 1:
@@ -49,23 +561,19 @@ def jacobian(expressions: expr_matrix, symbols: Union[List[ca.SX], expr_matrix],
         raise NotImplementedError('jacobian only supports order 1 and 2')
 
 
-def equivalent(expression1: any_expr, expression2: any_expr) -> bool:
+def equivalent(expression1: Union[Symbol, Matrix], expression2: Union[Symbol, Matrix]) -> bool:
     return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
 
 
-def free_symbols(expression: any_expr) -> List[ca.SX]:
+def free_symbols(expression: Union[Symbol, Matrix]) -> List[ca.SX]:
     return ca.symvar(expression)
 
 
-def is_matrix(expression: any_expr) -> bool:
+def is_matrix(expression: Union[Symbol, Matrix]) -> bool:
     return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
 
 
-def is_homo_vector(expression: any_expr):
-    return is_matrix(expression) and expression.shape == (4, 1) and expression[-1] == 0
-
-
-def is_symbol(expression: any_expr) -> bool:
+def is_symbol(expression: Union[Symbol, Matrix]) -> bool:
     return expression.shape[0] * expression.shape[1] == 1
 
 
@@ -111,40 +619,11 @@ def compile_and_execute(f: Callable, params: Union[List[Union[float, np.ndarray]
         return result
 
 
-def Matrix(data: Union[Iterable[expr_symbol],
-                       Iterable[Iterable[expr_symbol]],
-                       np.ndarray,
-                       expr_matrix]) -> expr_matrix:
-    try:
-        return ca.SX(data)
-    except NotImplementedError:
-        if hasattr(data, 'shape'):
-            m = ca.SX(*data.shape)
-            y = data.shape[1]
-        else:
-            x = len(data)
-            if isinstance(data[0], list) or isinstance(data[0], tuple):
-                y = len(data[0])
-            else:
-                y = 1
-            m = ca.SX(x, y)
-        for i in range(m.shape[0]):
-            if y > 1:
-                for j in range(m.shape[1]):
-                    try:
-                        m[i, j] = data[i][j]
-                    except:
-                        m[i, j] = data[i, j]
-            else:
-                m[i] = data[i]
-        return m
-
-
-def ros_msg_to_matrix(msg: rospy.Message) -> expr_matrix:
+def ros_msg_to_matrix(msg: rospy.Message) -> Matrix:
     return Matrix(msg_to_homogeneous_matrix(msg))
 
 
-def matrix_to_list(m: expr_matrix) -> List[expr_symbol]:
+def matrix_to_list(m: Matrix) -> List[Union[Symbol, float]]:
     try:
         len(m)
         return m
@@ -152,35 +631,37 @@ def matrix_to_list(m: expr_matrix) -> List[expr_symbol]:
         return [m[i] for i in range(m.shape[0])]
 
 
-def zeros(x: int, y: int) -> expr_matrix:
+def zeros(x: int, y: int) -> Matrix:
     return ca.SX.zeros(x, y)
 
 
-def ones(x: int, y: int) -> expr_matrix:
+def ones(x: int, y: int) -> Matrix:
     return ca.SX.ones(x, y)
 
 
-def abs(x: expr_symbol) -> expr_symbol:
+def abs(x: Union[Symbol, float]) -> Union[Symbol, float]:
     return ca.fabs(x)
 
 
-def max(x: expr_symbol, y: expr_symbol) -> expr_symbol:
+def max(x: Union[Symbol, float], y: Union[Symbol, float]) -> Union[Symbol, float]:
     return ca.fmax(x, y)
 
 
-def min(x: expr_symbol, y: expr_symbol) -> expr_symbol:
+def min(x: Union[Symbol, float], y: Union[Symbol, float]) -> Union[Symbol, float]:
     return ca.fmin(x, y)
 
 
-def limit(x: expr_symbol, lower_limit: expr_symbol, upper_limit: expr_symbol) -> expr_symbol:
+def limit(x: Union[Symbol, float], lower_limit: Union[Symbol, float],
+          upper_limit: Union[Symbol, float]) -> Union[Symbol, float]:
     return max(lower_limit, min(upper_limit, x))
 
 
-def if_else(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_else(condition: Union[Symbol, float], if_result: Union[Symbol, float],
+            else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     return ca.if_else(condition, if_result, else_result)
 
 
-def logic_and(*args: List[expr_symbol]) -> expr_symbol:
+def logic_and(*args: List[Union[Symbol, float]]) -> Union[Symbol, float]:
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
         return ca.logic_and(args[0], args[1])
@@ -188,7 +669,7 @@ def logic_and(*args: List[expr_symbol]) -> expr_symbol:
         return ca.logic_and(args[0], logic_and(*args[1:]))
 
 
-def logic_or(*args: List[expr_symbol]) -> expr_symbol:
+def logic_or(*args: List[Union[Symbol, float]]) -> Union[Symbol, float]:
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
         return ca.logic_or(args[0], args[1])
@@ -196,15 +677,18 @@ def logic_or(*args: List[expr_symbol]) -> expr_symbol:
         return ca.logic_or(args[0], logic_and(*args[1:]))
 
 
-def if_greater(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_greater(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
+               else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     return if_else(ca.gt(a, b), if_result, else_result)
 
 
-def if_less(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_less(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
+            else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     return if_else(ca.lt(a, b), if_result, else_result)
 
 
-def if_greater_zero(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_greater_zero(condition: Union[Symbol, float], if_result: Union[Symbol, float],
+                    else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     :return: if_result if condition > 0 else else_result
     """
@@ -214,40 +698,46 @@ def if_greater_zero(condition: expr_symbol, if_result: expr_symbol, else_result:
     return _if + _else + (1 - abs(_condition)) * else_result  # if_result or else_result
 
 
-def if_greater_eq_zero(condition: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_greater_eq_zero(condition: Union[Symbol, float], if_result: Union[Symbol, float],
+                       else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     :return: if_result if condition >= 0 else else_result
     """
     return if_greater_eq(condition, 0, if_result, else_result)
 
 
-def if_greater_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_greater_eq(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
+                  else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     :return: if_result if a >= b else else_result
     """
     return if_else(ca.ge(a, b), if_result, else_result)
 
 
-def if_less_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_less_eq(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
+               else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     :return: if_result if a <= b else else_result
     """
     return if_greater_eq(b, a, if_result, else_result)
 
 
-def if_eq_zero(condition:expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_eq_zero(condition: Union[Symbol, float], if_result: Union[Symbol, float],
+               else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     :return: if_result if condition == 0 else else_result
     """
     return if_else(condition, else_result, if_result)
 
 
-def if_eq(a: expr_symbol, b: expr_symbol, if_result: expr_symbol, else_result: expr_symbol) -> expr_symbol:
+def if_eq(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
+          else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
-def if_eq_cases(a: expr_symbol, b_result_cases: Union[Iterable[Tuple[expr_symbol, expr_symbol]], expr_matrix],
-                else_result: expr_symbol) -> expr_symbol:
+def if_eq_cases(a: Union[Symbol, float],
+                b_result_cases: Union[Iterable[Tuple[Union[Symbol, float], Union[Symbol, float]]], Matrix],
+                else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     result = else_result
     if isinstance(b_result_cases, list):
         b_result_cases = Matrix(b_result_cases)
@@ -258,8 +748,9 @@ def if_eq_cases(a: expr_symbol, b_result_cases: Union[Iterable[Tuple[expr_symbol
     return result
 
 
-def if_less_eq_cases(a: expr_symbol, b_result_cases: Iterable[Tuple[expr_symbol, expr_symbol]],
-                     else_result: expr_symbol) -> expr_symbol:
+def if_less_eq_cases(a: Union[Symbol, float],
+                     b_result_cases: Iterable[Tuple[Union[Symbol, float], Union[Symbol, float]]],
+                     else_result: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     This only works if b_result_cases is sorted in an ascending order.
     """
@@ -332,240 +823,40 @@ def speed_up(function, parameters, backend='clang') -> CompiledFunction:
     return CompiledFunction(str_params, f, function.shape)
 
 
-def cross(u: expr_matrix, v: expr_matrix) -> expr_matrix:
-    """
-    :param u: 1d matrix
-    :param v: 1d matrix
-    :return: 1d Matrix. If u and v have length 4, it ignores the last entry and adds a zero to the result.
-    """
-    if is_homo_vector(u):
-        u = u[:-1]
-    if is_homo_vector(v):
-        v = v[:-1]
-    result = ca.cross(u, v)
-    return Matrix([result[0],
-                   result[1],
-                   result[2],
-                   0])
+def cross(u: Vector3, v: Vector3) -> Vector3:
+    u = Vector3.from_matrix(u)
+    v = Vector3.from_matrix(v)
+    return u.cross(v)
 
 
-def vector3(x: expr_symbol, y: expr_symbol, z: expr_symbol) -> expr_matrix:
-    return Matrix([x, y, z, 0])
-
-
-def point3(x: expr_symbol, y: expr_symbol, z: expr_symbol) -> expr_matrix:
-    return Matrix([x, y, z, 1])
-
-
-def norm(v: expr_matrix) -> expr_symbol:
+def norm(v: Matrix) -> Union[Symbol, float]:
     return ca.norm_2(v)
 
 
-def scale(v: expr_matrix, a: expr_symbol) -> expr_matrix:
+def scale(v: Matrix, a: Union[Symbol, float]) -> Matrix:
     return save_division(v, norm(v)) * a
 
 
-def dot(*matrices: expr_matrix) -> expr_matrix:
+def dot(*matrices: Matrix) -> Matrix:
     return ca.mtimes(matrices)
 
 
-def translation3(x: expr_symbol, y: expr_symbol, z: expr_symbol) -> expr_matrix:
-    """
-    :return: 4x4 Matrix
-        [[1,0,0,x],
-         [0,1,0,y],
-         [0,0,1,z],
-         [0,0,0,1]]
-    """
-    r = eye(4)
-    r[0, 3] = x
-    r[1, 3] = y
-    r[2, 3] = z
-    return r
-
-
-def rotation_matrix_from_vectors(x: Optional[expr_matrix] = None,
-                                 y: Optional[expr_matrix] = None,
-                                 z: Optional[expr_matrix] = None) -> expr_matrix:
-    if x is not None:
-        x = scale(x, 1)
-    if y is not None:
-        y = scale(y, 1)
-    if z is not None:
-        z = scale(z, 1)
-    if x is not None and y is not None and z is None:
-        z = cross(x, y)
-        z = scale(z, 1)
-    elif x is not None and y is None and z is not None:
-        y = cross(z, x)
-        y = scale(y, 1)
-    elif x is None and y is not None and z is not None:
-        x = cross(y, z)
-        x = scale(x, 1)
-    else:
-        raise AttributeError(f'only one vector can be None')
-    R = Matrix([[x[0], y[0], z[0], 0],
-                [x[1], y[1], z[1], 0],
-                [x[2], y[2], z[2], 0],
-                [0, 0, 0, 1]])
-    return R
-
-
-def rotation_matrix_from_rpy(roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) -> expr_matrix:
-    """
-    Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
-    https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
-    :return: 4x4 Matrix
-    """
-    # TODO don't split this into 3 matrices
-
-    rx = Matrix([[1, 0, 0, 0],
-                 [0, ca.cos(roll), -ca.sin(roll), 0],
-                 [0, ca.sin(roll), ca.cos(roll), 0],
-                 [0, 0, 0, 1]])
-    ry = Matrix([[ca.cos(pitch), 0, ca.sin(pitch), 0],
-                 [0, 1, 0, 0],
-                 [-ca.sin(pitch), 0, ca.cos(pitch), 0],
-                 [0, 0, 0, 1]])
-    rz = Matrix([[ca.cos(yaw), -ca.sin(yaw), 0, 0],
-                 [ca.sin(yaw), ca.cos(yaw), 0, 0],
-                 [0, 0, 1, 0],
-                 [0, 0, 0, 1]])
-    return dot(rz, ry, rx)
-
-
-def rotation_matrix_from_axis_angle(axis: Union[Tuple[expr_symbol, expr_symbol, expr_symbol], expr_matrix],
-                                    angle: expr_symbol) -> expr_matrix:
-    """
-    Conversion of unit axis and angle to 4x4 rotation matrix according to:
-    http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
-    :param axis: 3x1 Matrix
-    :return: 4x4 Matrix
-    """
-    ct = ca.cos(angle)
-    st = ca.sin(angle)
-    vt = 1 - ct
-    m_vt_0 = vt * axis[0]
-    m_vt_1 = vt * axis[1]
-    m_vt_2 = vt * axis[2]
-    m_st_0 = axis[0] * st
-    m_st_1 = axis[1] * st
-    m_st_2 = axis[2] * st
-    m_vt_0_1 = m_vt_0 * axis[1]
-    m_vt_0_2 = m_vt_0 * axis[2]
-    m_vt_1_2 = m_vt_1 * axis[2]
-    return Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
-                   [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
-                   [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
-                   [0, 0, 0, 1]])
-
-
-def rotation_matrix_from_quaternion(x: expr_symbol, y: expr_symbol, z: expr_symbol, w: expr_symbol) -> expr_matrix:
-    """
-    Unit quaternion to 4x4 rotation matrix according to:
-    https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
-    :return: 4x4 Matrix
-    """
-    x2 = x * x
-    y2 = y * y
-    z2 = z * z
-    w2 = w * w
-    return Matrix([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                   [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                   [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                   [0, 0, 0, 1]])
-
-
-def frame_axis_angle(x: expr_symbol, y: expr_symbol, z: expr_symbol, axis: expr_matrix, angle: expr_symbol) -> expr_matrix:
-    """
-    :param axis: 3x1 Matrix
-    :return: 4x4 Matrix
-    """
-    return dot(translation3(x, y, z), rotation_matrix_from_axis_angle(axis, angle))
-
-
-def frame_rpy(x: expr_symbol, y: expr_symbol, z: expr_symbol, roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) \
-        -> expr_matrix:
-    """
-    :return: 4x4 Matrix
-    """
-    return dot(translation3(x, y, z), rotation_matrix_from_rpy(roll, pitch, yaw))
-
-
-def frame_quaternion(x: expr_symbol, y: expr_symbol, z: expr_symbol, qx: expr_symbol, qy: expr_symbol, qz: expr_symbol,
-                     qw: expr_symbol) -> expr_matrix:
-    """
-    :return: 4x4 Matrix
-    """
-    return dot(translation3(x, y, z), rotation_matrix_from_quaternion(qx, qy, qz, qw))
-
-
-def frame_from_x_y_rot(x: expr_symbol, y: expr_symbol, rot: expr_symbol) -> expr_matrix:
-    parent_P_link = translation3(x, y, 0)
-    link_R_child = rotation_matrix_from_axis_angle(vector3(0, 0, 1),
-                                                   rot)
-    return dot(parent_P_link, link_R_child)
-
-
-def eye(size: int) -> expr_symbol:
+def eye(size: int) -> Union[Symbol, float]:
     return ca.SX.eye(size)
 
 
-def kron(m1: expr_matrix, m2: expr_matrix) -> expr_matrix:
+def kron(m1: Matrix, m2: Matrix) -> Matrix:
     return ca.kron(m1, m2)
 
 
-def inverse_frame(frame: expr_matrix) -> expr_matrix:
-    """
-    :param frame: 4x4 Matrix
-    :return: 4x4 Matrix
-    """
-    inv = eye(4)
-    inv[:3, :3] = frame[:3, :3].T
-    inv[:3, 3] = dot(-inv[:3, :3], frame[:3, 3])
-    return inv
-
-
-def position_of(frame: expr_matrix) -> expr_matrix:
-    """
-    :param frame: 4x4 Matrix
-    :return: 4x1 Matrix; the translation part of a frame in form of a point
-    """
-    return frame[:4, 3:]
-
-
-def translation_of(frame: expr_matrix) -> expr_matrix:
-    """
-    :param frame: 4x4 Matrix
-    :return: 4x4 Matrix; sets the rotation part of a frame to identity
-    """
-    r = eye(4)
-    r[0, 3] = frame[0, 3]
-    r[1, 3] = frame[1, 3]
-    r[2, 3] = frame[2, 3]
-    return r
-
-
-def rotation_of(frame: expr_matrix) ->expr_matrix:
-    """
-    :param frame: 4x4 Matrix
-    :return: 4x4 Matrix; sets the translation part of a frame to 0
-    """
-    r = eye(4)
-    for i in range(3):
-        for j in range(3):
-            r[i, j] = frame[i, j]
-    return r
-
-
-def trace(matrix: expr_matrix) -> expr_symbol:
+def trace(matrix: Matrix) -> Union[Symbol, float]:
     s = 0
     for i in range(matrix.shape[0]):
         s += matrix[i, i]
     return s
 
 
-def rotation_distance(a_R_b: expr_matrix, a_R_c: expr_matrix) -> expr_symbol:
+def rotation_distance(a_R_b: Matrix, a_R_c: Matrix) -> Union[Symbol, float]:
     """
     :param a_R_b: 4x4 or 3x3 Matrix
     :param a_R_c: 4x4 or 3x3 Matrix
@@ -579,47 +870,21 @@ def rotation_distance(a_R_b: expr_matrix, a_R_c: expr_matrix) -> expr_symbol:
     return acos(angle)
 
 
-def vstack(list_of_matrices: List[expr_matrix]) -> expr_matrix:
+def vstack(list_of_matrices: List[Matrix]) -> Matrix:
     return ca.vertcat(*list_of_matrices)
 
 
-def hstack(list_of_matrices: List[expr_matrix]) -> expr_matrix:
+def hstack(list_of_matrices: List[Matrix]) -> Matrix:
     return ca.horzcat(*list_of_matrices)
 
 
-def axis_angle_from_matrix(rotation_matrix: expr_matrix) -> Tuple[expr_matrix, expr_symbol]:
-    """
-    MAKE SURE MATRIX IS NORMALIZED
-    :param rotation_matrix: 4x4 or 3x3 Matrix
-    :return: 3x1 Matrix, angle
-    """
-    q = quaternion_from_matrix(rotation_matrix)
-    return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
-
-
-def axis_angle_from_quaternion(x: expr_symbol, y: expr_symbol, z: expr_symbol, w: expr_symbol) \
-        -> Tuple[expr_matrix, expr_symbol]:
-    """
-    :return: 4x1 Matrix
-    """
-    l = norm(Matrix([x, y, z, w]))
-    x, y, z, w = x / l, y / l, z / l, w / l
-    w2 = sqrt(1 - w ** 2)
-    m = if_eq_zero(w2, 1, w2)  # avoid /0
-    angle = if_eq_zero(w2, 0, (2 * acos(limit(w, -1, 1))))
-    x = if_eq_zero(w2, 0, x / m)
-    y = if_eq_zero(w2, 0, y / m)
-    z = if_eq_zero(w2, 1, z / m)
-    return Matrix([x, y, z]), angle
-
-
-def normalize_axis_angle(axis: expr_matrix, angle: expr_symbol) -> Tuple[expr_matrix, expr_symbol]:
+def normalize_axis_angle(axis: Matrix, angle: Union[Symbol, float]) -> Tuple[Matrix, Union[Symbol, float]]:
     axis = if_less(angle, 0, -axis, axis)
     angle = abs(angle)
     return axis, angle
 
 
-def normalize_rotation_matrix(R: expr_symbol) -> expr_symbol:
+def normalize_rotation_matrix(R: Union[Symbol, float]) -> Union[Symbol, float]:
     """Scales each of the axes to the length of one."""
     scale_v = 1.0
     R[:3, 0] = scale(R[:3, 0], scale_v)
@@ -628,176 +893,15 @@ def normalize_rotation_matrix(R: expr_symbol) -> expr_symbol:
     return R
 
 
-def quaternion_from_axis_angle(axis: expr_matrix, angle: expr_symbol) -> expr_matrix:
-    """
-    :param axis: 3x1 Matrix
-    :return: 4x1 Matrix
-    """
-    half_angle = angle / 2
-    return Matrix([axis[0] * sin(half_angle),
-                   axis[1] * sin(half_angle),
-                   axis[2] * sin(half_angle),
-                   cos(half_angle)])
-
-
-def axis_angle_from_rpy(roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) -> Tuple[expr_matrix, expr_symbol]:
-    """
-    :return: 3x1 Matrix, angle
-    """
-    q = quaternion_from_rpy(roll, pitch, yaw)
-    return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
+def axis_angle_from_rpy(roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
+        -> Tuple[Vector3, Union[Symbol, float]]:
+    return Quaternion.from_rpy(roll, pitch, yaw).to_axis_angle()
 
 
 _EPS = np.finfo(float).eps * 4.0
 
 
-def rpy_from_matrix(rotation_matrix: expr_matrix) -> Tuple[expr_symbol, expr_symbol, expr_symbol]:
-    """
-    :param rotation_matrix: 4x4 Matrix
-    :return: roll, pitch, yaw
-    """
-    i = 0
-    j = 1
-    k = 2
-
-    cy = sqrt(rotation_matrix[i, i] * rotation_matrix[i, i] + rotation_matrix[j, i] * rotation_matrix[j, i])
-    if0 = cy - _EPS
-    ax = if_greater_zero(if0,
-                         atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
-                         atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
-    ay = if_greater_zero(if0,
-                         atan2(-rotation_matrix[k, i], cy),
-                         atan2(-rotation_matrix[k, i], cy))
-    az = if_greater_zero(if0,
-                         atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
-                         0)
-    return ax, ay, az
-
-
-def quaternion_from_rpy(roll: expr_symbol, pitch: expr_symbol, yaw: expr_symbol) -> expr_matrix:
-    """
-    :return: 4x1 Matrix
-    """
-    roll_half = roll / 2.0
-    pitch_half = pitch / 2.0
-    yaw_half = yaw / 2.0
-
-    c_roll = cos(roll_half)
-    s_roll = sin(roll_half)
-    c_pitch = cos(pitch_half)
-    s_pitch = sin(pitch_half)
-    c_yaw = cos(yaw_half)
-    s_yaw = sin(yaw_half)
-
-    cc = c_roll * c_yaw
-    cs = c_roll * s_yaw
-    sc = s_roll * c_yaw
-    ss = s_roll * s_yaw
-
-    x = c_pitch * sc - s_pitch * cs
-    y = c_pitch * ss + s_pitch * cc
-    z = c_pitch * cs - s_pitch * sc
-    w = c_pitch * cc + s_pitch * ss
-
-    return Matrix([x, y, z, w])
-
-
-def quaternion_from_matrix(matrix: expr_matrix) -> expr_matrix:
-    """
-    :param matrix: 4x4 or 3x3 Matrix
-    :return: 4x1 Matrix
-    """
-    q = Matrix([0, 0, 0, 0])
-    if isinstance(matrix, np.ndarray):
-        M = Matrix(matrix.tolist())
-    else:
-        M = Matrix(matrix)
-    t = trace(M)
-
-    if0 = t - M[3, 3]
-
-    if1 = M[1, 1] - M[0, 0]
-
-    m_i_i = if_greater_zero(if1, M[1, 1], M[0, 0])
-    m_i_j = if_greater_zero(if1, M[1, 2], M[0, 1])
-    m_i_k = if_greater_zero(if1, M[1, 0], M[0, 2])
-
-    m_j_i = if_greater_zero(if1, M[2, 1], M[1, 0])
-    m_j_j = if_greater_zero(if1, M[2, 2], M[1, 1])
-    m_j_k = if_greater_zero(if1, M[2, 0], M[1, 2])
-
-    m_k_i = if_greater_zero(if1, M[0, 1], M[2, 0])
-    m_k_j = if_greater_zero(if1, M[0, 2], M[2, 1])
-    m_k_k = if_greater_zero(if1, M[0, 0], M[2, 2])
-
-    if2 = M[2, 2] - m_i_i
-
-    m_i_i = if_greater_zero(if2, M[2, 2], m_i_i)
-    m_i_j = if_greater_zero(if2, M[2, 0], m_i_j)
-    m_i_k = if_greater_zero(if2, M[2, 1], m_i_k)
-
-    m_j_i = if_greater_zero(if2, M[0, 2], m_j_i)
-    m_j_j = if_greater_zero(if2, M[0, 0], m_j_j)
-    m_j_k = if_greater_zero(if2, M[0, 1], m_j_k)
-
-    m_k_i = if_greater_zero(if2, M[1, 2], m_k_i)
-    m_k_j = if_greater_zero(if2, M[1, 0], m_k_j)
-    m_k_k = if_greater_zero(if2, M[1, 1], m_k_k)
-
-    t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
-    q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
-                           if_greater_zero(if2, m_i_j + m_j_i,
-                                           if_greater_zero(if1, m_k_i + m_i_k, t)))
-    q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
-                           if_greater_zero(if2, m_k_i + m_i_k,
-                                           if_greater_zero(if1, t, m_i_j + m_j_i)))
-    q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
-                           if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i,
-                                                                   m_k_i + m_i_k)))
-    q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
-
-    q *= 0.5 / sqrt(t * M[3, 3])
-    return q
-
-
-def quaternion_multiply(q1: expr_matrix, q2: expr_matrix) -> expr_matrix:
-    """
-    :param q1: 4x1 Matrix
-    :param q2: 4x1 Matrix
-    :return: 4x1 Matrix
-    """
-    x0 = q2[0]
-    y0 = q2[1]
-    z0 = q2[2]
-    w0 = q2[3]
-    x1 = q1[0]
-    y1 = q1[1]
-    z1 = q1[2]
-    w1 = q1[3]
-    return Matrix([x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
-                   -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
-                   x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
-                   -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0])
-
-
-def quaternion_conjugate(quaternion: expr_matrix) -> expr_matrix:
-    """
-    :param quaternion: 4x1 Matrix
-    :return: 4x1 Matrix
-    """
-    return Matrix([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
-
-
-def quaternion_diff(q0: expr_matrix, q1: expr_matrix) -> expr_matrix:
-    """
-    :param q0: 4x1 Matrix
-    :param q1: 4x1 Matrix
-    :return: 4x1 Matrix p, such that q1*p=q2
-    """
-    return quaternion_multiply(quaternion_conjugate(q0), q1)
-
-
-def cosine_distance(v0: expr_matrix, v1: expr_matrix) -> expr_symbol:
+def cosine_distance(v0: Matrix, v1: Matrix) -> Union[Symbol, float]:
     """
     cosine distance ranging from 0 to 2
     :param v0: nx1 Matrix
@@ -806,7 +910,7 @@ def cosine_distance(v0: expr_matrix, v1: expr_matrix) -> expr_symbol:
     return 1 - ((dot(v0.T, v1))[0] / (norm(v0) * norm(v1)))
 
 
-def euclidean_distance(v1: expr_matrix, v2: expr_matrix) -> expr_symbol:
+def euclidean_distance(v1: Matrix, v2: Matrix) -> Union[Symbol, float]:
     """
     :param v1: nx1 Matrix
     :param v2: nx1 Matrix
@@ -814,11 +918,11 @@ def euclidean_distance(v1: expr_matrix, v2: expr_matrix) -> expr_symbol:
     return norm(v1 - v2)
 
 
-def fmod(a: expr_symbol, b: expr_symbol) -> expr_symbol:
+def fmod(a: Union[Symbol, float], b: Union[Symbol, float]) -> Union[Symbol, float]:
     return ca.fmod(a, b)
 
 
-def normalize_angle_positive(angle: expr_symbol) -> expr_symbol:
+def normalize_angle_positive(angle: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     Normalizes the angle to be 0 to 2*pi
     It takes and returns radians.
@@ -826,7 +930,7 @@ def normalize_angle_positive(angle: expr_symbol) -> expr_symbol:
     return fmod(fmod(angle, 2.0 * pi) + 2.0 * pi, 2.0 * pi)
 
 
-def normalize_angle(angle: expr_symbol) -> expr_symbol:
+def normalize_angle(angle: Union[Symbol, float]) -> Union[Symbol, float]:
     """
     Normalizes the angle to be -pi to +pi
     It takes and returns radians.
@@ -835,7 +939,7 @@ def normalize_angle(angle: expr_symbol) -> expr_symbol:
     return if_greater(a, pi, a - 2.0 * pi, a)
 
 
-def shortest_angular_distance(from_angle: expr_symbol, to_angle: expr_symbol) -> expr_matrix:
+def shortest_angular_distance(from_angle: Union[Symbol, float], to_angle: Union[Symbol, float]) -> Matrix:
     """
     Given 2 angles, this returns the shortest angular
     difference.  The inputs and outputs are of course radians.
@@ -846,7 +950,7 @@ def shortest_angular_distance(from_angle: expr_symbol, to_angle: expr_symbol) ->
     return normalize_angle(to_angle - from_angle)
 
 
-def quaternion_slerp(q1: expr_matrix, q2: expr_matrix, t: expr_symbol) -> expr_matrix:
+def quaternion_slerp(q1: Matrix, q2: Matrix, t: Union[Symbol, float]) -> Matrix:
     """
     spherical linear interpolation that takes into account that q == -q
     :param q1: 4x1 Matrix
@@ -880,16 +984,7 @@ def quaternion_slerp(q1: expr_matrix, q2: expr_matrix, t: expr_symbol) -> expr_m
                                               ratio_a * q1 + ratio_b * q2))
 
 
-def scale_quaternion(q: expr_matrix, angle: expr_symbol) -> expr_matrix:
-    axis, _ = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
-    return quaternion_from_axis_angle(axis, angle)
-
-
-def quaternion_angle(q: expr_matrix) -> expr_symbol:
-    return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])[1]
-
-
-def slerp(v1: expr_matrix, v2: expr_matrix, t: float) -> expr_matrix:
+def slerp(v1: Matrix, v2: Matrix, t: float) -> Matrix:
     """
     spherical linear interpolation
     :param v1: any vector
@@ -903,21 +998,22 @@ def slerp(v1: expr_matrix, v2: expr_matrix, t: float) -> expr_matrix:
                  (sin((1 - t) * angle2) / sin(angle2)) * v1 + (sin(t * angle2) / sin(angle2)) * v2)
 
 
-def to_numpy(matrix: expr_matrix) -> np.ndarray:
+def to_numpy(matrix: Matrix) -> np.ndarray:
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
 
 
-def save_division(nominator: any_expr, denominator: expr_symbol, if_nan: expr_symbol = 0) -> any_expr:
+def save_division(nominator: Union[Symbol, Matrix], denominator: Union[Symbol, float],
+                  if_nan: Union[Symbol, float] = 0) -> Union[Symbol, Matrix]:
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 
 
-def save_acos(angle: expr_symbol) -> expr_symbol:
+def save_acos(angle: Union[Symbol, float]) -> Union[Symbol, float]:
     angle = limit(angle, -1, 1)
     return acos(angle)
 
 
-def entrywise_product(matrix1: expr_matrix, matrix2: expr_matrix) -> expr_matrix:
+def entrywise_product(matrix1: Matrix, matrix2: Matrix) -> Matrix:
     assert matrix1.shape == matrix2.shape
     result = zeros(*matrix1.shape)
     for i in range(matrix1.shape[0]):
@@ -926,47 +1022,47 @@ def entrywise_product(matrix1: expr_matrix, matrix2: expr_matrix) -> expr_matrix
     return result
 
 
-def floor(x: expr_symbol) -> expr_symbol:
+def floor(x: Union[Symbol, float]) -> Union[Symbol, float]:
     return ca.floor(x)
 
 
-def ceil(x: expr_symbol) -> expr_symbol:
+def ceil(x: Union[Symbol, float]) -> Union[Symbol, float]:
     return ca.ceil(x)
 
 
-def round_up(x: expr_symbol, decimal_places: expr_symbol) -> expr_symbol:
+def round_up(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Union[Symbol, float]:
     f = 10 ** (decimal_places)
     return ceil(x * f) / f
 
 
-def round_down(x: expr_symbol, decimal_places: expr_symbol) -> expr_symbol:
+def round_down(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Union[Symbol, float]:
     f = 10 ** (decimal_places)
     return floor(x * f) / f
 
 
-def sum(matrix: expr_matrix) -> expr_symbol:
+def sum(matrix: Matrix) -> Union[Symbol, float]:
     """
     the equivalent to np.sum(matrix)
     """
     return ca.sum1(ca.sum2(matrix))
 
 
-def sum_row(matrix: expr_matrix) -> expr_matrix:
+def sum_row(matrix: Matrix) -> Matrix:
     """
     the equivalent to np.sum(matrix, axis=0)
     """
     return ca.sum1(matrix)
 
 
-def sum_column(matrix: expr_matrix) -> expr_matrix:
+def sum_column(matrix: Matrix) -> Matrix:
     """
     the equivalent to np.sum(matrix, axis=1)
     """
     return ca.sum2(matrix)
 
 
-def distance_point_to_line_segment(point: expr_matrix, line_start: expr_matrix, line_end: expr_matrix) \
-        -> Tuple[expr_symbol, expr_matrix]:
+def distance_point_to_line_segment(point: Matrix, line_start: Matrix, line_end: Matrix) \
+        -> Tuple[Union[Symbol, float], Matrix]:
     """
     :param point: current position of an object (i. e.) gripper tip
     :param line_start: start of the approached line
@@ -986,30 +1082,17 @@ def distance_point_to_line_segment(point: expr_matrix, line_start: expr_matrix, 
     return dist, nearest
 
 
-def angle_between_vector(v1: expr_matrix, v2: expr_matrix) -> expr_symbol:
+def angle_between_vector(v1: Matrix, v2: Matrix) -> Union[Symbol, float]:
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
 
 
-def angle_from_matrix(R: expr_matrix, hint: Callable) -> expr_symbol:
-    """
-    :param R:
-    :param hint: A function who's sign of the result will be used to to determine if angle should be positive or
-                    negative
-    :return:
-    """
-    axis, angle = axis_angle_from_matrix(R)
-    return normalize_angle(if_greater_zero(hint(axis),
-                                           if_result=angle,
-                                           else_result=-angle))
-
-
-def velocity_limit_from_position_limit(acceleration_limit: expr_symbol,
-                                       position_limit: expr_symbol,
-                                       current_position: expr_symbol,
-                                       step_size: expr_symbol,
-                                       eps: float = 1e-5) -> expr_symbol:
+def velocity_limit_from_position_limit(acceleration_limit: Union[Symbol, float],
+                                       position_limit: Union[Symbol, float],
+                                       current_position: Union[Symbol, float],
+                                       step_size: Union[Symbol, float],
+                                       eps: float = 1e-5) -> Union[Symbol, float]:
     """
     Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
     :param acceleration_limit:
@@ -1118,7 +1201,7 @@ def velocity_limit_from_position_limit(acceleration_limit: expr_symbol,
 #     t_a = t_b * 2
 
 
-def to_str(expression: expr_symbol) -> str:
+def to_str(expression: Union[Symbol, float]) -> str:
     """
     Turns expression into a more or less readable string.
     """
@@ -1134,8 +1217,8 @@ def to_str(expression: expr_symbol) -> str:
     pass
 
 
-def total_derivative(expr: any_expr, symbols: expr_matrix, symbols_dot: expr_matrix) \
-        -> any_expr:
+def total_derivative(expr: Union[Symbol, Matrix], symbols: Matrix, symbols_dot: Matrix) \
+        -> Union[Symbol, Matrix]:
     expr_jacobian = jacobian(expr, symbols)
     last_velocities = Matrix(symbols_dot)
     velocity = dot(expr_jacobian, last_velocities)
@@ -1143,3 +1226,21 @@ def total_derivative(expr: any_expr, symbols: expr_matrix, symbols_dot: expr_mat
         return velocity[0]
     else:
         return velocity
+
+
+def quaternion_multiply(q1: Quaternion, q2: Quaternion) -> Quaternion:
+    q1 = Quaternion.from_matrix(q1)
+    q2 = Quaternion.from_matrix(q2)
+    return q1.multiply(q2)
+
+
+def quaternion_conjugate(q: Quaternion) -> Quaternion:
+    q1 = Quaternion.from_matrix(q)
+    return q1.conjugate()
+
+
+def quaternion_diff(q1: Quaternion, q2: Quaternion) -> Quaternion:
+    q1 = Quaternion.from_matrix(q1)
+    q2 = Quaternion.from_matrix(q2)
+    return q1.diff(q2
+                   )

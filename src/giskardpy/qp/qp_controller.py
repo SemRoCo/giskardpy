@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple, Type
+from typing import List, Dict, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +15,6 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import expr_symbol
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
@@ -584,7 +583,7 @@ class QPController:
                  free_variables: List[FreeVariable] = None,
                  constraints: List[Constraint] = None,
                  velocity_constraints: List[VelocityConstraint] = None,
-                 debug_expressions: Dict[str, expr_symbol] = None,
+                 debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,

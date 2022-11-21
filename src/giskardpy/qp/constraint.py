@@ -2,7 +2,6 @@ from collections import namedtuple
 from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as w
-from giskardpy.my_types import expr_symbol
 
 DebugConstraint = namedtuple('debug', ['expr'])
 
@@ -51,13 +50,13 @@ class VelocityConstraint:
     def __init__(self,
                  name,
                  expression,
-                 lower_velocity_limit: Union[expr_symbol, List[expr_symbol]],
-                 upper_velocity_limit: Union[expr_symbol, List[expr_symbol]],
+                 lower_velocity_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
+                 upper_velocity_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
                  velocity_limit,
                  quadratic_weight,
                  control_horizon,
-                 lower_slack_limit: Union[expr_symbol, List[expr_symbol]],
-                 upper_slack_limit: Union[expr_symbol, List[expr_symbol]],
+                 lower_slack_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
+                 upper_slack_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
                  linear_weight=None,
                  horizon_function: Optional[Callable[[float, int], float]] = None):
         self.name = name

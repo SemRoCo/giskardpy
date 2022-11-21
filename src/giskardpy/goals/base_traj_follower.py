@@ -1,9 +1,11 @@
 from __future__ import division
 
+from typing import Union
+
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive
-from giskardpy.my_types import my_string, expr_symbol, Derivatives
+from giskardpy.my_types import my_string, Derivatives
 
 
 class BaseTrajFollower(Goal):
@@ -26,10 +28,12 @@ class BaseTrajFollower(Goal):
         self.track_only_velocity = track_only_velocity
         # self.control_horizon = 1
 
-    def x_symbol(self, t: int, free_variable_name: str, derivative: Derivatives = Derivatives.position) -> expr_symbol:
+    def x_symbol(self, t: int, free_variable_name: str, derivative: Derivatives = Derivatives.position) \
+            -> Union[w.Symbol, float]:
         return self.god_map.to_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, derivative])
 
-    def current_traj_point(self, free_variable_name: str, start_t: float, derivative: Derivatives = Derivatives.position) -> expr_symbol:
+    def current_traj_point(self, free_variable_name: str, start_t: float, derivative: Derivatives = Derivatives.position) \
+            -> Union[w.Symbol, float]:
         time = self.god_map.to_expr(identifier.time)
         # self.add_debug_expr('time', time)
         b_result_cases = []

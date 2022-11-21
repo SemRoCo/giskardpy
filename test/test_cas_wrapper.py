@@ -17,7 +17,7 @@ from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector
 
 class TestRotationMatrix(unittest.TestCase):
     def test_create_RotationMatrix(self):
-        r = w.RotationMatrix.from_rpy(1, 2, 3)
+        r = w.RotationMatrix.from_xyz_rpy(1, 2, 3)
         assert isinstance(r, w.RotationMatrix)
 
     @given(quaternion())
@@ -29,7 +29,7 @@ class TestRotationMatrix(unittest.TestCase):
            random_angle(),
            random_angle())
     def test_rotation_matrix_from_rpy(self, roll, pitch, yaw):
-        m1 = w.compile_and_execute(w.RotationMatrix.from_rpy, [roll, pitch, yaw])
+        m1 = w.compile_and_execute(w.RotationMatrix.from_xyz_rpy, [roll, pitch, yaw])
         m2 = euler_matrix(roll, pitch, yaw)
         np.testing.assert_array_almost_equal(m1, m2)
 
@@ -82,11 +82,18 @@ class TestRotationMatrix(unittest.TestCase):
         roll = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[0], [matrix])
         pitch = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[1], [matrix])
         yaw = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[2], [matrix])
-        r1 = w.compile_and_execute(w.RotationMatrix.from_rpy, [roll, pitch, yaw])
+        r1 = w.compile_and_execute(w.RotationMatrix.from_xyz_rpy, [roll, pitch, yaw])
         self.assertTrue(np.isclose(r1, matrix, atol=1.e-4).all(), msg='{} != {}'.format(r1, matrix))
 
 
 class TestPoint3(unittest.TestCase):
+
+    def test_norm(self):
+        p = w.Point3(1, 2, 3)
+        try:
+            p.norm()
+        except AttributeError as e:
+            assert 'Point3' in str(e)
 
     @given(vector(3))
     def test_point3(self, v):
@@ -148,7 +155,7 @@ class TestTransformationMatrix(unittest.TestCase):
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_translation3(self, x, y, z):
-        r1 = w.compile_and_execute(w.TransformationMatrix.translation3, [x, y, z])
+        r1 = w.compile_and_execute(w.TransMatrix.from_xyz, [x, y, z])
         r2 = np.identity(4)
         r2[0, 3] = x
         r2[1, 3] = y
@@ -156,8 +163,8 @@ class TestTransformationMatrix(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2).all(), msg=f'{r1} != {r2}')
 
     def test_TransformationMatrix(self):
-        f = w.TransformationMatrix.translation3(1, 2, 3)
-        assert isinstance(f, w.TransformationMatrix)
+        f = w.TransMatrix.from_xyz(1, 2, 3)
+        assert isinstance(f, w.TransMatrix)
 
     @given(st.integers(min_value=1, max_value=10))
     def test_matrix(self, x_dim):
@@ -184,9 +191,10 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.TransformationMatrix.frame_axis_angle,
-                                                                   [x, y, z, axis, angle]),
-                                             r2)
+        r = w.compile_and_execute(lambda x, y, z, axis, angle: w.TransMatrix.from_parts(w.Point3(x, y, z),
+                                                                              (axis, angle)),
+                                  [x, y, z, axis, angle])
+        np.testing.assert_array_almost_equal(r, r2)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -199,7 +207,7 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.TransformationMatrix.from_rpy,
+        np.testing.assert_array_almost_equal(w.compile_and_execute(w.TransMatrix.from_xyz_rpy,
                                                                    [x, y, z, roll, pitch, yaw]),
                                              r2)
 
@@ -212,10 +220,10 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        np.testing.assert_array_almost_equal(w.compile_and_execute(
-            lambda x, y, z, q: w.TransformationMatrix.from_quaternion(x, y, z, w.Quaternion.from_matrix(q)),
-            [x, y, z, q]),
-                                             r2)
+        r = w.compile_and_execute(lambda x, y, z, q: w.TransMatrix.from_parts(w.Point3(x, y, z),
+                                                                              w.Quaternion.from_matrix(q)),
+                                  [x, y, z, q])
+        np.testing.assert_array_almost_equal(r, r2)
 
     @given(float_no_nan_no_inf(outer_limit=1000),
            float_no_nan_no_inf(outer_limit=1000),
@@ -226,7 +234,7 @@ class TestTransformationMatrix(unittest.TestCase):
         f[0, 3] = x
         f[1, 3] = y
         f[2, 3] = z
-        r = w.ca.evalf(w.TransformationMatrix(f).inverse())
+        r = w.ca.evalf(w.TransMatrix(f).inverse())
 
         r2 = PyKDL.Frame()
         r2.M = PyKDL.Rotation.Quaternion(q[0], q[1], q[2], q[3])
@@ -242,7 +250,8 @@ class TestTransformationMatrix(unittest.TestCase):
            float_no_nan_no_inf(),
            unit_vector(4))
     def test_pos_of(self, x, y, z, q):
-        r1 = w.TransformationMatrix.from_quaternion(x, y, z, w.Quaternion(*q)).position()
+        r1 = w.TransMatrix.from_parts(w.Point3(x, y, z),
+                                      w.Quaternion(*q)).position()
         r2 = [x, y, z, 1]
         for i, e in enumerate(r2):
             self.assertAlmostEqual(r1[i], e)
@@ -252,7 +261,11 @@ class TestTransformationMatrix(unittest.TestCase):
            float_no_nan_no_inf(),
            unit_vector(4))
     def test_trans_of(self, x, y, z, q):
-        r1 = w.compile_and_execute(lambda x, y, z, q: w.TransformationMatrix.from_quaternion(x, y, z, w.Quaternion(q[0], q[1], q[2], q[3])).to_translation(),
+        r1 = w.compile_and_execute(lambda x, y, z, q: w.TransMatrix.from_parts(w.Point3(x, y, z),
+                                                                               w.Quaternion(q[0],
+                                                                                            q[1],
+                                                                                            q[2],
+                                                                                            q[3])).to_translation(),
                                    [x, y, z, q])
         r2 = np.identity(4)
         r2[0, 3] = x
@@ -267,7 +280,11 @@ class TestTransformationMatrix(unittest.TestCase):
            float_no_nan_no_inf(),
            unit_vector(4))
     def test_rot_of(self, x, y, z, q):
-        r1 = w.compile_and_execute(lambda x, y, z, q: w.TransformationMatrix.from_quaternion(x, y, z, w.Quaternion(q[0], q[1], q[2], q[3])).to_rotation(),
+        r1 = w.compile_and_execute(lambda x, y, z, q: w.TransMatrix.from_parts(w.Point3(x, y, z),
+                                                                               w.Quaternion(q[0],
+                                                                                            q[1],
+                                                                                            q[2],
+                                                                                            q[3])).to_rotation(),
                                    [x, y, z, q])
         r2 = quaternion_matrix(q)
         self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
@@ -276,7 +293,7 @@ class TestTransformationMatrix(unittest.TestCase):
         """
         Test to make sure the function doesn't alter the original
         """
-        f = w.TransformationMatrix.translation3(1, 2, 3)
+        f = w.TransMatrix.from_xyz(1, 2, 3)
         r = f.to_rotation()
         self.assertTrue(f[0, 3], 1)
         self.assertTrue(f[0, 3], 2)

@@ -695,7 +695,7 @@ class WorldTree:
             joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,
                                child_link_name=link.name,
-                               parent_T_child=w.Matrix(msg_to_homogeneous_matrix(pose)))
+                               parent_T_child=w.TransMatrix.from_ros_msg(pose))
             self._link_joint_to_links(joint)
             self.register_group(group_name, link.name)
             self.notify_model_change()
@@ -838,7 +838,7 @@ class WorldTree:
         if not self.is_joint_fixed(joint_name):
             raise NotImplementedError('Can only change fixed joints')
         joint = self._joints[joint_name]
-        fk = w.Matrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
+        fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
         old_parent_link = self._links[joint.parent_link_name]
         new_parent_link = self._links[new_parent_link_name]
 
@@ -849,7 +849,10 @@ class WorldTree:
         self.notify_model_change()
 
     @profile
-    def update_joint_parent_T_child(self, joint_name: PrefixName, new_parent_T_child: w.Matrix, notify: bool = True):
+    def update_joint_parent_T_child(self,
+                                    joint_name: PrefixName,
+                                    new_parent_T_child: w.TransMatrix,
+                                    notify: bool = True):
         joint = self._joints[joint_name]
         joint.parent_T_child = new_parent_T_child
         if notify:
@@ -1049,20 +1052,20 @@ class WorldTree:
 
     @memoize
     @profile
-    def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> w.Matrix:
+    def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> w.TransMatrix:
         """
         Multiplies all transformation matrices in the chain between root_link and tip_link
         :param root_link:
         :param tip_link:
         :return: 4x4 homogenous transformation matrix
         """
-        fk = w.eye(4)
+        fk = w.TransMatrix()
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, add_joints=True, add_links=False,
                                                             add_fixed_joints=True, add_non_controlled_joints=True)
         for joint_name in root_chain:
-            fk = w.dot(fk, w.inverse_frame(self._joints[joint_name].parent_T_child))
+            fk = fk.dot(self._joints[joint_name].parent_T_child.inverse())
         for joint_name in tip_chain:
-            fk = w.dot(fk, self._joints[joint_name].parent_T_child)
+            fk = fk.dot(self._joints[joint_name].parent_T_child)
         return fk
 
     @memoize
@@ -1088,7 +1091,7 @@ class WorldTree:
         try:
             root_T_tip = self.compute_fk_np(root, tip)
             tip_link = self._links[tip]
-            root_T_tip = w.dot(root_T_tip, tip_link.collisions[collision_id].link_T_geometry)
+            root_T_tip = root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
             p = PoseStamped()
             p.header.frame_id = str(root)
             p.pose = homo_matrix_to_pose(root_T_tip)
@@ -1108,10 +1111,10 @@ class WorldTree:
                 if link.name == self.root_link_name:
                     continue
                 if link.has_collisions():
-                    fk = self.compose_fk_expression(self.root_link_name, link.name)
-                    fk = w.dot(fk, link.collisions[0].link_T_geometry)
-                    position = w.position_of(fk)
-                    orientation = w.quaternion_from_matrix(fk)
+                    fk: w.TransMatrix = self.compose_fk_expression(self.root_link_name, link.name)
+                    fk = fk.dot(link.collisions[0].link_T_geometry)
+                    position = fk.position()
+                    orientation = fk.to_rotation().to_quaternion()
                     fks.append(w.vstack([position, orientation]).T)
                     self.fk_idx[link.name] = i
                     i += 1
@@ -1151,13 +1154,13 @@ class WorldTree:
             def __init__(self, world: WorldTree):
                 self.world = world
                 self.god_map = self.world.god_map
-                self.fks = {self.world.root_link_name: w.eye(4)}
+                self.fks = {self.world.root_link_name: w.TransMatrix()}
 
             @profile
             def joint_call(self, joint_name: my_string) -> bool:
                 joint = self.world._joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
-                self.fks[joint.child_link_name] = w.dot(map_T_parent, joint.parent_T_child)
+                self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
                 return False
 
             @profile
@@ -1171,7 +1174,7 @@ class WorldTree:
                     link = self.world._links[link_name]
                     for collision_id, geometry in enumerate(link.collisions):
                         link_name_with_id = link.name_with_collision_id(collision_id)
-                        collision_fks.append(w.dot(self.fks[link_name], geometry.link_T_geometry))
+                        collision_fks.append(self.fks[link_name].dot(geometry.link_T_geometry))
                         collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
                 self.collision_link_order = list(collision_ids)

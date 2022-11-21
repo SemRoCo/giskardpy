@@ -8,6 +8,7 @@ import casadi as ca
 import numpy as np
 import rospy
 from casadi import sign, cos, sin, sqrt, atan2, acos
+from geometry_msgs.msg import PoseStamped, Pose
 from numpy import pi
 
 from giskardpy.utils import logging
@@ -49,11 +50,13 @@ class Matrix(ca.SX):
                     self[i] = data[i]
 
 
-class TransformationMatrix(Matrix):
-    def __init__(self, data: Union[Iterable[Union[Symbol, float]],
-                                   Iterable[Iterable[Union[Symbol, float]]],
-                                   np.ndarray,
-                                   Matrix]):
+class TransMatrix(Matrix):
+    def __init__(self, data: Optional[Union[Iterable[Union[Symbol, float]],
+                                            Iterable[Iterable[Union[Symbol, float]]],
+                                            np.ndarray,
+                                            Matrix]] = None):
+        if data is None:
+            data = np.eye(4)
         super().__init__(data)
         if self.shape[0] != 4 or self.shape[1] != 4:
             raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
@@ -63,15 +66,8 @@ class TransformationMatrix(Matrix):
         self[3, 3] = 1
 
     @classmethod
-    def translation3(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]) \
-            -> TransformationMatrix:
-        """
-        :return: 4x4 Matrix
-            [[1,0,0,x],
-             [0,1,0,y],
-             [0,0,1,z],
-             [0,0,0,1]]
-        """
+    def from_xyz(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]) \
+            -> TransMatrix:
         r = eye(4)
         r[0, 3] = x
         r[1, 3] = y
@@ -79,15 +75,42 @@ class TransformationMatrix(Matrix):
         return cls(r)
 
     @classmethod
-    def frame_axis_angle(cls,
-                         x: Union[Symbol, float],
-                         y: Union[Symbol, float],
-                         z: Union[Symbol, float],
-                         axis: Vector3,
-                         angle: Union[Symbol, float]) -> TransformationMatrix:
-        a_T_b = TransformationMatrix.translation3(x, y, z)
-        a_R_b = RotationMatrix.from_axis_angle(axis, angle)
-        return dot(a_T_b, a_R_b)
+    def from_ros_msg(cls, msg: Union[Pose, PoseStamped]) -> TransMatrix:
+        if isinstance(msg, PoseStamped):
+            msg = msg.pose
+        p = Point3(x=msg.position.x,
+                   y=msg.position.y,
+                   z=msg.position.z)
+        q = Quaternion(x=msg.orientation.x,
+                       y=msg.orientation.y,
+                       z=msg.orientation.z,
+                       w=msg.orientation.w)
+        return cls.from_parts(p, q)
+
+    @classmethod
+    def from_parts(cls,
+                   point3: Optional[Point3] = None,
+                   rotation: Optional[Union[RotationMatrix,
+                                            Quaternion,
+                                            Tuple[Vector3, Union[Symbol, float]],
+                                            Tuple[Union[Symbol, float],
+                                                  Union[Symbol, float],
+                                                  Union[Symbol, float]]]] = None) -> TransMatrix:
+        if point3 is not None:
+            a_T_b = TransMatrix.from_xyz(point3.x, point3.y, point3.z)
+        else:
+            a_T_b = TransMatrix()
+        if isinstance(rotation, RotationMatrix):
+            a_R_b = rotation
+        elif isinstance(rotation, Quaternion):
+            a_R_b = RotationMatrix.from_quaternion(rotation)
+        elif len(rotation) == 2:
+            a_R_b = RotationMatrix.from_axis_angle(rotation[0], rotation[1])
+        elif rotation is not None:
+            a_R_b = RotationMatrix.from_xyz_rpy(rotation[0], rotation[1], rotation[2])
+        else:
+            a_R_b = TransMatrix()
+        return a_T_b.dot(a_R_b)
 
     @overload
     def dot(self, other: Point3) -> Point3:
@@ -98,11 +121,11 @@ class TransformationMatrix(Matrix):
         ...
 
     @overload
-    def dot(self, other: TransformationMatrix) -> TransformationMatrix:
+    def dot(self, other: TransMatrix) -> TransMatrix:
         ...
 
     def dot(self, other):
-        result = super().__mul__(other)
+        result = dot(self, other)
         if isinstance(other, Point3):
             return Point3.from_matrix(result)
         if isinstance(other, Vector3):
@@ -116,33 +139,24 @@ class TransformationMatrix(Matrix):
         return self.__class__(inv)
 
     @classmethod
-    def from_rpy(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float],
-                 roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
-            -> TransformationMatrix:
-        a_T_b = TransformationMatrix.translation3(x, y, z)
-        a_R_b = RotationMatrix.from_rpy(roll, pitch, yaw)
+    def from_xyz_rpy(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float],
+                     roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
+            -> TransMatrix:
+        a_T_b = TransMatrix.from_xyz(x, y, z)
+        a_R_b = RotationMatrix.from_xyz_rpy(roll, pitch, yaw)
         return cls(dot(a_T_b, a_R_b))
 
     @classmethod
-    def from_x_y_rot(cls, x: Union[Symbol, float], y: Union[Symbol, float], yaw: Union[Symbol, float]) \
-            -> TransformationMatrix:
+    def from_xy_yaw(cls, x: Union[Symbol, float], y: Union[Symbol, float], yaw: Union[Symbol, float]) \
+            -> TransMatrix:
+        p = Point3(x, y, z)
         axis = Vector3(0, 0, 1)
-        return cls.frame_axis_angle(x, y, 0, axis, yaw)
-
-    @classmethod
-    def from_quaternion(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float],
-                        q: Quaternion) -> Matrix:
-        """
-        :return: 4x4 Matrix
-        """
-        a_T_b = TransformationMatrix.translation3(x, y, z)
-        a_R_b = RotationMatrix.from_quaternion(q)
-        return cls(dot(a_T_b, a_R_b))
+        return cls.from_parts(p, (axis, yaw))
 
     def position(self):
         return Point3.from_matrix(self[:4, 3:])
 
-    def to_translation(self) -> TransformationMatrix:
+    def to_translation(self) -> TransMatrix:
         """
         :return: sets the rotation part of a frame to identity
         """
@@ -150,13 +164,13 @@ class TransformationMatrix(Matrix):
         r[0, 3] = self[0, 3]
         r[1, 3] = self[1, 3]
         r[2, 3] = self[2, 3]
-        return TransformationMatrix(r)
+        return TransMatrix(r)
 
     def to_rotation(self) -> RotationMatrix:
         return RotationMatrix(self)
 
 
-class RotationMatrix(TransformationMatrix):
+class RotationMatrix(TransMatrix):
     def __init__(self, data: Union[Iterable[Union[Symbol, float]],
                                    Iterable[Iterable[Union[Symbol, float]]],
                                    np.ndarray,
@@ -170,7 +184,7 @@ class RotationMatrix(TransformationMatrix):
     def from_axis_angle(cls, axis: Vector3, angle: Union[Symbol, float]) -> RotationMatrix:
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
-        http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
+        https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
         """
         ct = ca.cos(angle)
         st = ca.sin(angle)
@@ -251,8 +265,8 @@ class RotationMatrix(TransformationMatrix):
         return R
 
     @classmethod
-    def from_rpy(cls, roll: Union[Symbol, float], pitch: Union[Symbol, float],
-                 yaw: Union[Symbol, float]) -> Matrix:
+    def from_xyz_rpy(cls, roll: Union[Symbol, float], pitch: Union[Symbol, float],
+                     yaw: Union[Symbol, float]) -> Matrix:
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
@@ -300,8 +314,11 @@ class Point3(Matrix):
     def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
         super().__init__([x, y, z, 1])
 
+    def __getattr__(self, item):
+        return object.__getattribute__(self, item)
+
     @classmethod
-    def from_matrix(cls, m: Matrix):
+    def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Matrix]) -> Point3:
         return cls(m[0], m[1], m[2])
 
     @property
@@ -311,6 +328,22 @@ class Point3(Matrix):
     @x.setter
     def x(self, value):
         self[0] = value
+
+    @property
+    def y(self):
+        return self[1]
+
+    @y.setter
+    def y(self, value):
+        self[1] = value
+
+    @property
+    def z(self):
+        return self[2]
+
+    @z.setter
+    def z(self, value):
+        self[2] = value
 
     def __add__(self, other: Union[Point3, Vector3]):
         result = super().__add__(other)
@@ -338,6 +371,30 @@ class Vector3(Matrix):
     @classmethod
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Matrix]) -> Vector3:
         return cls(m[0], m[1], m[2])
+
+    @property
+    def x(self):
+        return self[0]
+
+    @x.setter
+    def x(self, value):
+        self[0] = value
+
+    @property
+    def y(self):
+        return self[1]
+
+    @y.setter
+    def y(self, value):
+        self[1] = value
+
+    @property
+    def z(self):
+        return self[2]
+
+    @z.setter
+    def z(self, value):
+        self[2] = value
 
     def __add__(self, other: Union[Point3, Vector3]):
         result = super().__add__(other)
@@ -508,15 +565,24 @@ class Quaternion(Matrix):
         """
         return self.conjugate().multiply(q)
 
+    def norm(self) -> Symbol:
+        return ca.norm_2(self)
+
+    def normalize(self):
+        norm = self.norm()
+        self.x /= norm
+        self.y /= norm
+        self.z /= norm
+        self.w /= norm
+
     def to_axis_angle(self) -> Tuple[Vector3, Union[Symbol, float]]:
-        l = norm(self)
-        x, y, z, w = self[0] / l, self[1] / l, self[2] / l, self[3] / l
-        w2 = sqrt(1 - w ** 2)
+        self.normalize()
+        w2 = sqrt(1 - self.w ** 2)
         m = if_eq_zero(w2, 1, w2)  # avoid /0
-        angle = if_eq_zero(w2, 0, (2 * acos(limit(w, -1, 1))))
-        x = if_eq_zero(w2, 0, x / m)
-        y = if_eq_zero(w2, 0, y / m)
-        z = if_eq_zero(w2, 1, z / m)
+        angle = if_eq_zero(w2, 0, (2 * acos(limit(self.w, -1, 1))))
+        x = if_eq_zero(w2, 0, self.x / m)
+        y = if_eq_zero(w2, 0, self.y / m)
+        z = if_eq_zero(w2, 1, self.z / m)
         return Vector3(x, y, z), angle
 
     def to_rotation_matrix(self):
@@ -1002,8 +1068,21 @@ def to_numpy(matrix: Matrix) -> np.ndarray:
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
 
 
-def save_division(nominator: Union[Symbol, Matrix], denominator: Union[Symbol, float],
-                  if_nan: Union[Symbol, float] = 0) -> Union[Symbol, Matrix]:
+@overload
+def save_division(nominator: Symbol, denominator: Union[Symbol, float], if_nan: Union[Symbol, float] = 0) -> Symbol: ...
+
+
+@overload
+def save_division(nominator: Vector3, denominator: Union[Symbol, float], if_nan: Union[Symbol, float] = 0) \
+        -> Vector3: ...
+
+
+@overload
+def save_division(nominator: Point3, denominator: Union[Symbol, float], if_nan: Union[Symbol, float] = 0) \
+        -> Point3: ...
+
+
+def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 

@@ -49,6 +49,8 @@ class Matrix(ca.SX):
                 else:
                     self[i] = data[i]
 
+    def __getattr__(self, item):
+        return object.__getattribute__(self, item)
 
 class TransMatrix(Matrix):
     def __init__(self, data: Optional[Union[Iterable[Union[Symbol, float]],
@@ -149,7 +151,7 @@ class TransMatrix(Matrix):
     @classmethod
     def from_xy_yaw(cls, x: Union[Symbol, float], y: Union[Symbol, float], yaw: Union[Symbol, float]) \
             -> TransMatrix:
-        p = Point3(x, y, z)
+        p = Point3(x, y, 0)
         axis = Vector3(0, 0, 1)
         return cls.from_parts(p, (axis, yaw))
 
@@ -313,9 +315,6 @@ class RotationMatrix(TransMatrix):
 class Point3(Matrix):
     def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
         super().__init__([x, y, z, 1])
-
-    def __getattr__(self, item):
-        return object.__getattribute__(self, item)
 
     @classmethod
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Matrix]) -> Point3:

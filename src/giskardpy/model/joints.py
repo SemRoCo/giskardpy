@@ -18,13 +18,13 @@ class Joint(ABC):
                  name: my_string,
                  parent_link_name: my_string,
                  child_link_name: my_string,
-                 parent_T_child: w.Matrix):
+                 parent_T_child: w.TransMatrix):
         if isinstance(name, str):
             name = PrefixName(name, None)
         self.name: my_string = name
         self.parent_link_name: my_string = parent_link_name
         self.child_link_name: my_string = child_link_name
-        self.parent_T_child: w.TransMatrix = parent_T_child
+        self.parent_T_child: w.TransMatrix = w.TransMatrix(parent_T_child)
         self.create_free_variables()
 
     @property
@@ -37,7 +37,7 @@ class Joint(ABC):
 
     @property
     def parent_T_child(self) -> w.TransMatrix:
-        return w.dot(self._parent_T_child, self._joint_transformation())
+        return self._parent_T_child.dot(self._joint_transformation())
 
     @parent_T_child.setter
     def parent_T_child(self, value: w.TransMatrix):

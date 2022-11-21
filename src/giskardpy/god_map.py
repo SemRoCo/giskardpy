@@ -311,29 +311,29 @@ class GodMap(object):
 
         return w.Matrix(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
-    def list_to_point3(self, identifier):
-        return w.point3(
+    def list_to_point3(self, identifier) -> w.Point3:
+        return w.Point3(
             x=self.to_symbol(identifier + [0]),
             y=self.to_symbol(identifier + [1]),
             z=self.to_symbol(identifier + [2]),
         )
 
-    def list_to_vector3(self, identifier):
-        return w.vector3(
+    def list_to_vector3(self, identifier) -> w.Vector3:
+        return w.Vector3(
             x=self.to_symbol(identifier + [0]),
             y=self.to_symbol(identifier + [1]),
             z=self.to_symbol(identifier + [2]),
         )
 
-    def list_to_translation3(self, identifier):
-        return w.translation3(
+    def list_to_translation3(self, identifier) -> w.TransMatrix:
+        return w.TransMatrix.from_xyz(
             x=self.to_symbol(identifier + [0]),
             y=self.to_symbol(identifier + [1]),
             z=self.to_symbol(identifier + [2]),
         )
 
     def list_to_frame(self, identifier):
-        return w.Matrix(
+        return w.TransMatrix(
             [
                 [
                     self.to_symbol(identifier + [0, 0]),
@@ -360,33 +360,31 @@ class GodMap(object):
         )
 
     def pose_msg_to_frame(self, identifier):
-        return w.frame_quaternion(
-            x=self.to_symbol(identifier + ['position', 'x']),
-            y=self.to_symbol(identifier + ['position', 'y']),
-            z=self.to_symbol(identifier + ['position', 'z']),
-            qx=self.to_symbol(identifier + ['orientation', 'x']),
-            qy=self.to_symbol(identifier + ['orientation', 'y']),
-            qz=self.to_symbol(identifier + ['orientation', 'z']),
-            qw=self.to_symbol(identifier + ['orientation', 'w']),
-        )
+        p = w.Point3(x=self.to_symbol(identifier + ['position', 'x']),
+                     y=self.to_symbol(identifier + ['position', 'y']),
+                     z=self.to_symbol(identifier + ['position', 'z']))
+        q = w.Quaternion(x=self.to_symbol(identifier + ['orientation', 'x']),
+                         y=self.to_symbol(identifier + ['orientation', 'y']),
+                         z=self.to_symbol(identifier + ['orientation', 'z']),
+                         w=self.to_symbol(identifier + ['orientation', 'w']))
+        return w.TransMatrix.from_parts(p, q)
 
     def quaternion_msg_to_rotation(self, identifier):
-        return w.rotation_matrix_from_quaternion(
-            x=self.to_symbol(identifier + ['x']),
-            y=self.to_symbol(identifier + ['y']),
-            z=self.to_symbol(identifier + ['z']),
-            w=self.to_symbol(identifier + ['w']),
-        )
+        q = w.Quaternion(x=self.to_symbol(identifier + ['x']),
+                         y=self.to_symbol(identifier + ['y']),
+                         z=self.to_symbol(identifier + ['z']),
+                         w=self.to_symbol(identifier + ['w']), )
+        return q.to_rotation_matrix()
 
     def point_msg_to_point3(self, identifier):
-        return w.point3(
+        return w.Point3(
             x=self.to_symbol(identifier + ['x']),
             y=self.to_symbol(identifier + ['y']),
             z=self.to_symbol(identifier + ['z']),
         )
 
     def vector_msg_to_vector3(self, identifier):
-        return w.vector3(
+        return w.Vector3(
             x=self.to_symbol(identifier + ['x']),
             y=self.to_symbol(identifier + ['y']),
             z=self.to_symbol(identifier + ['z']),

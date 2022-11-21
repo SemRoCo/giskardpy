@@ -178,7 +178,7 @@ class SelfCollisionAvoidance(Goal):
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
-    def get_b_T_pb(self):
+    def get_b_T_pb(self) -> w.TransMatrix:
         return self.god_map.list_to_translation3(identifier.closest_point + ['get_self_collisions',
                                                                              (self.link_a, self.link_b),
                                                                              self.idx,
@@ -202,7 +202,7 @@ class SelfCollisionAvoidance(Goal):
 
         # b_T_a2 = self.get_fk_evaluated(self.link_b, self.link_a)
         b_T_a = self.get_fk(self.link_b, self.link_a)
-        pb_T_b = w.inverse_frame(self.get_b_T_pb())
+        pb_T_b = self.get_b_T_pb().inverse()
         a_P_pa = self.get_position_on_a_in_a()
 
         pb_V_n = self.get_contact_normal_in_b()

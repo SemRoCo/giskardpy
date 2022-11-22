@@ -115,7 +115,7 @@ class DependentJoint(Joint, ABC):
 class FixedJoint(Joint):
 
     def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
-                 parent_T_child: Optional[w.Matrix] = None):
+                 parent_T_child: Optional[w.Expression] = None):
         if parent_T_child is None:
             parent_T_child = w.eye(4)
         super().__init__(name, parent_link_name, child_link_name, parent_T_child)
@@ -244,7 +244,7 @@ class OneDofJoint(Joint, ABC):
     axis: Tuple[float, float, float]
 
     def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
-                 parent_T_child: w.Matrix,
+                 parent_T_child: w.Expression,
                  axis: Tuple[float, float, float], lower_limits, upper_limits):
         self.axis = axis
         self.lower_limits = lower_limits

@@ -35,7 +35,7 @@ class DiffDriveTangentialToPoint(Goal):
         map_P_base = w.position_of(map_T_base)
         map_V_base_to_center = map_P_center - map_P_base
         map_V_base_to_center = w.scale(map_V_base_to_center, 1)
-        map_V_up = w.Matrix([0, 0, 1, 0])
+        map_V_up = w.Expression([0, 0, 1, 0])
         map_V_tangent = w.cross(map_V_base_to_center, map_V_up)
         tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
         map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)

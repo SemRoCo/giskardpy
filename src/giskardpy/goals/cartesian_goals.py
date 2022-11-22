@@ -179,7 +179,7 @@ class CartesianPositionStraight(Goal):
         # x-axis
         tip_P_intermediate_error = w.save_division(tip_P_error, trans_error)[:3]
         # y- and z-axis
-        tip_P_intermediate_y = w.scale(w.Matrix(np.random.random((3,))), 1)
+        tip_P_intermediate_y = w.scale(w.Expression(np.random.random((3,))), 1)
         y = w.cross(tip_P_intermediate_error, tip_P_intermediate_y)
         z = w.cross(tip_P_intermediate_error, y)
         t_R_a = w.RotationMatrix.from_vectors(x=tip_P_intermediate_error, y=-z, z=y)

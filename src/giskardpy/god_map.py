@@ -309,7 +309,7 @@ class GodMap(object):
                     result.append(f(index))
             return result
 
-        return w.Matrix(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
+        return w.Expression(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
     def list_to_point3(self, identifier) -> w.Point3:
         return w.Point3(

@@ -142,7 +142,7 @@ class Goal(ABC):
         """
         return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
 
-    def get_parameter_as_symbolic_expression(self, name: str) -> Union[Union[w.Symbol, float], w.Matrix]:
+    def get_parameter_as_symbolic_expression(self, name: str) -> Union[Union[w.Symbol, float], w.Expression]:
         """
         :param name: name of a class attribute, e.g. self.muh
         :return: a symbol (or matrix of symbols) that refers to self.muh
@@ -151,7 +151,7 @@ class Goal(ABC):
             raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
         return self.god_map.to_expr(self._get_identifier() + [name])
 
-    def get_expr_velocity(self, expr: Union[Union[w.Symbol, float], w.Matrix]) -> Union[w.Symbol, float]:
+    def get_expr_velocity(self, expr: Union[Union[w.Symbol, float], w.Expression]) -> Union[w.Symbol, float]:
         """
         Creates an expressions that computes the total derivative of expr
         """
@@ -173,18 +173,18 @@ class Goal(ABC):
             position_symbols.extend(self.world._joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.velocity) for x in position_symbols]
 
-    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Matrix:
+    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:
         r_T_t = self.get_fk(root, tip)
         r_R_t = r_T_t.to_rotation()
         axis, angle = r_R_t.to_axis_angle()
         r_R_t_axis_angle = axis * angle
         r_P_t = r_T_t.position()
-        fk = w.Matrix([r_P_t[0],
-                       r_P_t[1],
-                       r_P_t[2],
-                       r_R_t_axis_angle[0],
-                       r_R_t_axis_angle[1],
-                       r_R_t_axis_angle[2]])
+        fk = w.Expression([r_P_t[0],
+                           r_P_t[1],
+                           r_P_t[2],
+                           r_R_t_axis_angle[0],
+                           r_R_t_axis_angle[1],
+                           r_R_t_axis_angle[2]])
         return self.get_expr_velocity(fk)
 
     def get_constraints(self) -> Tuple[Dict[str, Constraint],
@@ -340,7 +340,7 @@ class Goal(ABC):
         name = f'{self}/{name}'
         self._debug_expressions[name] = expr
 
-    def add_debug_matrix(self, name: str, matrix_expr: w.Matrix):
+    def add_debug_matrix(self, name: str, matrix_expr: w.Expression):
         """
         Calls add_debug_expr for a matrix.
         """
@@ -373,8 +373,8 @@ class Goal(ABC):
                             name=name)
 
     def add_point_goal_constraints(self,
-                                   frame_P_current: w.Matrix,
-                                   frame_P_goal: w.Matrix,
+                                   frame_P_current: w.Expression,
+                                   frame_P_goal: w.Expression,
                                    reference_velocity: Union[w.Symbol, float],
                                    weight: Union[w.Symbol, float],
                                    name: str = ''):
@@ -398,7 +398,7 @@ class Goal(ABC):
                                           f'{name}/z'])
 
     def add_translational_velocity_limit(self,
-                                         frame_P_current: w.Matrix,
+                                         frame_P_current: w.Expression,
                                          max_velocity: Union[w.Symbol, float],
                                          weight: Union[w.Symbol, float],
                                          max_violation: Union[w.Symbol, float] = 1e4,
@@ -423,8 +423,8 @@ class Goal(ABC):
                                      name_suffix=f'{name}/vel')
 
     def add_vector_goal_constraints(self,
-                                    frame_V_current: w.Matrix,
-                                    frame_V_goal: w.Matrix,
+                                    frame_V_current: w.Expression,
+                                    frame_V_goal: w.Expression,
                                     reference_velocity: Union[w.Symbol, float],
                                     weight: Union[w.Symbol, float] = WEIGHT_BELOW_CA,
                                     name: str = ''):

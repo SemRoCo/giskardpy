@@ -454,10 +454,10 @@ class A(Parent):
         J_vel = []
         J_err = []
         for order in range(self.order):
-            J_vel.append(w.jacobian(expressions=w.Matrix(self.get_velocity_constraint_expressions()),
+            J_vel.append(w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
                                     symbols=self.get_free_variable_symbols(order),
                                     order=1) * self.sample_period)
-            J_err.append(w.jacobian(expressions=w.Matrix(self.get_constraint_expressions()),
+            J_err.append(w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
                                     symbols=self.get_free_variable_symbols(order),
                                     order=1) * self.sample_period)
         jac_time = time() - t
@@ -848,17 +848,17 @@ class QPController:
 
         self._init_big_ass_M()
 
-        self._set_weights(w.Matrix(self.H.weights()))
+        self._set_weights(w.Expression(self.H.weights()))
         self._set_A_soft(self.A.A())
         lbA, ubA = self.bA()
-        self._set_lbA(w.Matrix(lbA))
-        self._set_ubA(w.Matrix(ubA))
+        self._set_lbA(w.Expression(lbA))
+        self._set_ubA(w.Expression(ubA))
         lb, ub = self.b()
-        self._set_lb(w.Matrix(lb))
-        self._set_ub(w.Matrix(ub))
+        self._set_lb(w.Expression(lb))
+        self._set_ub(w.Expression(ub))
         self.np_g = np.zeros(self.H.width)
         self.debug_names = list(sorted(self.debug_expressions.keys()))
-        self.debug_v = w.Matrix([self.debug_expressions[name] for name in self.debug_names])
+        self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
     @profile
     def _eval_debug_exprs(self, substitutions):

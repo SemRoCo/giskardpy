@@ -15,6 +15,81 @@ from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector
     pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix
 
 
+class TestSymbol:
+    def test_from_name(self):
+        s = w.Symbol('muh')
+        assert isinstance(s, w.Symbol)
+        assert str(s) == 'muh'
+
+    def test_simple_math(self):
+        s = w.Symbol('muh')
+        e = s + s
+        assert isinstance(e, w.Expression)
+        e = s - s
+        assert isinstance(e, w.Expression)
+        e = s * s
+        assert isinstance(e, w.Expression)
+        e = s / s
+        assert isinstance(e, w.Expression)
+        e = s ** s
+        assert isinstance(e, w.Expression)
+
+    def test_comparisons(self):
+        s = w.Symbol('muh')
+        e = s > s
+        assert isinstance(e, w.Expression)
+        e = s >= s
+        assert isinstance(e, w.Expression)
+        e = s < s
+        assert isinstance(e, w.Expression)
+        e = s <= s
+        assert isinstance(e, w.Expression)
+        e = s == s
+        assert isinstance(e, w.Expression)
+
+
+class TestMatrix:
+    def test_create(self):
+        m = w.Expression(np.eye(4))
+        w.Expression(w.Symbol('muh'))
+        w.Expression([1, 1])
+        w.Expression(1)
+        w.Expression([[1, 1], [2, 2]])
+        w.Expression(m)
+
+    def test_simple_math(self):
+        m = w.Expression([1, 1])
+        s = w.Symbol('muh')
+        e = m + s
+        e = m + 1
+        e = 1 + m
+        assert isinstance(e, w.Expression)
+        e = m - s
+        e = m - 1
+        e = 1 - m
+        assert isinstance(e, w.Expression)
+        e = m * s
+        e = m * 1
+        e = 1 * m
+        assert isinstance(e, w.Expression)
+        e = m / s
+        e = m / 1
+        e = 1 / m
+        assert isinstance(e, w.Expression)
+        e = m ** s
+        e = m ** 1
+        e = 1 ** m
+        assert isinstance(e, w.Expression)
+
+    def test_get_attr(self):
+        m = w.Expression(np.eye(4))
+        assert m[0, 0] == w.Expression(1)
+        assert m[1, 1] == w.Expression(1)
+        assert m[1, 0] == w.Expression(0)
+        assert isinstance(m[0, 0], w.Expression)
+        print(m.shape)
+
+
 class TestRotationMatrix(unittest.TestCase):
     def test_create_RotationMatrix(self):
         r = w.RotationMatrix.from_xyz_rpy(1, 2, 3)
@@ -169,7 +244,7 @@ class TestTransformationMatrix(unittest.TestCase):
     @given(st.integers(min_value=1, max_value=10))
     def test_matrix(self, x_dim):
         data = list(range(x_dim))
-        m = w.Matrix(data)
+        m = w.Expression(data)
         self.assertEqual(m[0], 0)
         self.assertEqual(m[-1], x_dim - 1)
 
@@ -177,7 +252,7 @@ class TestTransformationMatrix(unittest.TestCase):
            st.integers(min_value=1, max_value=10))
     def test_matrix2(self, x_dim, y_dim):
         data = [[i + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
-        m = w.Matrix(data)
+        m = w.Expression(data)
         self.assertEqual(float(m[0, 0]), 0)
         self.assertEqual(float(m[x_dim - 1, y_dim - 1]), (x_dim * y_dim) - 1)
 
@@ -192,7 +267,7 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[1, 3] = y
         r2[2, 3] = z
         r = w.compile_and_execute(lambda x, y, z, axis, angle: w.TransMatrix.from_parts(w.Point3(x, y, z),
-                                                                              (axis, angle)),
+                                                                                        (axis, angle)),
                                   [x, y, z, axis, angle])
         np.testing.assert_array_almost_equal(r, r2)
 
@@ -370,7 +445,7 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(s, w.Symbol)
 
     def test_free_symbols(self):
-        m = w.Matrix(w.var('a b c d'))
+        m = w.Expression(w.var('a b c d'))
         assert len(w.free_symbols(m)) == 4
         a = w.Symbol('a')
         assert w.equivalent(a, w.free_symbols(a)[0])
@@ -378,9 +453,9 @@ class TestCASWrapper(unittest.TestCase):
     def test_jacobian(self):
         a = w.Symbol('a')
         b = w.Symbol('b')
-        m = w.Matrix([a + b, a ** 2, b ** 2])
+        m = w.Expression([a + b, a ** 2, b ** 2])
         jac = w.jacobian(m, [a, b])
-        expected = w.Matrix([[1, 1], [2 * a, 0], [0, 2 * b]])
+        expected = w.Expression([[1, 1], [2 * a, 0], [0, 2 * b]])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
@@ -388,9 +463,9 @@ class TestCASWrapper(unittest.TestCase):
     def test_jacobian_order2(self):
         a = w.Symbol('a')
         b = w.Symbol('b')
-        m = w.Matrix([a + b, a ** 2 + b, a ** 3 + b ** 2])
+        m = w.Expression([a + b, a ** 2 + b, a ** 3 + b ** 2])
         jac = w.jacobian(m, [a, b], order=2)
-        expected = w.Matrix([[0, 0], [2, 0], [6 * a, 2]])
+        expected = w.Expression([[0, 0], [2, 0], [6 * a, 2]])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
@@ -414,7 +489,7 @@ class TestCASWrapper(unittest.TestCase):
         assert result[2, 0] == 0
         assert result[2, 1] == 0
         assert result[2, 2] == 3
-        assert w.equivalent(w.diag(w.Matrix([1, 2, 3])), w.diag([1, 2, 3]))
+        assert w.equivalent(w.diag(w.Expression([1, 2, 3])), w.diag([1, 2, 3]))
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
@@ -462,35 +537,31 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_greater_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
-            np.float(if_result if a >= b else else_result), places=7)
+        self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
+                               np.float(if_result if a >= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_less_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
-            np.float(if_result if a <= b else else_result), places=7)
+        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
+                               np.float(if_result if a <= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq_zero(self, condition, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
-            np.float(if_result if condition == 0 else else_result), places=7)
+        self.assertAlmostEqual(w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
+                               np.float(if_result if condition == 0 else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq(self, a, b, if_result, else_result):
-        self.assertTrue(np.isclose(
-            w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
-            np.float(if_result if a == b else else_result)))
+        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
+                                   np.float(if_result if a == b else else_result)))
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases(self, a):
@@ -507,9 +578,8 @@ class TestCASWrapper(unittest.TestCase):
                     return if_result
             return else_result
 
-        self.assertTrue(np.isclose(
-            w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
-            np.float(reference(a, b_result_cases, 0))))
+        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
+                                   np.float(reference(a, b_result_cases, 0))))
 
     @given(float_no_nan_no_inf())
     def test_if_less_eq_cases(self, a):
@@ -530,44 +600,6 @@ class TestCASWrapper(unittest.TestCase):
 
         self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq_cases, [a, b_result_cases, 0]),
                                np.float(reference(a, b_result_cases, 0)))
-
-    #
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_greater_zero(self, condition, if_result, else_result):
-    #     self.assertAlmostEqual(
-    #         w.compile_and_execute(w.diffable_if_greater_zero, [condition, if_result, else_result]),
-    #         np.float(if_result if condition > 0 else else_result), places=7)
-
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_greater_eq_zero(self, condition, if_result, else_result):
-    #     self.assertAlmostEqual(
-    #         w.compile_and_execute(w.diffable_if_greater_eq_zero, [condition, if_result, else_result]),
-    #         np.float(if_result if condition >= 0 else else_result), places=7)
-    #
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_greater_eq(self, a, b, if_result, else_result):
-    #     r2 = np.float(if_result if a >= b else else_result)
-    #     self.assertAlmostEqual(compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
-    #                            r2, places=7)
-    #
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_eq_zero(self, condition, if_result, else_result):
-    #     r1 = np.float(w.if_eq_zero(condition, if_result, else_result))
-    #     r2 = np.float(if_result if condition == 0 else else_result)
-    #     self.assertTrue(np.isclose(r1, r2, atol=1.e-7), msg='{} if {} == 0 else {} => {}'.format(if_result, condition,
-    #                                                                                              else_result,
-    #                                                                                              r1))
-    #     self.assertAlmostEqual(compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
-    #                            r1, places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -594,7 +626,7 @@ class TestCASWrapper(unittest.TestCase):
             w.compile_and_execute(w.cross, [u, v])[:3],
             np.cross(u, v))
 
-    @given(st.lists(float_no_nan_no_inf()))
+    @given(st.lists(float_no_nan_no_inf(), min_size=1))
     def test_norm(self, v):
         actual = w.compile_and_execute(w.norm, [v])
         expected = np.linalg.norm(v)
@@ -618,7 +650,7 @@ class TestCASWrapper(unittest.TestCase):
         u = np.array(u, ndmin=2)
         v = np.array(v, ndmin=2)
         result = w.compile_and_execute(w.dot, [u, v.T])
-        if not np.isnan(result):
+        if not np.isnan(result) and not np.isinf(result):
             self.assertTrue(np.isclose(result, np.dot(u, v.T)))
 
     @given(unit_vector(4))

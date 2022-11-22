@@ -9,6 +9,7 @@ import numpy as np
 import rospy
 from casadi import sign, cos, sin, sqrt, atan2, acos
 from geometry_msgs.msg import PoseStamped, Pose
+import geometry_msgs.msg as geometry_msgs
 from numpy import pi
 
 from giskardpy.utils import logging
@@ -19,6 +20,13 @@ class Symbol(ca.SX):
     def __init__(self, name):
         s = ca.SX.sym(name)
         super().__init__(s)
+
+
+class Expression(Symbol):
+    def __init__(self, data):
+        if data.shape != (1, 1):
+            raise ValueError(f'Symbol can not be created from {data.shape} shaped data.')
+        super(Symbol, self).__init__(data)
 
 
 class Matrix(ca.SX):
@@ -51,6 +59,7 @@ class Matrix(ca.SX):
 
     def __getattr__(self, item):
         return object.__getattribute__(self, item)
+
 
 class TransMatrix(Matrix):
     def __init__(self, data: Optional[Union[Iterable[Union[Symbol, float]],
@@ -134,7 +143,7 @@ class TransMatrix(Matrix):
             return Vector3.from_matrix(result)
         return self.__class__(result)
 
-    def inverse(self) -> Matrix:
+    def inverse(self) -> TransMatrix:
         inv = eye(4)
         inv[:3, :3] = self[:3, :3].T
         inv[:3, 3] = dot(-inv[:3, :3], self[:3, 3])
@@ -224,6 +233,16 @@ class RotationMatrix(TransMatrix):
                     [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
                     [0, 0, 0, 1]])
 
+    @classmethod
+    def from_ros_msg(cls, msg: Union[geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped]) -> TransMatrix:
+        if isinstance(msg, geometry_msgs.QuaternionStamped):
+            msg = msg.quaternion
+        q = Quaternion(x=msg.x,
+                       y=msg.y,
+                       z=msg.z,
+                       w=msg.w)
+        return cls.from_quaternion(q)
+
     def to_axis_angle(self) -> Tuple[Vector3, Union[Symbol, float]]:
         return self.to_quaternion().to_axis_angle()
 
@@ -260,10 +279,11 @@ class RotationMatrix(TransMatrix):
             x = scale(x, 1)
         else:
             raise AttributeError(f'only one vector can be None')
-        R = Matrix([[x[0], y[0], z[0], 0],
-                    [x[1], y[1], z[1], 0],
-                    [x[2], y[2], z[2], 0],
-                    [0, 0, 0, 1]])
+        R = cls([[x[0], y[0], z[0], 0],
+                 [x[1], y[1], z[1], 0],
+                 [x[2], y[2], z[2], 0],
+                 [0, 0, 0, 1]])
+        R.normalize()
         return R
 
     @classmethod
@@ -286,6 +306,9 @@ class RotationMatrix(TransMatrix):
                              [0, 0, 1, 0],
                              [0, 0, 0, 1]])
         return cls(dot(rz, ry, rx))
+
+    def inverse(self) -> RotationMatrix:
+        return RotationMatrix(self.T)
 
     def to_rpy(self) -> Tuple[Union[Symbol, float], Union[Symbol, float], Union[Symbol, float]]:
         """
@@ -311,6 +334,13 @@ class RotationMatrix(TransMatrix):
     def to_quaternion(self) -> Quaternion:
         return Quaternion.from_rotation_matrix(self)
 
+    def normalize(self):
+        """Scales each of the axes to the length of one."""
+        scale_v = 1.0
+        self[:3, 0] = scale(self[:3, 0], scale_v)
+        self[:3, 1] = scale(self[:3, 1], scale_v)
+        self[:3, 2] = scale(self[:3, 2], scale_v)
+
 
 class Point3(Matrix):
     def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
@@ -318,7 +348,10 @@ class Point3(Matrix):
 
     @classmethod
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Matrix]) -> Point3:
-        return cls(m[0], m[1], m[2])
+        try:
+            return cls(m[0], m[1], m[2])
+        except Exception as e:
+            pass
 
     @property
     def x(self):
@@ -394,6 +427,19 @@ class Vector3(Matrix):
     @z.setter
     def z(self, value):
         self[2] = value
+
+    @overload
+    def dot(self, other: Vector3) -> Symbol:
+        ...
+
+    @overload
+    def dot(self, other: Point3) -> Symbol:
+        ...
+
+    def dot(self, other):
+        if isinstance(other, Vector3) or isinstance(other, Point3):
+            return Expression(dot(self[:3].T, other[:3])[0])
+        return dot(self, other)
 
     def __add__(self, other: Union[Point3, Vector3]):
         result = super().__add__(other)
@@ -688,7 +734,7 @@ def ros_msg_to_matrix(msg: rospy.Message) -> Matrix:
     return Matrix(msg_to_homogeneous_matrix(msg))
 
 
-def matrix_to_list(m: Matrix) -> List[Union[Symbol, float]]:
+def matrix_to_list(m: Union[Matrix, Iterable[Symbol]]) -> List[Union[Symbol, float]]:
     try:
         len(m)
         return m
@@ -903,7 +949,16 @@ def scale(v: Matrix, a: Union[Symbol, float]) -> Matrix:
 
 
 def dot(*matrices: Matrix) -> Matrix:
-    return ca.mtimes(matrices)
+    result = ca.mtimes(matrices)
+    if isinstance(matrices[-1], TransMatrix):
+        return TransMatrix(result)
+    elif isinstance(matrices[-1], Vector3):
+        return Vector3.from_matrix(result)
+    elif isinstance(matrices[-1], Point3):
+        return Point3.from_matrix(result)
+    elif isinstance(matrices[-1], RotationMatrix):
+        return RotationMatrix(result)
+    return result
 
 
 def eye(size: int) -> Union[Symbol, float]:
@@ -947,15 +1002,6 @@ def normalize_axis_angle(axis: Matrix, angle: Union[Symbol, float]) -> Tuple[Mat
     axis = if_less(angle, 0, -axis, axis)
     angle = abs(angle)
     return axis, angle
-
-
-def normalize_rotation_matrix(R: Union[Symbol, float]) -> Union[Symbol, float]:
-    """Scales each of the axes to the length of one."""
-    scale_v = 1.0
-    R[:3, 0] = scale(R[:3, 0], scale_v)
-    R[:3, 1] = scale(R[:3, 1], scale_v)
-    R[:3, 2] = scale(R[:3, 2], scale_v)
-    return R
 
 
 def axis_angle_from_rpy(roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
@@ -1295,7 +1341,9 @@ def to_str(expression: Union[Symbol, float]) -> str:
     pass
 
 
-def total_derivative(expr: Union[Symbol, Matrix], symbols: Matrix, symbols_dot: Matrix) \
+def total_derivative(expr: Union[Symbol, Matrix],
+                     symbols: Union[Matrix, Iterable[Symbol]],
+                     symbols_dot: Union[Matrix, Iterable[Symbol]]) \
         -> Union[Symbol, Matrix]:
     expr_jacobian = jacobian(expr, symbols)
     last_velocities = Matrix(symbols_dot)

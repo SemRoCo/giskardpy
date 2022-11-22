@@ -84,10 +84,10 @@ class ExternalCollisionAvoidance(Goal):
 
         map_T_a = self.get_fk(self.root, self.link_name)
 
-        map_P_pa = w.dot(map_T_a, a_P_pa)
+        map_P_pa = map_T_a.dot(a_P_pa)
 
         # the position distance is not accurate, but the derivative is still correct
-        dist = w.dot(map_V_n.T, map_P_pa)[0]
+        dist = map_V_n.dot(map_P_pa)
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
@@ -207,9 +207,9 @@ class SelfCollisionAvoidance(Goal):
 
         pb_V_n = self.get_contact_normal_in_b()
 
-        pb_P_pa = w.dot(pb_T_b, b_T_a, a_P_pa)
+        pb_P_pa = pb_T_b.dot(b_T_a).dot(a_P_pa)
 
-        dist = w.dot(pb_V_n.T, pb_P_pa)[0]
+        dist = pb_V_n.dot(pb_P_pa)
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
         weight = w.save_division(weight,  # divide by number of active repeller per link
@@ -329,8 +329,8 @@ class CollisionAvoidanceHint(Goal):
 
         # penetration_distance = threshold - actual_distance_capped
 
-        root_P_a = w.position_of(root_T_a)
-        expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
+        root_P_a = root_T_a.position()
+        expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)
         self.add_constraint(name='avoidance_hint',

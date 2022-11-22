@@ -26,7 +26,6 @@ class CartesianPosition(Goal):
         super().__init__()
         if reference_velocity is None:
             reference_velocity = 0.2
-        self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
         if isinstance(goal_point, PoseStamped):
@@ -37,9 +36,11 @@ class CartesianPosition(Goal):
             goal_point = p
         self.root_link = self.world.get_link_name(root_link, root_group)
         self.tip_link = self.world.get_link_name(tip_link, tip_group)
-        if self.root_link2 is not None:
+        if root_link2 is not None:
+            self.root_link2 = self.world.get_link_name(root_link2, root_group)
             self.goal_point = self.transform_msg(self.root_link2, goal_point)
         else:
+            self.root_link2 = None
             self.goal_point = self.transform_msg(self.root_link, goal_point)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
@@ -55,7 +56,7 @@ class CartesianPosition(Goal):
 
     def make_constraints(self):
         r_P_g = w.ros_msg_to_matrix(self.goal_point)
-        r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        r_P_c = self.get_fk(self.root_link, self.tip_link).position()
         if self.root_link2 is not None:
             root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
             r_P_c = w.dot(root_link2_T_root_link, r_P_c)
@@ -85,7 +86,6 @@ class CartesianOrientation(Goal):
         See CartesianPose.
         """
         super().__init__()
-        self.root_link2 = root_link2
         if reference_velocity is None:
             reference_velocity = max_velocity
         if reference_velocity is None:
@@ -99,9 +99,11 @@ class CartesianOrientation(Goal):
             goal_orientation = q
         self.root_link = self.world.get_link_name(root_link, root_group)
         self.tip_link = self.world.get_link_name(tip_link, tip_group)
-        if self.root_link2 is not None:
+        if root_link2 is not None:
+            self.root_link2 = self.world.get_link_name(root_link2, root_group)
             self.goal_orientation = self.transform_msg(self.root_link2, goal_orientation)
         else:
+            self.root_link2 = None
             self.goal_orientation = self.transform_msg(self.root_link, goal_orientation)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
@@ -116,15 +118,15 @@ class CartesianOrientation(Goal):
         #                                                        **kwargs))
 
     def make_constraints(self):
-        r_R_g = w.ros_msg_to_matrix(self.goal_orientation)
-        r_R_c = self.get_fk(self.root_link, self.tip_link)
+        r_R_g = w.RotationMatrix.from_ros_msg(self.goal_orientation)
+        r_R_c = self.get_fk(self.root_link, self.tip_link).to_rotation()
         if self.root_link2 is not None:
-            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link2)
+            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link2).to_rotation()
             root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
             # self.add_debug_matrix('root_link2_T_root_link', root_link2_T_root_link)
-            r_R_c = w.dot(root_link2_T_root_link, r_R_c)
+            r_R_c = root_link2_T_root_link.dot(r_R_c)
         else:
-            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link)
+            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link).to_rotation()
         # self.add_debug_expr('trans', w.norm(r_P_c))
         self.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=r_R_g,
@@ -164,9 +166,9 @@ class CartesianPositionStraight(Goal):
 
     def make_constraints(self):
         root_P_goal = w.ros_msg_to_matrix(self.goal_point)
-        root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        root_P_tip = self.get_fk(self.root_link, self.tip_link).position()
         t_T_r = self.get_fk(self.tip_link, self.root_link)
-        tip_P_goal = w.dot(t_T_r, root_P_goal)
+        tip_P_goal = t_T_r.dot(root_P_goal)
 
         # Create rotation matrix, which rotates the tip link frame
         # such that its x-axis shows towards the goal position.
@@ -180,17 +182,13 @@ class CartesianPositionStraight(Goal):
         tip_P_intermediate_y = w.scale(w.Matrix(np.random.random((3,))), 1)
         y = w.cross(tip_P_intermediate_error, tip_P_intermediate_y)
         z = w.cross(tip_P_intermediate_error, y)
-        t_R_a = w.Matrix([[tip_P_intermediate_error[0], -z[0], y[0], 0],
-                          [tip_P_intermediate_error[1], -z[1], y[1], 0],
-                          [tip_P_intermediate_error[2], -z[2], y[2], 0],
-                          [0, 0, 0, 1]])
-        t_R_a = w.normalize_rotation_matrix(t_R_a)
+        t_R_a = w.RotationMatrix.from_vectors(x=tip_P_intermediate_error, y=-z, z=y)
 
         # Apply rotation matrix on the fk of the tip link
-        a_T_t = w.dot(w.inverse_frame(t_R_a),
-                      self.get_fk_evaluated(self.tip_link, self.root_link),
-                      self.get_fk(self.root_link, self.tip_link))
-        expr_p = w.position_of(a_T_t)
+        a_T_t = t_R_a.inverse().dot(
+            self.get_fk_evaluated(self.tip_link, self.root_link)).dot(
+            self.get_fk(self.root_link, self.tip_link))
+        expr_p = a_T_t.position()
         dist = w.norm(root_P_goal - root_P_tip)
 
         # self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
@@ -283,6 +281,7 @@ class DiffDriveBaseGoal(Goal):
 
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
+                 root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  always_forward: bool = False):
         """
         Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
@@ -307,8 +306,8 @@ class DiffDriveBaseGoal(Goal):
             pointing_axis.header.frame_id = tip_link
             pointing_axis.vector.x = 1
         self.weight = weight
-        self.map = root_link
-        self.base_footprint = tip_link
+        self.map = self.world.get_link_name(root_link, root_group)
+        self.base_footprint = self.world.get_link_name(tip_link, tip_group)
         self.goal_pose = self.transform_msg(self.map, goal_pose)
         self.goal_pose.pose.position.z = 0
         diff_drive_joints = [v for k, v in self.world._joints.items() if isinstance(v, DiffDrive)]
@@ -324,37 +323,37 @@ class DiffDriveBaseGoal(Goal):
             self.base_footprint_V_pointing_axis.vector.z = 1
 
     def make_constraints(self):
-        map_T_base_current = self.world.compute_fk_np(self.map, self.base_footprint)
-        map_R_base_current = w.rotation_of(map_T_base_current)
-        axis_start, angle_start = w.axis_angle_from_matrix(map_R_base_current)
+        map_T_base_current = w.TransMatrix(self.world.compute_fk_np(self.map, self.base_footprint))
+        map_R_base_current = map_T_base_current.to_rotation()
+        axis_start, angle_start = map_R_base_current.to_axis_angle()
         angle_start = w.if_greater_zero(axis_start[2], angle_start, -angle_start)
 
         map_T_base_footprint = self.get_fk(self.map, self.base_footprint)
-        map_P_base_footprint = w.position_of(map_T_base_footprint)
-        map_R_base_footprint = w.rotation_of(map_T_base_footprint)
-        map_T_base_footprint_goal = w.ros_msg_to_matrix(self.goal_pose)
-        map_P_base_footprint_goal = w.position_of(map_T_base_footprint_goal)
-        map_R_base_footprint_goal = w.rotation_of(map_T_base_footprint_goal)
-        base_footprint_V_pointing_axis = w.ros_msg_to_matrix(self.base_footprint_V_pointing_axis)
+        map_P_base_footprint = map_T_base_footprint.to_rotation()
+        map_R_base_footprint = map_T_base_footprint.to_rotation()
+        map_T_base_footprint_goal = w.TransMatrix.from_ros_msg(self.goal_pose)
+        map_P_base_footprint_goal = map_T_base_footprint_goal.position()
+        map_R_base_footprint_goal = map_T_base_footprint_goal.to_rotation()
+        # base_footprint_V_pointing_axis = w.ros_msg_to_matrix(self.base_footprint_V_pointing_axis)
 
         map_V_goal_x = map_P_base_footprint_goal - map_P_base_footprint
         distance = w.norm(map_V_goal_x)
 
         # map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
         # map_goal_angle1 = w.angle_between_vector(map_V_goal_x, map_V_pointing_axis)
-        axis, map_current_angle = w.axis_angle_from_matrix(map_R_base_footprint)
+        axis, map_current_angle = map_R_base_footprint.to_axis_angle()
         map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
         # rot_vel_symbol = self.joint.rot_vel.get_symbol(0)
         # map_current_angle = w.angle_between_vector(map_V_pointing_axis, w.vector3(1, 0, 0))
         # map_current_angle = w.if_greater_zero(map_V_pointing_axis[1], map_current_angle, -map_current_angle)
 
-        axis2, map_goal_angle2 = w.axis_angle_from_matrix(map_R_base_footprint_goal)
+        axis2, map_goal_angle2 = map_R_base_footprint_goal.to_axis_angle()
         map_goal_angle2 = w.if_greater_zero(axis2[2], map_goal_angle2, -map_goal_angle2)
         final_rotation_error = w.shortest_angular_distance(map_current_angle, map_goal_angle2)
 
-        map_R_goal = w.rotation_matrix_from_vectors(x=map_V_goal_x, y=None, z=w.vector3(0, 0, 1))
+        map_R_goal = w.RotationMatrix.from_vectors(x=map_V_goal_x, y=None, z=w.Vector3(0, 0, 1))
 
-        map_goal_angle_direction_f = w.angle_from_matrix(map_R_goal, lambda axis: axis[2])
+        map_goal_angle_direction_f = map_R_goal.to_angle(lambda axis: axis[2])
 
         # map_goal_angle1_f = w.angle_between_vector(map_V_goal_x, w.vector3(1, 0, 0))
         map_goal_angle_direction_b = w.if_less_eq(map_goal_angle_direction_f, 0,
@@ -495,7 +494,7 @@ class TranslationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_P_c = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        r_P_c = self.get_fk(self.root_link, self.tip_link).position()
         # self.add_debug_expr('limit', -self.max_velocity)
         if not self.hard:
             self.add_translational_velocity_limit(frame_P_current=r_P_c,
@@ -509,7 +508,7 @@ class TranslationVelocityLimit(Goal):
 
     def __str__(self):
         s = super(TranslationVelocityLimit, self).__str__()
-        return '{}/{}/{}'.format(s, self.root_link, self.tip_link)
+        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class RotationVelocityLimit(Goal):
@@ -528,7 +527,7 @@ class RotationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_R_c = w.rotation_of(self.get_fk(self.root_link, self.tip_link))
+        r_R_c = self.get_fk(self.root_link, self.tip_link).position()
         if self.hard:
             self.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,

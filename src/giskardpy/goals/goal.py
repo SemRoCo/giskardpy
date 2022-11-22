@@ -59,7 +59,8 @@ class Goal(ABC):
         Tell Giskard to check this collision, even if it got disabled through other means such as allow_all_collisions.
         :param link_a:
         :param link_b:
-        :param distance: distance threshold for the collision check. Only distances smaller than this value can be detected.
+        :param distance: distance threshold for the collision check. Only distances smaller than this value can be
+                            detected.
         """
         if self.world.link_order(link_a, link_b):
             key = (link_a, link_b)
@@ -107,7 +108,7 @@ class Goal(ABC):
             except UnknownGroupException:
                 pass
             return self.world.transform_msg(target_frame, msg)
-        except KeyError as e:
+        except KeyError:
             return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
     def get_joint_position_symbol(self, joint_name: PrefixName) -> Union[w.Symbol, float]:
@@ -128,13 +129,13 @@ class Goal(ABC):
     def get_sampling_period_symbol(self) -> Union[w.Symbol, float]:
         return self.god_map.to_symbol(identifier.sample_period)
 
-    def get_fk(self, root: PrefixName, tip: PrefixName) -> w.Matrix:
+    def get_fk(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
         """
         return self.world.compose_fk_expression(root, tip)
 
-    def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> w.Matrix:
+    def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
         This means that the derivative towards the joint symbols will be 0.
@@ -174,10 +175,10 @@ class Goal(ABC):
 
     def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Matrix:
         r_T_t = self.get_fk(root, tip)
-        r_R_t = w.rotation_of(r_T_t)
-        axis, angle = w.axis_angle_from_matrix(r_R_t)
+        r_R_t = r_T_t.to_rotation()
+        axis, angle = r_R_t.to_axis_angle()
         r_R_t_axis_angle = axis * angle
-        r_P_t = w.position_of(r_T_t)
+        r_P_t = r_T_t.position()
         fk = w.Matrix([r_P_t[0],
                        r_P_t[1],
                        r_P_t[2],
@@ -186,7 +187,9 @@ class Goal(ABC):
                        r_R_t_axis_angle[2]])
         return self.get_expr_velocity(fk)
 
-    def get_constraints(self) -> Tuple[Dict[str, Constraint], Dict[str, VelocityConstraint], Dict[str, Union[w.Symbol, float]]]:
+    def get_constraints(self) -> Tuple[Dict[str, Constraint],
+                                       Dict[str, VelocityConstraint],
+                                       Dict[str, Union[w.Symbol, float]]]:
         self._constraints = OrderedDict()
         self._velocity_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
@@ -256,7 +259,8 @@ class Goal(ABC):
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error and normalize the weight, will not be strictly enforced.
+        :param reference_velocity: used by Giskard to limit the error and normalize the weight, will not be strictly
+                                    enforced.
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
         :param weight:
@@ -451,9 +455,9 @@ class Goal(ABC):
                                           f'{name}/trans/z'])
 
     def add_rotation_goal_constraints(self,
-                                      frame_R_current: w.Matrix,
-                                      frame_R_goal: w.Matrix,
-                                      current_R_frame_eval: w.Matrix,
+                                      frame_R_current: w.RotationMatrix,
+                                      frame_R_goal: w.RotationMatrix,
+                                      current_R_frame_eval: w.RotationMatrix,
                                       reference_velocity: Union[w.Symbol, float],
                                       weight: Union[w.Symbol, float],
                                       name: str = ''):
@@ -468,12 +472,12 @@ class Goal(ABC):
         :param weight:
         :param name:
         """
-        hack = w.rotation_matrix_from_axis_angle((0, 0, 1), 0.0001)
-        frame_R_current = w.dot(frame_R_current, hack)  # hack to avoid singularity
-        tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(current_R_frame_eval, frame_R_current))
-        tip_R_goal = w.dot(current_R_frame_eval, frame_R_goal)
+        hack = w.RotationMatrix.from_axis_angle(w.Vector3(0, 0, 1), 0.0001)
+        frame_R_current = frame_R_current.dot(hack)  # hack to avoid singularity
+        tip_Q_tipCurrent = current_R_frame_eval.dot(frame_R_current).to_quaternion()
+        tip_R_goal = current_R_frame_eval.dot(frame_R_goal)
 
-        tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
+        tip_Q_goal = tip_R_goal.to_quaternion()
 
         tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
 
@@ -489,7 +493,7 @@ class Goal(ABC):
                                           f'{name}/rot/z'])
 
     def add_rotational_velocity_limit(self,
-                                      frame_R_current: w.Matrix,
+                                      frame_R_current: w.RotationMatrix,
                                       max_velocity: Union[w.Symbol, float],
                                       weight: Union[w.Symbol, float],
                                       max_violation: Union[w.Symbol, float] = 1e4,
@@ -503,15 +507,15 @@ class Goal(ABC):
         :param max_violation:
         :param name:
         """
-        root_Q_tipCurrent = w.quaternion_from_matrix(frame_R_current)
-        angle_error = w.quaternion_angle(root_Q_tipCurrent)
+        root_Q_tipCurrent = frame_R_current.to_quaternion()
+        angle_error = root_Q_tipCurrent.to_axis_angle()[1]
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
                                      lower_velocity_limit=-max_velocity,
                                      weight=weight,
                                      task_expression=angle_error,
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
-                                     name_suffix='{}/q/vel'.format(name),
+                                     name_suffix=f'{name}/q/vel',
                                      velocity_limit=max_velocity)
 
 

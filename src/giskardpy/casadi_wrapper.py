@@ -1,7 +1,4 @@
 from __future__ import annotations
-import errno
-import os
-import pickle
 from typing import List, Tuple, Union, Callable, Iterable, Optional, overload, Any
 
 import casadi as ca
@@ -11,7 +8,6 @@ from geometry_msgs.msg import PoseStamped, Pose
 import geometry_msgs.msg as geometry_msgs
 from numpy import pi
 
-from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
 
 
@@ -173,13 +169,19 @@ class Expression(Symbol):
                     for j in range(self.shape[1]):
                         try:
                             self[i, j] = data[i][j]
-                        except:
+                        except Exception:
                             self[i, j] = data[i, j]
                 else:
                     if isinstance(data[i], Symbol):
                         self[i] = data[i].s
                     else:
                         self[i] = data[i]
+
+    def to_list(self) -> List[Expression]:
+        return [self[i] for i in range(self.shape[0])]
+
+    def __len__(self):
+        return self.shape[0] + self.shape[1]
 
     def __getitem__(self, item):
         return Expression(self.s[item])
@@ -197,9 +199,12 @@ class Expression(Symbol):
         str_params = [str(x) for x in parameters]
         try:
             f = ca.Function('f', [Expression(parameters).s], [ca.densify(self.s)])
-        except:
+        except Exception:
             f = ca.Function('f', [Expression(parameters).s], ca.densify(self.s))
         return CompiledFunction(str_params, f, self.shape)
+
+    def evaluate(self):
+        return ca.evalf(self.s)
 
     @property
     def T(self):
@@ -263,7 +268,7 @@ class TransMatrix(Expression):
         elif len(rotation) == 2:
             a_R_b = RotationMatrix.from_axis_angle(rotation[0], rotation[1])
         elif rotation is not None:
-            a_R_b = RotationMatrix.from_xyz_rpy(rotation[0], rotation[1], rotation[2])
+            a_R_b = RotationMatrix.from_rpy(rotation[0], rotation[1], rotation[2])
         else:
             a_R_b = TransMatrix()
         return a_T_b.dot(a_R_b)
@@ -289,7 +294,7 @@ class TransMatrix(Expression):
         return self.__class__(result)
 
     def inverse(self) -> TransMatrix:
-        inv = eye(4)
+        inv = TransMatrix()
         inv[:3, :3] = self[:3, :3].T
         inv[:3, 3] = dot(-inv[:3, :3], self[:3, 3])
         return self.__class__(inv)
@@ -299,7 +304,7 @@ class TransMatrix(Expression):
                      roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
             -> TransMatrix:
         a_T_b = TransMatrix.from_xyz(x, y, z)
-        a_R_b = RotationMatrix.from_xyz_rpy(roll, pitch, yaw)
+        a_R_b = RotationMatrix.from_rpy(roll, pitch, yaw)
         return cls(dot(a_T_b, a_R_b))
 
     @classmethod
@@ -316,7 +321,7 @@ class TransMatrix(Expression):
         """
         :return: sets the rotation part of a frame to identity
         """
-        r = eye(4)
+        r = TransMatrix()
         r[0, 3] = self[0, 3]
         r[1, 3] = self[1, 3]
         r[2, 3] = self[2, 3]
@@ -342,8 +347,8 @@ class RotationMatrix(TransMatrix):
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
         https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
         """
-        ct = ca.cos(angle)
-        st = ca.sin(angle)
+        ct = cos(angle)
+        st = sin(angle)
         vt = 1 - ct
         m_vt_0 = vt * axis[0]
         m_vt_1 = vt * axis[1]
@@ -388,7 +393,7 @@ class RotationMatrix(TransMatrix):
                        w=msg.w)
         return cls.from_quaternion(q)
 
-    def to_axis_angle(self) -> Tuple[Vector3, Union[Symbol, float]]:
+    def to_axis_angle(self) -> Tuple[Vector3, Expression]:
         return self.to_quaternion().to_axis_angle()
 
     def to_angle(self, hint: Callable) -> Symbol:
@@ -432,22 +437,22 @@ class RotationMatrix(TransMatrix):
         return R
 
     @classmethod
-    def from_xyz_rpy(cls, roll: Union[Symbol, float], pitch: Union[Symbol, float],
-                     yaw: Union[Symbol, float]) -> Expression:
+    def from_rpy(cls, roll: Union[Symbol, float], pitch: Union[Symbol, float],
+                 yaw: Union[Symbol, float]) -> Expression:
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
         """
         rx = RotationMatrix([[1, 0, 0, 0],
-                             [0, ca.cos(roll), -ca.sin(roll), 0],
-                             [0, ca.sin(roll), ca.cos(roll), 0],
+                             [0, cos(roll), -sin(roll), 0],
+                             [0, sin(roll), cos(roll), 0],
                              [0, 0, 0, 1]])
-        ry = RotationMatrix([[ca.cos(pitch), 0, ca.sin(pitch), 0],
+        ry = RotationMatrix([[cos(pitch), 0, sin(pitch), 0],
                              [0, 1, 0, 0],
-                             [-ca.sin(pitch), 0, ca.cos(pitch), 0],
+                             [-sin(pitch), 0, cos(pitch), 0],
                              [0, 0, 0, 1]])
-        rz = RotationMatrix([[ca.cos(yaw), -ca.sin(yaw), 0, 0],
-                             [ca.sin(yaw), ca.cos(yaw), 0, 0],
+        rz = RotationMatrix([[cos(yaw), -sin(yaw), 0, 0],
+                             [sin(yaw), cos(yaw), 0, 0],
                              [0, 0, 1, 0],
                              [0, 0, 0, 1]])
         return cls(dot(rz, ry, rx))
@@ -455,7 +460,7 @@ class RotationMatrix(TransMatrix):
     def inverse(self) -> RotationMatrix:
         return RotationMatrix(self.T)
 
-    def to_rpy(self) -> Tuple[Union[Symbol, float], Union[Symbol, float], Union[Symbol, float]]:
+    def to_rpy(self) -> Tuple[Expression, Expression, Expression]:
         """
         :return: roll, pitch, yaw
         """
@@ -493,10 +498,10 @@ class Point3(Expression):
 
     @classmethod
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Point3:
-        try:
-            return cls(m[0], m[1], m[2])
-        except Exception as e:
-            pass
+        return cls(m[0], m[1], m[2])
+
+    def norm(self) -> Expression:
+        return norm(self)
 
     @property
     def x(self):
@@ -608,11 +613,11 @@ class Vector3(Expression):
         result = ca.cross(self.s[:3], v.s[:3])
         return Vector3.from_matrix(result)
 
-    def norm(self) -> Symbol:
-        return ca.norm_2(self)
+    def norm(self) -> Expression:
+        return norm(self)
 
-    def scale(self, a: Union[Symbol, float]) -> Vector3:
-        return save_division(self, self.norm()) * a
+    def scale(self, a: Union[Symbol, float]):
+        self.s = (save_division(self, self.norm()) * a).s
 
 
 class Quaternion(Expression):
@@ -762,11 +767,11 @@ class Quaternion(Expression):
         return norm(self)
 
     def normalize(self):
-        norm = self.norm()
-        self.x /= norm
-        self.y /= norm
-        self.z /= norm
-        self.w /= norm
+        norm_ = self.norm()
+        self.x /= norm_
+        self.y /= norm_
+        self.z /= norm_
+        self.w /= norm_
 
     def to_axis_angle(self) -> Tuple[Vector3, Expression]:
         self.normalize()
@@ -846,7 +851,7 @@ def create_symbols(names: List[str]) -> List[Symbol]:
 
 def compile_and_execute(f: Callable[[Any], Expression], params: Union[List[Union[float, np.ndarray]], np.ndarray]) \
         -> Union[float, np.ndarray]:
-    input = []
+    input_ = []
     symbol_params = []
     symbol_params2 = []
 
@@ -856,16 +861,16 @@ def compile_and_execute(f: Callable[[Any], Expression], params: Union[List[Union
         if isinstance(param, np.ndarray):
             symbol_param = ca.SX.sym('m', *param.shape)
             if len(param.shape) == 2:
-                l = param.shape[0] * param.shape[1]
+                number_of_params = param.shape[0] * param.shape[1]
             else:
-                l = param.shape[0]
+                number_of_params = param.shape[0]
 
-            input.append(param.reshape((l, 1)))
+            input_.append(param.reshape((number_of_params, 1)))
             symbol_params.append(symbol_param)
-            asdf = symbol_param.T.reshape((l, 1))
-            symbol_params2.extend(asdf[k] for k in range(l))
+            asdf = symbol_param.T.reshape((number_of_params, 1))
+            symbol_params2.extend(asdf[k] for k in range(number_of_params))
         else:
-            input.append(np.array([param], ndmin=2))
+            input_.append(np.array([param], ndmin=2))
             symbol_param = ca.SX.sym('s')
             symbol_params.append(symbol_param)
             symbol_params2.append(symbol_param)
@@ -874,8 +879,8 @@ def compile_and_execute(f: Callable[[Any], Expression], params: Union[List[Union
     expr = f(*symbol_params)
     assert isinstance(expr, Expression)
     fast_f = expr.compile(symbol_params2)
-    input = np.concatenate(input).T[0]
-    result = fast_f.call2(input)
+    input_ = np.concatenate(input_).T[0]
+    result = fast_f.call2(input_)
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
     elif result.shape[1] == 1:
@@ -888,14 +893,6 @@ def compile_and_execute(f: Callable[[Any], Expression], params: Union[List[Union
 
 def ros_msg_to_matrix(msg: rospy.Message) -> Expression:
     return Expression(msg_to_homogeneous_matrix(msg))
-
-
-def matrix_to_list(m: Union[Expression, Iterable[Symbol]]) -> List[Union[Symbol, float]]:
-    try:
-        len(m)
-        return m
-    except:
-        return [m[i] for i in range(m.shape[0])]
 
 
 def zeros(x: int, y: int) -> Expression:
@@ -1059,29 +1056,6 @@ def if_less_eq_cases(a: Union[Symbol, float],
         b_result = b_result_cases[i, 1]
         result = if_less_eq(a, b, b_result, result)
     return result
-
-
-def safe_compiled_function(f, file_name):
-    if not os.path.exists(os.path.dirname(file_name)):
-        try:
-            os.makedirs(os.path.dirname(file_name))
-        except OSError as exc:  # Guard against race condition
-            if exc.errno != errno.EEXIST:
-                raise
-    with open(file_name, 'w') as file:
-        pickle.dump(f, file)
-        logging.loginfo('saved {}'.format(file_name))
-
-
-def load_compiled_function(file_name):
-    if os.path.isfile(file_name):
-        try:
-            with open(file_name, 'r') as file:
-                fast_f = pickle.load(file)
-                return fast_f
-        except EOFError as e:
-            os.remove(file_name)
-            logging.logerr('{} deleted because it was corrupted'.format(file_name))
 
 
 def cross(u: Union[Vector3, Expression], v: Union[Vector3, Expression]) -> Vector3:
@@ -1261,10 +1235,6 @@ def slerp(v1: Expression, v2: Expression, t: float) -> Expression:
                  (sin((1 - t) * angle2) / sin(angle2)) * v1 + (sin(t * angle2) / sin(angle2)) * v2)
 
 
-def to_numpy(matrix: Expression) -> np.ndarray:
-    return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
-
-
 @overload
 def save_division(nominator: Symbol, denominator: Union[Symbol, float], if_nan: Union[Symbol, float] = 0) -> Symbol: ...
 
@@ -1407,86 +1377,6 @@ def velocity_limit_from_position_limit(acceleration_limit: Union[Symbol, float],
     velocity_limit *= sign_
     velocity_limit /= m
     return Expression(velocity_limit)
-
-
-# def position_with_max_velocity(velocity_limit: expr_symbol, jerk_limit: expr_symbol) -> expr_symbol:
-#     t = np.sqrt(np.abs(velocity_limit / jerk_limit))
-#     return -t * velocity_limit
-
-
-# def t_til_pos2(position_error, jerk_limit):
-#     return (position_error / (2 * jerk_limit)) ** (1 / 3)
-
-
-# def position_till_b(jerk_limit, t):
-#     return (1 / 6) * jerk_limit * t ** 3
-
-
-# def position_till_a(jerk_limit, t, t_offset, velocity_limit):
-#     return (1 / 6) * jerk_limit * t ** 3 - 0.5 * jerk_limit * t_offset * t ** 2 + 0.5 * jerk_limit * t_offset ** 2 * t + velocity_limit * t
-
-
-# def velocity(velocity_limit, jerk_limit, t):
-#     t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
-#     t_a = t_b * 2
-#     if t < t_b:
-#         return velocity_limit + 0.5 * jerk_limit * t ** 2
-#     if t < t_a:
-#         t -= t_a
-#         return -0.5 * jerk_limit * t ** 2
-#     return velocity_limit
-
-
-# def position(jerk_limit, t, velocity_limit):
-#     t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
-#     t_a = t_b * 2
-#     if t < t_b:
-#         return (1 / 6) * jerk_limit * t ** 3 + velocity_limit * t - velocity_limit * t_b
-#     if t < t_a:
-#         t -= t_a
-#         return -(1 / 6) * jerk_limit * t ** 3
-#     return velocity_limit * t
-
-
-# def compute_t_from_position(jerk_limit, position_error, velocity_limit):
-#     t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
-#     a = position_with_max_velocity(velocity_limit, jerk_limit)
-#     b = -(1 / 6) * jerk_limit * (-t_b) ** 3
-#     t_a = t_b * 2
-#     if position_error < b:
-#         asdf = (-(6 * position_error) / jerk_limit)
-#         return np.sign(asdf) * np.abs(asdf) ** (1 / 3) + t_a
-#     if position_error < a:
-#         return np.real(-1.44224957030741 * (-0.5 - 0.866025403784439j) * \
-#                        (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
-#                                8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j) + (1 / 6) *
-#                         (-6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (1 / 3) \
-#                        + 1.38672254870127 * velocity_limit * (-0.5 + 0.866025403784439j) / \
-#                        (jerk_limit * (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
-#                                8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j)
-#                                       + (1 / 6) * (
-#                                               -6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (
-#                                 1 / 3)))
-#     return 0
-
-
-# def jerk_limits_from_everything(position_limit, velocity_limit, jerk_limit, current_position, current_velocity,
-#                                 current_acceleration, t, step_size, eps=1e-5):
-#     """
-#     Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
-#     :param acceleration_limit:
-#     :param distance_to_position_limit:
-#     :param step_size:
-#     :param eps:
-#     :return:
-#     """
-#     # p(t) describes slowdown with max vel/jerk down to 0
-#     # 1. get t from p(t)=position_limit - current_position
-#     # 2. plug t into v(t) to get vel limit
-#
-#     a = position_with_max_velocity(velocity_limit, jerk_limit)
-#     t_b = t_til_pos2(a, jerk_limit)
-#     t_a = t_b * 2
 
 
 def to_str(expression: Union[Symbol, float]) -> str:

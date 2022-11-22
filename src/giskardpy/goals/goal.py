@@ -300,15 +300,6 @@ class Goal(ABC):
         """
         Calls add_constraint for a list of expressions.
         """
-        reference_velocities = w.matrix_to_list(reference_velocities)
-        lower_errors = w.matrix_to_list(lower_errors)
-        upper_errors = w.matrix_to_list(upper_errors)
-        weights = w.matrix_to_list(weights)
-        task_expression = w.matrix_to_list(task_expression)
-        if lower_slack_limits is not None:
-            lower_slack_limits = w.matrix_to_list(lower_slack_limits)
-        if upper_slack_limits is not None:
-            upper_slack_limits = w.matrix_to_list(upper_slack_limits)
         if len(lower_errors) != len(upper_errors) \
                 or len(lower_errors) != len(task_expression) \
                 or len(lower_errors) != len(reference_velocities) \

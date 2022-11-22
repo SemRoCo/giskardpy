@@ -92,7 +92,7 @@ class TestMatrix:
 
 class TestRotationMatrix(unittest.TestCase):
     def test_create_RotationMatrix(self):
-        r = w.RotationMatrix.from_xyz_rpy(1, 2, 3)
+        r = w.RotationMatrix.from_rpy(1, 2, 3)
         assert isinstance(r, w.RotationMatrix)
 
     @given(quaternion())
@@ -104,7 +104,7 @@ class TestRotationMatrix(unittest.TestCase):
            random_angle(),
            random_angle())
     def test_rotation_matrix_from_rpy(self, roll, pitch, yaw):
-        m1 = w.compile_and_execute(w.RotationMatrix.from_xyz_rpy, [roll, pitch, yaw])
+        m1 = w.compile_and_execute(w.RotationMatrix.from_rpy, [roll, pitch, yaw])
         m2 = euler_matrix(roll, pitch, yaw)
         np.testing.assert_array_almost_equal(m1, m2)
 
@@ -157,7 +157,7 @@ class TestRotationMatrix(unittest.TestCase):
         roll = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[0], [matrix])
         pitch = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[1], [matrix])
         yaw = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[2], [matrix])
-        r1 = w.compile_and_execute(w.RotationMatrix.from_xyz_rpy, [roll, pitch, yaw])
+        r1 = w.compile_and_execute(w.RotationMatrix.from_rpy, [roll, pitch, yaw])
         self.assertTrue(np.isclose(r1, matrix, atol=1.e-4).all(), msg='{} != {}'.format(r1, matrix))
 
 
@@ -252,7 +252,7 @@ class TestTransformationMatrix(unittest.TestCase):
            st.integers(min_value=1, max_value=10))
     def test_matrix2(self, x_dim, y_dim):
         data = [[i + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
-        m = w.Expression(data)
+        m = w.Expression(data).evaluate()
         self.assertEqual(float(m[0, 0]), 0)
         self.assertEqual(float(m[x_dim - 1, y_dim - 1]), (x_dim * y_dim) - 1)
 
@@ -309,7 +309,7 @@ class TestTransformationMatrix(unittest.TestCase):
         f[0, 3] = x
         f[1, 3] = y
         f[2, 3] = z
-        r = w.ca.evalf(w.TransMatrix(f).inverse())
+        r = w.compile_and_execute(lambda x: w.TransMatrix(x).inverse(), [f])
 
         r2 = PyKDL.Frame()
         r2.M = PyKDL.Rotation.Quaternion(q[0], q[1], q[2], q[3])

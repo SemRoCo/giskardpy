@@ -410,6 +410,8 @@ class GodMap(object):
         if isinstance(expr, (int, float)):
             return expr
         f = expr.compile()
+        if len(f.str_params) == 0:
+            return expr.evaluate()
         result = f.call2(self.get_values(f.str_params))
         if len(result) == 1:
             return result[0][0]

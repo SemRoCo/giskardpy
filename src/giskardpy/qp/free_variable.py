@@ -1,6 +1,6 @@
 from collections import defaultdict
 from typing import Dict, Optional, List, Union
-
+import numpy as np
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
@@ -50,7 +50,7 @@ class FreeVariable:
 
     def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
-            expr = w.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
+            expr = max(self.default_lower_limits[derivative], self.lower_limits[derivative])
         elif derivative in self.default_lower_limits:
             expr = self.default_lower_limits[derivative]
         elif derivative in self.lower_limits:
@@ -69,7 +69,7 @@ class FreeVariable:
 
     def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
         if not default and derivative in self.default_upper_limits and derivative in self.upper_limits:
-            expr = w.min(self.default_upper_limits[derivative], self.upper_limits[derivative])
+            expr = min(self.default_upper_limits[derivative], self.upper_limits[derivative])
         elif derivative in self.default_upper_limits:
             expr = self.default_upper_limits[derivative]
         elif derivative in self.upper_limits:

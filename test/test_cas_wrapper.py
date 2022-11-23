@@ -48,14 +48,26 @@ class TestSymbol:
         assert isinstance(e, w.Expression)
 
 
-class TestMatrix:
+class TestMatrix(unittest.TestCase):
     def test_create(self):
-        m = w.Expression(np.eye(4))
         w.Expression(w.Symbol('muh'))
-        w.Expression([1, 1])
-        w.Expression(1)
-        w.Expression([[1, 1], [2, 2]])
-        w.Expression(m)
+        w.Expression([w.ca.SX(1), w.ca.SX.sym('muh')])
+        m = w.Expression(np.eye(4))
+        m = w.Expression(m)
+        np.testing.assert_array_almost_equal(m.evaluate(), np.eye(4))
+        m = w.Expression(w.ca.SX(np.eye(4)))
+        np.testing.assert_array_almost_equal(m.evaluate(), np.eye(4))
+        m = w.Expression([1, 1])
+        np.testing.assert_array_almost_equal(m.evaluate(), [[1], [1]])
+        m = w.Expression([np.array([1, 1])])
+        np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1]])
+        m = w.Expression(1)
+        assert m.evaluate() == 1
+        m = w.Expression([[1, 1], [2, 2]])
+        np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1], [2, 2]])
+        m = w.Expression([])
+        with self.assertRaises(RuntimeError):
+            print(m.evaluate())
 
     def test_simple_math(self):
         m = w.Expression([1, 1])
@@ -507,7 +519,6 @@ class TestCASWrapper(unittest.TestCase):
         r2 = np.hstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
-
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
         self.assertAlmostEqual(w.compile_and_execute(w.abs, [f1]), abs(f1), places=7)
@@ -807,6 +818,12 @@ class TestCASWrapper(unittest.TestCase):
         m2 = rotation_matrix_from_quaternion(q2[0], q2[1], q2[2], q2[3])
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])
         r2 = m1 * m2
+        np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_kron(self):
+        m1 = np.eye(4)
+        r1 = w.compile_and_execute(w.kron, [m1, m1])
+        r2 = np.kron(m1, m1)
         np.testing.assert_array_almost_equal(r1, r2)
 
     @given(sq_matrix())

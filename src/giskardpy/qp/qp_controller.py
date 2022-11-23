@@ -705,12 +705,11 @@ class QPController:
         free_symbols = set(free_symbols)
         free_symbols.update(debug_free_symbols)
         free_symbols = list(free_symbols)
-        self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
-                                             free_symbols)
+        self.compiled_big_ass_M = self.big_ass_M.compile(free_symbols)
         compilation_time = time() - t
-        logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(compilation_time))
+        logging.loginfo(f'Compiled symbolic controller in {compilation_time:.5f}s')
         self.time_collector.compilations.append(compilation_time)
-        self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
+        self.compiled_debug_v = self.debug_v.compile(free_symbols)
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]

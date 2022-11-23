@@ -45,6 +45,26 @@ class Symbol:
     def free_symbols(self) -> List[ca.SX]:
         return free_symbols(self.s)
 
+    @property
+    def shape(self) -> Tuple[int, int]:
+        return self.s.shape
+
+    def compile(self, parameters: Optional[List[Symbol]] = None) -> CompiledFunction:
+        if parameters is None:
+            parameters = self.free_symbols()
+        str_params = [str(x) for x in parameters]
+        if len(parameters) > 0:
+            parameters = [Expression(parameters).s]
+        try:
+            f = ca.Function('f', parameters, [ca.densify(self.s)])
+        except Exception:
+            f = ca.Function('f', parameters, ca.densify(self.s))
+        return CompiledFunction(str_params, f, self.shape)
+
+    @property
+    def T(self):
+        return self.s.T
+
     def __str__(self):
         return str(self.s)
 
@@ -146,34 +166,35 @@ class Symbol:
 
 
 class Expression(Symbol):
+    @profile
     def __init__(self, data: Union[Symbol,
                                    Expression,
                                    float,
                                    Iterable[Union[Symbol, float]],
                                    Iterable[Iterable[Union[Symbol, float]]],
                                    np.ndarray]):
-        if isinstance(data, (Symbol, Expression)):
-            self.s = ca.SX(data.s)
+        if isinstance(data, ca.SX):
+            self.s = data
+        elif isinstance(data, Symbol):
+            self.s = data.s
         elif isinstance(data, (int, float)):
             self.s = ca.SX(data)
+        elif isinstance(data, np.ndarray):
+            self.s = ca.SX(data)
         else:
-            if hasattr(data, 'shape'):
-                self.s = ca.SX(*data.shape)
-                y = data.shape[1]
+            x = len(data)
+            if x == 0:
+                self.s = ca.SX([])
+                return
+            if isinstance(data[0], list) or isinstance(data[0], tuple) or isinstance(data[0], np.ndarray):
+                y = len(data[0])
             else:
-                x = len(data)
-                if isinstance(data[0], list) or isinstance(data[0], tuple):
-                    y = len(data[0])
-                else:
-                    y = 1
-                self.s = ca.SX(x, y)
+                y = 1
+            self.s = ca.SX(x, y)
             for i in range(self.shape[0]):
                 if y > 1:
                     for j in range(self.shape[1]):
-                        try:
-                            self[i, j] = data[i][j]
-                        except Exception:
-                            self[i, j] = data[i, j]
+                        self[i, j] = data[i][j]
                 else:
                     if isinstance(data[i], Symbol):
                         self[i] = data[i].s
@@ -182,6 +203,9 @@ class Expression(Symbol):
 
     def to_list(self) -> List[Expression]:
         return [self[i] for i in range(self.shape[0])]
+
+    def remove(self, rows: List[int], columns: List[int]):
+        self.s.remove(rows, columns)
 
     def __len__(self):
         return self.shape[0] + self.shape[1]
@@ -194,38 +218,25 @@ class Expression(Symbol):
             value = value.s
         self.s[key] = value
 
-    @property
-    def shape(self) -> Tuple[int, int]:
-        return self.s.shape
-
-    def compile(self, parameters: Optional[List[Symbol]] = None) -> CompiledFunction:
-        if parameters is None:
-            parameters = self.free_symbols()
-        str_params = [str(x) for x in parameters]
-        if len(parameters) > 0:
-            parameters = [Expression(parameters).s]
-        try:
-            f = ca.Function('f', parameters, [ca.densify(self.s)])
-        except Exception:
-            f = ca.Function('f', parameters, ca.densify(self.s))
-        return CompiledFunction(str_params, f, self.shape)
-
     def evaluate(self):
-        return ca.evalf(self.s)
-
-    @property
-    def T(self):
-        return self.s.T
+        if len(self) == 1:
+            return float(ca.evalf(self.s))
+        else:
+            return np.array(ca.evalf(self.s))
 
 
 class TransMatrix(Expression):
+    @profile
     def __init__(self, data: Optional[Union[Iterable[Union[Symbol, float]],
                                             Iterable[Iterable[Union[Symbol, float]]],
                                             np.ndarray,
                                             Expression]] = None):
         if data is None:
-            data = np.eye(4)
-        super().__init__(data)
+            self.s = ca.SX.eye(4)
+        elif isinstance(data, Expression):
+            self.s = data.s
+        else:
+            super().__init__(data)
         if self.shape[0] != 4 or self.shape[1] != 4:
             raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
         self[3, 0] = 0
@@ -339,6 +350,7 @@ class TransMatrix(Expression):
 
 
 class RotationMatrix(TransMatrix):
+    @profile
     def __init__(self, data: Union[Iterable[Union[Symbol, float]],
                                    Iterable[Iterable[Union[Symbol, float]]],
                                    np.ndarray,
@@ -500,10 +512,12 @@ class RotationMatrix(TransMatrix):
 
 
 class Point3(Expression):
+    @profile
     def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
         super().__init__([x, y, z, 1])
 
     @classmethod
+    @profile
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Point3:
         return cls(m[0], m[1], m[2])
 
@@ -554,10 +568,12 @@ class Point3(Expression):
 
 
 class Vector3(Expression):
+    @profile
     def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
         super().__init__([x, y, z, 0])
 
     @classmethod
+    @profile
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Vector3:
         return cls(m[0], m[1], m[2])
 
@@ -628,6 +644,7 @@ class Vector3(Expression):
 
 
 class Quaternion(Expression):
+    @profile
     def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float],
                  z: Union[Symbol, float], w: Union[Symbol, float]):
         super().__init__([x, y, z, w])
@@ -1086,12 +1103,14 @@ def dot(*matrices: Expression) -> Expression:
     return Expression(result)
 
 
-def eye(size: int) -> Union[Symbol, float]:
-    return ca.SX.eye(size)
+def eye(size: int) -> Expression:
+    return Expression(ca.SX.eye(size))
 
 
 def kron(m1: Expression, m2: Expression) -> Expression:
-    return ca.kron(m1, m2)
+    m1 = Expression(m1).s
+    m2 = Expression(m2).s
+    return Expression(ca.kron(m1, m2))
 
 
 def trace(matrix: Expression) -> Expression:

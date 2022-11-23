@@ -1178,8 +1178,8 @@ class WorldTree:
                         collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
                 self.collision_link_order = list(collision_ids)
-                self.fast_all_fks = w.speed_up(all_fks, w.free_symbols(all_fks))
-                self.fast_collision_fks = w.speed_up(collision_fks, w.free_symbols(collision_fks))
+                self.fast_all_fks = all_fks.compile()
+                self.fast_collision_fks = collision_fks.compile()
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
 
             @profile

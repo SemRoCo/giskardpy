@@ -259,7 +259,7 @@ class GodMap(object):
         if identifier not in self.key_to_expr:
             expr = w.Symbol(self.expr_separator.join([str(x) for x in identifier]))
             if expr in self.expr_to_key:
-                raise Exception('{} not allowed in key'.format(self.expr_separator))
+                raise Exception(f'{self.expr_separator} not allowed in key')
             self.key_to_expr[identifier] = expr
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
@@ -406,13 +406,11 @@ class GodMap(object):
         """
         return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
-    def evaluate_expr(self, expr):
+    def evaluate_expr(self, expr: w.Expression):
         if isinstance(expr, (int, float)):
             return expr
-        fs = w.free_symbols(expr)
-        fss = [str(s) for s in fs]
-        f = w.speed_up(expr, fs)
-        result = f.call2(self.get_values(fss))
+        f = expr.compile()
+        result = f.call2(self.get_values(f.str_params))
         if len(result) == 1:
             return result[0][0]
         else:

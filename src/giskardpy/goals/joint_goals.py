@@ -296,7 +296,8 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
     def __init__(self, joint_name, goal, frequency, group_name: str = None, noise_amplitude=1.0, weight=WEIGHT_BELOW_CA,
                  max_velocity=1):
         """
-        This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given frequency.
+        This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given
+        frequency.
         :param joint_name: str
         :param goal: float
         :param frequency: float
@@ -305,7 +306,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
         super().__init__()
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_joint_name(joint_name, group_name)
         if not self.world.is_joint_revolute(self.joint_name) and not self.world.is_joint_prismatic(joint_name):
             raise ConstraintException(
                 f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
@@ -362,7 +363,7 @@ class ShakyJointPositionContinuous(Goal):
         self.weight = weight
         self.max_velocity = max_velocity
         super().__init__()
-        self.joint_name = self.world.get_joint(joint_name, group_name)
+        self.joint_name = self.world.get_joint_name(joint_name, group_name)
         if not self.world.is_joint_continuous(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
@@ -509,7 +510,7 @@ class JointPositionList(Goal):
         :param goal_state: maps joint_name to goal position
         :param group_name: if joint_name is not unique, search in this group for matches.
         :param weight:
-        :param max_velocity: will be applied to all joints, you should group prismatic and non prismatic joints if using this.
+        :param max_velocity: will be applied to all joints, you should group joint types, e.g., prismatic joints
         :param hard: turns this into a hard constraint.
         """
         super().__init__()
@@ -549,7 +550,7 @@ class JointPosition(Goal):
         :param goal:
         :param group_name: if joint_name is not unique, search in this group for matches.
         :param weight:
-        :param max_velocity: m/s for prismatic joints, rad/s for revolute or continuous joints, can not surpass urdf limit
+        :param max_velocity: m/s for prismatic joints, rad/s for revolute or continuous joints, limited by urdf
         """
         super().__init__()
         self.joint_name = self.world.get_joint_name(joint_name, group_name)

@@ -39,6 +39,9 @@ class Symbol:
     def __init__(self, name: str):
         self.s: ca.SX = ca.SX.sym(name)
 
+    def __hash__(self):
+        return self.s.__hash__()
+
     def free_symbols(self) -> List[ca.SX]:
         return free_symbols(self.s)
 
@@ -195,12 +198,16 @@ class Expression(Symbol):
     def shape(self) -> Tuple[int, int]:
         return self.s.shape
 
-    def compile(self, parameters: List[Symbol]) -> CompiledFunction:
+    def compile(self, parameters: Optional[List[Symbol]] = None) -> CompiledFunction:
+        if parameters is None:
+            parameters = self.free_symbols()
         str_params = [str(x) for x in parameters]
+        if len(parameters) > 0:
+            parameters = [Expression(parameters).s]
         try:
-            f = ca.Function('f', [Expression(parameters).s], [ca.densify(self.s)])
+            f = ca.Function('f', parameters, [ca.densify(self.s)])
         except Exception:
-            f = ca.Function('f', [Expression(parameters).s], ca.densify(self.s))
+            f = ca.Function('f', parameters, ca.densify(self.s))
         return CompiledFunction(str_params, f, self.shape)
 
     def evaluate(self):
@@ -1112,11 +1119,11 @@ def rotation_distance(a_R_b: Expression, a_R_c: Expression) -> Expression:
 
 
 def vstack(list_of_matrices: List[Expression]) -> Expression:
-    return ca.vertcat(*list_of_matrices)
+    return Expression(ca.vertcat(*[x.s for x in list_of_matrices]))
 
 
 def hstack(list_of_matrices: List[Expression]) -> Expression:
-    return ca.horzcat(*list_of_matrices)
+    return Expression(ca.horzcat(*[x.s for x in list_of_matrices]))
 
 
 def normalize_axis_angle(axis: Expression, angle: Union[Symbol, float]) -> Tuple[Expression, Union[Symbol, float]]:

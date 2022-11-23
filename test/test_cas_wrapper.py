@@ -491,6 +491,23 @@ class TestCASWrapper(unittest.TestCase):
         assert result[2, 2] == 3
         assert w.equivalent(w.diag(w.Expression([1, 2, 3])), w.diag([1, 2, 3]))
 
+    def test_vstack(self):
+        m = np.eye(4)
+        m1 = w.Expression(m)
+        e = w.vstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.vstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_hstack(self):
+        m = np.eye(4)
+        m1 = w.Expression(m)
+        e = w.hstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.hstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
+
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
         self.assertAlmostEqual(w.compile_and_execute(w.abs, [f1]), abs(f1), places=7)

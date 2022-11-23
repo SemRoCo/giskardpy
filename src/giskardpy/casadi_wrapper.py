@@ -207,8 +207,8 @@ class Expression(Symbol):
     def remove(self, rows: List[int], columns: List[int]):
         self.s.remove(rows, columns)
 
-    def __len__(self):
-        return self.shape[0] + self.shape[1]
+    def __len__(self) -> int:
+        return self.shape[0] * self.shape[1]
 
     def __getitem__(self, item):
         return Expression(self.s[item])
@@ -403,7 +403,7 @@ class RotationMatrix(TransMatrix):
                     [0, 0, 0, 1]])
 
     @classmethod
-    def from_ros_msg(cls, msg: Union[geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped]) -> TransMatrix:
+    def from_ros_msg(cls, msg: Union[geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped]) -> RotationMatrix:
         if isinstance(msg, geometry_msgs.QuaternionStamped):
             msg = msg.quaternion
         q = Quaternion(x=msg.x,
@@ -521,6 +521,12 @@ class Point3(Expression):
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Point3:
         return cls(m[0], m[1], m[2])
 
+    @classmethod
+    def from_ros_msg(cls, msg: Union[geometry_msgs.Point, geometry_msgs.PointStamped]) -> Point3:
+        if isinstance(msg, geometry_msgs.PointStamped):
+            msg = msg.point
+        return cls(x=msg.x, y=msg.y, z=msg.z)
+
     def norm(self) -> Expression:
         return norm(self)
 
@@ -566,6 +572,9 @@ class Point3(Expression):
         result = super().__truediv__(other)
         return Point3.from_matrix(result)
 
+    def __neg__(self) -> Point3:
+        return Point3.from_matrix(super().__neg__())
+
 
 class Vector3(Expression):
     @profile
@@ -576,6 +585,13 @@ class Vector3(Expression):
     @profile
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Vector3:
         return cls(m[0], m[1], m[2])
+
+
+    @classmethod
+    def from_ros_msg(cls, msg: Union[geometry_msgs.Vector3, geometry_msgs.Vector3Stamped]) -> Vector3:
+        if isinstance(msg, geometry_msgs.Vector3Stamped):
+            msg = msg.vector
+        return cls(x=msg.x, y=msg.y, z=msg.z)
 
     @property
     def x(self):
@@ -627,6 +643,9 @@ class Vector3(Expression):
     def __mul__(self, other: Union[Symbol, float]):
         result = super().__mul__(other)
         return Vector3.from_matrix(result)
+
+    def __neg__(self) -> Vector3:
+        return Vector3.from_matrix(super().__neg__())
 
     def __truediv__(self, other: Union[Symbol, float]):
         result = super().__truediv__(other)

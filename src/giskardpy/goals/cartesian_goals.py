@@ -55,11 +55,11 @@ class CartesianPosition(Goal):
                                                                   hard=False))
 
     def make_constraints(self):
-        r_P_g = w.ros_msg_to_matrix(self.goal_point)
+        r_P_g = w.Point3.from_ros_msg(self.goal_point)
         r_P_c = self.get_fk(self.root_link, self.tip_link).position()
         if self.root_link2 is not None:
             root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
-            r_P_c = w.dot(root_link2_T_root_link, r_P_c)
+            r_P_c = root_link2_T_root_link.dot(r_P_c)
         # self.add_debug_expr('trans', w.norm(r_P_c))
         self.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
@@ -165,7 +165,7 @@ class CartesianPositionStraight(Goal):
         self.goal_point = self.transform_msg(self.root_link, goal_point)
 
     def make_constraints(self):
-        root_P_goal = w.ros_msg_to_matrix(self.goal_point)
+        root_P_goal = w.Point3.from_ros_msg(self.goal_point)
         root_P_tip = self.get_fk(self.root_link, self.tip_link).position()
         t_T_r = self.get_fk(self.tip_link, self.root_link)
         tip_P_goal = t_T_r.dot(root_P_goal)
@@ -174,15 +174,15 @@ class CartesianPositionStraight(Goal):
         # such that its x-axis shows towards the goal position.
         # The goal frame is called 'a'.
         # Thus, the rotation matrix is called t_R_a.
-        tip_P_error = tip_P_goal[:3]
-        trans_error = w.norm(tip_P_error)
+        tip_V_error = w.Vector3(tip_P_goal)
+        trans_error = tip_V_error.norm()
         # x-axis
-        tip_P_intermediate_error = w.save_division(tip_P_error, trans_error)[:3]
+        tip_V_intermediate_error = w.Vector3(w.save_division(tip_V_error, trans_error))
         # y- and z-axis
-        tip_P_intermediate_y = w.scale(w.Expression(np.random.random((3,))), 1)
-        y = w.cross(tip_P_intermediate_error, tip_P_intermediate_y)
-        z = w.cross(tip_P_intermediate_error, y)
-        t_R_a = w.RotationMatrix.from_vectors(x=tip_P_intermediate_error, y=-z, z=y)
+        tip_V_intermediate_y = w.Vector3(np.random.random((3,))).scale(1)
+        y = tip_V_intermediate_error.cross(tip_V_intermediate_y)
+        z = tip_V_intermediate_error.cross(y)
+        t_R_a = w.RotationMatrix.from_vectors(x=tip_V_intermediate_error, y=-z, z=y)
 
         # Apply rotation matrix on the fk of the tip link
         a_T_t = t_R_a.inverse().dot(

@@ -364,8 +364,8 @@ class Goal(ABC):
                             name=name)
 
     def add_point_goal_constraints(self,
-                                   frame_P_current: w.Expression,
-                                   frame_P_goal: w.Expression,
+                                   frame_P_current: w.Point3,
+                                   frame_P_goal: w.Point3,
                                    reference_velocity: Union[w.Symbol, float],
                                    weight: Union[w.Symbol, float],
                                    name: str = ''):
@@ -378,10 +378,10 @@ class Goal(ABC):
         :param weight:
         :param name:
         """
-        error = frame_P_goal[:3] - frame_P_current[:3]
+        frame_V_error = frame_P_goal - frame_P_current
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
-                                   lower_errors=error[:3],
-                                   upper_errors=error[:3],
+                                   lower_errors=frame_V_error[:3],
+                                   upper_errors=frame_V_error[:3],
                                    weights=[weight] * 3,
                                    task_expression=frame_P_current[:3],
                                    names=[f'{name}/x',

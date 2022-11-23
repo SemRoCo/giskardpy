@@ -69,6 +69,10 @@ class TestMatrix(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             print(m.evaluate())
 
+    def test_len(self):
+        m = w.Expression(np.eye(4))
+        assert(len(m) == 16)
+
     def test_simple_math(self):
         m = w.Expression([1, 1])
         s = w.Symbol('muh')

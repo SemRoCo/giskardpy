@@ -586,7 +586,6 @@ class Vector3(Expression):
     def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Vector3:
         return cls(m[0], m[1], m[2])
 
-
     @classmethod
     def from_ros_msg(cls, msg: Union[geometry_msgs.Vector3, geometry_msgs.Vector3Stamped]) -> Vector3:
         if isinstance(msg, geometry_msgs.Vector3Stamped):
@@ -878,14 +877,6 @@ def equivalent(expression1: Union[Symbol, Expression], expression2: Union[Symbol
 def free_symbols(expression: Union[Symbol, Expression]) -> List[ca.SX]:
     expression = Expression(expression).s
     return ca.symvar(expression)
-
-
-def is_matrix(expression: Union[Symbol, Expression]) -> bool:
-    return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
-
-
-def is_symbol(expression: Union[Symbol, Expression]) -> bool:
-    return expression.shape[0] * expression.shape[1] == 1
 
 
 def create_symbols(names: List[str]) -> List[Symbol]:
@@ -1319,12 +1310,12 @@ def ceil(x: Union[Symbol, float]) -> Expression:
     return Expression(ca.ceil(x))
 
 
-def round_up(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Union[Symbol, float]:
+def round_up(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Expression:
     f = 10 ** (decimal_places)
     return ceil(x * f) / f
 
 
-def round_down(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Union[Symbol, float]:
+def round_down(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Expression:
     f = 10 ** (decimal_places)
     return floor(x * f) / f
 
@@ -1431,7 +1422,6 @@ def to_str(expression: Union[Symbol, float]) -> str:
             raise Exception('fuck')
         result = result.replace(index, sub)
     return result
-    pass
 
 
 def total_derivative(expr: Union[Symbol, Expression],

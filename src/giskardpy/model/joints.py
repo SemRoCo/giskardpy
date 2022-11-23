@@ -55,11 +55,11 @@ class Joint(ABC):
         """
 
     @abc.abstractmethod
-    def _joint_transformation(self):
+    def _joint_transformation(self) -> w.TransMatrix:
         """
         modifies self.parent_T_child using free variables
         """
-        return w.eye(4)
+        return w.TransMatrix()
 
     @abc.abstractmethod
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
@@ -115,7 +115,7 @@ class DependentJoint(Joint, ABC):
 class FixedJoint(Joint):
 
     def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
-                 parent_T_child: Optional[w.Expression] = None):
+                 parent_T_child: Optional[w.TransMatrix] = None):
         if parent_T_child is None:
             parent_T_child = w.eye(4)
         super().__init__(name, parent_link_name, child_link_name, parent_T_child)
@@ -244,7 +244,7 @@ class OneDofJoint(Joint, ABC):
     axis: Tuple[float, float, float]
 
     def __init__(self, name: my_string, parent_link_name: my_string, child_link_name: my_string,
-                 parent_T_child: w.Expression,
+                 parent_T_child: w.TransMatrix,
                  axis: Tuple[float, float, float], lower_limits, upper_limits):
         self.axis = axis
         self.lower_limits = lower_limits
@@ -254,20 +254,20 @@ class OneDofJoint(Joint, ABC):
     def create_free_variables(self):
         self.free_variable = self.create_free_variable(self.name, self.lower_limits, self.upper_limits)
 
-    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
+    def update_state(self, new_cmds: derivative_joint_map, dt: float):
         world = self.god_map.unsafe_get_data(identifier.world)
         try:
-            vel = new_cmds[0][self.free_variable.position_name]
+            vel = new_cmds[Derivatives.velocity][self.free_variable.position_name]
         except KeyError as e:
             # joint is currently not part of the optimization problem
             return
         world.state[self.name].position += vel * dt
         world.state[self.name].velocity = vel
         if len(new_cmds) >= 2:
-            acc = new_cmds[1][self.free_variable.position_name]
+            acc = new_cmds[Derivatives.acceleration][self.free_variable.position_name]
             world.state[self.name].acceleration = acc
         if len(new_cmds) >= 3:
-            jerk = new_cmds[2][self.free_variable.position_name]
+            jerk = new_cmds[Derivatives.jerk][self.free_variable.position_name]
             world.state[self.name].jerk = jerk
 
     @property
@@ -485,7 +485,7 @@ class OmniDrive(Joint):
         self.rot_vel_name = PrefixName('odom_yaw_vel', group_name)
         self.translation_variables: List[FreeVariable] = []
         self.orientation_variables: List[FreeVariable] = []
-        super().__init__(name, parent_link_name, child_link_name, w.eye(4))
+        super().__init__(name, parent_link_name, child_link_name, w.TransMatrix())
 
     def create_free_variables(self):
         translation_upper_limits = {}
@@ -585,16 +585,16 @@ class OmniDrive(Joint):
         state = self.world.state
         for free_variable in self.free_variable_list:
             try:
-                vel = new_cmds[0][free_variable.position_name]
+                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
             except KeyError as e:
                 # joint is currently not part of the optimization problem
                 continue
             state[free_variable.name].velocity = vel
             if len(new_cmds) >= 2:
-                acc = new_cmds[1][free_variable.position_name]
+                acc = new_cmds[Derivatives.acceleration][free_variable.position_name]
                 state[free_variable.name].acceleration = acc
             if len(new_cmds) >= 3:
-                jerk = new_cmds[2][free_variable.position_name]
+                jerk = new_cmds[Derivatives.jerk][free_variable.position_name]
                 state[free_variable.name].jerk = jerk
         x_vel = state[self.x_vel_name].velocity
         y_vel = state[self.y_vel_name].velocity
@@ -656,7 +656,8 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
     def create_free_variables(self):
         pass
 
-    def pointVel2D(self, pos_x, pos_y, vel_x, vel_y, vel_z):
+    @staticmethod
+    def pointVel2D(pos_x, pos_y, vel_x, vel_y, vel_z):
         new_vel_x = vel_x - pos_y * vel_z
         new_vel_y = vel_y + pos_x * vel_z
         return new_vel_x, new_vel_y
@@ -1219,7 +1220,7 @@ class DiffDrive(Joint):
         self.yaw_name = PrefixName(yaw_name, group_name)
         self.x_vel_name = PrefixName(x_vel_name, group_name)
         self.rot_vel_name = PrefixName(rot_vel_name, group_name)
-        super().__init__(name, parent_link_name, child_link_name, w.eye(4))
+        super().__init__(name, parent_link_name, child_link_name, w.TransMatrix())
 
     def create_free_variables(self):
         translation_upper_limits = {}
@@ -1269,16 +1270,16 @@ class DiffDrive(Joint):
         world = self.god_map.unsafe_get_data(identifier.world)
         for free_variable in self.free_variable_list:
             try:
-                vel = new_cmds[Derivatives.position][free_variable.position_name]
+                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
             except KeyError as e:
                 # joint is currently not part of the optimization problem
                 continue
             world.state[free_variable.name].velocity = vel
             if len(new_cmds) >= 2:
-                acc = new_cmds[Derivatives.velocity][free_variable.position_name]
+                acc = new_cmds[Derivatives.acceleration][free_variable.position_name]
                 world.state[free_variable.name].acceleration = acc
             if len(new_cmds) >= 3:
-                jerk = new_cmds[Derivatives.acceleration][free_variable.position_name]
+                jerk = new_cmds[Derivatives.jerk][free_variable.position_name]
                 world.state[free_variable.name].jerk = jerk
         x = world.state[self.x_vel_name].velocity
         rot = world.state[self.rot_vel_name].velocity

@@ -15,6 +15,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
+from giskardpy.my_types import derivative_joint_map, Derivatives
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
@@ -980,12 +981,13 @@ class QPController:
         logging.loginfo('No slack limit violation detected.')
         return False
 
-    def split_xdot(self, xdot):
-        split = []
+    def split_xdot(self, xdot) -> derivative_joint_map:
+        split = {}
         offset = len(self.free_variables)
         for derivative in range(self.order - 1):
-            split.append(OrderedDict((x.position_name, xdot[i + offset * self.prediction_horizon * derivative])
-                                     for i, x in enumerate(self.free_variables)))
+            split[Derivatives(derivative + 1)] = OrderedDict((x.position_name,
+                                                              xdot[i + offset * self.prediction_horizon * derivative])
+                                                             for i, x in enumerate(self.free_variables))
         return split
 
     def b_names(self):

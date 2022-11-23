@@ -654,6 +654,14 @@ class TestCASWrapper(unittest.TestCase):
             w.compile_and_execute(w.cross, [u, v])[:3],
             np.cross(u, v))
 
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_limit(self, x, lower_limit, upper_limit):
+        r1 = w.compile_and_execute(w.limit, [x, lower_limit, upper_limit])
+        r2 = max(lower_limit, min(upper_limit, x))
+        np.testing.assert_array_almost_equal(r1, r2)
+
     @given(st.lists(float_no_nan_no_inf(), min_size=1))
     def test_norm(self, v):
         actual = w.compile_and_execute(w.norm, [v])

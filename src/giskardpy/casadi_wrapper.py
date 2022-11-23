@@ -947,12 +947,6 @@ def min(x: Union[Symbol, float], y: Union[Symbol, float]) -> Expression:
 def limit(x: Union[Symbol, float],
           lower_limit: Union[Symbol, float],
           upper_limit: Union[Symbol, float]) -> Expression:
-    if isinstance(x, Symbol):
-        x = x.s
-    if isinstance(lower_limit, Symbol):
-        x = lower_limit.s
-    if isinstance(upper_limit, Symbol):
-        x = upper_limit.s
     return Expression(max(lower_limit, min(upper_limit, x)))
 
 

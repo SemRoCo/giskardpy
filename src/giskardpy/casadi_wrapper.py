@@ -1,55 +1,70 @@
 from __future__ import annotations
-from typing import List, Tuple, Union, Callable, Iterable, Optional, overload, Any
 
-import casadi as ca
+from typing import Union
+
+import casadi as ca  # type: ignore
 import numpy as np
-import rospy
-from geometry_msgs.msg import PoseStamped, Pose
+from geometry_msgs.msg import PoseStamped
 import geometry_msgs.msg as geometry_msgs
-from numpy import pi
 
-from giskardpy.utils.tfwrapper import msg_to_homogeneous_matrix
+_EPS = np.finfo(float).eps * 4.0
 
 
 class CompiledFunction:
-    def __init__(self, str_params: Iterable[str], fast_f: ca.Function, shape: Tuple[int, int]):
+    def __init__(self, str_params, fast_f, shape):
         self.str_params = str_params
         self.fast_f = fast_f
         self.shape = shape
         self.buf, self.f_eval = fast_f.buffer()
         self.out = np.zeros(self.shape, order='F')
-        self.buf.set_res(0, memoryview(self.out))
+        self.buf.set_res(0, memoryview(self.out))  # type: ignore
 
-    def __call__(self, **kwargs) -> np.ndarray:
+    def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
         return self.call2(filtered_args)
 
-    def call2(self, filtered_args: Iterable[float]) -> np.ndarray:
+    def call2(self, filtered_args):
         """
         :param filtered_args: parameter values in the same order as in self.str_params
         """
 
         filtered_args = np.array(filtered_args, dtype=float)
-        self.buf.set_arg(0, memoryview(filtered_args))
+        self.buf.set_arg(0, memoryview(filtered_args))  # type: ignore
         self.f_eval()
         return self.out
 
 
-class Symbol:
-    def __init__(self, name: str):
-        self.s: ca.SX = ca.SX.sym(name)
+class Symbol_:
+    s: ca.SX
 
     def __hash__(self):
         return self.s.__hash__()
 
-    def free_symbols(self) -> List[ca.SX]:
-        return free_symbols(self.s)
+    def __getitem__(self, item):
+        return Expression(self.s[item])
+
+    def __setitem__(self, key, value):
+        if isinstance(value, Symbol):
+            value = value.s
+        self.s[key] = value
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self):
         return self.s.shape
 
-    def compile(self, parameters: Optional[List[Symbol]] = None) -> CompiledFunction:
+    def __len__(self):
+        return self.shape[0] * self.shape[1]
+
+    def free_symbols(self):
+        return free_symbols(self.s)
+
+    def evaluate(self):
+        if len(self) == 1:
+            return float(ca.evalf(self.s))
+        else:
+            return np.array(ca.evalf(self.s))
+
+    def compile(self, parameters=None):
         if parameters is None:
             parameters = self.free_symbols()
         str_params = [str(x) for x in parameters]
@@ -61,9 +76,10 @@ class Symbol:
             f = ca.Function('f', parameters, ca.densify(self.s))
         return CompiledFunction(str_params, f, self.shape)
 
-    @property
-    def T(self):
-        return self.s.T
+
+class Symbol(Symbol_):
+    def __init__(self, name: str):
+        self.s: ca.SX = ca.SX.sym(name)
 
     def __str__(self):
         return str(self.s)
@@ -71,108 +87,93 @@ class Symbol:
     def __repr__(self):
         return repr(self.s)
 
-    def __add__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __add__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__add__(other))
 
-    def __radd__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __radd__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__radd__(other))
 
-    def __sub__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __sub__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__sub__(other))
 
-    def __rsub__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __rsub__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__rsub__(other))
 
-    def __mul__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __mul__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__mul__(other))
 
-    def __rmul__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __rmul__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__rmul__(other))
 
-    def __truediv__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __truediv__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__truediv__(other))
 
-    def __rtruediv__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __rtruediv__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__rtruediv__(other))
 
-    def __lt__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __lt__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__lt__(other))
 
-    def __le__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __le__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__le__(other))
 
-    def __gt__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __gt__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__gt__(other))
 
-    def __ge__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __ge__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__ge__(other))
 
-    def __eq__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __eq__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__eq__(other))
 
-    def __ne__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __ne__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__ne__(other))
 
-    def __neg__(self) -> Expression:
+    def __neg__(self):
         return Expression(self.s.__neg__())
 
-    def __pow__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __pow__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__pow__(other))
 
-    def __rpow__(self, other: Union[Symbol, Expression, float]) -> Expression:
+    def __rpow__(self, other):
         if isinstance(other, Symbol):
             other = other.s
         return Expression(self.s.__rpow__(other))
 
-    def __matmul__(self, other: Union[Symbol, Expression, float]) -> Expression:
-        if isinstance(other, Symbol):
-            other = other.s
-        return Expression(self.s.__matmul__(other))
 
-    def __rmatmul__(self, other: Union[Symbol, Expression, float]) -> Expression:
-        if isinstance(other, Symbol):
-            other = other.s
-        return Expression(self.s.__rmatmul__(other))
-
-
-class Expression(Symbol):
+class Expression(Symbol_):
     @profile
-    def __init__(self, data: Union[Symbol,
-                                   Expression,
-                                   float,
-                                   Iterable[Union[Symbol, float]],
-                                   Iterable[Iterable[Union[Symbol, float]]],
-                                   np.ndarray]):
+    def __init__(self, data):
         if isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, Symbol):
@@ -201,42 +202,96 @@ class Expression(Symbol):
                     else:
                         self[i] = data[i]
 
-    def to_list(self) -> List[Expression]:
-        return [self[i] for i in range(self.shape[0])]
-
-    def remove(self, rows: List[int], columns: List[int]):
+    def remove(self, rows, columns):
         self.s.remove(rows, columns)
-
-    def __len__(self) -> int:
-        return self.shape[0] * self.shape[1]
 
     def __getitem__(self, item):
         return Expression(self.s[item])
 
-    def __setitem__(self, key, value: Union[float, Symbol, Expression]):
+    def __setitem__(self, key, value):
         if isinstance(value, Symbol):
             value = value.s
         self.s[key] = value
 
-    def evaluate(self):
-        if len(self) == 1:
-            return float(ca.evalf(self.s))
-        else:
-            return np.array(ca.evalf(self.s))
+    def __add__(self, other):
+        if isinstance(other, Point3):
+            return Point3(self.s + other.s)
+        if isinstance(other, Vector3):
+            return Vector3(self.s + other.s)
+        if isinstance(other, (Expression, Symbol)):
+            return Expression(self.s + other.s)
+        return Expression(self.s + other)
+
+    def __radd__(self, other):
+        return Expression(self.s + other)
+
+    def __sub__(self, other):
+        if isinstance(other, Point3):
+            return Point3(self.s - other.s)
+        if isinstance(other, Vector3):
+            return Vector3(self.s - other.s)
+        if isinstance(other, (Expression, Symbol)):
+            return Expression(self.s - other.s)
+        return Expression(self.s - other)
+
+    def __rsub__(self, other):
+        return Expression(self.s - other)
+
+    def __truediv__(self, other):
+        if isinstance(other, Point3):
+            return Point3(self.s / other.s)
+        if isinstance(other, Vector3):
+            return Vector3(self.s / other.s)
+        if isinstance(other, (Expression, Symbol)):
+            return Expression(self.s / other.s)
+        return Expression(self.s / other)
+
+    def __rtruediv__(self, other):
+        return Expression(self.s / other)
+
+    def __mul__(self, other):
+        if isinstance(other, Point3):
+            return Point3(self.s * other.s)
+        if isinstance(other, Vector3):
+            return Vector3(self.s * other.s)
+        if isinstance(other, (Expression, Symbol)):
+            return Expression(self.s * other.s)
+        return Expression(self.s * other)
+
+    def __rmul__(self, other):
+        return Expression(self.s * other)
+
+    def __neg__(self):
+        return Expression(self.s.__neg__())
+
+    def __pow__(self, other):
+        if isinstance(other, (Expression, Symbol)):
+            return Expression(self.s ** other.s)
+        return Expression(self.s ** other)
+
+    def __rpow__(self, other):
+        return Expression(self.s ** other)
+
+    @property
+    def T(self):
+        return self.s.T
 
 
-class TransMatrix(Expression):
+class TransMatrix(Symbol_):
     @profile
-    def __init__(self, data: Optional[Union[Iterable[Union[Symbol, float]],
-                                            Iterable[Iterable[Union[Symbol, float]]],
-                                            np.ndarray,
-                                            Expression]] = None):
+    def __init__(self, data=None):
+        if isinstance(data, geometry_msgs.PoseStamped):
+            data = data.pose
+        if isinstance(data, geometry_msgs.Pose):
+            r = RotationMatrix(data.orientation)
+            self.s = r.s
+            self.s[0, 3] = data.position.x
+            self.s[1, 3] = data.position.y
+            self.s[2, 3] = data.position.z
+            return
         if data is None:
-            self.s = ca.SX.eye(4)
-        elif isinstance(data, Expression):
-            self.s = data.s
-        else:
-            super().__init__(data)
+            data = ca.SX.eye(4)
+        self.s = Expression(data).s
         if self.shape[0] != 4 or self.shape[1] != 4:
             raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
         self[3, 0] = 0
@@ -245,97 +300,35 @@ class TransMatrix(Expression):
         self[3, 3] = 1
 
     @classmethod
-    def from_xyz(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]) \
-            -> TransMatrix:
-        r = cls()
-        r[0, 3] = x
-        r[1, 3] = y
-        r[2, 3] = z
-        return r
-
-    @classmethod
-    def from_ros_msg(cls, msg: Union[Pose, PoseStamped]) -> TransMatrix:
-        if isinstance(msg, PoseStamped):
-            msg = msg.pose
-        p = Point3(x=msg.position.x,
-                   y=msg.position.y,
-                   z=msg.position.z)
-        q = Quaternion(x=msg.orientation.x,
-                       y=msg.orientation.y,
-                       z=msg.orientation.z,
-                       w=msg.orientation.w)
-        return cls.from_parts(p, q)
-
-    @classmethod
-    def from_parts(cls,
-                   point3: Optional[Point3] = None,
-                   rotation: Optional[Union[RotationMatrix,
-                                            Quaternion,
-                                            Tuple[Vector3, Union[Symbol, float]],
-                                            Tuple[Union[Symbol, float],
-                                                  Union[Symbol, float],
-                                                  Union[Symbol, float]]]] = None) -> TransMatrix:
-        if point3 is not None:
-            a_T_b = TransMatrix.from_xyz(point3.x, point3.y, point3.z)
+    def from_point_rotation_matrix(cls, point=None, rotation_matrix=None):
+        if rotation_matrix is None:
+            a_T_b = cls()
         else:
-            a_T_b = TransMatrix()
-        if isinstance(rotation, RotationMatrix):
-            a_R_b = rotation
-        elif isinstance(rotation, Quaternion):
-            a_R_b = RotationMatrix.from_quaternion(rotation)
-        elif len(rotation) == 2:
-            a_R_b = RotationMatrix.from_axis_angle(rotation[0], rotation[1])
-        elif rotation is not None:
-            a_R_b = RotationMatrix.from_rpy(rotation[0], rotation[1], rotation[2])
-        else:
-            a_R_b = TransMatrix()
-        return a_T_b.dot(a_R_b)
-
-    @overload
-    def dot(self, other: Point3) -> Point3:
-        ...
-
-    @overload
-    def dot(self, other: Vector3) -> Vector3:
-        ...
-
-    @overload
-    def dot(self, other: TransMatrix) -> TransMatrix:
-        ...
+            a_T_b = cls(rotation_matrix)
+        a_T_b[3, 0] = point.x
+        a_T_b[3, 0] = point.y
+        a_T_b[3, 0] = point.z
+        return a_T_b
 
     def dot(self, other):
-        result = dot(self, other)
-        if isinstance(other, Point3):
-            return Point3.from_matrix(result)
-        if isinstance(other, Vector3):
-            return Vector3.from_matrix(result)
-        return self.__class__(result)
+        return dot(self, other)
 
-    def inverse(self) -> TransMatrix:
+    def inverse(self):
         inv = TransMatrix()
         inv[:3, :3] = self[:3, :3].T
         inv[:3, 3] = dot(-inv[:3, :3], self[:3, 3])
         return self.__class__(inv)
 
     @classmethod
-    def from_xyz_rpy(cls, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float],
-                     roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
-            -> TransMatrix:
-        a_T_b = TransMatrix.from_xyz(x, y, z)
-        a_R_b = RotationMatrix.from_rpy(roll, pitch, yaw)
-        return cls(dot(a_T_b, a_R_b))
+    def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None):
+        p = Point3.from_xyz(x, y, z)
+        r = RotationMatrix.from_rpy(roll, pitch, yaw)
+        return cls.from_point_rotation_matrix(p, r)
 
-    @classmethod
-    def from_xy_yaw(cls, x: Union[Symbol, float], y: Union[Symbol, float], yaw: Union[Symbol, float]) \
-            -> TransMatrix:
-        p = Point3(x, y, 0)
-        axis = Vector3(0, 0, 1)
-        return cls.from_parts(p, (axis, yaw))
-
-    def position(self):
+    def to_position(self):
         return Point3.from_matrix(self[:4, 3:])
 
-    def to_translation(self) -> TransMatrix:
+    def to_translation(self):
         """
         :return: sets the rotation part of a frame to identity
         """
@@ -345,23 +338,26 @@ class TransMatrix(Expression):
         r[2, 3] = self[2, 3]
         return TransMatrix(r)
 
-    def to_rotation(self) -> RotationMatrix:
+    def to_rotation(self):
         return RotationMatrix(self)
 
 
-class RotationMatrix(TransMatrix):
+class RotationMatrix(Symbol_):
     @profile
-    def __init__(self, data: Union[Iterable[Union[Symbol, float]],
-                                   Iterable[Iterable[Union[Symbol, float]]],
-                                   np.ndarray,
-                                   Expression]):
+    def __init__(self, data=None):
+        if isinstance(data, geometry_msgs.QuaternionStamped):
+            data = data.quaternion
+        if isinstance(data, geometry_msgs.Quaternion):
+            data = Quaternion(data)
+        if isinstance(data, Quaternion):
+            data = self.__quaternion_to_rotation_matrix(data)
         super().__init__(data)
         self[0, 3] = 0
         self[1, 3] = 0
         self[2, 3] = 0
 
     @classmethod
-    def from_axis_angle(cls, axis: Vector3, angle: Union[Symbol, float]) -> RotationMatrix:
+    def from_axis_angle(cls, axis, angle):
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
         https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
@@ -384,7 +380,7 @@ class RotationMatrix(TransMatrix):
                     [0, 0, 0, 1]])
 
     @classmethod
-    def from_quaternion(cls, q: Quaternion) -> RotationMatrix:
+    def __quaternion_to_rotation_matrix(cls, q):
         """
         Unit quaternion to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
@@ -397,25 +393,22 @@ class RotationMatrix(TransMatrix):
         y2 = y * y
         z2 = z * z
         w2 = w * w
-        return cls([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                    [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                    [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                    [0, 0, 0, 1]])
+        return [[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                [0, 0, 0, 1]]
 
     @classmethod
-    def from_ros_msg(cls, msg: Union[geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped]) -> RotationMatrix:
-        if isinstance(msg, geometry_msgs.QuaternionStamped):
-            msg = msg.quaternion
-        q = Quaternion(x=msg.x,
-                       y=msg.y,
-                       z=msg.z,
-                       w=msg.w)
-        return cls.from_quaternion(q)
+    def from_quaternion(cls, q):
+        return cls(cls.__quaternion_to_rotation_matrix(q))
 
-    def to_axis_angle(self) -> Tuple[Vector3, Expression]:
+    def dot(self, other):
+        return dot(self, other)
+
+    def to_axis_angle(self):
         return self.to_quaternion().to_axis_angle()
 
-    def to_angle(self, hint: Callable) -> Symbol:
+    def to_angle(self, hint):
         """
         :param hint: A function who's sign of the result will be used to to determine if angle should be positive or
                         negative
@@ -427,10 +420,7 @@ class RotationMatrix(TransMatrix):
                                                else_result=-angle))
 
     @classmethod
-    def from_vectors(cls,
-                     x: Optional[Vector3] = None,
-                     y: Optional[Vector3] = None,
-                     z: Optional[Vector3] = None) -> RotationMatrix:
+    def from_vectors(cls, x=None, y=None, z=None):
         if x is not None:
             x = scale(x, 1)
         if y is not None:
@@ -456,30 +446,32 @@ class RotationMatrix(TransMatrix):
         return R
 
     @classmethod
-    def from_rpy(cls, roll: Union[Symbol, float], pitch: Union[Symbol, float],
-                 yaw: Union[Symbol, float]) -> Expression:
+    def from_rpy(cls, roll=None, pitch=None, yaw=None):
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
         """
-        rx = RotationMatrix([[1, 0, 0, 0],
-                             [0, cos(roll), -sin(roll), 0],
-                             [0, sin(roll), cos(roll), 0],
-                             [0, 0, 0, 1]])
-        ry = RotationMatrix([[cos(pitch), 0, sin(pitch), 0],
-                             [0, 1, 0, 0],
-                             [-sin(pitch), 0, cos(pitch), 0],
-                             [0, 0, 0, 1]])
-        rz = RotationMatrix([[cos(yaw), -sin(yaw), 0, 0],
-                             [sin(yaw), cos(yaw), 0, 0],
-                             [0, 0, 1, 0],
-                             [0, 0, 0, 1]])
-        return cls(dot(rz, ry, rx))
+        roll = 0 if roll is None else roll
+        pitch = 0 if pitch is None else pitch
+        yaw = 0 if yaw is None else yaw
+        rx = cls([[1, 0, 0, 0],
+                  [0, cos(roll), -sin(roll), 0],
+                  [0, sin(roll), cos(roll), 0],
+                  [0, 0, 0, 1]])
+        ry = cls([[cos(pitch), 0, sin(pitch), 0],
+                  [0, 1, 0, 0],
+                  [-sin(pitch), 0, cos(pitch), 0],
+                  [0, 0, 0, 1]])
+        rz = cls([[cos(yaw), -sin(yaw), 0, 0],
+                  [sin(yaw), cos(yaw), 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]])
+        return rz.dot(ry).dot(rx)
 
-    def inverse(self) -> RotationMatrix:
+    def inverse(self):
         return RotationMatrix(self.T)
 
-    def to_rpy(self) -> Tuple[Expression, Expression, Expression]:
+    def to_rpy(self):
         """
         :return: roll, pitch, yaw
         """
@@ -500,7 +492,7 @@ class RotationMatrix(TransMatrix):
                              0)
         return ax, ay, az
 
-    def to_quaternion(self) -> Quaternion:
+    def to_quaternion(self):
         return Quaternion.from_rotation_matrix(self)
 
     def normalize(self):
@@ -510,24 +502,36 @@ class RotationMatrix(TransMatrix):
         self[:3, 1] = scale(self[:3, 1], scale_v)
         self[:3, 2] = scale(self[:3, 2], scale_v)
 
+    @property
+    def T(self):
+        return self.s.T
 
-class Point3(Expression):
+
+class Point3(Symbol_):
     @profile
-    def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
-        super().__init__([x, y, z, 1])
+    def __init__(self, data=None):
+        if isinstance(data, geometry_msgs.PointStamped):
+            data = data.point
+        if isinstance(data, geometry_msgs.Vector3Stamped):
+            data = data.vector
+        if isinstance(data, (Point3, Vector3, geometry_msgs.Point, geometry_msgs.Vector3)):
+            x, y, z = data.x, data.y, data.z
+        else:
+            x, y, z = data[0], data[1], data[2]
+        self.s = ca.SX(4, 1)
+        self.s[0] = x
+        self.s[1] = y
+        self.s[2] = z
+        self.s[3] = 1
 
     @classmethod
-    @profile
-    def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Point3:
-        return cls(m[0], m[1], m[2])
+    def from_xyz(cls, x=None, y=None, z=None):
+        x = 0 if x is None else x
+        y = 0 if y is None else y
+        z = 0 if z is None else z
+        return cls((x, y, z))
 
-    @classmethod
-    def from_ros_msg(cls, msg: Union[geometry_msgs.Point, geometry_msgs.PointStamped]) -> Point3:
-        if isinstance(msg, geometry_msgs.PointStamped):
-            msg = msg.point
-        return cls(x=msg.x, y=msg.y, z=msg.z)
-
-    def norm(self) -> Expression:
+    def norm(self):
         return norm(self)
 
     @property
@@ -554,43 +558,52 @@ class Point3(Expression):
     def z(self, value):
         self[2] = value
 
-    def __add__(self, other: Union[Point3, Vector3]):
-        result = super().__add__(other)
-        return Point3.from_matrix(result)
+    def __add__(self, other):
+        if isinstance(other, (Vector3, Expression, Symbol)):
+            return Point3(self.s + other.s)
+        return Point3(self.s + other)
 
-    def __sub__(self, other: Union[Point3, Vector3]):
-        result = super().__sub__(other)
+    def __radd__(self, other):
+        return Point3(self.s.__add__(other))
+
+    def __sub__(self, other):
         if isinstance(other, Point3):
-            return Vector3.from_matrix(result)
-        return Point3.from_matrix(result)
+            return Vector3(self.s - other.s)
+        if isinstance(other, (Symbol, Expression, Vector3)):
+            return Point3(self.s - other.s)
+        return Point3(self.s - other)
 
-    def __mul__(self, other: Union[Symbol, float]):
-        result = super().__mul__(other)
-        return Point3.from_matrix(result)
+    def __rsub__(self, other):
+        return Point3(self.s.__sub__(other))
 
-    def __truediv__(self, other: Union[Symbol, float]):
-        result = super().__truediv__(other)
-        return Point3.from_matrix(result)
+    def __mul__(self, other):
+        if isinstance(other, (Symbol, Expression)):
+            return Point3(self.s * other.s)
+        return Point3(self.s * other)
+
+    def __rmul__(self, other):
+        return Point3(self.s.__mul__(other))
+
+    def __truediv__(self, other):
+        if isinstance(other, (Symbol, Expression)):
+            return Point3(self.s / other.s)
+        return Point3(self.s / other)
+
+    def __rtruediv__(self, other):
+        return Point3(self.s.__rtruediv__(other))
 
     def __neg__(self) -> Point3:
-        return Point3.from_matrix(super().__neg__())
+        return Point3(self.s.__neg__())
+
+    def dot(self, other):
+        return dot(self, other)
 
 
-class Vector3(Expression):
+class Vector3(Symbol_):
     @profile
-    def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float], z: Union[Symbol, float]):
-        super().__init__([x, y, z, 0])
-
-    @classmethod
-    @profile
-    def from_matrix(cls, m: Union[Iterable[Union[Symbol, float]], Expression]) -> Vector3:
-        return cls(m[0], m[1], m[2])
-
-    @classmethod
-    def from_ros_msg(cls, msg: Union[geometry_msgs.Vector3, geometry_msgs.Vector3Stamped]) -> Vector3:
-        if isinstance(msg, geometry_msgs.Vector3Stamped):
-            msg = msg.vector
-        return cls(x=msg.x, y=msg.y, z=msg.z)
+    def __init__(self, data=None):
+        self.s = Point3(data).s
+        self.s[3] = 0
 
     @property
     def x(self):
@@ -616,56 +629,74 @@ class Vector3(Expression):
     def z(self, value):
         self[2] = value
 
-    @overload
-    def dot(self, other: Vector3) -> Symbol:
-        ...
+    def __add__(self, other):
+        if isinstance(other, (Vector3, Expression, Symbol)):
+            return Point3(self.s + other.s)
+        return Point3(self.s + other)
 
-    @overload
-    def dot(self, other: Point3) -> Symbol:
-        ...
+    def __radd__(self, other):
+        return Point3(self.s.__add__(other))
+
+    def __sub__(self, other):
+        if isinstance(other, Point3):
+            return Vector3(self.s - other.s)
+        if isinstance(other, (Symbol, Expression, Vector3)):
+            return Point3(self.s - other.s)
+        return Point3(self.s - other)
+
+    def __rsub__(self, other):
+        return Point3(self.s.__sub__(other))
+
+    def __mul__(self, other):
+        if isinstance(other, (Symbol, Expression)):
+            return Point3(self.s * other.s)
+        return Point3(self.s * other)
+
+    def __rmul__(self, other):
+        return Point3(self.s.__mul__(other))
+
+    def __truediv__(self, other):
+        if isinstance(other, (Symbol, Expression)):
+            return Point3(self.s / other.s)
+        return Point3(self.s / other)
+
+    def __rtruediv__(self, other):
+        return Point3(self.s.__rtruediv__(other))
+
+    def __neg__(self) -> Point3:
+        return Point3(self.s.__neg__())
 
     def dot(self, other):
-        if isinstance(other, Vector3) or isinstance(other, Point3):
-            return Expression(dot(self[:3].T, other[:3])[0])
         return dot(self, other)
 
-    def __add__(self, other: Union[Point3, Vector3]):
-        result = super().__add__(other)
-        if isinstance(other, Point3):
-            return Point3.from_matrix(result)
-        return Vector3.from_matrix(result)
+    def cross(self, other):
+        result = ca.cross(self.s[:3], other.s[:3])
+        return Vector3(result)
 
-    def __sub__(self, other: Vector3):
-        result = super().__sub__(other)
-        return Vector3.from_matrix(result)
-
-    def __mul__(self, other: Union[Symbol, float]):
-        result = super().__mul__(other)
-        return Vector3.from_matrix(result)
-
-    def __neg__(self) -> Vector3:
-        return Vector3.from_matrix(super().__neg__())
-
-    def __truediv__(self, other: Union[Symbol, float]):
-        result = super().__truediv__(other)
-        return Vector3.from_matrix(result)
-
-    def cross(self, v: Vector3) -> Vector3:
-        result = ca.cross(self.s[:3], v.s[:3])
-        return Vector3.from_matrix(result)
-
-    def norm(self) -> Expression:
+    def norm(self):
         return norm(self)
 
-    def scale(self, a: Union[Symbol, float]):
+    def scale(self, a):
         self.s = (save_division(self, self.norm()) * a).s
 
 
-class Quaternion(Expression):
-    @profile
-    def __init__(self, x: Union[Symbol, float], y: Union[Symbol, float],
-                 z: Union[Symbol, float], w: Union[Symbol, float]):
-        super().__init__([x, y, z, w])
+class Quaternion(Symbol_):
+    def __init__(self, data=None):
+        if isinstance(data, geometry_msgs.QuaternionStamped):
+            data = data.quaternion
+        if isinstance(data, (Point3, Vector3, geometry_msgs.Quaternion)):
+            x, y, z, w = data.x, data.y, data.z, data.w
+        else:
+            x, y, z, w = data[0], data[1], data[2], data[3]
+        self.s = ca.SX(4, 1)
+        self.s[0] = x
+        self.s[1] = y
+        self.s[2] = z
+        self.s[3] = w
+
+    @classmethod
+    def from_xyzw(cls, x, y, z, w):
+        return cls((x, y, z, w))
 
     @property
     def x(self):
@@ -700,20 +731,15 @@ class Quaternion(Expression):
         self[3] = value
 
     @classmethod
-    def from_matrix(cls, m: Expression) -> Quaternion:
-        return cls(m[0], m[1], m[2], m[3])
-
-    @classmethod
-    def from_axis_angle(cls, axis: Vector3, angle: Union[Symbol, float]) -> Quaternion:
+    def from_axis_angle(cls, axis, angle):
         half_angle = angle / 2
-        return cls(axis[0] * sin(half_angle),
-                   axis[1] * sin(half_angle),
-                   axis[2] * sin(half_angle),
-                   cos(half_angle))
+        return cls((axis[0] * sin(half_angle),
+                    axis[1] * sin(half_angle),
+                    axis[2] * sin(half_angle),
+                    cos(half_angle)))
 
     @classmethod
-    def from_rpy(cls, roll: Union[Expression, float], pitch: Union[Expression, float], yaw: Union[Expression, float]) \
-            -> Quaternion:
+    def from_rpy(cls, roll, pitch, yaw):
         roll = Expression(roll).s
         pitch = Expression(pitch).s
         yaw = Expression(yaw).s
@@ -741,7 +767,7 @@ class Quaternion(Expression):
         return cls(x, y, z, w)
 
     @classmethod
-    def from_rotation_matrix(cls, r: RotationMatrix) -> Quaternion:
+    def from_rotation_matrix(cls, r):
         q = cls(0, 0, 0, 0)
         t = trace(r)
 
@@ -790,22 +816,22 @@ class Quaternion(Expression):
         q *= 0.5 / sqrt(t * r[3, 3])
         return cls.from_matrix(q)
 
-    def conjugate(self) -> Quaternion:
+    def conjugate(self):
         return Quaternion(-self[0], -self[1], -self[2], self[3])
 
-    def multiply(self, q: Quaternion) -> Quaternion:
+    def multiply(self, q):
         return Quaternion(x=self.x * q.w + self.y * q.z - self.z * q.y + self.w * q.x,
                           y=-self.x * q.z + self.y * q.w + self.z * q.x + self.w * q.y,
                           z=self.x * q.y - self.y * q.x + self.z * q.w + self.w * q.z,
                           w=-self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w)
 
-    def diff(self, q: Quaternion) -> Quaternion:
+    def diff(self, q):
         """
         :return: quaternion p, such that self*p=q
         """
         return self.conjugate().multiply(q)
 
-    def norm(self) -> Expression:
+    def norm(self):
         return norm(self)
 
     def normalize(self):
@@ -815,7 +841,7 @@ class Quaternion(Expression):
         self.z /= norm_
         self.w /= norm_
 
-    def to_axis_angle(self) -> Tuple[Vector3, Expression]:
+    def to_axis_angle(self):
         self.normalize()
         w2 = sqrt(1 - self.w ** 2)
         m = if_eq_zero(w2, 1, w2)  # avoid /0
@@ -832,7 +858,13 @@ class Quaternion(Expression):
         return self.to_rotation_matrix().to_rpy()
 
 
-def var(variables_names: str) -> List[Symbol]:
+all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
+all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
+symbol_expr_float = Union[Symbol, Expression, float]
+symbol_expr = Union[Symbol, Expression]
+
+
+def var(variables_names: str):
     """
     :param variables_names: e.g. 'a b c'
     :return: e.g. [Symbol('a'), Symbol('b'), Symbol('c')]
@@ -843,48 +875,39 @@ def var(variables_names: str) -> List[Symbol]:
     return symbols
 
 
-def diag(args: Union[List[Union[Symbol, float]], Expression]) -> Expression:
+def diag(args):
     return Expression(ca.diag(Expression(args).s))
 
 
-# def Symbol(data: str) -> ca.SX:
-#     if isinstance(data, str):
-#         return ca.SX.sym(data)
-#     return ca.SX(data)
-
-
-def jacobian(expressions: Union[Expression, List[Expression]],
-             symbols: Union[Expression, List[Symbol]],
-             order: float = 1) -> Expression:
+def jacobian(expressions, symbols, order=1):
     expressions = Expression(expressions)
     if order == 1:
         return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
     elif order == 2:
         j = jacobian(expressions, symbols, order=1)
         for i, symbol in enumerate(symbols):
-            j[:, i] = jacobian(j[:, i], symbol)
+            j[:, i] = jacobian(j[:, i], [symbol])
         return j
     else:
         raise NotImplementedError('jacobian only supports order 1 and 2')
 
 
-def equivalent(expression1: Union[Symbol, Expression], expression2: Union[Symbol, Expression]) -> bool:
+def equivalent(expression1, expression2):
     expression1 = Expression(expression1).s
     expression2 = Expression(expression2).s
     return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
 
 
-def free_symbols(expression: Union[Symbol, Expression]) -> List[ca.SX]:
+def free_symbols(expression):
     expression = Expression(expression).s
     return ca.symvar(expression)
 
 
-def create_symbols(names: List[str]) -> List[Symbol]:
+def create_symbols(names):
     return [Symbol(x) for x in names]
 
 
-def compile_and_execute(f: Callable[[Any], Expression], params: Union[List[Union[float, np.ndarray]], np.ndarray]) \
-        -> Union[float, np.ndarray]:
+def compile_and_execute(f, params):
     input_ = []
     symbol_params = []
     symbol_params2 = []
@@ -925,50 +948,48 @@ def compile_and_execute(f: Callable[[Any], Expression], params: Union[List[Union
         return result
 
 
-def ros_msg_to_matrix(msg: rospy.Message) -> Expression:
-    return Expression(msg_to_homogeneous_matrix(msg))
-
-
-def zeros(x: int, y: int) -> Expression:
+def zeros(x, y):
     return Expression(ca.SX.zeros(x, y))
 
 
-def ones(x: int, y: int) -> Expression:
+def ones(x, y):
     return Expression(ca.SX.ones(x, y))
 
 
-def abs(x: Union[Symbol, float]) -> Expression:
+def abs(x):
     x = Expression(x).s
-    return Expression(ca.fabs(x))
+    result = ca.fabs(x)
+    if isinstance(x, Point3):
+        return Point3(result)
+    elif isinstance(x, Vector3):
+        return Vector3(result)
+    return Expression(result)
 
 
-def max(x: Union[Symbol, float], y: Union[Symbol, float]) -> Expression:
+def max(x, y=None):
     x = Expression(x).s
     y = Expression(y).s
     return Expression(ca.fmax(x, y))
 
 
-def min(x: Union[Symbol, float], y: Union[Symbol, float]) -> Expression:
+def min(x, y=None):
     x = Expression(x).s
     y = Expression(y).s
     return Expression(ca.fmin(x, y))
 
 
-def limit(x: Union[Symbol, float],
-          lower_limit: Union[Symbol, float],
-          upper_limit: Union[Symbol, float]) -> Expression:
+def limit(x, lower_limit, upper_limit):
     return Expression(max(lower_limit, min(upper_limit, x)))
 
 
-def if_else(condition: Union[Symbol, float], if_result: Union[Symbol, float],
-            else_result: Union[Symbol, float]) -> Expression:
+def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
     if_result = Expression(if_result).s
     else_result = Expression(else_result).s
     return Expression(ca.if_else(condition, if_result, else_result))
 
 
-def logic_and(*args: List[Union[Symbol, float]]) -> Union[Symbol, float]:
+def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
         return Expression(ca.logic_and(args[0], args[1]))
@@ -976,7 +997,7 @@ def logic_and(*args: List[Union[Symbol, float]]) -> Union[Symbol, float]:
         return Expression(ca.logic_and(args[0], logic_and(*args[1:])))
 
 
-def logic_or(*args: List[Union[Symbol, float]]) -> Union[Symbol, float]:
+def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
         return ca.logic_or(args[0], args[1])
@@ -984,23 +1005,19 @@ def logic_or(*args: List[Union[Symbol, float]]) -> Union[Symbol, float]:
         return ca.logic_or(args[0], logic_and(*args[1:]))
 
 
-def if_greater(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
-               else_result: Union[Symbol, float]) -> Expression:
+def if_greater(a, b, if_result, else_result):
     a = Expression(a).s
     b = Expression(b).s
     return if_else(ca.gt(a, b), if_result, else_result)
 
 
-def if_less(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
-            else_result: Union[Symbol, float]) -> Expression:
+def if_less(a, b, if_result, else_result):
     a = Expression(a).s
     b = Expression(b).s
     return if_else(ca.lt(a, b), if_result, else_result)
 
 
-def if_greater_zero(condition: Union[Symbol, float],
-                    if_result: Union[Symbol, float],
-                    else_result: Union[Symbol, float]) -> Expression:
+def if_greater_zero(condition, if_result, else_result):
     """
     :return: if_result if condition > 0 else else_result
     """
@@ -1013,16 +1030,14 @@ def if_greater_zero(condition: Union[Symbol, float],
     return Expression(_if + _else + (1 - abs(_condition)) * else_result)  # if_result or else_result
 
 
-def if_greater_eq_zero(condition: Union[Symbol, float], if_result: Union[Symbol, float],
-                       else_result: Union[Symbol, float]) -> Expression:
+def if_greater_eq_zero(condition, if_result, else_result):
     """
     :return: if_result if condition >= 0 else else_result
     """
     return if_greater_eq(condition, 0, if_result, else_result)
 
 
-def if_greater_eq(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
-                  else_result: Union[Symbol, float]) -> Expression:
+def if_greater_eq(a, b, if_result, else_result):
     """
     :return: if_result if a >= b else else_result
     """
@@ -1031,35 +1046,27 @@ def if_greater_eq(a: Union[Symbol, float], b: Union[Symbol, float], if_result: U
     return if_else(ca.ge(a, b), if_result, else_result)
 
 
-def if_less_eq(a: Union[Symbol, float], b: Union[Symbol, float], if_result: Union[Symbol, float],
-               else_result: Union[Symbol, float]) -> Expression:
+def if_less_eq(a, b, if_result, else_result):
     """
     :return: if_result if a <= b else else_result
     """
     return if_greater_eq(b, a, if_result, else_result)
 
 
-def if_eq_zero(condition: Union[Symbol, float],
-               if_result: Union[Symbol, float],
-               else_result: Union[Symbol, float]) -> Expression:
+def if_eq_zero(condition, if_result, else_result):
     """
     :return: if_result if condition == 0 else else_result
     """
     return Expression(if_else(condition, else_result, if_result))
 
 
-def if_eq(a: Union[Symbol, float],
-          b: Union[Symbol, float],
-          if_result: Union[Symbol, float],
-          else_result: Union[Symbol, float]) -> Expression:
+def if_eq(a, b, if_result, else_result):
     a = Expression(a).s
     b = Expression(b).s
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
-def if_eq_cases(a: Union[Symbol, float],
-                b_result_cases: Union[Iterable[Tuple[Union[Symbol, float], Union[Symbol, float]]], Expression],
-                else_result: Union[Symbol, float]) -> Expression:
+def if_eq_cases(a, b_result_cases, else_result):
     a = Expression(a).s
     b_result_cases = Expression(b_result_cases).s
     result = Expression(else_result).s
@@ -1070,9 +1077,7 @@ def if_eq_cases(a: Union[Symbol, float],
     return result
 
 
-def if_less_eq_cases(a: Union[Symbol, float],
-                     b_result_cases: Iterable[Tuple[Union[Symbol, float], Union[Symbol, float]]],
-                     else_result: Union[Symbol, float]) -> Expression:
+def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
     """
@@ -1086,38 +1091,47 @@ def if_less_eq_cases(a: Union[Symbol, float],
     return result
 
 
-def cross(u: Union[Vector3, Expression], v: Union[Vector3, Expression]) -> Vector3:
-    u = Vector3.from_matrix(u)
-    v = Vector3.from_matrix(v)
+def cross(u, v):
+    u = Vector3(u)
+    v = Vector3(v)
     return u.cross(v)
 
 
-def norm(v: Expression) -> Expression:
+def norm(v):
     v = Expression(v).s
     return Expression(ca.norm_2(v))
 
 
-def scale(v: Expression, a: Union[Symbol, float]) -> Expression:
+def scale(v, a):
     return save_division(v, norm(v)) * a
 
 
-def dot(*matrices: Expression) -> Expression:
-    matrices = [Expression(x).s for x in matrices]
-    result = ca.mtimes(matrices)
+def dot(e1, e2):
+    if isinstance(e1, (Point3, Vector3)) and isinstance(e2, (Point3, Vector3)):
+        return Expression(dot(e1[:3].T, e1[:3])[0])
+    result = ca.dot(e1.s, e2.s)
+    if isinstance(e2, RotationMatrix):
+        return RotationMatrix(e2)
+    elif isinstance(e2, TransMatrix):
+        return TransMatrix(e2)
+    elif isinstance(e2, Point3):
+        return Point3(e2)
+    elif isinstance(e2, Vector3):
+        return Vector3(e2)
     return Expression(result)
 
 
-def eye(size: int) -> Expression:
+def eye(size):
     return Expression(ca.SX.eye(size))
 
 
-def kron(m1: Expression, m2: Expression) -> Expression:
+def kron(m1, m2):
     m1 = Expression(m1).s
     m2 = Expression(m2).s
     return Expression(ca.kron(m1, m2))
 
 
-def trace(matrix: Expression) -> Expression:
+def trace(matrix):
     matrix = Expression(matrix).s
     s = 0
     for i in range(matrix.shape[0]):
@@ -1125,45 +1139,42 @@ def trace(matrix: Expression) -> Expression:
     return Expression(s)
 
 
-def rotation_distance(a_R_b: Expression, a_R_c: Expression) -> Expression:
-    """
-    :param a_R_b: 4x4 or 3x3 Matrix
-    :param a_R_c: 4x4 or 3x3 Matrix
-    :return: angle of axis angle representation of b_R_c
-    """
-    a_R_b = Expression(a_R_b).s
-    a_R_c = Expression(a_R_c).s
-    difference = dot(a_R_b.T, a_R_c)
-    # return axis_angle_from_matrix(difference)[1]
-    angle = (trace(difference[:3, :3]) - 1) / 2
-    angle = min(angle, 1)
-    angle = max(angle, -1)
-    return acos(angle)
+# def rotation_distance(a_R_b, a_R_c):
+#     """
+#     :param a_R_b: 4x4 or 3x3 Matrix
+#     :param a_R_c: 4x4 or 3x3 Matrix
+#     :return: angle of axis angle representation of b_R_c
+#     """
+#     a_R_b = Expression(a_R_b).s
+#     a_R_c = Expression(a_R_c).s
+#     difference = dot(a_R_b.T, a_R_c)
+#     # return axis_angle_from_matrix(difference)[1]
+#     angle = (trace(difference[:3, :3]) - 1) / 2
+#     angle = min(angle, 1)
+#     angle = max(angle, -1)
+#     return acos(angle)
 
 
-def vstack(list_of_matrices: List[Expression]) -> Expression:
+def vstack(list_of_matrices):
     return Expression(ca.vertcat(*[x.s for x in list_of_matrices]))
 
 
-def hstack(list_of_matrices: List[Expression]) -> Expression:
+def hstack(list_of_matrices):
     return Expression(ca.horzcat(*[x.s for x in list_of_matrices]))
 
 
-def normalize_axis_angle(axis: Expression, angle: Union[Symbol, float]) -> Tuple[Expression, Union[Symbol, float]]:
+def normalize_axis_angle(axis, angle):
+    # todo add test
     axis = if_less(angle, 0, -axis, axis)
     angle = abs(angle)
     return axis, angle
 
 
-def axis_angle_from_rpy(roll: Union[Symbol, float], pitch: Union[Symbol, float], yaw: Union[Symbol, float]) \
-        -> Tuple[Vector3, Expression]:
+def axis_angle_from_rpy(roll, pitch, yaw):
     return Quaternion.from_rpy(roll, pitch, yaw).to_axis_angle()
 
 
-_EPS = np.finfo(float).eps * 4.0
-
-
-def cosine_distance(v0: Expression, v1: Expression) -> Union[Symbol, float]:
+def cosine_distance(v0, v1):
     """
     cosine distance ranging from 0 to 2
     :param v0: nx1 Matrix
@@ -1172,7 +1183,7 @@ def cosine_distance(v0: Expression, v1: Expression) -> Union[Symbol, float]:
     return 1 - ((dot(v0.T, v1))[0] / (norm(v0) * norm(v1)))
 
 
-def euclidean_distance(v1: Expression, v2: Expression) -> Union[Symbol, float]:
+def euclidean_distance(v1, v2):
     """
     :param v1: nx1 Matrix
     :param v2: nx1 Matrix
@@ -1180,30 +1191,30 @@ def euclidean_distance(v1: Expression, v2: Expression) -> Union[Symbol, float]:
     return norm(v1 - v2)
 
 
-def fmod(a: Union[Symbol, float], b: Union[Symbol, float]) -> Expression:
+def fmod(a, b):
     a = Expression(a).s
     b = Expression(b).s
     return Expression(ca.fmod(a, b))
 
 
-def normalize_angle_positive(angle: Union[Symbol, float]) -> Expression:
+def normalize_angle_positive(angle):
     """
     Normalizes the angle to be 0 to 2*pi
     It takes and returns radians.
     """
-    return fmod(fmod(angle, 2.0 * pi) + 2.0 * pi, 2.0 * pi)
+    return fmod(fmod(angle, 2.0 * ca.pi) + 2.0 * ca.pi, 2.0 * ca.pi)
 
 
-def normalize_angle(angle: Union[Symbol, float]) -> Expression:
+def normalize_angle(angle):
     """
     Normalizes the angle to be -pi to +pi
     It takes and returns radians.
     """
     a = normalize_angle_positive(angle)
-    return if_greater(a, pi, a - 2.0 * pi, a)
+    return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
 
 
-def shortest_angular_distance(from_angle: Union[Symbol, float], to_angle: Union[Symbol, float]) -> Expression:
+def shortest_angular_distance(from_angle, to_angle):
     """
     Given 2 angles, this returns the shortest angular
     difference.  The inputs and outputs are of course radians.
@@ -1214,7 +1225,7 @@ def shortest_angular_distance(from_angle: Union[Symbol, float], to_angle: Union[
     return normalize_angle(to_angle - from_angle)
 
 
-def quaternion_slerp(q1: Expression, q2: Expression, t: Union[Symbol, float]) -> Expression:
+def quaternion_slerp(q1, q2, t):
     """
     spherical linear interpolation that takes into account that q == -q
     :param q1: 4x1 Matrix
@@ -1251,7 +1262,7 @@ def quaternion_slerp(q1: Expression, q2: Expression, t: Union[Symbol, float]) ->
                                               ratio_a * q1 + ratio_b * q2))
 
 
-def slerp(v1: Expression, v2: Expression, t: float) -> Expression:
+def slerp(v1, v2, t):
     """
     spherical linear interpolation
     :param v1: any vector
@@ -1265,33 +1276,18 @@ def slerp(v1: Expression, v2: Expression, t: float) -> Expression:
                  (sin((1 - t) * angle2) / sin(angle2)) * v1 + (sin(t * angle2) / sin(angle2)) * v2)
 
 
-@overload
-def save_division(nominator: Symbol, denominator: Union[Symbol, float], if_nan: Union[Symbol, float] = 0) -> Symbol: ...
-
-
-@overload
-def save_division(nominator: Vector3, denominator: Union[Symbol, float], if_nan: Union[Symbol, float] = 0) \
-        -> Vector3: ...
-
-
-@overload
-def save_division(nominator: Point3, denominator: Union[Symbol, float], if_nan: Union[Symbol, float] = 0) \
-        -> Point3: ...
-
-
-def save_division(nominator: Union[Symbol, float],
-                  denominator: Union[Symbol, float],
-                  if_nan: Union[Symbol, float] = 0) -> Expression:
+def save_division(nominator, denominator, if_nan=None):
+    if_nan = 0 if if_nan is None else if_nan
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 
 
-def save_acos(angle: Union[Symbol, float]) -> Union[Symbol, float]:
+def save_acos(angle):
     angle = limit(angle, -1, 1)
     return acos(angle)
 
 
-def entrywise_product(matrix1: Expression, matrix2: Expression) -> Expression:
+def entrywise_product(matrix1, matrix2):
     assert matrix1.shape == matrix2.shape
     result = zeros(*matrix1.shape)
     for i in range(matrix1.shape[0]):
@@ -1300,27 +1296,27 @@ def entrywise_product(matrix1: Expression, matrix2: Expression) -> Expression:
     return result
 
 
-def floor(x: Union[Symbol, float]) -> Expression:
+def floor(x):
     x = Expression(x).s
     return Expression(ca.floor(x))
 
 
-def ceil(x: Union[Symbol, float]) -> Expression:
+def ceil(x):
     x = Expression(x).s
     return Expression(ca.ceil(x))
 
 
-def round_up(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Expression:
+def round_up(x, decimal_places):
     f = 10 ** (decimal_places)
     return ceil(x * f) / f
 
 
-def round_down(x: Union[Symbol, float], decimal_places: Union[Symbol, float]) -> Expression:
+def round_down(x, decimal_places):
     f = 10 ** (decimal_places)
     return floor(x * f) / f
 
 
-def sum(matrix: Expression) -> Expression:
+def sum(matrix):
     """
     the equivalent to np.sum(matrix)
     """
@@ -1336,7 +1332,7 @@ def sum_row(matrix: Expression) -> Expression:
     return Expression(ca.sum1(matrix))
 
 
-def sum_column(matrix: Expression) -> Expression:
+def sum_column(matrix):
     """
     the equivalent to np.sum(matrix, axis=1)
     """
@@ -1344,8 +1340,7 @@ def sum_column(matrix: Expression) -> Expression:
     return Expression(ca.sum2(matrix))
 
 
-def distance_point_to_line_segment(point: Point3, line_start: Point3, line_end: Point3) \
-        -> Tuple[Expression, Point3]:
+def distance_point_to_line_segment(point, line_start, line_end):
     """
     :param point: current position of an object (i. e.) gripper tip
     :param line_start: start of the approached line
@@ -1365,17 +1360,17 @@ def distance_point_to_line_segment(point: Point3, line_start: Point3, line_end: 
     return dist, Point3.from_matrix(nearest)
 
 
-def angle_between_vector(v1: Expression, v2: Expression) -> Union[Symbol, float]:
+def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
 
 
-def velocity_limit_from_position_limit(acceleration_limit: Union[Symbol, float],
-                                       position_limit: Union[Symbol, float],
-                                       current_position: Union[Symbol, float],
-                                       step_size: Union[Symbol, float],
-                                       eps: float = 1e-5) -> Expression:
+def velocity_limit_from_position_limit(acceleration_limit,
+                                       position_limit,
+                                       current_position,
+                                       step_size,
+                                       eps=1e-5):
     """
     Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
     :param acceleration_limit:
@@ -1409,7 +1404,7 @@ def velocity_limit_from_position_limit(acceleration_limit: Union[Symbol, float],
     return Expression(velocity_limit)
 
 
-def to_str(expression: Union[Symbol, float]) -> str:
+def to_str(expression):
     """
     Turns expression into a more or less readable string.
     """
@@ -1424,10 +1419,9 @@ def to_str(expression: Union[Symbol, float]) -> str:
     return result
 
 
-def total_derivative(expr: Union[Symbol, Expression],
-                     symbols: Union[Expression, Iterable[Symbol]],
-                     symbols_dot: Union[Expression, Iterable[Symbol]]) \
-        -> Union[Symbol, Expression]:
+def total_derivative(expr,
+                     symbols,
+                     symbols_dot):
     expr_jacobian = jacobian(expr, symbols)
     last_velocities = Expression(symbols_dot)
     velocity = dot(expr_jacobian, last_velocities)
@@ -1437,49 +1431,49 @@ def total_derivative(expr: Union[Symbol, Expression],
         return velocity
 
 
-def quaternion_multiply(q1: Quaternion, q2: Quaternion) -> Quaternion:
-    q1 = Quaternion.from_matrix(q1)
-    q2 = Quaternion.from_matrix(q2)
+def quaternion_multiply(q1, q2):
+    q1 = Quaternion(q1)
+    q2 = Quaternion(q2)
     return q1.multiply(q2)
 
 
-def quaternion_conjugate(q: Quaternion) -> Quaternion:
-    q1 = Quaternion.from_matrix(q)
+def quaternion_conjugate(q):
+    q1 = Quaternion(q)
     return q1.conjugate()
 
 
-def quaternion_diff(q1: Quaternion, q2: Quaternion) -> Quaternion:
-    q1 = Quaternion.from_matrix(q1)
-    q2 = Quaternion.from_matrix(q2)
+def quaternion_diff(q1, q2):
+    q1 = Quaternion(q1)
+    q2 = Quaternion(q2)
     return q1.diff(q2)
 
 
-def sign(x: Union[Symbol, float]) -> Expression:
+def sign(x):
     x = Expression(x).s
     return Expression(ca.sign(x))
 
 
-def cos(x: Union[Symbol, float]) -> Expression:
+def cos(x):
     x = Expression(x).s
     return Expression(ca.cos(x))
 
 
-def sin(x: Union[Symbol, float]) -> Expression:
+def sin(x):
     x = Expression(x).s
     return Expression(ca.sin(x))
 
 
-def sqrt(x: Union[Symbol, float]) -> Expression:
+def sqrt(x):
     x = Expression(x).s
     return Expression(ca.sqrt(x))
 
 
-def acos(x: Union[Symbol, float]) -> Expression:
+def acos(x):
     x = Expression(x).s
     return Expression(ca.acos(x))
 
 
-def atan2(x: Union[Symbol, float], y: Union[Symbol, float]) -> Expression:
+def atan2(x, y):
     x = Expression(x).s
     y = Expression(y).s
     return Expression(ca.atan2(x, y))

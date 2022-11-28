@@ -329,7 +329,7 @@ class CollisionAvoidanceHint(Goal):
 
         # penetration_distance = threshold - actual_distance_capped
 
-        root_P_a = root_T_a.position()
+        root_P_a = root_T_a.to_position()
         expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)

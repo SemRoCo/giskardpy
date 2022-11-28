@@ -73,10 +73,6 @@ class Derivatives(IntEnum):
 
 my_string = Union[str, PrefixName]
 goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, None]
-# Union[w.Symbol, float] = Union[Symbol, float]
-# expr_symbol = ca.SX
-# w.Matrix = ca.SX
-# any_expr = Union[Union[w.Symbol, float], w.Matrix]
 derivative_map = Dict[Derivatives, float]
 derivative_joint_map = Dict[Derivatives, Dict[my_string, float]]
 transformable_message = Union[PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped]

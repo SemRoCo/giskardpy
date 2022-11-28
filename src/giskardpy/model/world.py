@@ -1113,7 +1113,7 @@ class WorldTree:
                 if link.has_collisions():
                     fk: w.TransMatrix = self.compose_fk_expression(self.root_link_name, link.name)
                     fk = fk.dot(link.collisions[0].link_T_geometry)
-                    position = fk.position()
+                    position = fk.to_position()
                     orientation = fk.to_rotation().to_quaternion()
                     fks.append(w.vstack([position, orientation]).T)
                     self.fk_idx[link.name] = i

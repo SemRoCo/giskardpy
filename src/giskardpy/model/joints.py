@@ -673,7 +673,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
             yaw_vel = 0
 
         # caster_link = self.world.joints[self.name].child_link_name
-        parent_P_child = self._parent_T_child.position()
+        parent_P_child = self._parent_T_child.to_position()
         new_vel_x, new_vel_y = self.pointVel2D(parent_P_child[0],
                                                parent_P_child[1],
                                                x_vel,

@@ -151,7 +151,7 @@ class Goal(ABC):
             raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
         return self.god_map.to_expr(self._get_identifier() + [name])
 
-    def get_expr_velocity(self, expr: Union[Union[w.Symbol, float], w.Expression]) -> Union[w.Symbol, float]:
+    def get_expr_velocity(self, expr: w.Expression) -> w.Expression:
         """
         Creates an expressions that computes the total derivative of expr
         """
@@ -178,7 +178,7 @@ class Goal(ABC):
         r_R_t = r_T_t.to_rotation()
         axis, angle = r_R_t.to_axis_angle()
         r_R_t_axis_angle = axis * angle
-        r_P_t = r_T_t.position()
+        r_P_t = r_T_t.to_position()
         fk = w.Expression([r_P_t[0],
                            r_P_t[1],
                            r_P_t[2],
@@ -339,7 +339,7 @@ class Goal(ABC):
             for y in range(matrix_expr.shape[1]):
                 self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
 
-    def add_debug_vector(self, name: str, vector_expr: Union[w.Symbol, float]):
+    def add_debug_vector(self, name: str, vector_expr: w.Expression):
         """
         Calls add_debug_expr for a vector.
         """

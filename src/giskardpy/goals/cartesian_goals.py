@@ -56,7 +56,7 @@ class CartesianPosition(Goal):
 
     def make_constraints(self):
         r_P_g = w.Point3.from_ros_msg(self.goal_point)
-        r_P_c = self.get_fk(self.root_link, self.tip_link).position()
+        r_P_c = self.get_fk(self.root_link, self.tip_link).to_position()
         if self.root_link2 is not None:
             root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
             r_P_c = root_link2_T_root_link.dot(r_P_c)
@@ -166,7 +166,7 @@ class CartesianPositionStraight(Goal):
 
     def make_constraints(self):
         root_P_goal = w.Point3.from_ros_msg(self.goal_point)
-        root_P_tip = self.get_fk(self.root_link, self.tip_link).position()
+        root_P_tip = self.get_fk(self.root_link, self.tip_link).to_position()
         t_T_r = self.get_fk(self.tip_link, self.root_link)
         tip_P_goal = t_T_r.dot(root_P_goal)
 
@@ -188,7 +188,7 @@ class CartesianPositionStraight(Goal):
         a_T_t = t_R_a.inverse().dot(
             self.get_fk_evaluated(self.tip_link, self.root_link)).dot(
             self.get_fk(self.root_link, self.tip_link))
-        expr_p = a_T_t.position()
+        expr_p = a_T_t.to_position()
         dist = w.norm(root_P_goal - root_P_tip)
 
         # self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
@@ -329,10 +329,10 @@ class DiffDriveBaseGoal(Goal):
         angle_start = w.if_greater_zero(axis_start[2], angle_start, -angle_start)
 
         map_T_base_footprint = self.get_fk(self.map, self.base_footprint)
-        map_P_base_footprint = map_T_base_footprint.to_rotation()
+        map_P_base_footprint = map_T_base_footprint.to_position()
         map_R_base_footprint = map_T_base_footprint.to_rotation()
         map_T_base_footprint_goal = w.TransMatrix.from_ros_msg(self.goal_pose)
-        map_P_base_footprint_goal = map_T_base_footprint_goal.position()
+        map_P_base_footprint_goal = map_T_base_footprint_goal.to_position()
         map_R_base_footprint_goal = map_T_base_footprint_goal.to_rotation()
         # base_footprint_V_pointing_axis = w.ros_msg_to_matrix(self.base_footprint_V_pointing_axis)
 
@@ -403,9 +403,6 @@ class DiffDriveBaseGoal(Goal):
         # self.add_debug_vector('map_V_goal_x', map_V_goal_x)
         # self.add_debug_vector('map_P_base_footprint_goal', map_P_base_footprint_goal)
         # self.add_debug_vector('map_P_base_footprint', map_P_base_footprint)
-        self.add_debug_expr('map_goal_angle1', map_goal_angle1)
-        self.add_debug_expr('map_current_angle', map_current_angle)
-        self.add_debug_expr('rotate_to_goal_error', rotate_to_goal_error)
 
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=map_V_goal_x,
@@ -494,7 +491,7 @@ class TranslationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_P_c = self.get_fk(self.root_link, self.tip_link).position()
+        r_P_c = self.get_fk(self.root_link, self.tip_link).to_position()
         # self.add_debug_expr('limit', -self.max_velocity)
         if not self.hard:
             self.add_translational_velocity_limit(frame_P_current=r_P_c,
@@ -527,7 +524,7 @@ class RotationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_R_c = self.get_fk(self.root_link, self.tip_link).position()
+        r_R_c = self.get_fk(self.root_link, self.tip_link).to_position()
         if self.hard:
             self.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,

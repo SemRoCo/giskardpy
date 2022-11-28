@@ -48,7 +48,7 @@ class TestSymbol:
         assert isinstance(e, w.Expression)
 
 
-class TestMatrix(unittest.TestCase):
+class TestExpression(unittest.TestCase):
     def test_create(self):
         w.Expression(w.Symbol('muh'))
         w.Expression([w.ca.SX(1), w.ca.SX.sym('muh')])
@@ -180,7 +180,7 @@ class TestRotationMatrix(unittest.TestCase):
 class TestPoint3(unittest.TestCase):
 
     def test_norm(self):
-        p = w.Point3(1, 2, 3)
+        p = w.Point3((1, 2, 3))
         try:
             p.norm()
         except AttributeError as e:
@@ -188,7 +188,7 @@ class TestPoint3(unittest.TestCase):
 
     @given(vector(3))
     def test_point3(self, v):
-        r1 = w.Point3(*v)
+        r1 = w.Point3(v)
         assert isinstance(r1, w.Point3)
         self.assertEqual(r1[0], v[0])
         self.assertEqual(r1[1], v[1])
@@ -196,8 +196,8 @@ class TestPoint3(unittest.TestCase):
         self.assertEqual(r1[3], 1)
 
     def test_point3_sub(self):
-        p1 = w.Point3(1, 1, 1)
-        p2 = w.Point3(1, 1, 1)
+        p1 = w.Point3((1, 1, 1))
+        p2 = w.Point3((1, 1, 1))
         p3 = p1 - p2
         assert isinstance(p3, w.Vector3)
         self.assertEqual(p3[0], 0)
@@ -206,8 +206,8 @@ class TestPoint3(unittest.TestCase):
         self.assertEqual(p3[3], 0)
 
     def test_point3_add_vector3(self):
-        p1 = w.Point3(1, 1, 1)
-        v1 = w.Vector3(1, 1, 1)
+        p1 = w.Point3((1, 1, 1))
+        v1 = w.Vector3((1, 1, 1))
         p3 = p1 + v1
         assert isinstance(p3, w.Point3)
         self.assertEqual(p3[0], 2)
@@ -216,7 +216,7 @@ class TestPoint3(unittest.TestCase):
         self.assertEqual(p3[3], 1)
 
     def test_point3_mul(self):
-        p1 = w.Point3(1, 1, 1)
+        p1 = w.Point3((1, 1, 1))
         s = w.Symbol('s')
         p3 = p1 * s
         assert isinstance(p3, w.Point3)
@@ -233,7 +233,7 @@ class TestVector3(unittest.TestCase):
 
     @given(vector(3))
     def test_vector3(self, v):
-        r1 = w.Vector3(*v)
+        r1 = w.Vector3(v)
         assert isinstance(r1, w.Vector3)
         self.assertEqual(r1[0], v[0])
         self.assertEqual(r1[1], v[1])

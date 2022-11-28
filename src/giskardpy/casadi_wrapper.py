@@ -4,7 +4,6 @@ from typing import Union
 
 import casadi as ca  # type: ignore
 import numpy as np
-from geometry_msgs.msg import PoseStamped
 import geometry_msgs.msg as geometry_msgs
 
 _EPS = np.finfo(float).eps * 4.0
@@ -44,7 +43,7 @@ class Symbol_:
         return Expression(self.s[item])
 
     def __setitem__(self, key, value):
-        if isinstance(value, Symbol):
+        if isinstance(value, Symbol_):
             value = value.s
         self.s[key] = value
 
@@ -59,7 +58,7 @@ class Symbol_:
         return free_symbols(self.s)
 
     def evaluate(self):
-        if len(self) == 1:
+        if len(self) <= 1:
             return float(ca.evalf(self.s))
         else:
             return np.array(ca.evalf(self.s))
@@ -88,72 +87,72 @@ class Symbol(Symbol_):
         return repr(self.s)
 
     def __add__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__add__(other))
 
     def __radd__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__radd__(other))
 
     def __sub__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__sub__(other))
 
     def __rsub__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__rsub__(other))
 
     def __mul__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__mul__(other))
 
     def __rmul__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__rmul__(other))
 
     def __truediv__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__truediv__(other))
 
     def __rtruediv__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__rtruediv__(other))
 
     def __lt__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__lt__(other))
 
     def __le__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__le__(other))
 
     def __gt__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__gt__(other))
 
     def __ge__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__ge__(other))
 
     def __eq__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__eq__(other))
 
     def __ne__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__ne__(other))
 
@@ -161,12 +160,12 @@ class Symbol(Symbol_):
         return Expression(self.s.__neg__())
 
     def __pow__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__pow__(other))
 
     def __rpow__(self, other):
-        if isinstance(other, Symbol):
+        if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__rpow__(other))
 
@@ -176,7 +175,7 @@ class Expression(Symbol_):
     def __init__(self, data):
         if isinstance(data, ca.SX):
             self.s = data
-        elif isinstance(data, Symbol):
+        elif isinstance(data, Symbol_):
             self.s = data.s
         elif isinstance(data, (int, float)):
             self.s = ca.SX(data)
@@ -204,14 +203,6 @@ class Expression(Symbol_):
 
     def remove(self, rows, columns):
         self.s.remove(rows, columns)
-
-    def __getitem__(self, item):
-        return Expression(self.s[item])
-
-    def __setitem__(self, key, value):
-        if isinstance(value, Symbol):
-            value = value.s
-        self.s[key] = value
 
     def __add__(self, other):
         if isinstance(other, Point3):
@@ -272,6 +263,16 @@ class Expression(Symbol_):
     def __rpow__(self, other):
         return Expression(self.s ** other)
 
+    def __eq__(self, other):
+        if isinstance(other, Symbol_):
+            other = other.s
+        return Expression(self.s.__eq__(other))
+
+    def __ne__(self, other):
+        if isinstance(other, Symbol_):
+            other = other.s
+        return Expression(self.s.__ne__(other))
+
     @property
     def T(self):
         return self.s.T
@@ -326,7 +327,7 @@ class TransMatrix(Symbol_):
         return cls.from_point_rotation_matrix(p, r)
 
     def to_position(self):
-        return Point3.from_matrix(self[:4, 3:])
+        return Point3(self[:4, 3:])
 
     def to_translation(self):
         """
@@ -351,10 +352,18 @@ class RotationMatrix(Symbol_):
             data = Quaternion(data)
         if isinstance(data, Quaternion):
             data = self.__quaternion_to_rotation_matrix(data)
-        super().__init__(data)
+        if data is None:
+            data = ca.SX.eye(4)
+        self.s = Expression(data).s
+        if self.shape[0] != 4 or self.shape[1] != 4:
+            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
         self[0, 3] = 0
         self[1, 3] = 0
         self[2, 3] = 0
+        self[3, 0] = 0
+        self[3, 1] = 0
+        self[3, 2] = 0
+        self[3, 3] = 1
 
     @classmethod
     def from_axis_angle(cls, axis, angle):
@@ -764,11 +773,11 @@ class Quaternion(Symbol_):
         z = c_pitch * cs - s_pitch * sc
         w = c_pitch * cc + s_pitch * ss
 
-        return cls(x, y, z, w)
+        return cls((x, y, z, w))
 
     @classmethod
     def from_rotation_matrix(cls, r):
-        q = cls(0, 0, 0, 0)
+        q = cls((0, 0, 0, 0))
         t = trace(r)
 
         if0 = t - r[3, 3]
@@ -814,16 +823,16 @@ class Quaternion(Symbol_):
         q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
 
         q *= 0.5 / sqrt(t * r[3, 3])
-        return cls.from_matrix(q)
+        return cls(q)
 
     def conjugate(self):
-        return Quaternion(-self[0], -self[1], -self[2], self[3])
+        return Quaternion((-self[0], -self[1], -self[2], self[3]))
 
     def multiply(self, q):
-        return Quaternion(x=self.x * q.w + self.y * q.z - self.z * q.y + self.w * q.x,
-                          y=-self.x * q.z + self.y * q.w + self.z * q.x + self.w * q.y,
-                          z=self.x * q.y - self.y * q.x + self.z * q.w + self.w * q.z,
-                          w=-self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w)
+        return Quaternion((self.x * q.w + self.y * q.z - self.z * q.y + self.w * q.x,
+                           -self.x * q.z + self.y * q.w + self.z * q.x + self.w * q.y,
+                           self.x * q.y - self.y * q.x + self.z * q.w + self.w * q.z,
+                           -self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w))
 
     def diff(self, q):
         """
@@ -849,7 +858,7 @@ class Quaternion(Symbol_):
         x = if_eq_zero(w2, 0, self.x / m)
         y = if_eq_zero(w2, 0, self.y / m)
         z = if_eq_zero(w2, 1, self.z / m)
-        return Vector3(x, y, z), angle
+        return Vector3((x, y, z)), angle
 
     def to_rotation_matrix(self):
         return RotationMatrix.from_quaternion(self)
@@ -934,7 +943,7 @@ def compile_and_execute(f, params):
     symbol_params = [Expression(x) for x in symbol_params]
     symbol_params2 = [Expression(x) for x in symbol_params2]
     expr = f(*symbol_params)
-    assert isinstance(expr, Expression)
+    assert isinstance(expr, Symbol_)
     fast_f = expr.compile(symbol_params2)
     input_ = np.concatenate(input_).T[0]
     result = fast_f.call2(input_)
@@ -1352,12 +1361,12 @@ def distance_point_to_line_segment(point, line_start, line_end):
     line_len = norm(line_vec)
     line_unitvec = line_vec / line_len
     pnt_vec_scaled = pnt_vec / line_len
-    t = dot(line_unitvec.T, pnt_vec_scaled)[0]
+    t = line_unitvec.dot(pnt_vec_scaled)
     t = min(max(t, 0.0), 1.0)
     nearest = line_vec * t
     dist = norm(nearest - pnt_vec)
     nearest = nearest + line_start
-    return dist, Point3.from_matrix(nearest)
+    return dist, Point3(nearest)
 
 
 def angle_between_vector(v1, v2):

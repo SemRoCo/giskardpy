@@ -158,6 +158,8 @@ class Expression(Symbol_):
 
     def remove(self, rows: List[int], columns: List[int]): ...
 
+    def dot(self, other: Expression) -> Expression: ...
+
 
 class Point3(Symbol_):
     @property
@@ -177,6 +179,7 @@ class Point3(Symbol_):
                                             geometry_msgs.Point, geometry_msgs.PointStamped,
                                             geometry_msgs.Vector3, geometry_msgs.Vector3Stamped,
                                             ca.SX,
+                                            np.ndarray,
                                             Tuple[symbol_expr_float,
                                                   symbol_expr_float,
                                                   symbol_expr_float]]] = None): ...
@@ -253,6 +256,7 @@ class Vector3(Symbol_):
                                             geometry_msgs.Point, geometry_msgs.PointStamped,
                                             geometry_msgs.Vector3, geometry_msgs.Vector3Stamped,
                                             ca.SX,
+                                            np.ndarray,
                                             Tuple[symbol_expr_float,
                                                   symbol_expr_float,
                                                   symbol_expr_float]]] = None): ...

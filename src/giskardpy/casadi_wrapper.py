@@ -36,6 +36,12 @@ class CompiledFunction:
 class Symbol_:
     s: ca.SX
 
+    def __str__(self):
+        return str(self.s)
+
+    def __repr__(self):
+        return repr(self.s)
+
     def __hash__(self):
         return self.s.__hash__()
 
@@ -79,12 +85,6 @@ class Symbol_:
 class Symbol(Symbol_):
     def __init__(self, name: str):
         self.s: ca.SX = ca.SX.sym(name)
-
-    def __str__(self):
-        return str(self.s)
-
-    def __repr__(self):
-        return repr(self.s)
 
     def __add__(self, other):
         if isinstance(other, Symbol_):
@@ -238,7 +238,7 @@ class Expression(Symbol_):
         return Expression(self.s / other)
 
     def __rtruediv__(self, other):
-        return Expression(self.s / other)
+        return Expression(self.s.__rtruediv__(other))
 
     def __mul__(self, other):
         if isinstance(other, Point3):
@@ -273,9 +273,12 @@ class Expression(Symbol_):
             other = other.s
         return Expression(self.s.__ne__(other))
 
+    def dot(self, other):
+        return dot(self, other)
+
     @property
     def T(self):
-        return self.s.T
+        return Expression(self.s.T)
 
 
 class TransMatrix(Symbol_):
@@ -356,7 +359,8 @@ class RotationMatrix(Symbol_):
             data = ca.SX.eye(4)
         self.s = Expression(data).s
         if self.shape[0] != 4 or self.shape[1] != 4:
-            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
+            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data, '
+                             f'you have{self.shape}.')
         self[0, 3] = 0
         self[1, 3] = 0
         self[2, 3] = 0
@@ -528,10 +532,10 @@ class Point3(Symbol_):
         else:
             x, y, z = data[0], data[1], data[2]
         self.s = ca.SX(4, 1)
-        self.s[0] = x
-        self.s[1] = y
-        self.s[2] = z
-        self.s[3] = 1
+        self[0] = x
+        self[1] = y
+        self[2] = z
+        self[3] = 1
 
     @classmethod
     def from_xyz(cls, x=None, y=None, z=None):
@@ -612,7 +616,7 @@ class Vector3(Symbol_):
     @profile
     def __init__(self, data=None):
         self.s = Point3(data).s
-        self.s[3] = 0
+        self[3] = 0
 
     @property
     def x(self):
@@ -698,10 +702,10 @@ class Quaternion(Symbol_):
         else:
             x, y, z, w = data[0], data[1], data[2], data[3]
         self.s = ca.SX(4, 1)
-        self.s[0] = x
-        self.s[1] = y
-        self.s[2] = z
-        self.s[3] = w
+        self[0] = x
+        self[1] = y
+        self[2] = z
+        self[3] = w
 
     @classmethod
     def from_xyzw(cls, x, y, z, w):
@@ -777,7 +781,7 @@ class Quaternion(Symbol_):
 
     @classmethod
     def from_rotation_matrix(cls, r):
-        q = cls((0, 0, 0, 0))
+        q = Expression((0, 0, 0, 0))
         t = trace(r)
 
         if0 = t - r[3, 3]
@@ -1033,10 +1037,12 @@ def if_greater_zero(condition, if_result, else_result):
     condition = Expression(condition).s
     if_result = Expression(if_result).s
     else_result = Expression(else_result).s
-    _condition = sign(condition)  # 1 or -1
-    _if = max(0, _condition) * if_result  # 0 or if_result
-    _else = -min(0, _condition) * else_result  # 0 or else_result
-    return Expression(_if + _else + (1 - abs(_condition)) * else_result)  # if_result or else_result
+    return Expression(if_else(ca.gt(condition, 0), if_result, else_result))
+
+    # _condition = sign(condition)  # 1 or -1
+    # _if = max(0, _condition) * if_result  # 0 or if_result
+    # _else = -min(0, _condition) * else_result  # 0 or else_result
+    # return Expression(_if + _else + (1 - abs(_condition)) * else_result)  # if_result or else_result
 
 
 def if_greater_eq_zero(condition, if_result, else_result):
@@ -1117,16 +1123,16 @@ def scale(v, a):
 
 def dot(e1, e2):
     if isinstance(e1, (Point3, Vector3)) and isinstance(e2, (Point3, Vector3)):
-        return Expression(dot(e1[:3].T, e1[:3])[0])
-    result = ca.dot(e1.s, e2.s)
+        return Expression(ca.mtimes(e1[:3].T.s, e2[:3].s))
+    result = ca.mtimes(e1.s, e2.s)
     if isinstance(e2, RotationMatrix):
-        return RotationMatrix(e2)
+        return RotationMatrix(result)
     elif isinstance(e2, TransMatrix):
-        return TransMatrix(e2)
+        return TransMatrix(result)
     elif isinstance(e2, Point3):
-        return Point3(e2)
+        return Point3(result)
     elif isinstance(e2, Vector3):
-        return Vector3(e2)
+        return Vector3(result)
     return Expression(result)
 
 
@@ -1356,13 +1362,16 @@ def distance_point_to_line_segment(point, line_start, line_end):
     :param line_end: end of the approached line
     :return: distance to line, the nearest point on the line
     """
+    point = Point3(point)
+    line_start = Point3(line_start)
+    line_end = Point3(line_end)
     line_vec = line_end - line_start
     pnt_vec = point - line_start
     line_len = norm(line_vec)
     line_unitvec = line_vec / line_len
     pnt_vec_scaled = pnt_vec / line_len
     t = line_unitvec.dot(pnt_vec_scaled)
-    t = min(max(t, 0.0), 1.0)
+    t = limit(t, lower_limit=0.0, upper_limit=1.0)
     nearest = line_vec * t
     dist = norm(nearest - pnt_vec)
     nearest = nearest + line_start

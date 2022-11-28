@@ -4,6 +4,7 @@ import PyKDL
 import hypothesis.strategies as st
 import numpy as np
 from angles import shortest_angular_distance, normalize_angle_positive, normalize_angle
+from geometry_msgs.msg import Point, PointStamped, Vector3, Vector3Stamped
 from hypothesis import given, assume
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
@@ -107,6 +108,10 @@ class TestExpression(unittest.TestCase):
 
 
 class TestRotationMatrix(unittest.TestCase):
+    def test_transpose(self):
+        #todo
+        pass
+
     def test_create_RotationMatrix(self):
         r = w.RotationMatrix.from_rpy(1, 2, 3)
         assert isinstance(r, w.RotationMatrix)
@@ -189,11 +194,20 @@ class TestPoint3(unittest.TestCase):
     @given(vector(3))
     def test_point3(self, v):
         r1 = w.Point3(v)
-        assert isinstance(r1, w.Point3)
         self.assertEqual(r1[0], v[0])
         self.assertEqual(r1[1], v[1])
         self.assertEqual(r1[2], v[2])
         self.assertEqual(r1[3], 1)
+        w.Point3(w.Expression(v))
+        w.Point3(w.Point3(v))
+        w.Point3(w.Vector3(v))
+        w.Point3(Point(*v))
+        w.Point3(PointStamped(point=Point(*v)))
+        w.Point3(Vector3(*v))
+        w.Point3(Vector3Stamped(vector=Vector3(*v)))
+        w.Point3(w.Expression(v).s)
+        w.Point3(np.array(v))
+
 
     def test_point3_sub(self):
         p1 = w.Point3((1, 1, 1))
@@ -228,6 +242,16 @@ class TestPoint3(unittest.TestCase):
         self.assertEqual(p3[2], 0.5)
         self.assertEqual(p3[3], 1)
 
+    @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], min_length=3, max_length=3))
+    def test_dot_point_point(self, vectors):
+        u, v = vectors
+        u = np.array(u)
+        v = np.array(v)
+        result = w.compile_and_execute(lambda p1, p2: w.Point3(p1).dot(w.Point3(p2)), [u, v])
+        expected = np.dot(u, v.T)
+        if not np.isnan(result) and not np.isinf(result):
+            self.assertTrue(np.isclose(result, expected))
+
 
 class TestVector3(unittest.TestCase):
 
@@ -239,6 +263,16 @@ class TestVector3(unittest.TestCase):
         self.assertEqual(r1[1], v[1])
         self.assertEqual(r1[2], v[2])
         self.assertEqual(r1[3], 0)
+
+    @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], min_length=3, max_length=3))
+    def test_dot(self, vectors):
+        u, v = vectors
+        u = np.array(u)
+        v = np.array(v)
+        result = w.compile_and_execute(lambda p1, p2: w.Vector3(p1).dot(w.Vector3(p2)), [u, v])
+        expected = np.dot(u, v.T)
+        if not np.isnan(result) and not np.isinf(result):
+            self.assertTrue(np.isclose(result, expected))
 
 
 class TestTransformationMatrix(unittest.TestCase):
@@ -451,7 +485,7 @@ class TestQuaternion(unittest.TestCase):
         matrix = quaternion_matrix(q)
         q2 = quaternion_from_matrix(matrix)
         q1_2 = w.compile_and_execute(w.Quaternion.from_rotation_matrix, [matrix])
-        self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg='{} != {}'.format(q, q1_2))
+        self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg=f'{q} != {q1_2}')
 
 
 class TestCASWrapper(unittest.TestCase):

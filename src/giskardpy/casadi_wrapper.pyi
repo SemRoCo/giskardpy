@@ -180,9 +180,7 @@ class Point3(Symbol_):
                                             geometry_msgs.Vector3, geometry_msgs.Vector3Stamped,
                                             ca.SX,
                                             np.ndarray,
-                                            Tuple[symbol_expr_float,
-                                                  symbol_expr_float,
-                                                  symbol_expr_float]]] = None): ...
+                                            Iterable[symbol_expr_float]]] = None): ...
 
     @classmethod
     def from_xyz(cls,
@@ -257,9 +255,7 @@ class Vector3(Symbol_):
                                             geometry_msgs.Vector3, geometry_msgs.Vector3Stamped,
                                             ca.SX,
                                             np.ndarray,
-                                            Tuple[symbol_expr_float,
-                                                  symbol_expr_float,
-                                                  symbol_expr_float]]] = None): ...
+                                            Iterable[symbol_expr_float]]] = None): ...
 
     def norm(self) -> Expression: ...
 
@@ -723,7 +719,7 @@ def velocity_limit_from_position_limit(acceleration_limit: Union[Symbol, float],
                                        step_size: Union[Symbol, float],
                                        eps: float = 1e-5) -> Expression: ...
 
-def to_str(expression: Union[Symbol, float]) -> str: ...
+def to_str(expression: all_expressions) -> str: ...
 
 def total_derivative(expr: Union[Symbol, Expression],
                      symbols: Iterable[Symbol],

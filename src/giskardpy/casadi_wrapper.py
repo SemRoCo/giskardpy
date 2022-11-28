@@ -172,7 +172,9 @@ class Symbol(Symbol_):
 
 class Expression(Symbol_):
     @profile
-    def __init__(self, data):
+    def __init__(self, data=None):
+        if data is None:
+            data = []
         if isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, Symbol_):
@@ -523,6 +525,8 @@ class RotationMatrix(Symbol_):
 class Point3(Symbol_):
     @profile
     def __init__(self, data=None):
+        if data is None:
+            data = (0, 0, 0)
         if isinstance(data, geometry_msgs.PointStamped):
             data = data.point
         if isinstance(data, geometry_msgs.Vector3Stamped):
@@ -695,6 +699,8 @@ class Vector3(Symbol_):
 
 class Quaternion(Symbol_):
     def __init__(self, data=None):
+        if data is None:
+            data = (0, 0, 0, 1)
         if isinstance(data, geometry_msgs.QuaternionStamped):
             data = data.quaternion
         if isinstance(data, (Point3, Vector3, geometry_msgs.Quaternion)):
@@ -997,9 +1003,11 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
+    assert type(if_result) == type(else_result)
+    return_type = type(if_result)
     if_result = Expression(if_result).s
     else_result = Expression(else_result).s
-    return Expression(ca.if_else(condition, if_result, else_result))
+    return return_type((ca.if_else(condition, if_result, else_result)))
 
 
 def logic_and(*args):
@@ -1035,9 +1043,7 @@ def if_greater_zero(condition, if_result, else_result):
     :return: if_result if condition > 0 else else_result
     """
     condition = Expression(condition).s
-    if_result = Expression(if_result).s
-    else_result = Expression(else_result).s
-    return Expression(if_else(ca.gt(condition, 0), if_result, else_result))
+    return if_else(ca.gt(condition, 0), if_result, else_result)
 
     # _condition = sign(condition)  # 1 or -1
     # _if = max(0, _condition) * if_result  # 0 or if_result
@@ -1072,7 +1078,7 @@ def if_eq_zero(condition, if_result, else_result):
     """
     :return: if_result if condition == 0 else else_result
     """
-    return Expression(if_else(condition, else_result, if_result))
+    return if_else(condition, else_result, if_result)
 
 
 def if_eq(a, b, if_result, else_result):
@@ -1113,6 +1119,8 @@ def cross(u, v):
 
 
 def norm(v):
+    if isinstance(v, (Point3, Vector3)):
+        return Expression(ca.norm_2(v[:3].s))
     v = Expression(v).s
     return Expression(ca.norm_2(v))
 
@@ -1248,9 +1256,9 @@ def quaternion_slerp(q1, q2, t):
     :param t: float, 0-1
     :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
     """
-    q1 = Expression(q1).s
-    q2 = Expression(q2).s
-    t = Expression(t).s
+    q1 = Expression(q1)
+    q2 = Expression(q2)
+    t = Expression(t)
     cos_half_theta = dot(q1.T, q2)
 
     if0 = -cos_half_theta
@@ -1270,11 +1278,11 @@ def quaternion_slerp(q1, q2, t):
 
     ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
     ratio_b = save_division(sin(t * half_theta), sin_half_theta)
-    return if_greater_eq_zero(if1,
-                              Expression(q1),
-                              if_greater_zero(if2,
-                                              0.5 * q1 + 0.5 * q2,
-                                              ratio_a * q1 + ratio_b * q2))
+    return Quaternion(if_greater_eq_zero(if1,
+                                         Expression(q1),
+                                         if_greater_zero(if2,
+                                                         0.5 * q1 + 0.5 * q2,
+                                                         ratio_a * q1 + ratio_b * q2)))
 
 
 def slerp(v1, v2, t):

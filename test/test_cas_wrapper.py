@@ -184,15 +184,16 @@ class TestRotationMatrix(unittest.TestCase):
 
 class TestPoint3(unittest.TestCase):
 
-    def test_norm(self):
-        p = w.Point3((1, 2, 3))
-        try:
-            p.norm()
-        except AttributeError as e:
-            assert 'Point3' in str(e)
+    @given(vector(3))
+    def test_norm(self, v):
+        p = w.Point3(v)
+        actual = p.norm().evaluate()
+        expected = np.linalg.norm(v)
+        self.assertAlmostEqual(actual, expected)
 
     @given(vector(3))
     def test_point3(self, v):
+        w.Point3()
         r1 = w.Point3(v)
         self.assertEqual(r1[0], v[0])
         self.assertEqual(r1[1], v[1])
@@ -243,7 +244,7 @@ class TestPoint3(unittest.TestCase):
         self.assertEqual(p3[3], 1)
 
     @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], min_length=3, max_length=3))
-    def test_dot_point_point(self, vectors):
+    def test_dot(self, vectors):
         u, v = vectors
         u = np.array(u)
         v = np.array(v)
@@ -252,8 +253,115 @@ class TestPoint3(unittest.TestCase):
         if not np.isnan(result) and not np.isinf(result):
             self.assertTrue(np.isclose(result, expected))
 
+    @given(float_no_nan_no_inf(), vector(3), vector(3))
+    def test_if_greater_zero(self, condition, if_result, else_result):
+        actual = w.compile_and_execute(w.if_greater_zero, [condition, if_result, else_result])
+        expected = if_result if condition > 0 else else_result
+        np.testing.assert_array_almost_equal(actual, expected)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_if_greater_eq_zero(self, condition, if_result, else_result):
+        self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq_zero, [condition, if_result, else_result]),
+                               np.float(if_result if condition >= 0 else else_result), places=7)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_if_greater_eq(self, a, b, if_result, else_result):
+        self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
+                               np.float(if_result if a >= b else else_result), places=7)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_if_less_eq(self, a, b, if_result, else_result):
+        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
+                               np.float(if_result if a <= b else else_result), places=7)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_if_eq_zero(self, condition, if_result, else_result):
+        self.assertAlmostEqual(w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
+                               np.float(if_result if condition == 0 else else_result), places=7)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_if_eq(self, a, b, if_result, else_result):
+        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
+                                   np.float(if_result if a == b else else_result)))
+
+    @given(float_no_nan_no_inf())
+    def test_if_eq_cases(self, a):
+        b_result_cases = [(1, 1),
+                          (3, 3),
+                          (4, 4),
+                          (-1, -1),
+                          (0.5, 0.5),
+                          (-0.5, -0.5)]
+
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ == b:
+                    return if_result
+            return else_result
+
+        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
+                                   np.float(reference(a, b_result_cases, 0))))
+
+    @given(float_no_nan_no_inf())
+    def test_if_less_eq_cases(self, a):
+        b_result_cases = [
+            (-1, -1),
+            (-0.5, -0.5),
+            (0.5, 0.5),
+            (1, 1),
+            (3, 3),
+            (4, 4),
+        ]
+
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ <= b:
+                    return if_result
+            return else_result
+
+        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq_cases, [a, b_result_cases, 0]),
+                               np.float(reference(a, b_result_cases, 0)))
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_if_greater(self, a, b, if_result, else_result):
+        self.assertAlmostEqual(
+            w.compile_and_execute(w.if_greater, [a, b, if_result, else_result]),
+            np.float(if_result if a > b else else_result), places=7)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_if_less(self, a, b, if_result, else_result):
+        self.assertAlmostEqual(
+            w.compile_and_execute(w.if_less, [a, b, if_result, else_result]),
+            np.float(if_result if a < b else else_result), places=7)
+
+
 
 class TestVector3(unittest.TestCase):
+    @given(vector(3))
+    def test_norm(self, v):
+        expected = np.linalg.norm(v)
+        v = w.Vector3(v)
+        actual = v.norm().evaluate()
+        self.assertAlmostEqual(actual, expected)
 
     @given(vector(3))
     def test_vector3(self, v):
@@ -590,6 +698,28 @@ class TestCASWrapper(unittest.TestCase):
     def test_if_greater_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_zero, [condition, if_result, else_result]),
                                np.float(if_result if condition > 0 else else_result), places=7)
+
+    def test_if_one_arg(self):
+        types = [w.Point3, w.Vector3, w.Quaternion, w.Expression, w.TransMatrix, w.RotationMatrix]
+        if_functions = [w.if_else, w.if_eq_zero, w.if_greater_eq_zero, w.if_greater_zero]
+        c = w.Symbol('c')
+        for type_ in types:
+            for if_function in if_functions:
+                if_result = type_()
+                else_result = type_()
+                result = if_function(c, if_result, else_result)
+                assert isinstance(result, type_), f'{type(result)} != {type_} for {if_function}'
+
+    def test_if_two_arg(self):
+        types = [w.Point3, w.Vector3, w.Quaternion, w.Expression, w.TransMatrix, w.RotationMatrix]
+        if_functions = [w.if_eq, w.if_greater, w.if_greater_eq, w.if_less, w.if_less_eq]
+        a = w.Symbol('a')
+        b = w.Symbol('b')
+        for type_ in types:
+            for if_function in if_functions:
+                if_result = type_()
+                else_result = type_()
+                assert isinstance(if_function(a, b, if_result, else_result), type_)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -945,7 +1075,7 @@ class TestCASWrapper(unittest.TestCase):
         assert nearest[2] == 1
 
     def test_to_str(self):
-        axis = w.Vector3.from_matrix(w.create_symbols(['v1', 'v2', 'v3']))
+        axis = w.Vector3(w.create_symbols(['v1', 'v2', 'v3']))
         angle = w.Symbol('alpha')
         q = w.Quaternion.from_axis_angle(axis, angle)
         expr = w.norm(q)

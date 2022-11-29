@@ -442,22 +442,22 @@ class RotationMatrix(Symbol_):
     @classmethod
     def from_vectors(cls, x=None, y=None, z=None):
         if x is not None:
-            x = scale(x, 1)
+            x.scale(1)
         if y is not None:
-            y = scale(y, 1)
+            y.scale(1)
         if z is not None:
-            z = scale(z, 1)
+            z.scale(1)
         if x is not None and y is not None and z is None:
             z = cross(x, y)
-            z = scale(z, 1)
+            z.scale(1)
         elif x is not None and y is None and z is not None:
             y = cross(z, x)
-            y = scale(y, 1)
+            y.scale(1)
         elif x is None and y is not None and z is not None:
             x = cross(y, z)
-            x = scale(x, 1)
-        else:
-            raise AttributeError(f'only one vector can be None')
+            x.scale(1)
+        # else:
+        #     raise AttributeError(f'only one vector can be None')
         R = cls([[x[0], y[0], z[0], 0],
                  [x[1], y[1], z[1], 0],
                  [x[2], y[2], z[2], 0],

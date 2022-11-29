@@ -11,6 +11,8 @@ all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatri
 symbol_expr_float = Union[Symbol, Expression, float]
 symbol_expr = Union[Symbol, Expression]
 
+pi: float
+
 class CompiledFunction:
     str_params: Iterable[str]
     fast_f: ca.Function

@@ -9,6 +9,7 @@ import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import Constraint as Constraint_msg
 from giskardpy import casadi_wrapper as w
+from giskardpy.casadi_wrapper import symbol_expr_float
 from giskardpy.exceptions import ConstraintInitalizationException, GiskardException, UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
@@ -247,14 +248,14 @@ class Goal(ABC):
                                                               horizon_function=horizon_function)
 
     def add_constraint(self,
-                       reference_velocity: Union[w.Symbol, float],
-                       lower_error: Union[w.Symbol, float],
-                       upper_error: Union[w.Symbol, float],
-                       weight: Union[w.Symbol, float],
-                       task_expression: Union[w.Symbol, float],
+                       reference_velocity: w.symbol_expr_float,
+                       lower_error: symbol_expr_float,
+                       upper_error: symbol_expr_float,
+                       weight: symbol_expr_float,
+                       task_expression: Union[w.Symbol, w.Expression],
                        name: Optional[str] = None,
-                       lower_slack_limit: Optional[Union[w.Symbol, float]] = None,
-                       upper_slack_limit: Optional[Union[w.Symbol, float]] = None):
+                       lower_slack_limit: Optional[w.symbol_expr_float] = None,
+                       upper_slack_limit: Optional[w.symbol_expr_float] = None):
         """
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final

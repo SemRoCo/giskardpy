@@ -7,6 +7,7 @@ import numpy as np
 import geometry_msgs.msg as geometry_msgs
 
 _EPS = np.finfo(float).eps * 4.0
+pi = ca.pi
 
 
 class CompiledFunction:

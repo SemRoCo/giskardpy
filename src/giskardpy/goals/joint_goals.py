@@ -43,8 +43,8 @@ class SetSeedConfiguration(NonMotionGoal):
 
 class SetOdometry(NonMotionGoal):
     def __init__(self, group_name: str, base_pose: PoseStamped):
-        self.group_name = group_name
         super().__init__()
+        self.group_name = group_name
         if self.god_map.get_data(identifier.execute) \
                 and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')

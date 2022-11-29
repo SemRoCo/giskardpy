@@ -532,7 +532,7 @@ class OmniDrive(Joint):
 
     def _joint_transformation(self):
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
-                                               z=self.y.get_symbol(Derivatives.position),
+                                               y=self.y.get_symbol(Derivatives.position),
                                                yaw=self.yaw.get_symbol(Derivatives.position))
         bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
                                                  y=self.y_vel.get_symbol(Derivatives.position),

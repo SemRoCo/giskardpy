@@ -106,12 +106,12 @@ class Symbol(Symbol_):
 
 
 class Expression(Symbol_):
-    def __init__(self, data: Union[Symbol,
-                                   Expression,
-                                   float,
-                                   Iterable[symbol_expr_float],
-                                   Iterable[Iterable[symbol_expr_float]],
-                                   np.ndarray]): ...
+    def __init__(self, data: Optional[Union[Symbol,
+                                            Expression,
+                                            float,
+                                            Iterable[symbol_expr_float],
+                                            Iterable[Iterable[symbol_expr_float]],
+                                            np.ndarray]] = None): ...
 
     @overload
     def __add__(self, other: Point3) -> Point3: ...

@@ -494,16 +494,16 @@ class TestQuaternion(unittest.TestCase):
     @given(quaternion())
     def test_axis_angle_from_quaternion(self, q):
         axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
-        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[0], q)
-        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[1], q)
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], q)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], q)
         compare_axis_angle(angle, axis[:3], angle2, axis2, 2)
         assert axis[-1] == 0
 
     def test_axis_angle_from_quaternion2(self):
         q = [0, 0, 0, 1.0000001]
         axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
-        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[0], q)
-        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[1], q)
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], q)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], q)
         compare_axis_angle(angle, axis[:3], angle2, axis2, 2)
         assert axis[-1] == 0
 

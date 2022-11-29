@@ -237,7 +237,7 @@ class Expression(Symbol_):
             return Vector3(self.s.__truediv__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__truediv__(other.s))
-        return Expression(self.s.__truediv__(ot.__mul__()))
+        return Expression(self.s.__truediv__(other))
 
     def __rtruediv__(self, other):
         return Expression(self.s.__rtruediv__(other))

@@ -1324,7 +1324,13 @@ def slerp(v1, v2, t):
 
 
 def save_division(nominator, denominator, if_nan=None):
-    if_nan = 0 if if_nan is None else if_nan
+    if if_nan is None:
+        if isinstance(nominator, Vector3):
+            if_nan = Vector3()
+        elif isinstance(nominator, Point3):
+            if_nan = Vector3
+        else:
+            if_nan = 0
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 

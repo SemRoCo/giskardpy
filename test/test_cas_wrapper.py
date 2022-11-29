@@ -292,6 +292,13 @@ class TestVector3(unittest.TestCase):
         actual = v.norm().evaluate()
         self.assertAlmostEqual(actual, expected)
 
+    @given(vector(3), float_no_nan_no_inf(), vector(3))
+    def test_save_division(self, nominator, denominator, if_nan):
+        nominator = w.Vector3(nominator)
+        denominator = w.Expression(denominator)
+        if_nan = w.Vector3(if_nan)
+        result = w.save_division(nominator, denominator, if_nan)
+
     @given(vector(3))
     def test_vector3(self, v):
         r1 = w.Vector3(v)

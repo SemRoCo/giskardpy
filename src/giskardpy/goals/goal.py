@@ -208,14 +208,14 @@ class Goal(ABC):
         self._sub_goals.append(goal)
 
     def add_velocity_constraint(self,
-                                lower_velocity_limit: Union[w.Symbol, float],
-                                upper_velocity_limit: Union[w.Symbol, float],
-                                weight: Union[w.Symbol, float],
-                                task_expression: Union[w.Symbol, float],
-                                velocity_limit: Union[w.Symbol, float],
+                                lower_velocity_limit: w.symbol_expr_float,
+                                upper_velocity_limit: w.symbol_expr_float,
+                                weight: w.symbol_expr_float,
+                                task_expression: w.symbol_expr,
+                                velocity_limit: w.symbol_expr_float,
                                 name_suffix: Optional[str] = None,
-                                lower_slack_limit: Union[w.Symbol, float] = -1e4,
-                                upper_slack_limit: Union[w.Symbol, float] = 1e4,
+                                lower_slack_limit: w.symbol_expr_float = -1e4,
+                                upper_slack_limit: w.symbol_expr_float = 1e4,
                                 horizon_function: Optional[Callable[[float, int], float]] = None):
         """
         Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
@@ -252,7 +252,7 @@ class Goal(ABC):
                        lower_error: symbol_expr_float,
                        upper_error: symbol_expr_float,
                        weight: symbol_expr_float,
-                       task_expression: Union[w.Symbol, w.Expression],
+                       task_expression: w.symbol_expr,
                        name: Optional[str] = None,
                        lower_slack_limit: Optional[w.symbol_expr_float] = None,
                        upper_slack_limit: Optional[w.symbol_expr_float] = None):
@@ -290,14 +290,14 @@ class Goal(ABC):
                                              control_horizon=self.control_horizon)
 
     def add_constraint_vector(self,
-                              reference_velocities: List[Union[w.Symbol, float]],
-                              lower_errors: List[Union[w.Symbol, float]],
-                              upper_errors: List[Union[w.Symbol, float]],
-                              weights: List[Union[w.Symbol, float]],
-                              task_expression: List[Union[w.Symbol, float]],
+                              reference_velocities: Union[w.Expression, w.Vector3, w.Point3, List[w.symbol_expr_float]],
+                              lower_errors: Union[w.Expression, w.Vector3, w.Point3, List[w.symbol_expr_float]],
+                              upper_errors: Union[w.Expression, w.Vector3, w.Point3, List[w.symbol_expr_float]],
+                              weights: Union[w.Expression, w.Vector3, w.Point3, List[w.symbol_expr_float]],
+                              task_expression: Union[w.Expression, w.Vector3, w.Point3, List[w.symbol_expr]],
                               names: List[str],
-                              lower_slack_limits: Optional[List[Union[w.Symbol, float]]] = None,
-                              upper_slack_limits: Optional[List[Union[w.Symbol, float]]] = None):
+                              lower_slack_limits: Optional[List[w.symbol_expr_float]] = None,
+                              upper_slack_limits: Optional[List[w.symbol_expr_float]] = None):
         """
         Calls add_constraint for a list of expressions.
         """
@@ -322,7 +322,7 @@ class Goal(ABC):
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
 
-    def add_debug_expr(self, name: str, expr: Union[w.Symbol, float]):
+    def add_debug_expr(self, name: str, expr: w.symbol_expr):
         """
         Add any expression for debug purposes. They will be evaluated as well and can be plotted by activating
         the debug plotter in this Giskard config.
@@ -367,8 +367,8 @@ class Goal(ABC):
     def add_point_goal_constraints(self,
                                    frame_P_current: w.Point3,
                                    frame_P_goal: w.Point3,
-                                   reference_velocity: Union[w.Symbol, float],
-                                   weight: Union[w.Symbol, float],
+                                   reference_velocity: w.symbol_expr_float,
+                                   weight: w.symbol_expr_float,
                                    name: str = ''):
         """
         Adds three constraints to move frame_P_current to frame_P_goal.
@@ -390,10 +390,10 @@ class Goal(ABC):
                                           f'{name}/z'])
 
     def add_translational_velocity_limit(self,
-                                         frame_P_current: w.Expression,
-                                         max_velocity: Union[w.Symbol, float],
-                                         weight: Union[w.Symbol, float],
-                                         max_violation: Union[w.Symbol, float] = 1e4,
+                                         frame_P_current: w.Point3,
+                                         max_velocity: w.symbol_expr_float,
+                                         weight: w.symbol_expr_float,
+                                         max_violation: w.symbol_expr_float = 1e4,
                                          name=''):
         """
         Adds constraints to limit the translational velocity of frame_P_current. Be aware that the velocity is relative
@@ -464,7 +464,7 @@ class Goal(ABC):
         :param weight:
         :param name:
         """
-        hack = w.RotationMatrix.from_axis_angle(w.Vector3(0, 0, 1), 0.0001)
+        hack = w.RotationMatrix.from_axis_angle(w.Vector3((0, 0, 1)), 0.0001)
         frame_R_current = frame_R_current.dot(hack)  # hack to avoid singularity
         tip_Q_tipCurrent = current_R_frame_eval.dot(frame_R_current).to_quaternion()
         tip_R_goal = current_R_frame_eval.dot(frame_R_goal)

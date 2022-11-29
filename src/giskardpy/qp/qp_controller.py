@@ -496,6 +496,7 @@ class A(Parent):
         # constraints
         # TODO i don't need vel checks for the last 2 entries because the have to be zero with current B's
         # velocity limits
+        next_vertical_offset = vertical_offset
         for order in range(self.order - 1):
             J_vel_tmp = J_vel[order]
             J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel_tmp)

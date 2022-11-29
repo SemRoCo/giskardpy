@@ -48,6 +48,11 @@ class TestSymbol:
         e = s == s
         assert isinstance(e, w.Expression)
 
+    def test_hash(self):
+        s = w.Symbol('muh')
+        d = {s: 1}
+        assert d[s] == 1
+
 
 class TestExpression(unittest.TestCase):
     def test_create(self):

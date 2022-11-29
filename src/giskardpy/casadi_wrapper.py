@@ -170,6 +170,9 @@ class Symbol(Symbol_):
             other = other.s
         return Expression(self.s.__rpow__(other))
 
+    def __hash__(self):
+        return self.s.__hash__()
+
 
 class Expression(Symbol_):
     @profile

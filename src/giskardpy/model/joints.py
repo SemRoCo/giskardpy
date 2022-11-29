@@ -344,10 +344,10 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
 class PrismaticJoint(OneDofJoint):
     def _joint_transformation(self):
-        translation_axis = w.Point3.from_matrix(self.axis) * self.position_expression
-        parent_T_child = w.TransMatrix.from_xyz(x=translation_axis[0],
-                                                y=translation_axis[1],
-                                                z=translation_axis[2])
+        translation_axis = w.Point3(self.axis) * self.position_expression
+        parent_T_child = w.TransMatrix.from_xyz_rpy(x=translation_axis[0],
+                                                    y=translation_axis[1],
+                                                    z=translation_axis[2])
         return parent_T_child
 
     def update_limits(self, linear_limits, angular_limits):
@@ -359,7 +359,7 @@ class PrismaticJoint(OneDofJoint):
 
 class RevoluteJoint(OneDofJoint):
     def _joint_transformation(self):
-        rotation_axis = w.Vector3.from_matrix(self.axis)
+        rotation_axis = w.Vector3(self.axis)
         parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis, self.position_expression)
         return parent_R_child
         # self.parent_T_child = w.dot(self.parent_T_child, parent_R_child)
@@ -531,19 +531,19 @@ class OmniDrive(Joint):
         return [self.x_name, self.y_name, self.yaw_name]
 
     def _joint_transformation(self):
-        odom_T_bf = w.TransMatrix.from_xy_yaw(self.x.get_symbol(Derivatives.position),
-                                              self.y.get_symbol(Derivatives.position),
-                                              self.yaw.get_symbol(Derivatives.position))
-        bf_T_bf_vel = w.TransMatrix.from_xy_yaw(self.x_vel.get_symbol(Derivatives.position),
-                                                self.y_vel.get_symbol(Derivatives.position),
-                                                self.yaw_vel.get_symbol(Derivatives.position))
+        odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
+                                               z=self.y.get_symbol(Derivatives.position),
+                                               yaw=self.yaw.get_symbol(Derivatives.position))
+        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
+                                                 y=self.y_vel.get_symbol(Derivatives.position),
+                                                 yaw=self.yaw_vel.get_symbol(Derivatives.position))
         bf_vel_T_bf = w.TransMatrix.from_xyz_rpy(x=0,
                                                  y=0,
                                                  z=self.translation_variables[2].get_symbol(Derivatives.position),
                                                  roll=self.orientation_variables[0].get_symbol(Derivatives.position),
                                                  pitch=self.orientation_variables[1].get_symbol(Derivatives.position),
                                                  yaw=0)
-        return w.dot(odom_T_bf, bf_T_bf_vel, bf_vel_T_bf)
+        return odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
 
     @property
     def x(self):
@@ -685,7 +685,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
                                         if_result=0,
                                         else_result=np.arctan2(new_vel_y, new_vel_x))
 
-        rotation_axis = w.Vector3.from_matrix(self.axis)
+        rotation_axis = w.Vector3(self.axis)
         parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis, steer_angle_desired)
         return parent_R_child
 
@@ -1258,12 +1258,12 @@ class DiffDrive(Joint):
                                                  rotation_upper_limits)
 
     def _joint_transformation(self):
-        odom_T_bf = w.TransMatrix.from_xy_yaw(self.x.get_symbol(Derivatives.position),
-                                              self.y.get_symbol(Derivatives.position),
-                                              self.yaw.get_symbol(Derivatives.position))
-        bf_T_bf_vel = w.TransMatrix.from_xy_yaw(self.x_vel.get_symbol(Derivatives.position),
-                                                0,
-                                                self.yaw_vel.get_symbol(Derivatives.position))
+        odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
+                                               y=self.y.get_symbol(Derivatives.position),
+                                               yaw=self.yaw.get_symbol(Derivatives.position))
+        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
+                                                 y=0,
+                                                 yaw=self.yaw_vel.get_symbol(Derivatives.position))
         return w.dot(odom_T_bf, bf_T_bf_vel)
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):

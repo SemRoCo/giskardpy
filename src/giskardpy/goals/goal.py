@@ -415,10 +415,10 @@ class Goal(ABC):
                                      name_suffix=f'{name}/vel')
 
     def add_vector_goal_constraints(self,
-                                    frame_V_current: w.Expression,
-                                    frame_V_goal: w.Expression,
-                                    reference_velocity: Union[w.Symbol, float],
-                                    weight: Union[w.Symbol, float] = WEIGHT_BELOW_CA,
+                                    frame_V_current: w.Vector3,
+                                    frame_V_goal: w.Vector3,
+                                    reference_velocity: w.symbol_expr_float,
+                                    weight: w.symbol_expr_float = WEIGHT_BELOW_CA,
                                     name: str = ''):
         """
         Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
@@ -429,7 +429,7 @@ class Goal(ABC):
         :param weight:
         :param name:
         """
-        angle = w.save_acos(w.dot(frame_V_current.T, frame_V_goal)[0])
+        angle = w.save_acos(frame_V_current.dot(frame_V_goal))
         # avoid singularity by staying away from pi
         angle_limited = w.min(w.max(angle, -reference_velocity), reference_velocity)
         angle_limited = w.save_division(angle_limited, angle)

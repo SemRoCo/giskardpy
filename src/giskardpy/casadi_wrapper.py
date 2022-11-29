@@ -311,9 +311,10 @@ class TransMatrix(Symbol_):
             a_T_b = cls()
         else:
             a_T_b = cls(rotation_matrix)
-        a_T_b[3, 0] = point.x
-        a_T_b[3, 0] = point.y
-        a_T_b[3, 0] = point.z
+        if point is not None:
+            a_T_b[0, 3] = point.x
+            a_T_b[1, 3] = point.y
+            a_T_b[2, 3] = point.z
         return a_T_b
 
     def dot(self, other):

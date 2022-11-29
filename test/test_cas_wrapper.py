@@ -70,9 +70,30 @@ class TestExpression(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             print(m.evaluate())
 
+    @given(float_no_nan_no_inf(), float_no_nan_no_inf())
+    def test_add(self, f1, f2):
+        expected = f1 + f2
+        r1 = w.compile_and_execute(lambda a: w.Expression(a) + f1, [f2])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a: f1 + w.Expression(a), [f2])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a, b: w.Expression(a) + w.Expression(b), [f1, f2])
+        self.assertAlmostEqual(r1, expected)
+
+    @given(float_no_nan_no_inf(), float_no_nan_no_inf())
+    def test_sub(self, f1, f2):
+        expected = f1 - f2
+        r1 = w.compile_and_execute(lambda a: w.Expression(a) - f2, [f1])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a: f1 - w.Expression(a), [f2])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a, b: w.Expression(a) - w.Expression(b), [f1, f2])
+        self.assertAlmostEqual(r1, expected)
+
+
     def test_len(self):
         m = w.Expression(np.eye(4))
-        assert(len(m) == 16)
+        assert (len(m) == 16)
 
     def test_simple_math(self):
         m = w.Expression([1, 1])
@@ -109,7 +130,7 @@ class TestExpression(unittest.TestCase):
 
 class TestRotationMatrix(unittest.TestCase):
     def test_transpose(self):
-        #todo
+        # todo
         pass
 
     def test_create_RotationMatrix(self):
@@ -209,7 +230,6 @@ class TestPoint3(unittest.TestCase):
         w.Point3(w.Expression(v).s)
         w.Point3(np.array(v))
 
-
     def test_point3_sub(self):
         p1 = w.Point3((1, 1, 1))
         p2 = w.Point3((1, 1, 1))
@@ -258,101 +278,6 @@ class TestPoint3(unittest.TestCase):
         actual = w.compile_and_execute(w.if_greater_zero, [condition, if_result, else_result])
         expected = if_result if condition > 0 else else_result
         np.testing.assert_array_almost_equal(actual, expected)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_if_greater_eq_zero(self, condition, if_result, else_result):
-        self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition >= 0 else else_result), places=7)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_if_greater_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
-                               np.float(if_result if a >= b else else_result), places=7)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_if_less_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
-                               np.float(if_result if a <= b else else_result), places=7)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_if_eq_zero(self, condition, if_result, else_result):
-        self.assertAlmostEqual(w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition == 0 else else_result), places=7)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_if_eq(self, a, b, if_result, else_result):
-        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
-                                   np.float(if_result if a == b else else_result)))
-
-    @given(float_no_nan_no_inf())
-    def test_if_eq_cases(self, a):
-        b_result_cases = [(1, 1),
-                          (3, 3),
-                          (4, 4),
-                          (-1, -1),
-                          (0.5, 0.5),
-                          (-0.5, -0.5)]
-
-        def reference(a_, b_result_cases_, else_result):
-            for b, if_result in b_result_cases_:
-                if a_ == b:
-                    return if_result
-            return else_result
-
-        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
-                                   np.float(reference(a, b_result_cases, 0))))
-
-    @given(float_no_nan_no_inf())
-    def test_if_less_eq_cases(self, a):
-        b_result_cases = [
-            (-1, -1),
-            (-0.5, -0.5),
-            (0.5, 0.5),
-            (1, 1),
-            (3, 3),
-            (4, 4),
-        ]
-
-        def reference(a_, b_result_cases_, else_result):
-            for b, if_result in b_result_cases_:
-                if a_ <= b:
-                    return if_result
-            return else_result
-
-        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq_cases, [a, b_result_cases, 0]),
-                               np.float(reference(a, b_result_cases, 0)))
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_if_greater(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_greater, [a, b, if_result, else_result]),
-            np.float(if_result if a > b else else_result), places=7)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_if_less(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_less, [a, b, if_result, else_result]),
-            np.float(if_result if a < b else else_result), places=7)
-
 
 
 class TestVector3(unittest.TestCase):
@@ -594,6 +519,15 @@ class TestQuaternion(unittest.TestCase):
         q2 = quaternion_from_matrix(matrix)
         q1_2 = w.compile_and_execute(w.Quaternion.from_rotation_matrix, [matrix])
         self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg=f'{q} != {q1_2}')
+
+    @given(quaternion(), quaternion())
+    def test_dot(self, q1, q2):
+        q1 = np.array(q1)
+        q2 = np.array(q2)
+        result = w.compile_and_execute(lambda p1, p2: w.Quaternion(p1).dot(w.Quaternion(p2)), [q1, q2])
+        expected = np.dot(q1.T, q2)
+        if not np.isnan(result) and not np.isinf(result):
+            self.assertTrue(np.isclose(result, expected))
 
 
 class TestCASWrapper(unittest.TestCase):
@@ -851,29 +785,40 @@ class TestCASWrapper(unittest.TestCase):
     @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], max_length=50))
     def test_dot(self, vectors):
         u, v = vectors
-        u = np.array(u, ndmin=2)
-        v = np.array(v, ndmin=2)
-        result = w.compile_and_execute(w.dot, [u, v.T])
+        u = np.array(u)
+        v = np.array(v)
+        result = w.compile_and_execute(w.dot, [u, v])
         if not np.isnan(result) and not np.isinf(result):
-            self.assertTrue(np.isclose(result, np.dot(u, v.T)))
+            self.assertTrue(np.isclose(result, np.dot(u, v)))
+
+    @given(lists_of_same_length([float_no_nan_no_inf(outer_limit=1000), float_no_nan_no_inf(outer_limit=1000)],
+                                min_length=16, max_length=16))
+    def test_dot2(self, vectors):
+        u, v = vectors
+        u = np.array(u).reshape((4,4))
+        v = np.array(v).reshape((4,4))
+        result = w.compile_and_execute(w.dot, [u, v])
+        expected = np.dot(u, v)
+        if not np.isnan(result).any() and not np.isinf(result).any():
+            np.testing.assert_array_almost_equal(result, expected)
 
     @given(unit_vector(4))
     def test_trace(self, q):
         m = quaternion_matrix(q)
         np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]), np.trace(m))
 
-    @given(quaternion(),
-           quaternion())
-    def test_rotation_distance(self, q1, q2):
-        m1 = quaternion_matrix(q1)
-        m2 = quaternion_matrix(q2)
-        actual_angle = w.compile_and_execute(w.rotation_distance, [m1, m2])
-        _, expected_angle = axis_angle_from_quaternion(*quaternion_from_matrix(m1.T.dot(m2)))
-        expected_angle = expected_angle
-        try:
-            self.assertAlmostEqual(shortest_angular_distance(actual_angle, expected_angle), 0, places=3)
-        except AssertionError:
-            self.assertAlmostEqual(shortest_angular_distance(actual_angle, -expected_angle), 0, places=3)
+    # @given(quaternion(),
+    #        quaternion())
+    # def test_rotation_distance(self, q1, q2):
+    #     m1 = quaternion_matrix(q1)
+    #     m2 = quaternion_matrix(q2)
+    #     actual_angle = w.compile_and_execute(w.rotation_distance, [m1, m2])
+    #     _, expected_angle = axis_angle_from_quaternion(*quaternion_from_matrix(m1.T.dot(m2)))
+    #     expected_angle = expected_angle
+    #     try:
+    #         self.assertAlmostEqual(shortest_angular_distance(actual_angle, expected_angle), 0, places=3)
+    #     except AssertionError:
+    #         self.assertAlmostEqual(shortest_angular_distance(actual_angle, -expected_angle), 0, places=3)
 
     @given(random_angle(),
            random_angle(),
@@ -895,6 +840,7 @@ class TestCASWrapper(unittest.TestCase):
            quaternion(),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
     def test_slerp(self, q1, q2, t):
+        r3 = w.quaternion_slerp(q1, q2, t)
         r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
         r2 = quaternion_slerp(q1, q2, t)
         self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
@@ -905,10 +851,10 @@ class TestCASWrapper(unittest.TestCase):
            quaternion())
     def test_slerp123(self, q1, q2):
         step = 0.1
-        q_d = w.compile_and_execute(lambda q1, q2: w.Quaternion.from_matrix(q1).diff(w.Quaternion.from_matrix(q2)),
+        q_d = w.compile_and_execute(lambda q1, q2: w.Quaternion(q1).diff(w.Quaternion(q2)),
                                     [q1, q2])
-        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[0], q_d)
-        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[1], q_d)
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], q_d)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], q_d)
         assume(angle != np.pi)
         if np.abs(angle) > np.pi:
             angle = angle - np.pi * 2
@@ -918,21 +864,21 @@ class TestCASWrapper(unittest.TestCase):
         r2s = []
         for t in np.arange(0, 1.001, step):
             r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
-            r1 = w.compile_and_execute(lambda q1, q2: w.Quaternion.from_matrix(q1).diff(w.Quaternion.from_matrix(q2)),
+            r1 = w.compile_and_execute(lambda q1, q2: w.Quaternion(q1).diff(w.Quaternion(q2)),
                                        [q1, r1])
-            axis2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[0], r1)
-            angle2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[1], r1)
+            axis2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r1)
+            angle2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r1)
             r2 = w.compile_and_execute(w.Quaternion.from_axis_angle, [axis, angle * t])
             r1s.append(r1)
             r2s.append(r2)
         aa1 = []
         aa2 = []
         for r1, r2 in zip(r1s, r2s):
-            axisr1 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[0], r1)
-            angler1 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[1], r1)
+            axisr1 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r1)
+            angler1 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r1)
             aa1.append([axisr1, angler1])
-            axisr2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[0], r2)
-            angler2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion(x, y, z, w_).to_axis_angle()[1], r2)
+            axisr2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r2)
+            angler2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r2)
             aa2.append([axisr2, angler2])
         aa1 = np.array(aa1)
         aa2 = np.array(aa2)
@@ -943,7 +889,7 @@ class TestCASWrapper(unittest.TestCase):
             q1t = r1s[i]
             q2t = r1s[i + 1]
             qds.append(
-                w.compile_and_execute(lambda q1, q2: w.Quaternion.from_matrix(q1).diff(w.Quaternion.from_matrix(q2)),
+                w.compile_and_execute(lambda q1, q2: w.Quaternion(q1).diff(w.Quaternion(q2)),
                                       [q1t, q2t]))
         qds = np.array(qds)
         for r1, r2 in zip(r1s, r2s):
@@ -953,12 +899,12 @@ class TestCASWrapper(unittest.TestCase):
     @given(unit_vector(3),
            unit_vector(3),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
-    def test_slerp2(self, q1, q2, t):
-        r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
-        r2 = quaternion_slerp(q1, q2, t)
+    def test_slerp2(self, v1, v2, t):
+        r1 = w.compile_and_execute(w.quaternion_slerp, [v1, v2, t])
+        r2 = quaternion_slerp(v1, v2, t)
         self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
                         np.isclose(r1, -r2, atol=1e-3).all(),
-                        msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+                        msg='q1={} q2={} t={}\n{} != {}'.format(v1, v2, t, r1, r2))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())

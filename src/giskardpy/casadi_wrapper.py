@@ -208,62 +208,62 @@ class Expression(Symbol_):
 
     def __add__(self, other):
         if isinstance(other, Point3):
-            return Point3(self.s + other.s)
+            return Point3(self.s.__add__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s + other.s)
+            return Vector3(self.s.__add__(other.s))
         if isinstance(other, (Expression, Symbol)):
-            return Expression(self.s + other.s)
-        return Expression(self.s + other)
+            return Expression(self.s.__add__(other.s))
+        return Expression(self.s.__add__(other))
 
     def __radd__(self, other):
-        return Expression(self.s + other)
+        return Expression(self.s.__radd__(other))
 
     def __sub__(self, other):
         if isinstance(other, Point3):
-            return Point3(self.s - other.s)
+            return Point3(self.s.__sub__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s - other.s)
+            return Vector3(self.s.__sub__(other.s))
         if isinstance(other, (Expression, Symbol)):
-            return Expression(self.s - other.s)
-        return Expression(self.s - other)
+            return Expression(self.s.__sub__(other.s))
+        return Expression(self.s.__sub__(other))
 
     def __rsub__(self, other):
-        return Expression(self.s - other)
+        return Expression(self.s.__rsub__(other))
 
     def __truediv__(self, other):
         if isinstance(other, Point3):
-            return Point3(self.s / other.s)
+            return Point3(self.s.__truediv__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s / other.s)
+            return Vector3(self.s.__truediv__(other.s))
         if isinstance(other, (Expression, Symbol)):
-            return Expression(self.s / other.s)
-        return Expression(self.s / other)
+            return Expression(self.s.__truediv__(other.s))
+        return Expression(self.s.__truediv__(ot.__mul__()))
 
     def __rtruediv__(self, other):
         return Expression(self.s.__rtruediv__(other))
 
     def __mul__(self, other):
         if isinstance(other, Point3):
-            return Point3(self.s * other.s)
+            return Point3(self.s.__mul__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s * other.s)
+            return Vector3(self.s.__mul__(other.s))
         if isinstance(other, (Expression, Symbol)):
-            return Expression(self.s * other.s)
-        return Expression(self.s * other)
+            return Expression(self.s.__mul__(other.s))
+        return Expression(self.s.__mul__(other))
 
     def __rmul__(self, other):
-        return Expression(self.s * other)
+        return Expression(self.s.__rmul__(other))
 
     def __neg__(self):
         return Expression(self.s.__neg__())
 
     def __pow__(self, other):
         if isinstance(other, (Expression, Symbol)):
-            return Expression(self.s ** other.s)
-        return Expression(self.s ** other)
+            return Expression(self.s.__pow__(other.s))
+        return Expression(self.s.__pow__(other))
 
     def __rpow__(self, other):
-        return Expression(self.s ** other)
+        return Expression(self.s.__rpow__(other))
 
     def __eq__(self, other):
         if isinstance(other, Symbol_):
@@ -577,34 +577,34 @@ class Point3(Symbol_):
 
     def __add__(self, other):
         if isinstance(other, (Vector3, Expression, Symbol)):
-            return Point3(self.s + other.s)
-        return Point3(self.s + other)
+            return Point3(self.s.__add__(other.s))
+        return Point3(self.s.__add__(other))
 
     def __radd__(self, other):
         return Point3(self.s.__add__(other))
 
     def __sub__(self, other):
         if isinstance(other, Point3):
-            return Vector3(self.s - other.s)
+            return Vector3(self.s.__sub__(other.s))
         if isinstance(other, (Symbol, Expression, Vector3)):
-            return Point3(self.s - other.s)
-        return Point3(self.s - other)
+            return Point3(self.s.__sub__(other.s))
+        return Point3(self.s.__sub__(other))
 
     def __rsub__(self, other):
         return Point3(self.s.__sub__(other))
 
     def __mul__(self, other):
         if isinstance(other, (Symbol, Expression)):
-            return Point3(self.s * other.s)
-        return Point3(self.s * other)
+            return Point3(self.s.__mul__(other.s))
+        return Point3(self.s.__mul__(other))
 
     def __rmul__(self, other):
         return Point3(self.s.__mul__(other))
 
     def __truediv__(self, other):
         if isinstance(other, (Symbol, Expression)):
-            return Point3(self.s / other.s)
-        return Point3(self.s / other)
+            return Point3(self.s.__truediv__(other.s))
+        return Point3(self.s.__truediv__(other))
 
     def __rtruediv__(self, other):
         return Point3(self.s.__rtruediv__(other))
@@ -647,41 +647,43 @@ class Vector3(Symbol_):
         self[2] = value
 
     def __add__(self, other):
+        if isinstance(other, Point3):
+            return Point3(self.__add__(other.s))
         if isinstance(other, (Vector3, Expression, Symbol)):
-            return Point3(self.s + other.s)
-        return Point3(self.s + other)
+            return Vector3(self.s.__add__(other.s))
+        return Vector3(self.s.__add__(other))
 
     def __radd__(self, other):
-        return Point3(self.s.__add__(other))
+        return Vector3(self.s.__add__(other))
 
     def __sub__(self, other):
         if isinstance(other, Point3):
-            return Vector3(self.s - other.s)
+            return Point3(self.s.__sub__(other.s))
         if isinstance(other, (Symbol, Expression, Vector3)):
-            return Point3(self.s - other.s)
-        return Point3(self.s - other)
+            return Vector3(self.s.__sub__(other.s))
+        return Vector3(self.s.__sub__(other))
 
     def __rsub__(self, other):
-        return Point3(self.s.__sub__(other))
+        return Vector3(self.s.__rsub__(other))
 
     def __mul__(self, other):
         if isinstance(other, (Symbol, Expression)):
-            return Point3(self.s * other.s)
-        return Point3(self.s * other)
+            return Vector3(self.s.__mul__(other.s))
+        return Vector3(self.s.__mul__(other))
 
     def __rmul__(self, other):
-        return Point3(self.s.__mul__(other))
+        return Vector3(self.s.__mul__(other))
 
     def __truediv__(self, other):
         if isinstance(other, (Symbol, Expression)):
-            return Point3(self.s / other.s)
-        return Point3(self.s / other)
+            return Vector3(self.s.__truediv__(other.s))
+        return Vector3(self.s.__truediv__(other))
 
     def __rtruediv__(self, other):
-        return Point3(self.s.__rtruediv__(other))
+        return Vector3(self.s.__rtruediv__(other))
 
-    def __neg__(self) -> Point3:
-        return Point3(self.s.__neg__())
+    def __neg__(self):
+        return Vector3(self.s.__neg__())
 
     def dot(self, other):
         return dot(self, other)
@@ -712,6 +714,9 @@ class Quaternion(Symbol_):
         self[1] = y
         self[2] = z
         self[3] = w
+
+    def __neg__(self):
+        return Quaternion(self.s.__neg__())
 
     @classmethod
     def from_xyzw(cls, x, y, z, w):
@@ -876,6 +881,9 @@ class Quaternion(Symbol_):
     def to_rpy(self):
         return self.to_rotation_matrix().to_rpy()
 
+    def dot(self, other):
+        return dot(self, other)
+
 
 all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
@@ -1003,11 +1011,14 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
-    assert type(if_result) == type(else_result)
+    if isinstance(if_result, (Point3, Vector3, TransMatrix, RotationMatrix, Quaternion)):
+        assert type(if_result) == type(else_result)
     return_type = type(if_result)
+    if return_type in (int, float):
+        return_type = Expression
     if_result = Expression(if_result).s
     else_result = Expression(else_result).s
-    return return_type((ca.if_else(condition, if_result, else_result)))
+    return return_type(ca.if_else(condition, if_result, else_result))
 
 
 def logic_and(*args):
@@ -1089,8 +1100,7 @@ def if_eq(a, b, if_result, else_result):
 
 def if_eq_cases(a, b_result_cases, else_result):
     a = Expression(a).s
-    b_result_cases = Expression(b_result_cases).s
-    result = Expression(else_result).s
+    result = else_result
     for i in range(b_result_cases.shape[0]):
         b = b_result_cases[i, 0]
         b_result = b_result_cases[i, 1]
@@ -1103,8 +1113,7 @@ def if_less_eq_cases(a, b_result_cases, else_result):
     This only works if b_result_cases is sorted in ascending order.
     """
     a = Expression(a).s
-    result = Expression(else_result).s
-    b_result_cases = Expression(b_result_cases).s
+    result = else_result
     for i in reversed(range(b_result_cases.shape[0] - 1)):
         b = b_result_cases[i, 0]
         b_result = b_result_cases[i, 1]
@@ -1132,6 +1141,10 @@ def scale(v, a):
 def dot(e1, e2):
     if isinstance(e1, (Point3, Vector3)) and isinstance(e2, (Point3, Vector3)):
         return Expression(ca.mtimes(e1[:3].T.s, e2[:3].s))
+    if isinstance(e1, Quaternion) and isinstance(e2, Quaternion):
+        return Expression(ca.mtimes(e1.s.T, e2.s))
+    if isinstance(e1, Expression) and isinstance(e2, Expression) and e1.shape[1] == 1 and e2.shape[1] == 1:
+        return Expression(ca.mtimes(e1.T.s, e2.s))
     result = ca.mtimes(e1.s, e2.s)
     if isinstance(e2, RotationMatrix):
         return RotationMatrix(result)
@@ -1258,8 +1271,7 @@ def quaternion_slerp(q1, q2, t):
     """
     q1 = Expression(q1)
     q2 = Expression(q2)
-    t = Expression(t)
-    cos_half_theta = dot(q1.T, q2)
+    cos_half_theta = q1.dot(q2)
 
     if0 = -cos_half_theta
     q2 = if_greater_zero(if0, -q2, q2)
@@ -1279,7 +1291,7 @@ def quaternion_slerp(q1, q2, t):
     ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
     ratio_b = save_division(sin(t * half_theta), sin_half_theta)
     return Quaternion(if_greater_eq_zero(if1,
-                                         Expression(q1),
+                                         q1,
                                          if_greater_zero(if2,
                                                          0.5 * q1 + 0.5 * q2,
                                                          ratio_a * q1 + ratio_b * q2)))
@@ -1292,7 +1304,7 @@ def slerp(v1, v2, t):
     :param v2: vector of same length as v1
     :param t: value between 0 and 1. 0 is v1 and 1 is v2
     """
-    angle = save_acos(dot(v1.T, v2)[0])
+    angle = save_acos(dot(v1, v2))
     angle2 = if_eq(angle, 0, 1, angle)
     return if_eq(angle, 0,
                  v1,

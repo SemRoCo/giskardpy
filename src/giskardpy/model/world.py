@@ -1,5 +1,4 @@
 from __future__ import annotations
-import traceback
 from functools import cached_property
 from itertools import combinations
 from typing import Dict, Union, Tuple, Set, Optional, List, Callable
@@ -695,7 +694,7 @@ class WorldTree:
             joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,
                                child_link_name=link.name,
-                               parent_T_child=w.TransMatrix.from_ros_msg(pose))
+                               parent_T_child=w.TransMatrix(pose))
             self._link_joint_to_links(joint)
             self.register_group(group_name, link.name)
             self.notify_model_change()
@@ -711,8 +710,8 @@ class WorldTree:
 
     def _clear(self):
         self.state = JointStates()
-        self._links: Dict[Union[PrefixName, str], Link] = {self.root_link_name: Link(self.root_link_name)}
-        self._joints: Dict[Union[PrefixName, str], Joint] = {}
+        self._links: Dict[PrefixName, Link] = {self.root_link_name: Link(self.root_link_name)}
+        self._joints: Dict[PrefixName, Joint] = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
 
@@ -1088,17 +1087,12 @@ class WorldTree:
     @memoize
     def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName,
                                               collision_id: int) -> PoseStamped:
-        try:
-            root_T_tip = self.compute_fk_np(root, tip)
-            tip_link = self._links[tip]
-            root_T_tip = root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
-            p = PoseStamped()
-            p.header.frame_id = str(root)
-            p.pose = homo_matrix_to_pose(root_T_tip)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            pass
+        root_T_tip = self.compute_fk_np(root, tip)
+        tip_link = self._links[tip]
+        root_T_tip = root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
+        p = PoseStamped()
+        p.header.frame_id = str(root)
+        p.pose = homo_matrix_to_pose(root_T_tip)
         return p
 
     @profile
@@ -1119,7 +1113,7 @@ class WorldTree:
                     self.fk_idx[link.name] = i
                     i += 1
             fks = w.vstack(fks)
-            self.fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
+            self.fast_all_fks = fks.compile(w.free_symbols(fks))
 
         fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
         result = {}
@@ -1237,7 +1231,7 @@ class WorldTree:
         self._links[link.name] = link
 
     def joint_limit_expr(self, joint_name: PrefixName, order: Derivatives) \
-            -> Tuple[Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
+            -> Tuple[Optional[w.symbol_expr_float], Optional[w.symbol_expr_float]]:
         return self._joints[joint_name].get_limit_expressions(order)
 
     def transform_msg(self, target_frame: PrefixName,
@@ -1292,7 +1286,7 @@ class WorldTree:
         return result
 
     def compute_joint_limits(self, joint_name: PrefixName, order: Derivatives) \
-            -> Tuple[Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
+            -> Tuple[Optional[w.symbol_expr_float], Optional[w.symbol_expr_float]]:
         try:
             lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
         except KeyError:
@@ -1416,10 +1410,10 @@ class SubWorldTree(WorldTree):
         self.world = world
         self.actuated = actuated
 
-    def get_link(self, link_name: my_string) -> Link:
+    def get_link(self, link_name: str) -> Link:
         return self.world.get_link(link_name, self.name)
 
-    def get_joint(self, joint_name: my_string) -> Joint:
+    def get_joint(self, joint_name: str) -> Joint:
         return self.world.get_joint(joint_name, self.name)
 
     @property
@@ -1438,7 +1432,7 @@ class SubWorldTree(WorldTree):
         raise NotImplementedError('Can\'t hard reset a SubWorldTree.')
 
     @property
-    def base_pose(self) -> PoseStamped:
+    def base_pose(self) -> Pose:
         return self.world.compute_fk_pose(self.world.root_link_name, self.root_link_name).pose
 
     @property
@@ -1504,9 +1498,9 @@ class SubWorldTree(WorldTree):
     def _joints(self) -> Dict[PrefixName, Joint]:
         def helper(root_link: Link) -> Dict[PrefixName, Joint]:
             joints = {j: self.world._joints[j] for j in root_link.child_joint_names}
-            for j in root_link.child_joint_names:  # type: Joint
-                j = self.world._joints[j]
-                child_link = self.world._links[j.child_link_name]
+            for joint_name in root_link.child_joint_names:
+                joint = self.world._joints[joint_name]
+                child_link = self.world._links[joint.child_link_name]
                 joints.update(helper(child_link))
             return joints
 
@@ -1536,10 +1530,10 @@ class SubWorldTree(WorldTree):
             -> PoseStamped:
         return self.world.compute_fk_pose_with_collision_offset(root, tip, collision_id)
 
-    def register_group(self, name: str, root_link_name: PrefixName):
+    def register_group(self, name, root_link_name, actuated):
         raise NotImplementedError()
 
-    def _link_joint_to_links(self, connecting_joint, child_link):
+    def _link_joint_to_links(self, joint: Joint):
         raise NotImplementedError()
 
     def add_urdf_joint(self, urdf_joint):

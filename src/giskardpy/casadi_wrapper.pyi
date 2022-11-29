@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any
+from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence
 import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
@@ -14,7 +14,7 @@ symbol_expr = Union[Symbol, Expression]
 pi: float
 
 class CompiledFunction:
-    str_params: Iterable[str]
+    str_params: Sequence[str]
     fast_f: ca.Function
     shape: Tuple[int, int]
     buf: ca.FunctionBuffer
@@ -262,6 +262,12 @@ class Vector3(Symbol_):
                                             ca.SX,
                                             np.ndarray,
                                             Iterable[symbol_expr_float]]] = None): ...
+
+    @classmethod
+    def from_xyz(cls,
+                 x: Optional[symbol_expr_float] = None,
+                 y: Optional[symbol_expr_float] = None,
+                 z: Optional[symbol_expr_float] = None): ...
 
     def norm(self) -> Expression: ...
 
@@ -676,8 +682,16 @@ def trace(matrix: Union[Expression, RotationMatrix, TransMatrix]) -> Expression:
 
 # def rotation_distance(a_R_b: Expression, a_R_c: Expression) -> Expression: ...
 
+@overload
+def vstack(list_of_matrices: List[Union[Point3, Vector3, Quaternion]]) -> Expression: ...
+@overload
+def vstack(list_of_matrices: List[TransMatrix]) -> Expression: ...
+@overload
 def vstack(list_of_matrices: List[Expression]) -> Expression: ...
 
+@overload
+def hstack(list_of_matrices: List[TransMatrix]) -> Expression: ...
+@overload
 def hstack(list_of_matrices: List[Expression]) -> Expression: ...
 
 def normalize_axis_angle(axis: Vector3, angle: symbol_expr_float) -> Tuple[Vector3, symbol_expr_float]: ...

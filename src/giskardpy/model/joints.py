@@ -129,8 +129,8 @@ class FixedJoint(Joint):
     def update_weights(self, weights: Dict[int, float]):
         pass
 
-    def _joint_transformation(self):
-        return w.eye(4)
+    def _joint_transformation(self) -> w.TransMatrix:
+        return w.TransMatrix()
 
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
         pass
@@ -343,7 +343,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
 
 class PrismaticJoint(OneDofJoint):
-    def _joint_transformation(self):
+    def _joint_transformation(self) -> w.TransMatrix:
         translation_axis = w.Point3(self.axis) * self.position_expression
         parent_T_child = w.TransMatrix.from_xyz_rpy(x=translation_axis[0],
                                                     y=translation_axis[1],
@@ -358,10 +358,10 @@ class PrismaticJoint(OneDofJoint):
 
 
 class RevoluteJoint(OneDofJoint):
-    def _joint_transformation(self):
+    def _joint_transformation(self) -> w.TransMatrix:
         rotation_axis = w.Vector3(self.axis)
         parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis, self.position_expression)
-        return parent_R_child
+        return w.TransMatrix(parent_R_child)
         # self.parent_T_child = w.dot(self.parent_T_child, parent_R_child)
 
     def update_limits(self, linear_limits, angular_limits):

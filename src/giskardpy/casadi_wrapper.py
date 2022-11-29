@@ -627,6 +627,13 @@ class Vector3(Symbol_):
         self.s = Point3(data).s
         self[3] = 0
 
+    @classmethod
+    def from_xyz(cls, x=None, y=None, z=None):
+        x = 0 if x is None else x
+        y = 0 if y is None else y
+        z = 0 if z is None else z
+        return cls((x, y, z))
+
     @property
     def x(self):
         return self[0]

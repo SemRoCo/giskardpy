@@ -3,6 +3,7 @@ import numbers
 from collections import defaultdict
 from copy import copy, deepcopy
 from multiprocessing import RLock
+from typing import Sequence, Union, Any
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
@@ -106,7 +107,7 @@ class GetMember(object):
         return self.child.c(a(*self.member))
 
 
-class GetMemberLeaf(object):
+class GetMemberLeaf:
     def __init__(self):
         self.member = None
         self.child = None
@@ -155,7 +156,7 @@ class GetMemberLeaf(object):
         return a(*self.member)
 
 
-def get_data(identifier, data):
+def get_data(identifier: Sequence[Union[str, int, Sequence[Union[str, int]]]], data: Any):
     """
     :param identifier: Identifier in the form of ['pose', 'position', 'x'],
                        to access class member: robot.joint_state = ['robot', 'joint_state']
@@ -163,7 +164,6 @@ def get_data(identifier, data):
                        to access lists or other indexable stuff: robot.l[-1] = ['robot', 'l', -1]
                        to access functions: lib.str_to_ascii('muh') = ['lib', 'str_to_acii', ['muh']]
                        to access functions without params: robot.get_pybullet_id() = ['robot', 'get_pybullet_id', []]
-    :type identifier: list
     :return: object that is saved at key
     """
     try:
@@ -208,7 +208,7 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
-    def unsafe_get_data(self, identifier):
+    def unsafe_get_data(self, identifier: Sequence):
         """
 
         :param identifier: Identifier in the form of ['pose', 'position', 'x'],
@@ -217,7 +217,6 @@ class GodMap(object):
                            to access lists or other indexable stuff: robot.l[-1] = ['robot', 'l', -1]
                            to access functions: lib.str_to_ascii('muh') = ['lib', 'str_to_acii', ['muh']]
                            to access functions without params: robot.get_pybullet_id() = ['robot', 'get_pybullet_id', []]
-        :type identifier: list
         :return: object that is saved at key
         """
         identifier = tuple(identifier)
@@ -312,21 +311,17 @@ class GodMap(object):
         return w.Expression(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
     def list_to_point3(self, identifier) -> w.Point3:
-        return w.Point3(
-            x=self.to_symbol(identifier + [0]),
-            y=self.to_symbol(identifier + [1]),
-            z=self.to_symbol(identifier + [2]),
-        )
+        return w.Point3((self.to_symbol(identifier + [0]),
+                         self.to_symbol(identifier + [1]),
+                         self.to_symbol(identifier + [2])))
 
     def list_to_vector3(self, identifier) -> w.Vector3:
-        return w.Vector3(
-            x=self.to_symbol(identifier + [0]),
-            y=self.to_symbol(identifier + [1]),
-            z=self.to_symbol(identifier + [2]),
-        )
+        return w.Vector3((self.to_symbol(identifier + [0]),
+                          self.to_symbol(identifier + [1]),
+                          self.to_symbol(identifier + [2])))
 
     def list_to_translation3(self, identifier) -> w.TransMatrix:
-        return w.TransMatrix.from_xyz(
+        return w.TransMatrix.from_xyz_rpy(
             x=self.to_symbol(identifier + [0]),
             y=self.to_symbol(identifier + [1]),
             z=self.to_symbol(identifier + [2]),
@@ -360,31 +355,30 @@ class GodMap(object):
         )
 
     def pose_msg_to_frame(self, identifier):
-        p = w.Point3(x=self.to_symbol(identifier + ['position', 'x']),
-                     y=self.to_symbol(identifier + ['position', 'y']),
-                     z=self.to_symbol(identifier + ['position', 'z']))
-        q = w.Quaternion(x=self.to_symbol(identifier + ['orientation', 'x']),
-                         y=self.to_symbol(identifier + ['orientation', 'y']),
-                         z=self.to_symbol(identifier + ['orientation', 'z']),
-                         w=self.to_symbol(identifier + ['orientation', 'w']))
-        return w.TransMatrix.from_parts(p, q)
+        p = w.Point3.from_xyz(x=self.to_symbol(identifier + ['position', 'x']),
+                              y=self.to_symbol(identifier + ['position', 'y']),
+                              z=self.to_symbol(identifier + ['position', 'z']))
+        q = w.Quaternion.from_xyzw(x=self.to_symbol(identifier + ['orientation', 'x']),
+                                   y=self.to_symbol(identifier + ['orientation', 'y']),
+                                   z=self.to_symbol(identifier + ['orientation', 'z']),
+                                   w=self.to_symbol(identifier + ['orientation', 'w'])).to_rotation_matrix()
+        return w.TransMatrix.from_point_rotation_matrix(p, q)
 
     def quaternion_msg_to_rotation(self, identifier):
-        q = w.Quaternion(x=self.to_symbol(identifier + ['x']),
-                         y=self.to_symbol(identifier + ['y']),
-                         z=self.to_symbol(identifier + ['z']),
-                         w=self.to_symbol(identifier + ['w']), )
-        return q.to_rotation_matrix()
+        return w.Quaternion.from_xyzw(x=self.to_symbol(identifier + ['x']),
+                                      y=self.to_symbol(identifier + ['y']),
+                                      z=self.to_symbol(identifier + ['z']),
+                                      w=self.to_symbol(identifier + ['w'])).to_rotation_matrix()
 
     def point_msg_to_point3(self, identifier):
-        return w.Point3(
+        return w.Point3.from_xyz(
             x=self.to_symbol(identifier + ['x']),
             y=self.to_symbol(identifier + ['y']),
             z=self.to_symbol(identifier + ['z']),
         )
 
     def vector_msg_to_vector3(self, identifier):
-        return w.Vector3(
+        return w.Vector3.from_xyz(
             x=self.to_symbol(identifier + ['x']),
             y=self.to_symbol(identifier + ['y']),
             z=self.to_symbol(identifier + ['z']),

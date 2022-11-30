@@ -841,16 +841,17 @@ class TestCASWrapper(unittest.TestCase):
            random_angle(),
            random_angle())
     def test_axis_angle_from_rpy(self, roll, pitch, yaw):
-        angle2, axis2, _ = rotation_from_matrix(euler_matrix(roll, pitch, yaw))
+        expected_angle, expected_axis = PyKDL.Rotation.RPY(roll, pitch, yaw).GetRotAngle()
+        expected_axis = np.array(list(list(expected_axis)))
         axis = w.compile_and_execute(lambda r, p, y: w.axis_angle_from_rpy(r, p, y)[0], [roll, pitch, yaw])
         angle = w.compile_and_execute(lambda r, p, y: w.axis_angle_from_rpy(r, p, y)[1], [roll, pitch, yaw])
         if angle < 0:
             angle = -angle
             axis = [-x for x in axis]
-        if angle2 < 0:
-            angle2 = -angle2
-            axis2 *= -1
-        compare_axis_angle(angle, axis[:3], angle2, axis2)
+        if expected_angle < 0:
+            angle2 = -expected_angle
+            expected_angle *= -1
+        compare_axis_angle(angle, axis[:3], expected_angle, expected_axis)
         assert axis[-1] == 0
 
     @given(quaternion(),

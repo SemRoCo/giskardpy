@@ -328,7 +328,7 @@ class TransMatrix(Symbol_):
         inv = TransMatrix()
         inv[:3, :3] = self[:3, :3].T
         inv[:3, 3] = dot(-inv[:3, :3], self[:3, 3])
-        return self.__class__(inv)
+        return inv
 
     @classmethod
     def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None):

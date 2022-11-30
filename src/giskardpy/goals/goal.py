@@ -322,7 +322,7 @@ class Goal(ABC):
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
 
-    def add_debug_expr(self, name: str, expr: w.symbol_expr):
+    def add_debug_expr(self, name: str, expr: w.symbol_expr_float):
         """
         Add any expression for debug purposes. They will be evaluated as well and can be plotted by activating
         the debug plotter in this Giskard config.

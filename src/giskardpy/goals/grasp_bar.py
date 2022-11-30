@@ -63,9 +63,9 @@ class GraspBar(Goal):
         return f'{s}/{self.root}/{self.tip}'
 
     def make_constraints(self):
-        root_V_bar_axis = w.ros_msg_to_matrix(self.bar_axis)
-        tip_V_tip_grasp_axis = w.ros_msg_to_matrix(self.tip_grasp_axis)
-        root_P_bar_center = w.ros_msg_to_matrix(self.bar_center)
+        root_V_bar_axis = w.Vector3(self.bar_axis)
+        tip_V_tip_grasp_axis = w.Vector3(self.tip_grasp_axis)
+        root_P_bar_center = w.Point3(self.bar_center)
 
         root_T_tip = self.get_fk(self.root, self.tip)
         root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)
@@ -75,14 +75,14 @@ class GraspBar(Goal):
                                          reference_velocity=self.reference_angular_velocity,
                                          weight=self.weight)
 
-        root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
+        root_P_tip = self.get_fk(self.root, self.tip).to_position()
 
         root_P_line_start = root_P_bar_center + root_V_bar_axis * self.bar_length / 2
         root_P_line_end = root_P_bar_center - root_V_bar_axis * self.bar_length / 2
 
         dist, nearest = w.distance_point_to_line_segment(root_P_tip, root_P_line_start, root_P_line_end)
 
-        self.add_point_goal_constraints(frame_P_current=w.position_of(root_T_tip),
+        self.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                         frame_P_goal=nearest,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)

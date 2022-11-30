@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Union
 
 import casadi as ca  # type: ignore
@@ -182,7 +183,7 @@ class Expression(Symbol_):
         if isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, Symbol_):
-            self.s = data.s
+            self.s = deepcopy(data.s)
         elif isinstance(data, (int, float)):
             self.s = ca.SX(data)
         elif isinstance(data, np.ndarray):
@@ -301,7 +302,7 @@ class TransMatrix(Symbol_):
             return
         if data is None:
             data = ca.SX.eye(4)
-        self.s = Expression(data).s
+        self.s = deepcopy(Expression(data).s)
         if self.shape[0] != 4 or self.shape[1] != 4:
             raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
         self[3, 0] = 0

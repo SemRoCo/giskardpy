@@ -140,6 +140,9 @@ class TestRotationMatrix(unittest.TestCase):
     def test_create_RotationMatrix(self):
         r = w.RotationMatrix.from_rpy(1, 2, 3)
         assert isinstance(r, w.RotationMatrix)
+        t = w.TransMatrix.from_xyz_rpy(1,2,3)
+        r = w.RotationMatrix(t)
+        assert t[0,3].evaluate() == 1
 
     @given(quaternion())
     def test_from_quaternion(self, q):

@@ -26,7 +26,7 @@ from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr, memoize
+from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize
 
 
 class TravelCompanion:
@@ -1050,7 +1050,7 @@ class WorldTree:
             tip_chain = tip_chain[1:]
         return root_chain, [connection] if add_links else [], tip_chain
 
-    @memoize
+    @copy_memoize
     @profile
     def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> w.TransMatrix:
         """

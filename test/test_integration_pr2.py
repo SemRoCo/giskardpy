@@ -2843,9 +2843,9 @@ class TestCollisionAvoidanceGoals:
         base_goal.pose.position.x = -1
         base_goal.pose.orientation.w = 1
         box_setup.allow_self_collision()
-        box_setup.move_base(base_goal)
-        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.148)
-        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.088)
+        box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_BELOW_CA)
+        box_setup.plan_and_execute()
+        box_setup.check_cpi_geq(['base_link'], 0.09)
 
     def test_avoid_collision_lower_soft_threshold(self, box_setup: PR2TestWrapper):
         base_goal = PoseStamped()

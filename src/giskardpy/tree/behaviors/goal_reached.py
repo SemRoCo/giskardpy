@@ -2,6 +2,7 @@ import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
@@ -26,13 +27,13 @@ class GoalReached(GiskardBehavior):
     def update(self):
         planning_time = self.get_god_map().get_data(identifier.time)
         if planning_time - self.above_threshold_time >= self.window_size:
-            velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution)[0].values()))
+            velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution)[Derivatives.velocity].values()))
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
                 run_time = self.get_runtime()
                 logging.loginfo('Velocities went below threshold.')
-                logging.loginfo('Found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * self.sample_period,
-                                                                                       run_time))
+                logging.loginfo(f'Found goal trajectory with length '
+                                f'{planning_time * self.sample_period:.3f}s in {run_time:.3f}s')
                 self.time_collector.lengths.append(planning_time * self.sample_period)
                 self.time_collector.times.append(run_time)
                 return Status.SUCCESS

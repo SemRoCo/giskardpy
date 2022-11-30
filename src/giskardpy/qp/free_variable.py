@@ -1,10 +1,10 @@
 from collections import defaultdict
 from typing import Dict, Optional, List, Union
-
+import numpy as np
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
-from giskardpy.my_types import expr_symbol, Derivatives
+from giskardpy.my_types import Derivatives
 
 
 class FreeVariable:
@@ -42,13 +42,13 @@ class FreeVariable:
     def order(self) -> Derivatives:
         return Derivatives(len(self.quadratic_weights) + 1)
 
-    def get_symbol(self, derivative: Derivatives) -> expr_symbol:
+    def get_symbol(self, derivative: Derivatives) -> Union[w.Symbol, float]:
         try:
             return self._symbols[derivative]
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {derivative}')
 
-    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[expr_symbol, float]:
+    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
             expr = w.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
         elif derivative in self.default_lower_limits:
@@ -61,13 +61,13 @@ class FreeVariable:
             return self.god_map.evaluate_expr(expr)
         return expr
 
-    def set_lower_limit(self, derivative: Derivatives, limit: Union[expr_symbol, float]):
+    def set_lower_limit(self, derivative: Derivatives, limit: Union[Union[w.Symbol, float], float]):
         self.lower_limits[derivative] = limit
 
-    def set_upper_limit(self, derivative: Derivatives, limit: Union[expr_symbol, float]):
+    def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[w.Symbol, float], float]):
         self.upper_limits[derivative] = limit
 
-    def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[expr_symbol, float]:
+    def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
         if not default and derivative in self.default_upper_limits and derivative in self.upper_limits:
             expr = w.min(self.default_upper_limits[derivative], self.upper_limits[derivative])
         elif derivative in self.default_upper_limits:
@@ -84,13 +84,12 @@ class FreeVariable:
         try:
             lower_limit = self.get_lower_limit(Derivatives.position)
             upper_limit = self.get_upper_limit(Derivatives.position)
-            return lower_limit is not None and abs(lower_limit) < 100 \
-                   and upper_limit is not None and abs(upper_limit) < 100
-        except Exception:
+            return lower_limit is not None and upper_limit is not None
+        except KeyError:
             return False
 
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
-                          evaluated: bool = False) -> Union[expr_symbol, float]:
+                          evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
         weight = self.quadratic_weights[derivative]
         start = weight * self.horizon_functions[derivative]
         a = (weight - start) / prediction_horizon
@@ -101,3 +100,6 @@ class FreeVariable:
 
     def __str__(self) -> str:
         return self.position_name
+
+    def __repr__(self):
+        return str(self)

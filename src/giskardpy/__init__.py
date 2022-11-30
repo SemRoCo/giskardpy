@@ -1,11 +1,11 @@
 import builtins
 
 try:
-    builtins.profile
+    builtins.profile  #type: ignore
 except AttributeError:
     # No line profiler, provide a pass-through version
     def profile(func): return func
-    builtins.profile = profile
+    builtins.profile = profile #type: ignore
 
 DEBUG = 0
 NORMAL = 1

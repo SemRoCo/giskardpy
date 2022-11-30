@@ -84,10 +84,10 @@ class ExternalCollisionAvoidance(Goal):
 
         map_T_a = self.get_fk(self.root, self.link_name)
 
-        map_P_pa = w.dot(map_T_a, a_P_pa)
+        map_P_pa = map_T_a.dot(a_P_pa)
 
         # the position distance is not accurate, but the derivative is still correct
-        dist = w.dot(map_V_n.T, map_P_pa)[0]
+        dist = map_V_n.dot(map_P_pa)
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
@@ -178,7 +178,7 @@ class SelfCollisionAvoidance(Goal):
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
-    def get_b_T_pb(self):
+    def get_b_T_pb(self) -> w.TransMatrix:
         return self.god_map.list_to_translation3(identifier.closest_point + ['get_self_collisions',
                                                                              (self.link_a, self.link_b),
                                                                              self.idx,
@@ -202,14 +202,14 @@ class SelfCollisionAvoidance(Goal):
 
         # b_T_a2 = self.get_fk_evaluated(self.link_b, self.link_a)
         b_T_a = self.get_fk(self.link_b, self.link_a)
-        pb_T_b = w.inverse_frame(self.get_b_T_pb())
+        pb_T_b = self.get_b_T_pb().inverse()
         a_P_pa = self.get_position_on_a_in_a()
 
         pb_V_n = self.get_contact_normal_in_b()
 
-        pb_P_pa = w.dot(pb_T_b, b_T_a, a_P_pa)
+        pb_P_pa = pb_T_b.dot(b_T_a).dot(a_P_pa)
 
-        dist = w.dot(pb_V_n.T, pb_P_pa)[0]
+        dist = pb_V_n.dot(pb_P_pa)
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
         weight = w.save_division(weight,  # divide by number of active repeller per link
@@ -257,7 +257,6 @@ class CollisionAvoidanceHint(Goal):
         to body_b/link_b.
         :param tip_link: str, name of the robot link, has to have a collision body
         :param avoidance_hint: Vector3Stamped as json, direction in which the robot link will get pushed
-        :param object_name: str, name of the environment object, can be the robot, e.g. kitchen
         :param object_link_name: str, name of the link of the environment object. e.g. fridge handle
         :param max_linear_velocity: float, m/s, default 0.1
         :param root_link: str, default robot root, name of the root link for the kinematic chain
@@ -325,12 +324,12 @@ class CollisionAvoidanceHint(Goal):
                               spring_weight)
         weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
 
-        root_V_avoidance_hint = w.ros_msg_to_matrix(self.avoidance_hint)
+        root_V_avoidance_hint = w.Vector3(self.avoidance_hint)
 
         # penetration_distance = threshold - actual_distance_capped
 
-        root_P_a = w.position_of(root_T_a)
-        expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
+        root_P_a = root_T_a.to_position()
+        expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)
         self.add_constraint(name='avoidance_hint',

@@ -2835,7 +2835,7 @@ class TestCollisionAvoidanceGoals:
     def test_avoid_collision_drive_into_box(self, box_setup: PR2TestWrapper):
         base_goal = PoseStamped()
         base_goal.header.frame_id = box_setup.default_root
-        # base_goal.pose.position.x = -0.5
+        base_goal.pose.position.x = 0.25
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         box_setup.teleport_base(base_goal)
         base_goal = PoseStamped()
@@ -2846,6 +2846,7 @@ class TestCollisionAvoidanceGoals:
         box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_BELOW_CA)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(['base_link'], 0.09)
+
 
     def test_avoid_collision_lower_soft_threshold(self, box_setup: PR2TestWrapper):
         base_goal = PoseStamped()

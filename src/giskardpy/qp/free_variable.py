@@ -100,3 +100,6 @@ class FreeVariable:
 
     def __str__(self) -> str:
         return self.position_name
+
+    def __repr__(self):
+        return str(self)

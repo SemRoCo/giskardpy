@@ -120,6 +120,7 @@ class H(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):
+                    o = Derivatives(o)
                     weights[o][f't{t:03}/{v.position_name}/{o}'] = v.normalized_weight(t, o,
                                                                                        self.prediction_horizon,
                                                                                        evaluated=self.evaluted)
@@ -179,6 +180,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):  # start with velocity
+                    o = Derivatives(o)
                     if t == self.prediction_horizon - 1 \
                             and o < min(v.order, self.order) - 1 \
                             and self.prediction_horizon > 2:  # and False:
@@ -257,36 +259,38 @@ class BA(Parent):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
                     normal_lower_bound = w.round_up(
-                        v.get_lower_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
+                        v.get_lower_limit(Derivatives.position,
+                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
                         self.round_to2)
                     normal_upper_bound = w.round_down(
-                        v.get_upper_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
+                        v.get_upper_limit(Derivatives.position,
+                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
                         self.round_to2)
                     if self.default_limits:
                         if self.order >= 4:
-                            lower_vel = w.min(v.get_upper_limit(derivative=1,
+                            lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(derivative=3,
+                                              v.get_upper_limit(derivative=Derivatives.jerk,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 3)
-                            upper_vel = w.max(v.get_lower_limit(derivative=1,
+                            upper_vel = w.max(v.get_lower_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(derivative=3,
+                                              v.get_lower_limit(derivative=Derivatives.jerk,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 3)
                         else:
-                            lower_vel = w.min(v.get_upper_limit(derivative=1,
+                            lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(derivative=2,
+                                              v.get_upper_limit(derivative=Derivatives.acceleration,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 2)
-                            upper_vel = w.max(v.get_lower_limit(derivative=1,
+                            upper_vel = w.max(v.get_lower_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(derivative=2,
+                                              v.get_lower_limit(derivative=Derivatives.acceleration,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 2)
                         lower_bound = w.if_greater(normal_lower_bound, 0,
@@ -306,6 +310,7 @@ class BA(Parent):
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
             for o in range(1, min(v.order, self.order) - 1):
+                o = Derivatives(o)
                 l_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
 

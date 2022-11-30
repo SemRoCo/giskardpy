@@ -473,9 +473,9 @@ class OmniDrive(Joint):
             self.translation_names[0] = PrefixName(odom_x_name, group_name)
         if odom_y_name is not None:
             self.translation_names[1] = PrefixName(odom_y_name, group_name)
-        self.orientation_names = [PrefixName('roll', group_name),
-                                  PrefixName('pitch', group_name),
-                                  PrefixName('yaw', group_name)]
+        self.orientation_names = [PrefixName('odom_roll', group_name),
+                                  PrefixName('odom_pitch', group_name),
+                                  PrefixName('odom_yaw', group_name)]
         if odom_yaw_name is not None:
             self.orientation_names[2] = PrefixName(odom_yaw_name, group_name)
         # self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']

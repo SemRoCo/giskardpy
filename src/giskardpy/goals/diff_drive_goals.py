@@ -30,14 +30,14 @@ class DiffDriveTangentialToPoint(Goal):
             self.tip_V_pointing_axis.vector.x = 1
 
     def make_constraints(self):
-        map_P_center = w.ros_msg_to_matrix(self.goal_point)
+        map_P_center = w.Point3(self.goal_point)
         map_T_base = self.get_fk(self.root, self.tip)
-        map_P_base = w.position_of(map_T_base)
+        map_P_base = map_T_base.to_position()
         map_V_base_to_center = map_P_center - map_P_base
         map_V_base_to_center = w.scale(map_V_base_to_center, 1)
-        map_V_up = w.Matrix([0, 0, 1, 0])
+        map_V_up = w.Expression([0, 0, 1, 0])
         map_V_tangent = w.cross(map_V_base_to_center, map_V_up)
-        tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
+        tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
         map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)
 
         if self.drive:
@@ -50,10 +50,10 @@ class DiffDriveTangentialToPoint(Goal):
                                 name='/rot')
         else:
             # angle = w.abs(w.angle_between_vector(w.vector3(1,0,0), map_V_tangent))
-            map_R_goal = w.rotation_matrix_from_vectors(x=map_V_tangent, y=None, z=w.vector3(0, 0, 1))
-            goal_angle = w.angle_from_matrix(map_R_goal, lambda axis: axis[2])
-            map_R_base = w.rotation_of(map_T_base)
-            axis, map_current_angle = w.axis_angle_from_matrix(map_R_base)
+            map_R_goal = w.RotationMatrix.from_vectors(x=map_V_tangent, y=None, z=w.Vector3((0, 0, 1)))
+            goal_angle = map_R_goal.to_angle(lambda axis: axis[2])
+            map_R_base = map_T_base.to_rotation()
+            axis, map_current_angle = map_R_base.to_axis_angle()
             map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
             angle_error = w.shortest_angular_distance(map_current_angle, goal_angle)
             self.add_constraint(reference_velocity=0.5,
@@ -88,12 +88,12 @@ class PointingDiffDriveEEF(Goal):
 
     def make_constraints(self):
         fk_vel = self.get_fk_velocity(self.eef_root, self.eef_tip)
-        eef_root_V_eef_tip = w.vector3(fk_vel[0], fk_vel[1], 0)
+        eef_root_V_eef_tip = w.Vector3((fk_vel[0], fk_vel[1], 0))
         eef_root_V_eef_tip_normed = w.scale(eef_root_V_eef_tip, 1)
         base_root_T_eef_root = self.get_fk(self.base_root, self.eef_root)
         base_root_V_eef_tip = w.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
 
-        tip_V_pointing_axis = w.ros_msg_to_matrix(self.tip_V_pointing_axis)
+        tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
         base_root_T_base_tip = self.get_fk(self.base_root, self.base_tip)
         base_root_V_pointing_axis = w.dot(base_root_T_base_tip, tip_V_pointing_axis)
 
@@ -141,16 +141,16 @@ class KeepHandInWorkspace(Goal):
 
     def make_constraints(self):
         weight = WEIGHT_ABOVE_CA
-        base_footprint_V_pointing_axis = w.ros_msg_to_matrix(self.map_V_pointing_axis)
+        base_footprint_V_pointing_axis = w.Vector3(self.map_V_pointing_axis)
         map_T_base_footprint = self.get_fk(self.map_frame, self.base_footprint)
         map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
         map_T_tip = self.get_fk(self.map_frame, self.tip_link)
-        map_V_tip = w.position_of(map_T_tip)
+        map_V_tip = map_T_tip.to_position()
         map_V_tip[2] = 0
         map_V_tip[3] = 0
-        map_P_tip = w.position_of(map_T_tip)
+        map_P_tip = map_T_tip.to_position()
         map_P_tip[2] = 0
-        map_P_base_footprint = w.position_of(map_T_base_footprint)
+        map_P_base_footprint = map_T_base_footprint.to_position()
         map_P_base_footprint[2] = 0
         base_footprint_V_tip = map_P_tip - map_P_base_footprint
         distance_to_base = w.norm(base_footprint_V_tip)

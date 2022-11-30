@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple, Type
+from typing import List, Dict, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +15,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import expr_symbol
+from giskardpy.my_types import derivative_joint_map, Derivatives
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
@@ -120,6 +120,7 @@ class H(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):
+                    o = Derivatives(o)
                     weights[o][f't{t:03}/{v.position_name}/{o}'] = v.normalized_weight(t, o,
                                                                                        self.prediction_horizon,
                                                                                        evaluated=self.evaluted)
@@ -179,6 +180,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, min(v.order, self.order)):  # start with velocity
+                    o = Derivatives(o)
                     if t == self.prediction_horizon - 1 \
                             and o < min(v.order, self.order) - 1 \
                             and self.prediction_horizon > 2:  # and False:
@@ -257,36 +259,38 @@ class BA(Parent):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
                     normal_lower_bound = w.round_up(
-                        v.get_lower_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
+                        v.get_lower_limit(Derivatives.position,
+                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
                         self.round_to2)
                     normal_upper_bound = w.round_down(
-                        v.get_upper_limit(0, False, evaluated=self.evaluated) - v.get_symbol(0),
+                        v.get_upper_limit(Derivatives.position,
+                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
                         self.round_to2)
                     if self.default_limits:
                         if self.order >= 4:
-                            lower_vel = w.min(v.get_upper_limit(derivative=1,
+                            lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(derivative=3,
+                                              v.get_upper_limit(derivative=Derivatives.jerk,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 3)
-                            upper_vel = w.max(v.get_lower_limit(derivative=1,
+                            upper_vel = w.max(v.get_lower_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(derivative=3,
+                                              v.get_lower_limit(derivative=Derivatives.jerk,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 3)
                         else:
-                            lower_vel = w.min(v.get_upper_limit(derivative=1,
+                            lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(derivative=2,
+                                              v.get_upper_limit(derivative=Derivatives.acceleration,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 2)
-                            upper_vel = w.max(v.get_lower_limit(derivative=1,
+                            upper_vel = w.max(v.get_lower_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(derivative=2,
+                                              v.get_lower_limit(derivative=Derivatives.acceleration,
                                                                 default=False,
                                                                 evaluated=self.evaluated) * self.sample_period ** 2)
                         lower_bound = w.if_greater(normal_lower_bound, 0,
@@ -306,6 +310,7 @@ class BA(Parent):
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
             for o in range(1, min(v.order, self.order) - 1):
+                o = Derivatives(o)
                 l_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
 
@@ -455,10 +460,10 @@ class A(Parent):
         J_vel = []
         J_err = []
         for order in range(self.order):
-            J_vel.append(w.jacobian(expressions=w.Matrix(self.get_velocity_constraint_expressions()),
+            J_vel.append(w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
                                     symbols=self.get_free_variable_symbols(order),
                                     order=1) * self.sample_period)
-            J_err.append(w.jacobian(expressions=w.Matrix(self.get_constraint_expressions()),
+            J_err.append(w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
                                     symbols=self.get_free_variable_symbols(order),
                                     order=1) * self.sample_period)
         jac_time = time() - t
@@ -496,6 +501,7 @@ class A(Parent):
         # constraints
         # TODO i don't need vel checks for the last 2 entries because the have to be zero with current B's
         # velocity limits
+        next_vertical_offset = vertical_offset
         for order in range(self.order - 1):
             J_vel_tmp = J_vel[order]
             J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel_tmp)
@@ -584,7 +590,7 @@ class QPController:
                  free_variables: List[FreeVariable] = None,
                  constraints: List[Constraint] = None,
                  velocity_constraints: List[VelocityConstraint] = None,
-                 debug_expressions: Dict[str, expr_symbol] = None,
+                 debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
@@ -706,12 +712,11 @@ class QPController:
         free_symbols = set(free_symbols)
         free_symbols.update(debug_free_symbols)
         free_symbols = list(free_symbols)
-        self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
-                                             free_symbols)
+        self.compiled_big_ass_M = self.big_ass_M.compile(free_symbols)
         compilation_time = time() - t
-        logging.loginfo('Compiled symbolic controller in {:.5f}s'.format(compilation_time))
+        logging.loginfo(f'Compiled symbolic controller in {compilation_time:.5f}s')
         self.time_collector.compilations.append(compilation_time)
-        self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
+        self.compiled_debug_v = self.debug_v.compile(free_symbols)
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]
@@ -849,17 +854,17 @@ class QPController:
 
         self._init_big_ass_M()
 
-        self._set_weights(w.Matrix(self.H.weights()))
+        self._set_weights(w.Expression(self.H.weights()))
         self._set_A_soft(self.A.A())
         lbA, ubA = self.bA()
-        self._set_lbA(w.Matrix(lbA))
-        self._set_ubA(w.Matrix(ubA))
+        self._set_lbA(w.Expression(lbA))
+        self._set_ubA(w.Expression(ubA))
         lb, ub = self.b()
-        self._set_lb(w.Matrix(lb))
-        self._set_ub(w.Matrix(ub))
+        self._set_lb(w.Expression(lb))
+        self._set_ub(w.Expression(ub))
         self.np_g = np.zeros(self.H.width)
         self.debug_names = list(sorted(self.debug_expressions.keys()))
-        self.debug_v = w.Matrix([self.debug_expressions[name] for name in self.debug_names])
+        self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
     @profile
     def _eval_debug_exprs(self, substitutions):
@@ -907,7 +912,7 @@ class QPController:
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: list) -> Tuple[list, dict]:
+    def get_cmd(self, substitutions: list) -> Tuple[derivative_joint_map, dict]:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:
@@ -982,12 +987,13 @@ class QPController:
         logging.loginfo('No slack limit violation detected.')
         return False
 
-    def split_xdot(self, xdot):
-        split = []
+    def split_xdot(self, xdot) -> derivative_joint_map:
+        split = {}
         offset = len(self.free_variables)
         for derivative in range(self.order - 1):
-            split.append(OrderedDict((x.position_name, xdot[i + offset * self.prediction_horizon * derivative])
-                                     for i, x in enumerate(self.free_variables)))
+            split[Derivatives(derivative + 1)] = OrderedDict((x.position_name,
+                                                              xdot[i + offset * self.prediction_horizon * derivative])
+                                                             for i, x in enumerate(self.free_variables))
         return split
 
     def b_names(self):

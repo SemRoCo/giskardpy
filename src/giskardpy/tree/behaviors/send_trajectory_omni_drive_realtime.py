@@ -14,6 +14,7 @@ from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.joints import OmniDrive, DiffDrive
+from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
@@ -24,7 +25,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     supported_state_types = [Twist]
 
     @profile
-    def __init__(self, cmd_vel_topic, goal_time_tolerance=1, track_only_velocity: bool = False,
+    def __init__(self, cmd_vel_topic: str, goal_time_tolerance: float = 1, track_only_velocity: bool = False,
                  joint_name: Optional[str] = None):
         self.cmd_vel_topic = cmd_vel_topic
         super().__init__(str(self))
@@ -55,6 +56,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
                 #TODO
                 pass
         else:
+            joint_name = self.world.get_joint_name(joint_name)
             self.joint = self.world._joints[joint_name]
         self.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
@@ -93,19 +95,19 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     def solver_cmd_to_twist(self, cmd) -> Twist:
         twist = Twist()
         try:
-            twist.linear.x = cmd[0][self.joint.x_vel.position_name]
+            twist.linear.x = cmd[Derivatives.velocity][self.joint.x_vel.position_name]
             if abs(twist.linear.x) < self.threshold[0]:
                 twist.linear.x = 0
         except:
             twist.linear.x = 0
         try:
-            twist.linear.y = cmd[0][self.joint.y_vel.position_name]
+            twist.linear.y = cmd[Derivatives.velocity][self.joint.y_vel.position_name]
             if abs(twist.linear.y) < self.threshold[1]:
                 twist.linear.y = 0
         except:
             twist.linear.y = 0
         try:
-            twist.angular.z = cmd[0][self.joint.yaw_vel.position_name]
+            twist.angular.z = cmd[Derivatives.velocity][self.joint.yaw_vel.position_name]
             if abs(twist.angular.z) < self.threshold[2]:
                 twist.angular.z = 0
         except:

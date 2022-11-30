@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
-from hypothesis import given
 from numpy import pi
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -2832,6 +2831,22 @@ class TestCollisionAvoidanceGoals:
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.148)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.088)
 
+    def test_avoid_collision_drive_into_box(self, box_setup: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = box_setup.default_root
+        base_goal.pose.position.x = 0.25
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        box_setup.teleport_base(base_goal)
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'base_footprint'
+        base_goal.pose.position.x = -1
+        base_goal.pose.orientation.w = 1
+        box_setup.allow_self_collision()
+        box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_BELOW_CA)
+        box_setup.plan_and_execute()
+        box_setup.check_cpi_geq(['base_link'], 0.09)
+
+
     def test_avoid_collision_lower_soft_threshold(self, box_setup: PR2TestWrapper):
         base_goal = PoseStamped()
         base_goal.header.frame_id = box_setup.default_root
@@ -3795,19 +3810,23 @@ class TestWorld:
                                                                        world_setup.get_link_name('r_gripper_palm_link'),
                                                                        world_setup.get_link_name('r_gripper_led_frame'),
                                                                        world_setup.get_link_name(
-                                                                    'r_gripper_motor_accelerometer_link'),
-                                                                       world_setup.get_link_name('r_gripper_tool_frame'),
+                                                                           'r_gripper_motor_accelerometer_link'),
                                                                        world_setup.get_link_name(
-                                                                    'r_gripper_motor_slider_link'),
-                                                                       world_setup.get_link_name('r_gripper_motor_screw_link'),
-                                                                       world_setup.get_link_name('r_gripper_l_finger_link'),
+                                                                           'r_gripper_tool_frame'),
                                                                        world_setup.get_link_name(
-                                                                    'r_gripper_l_finger_tip_link'),
-                                                                       world_setup.get_link_name('r_gripper_r_finger_link'),
+                                                                           'r_gripper_motor_slider_link'),
                                                                        world_setup.get_link_name(
-                                                                    'r_gripper_r_finger_tip_link'),
+                                                                           'r_gripper_motor_screw_link'),
                                                                        world_setup.get_link_name(
-                                                                    'r_gripper_l_finger_tip_frame')}
+                                                                           'r_gripper_l_finger_link'),
+                                                                       world_setup.get_link_name(
+                                                                           'r_gripper_l_finger_tip_link'),
+                                                                       world_setup.get_link_name(
+                                                                           'r_gripper_r_finger_link'),
+                                                                       world_setup.get_link_name(
+                                                                           'r_gripper_r_finger_tip_link'),
+                                                                       world_setup.get_link_name(
+                                                                           'r_gripper_l_finger_tip_frame')}
 
     def test_get_chain(self, world_setup: WorldTree):
         with suppress_stderr():
@@ -4059,8 +4078,9 @@ class TestWorld:
         assert result == reference
 
     def test_compute_chain_reduced_to_controlled_joints2(self, world_setup: WorldTree):
-        link_a, link_b = world_setup.compute_chain_reduced_to_controlled_joints(world_setup.get_link_name('l_upper_arm_link'),
-                                                                                world_setup.get_link_name('r_upper_arm_link'))
+        link_a, link_b = world_setup.compute_chain_reduced_to_controlled_joints(
+            world_setup.get_link_name('l_upper_arm_link'),
+            world_setup.get_link_name('r_upper_arm_link'))
         assert link_a == 'pr2/l_upper_arm_roll_link'
         assert link_b == 'pr2/r_upper_arm_roll_link'
 
@@ -4071,6 +4091,7 @@ class TestWorld:
 
 # time: *[1-9].[1-9]* s
 # import pytest
+# pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal2'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])

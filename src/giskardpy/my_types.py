@@ -3,7 +3,6 @@ from __future__ import annotations
 from enum import IntEnum
 from typing import Union, Dict
 
-import casadi as ca
 import genpy
 from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
 
@@ -74,9 +73,6 @@ class Derivatives(IntEnum):
 
 my_string = Union[str, PrefixName]
 goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, None]
-expr_symbol = Union[ca.SX, float]
-expr_matrix = ca.SX
-any_expr = Union[expr_symbol, expr_matrix]
 derivative_map = Dict[Derivatives, float]
 derivative_joint_map = Dict[Derivatives, Dict[my_string, float]]
 transformable_message = Union[PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped]

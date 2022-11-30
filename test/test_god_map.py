@@ -303,7 +303,7 @@ class TestGodMap(unittest.TestCase):
     def test_to_symbol(self, key, value):
         gm = GodMap()
         gm.set_data([key], value)
-        self.assertTrue(w.is_symbol(gm.to_symbol([key])))
+        self.assertTrue(isinstance(gm.to_symbol([key]), w.Symbol))
         self.assertTrue(key in str(gm.to_symbol([key])))
 
     def test_to_symbol_pose_stamped(self):

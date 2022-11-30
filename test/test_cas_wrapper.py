@@ -4,36 +4,567 @@ import PyKDL
 import hypothesis.strategies as st
 import numpy as np
 from angles import shortest_angular_distance, normalize_angle_positive, normalize_angle
+from geometry_msgs.msg import Point, PointStamped, Vector3, Vector3Stamped
 from hypothesis import given, assume
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.casadi_wrapper import rotation_matrix_from_quaternion
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
 from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix
 
 
+class TestSymbol:
+    def test_from_name(self):
+        s = w.Symbol('muh')
+        assert isinstance(s, w.Symbol)
+        assert str(s) == 'muh'
+
+    def test_simple_math(self):
+        s = w.Symbol('muh')
+        e = s + s
+        assert isinstance(e, w.Expression)
+        e = s - s
+        assert isinstance(e, w.Expression)
+        e = s * s
+        assert isinstance(e, w.Expression)
+        e = s / s
+        assert isinstance(e, w.Expression)
+        e = s ** s
+        assert isinstance(e, w.Expression)
+
+    def test_comparisons(self):
+        s = w.Symbol('muh')
+        e = s > s
+        assert isinstance(e, w.Expression)
+        e = s >= s
+        assert isinstance(e, w.Expression)
+        e = s < s
+        assert isinstance(e, w.Expression)
+        e = s <= s
+        assert isinstance(e, w.Expression)
+        e = s == s
+        assert isinstance(e, w.Expression)
+
+    def test_hash(self):
+        s = w.Symbol('muh')
+        d = {s: 1}
+        assert d[s] == 1
+
+
+class TestExpression(unittest.TestCase):
+    def test_create(self):
+        w.Expression(w.Symbol('muh'))
+        w.Expression([w.ca.SX(1), w.ca.SX.sym('muh')])
+        m = w.Expression(np.eye(4))
+        m = w.Expression(m)
+        np.testing.assert_array_almost_equal(m.evaluate(), np.eye(4))
+        m = w.Expression(w.ca.SX(np.eye(4)))
+        np.testing.assert_array_almost_equal(m.evaluate(), np.eye(4))
+        m = w.Expression([1, 1])
+        np.testing.assert_array_almost_equal(m.evaluate(), [[1], [1]])
+        m = w.Expression([np.array([1, 1])])
+        np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1]])
+        m = w.Expression(1)
+        assert m.evaluate() == 1
+        m = w.Expression([[1, 1], [2, 2]])
+        np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1], [2, 2]])
+        m = w.Expression([])
+        with self.assertRaises(RuntimeError):
+            print(m.evaluate())
+
+    @given(float_no_nan_no_inf(), float_no_nan_no_inf())
+    def test_add(self, f1, f2):
+        expected = f1 + f2
+        r1 = w.compile_and_execute(lambda a: w.Expression(a) + f1, [f2])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a: f1 + w.Expression(a), [f2])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a, b: w.Expression(a) + w.Expression(b), [f1, f2])
+        self.assertAlmostEqual(r1, expected)
+
+    @given(float_no_nan_no_inf(), float_no_nan_no_inf())
+    def test_sub(self, f1, f2):
+        expected = f1 - f2
+        r1 = w.compile_and_execute(lambda a: w.Expression(a) - f2, [f1])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a: f1 - w.Expression(a), [f2])
+        self.assertAlmostEqual(r1, expected)
+        r1 = w.compile_and_execute(lambda a, b: w.Expression(a) - w.Expression(b), [f1, f2])
+        self.assertAlmostEqual(r1, expected)
+
+    def test_len(self):
+        m = w.Expression(np.eye(4))
+        assert (len(m) == 16)
+
+    def test_simple_math(self):
+        m = w.Expression([1, 1])
+        s = w.Symbol('muh')
+        e = m + s
+        e = m + 1
+        e = 1 + m
+        assert isinstance(e, w.Expression)
+        e = m - s
+        e = m - 1
+        e = 1 - m
+        assert isinstance(e, w.Expression)
+        e = m * s
+        e = m * 1
+        e = 1 * m
+        assert isinstance(e, w.Expression)
+        e = m / s
+        e = m / 1
+        e = 1 / m
+        assert isinstance(e, w.Expression)
+        e = m ** s
+        e = m ** 1
+        e = 1 ** m
+        assert isinstance(e, w.Expression)
+
+    def test_get_attr(self):
+        m = w.Expression(np.eye(4))
+        assert m[0, 0] == w.Expression(1)
+        assert m[1, 1] == w.Expression(1)
+        assert m[1, 0] == w.Expression(0)
+        assert isinstance(m[0, 0], w.Expression)
+        print(m.shape)
+
+
+class TestRotationMatrix(unittest.TestCase):
+    def test_transpose(self):
+        # todo
+        pass
+
+    def test_create_RotationMatrix(self):
+        r = w.RotationMatrix.from_rpy(1, 2, 3)
+        assert isinstance(r, w.RotationMatrix)
+        t = w.TransMatrix.from_xyz_rpy(1,2,3)
+        r = w.RotationMatrix(t)
+        assert t[0,3].evaluate() == 1
+
+    @given(quaternion())
+    def test_from_quaternion(self, q):
+        np.testing.assert_array_almost_equal(w.compile_and_execute(w.RotationMatrix.from_quaternion, [q]),
+                                             quaternion_matrix(q))
+
+    @given(random_angle(),
+           random_angle(),
+           random_angle())
+    def test_rotation_matrix_from_rpy(self, roll, pitch, yaw):
+        m1 = w.compile_and_execute(w.RotationMatrix.from_rpy, [roll, pitch, yaw])
+        m2 = euler_matrix(roll, pitch, yaw)
+        np.testing.assert_array_almost_equal(m1, m2)
+
+    @given(unit_vector(length=3),
+           random_angle())
+    def test_rotation3_axis_angle(self, axis, angle):
+        np.testing.assert_array_almost_equal(w.compile_and_execute(w.RotationMatrix.from_axis_angle, [axis, angle]),
+                                             rotation_matrix(angle, np.array(axis)))
+
+    @given(unit_vector(length=3),
+           random_angle())
+    def test_speed_up_matrix_from_axis_angle(self, axis, angle):
+        np.testing.assert_array_almost_equal(
+            w.compile_and_execute(w.RotationMatrix.from_axis_angle, [axis, angle]),
+            rotation_matrix(angle, axis))
+
+    @given(quaternion())
+    def test_axis_angle_from_matrix(self, q):
+        m = quaternion_matrix(q)
+        actual_axis = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[0], [m])
+        actual_angle = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[1], [m])
+        expected_angle, expected_axis, _ = rotation_from_matrix(m)
+        compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
+        assert actual_axis[-1] == 0
+
+    @given(unit_vector(length=3),
+           angle_positive())
+    def test_axis_angle_from_matrix2(self, expected_axis, expected_angle):
+        m = rotation_matrix(expected_angle, expected_axis)
+        actual_axis = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[0], [m])
+        actual_angle = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[1], [m])
+        expected_angle, expected_axis, _ = rotation_from_matrix(m)
+        compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
+        assert actual_axis[-1] == 0
+
+    @given(unit_vector(4))
+    def test_rpy_from_matrix(self, q):
+        matrix = quaternion_matrix(q)
+        roll = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[0], [matrix])
+        pitch = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[1], [matrix])
+        yaw = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[2], [matrix])
+        roll2, pitch2, yaw2 = euler_from_matrix(matrix)
+        self.assertTrue(np.isclose(roll, roll2), msg='{} != {}'.format(roll, roll2))
+        self.assertTrue(np.isclose(pitch, pitch2), msg='{} != {}'.format(pitch, pitch2))
+        self.assertTrue(np.isclose(yaw, yaw2), msg='{} != {}'.format(yaw, yaw2))
+
+    @given(unit_vector(4))
+    def test_rpy_from_matrix2(self, q):
+        matrix = quaternion_matrix(q)
+        roll = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[0], [matrix])
+        pitch = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[1], [matrix])
+        yaw = w.compile_and_execute(lambda m: w.RotationMatrix(m).to_rpy()[2], [matrix])
+        r1 = w.compile_and_execute(w.RotationMatrix.from_rpy, [roll, pitch, yaw])
+        self.assertTrue(np.isclose(r1, matrix, atol=1.e-4).all(), msg='{} != {}'.format(r1, matrix))
+
+
+class TestPoint3(unittest.TestCase):
+
+    @given(vector(3))
+    def test_norm(self, v):
+        p = w.Point3(v)
+        actual = p.norm().evaluate()
+        expected = np.linalg.norm(v)
+        self.assertAlmostEqual(actual, expected)
+
+    @given(vector(3))
+    def test_point3(self, v):
+        w.Point3()
+        r1 = w.Point3(v)
+        self.assertEqual(r1[0], v[0])
+        self.assertEqual(r1[1], v[1])
+        self.assertEqual(r1[2], v[2])
+        self.assertEqual(r1[3], 1)
+        w.Point3(w.Expression(v))
+        w.Point3(w.Point3(v))
+        w.Point3(w.Vector3(v))
+        w.Point3(Point(*v))
+        w.Point3(PointStamped(point=Point(*v)))
+        w.Point3(Vector3(*v))
+        w.Point3(Vector3Stamped(vector=Vector3(*v)))
+        w.Point3(w.Expression(v).s)
+        w.Point3(np.array(v))
+
+    def test_point3_sub(self):
+        p1 = w.Point3((1, 1, 1))
+        p2 = w.Point3((1, 1, 1))
+        p3 = p1 - p2
+        assert isinstance(p3, w.Vector3)
+        self.assertEqual(p3[0], 0)
+        self.assertEqual(p3[1], 0)
+        self.assertEqual(p3[2], 0)
+        self.assertEqual(p3[3], 0)
+
+    def test_point3_add_vector3(self):
+        p1 = w.Point3((1, 1, 1))
+        v1 = w.Vector3((1, 1, 1))
+        p3 = p1 + v1
+        assert isinstance(p3, w.Point3)
+        self.assertEqual(p3[0], 2)
+        self.assertEqual(p3[1], 2)
+        self.assertEqual(p3[2], 2)
+        self.assertEqual(p3[3], 1)
+
+    def test_point3_mul(self):
+        p1 = w.Point3((1, 1, 1))
+        s = w.Symbol('s')
+        p3 = p1 * s
+        assert isinstance(p3, w.Point3)
+        f = 2
+        p3 = p1 / f
+        assert isinstance(p3, w.Point3)
+        self.assertEqual(p3[0], 0.5)
+        self.assertEqual(p3[1], 0.5)
+        self.assertEqual(p3[2], 0.5)
+        self.assertEqual(p3[3], 1)
+
+    @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], min_length=3, max_length=3))
+    def test_dot(self, vectors):
+        u, v = vectors
+        u = np.array(u)
+        v = np.array(v)
+        result = w.compile_and_execute(lambda p1, p2: w.Point3(p1).dot(w.Point3(p2)), [u, v])
+        expected = np.dot(u, v.T)
+        if not np.isnan(result) and not np.isinf(result):
+            self.assertTrue(np.isclose(result, expected))
+
+    @given(float_no_nan_no_inf(), vector(3), vector(3))
+    def test_if_greater_zero(self, condition, if_result, else_result):
+        actual = w.compile_and_execute(w.if_greater_zero, [condition, if_result, else_result])
+        expected = if_result if condition > 0 else else_result
+        np.testing.assert_array_almost_equal(actual, expected)
+
+
+class TestVector3(unittest.TestCase):
+    @given(vector(3))
+    def test_norm(self, v):
+        expected = np.linalg.norm(v)
+        v = w.Vector3(v)
+        actual = v.norm().evaluate()
+        self.assertAlmostEqual(actual, expected)
+
+    @given(vector(3), float_no_nan_no_inf(), vector(3))
+    def test_save_division(self, nominator, denominator, if_nan):
+        nominator = w.Vector3(nominator)
+        denominator = w.Expression(denominator)
+        if_nan = w.Vector3(if_nan)
+        result = w.save_division(nominator, denominator, if_nan)
+
+    @given(vector(3))
+    def test_vector3(self, v):
+        r1 = w.Vector3(v)
+        assert isinstance(r1, w.Vector3)
+        self.assertEqual(r1[0], v[0])
+        self.assertEqual(r1[1], v[1])
+        self.assertEqual(r1[2], v[2])
+        self.assertEqual(r1[3], 0)
+
+    @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], min_length=3, max_length=3))
+    def test_dot(self, vectors):
+        u, v = vectors
+        u = np.array(u)
+        v = np.array(v)
+        result = w.compile_and_execute(lambda p1, p2: w.Vector3(p1).dot(w.Vector3(p2)), [u, v])
+        expected = np.dot(u, v.T)
+        if not np.isnan(result) and not np.isinf(result):
+            self.assertTrue(np.isclose(result, expected))
+
+
+class TestTransformationMatrix(unittest.TestCase):
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_translation3(self, x, y, z):
+        r1 = w.compile_and_execute(w.TransMatrix.from_xyz_rpy, [x, y, z])
+        r2 = np.identity(4)
+        r2[0, 3] = x
+        r2[1, 3] = y
+        r2[2, 3] = z
+        self.assertTrue(np.isclose(r1, r2).all(), msg=f'{r1} != {r2}')
+
+    def test_TransformationMatrix(self):
+        f = w.TransMatrix.from_xyz_rpy(1, 2, 3)
+        assert isinstance(f, w.TransMatrix)
+
+    @given(st.integers(min_value=1, max_value=10))
+    def test_matrix(self, x_dim):
+        data = list(range(x_dim))
+        with self.assertRaises(ValueError):
+            w.TransMatrix(data)
+
+    @given(st.integers(min_value=1, max_value=10),
+           st.integers(min_value=1, max_value=10))
+    def test_matrix2(self, x_dim, y_dim):
+        data = [[i + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
+        if x_dim != 4 or y_dim != 4:
+            with self.assertRaises(ValueError):
+                m = w.TransMatrix(data).evaluate()
+        else:
+            m = w.TransMatrix(data).evaluate()
+            self.assertEqual(float(m[3, 0]), 0)
+            self.assertEqual(float(m[3, 1]), 0)
+            self.assertEqual(float(m[3, 2]), 0)
+            self.assertEqual(float(m[x_dim - 1, y_dim - 1]), 1)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           unit_vector(length=3),
+           random_angle())
+    def test_frame3_axis_angle(self, x, y, z, axis, angle):
+        r2 = rotation_matrix(angle, np.array(axis))
+        r2[0, 3] = x
+        r2[1, 3] = y
+        r2[2, 3] = z
+        r = w.compile_and_execute(lambda x, y, z, axis, angle: w.TransMatrix.from_point_rotation_matrix(
+            w.Point3((x, y, z)),
+            w.RotationMatrix.from_axis_angle(axis, angle)),
+                                  [x, y, z, axis, angle])
+        np.testing.assert_array_almost_equal(r, r2)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           random_angle(),
+           random_angle(),
+           random_angle())
+    def test_frame3_rpy(self, x, y, z, roll, pitch, yaw):
+        r2 = euler_matrix(roll, pitch, yaw)
+        r2[0, 3] = x
+        r2[1, 3] = y
+        r2[2, 3] = z
+        np.testing.assert_array_almost_equal(w.compile_and_execute(w.TransMatrix.from_xyz_rpy,
+                                                                   [x, y, z, roll, pitch, yaw]),
+                                             r2)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           unit_vector(4))
+    def test_frame3_quaternion(self, x, y, z, q):
+        r2 = quaternion_matrix(q)
+        r2[0, 3] = x
+        r2[1, 3] = y
+        r2[2, 3] = z
+        r = w.compile_and_execute(lambda x, y, z, q: w.TransMatrix.from_point_rotation_matrix(
+            w.Point3((x, y, z)),
+            w.RotationMatrix.from_quaternion(q)),
+                                  [x, y, z, q])
+        np.testing.assert_array_almost_equal(r, r2)
+
+    @given(float_no_nan_no_inf(outer_limit=1000),
+           float_no_nan_no_inf(outer_limit=1000),
+           float_no_nan_no_inf(outer_limit=1000),
+           quaternion())
+    def test_inverse_frame(self, x, y, z, q):
+        f = quaternion_matrix(q)
+        f[0, 3] = x
+        f[1, 3] = y
+        f[2, 3] = z
+        r = w.compile_and_execute(lambda x: w.TransMatrix(x).inverse(), [f])
+
+        r2 = PyKDL.Frame()
+        r2.M = PyKDL.Rotation.Quaternion(q[0], q[1], q[2], q[3])
+        r2.p[0] = x
+        r2.p[1] = y
+        r2.p[2] = z
+        r2 = r2.Inverse()
+        r2 = pykdl_frame_to_numpy(r2)
+        self.assertTrue(np.isclose(r, r2, atol=1.e-4, rtol=1.e-4).all())
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           unit_vector(4))
+    def test_pos_of(self, x, y, z, q):
+        r1 = w.TransMatrix.from_point_rotation_matrix(w.Point3((x, y, z)),
+                                                      w.RotationMatrix.from_quaternion(q)).to_position()
+        r2 = [x, y, z, 1]
+        for i, e in enumerate(r2):
+            self.assertAlmostEqual(r1[i].evaluate(), e)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           unit_vector(4))
+    def test_trans_of(self, x, y, z, q):
+        r1 = w.compile_and_execute(lambda x, y, z, q: w.TransMatrix.from_point_rotation_matrix(
+            w.Point3((x, y, z)),
+            w.RotationMatrix.from_quaternion(q)).to_translation(),
+                                   [x, y, z, q])
+        r2 = np.identity(4)
+        r2[0, 3] = x
+        r2[1, 3] = y
+        r2[2, 3] = z
+        for i in range(r2.shape[0]):
+            for j in range(r2.shape[1]):
+                self.assertAlmostEqual(float(r1[i, j]), r2[i, j])
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           unit_vector(4))
+    def test_rot_of(self, x, y, z, q):
+        r1 = w.compile_and_execute(lambda x, y, z, q: w.TransMatrix.from_point_rotation_matrix(
+            w.Point3((x, y, z)),
+            w.RotationMatrix.from_quaternion(q)).to_rotation(),
+                                   [x, y, z, q])
+        r2 = quaternion_matrix(q)
+        self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
+
+    def test_rot_of2(self):
+        """
+        Test to make sure the function doesn't alter the original
+        """
+        f = w.TransMatrix.from_xyz_rpy(1, 2, 3)
+        r = f.to_rotation()
+        self.assertTrue(f[0, 3], 1)
+        self.assertTrue(f[0, 3], 2)
+        self.assertTrue(f[0, 3], 3)
+        self.assertTrue(r[0, 0], 1)
+        self.assertTrue(r[1, 1], 1)
+        self.assertTrue(r[2, 2], 1)
+
+
+class TestQuaternion(unittest.TestCase):
+    @given(unit_vector(length=3),
+           random_angle())
+    def test_quaternion_from_axis_angle1(self, axis, angle):
+        r2 = quaternion_about_axis(angle, axis)
+        self.assertTrue(np.isclose(w.compile_and_execute(w.Quaternion.from_axis_angle, [axis, angle]),
+                                   r2).all())
+
+    @given(quaternion(),
+           quaternion())
+    def test_quaternion_multiply(self, q, p):
+        r1 = w.compile_and_execute(w.quaternion_multiply, [q, p])
+        r2 = quaternion_multiply(q, p)
+        self.assertTrue(np.isclose(r1, r2).all() or np.isclose(r1, -r2).all(), msg='{} != {}'.format(r1, r2))
+
+    @given(quaternion())
+    def test_quaternion_conjugate(self, q):
+        r1 = w.compile_and_execute(w.quaternion_conjugate, [q])
+        r2 = quaternion_conjugate(q)
+        self.assertTrue(np.isclose(r1, r2).all() or np.isclose(r1, -r2).all(), msg='{} != {}'.format(r1, r2))
+
+    @given(quaternion(),
+           quaternion())
+    def test_quaternion_diff(self, q1, q2):
+        q3 = quaternion_multiply(quaternion_conjugate(q1), q2)
+        q4 = w.compile_and_execute(w.quaternion_diff, [q1, q2])
+        self.assertTrue(np.isclose(q3, q4).all() or np.isclose(q3, -q4).all(), msg='{} != {}'.format(q1, q4))
+
+    @given(quaternion())
+    def test_axis_angle_from_quaternion(self, q):
+        axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], q)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], q)
+        compare_axis_angle(angle, axis[:3], angle2, axis2, 2)
+        assert axis[-1] == 0
+
+    def test_axis_angle_from_quaternion2(self):
+        q = [0, 0, 0, 1.0000001]
+        axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], q)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], q)
+        compare_axis_angle(angle, axis[:3], angle2, axis2, 2)
+        assert axis[-1] == 0
+
+    @given(random_angle(),
+           random_angle(),
+           random_angle())
+    def test_quaternion_from_rpy(self, roll, pitch, yaw):
+        q = w.compile_and_execute(w.Quaternion.from_rpy, [roll, pitch, yaw])
+        q2 = quaternion_from_euler(roll, pitch, yaw)
+        self.assertTrue(np.isclose(q, q2).all(), msg='{} != {}'.format(q, q2))
+
+    @given(quaternion())
+    def test_quaternion_from_matrix(self, q):
+        matrix = quaternion_matrix(q)
+        q2 = quaternion_from_matrix(matrix)
+        q1_2 = w.compile_and_execute(w.Quaternion.from_rotation_matrix, [matrix])
+        self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg=f'{q} != {q1_2}')
+
+    @given(quaternion(), quaternion())
+    def test_dot(self, q1, q2):
+        q1 = np.array(q1)
+        q2 = np.array(q2)
+        result = w.compile_and_execute(lambda p1, p2: w.Quaternion(p1).dot(w.Quaternion(p2)), [q1, q2])
+        expected = np.dot(q1.T, q2)
+        if not np.isnan(result) and not np.isinf(result):
+            self.assertTrue(np.isclose(result, expected))
+
+
 class TestCASWrapper(unittest.TestCase):
 
+    def test_Symbol(self):
+        s = w.Symbol('a')
+        assert isinstance(s, w.Symbol)
+
     def test_free_symbols(self):
-        m = w.Matrix(w.var('a b c d'))
+        m = w.Expression(w.var('a b c d'))
         assert len(w.free_symbols(m)) == 4
         a = w.Symbol('a')
         assert w.equivalent(a, w.free_symbols(a)[0])
 
-    def test_is_matrix(self):
-        self.assertFalse(w.is_matrix(w.Symbol('a')))
-        self.assertTrue(w.is_matrix(w.Matrix([[0, 0]])))
-
     def test_jacobian(self):
         a = w.Symbol('a')
         b = w.Symbol('b')
-        m = w.Matrix([a + b, a ** 2, b ** 2])
+        m = w.Expression([a + b, a ** 2, b ** 2])
         jac = w.jacobian(m, [a, b])
-        expected = w.Matrix([[1, 1], [2 * a, 0], [0, 2 * b]])
+        expected = w.Expression([[1, 1], [2 * a, 0], [0, 2 * b]])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
@@ -41,9 +572,9 @@ class TestCASWrapper(unittest.TestCase):
     def test_jacobian_order2(self):
         a = w.Symbol('a')
         b = w.Symbol('b')
-        m = w.Matrix([a + b, a ** 2 + b, a ** 3 + b ** 2])
+        m = w.Expression([a + b, a ** 2 + b, a ** 3 + b ** 2])
         jac = w.jacobian(m, [a, b], order=2)
-        expected = w.Matrix([[0, 0], [2, 0], [6 * a, 2]])
+        expected = w.Expression([[0, 0], [2, 0], [6 * a, 2]])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
@@ -67,7 +598,23 @@ class TestCASWrapper(unittest.TestCase):
         assert result[2, 0] == 0
         assert result[2, 1] == 0
         assert result[2, 2] == 3
-        assert w.equivalent(w.diag(w.Matrix([1, 2, 3])), w.diag([1, 2, 3]))
+        assert w.equivalent(w.diag(w.Expression([1, 2, 3])), w.diag([1, 2, 3]))
+
+    def test_vstack(self):
+        m = np.eye(4)
+        m1 = w.Expression(m)
+        e = w.vstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.vstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_hstack(self):
+        m = np.eye(4)
+        m1 = w.Expression(m)
+        e = w.hstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.hstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
@@ -91,21 +638,6 @@ class TestCASWrapper(unittest.TestCase):
         self.assertAlmostEqual(w.compile_and_execute(w.min, [f1, f2]),
                                min(f1, f2), places=7)
 
-    @given(st.integers(min_value=1, max_value=10))
-    def test_matrix(self, x_dim):
-        data = list(range(x_dim))
-        m = w.Matrix(data)
-        self.assertEqual(m[0], 0)
-        self.assertEqual(m[-1], x_dim - 1)
-
-    @given(st.integers(min_value=1, max_value=10),
-           st.integers(min_value=1, max_value=10))
-    def test_matrix2(self, x_dim, y_dim):
-        data = [[i + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
-        m = w.Matrix(data)
-        self.assertEqual(float(m[0, 0]), 0)
-        self.assertEqual(float(m[x_dim - 1, y_dim - 1]), (x_dim * y_dim) - 1)
-
     @given(float_no_nan_no_inf())
     def test_sign(self, f1):
         self.assertAlmostEqual(w.compile_and_execute(w.sign, [f1]),
@@ -117,6 +649,28 @@ class TestCASWrapper(unittest.TestCase):
     def test_if_greater_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_zero, [condition, if_result, else_result]),
                                np.float(if_result if condition > 0 else else_result), places=7)
+
+    def test_if_one_arg(self):
+        types = [w.Point3, w.Vector3, w.Quaternion, w.Expression, w.TransMatrix, w.RotationMatrix]
+        if_functions = [w.if_else, w.if_eq_zero, w.if_greater_eq_zero, w.if_greater_zero]
+        c = w.Symbol('c')
+        for type_ in types:
+            for if_function in if_functions:
+                if_result = type_()
+                else_result = type_()
+                result = if_function(c, if_result, else_result)
+                assert isinstance(result, type_), f'{type(result)} != {type_} for {if_function}'
+
+    def test_if_two_arg(self):
+        types = [w.Point3, w.Vector3, w.Quaternion, w.Expression, w.TransMatrix, w.RotationMatrix]
+        if_functions = [w.if_eq, w.if_greater, w.if_greater_eq, w.if_less, w.if_less_eq]
+        a = w.Symbol('a')
+        b = w.Symbol('b')
+        for type_ in types:
+            for if_function in if_functions:
+                if_result = type_()
+                else_result = type_()
+                assert isinstance(if_function(a, b, if_result, else_result), type_)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -130,35 +684,31 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_greater_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
-            np.float(if_result if a >= b else else_result), places=7)
+        self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
+                               np.float(if_result if a >= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_less_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
-            np.float(if_result if a <= b else else_result), places=7)
+        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
+                               np.float(if_result if a <= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq_zero(self, condition, if_result, else_result):
-        self.assertAlmostEqual(
-            w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
-            np.float(if_result if condition == 0 else else_result), places=7)
+        self.assertAlmostEqual(w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
+                               np.float(if_result if condition == 0 else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq(self, a, b, if_result, else_result):
-        self.assertTrue(np.isclose(
-            w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
-            np.float(if_result if a == b else else_result)))
+        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
+                                   np.float(if_result if a == b else else_result)))
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases(self, a):
@@ -175,9 +725,8 @@ class TestCASWrapper(unittest.TestCase):
                     return if_result
             return else_result
 
-        self.assertTrue(np.isclose(
-            w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
-            np.float(reference(a, b_result_cases, 0))))
+        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
+                                   np.float(reference(a, b_result_cases, 0))))
 
     @given(float_no_nan_no_inf())
     def test_if_less_eq_cases(self, a):
@@ -199,44 +748,6 @@ class TestCASWrapper(unittest.TestCase):
         self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq_cases, [a, b_result_cases, 0]),
                                np.float(reference(a, b_result_cases, 0)))
 
-    #
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_greater_zero(self, condition, if_result, else_result):
-    #     self.assertAlmostEqual(
-    #         w.compile_and_execute(w.diffable_if_greater_zero, [condition, if_result, else_result]),
-    #         np.float(if_result if condition > 0 else else_result), places=7)
-
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_greater_eq_zero(self, condition, if_result, else_result):
-    #     self.assertAlmostEqual(
-    #         w.compile_and_execute(w.diffable_if_greater_eq_zero, [condition, if_result, else_result]),
-    #         np.float(if_result if condition >= 0 else else_result), places=7)
-    #
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_greater_eq(self, a, b, if_result, else_result):
-    #     r2 = np.float(if_result if a >= b else else_result)
-    #     self.assertAlmostEqual(compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
-    #                            r2, places=7)
-    #
-    # @given(limited_float(),
-    #        limited_float(),
-    #        limited_float())
-    # def test_if_eq_zero(self, condition, if_result, else_result):
-    #     r1 = np.float(w.if_eq_zero(condition, if_result, else_result))
-    #     r2 = np.float(if_result if condition == 0 else else_result)
-    #     self.assertTrue(np.isclose(r1, r2, atol=1.e-7), msg='{} if {} == 0 else {} => {}'.format(if_result, condition,
-    #                                                                                              else_result,
-    #                                                                                              r1))
-    #     self.assertAlmostEqual(compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
-    #                            r1, places=7)
-
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -255,14 +766,6 @@ class TestCASWrapper(unittest.TestCase):
             w.compile_and_execute(w.if_less, [a, b, if_result, else_result]),
             np.float(if_result if a < b else else_result), places=7)
 
-    # fails if numbers too big or too small
-    @given(unit_vector(length=3),
-           random_angle())
-    def test_speed_up_matrix_from_axis_angle(self, axis, angle):
-        np.testing.assert_array_almost_equal(
-            w.compile_and_execute(w.rotation_matrix_from_axis_angle, [axis, angle]),
-            rotation_matrix(angle, axis))
-
     @given(vector(3),
            vector(3))
     def test_cross(self, u, v):
@@ -270,23 +773,15 @@ class TestCASWrapper(unittest.TestCase):
             w.compile_and_execute(w.cross, [u, v])[:3],
             np.cross(u, v))
 
-    @given(vector(3))
-    def test_vector3(self, v):
-        r1 = w.vector3(*v)
-        self.assertEqual(r1[0], v[0])
-        self.assertEqual(r1[1], v[1])
-        self.assertEqual(r1[2], v[2])
-        self.assertEqual(r1[3], 0)
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_limit(self, x, lower_limit, upper_limit):
+        r1 = w.compile_and_execute(w.limit, [x, lower_limit, upper_limit])
+        r2 = max(lower_limit, min(upper_limit, x))
+        np.testing.assert_array_almost_equal(r1, r2)
 
-    @given(vector(3))
-    def test_point3(self, v):
-        r1 = w.point3(*v)
-        self.assertEqual(r1[0], v[0])
-        self.assertEqual(r1[1], v[1])
-        self.assertEqual(r1[2], v[2])
-        self.assertEqual(r1[3], 1)
-
-    @given(st.lists(float_no_nan_no_inf()))
+    @given(st.lists(float_no_nan_no_inf(), min_size=1))
     def test_norm(self, v):
         actual = w.compile_and_execute(w.norm, [v])
         expected = np.linalg.norm(v)
@@ -307,190 +802,40 @@ class TestCASWrapper(unittest.TestCase):
     @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], max_length=50))
     def test_dot(self, vectors):
         u, v = vectors
-        u = np.array(u, ndmin=2)
-        v = np.array(v, ndmin=2)
-        result = w.compile_and_execute(w.dot, [u, v.T])
-        if not np.isnan(result):
-            self.assertTrue(np.isclose(result, np.dot(u, v.T)))
+        u = np.array(u)
+        v = np.array(v)
+        result = w.compile_and_execute(w.dot, [u, v])
+        if not np.isnan(result) and not np.isinf(result):
+            self.assertTrue(np.isclose(result, np.dot(u, v)))
 
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
-    def test_translation3(self, x, y, z):
-        r1 = w.compile_and_execute(w.translation3, [x, y, z])
-        r2 = np.identity(4)
-        r2[0, 3] = x
-        r2[1, 3] = y
-        r2[2, 3] = z
-        self.assertTrue(np.isclose(r1, r2).all(), msg='{} != {}'.format(r1, r2))
-
-    @given(random_angle(),
-           random_angle(),
-           random_angle())
-    def test_rotation_matrix_from_rpy(self, roll, pitch, yaw):
-        m1 = w.compile_and_execute(w.rotation_matrix_from_rpy, [roll, pitch, yaw])
-        m2 = euler_matrix(roll, pitch, yaw)
-        np.testing.assert_array_almost_equal(m1, m2)
-
-    @given(unit_vector(length=3),
-           random_angle())
-    def test_rotation3_axis_angle(self, axis, angle):
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.rotation_matrix_from_axis_angle, [axis, angle]),
-                                             rotation_matrix(angle, np.array(axis)))
-
-    @given(quaternion())
-    def test_rotation3_quaternion(self, q):
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.rotation_matrix_from_quaternion, q),
-                                             quaternion_matrix(q))
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           unit_vector(length=3),
-           random_angle())
-    def test_frame3_axis_angle(self, x, y, z, axis, angle):
-        r2 = rotation_matrix(angle, np.array(axis))
-        r2[0, 3] = x
-        r2[1, 3] = y
-        r2[2, 3] = z
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.frame_axis_angle, [x, y, z, axis, angle]),
-                                             r2)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           random_angle(),
-           random_angle(),
-           random_angle())
-    def test_frame3_rpy(self, x, y, z, roll, pitch, yaw):
-        r2 = euler_matrix(roll, pitch, yaw)
-        r2[0, 3] = x
-        r2[1, 3] = y
-        r2[2, 3] = z
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.frame_rpy, [x, y, z, roll, pitch, yaw]),
-                                             r2)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           unit_vector(4))
-    def test_frame3_quaternion(self, x, y, z, q):
-        r2 = quaternion_matrix(q)
-        r2[0, 3] = x
-        r2[1, 3] = y
-        r2[2, 3] = z
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.frame_quaternion, [x, y, z] + q.tolist()),
-                                             r2)
-
-    @given(float_no_nan_no_inf(outer_limit=1000),
-           float_no_nan_no_inf(outer_limit=1000),
-           float_no_nan_no_inf(outer_limit=1000),
-           quaternion())
-    def test_inverse_frame(self, x, y, z, q):
-        f = quaternion_matrix(q)
-        f[0, 3] = x
-        f[1, 3] = y
-        f[2, 3] = z
-        r = w.compile_and_execute(w.inverse_frame, [f])
-
-        r2 = PyKDL.Frame()
-        r2.M = PyKDL.Rotation.Quaternion(q[0], q[1], q[2], q[3])
-        r2.p[0] = x
-        r2.p[1] = y
-        r2.p[2] = z
-        r2 = r2.Inverse()
-        r2 = pykdl_frame_to_numpy(r2)
-        self.assertTrue(np.isclose(r, r2, atol=1.e-4, rtol=1.e-4).all())
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           unit_vector(4))
-    def test_pos_of(self, x, y, z, q):
-        r1 = w.position_of(w.frame_quaternion(x, y, z, q[0], q[1], q[2], q[3]))
-        r2 = [x, y, z, 1]
-        for i, e in enumerate(r2):
-            self.assertAlmostEqual(r1[i], e)
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           unit_vector(4))
-    def test_trans_of(self, x, y, z, q):
-        r1 = w.compile_and_execute(lambda *args: w.translation_of(w.frame_quaternion(*args)),
-                                   [x, y, z, q[0], q[1], q[2], q[3]])
-        r2 = np.identity(4)
-        r2[0, 3] = x
-        r2[1, 3] = y
-        r2[2, 3] = z
-        for i in range(r2.shape[0]):
-            for j in range(r2.shape[1]):
-                self.assertAlmostEqual(float(r1[i, j]), r2[i, j])
-
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           unit_vector(4))
-    def test_rot_of(self, x, y, z, q):
-        r1 = w.compile_and_execute(lambda *args: w.rotation_of(w.frame_quaternion(*args)),
-                                   [x, y, z, q[0], q[1], q[2], q[3]])
-        r2 = quaternion_matrix(q)
-        self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
-
-    def test_rot_of2(self):
-        """
-        Test to make sure the function doesn't alter the original
-        """
-        f = w.translation3(1, 2, 3)
-        r = w.rotation_of(f)
-        self.assertTrue(f[0, 3], 1)
-        self.assertTrue(f[0, 3], 2)
-        self.assertTrue(f[0, 3], 3)
-        self.assertTrue(r[0, 0], 1)
-        self.assertTrue(r[1, 1], 1)
-        self.assertTrue(r[2, 2], 1)
+    @given(lists_of_same_length([float_no_nan_no_inf(outer_limit=1000), float_no_nan_no_inf(outer_limit=1000)],
+                                min_length=16, max_length=16))
+    def test_dot2(self, vectors):
+        u, v = vectors
+        u = np.array(u).reshape((4, 4))
+        v = np.array(v).reshape((4, 4))
+        result = w.compile_and_execute(w.dot, [u, v])
+        expected = np.dot(u, v)
+        if not np.isnan(result).any() and not np.isinf(result).any():
+            np.testing.assert_array_almost_equal(result, expected)
 
     @given(unit_vector(4))
     def test_trace(self, q):
         m = quaternion_matrix(q)
         np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]), np.trace(m))
 
-    @given(quaternion(),
-           quaternion())
-    def test_rotation_distance(self, q1, q2):
-        m1 = quaternion_matrix(q1)
-        m2 = quaternion_matrix(q2)
-        actual_angle = w.compile_and_execute(w.rotation_distance, [m1, m2])
-        _, expected_angle = axis_angle_from_quaternion(*quaternion_from_matrix(m1.T.dot(m2)))
-        expected_angle = expected_angle
-        try:
-            self.assertAlmostEqual(shortest_angular_distance(actual_angle, expected_angle), 0, places=3)
-        except AssertionError:
-            self.assertAlmostEqual(shortest_angular_distance(actual_angle, -expected_angle), 0, places=3)
-
-    @given(quaternion())
-    def test_axis_angle_from_matrix(self, q):
-        m = quaternion_matrix(q)
-        actual_axis = w.compile_and_execute(lambda x: w.axis_angle_from_matrix(x)[0], [m])
-        actual_angle = w.compile_and_execute(lambda x: w.axis_angle_from_matrix(x)[1], [m])
-        expected_angle, expected_axis, _ = rotation_from_matrix(m)
-        compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis)
-
-    @given(unit_vector(length=3),
-           angle_positive())
-    def test_axis_angle_from_matrix2(self, expected_axis, expected_angle):
-        m = rotation_matrix(expected_angle, expected_axis)
-        actual_axis = w.compile_and_execute(lambda x: w.axis_angle_from_matrix(x)[0], [m])
-        actual_angle = w.compile_and_execute(lambda x: w.axis_angle_from_matrix(x)[1], [m])
-        expected_angle, expected_axis, _ = rotation_from_matrix(m)
-        compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis)
-
-    @given(unit_vector(length=3),
-           random_angle())
-    def test_quaternion_from_axis_angle1(self, axis, angle):
-        r2 = quaternion_about_axis(angle, axis)
-        self.assertTrue(np.isclose(w.compile_and_execute(w.quaternion_from_axis_angle, [axis, angle]),
-                                   r2).all())
+    # @given(quaternion(),
+    #        quaternion())
+    # def test_rotation_distance(self, q1, q2):
+    #     m1 = quaternion_matrix(q1)
+    #     m2 = quaternion_matrix(q2)
+    #     actual_angle = w.compile_and_execute(w.rotation_distance, [m1, m2])
+    #     _, expected_angle = axis_angle_from_quaternion(*quaternion_from_matrix(m1.T.dot(m2)))
+    #     expected_angle = expected_angle
+    #     try:
+    #         self.assertAlmostEqual(shortest_angular_distance(actual_angle, expected_angle), 0, places=3)
+    #     except AssertionError:
+    #         self.assertAlmostEqual(shortest_angular_distance(actual_angle, -expected_angle), 0, places=3)
 
     @given(random_angle(),
            random_angle(),
@@ -505,81 +850,14 @@ class TestCASWrapper(unittest.TestCase):
         if angle2 < 0:
             angle2 = -angle2
             axis2 *= -1
-        compare_axis_angle(angle, axis, angle2, axis2)
-
-    @given(quaternion())
-    def test_axis_angle_from_quaternion(self, q):
-        axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
-        axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q)
-        angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q)
-        compare_axis_angle(angle, axis, angle2, axis2, 2)
-
-    def test_axis_angle_from_quaternion2(self):
-        q = [0, 0, 0, 1.0000001]
-        axis2, angle2 = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
-        axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q)
-        angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q)
-        compare_axis_angle(angle, axis, angle2, axis2, 2)
-
-    @given(unit_vector(4))
-    def test_rpy_from_matrix(self, q):
-        matrix = quaternion_matrix(q)
-        roll = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[0], [matrix])
-        pitch = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[1], [matrix])
-        yaw = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[2], [matrix])
-        roll2, pitch2, yaw2 = euler_from_matrix(matrix)
-        self.assertTrue(np.isclose(roll, roll2), msg='{} != {}'.format(roll, roll2))
-        self.assertTrue(np.isclose(pitch, pitch2), msg='{} != {}'.format(pitch, pitch2))
-        self.assertTrue(np.isclose(yaw, yaw2), msg='{} != {}'.format(yaw, yaw2))
-
-    @given(unit_vector(4))
-    def test_rpy_from_matrix2(self, q):
-        matrix = quaternion_matrix(q)
-        roll = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[0], [matrix])
-        pitch = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[1], [matrix])
-        yaw = w.compile_and_execute(lambda m: w.rpy_from_matrix(m)[2], [matrix])
-        r1 = w.compile_and_execute(w.rotation_matrix_from_rpy, [roll, pitch, yaw])
-        self.assertTrue(np.isclose(r1, matrix, atol=1.e-4).all(), msg='{} != {}'.format(r1, matrix))
-
-    @given(random_angle(),
-           random_angle(),
-           random_angle())
-    def test_quaternion_from_rpy(self, roll, pitch, yaw):
-        q = w.compile_and_execute(w.quaternion_from_rpy, [roll, pitch, yaw])
-        q2 = quaternion_from_euler(roll, pitch, yaw)
-        self.assertTrue(np.isclose(q, q2).all(), msg='{} != {}'.format(q, q2))
-
-    @given(quaternion())
-    def test_quaternion_from_matrix(self, q):
-        matrix = quaternion_matrix(q)
-        q2 = quaternion_from_matrix(matrix)
-        q1_2 = w.compile_and_execute(w.quaternion_from_matrix, [matrix])
-        self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg='{} != {}'.format(q, q1_2))
-
-    @given(quaternion(),
-           quaternion())
-    def test_quaternion_multiply(self, q, p):
-        r1 = w.compile_and_execute(w.quaternion_multiply, [q, p])
-        r2 = quaternion_multiply(q, p)
-        self.assertTrue(np.isclose(r1, r2).all() or np.isclose(r1, -r2).all(), msg='{} != {}'.format(r1, r2))
-
-    @given(quaternion())
-    def test_quaternion_conjugate(self, q):
-        r1 = w.compile_and_execute(w.quaternion_conjugate, [q])
-        r2 = quaternion_conjugate(q)
-        self.assertTrue(np.isclose(r1, r2).all() or np.isclose(r1, -r2).all(), msg='{} != {}'.format(r1, r2))
-
-    @given(quaternion(),
-           quaternion())
-    def test_quaternion_diff(self, q1, q2):
-        q3 = quaternion_multiply(quaternion_conjugate(q1), q2)
-        q4 = w.compile_and_execute(w.quaternion_diff, [q1, q2])
-        self.assertTrue(np.isclose(q3, q4).all() or np.isclose(q3, -q4).all(), msg='{} != {}'.format(q1, q4))
+        compare_axis_angle(angle, axis[:3], angle2, axis2)
+        assert axis[-1] == 0
 
     @given(quaternion(),
            quaternion(),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
     def test_slerp(self, q1, q2, t):
+        r3 = w.quaternion_slerp(q1, q2, t)
         r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
         r2 = quaternion_slerp(q1, q2, t)
         self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
@@ -590,9 +868,10 @@ class TestCASWrapper(unittest.TestCase):
            quaternion())
     def test_slerp123(self, q1, q2):
         step = 0.1
-        q_d = w.compile_and_execute(w.quaternion_diff, [q1, q2])
-        axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q_d)
-        angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q_d)
+        q_d = w.compile_and_execute(lambda q1, q2: w.Quaternion(q1).diff(w.Quaternion(q2)),
+                                    [q1, q2])
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], q_d)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], q_d)
         assume(angle != np.pi)
         if np.abs(angle) > np.pi:
             angle = angle - np.pi * 2
@@ -602,20 +881,21 @@ class TestCASWrapper(unittest.TestCase):
         r2s = []
         for t in np.arange(0, 1.001, step):
             r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
-            r1 = w.compile_and_execute(w.quaternion_diff, [q1, r1])
-            axis2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], r1)
-            angle2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], r1)
-            r2 = w.compile_and_execute(w.quaternion_from_axis_angle, [axis, angle * t])
+            r1 = w.compile_and_execute(lambda q1, q2: w.Quaternion(q1).diff(w.Quaternion(q2)),
+                                       [q1, r1])
+            axis2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r1)
+            angle2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r1)
+            r2 = w.compile_and_execute(w.Quaternion.from_axis_angle, [axis, angle * t])
             r1s.append(r1)
             r2s.append(r2)
         aa1 = []
         aa2 = []
         for r1, r2 in zip(r1s, r2s):
-            axisr1 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], r1)
-            angler1 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], r1)
+            axisr1 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r1)
+            angler1 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r1)
             aa1.append([axisr1, angler1])
-            axisr2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], r2)
-            angler2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], r2)
+            axisr2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r2)
+            angler2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r2)
             aa2.append([axisr2, angler2])
         aa1 = np.array(aa1)
         aa2 = np.array(aa2)
@@ -625,21 +905,23 @@ class TestCASWrapper(unittest.TestCase):
         for i in range(len(r1s) - 1):
             q1t = r1s[i]
             q2t = r1s[i + 1]
-            qds.append(w.compile_and_execute(w.quaternion_diff, [q1t, q2t]))
+            qds.append(
+                w.compile_and_execute(lambda q1, q2: w.Quaternion(q1).diff(w.Quaternion(q2)),
+                                      [q1t, q2t]))
         qds = np.array(qds)
         for r1, r2 in zip(r1s, r2s):
             compare_orientations(r1, r2)
 
-    # fails if numbers too big or too small
-    @given(unit_vector(3),
-           unit_vector(3),
-           st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
-    def test_slerp2(self, q1, q2, t):
-        r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
-        r2 = quaternion_slerp(q1, q2, t)
-        self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
-                        np.isclose(r1, -r2, atol=1e-3).all(),
-                        msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+    # @given(unit_vector(3),
+    #        unit_vector(3),
+    #        st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
+    # def test_slerp2(self, v1, v2, t):
+    #     r1 = w.compile_and_execute(w.quaternion_slerp, [v1, v2, t])
+    #     r2 = quaternion_slerp(v1, v2, t)
+    #
+    #     self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
+    #                     np.isclose(r1, -r2, atol=1e-3).all(),
+    #                     msg='q1={} q2={} t={}\n{} != {}'.format(v1, v2, t, r1, r2))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
@@ -675,6 +957,12 @@ class TestCASWrapper(unittest.TestCase):
         m2 = rotation_matrix_from_quaternion(q2[0], q2[1], q2[2], q2[3])
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])
         r2 = m1 * m2
+        np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_kron(self):
+        m1 = np.eye(4)
+        r1 = w.compile_and_execute(w.kron, [m1, m1])
+        r2 = np.kron(m1, m1)
         np.testing.assert_array_almost_equal(r1, r2)
 
     @given(sq_matrix())
@@ -750,8 +1038,10 @@ class TestCASWrapper(unittest.TestCase):
         assert nearest[2] == 1
 
     def test_to_str(self):
-        expr = w.norm(w.quaternion_from_axis_angle(w.Matrix(w.create_symbols(['v1', 'v2', 'v3'])),
-                                                   w.Symbol('alpha')))
+        axis = w.Vector3(w.create_symbols(['v1', 'v2', 'v3']))
+        angle = w.Symbol('alpha')
+        q = w.Quaternion.from_axis_angle(axis, angle)
+        expr = w.norm(q)
         assert w.to_str(expr) == 'sqrt((((sq((v1*sin((alpha/2))))' \
                                  '+sq((v2*sin((alpha/2)))))' \
                                  '+sq((v3*sin((alpha/2)))))' \

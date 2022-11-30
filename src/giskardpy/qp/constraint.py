@@ -46,17 +46,17 @@ class VelocityConstraint:
     lower_slack_limit = -1e3
     upper_slack_limit = 1e3
     linear_weight = 0
-
+    
     def __init__(self,
                  name,
                  expression,
-                 lower_velocity_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
-                 upper_velocity_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
+                 lower_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                 upper_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                  velocity_limit,
                  quadratic_weight,
                  control_horizon,
-                 lower_slack_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
-                 upper_slack_limit: Union[Union[w.Symbol, float], List[Union[w.Symbol, float]]],
+                 lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                 upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                  linear_weight=None,
                  horizon_function: Optional[Callable[[float, int], float]] = None):
         self.name = name

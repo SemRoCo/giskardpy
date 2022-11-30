@@ -208,14 +208,14 @@ class Goal(ABC):
         self._sub_goals.append(goal)
 
     def add_velocity_constraint(self,
-                                lower_velocity_limit: w.symbol_expr_float,
-                                upper_velocity_limit: w.symbol_expr_float,
+                                lower_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                                upper_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                                 weight: w.symbol_expr_float,
                                 task_expression: w.symbol_expr,
                                 velocity_limit: w.symbol_expr_float,
                                 name_suffix: Optional[str] = None,
-                                lower_slack_limit: w.symbol_expr_float = -1e4,
-                                upper_slack_limit: w.symbol_expr_float = 1e4,
+                                lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = -1e4,
+                                upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = 1e4,
                                 horizon_function: Optional[Callable[[float, int], float]] = None):
         """
         Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the

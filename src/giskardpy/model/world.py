@@ -18,7 +18,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
     PhysicsWorldException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
-    PrismaticJoint, RevoluteJoint, ContinuousJoint
+    PrismaticJoint, RevoluteJoint, ContinuousJoint, OmniDrive
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map
@@ -44,6 +44,7 @@ class TravelCompanion:
 
 
 class WorldTree:
+    _joints: Dict[PrefixName, Union[Joint, OmniDrive]]
 
     def __init__(self, root_link_name: PrefixName, god_map: GodMap):
         self.root_link_name = root_link_name
@@ -711,7 +712,7 @@ class WorldTree:
     def _clear(self):
         self.state = JointStates()
         self._links: Dict[PrefixName, Link] = {self.root_link_name: Link(self.root_link_name)}
-        self._joints: Dict[PrefixName, Joint] = {}
+        self._joints = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
 

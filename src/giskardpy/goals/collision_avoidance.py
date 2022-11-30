@@ -257,7 +257,6 @@ class CollisionAvoidanceHint(Goal):
         to body_b/link_b.
         :param tip_link: str, name of the robot link, has to have a collision body
         :param avoidance_hint: Vector3Stamped as json, direction in which the robot link will get pushed
-        :param object_name: str, name of the environment object, can be the robot, e.g. kitchen
         :param object_link_name: str, name of the link of the environment object. e.g. fridge handle
         :param max_linear_velocity: float, m/s, default 0.1
         :param root_link: str, default robot root, name of the root link for the kinematic chain
@@ -325,7 +324,7 @@ class CollisionAvoidanceHint(Goal):
                               spring_weight)
         weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
 
-        root_V_avoidance_hint = w.ros_msg_to_matrix(self.avoidance_hint)
+        root_V_avoidance_hint = w.Vector3(self.avoidance_hint)
 
         # penetration_distance = threshold - actual_distance_capped
 

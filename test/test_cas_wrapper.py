@@ -140,9 +140,9 @@ class TestRotationMatrix(unittest.TestCase):
     def test_create_RotationMatrix(self):
         r = w.RotationMatrix.from_rpy(1, 2, 3)
         assert isinstance(r, w.RotationMatrix)
-        t = w.TransMatrix.from_xyz_rpy(1,2,3)
+        t = w.TransMatrix.from_xyz_rpy(1, 2, 3)
         r = w.RotationMatrix(t)
-        assert t[0,3].evaluate() == 1
+        assert t[0, 3].evaluate() == 1
 
     @given(quaternion())
     def test_from_quaternion(self, q):
@@ -548,10 +548,485 @@ class TestQuaternion(unittest.TestCase):
 
 
 class TestCASWrapper(unittest.TestCase):
+    def test_add(self):
+        f = 1.0
+        s = w.Symbol('s')
+        e = w.Expression(1)
+        v = w.Vector3((1, 1, 1))
+        p = w.Point3((1, 1, 1))
+        t = w.TransMatrix()
+        r = w.RotationMatrix()
+        q = w.Quaternion()
+        # float
+        assert isinstance(s + f, w.Expression)
+        assert isinstance(f + s, w.Expression)
+        assert isinstance(e + f, w.Expression)
+        assert isinstance(f + e, w.Expression)
+        assert isinstance(v + f, w.Vector3)
+        assert isinstance(f + v, w.Vector3)
+        assert isinstance(p + f, w.Point3)
+        assert isinstance(f + p, w.Point3)
+        with self.assertRaises(TypeError):
+            t + f
+        with self.assertRaises(TypeError):
+            f + t
+        with self.assertRaises(TypeError):
+            r + f
+        with self.assertRaises(TypeError):
+            f + r
+        with self.assertRaises(TypeError):
+            q + f
+        with self.assertRaises(TypeError):
+            f + q
 
-    def test_Symbol(self):
-        s = w.Symbol('a')
-        assert isinstance(s, w.Symbol)
+        # Symbol
+        assert isinstance(s + s, w.Expression)
+        assert isinstance(s + e, w.Expression)
+        assert isinstance(e + s, w.Expression)
+        assert isinstance(s + v, w.Vector3)
+        assert isinstance(v + s, w.Vector3)
+        assert (s + v)[3].evaluate() == 0 == (v + s)[3].evaluate()
+        assert isinstance(s + p, w.Point3)
+        assert isinstance(p + s, w.Point3)
+        assert (s + p)[3].evaluate() == 1 == (p + s)[3].evaluate()
+        with self.assertRaises(TypeError):
+            s + t
+        with self.assertRaises(TypeError):
+            t + s
+        with self.assertRaises(TypeError):
+            s + r
+        with self.assertRaises(TypeError):
+            r + s
+        with self.assertRaises(TypeError):
+            s + q
+        with self.assertRaises(TypeError):
+            q + s
+        # Expression
+        assert isinstance(e + e, w.Expression)
+        assert isinstance(e + v, w.Vector3)
+        assert isinstance(v + e, w.Vector3)
+        assert (e + v)[3].evaluate() == 0 == (v + e)[3].evaluate()
+        assert isinstance(e + p, w.Point3)
+        assert isinstance(p + e, w.Point3)
+        assert (e + p)[3].evaluate() == 1 == (p + e)[3].evaluate()
+        with self.assertRaises(TypeError):
+            e + t
+        with self.assertRaises(TypeError):
+            t + e
+        with self.assertRaises(TypeError):
+            e + r
+        with self.assertRaises(TypeError):
+            r + e
+        with self.assertRaises(TypeError):
+            e + q
+        with self.assertRaises(TypeError):
+            q + e
+        # Vector3
+        assert isinstance(v + v, w.Vector3)
+        assert (v + v)[3].evaluate() == 0
+        assert isinstance(v + p, w.Point3)
+        assert isinstance(p + v, w.Point3)
+        assert (v + p)[3].evaluate() == 1 == (p + v)[3].evaluate()
+        with self.assertRaises(TypeError):
+            v + t
+        with self.assertRaises(TypeError):
+            t + v
+        with self.assertRaises(TypeError):
+            v + r
+        with self.assertRaises(TypeError):
+            r + v
+        with self.assertRaises(TypeError):
+            v + q
+        with self.assertRaises(TypeError):
+            q + v
+        # Point3
+        with self.assertRaises(TypeError):
+            p + p
+        with self.assertRaises(TypeError):
+            p + t
+        with self.assertRaises(TypeError):
+            t + p
+        with self.assertRaises(TypeError):
+            p + r
+        with self.assertRaises(TypeError):
+            r + p
+        with self.assertRaises(TypeError):
+            p + q
+        with self.assertRaises(TypeError):
+            q + p
+        # TransMatrix
+        with self.assertRaises(TypeError):
+            t + t
+        with self.assertRaises(TypeError):
+            t + r
+        with self.assertRaises(TypeError):
+            r + t
+        with self.assertRaises(TypeError):
+            t + q
+        with self.assertRaises(TypeError):
+            q + t
+        # RotationMatrix
+        with self.assertRaises(TypeError):
+            r + r
+        with self.assertRaises(TypeError):
+            r + q
+        with self.assertRaises(TypeError):
+            q + r
+        # Quaternion
+        with self.assertRaises(TypeError):
+            q + q
+
+    def test_sub(self):
+        f = 1.0
+        s = w.Symbol('s')
+        e = w.Expression(1)
+        v = w.Vector3((1, 1, 1))
+        p = w.Point3((1, 1, 1))
+        t = w.TransMatrix()
+        r = w.RotationMatrix()
+        q = w.Quaternion()
+        # float
+        assert isinstance(s - f, w.Expression)
+        assert isinstance(f - s, w.Expression)
+        assert isinstance(e - f, w.Expression)
+        assert isinstance(f - e, w.Expression)
+        assert isinstance(v - f, w.Vector3)
+        assert isinstance(f - v, w.Vector3)
+        assert isinstance(p - f, w.Point3)
+        assert isinstance(f - p, w.Point3)
+        with self.assertRaises(TypeError):
+            t - f
+        with self.assertRaises(TypeError):
+            f - t
+        with self.assertRaises(TypeError):
+            r - f
+        with self.assertRaises(TypeError):
+            f - r
+        with self.assertRaises(TypeError):
+            q - f
+        with self.assertRaises(TypeError):
+            f - q
+        # Symbol
+        assert isinstance(s - s, w.Expression)
+        assert isinstance(s - e, w.Expression)
+        assert isinstance(e - s, w.Expression)
+        assert isinstance(s - v, w.Vector3)
+        assert isinstance(v - s, w.Vector3)
+        assert (s - v)[3].evaluate() == 0 == (v - s)[3].evaluate()
+        assert isinstance(s - p, w.Point3)
+        assert isinstance(p - s, w.Point3)
+        assert (s - p)[3].evaluate() == 1 == (p - s)[3].evaluate()
+        with self.assertRaises(TypeError):
+            s - t
+        with self.assertRaises(TypeError):
+            t - s
+        with self.assertRaises(TypeError):
+            s - r
+        with self.assertRaises(TypeError):
+            r - s
+        with self.assertRaises(TypeError):
+            s - q
+        with self.assertRaises(TypeError):
+            q - s
+        # Expression
+        assert isinstance(e - e, w.Expression)
+        assert isinstance(e - v, w.Vector3)
+        assert isinstance(v - e, w.Vector3)
+        assert (e - v)[3].evaluate() == 0 == (v - e)[3].evaluate()
+        assert isinstance(e - p, w.Point3)
+        assert isinstance(p - e, w.Point3)
+        assert (e - p)[3].evaluate() == 1 == (p - e)[3].evaluate()
+        with self.assertRaises(TypeError):
+            e - t
+        with self.assertRaises(TypeError):
+            t - e
+        with self.assertRaises(TypeError):
+            e - r
+        with self.assertRaises(TypeError):
+            r - e
+        with self.assertRaises(TypeError):
+            e - q
+        with self.assertRaises(TypeError):
+            q - e
+        # Vector3
+        assert isinstance(v - v, w.Vector3)
+        assert (v - v)[3].evaluate() == 0
+        assert isinstance(v - p, w.Point3)
+        assert isinstance(p - v, w.Point3)
+        assert (v - p)[3].evaluate() == 1 == (p - v)[3].evaluate()
+        with self.assertRaises(TypeError):
+            v - t
+        with self.assertRaises(TypeError):
+            t - v
+        with self.assertRaises(TypeError):
+            v - r
+        with self.assertRaises(TypeError):
+            r - v
+        with self.assertRaises(TypeError):
+            v - q
+        with self.assertRaises(TypeError):
+            q - v
+        # Point3
+        assert isinstance(p - p, w.Vector3)
+        assert (p - p)[3].evaluate() == 0
+        with self.assertRaises(TypeError):
+            p - t
+        with self.assertRaises(TypeError):
+            t - p
+        with self.assertRaises(TypeError):
+            p - r
+        with self.assertRaises(TypeError):
+            r - p
+        with self.assertRaises(TypeError):
+            p - q
+        with self.assertRaises(TypeError):
+            q - p
+        # TransMatrix
+        with self.assertRaises(TypeError):
+            t - t
+        with self.assertRaises(TypeError):
+            t - r
+        with self.assertRaises(TypeError):
+            r - t
+        with self.assertRaises(TypeError):
+            t - q
+        with self.assertRaises(TypeError):
+            q - t
+        # RotationMatrix
+        with self.assertRaises(TypeError):
+            r - r
+        with self.assertRaises(TypeError):
+            r - q
+        with self.assertRaises(TypeError):
+            q - r
+        # Quaternion
+        with self.assertRaises(TypeError):
+            q - q
+
+    def test_mul_truediv_pow(self):
+        f = 1.0
+        s = w.Symbol('s')
+        e = w.Expression(1)
+        v = w.Vector3((1, 1, 1))
+        p = w.Point3((1, 1, 1))
+        t = w.TransMatrix()
+        r = w.RotationMatrix()
+        q = w.Quaternion()
+        functions = [lambda a, b: a * b, lambda a, b: a / b, lambda a, b: a ** b]
+        for fn in functions:
+            # float
+            assert isinstance(fn(f, s), w.Expression)
+            assert isinstance(fn(s, f), w.Expression)
+            assert isinstance(fn(f, v), w.Vector3)
+            assert isinstance(fn(v, f), w.Vector3)
+            assert isinstance(fn(f, p), w.Point3)
+            assert isinstance(fn(p, f), w.Point3)
+            with self.assertRaises(TypeError):
+                fn(f, t)
+            with self.assertRaises(TypeError):
+                fn(t, f)
+            with self.assertRaises(TypeError):
+                fn(f, r)
+            with self.assertRaises(TypeError):
+                fn(r, f)
+            with self.assertRaises(TypeError):
+                fn(f, q)
+            with self.assertRaises(TypeError):
+                fn(q, f)
+
+            # Symbol
+            assert isinstance(fn(s, s), w.Expression)
+            assert isinstance(fn(s, e), w.Expression)
+            assert isinstance(fn(e, s), w.Expression)
+            assert isinstance(fn(s, v), w.Vector3)
+            assert isinstance(fn(v, s), w.Vector3)
+            assert (fn(s, v))[3].evaluate() == 0 == (fn(v, s))[3].evaluate()
+            assert isinstance(fn(s, p), w.Point3)
+            assert isinstance(fn(p, s), w.Point3)
+            assert (fn(s, p))[3].evaluate() == 1 == (fn(p, s))[3].evaluate()
+            with self.assertRaises(TypeError):
+                fn(s, t)
+            with self.assertRaises(TypeError):
+                fn(t, s)
+            with self.assertRaises(TypeError):
+                fn(s, r)
+            with self.assertRaises(TypeError):
+                fn(r, s)
+            with self.assertRaises(TypeError):
+                fn(s, q)
+            with self.assertRaises(TypeError):
+                fn(q, s)
+            # Expression
+            assert isinstance(fn(e, e), w.Expression)
+            assert isinstance(fn(e, v), w.Vector3)
+            assert isinstance(fn(v, e), w.Vector3)
+            assert (fn(e, v))[3].evaluate() == 0 == (fn(v, e))[3].evaluate()
+            assert isinstance(fn(e, p), w.Point3)
+            assert isinstance(fn(p, e), w.Point3)
+            assert (fn(e, p))[3].evaluate() == 1 == (fn(p, e))[3].evaluate()
+            with self.assertRaises(TypeError):
+                fn(e, t)
+            with self.assertRaises(TypeError):
+                fn(t, e)
+            with self.assertRaises(TypeError):
+                fn(e, r)
+            with self.assertRaises(TypeError):
+                fn(r, e)
+            with self.assertRaises(TypeError):
+                fn(e, q)
+            with self.assertRaises(TypeError):
+                fn(q, e)
+            # Vector3
+            with self.assertRaises(TypeError):
+                fn(v, v)
+            with self.assertRaises(TypeError):
+                fn(v, p)
+            with self.assertRaises(TypeError):
+                fn(p, v)
+            with self.assertRaises(TypeError):
+                fn(v, t)
+            with self.assertRaises(TypeError):
+                fn(t, v)
+            with self.assertRaises(TypeError):
+                fn(v, r)
+            with self.assertRaises(TypeError):
+                fn(r, v)
+            with self.assertRaises(TypeError):
+                fn(v, q)
+            with self.assertRaises(TypeError):
+                fn(q, v)
+            # Point3
+            with self.assertRaises(TypeError):
+                fn(p, p)
+            with self.assertRaises(TypeError):
+                fn(p, t)
+            with self.assertRaises(TypeError):
+                fn(t, p)
+            with self.assertRaises(TypeError):
+                fn(p, r)
+            with self.assertRaises(TypeError):
+                fn(r, p)
+            with self.assertRaises(TypeError):
+                fn(p, q)
+            with self.assertRaises(TypeError):
+                fn(q, p)
+            # TransMatrix
+            with self.assertRaises(TypeError):
+                fn(t, t)
+            with self.assertRaises(TypeError):
+                fn(t, r)
+            with self.assertRaises(TypeError):
+                fn(r, t)
+            with self.assertRaises(TypeError):
+                fn(t, q)
+            with self.assertRaises(TypeError):
+                fn(q, t)
+            # RotationMatrix
+            with self.assertRaises(TypeError):
+                fn(r, r)
+            with self.assertRaises(TypeError):
+                fn(r, q)
+            with self.assertRaises(TypeError):
+                fn(q, r)
+            # Quaternion
+            with self.assertRaises(TypeError):
+                fn(q, q)
+
+    def test_dot_types(self):
+        s = w.Symbol('s')
+        e = w.Expression(1)
+        v = w.Vector3((1, 1, 1))
+        p = w.Point3((1, 1, 1))
+        t = w.TransMatrix()
+        r = w.RotationMatrix()
+        q = w.Quaternion()
+        # Symbol
+        for muh in [s, e, v, p, t, r, q]:
+            with self.assertRaises(TypeError):
+                w.dot(s, muh)
+            with self.assertRaises(TypeError):
+                w.dot(muh, s)
+        # Expression
+        assert isinstance(w.dot(e, e), w.Expression)
+        assert isinstance(e.dot(e), w.Expression)
+        for muh in [v, p, t, r, q]:
+            with self.assertRaises(TypeError):
+                w.dot(e, muh)
+            with self.assertRaises(TypeError):
+                w.dot(muh, e)
+            with self.assertRaises(TypeError):
+                e.dot(muh)
+        # Vector3
+        assert isinstance(v.dot(v), w.Expression)
+        assert isinstance(w.dot(v, v), w.Expression)
+        assert isinstance(v.dot(p), w.Expression)
+        assert isinstance(w.dot(v, p), w.Expression)
+        assert isinstance(p.dot(v), w.Expression)
+        assert isinstance(w.dot(p, v), w.Expression)
+        assert isinstance(t.dot(v), w.Vector3)
+        assert isinstance(w.dot(t, v), w.Vector3)
+        with self.assertRaises(TypeError):
+            v.dot(t)
+        with self.assertRaises(TypeError):
+            w.dot(v, t)
+        assert isinstance(r.dot(v), w.Vector3)
+        assert isinstance(w.dot(r, v), w.Vector3)
+        with self.assertRaises(TypeError):
+            v.dot(q)
+        with self.assertRaises(TypeError):
+            w.dot(v, q)
+        with self.assertRaises(TypeError):
+            q.dot(v)
+        with self.assertRaises(TypeError):
+            w.dot(q, v)
+        # Point3
+        assert isinstance(p.dot(p), w.Expression)
+        assert isinstance(w.dot(p, p), w.Expression)
+        assert isinstance(t.dot(p), w.Point3)
+        assert isinstance(w.dot(t, p), w.Point3)
+        with self.assertRaises(TypeError):
+            p.dot(t)
+        with self.assertRaises(TypeError):
+            w.dot(p, t)
+        assert isinstance(r.dot(p), w.Point3)
+        assert isinstance(w.dot(r, p), w.Point3)
+        with self.assertRaises(TypeError):
+            p.dot(q)
+        with self.assertRaises(TypeError):
+            w.dot(p, q)
+        with self.assertRaises(TypeError):
+            q.dot(p)
+        with self.assertRaises(TypeError):
+            w.dot(q, p)
+        # TransMatrix
+        assert isinstance(t.dot(t), w.TransMatrix)
+        assert isinstance(w.dot(t, t), w.TransMatrix)
+        assert isinstance(t.dot(r), w.RotationMatrix)
+        assert isinstance(w.dot(t, r), w.RotationMatrix)
+        assert isinstance(r.dot(t), w.TransMatrix)
+        assert isinstance(w.dot(r, t), w.TransMatrix)
+        with self.assertRaises(TypeError):
+            t.dot(q)
+        with self.assertRaises(TypeError):
+            w.dot(t, q)
+        with self.assertRaises(TypeError):
+            q.dot(t)
+        with self.assertRaises(TypeError):
+            w.dot(q, t)
+        # RotationMatrix
+        assert isinstance(r.dot(r), w.RotationMatrix)
+        assert isinstance(w.dot(r, r), w.RotationMatrix)
+        with self.assertRaises(TypeError):
+            r.dot(q)
+        with self.assertRaises(TypeError):
+            w.dot(r, q)
+        with self.assertRaises(TypeError):
+            q.dot(r)
+        with self.assertRaises(TypeError):
+            w.dot(q, r)
+        assert isinstance(q.dot(q), w.Expression)
+        assert isinstance(w.dot(q, q), w.Expression)
+
 
     def test_free_symbols(self):
         m = w.Expression(w.var('a b c d'))
@@ -849,7 +1324,7 @@ class TestCASWrapper(unittest.TestCase):
             angle = -angle
             axis = [-x for x in axis]
         if expected_angle < 0:
-            angle2 = -expected_angle
+            expected_angle = -expected_angle
             expected_angle *= -1
         compare_axis_angle(angle, axis[:3], expected_angle, expected_axis)
         assert axis[-1] == 0

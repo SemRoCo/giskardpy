@@ -78,7 +78,7 @@ def angle_positive():
     return st.floats(0, 2 * np.pi)
 
 
-def angle():
+def random_angle():
     return st.floats(-np.pi, np.pi)
 
 

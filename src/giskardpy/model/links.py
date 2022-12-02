@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import List
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -16,15 +17,18 @@ from giskardpy.my_types import PrefixName
 from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import resolve_ros_iris
+import giskardpy.casadi_wrapper as w
 
 
 class LinkGeometry:
+    link_T_geometry: w.TransMatrix
+
     def __init__(self, link_T_geometry: np.ndarray, color: ColorRGBA = None):
         if color is None:
             self.color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
         else:
             self.color = color
-        self.link_T_geometry = link_T_geometry
+        self.link_T_geometry = w.TransMatrix(link_T_geometry)
 
     @classmethod
     def from_urdf(cls, urdf_thing, color) -> LinkGeometry:
@@ -57,7 +61,7 @@ class LinkGeometry:
                                       radius=urdf_geometry.radius,
                                       color=color)
         else:
-            NotImplementedError(f'{type(urdf_geometry)} geometry is not supported')
+            raise NotImplementedError(f'{type(urdf_geometry)} geometry is not supported')
         return geometry
 
     @classmethod
@@ -96,7 +100,7 @@ class LinkGeometry:
         marker.color = self.color
 
         marker.pose = Pose()
-        marker.pose = np_to_pose(self.link_T_geometry)
+        marker.pose = np_to_pose(self.link_T_geometry.evaluate())
         return marker
 
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
@@ -197,6 +201,8 @@ class SphereGeometry(LinkGeometry):
 
 
 class Link:
+    child_joint_names: List[PrefixName]
+
     def __init__(self, name: my_string):
         if isinstance(name, str):
             name = PrefixName(name, None)

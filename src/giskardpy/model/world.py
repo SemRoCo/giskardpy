@@ -397,6 +397,7 @@ class WorldTree:
                  urdf: str,
                  group_name: Optional[str] = None,
                  parent_link_name: Optional[PrefixName] = None,
+                 pose: Optional[w.TransMatrix] = None,
                  actuated: bool = False):
         """
         Add a urdf to the world at parent_link_name and create a SubWorldTree named group_name for it.
@@ -419,7 +420,8 @@ class WorldTree:
             urdf_root_link = Link(urdf_root_link_name)
             self._add_link(urdf_root_link)
             self._add_fixed_joint(parent_link=parent_link,
-                                  child_link=urdf_root_link)
+                                  child_link=urdf_root_link,
+                                  transform=pose)
         else:
             urdf_root_link = self._links[urdf_root_link_name]
 
@@ -448,7 +450,8 @@ class WorldTree:
             self.apply_default_limits_and_weights()
         self._set_free_variables_on_mimic_joints(group_name)
 
-    def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None, transform=None):
+    def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
+                         transform: Optional[w.TransMatrix] = None):
         self._raise_if_link_does_not_exist(parent_link.name)
         self._raise_if_link_does_not_exist(child_link.name)
         if joint_name is None:
@@ -686,7 +689,8 @@ class WorldTree:
         if msg.type == msg.URDF_BODY:
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link_name,
-                          group_name=group_name)
+                          group_name=group_name,
+                          pose=w.TransMatrix(pose))
             self.notify_model_change()
         else:
             link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,

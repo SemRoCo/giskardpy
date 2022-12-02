@@ -2308,7 +2308,8 @@ class TestWorldManipulation:
             raise 'expected error'
         p = PoseStamped()
         p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
+        p.pose.position.x = 1
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
         if kitchen_setup.is_standalone():
             js_topic = ''
             set_js_topic = ''

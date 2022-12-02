@@ -2299,6 +2299,7 @@ class TestWorldManipulation:
 
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
         object_name = kitchen_setup.kitchen_name
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint' : 0.1})
         kitchen_setup.clear_world()
         try:
             GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
@@ -2308,7 +2309,8 @@ class TestWorldManipulation:
             raise 'expected error'
         p = PoseStamped()
         p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
+        p.pose.position.x = 1
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
         if kitchen_setup.is_standalone():
             js_topic = ''
             set_js_topic = ''
@@ -2320,6 +2322,11 @@ class TestWorldManipulation:
                                pose=p,
                                js_topic=js_topic,
                                set_js_topic=set_js_topic)
+        joint_state = kitchen_setup.get_group_info(object_name).joint_state
+        for i, joint_name in enumerate(joint_state.name):
+            actual = joint_state.position[i]
+            assert actual == 0, f'Joint {joint_name} is at {actual} instead of 0'
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.1})
         kitchen_setup.remove_group(object_name)
         try:
             GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
@@ -2332,6 +2339,10 @@ class TestWorldManipulation:
                                pose=p,
                                js_topic=js_topic,
                                set_js_topic=set_js_topic)
+        joint_state = kitchen_setup.get_group_info(object_name).joint_state
+        for i, joint_name in enumerate(joint_state.name):
+            actual = joint_state.position[i]
+            assert actual == 0, f'Joint {joint_name} is at {actual} instead of 0'
 
     def test_add_mesh(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'

@@ -15,6 +15,7 @@ import giskardpy.casadi_wrapper as w
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup
+from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.model.world import SubWorldTree
@@ -274,7 +275,10 @@ class WorldUpdater(GiskardBehavior):
         if name not in self.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
         self.collision_scene.remove_black_list_entries(set(self.world.groups[name].link_names_with_collisions))
+        old_free_variables = [x.name for x in self.world.groups[name].free_variables]
         self.world.delete_group(name)
+        for free_variable in old_free_variables:
+            del self.world.state[free_variable]
         self._remove_plugins_of_group(name)
         logging.loginfo(f'Deleted \'{name}\'.')
 
@@ -292,7 +296,9 @@ class WorldUpdater(GiskardBehavior):
         for group_name in list(self.added_plugin_names.keys()):
             self._remove_plugins_of_group(group_name)
         self.added_plugin_names = defaultdict(list)
-        self.world.state = tmp_state
+        # copy only state of joints that didn't get deleted
+        remaining_free_variables = [x.name for x in self.world.free_variables]
+        self.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
         self.world.notify_state_change()
         self.clear_markers()
         logging.loginfo('Cleared world.')

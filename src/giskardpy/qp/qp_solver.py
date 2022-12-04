@@ -1,136 +1,69 @@
+import abc
+from abc import ABC
+from typing import Tuple
+
 import numpy as np
 
-import qpoases
-from qpoases import PyReturnValue
-
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, InfeasibleException
-from giskardpy.utils import logging
+from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 
 
-class QPSolver(object):
-    STATUS_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
+class QPSolver(ABC):
 
-    def __init__(self):
-        """
-        :param dim_a: number of joint constraints + number of soft constraints
-        :type int
-        :param dim_b: number of hard constraints + number of soft constraints
-        :type int
-        """
-        self.started = False
-        self.shape = (0,0)
+    def __init__(self,
+                 num_non_slack: int,
+                 retry_added_slack: float,
+                 retry_weight_factor: float,
+                 retries_with_relaxed_constraints: int,
+                 on_fail_round_to: int = 4):
+        self.num_non_slack = num_non_slack
+        self.retry_added_slack = retry_added_slack
+        self.retry_weight_factor = retry_weight_factor
+        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
+        self.on_fail_round_to = on_fail_round_to
 
-    def init(self, dim_a, dim_b):
-        self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)
-        options = qpoases.PyOptions()
-        options.setToMPC()
-        options.printLevel = qpoases.PyPrintLevel.NONE
-        self.qpProblem.setOptions(options)
-        self.xdot_full = np.zeros(dim_a)
-
-        self.started = False
-
-    # @profile
-    def solve(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
+    @abc.abstractmethod
+    def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
+              ubA: np.ndarray) -> np.ndarray:
         """
         x^T*H*x + x^T*g
         s.t.: lbA < A*x < ubA
         and    lb <  x  < ub
-        :param H: 2d diagonal weight matrix, shape = (jc (joint constraints) + sc (soft constraints)) * (jc + sc)
-        :type np.array
+        :param weights: 1d vector, len = (jc (joint constraints) + sc (soft constraints))
         :param g: 1d zero vector of len joint constraints + soft constraints
-        :type np.array
         :param A: 2d jacobi matrix of hc (hard constraints) and sc, shape = (hc + sc) * (number of joints)
-        :type np.array
         :param lb: 1d vector containing lower bound of x, len = jc + sc
-        :type np.array
         :param ub: 1d vector containing upper bound of x, len = js + sc
-        :type np.array
         :param lbA: 1d vector containing lower bounds for the change of hc and sc, len = hc+sc
-        :type np.array
         :param ubA: 1d vector containing upper bounds for the change of hc and sc, len = hc+sc
-        :type np.array
-        :param nWSR:
-        :type np.array
         :return: x according to the equations above, len = joint constraints + soft constraints
-        :type np.array
         """
-        H = np.diag(H)
-        H = H.copy()
-        A = A.copy()
-        lbA = lbA.copy()
-        ubA = ubA.copy()
-        lb = lb.copy()
-        ub = ub.copy()
-        if A.shape != self.shape:
-            self.started = False
-            self.shape = A.shape
 
-        number_of_retries = 2
-        while number_of_retries > 0:
-            if nWSR is None:
-                nWSR = np.array([sum(A.shape) * 2])
-            else:
-                nWSR = np.array([nWSR])
-            number_of_retries -= 1
-            if not self.started:
-                self.init(A.shape[1], A.shape[0])
-                success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
-                if success == PyReturnValue.MAX_NWSR_REACHED:
-                    self.started = False
-                    raise MAX_NWSR_REACHEDException('Failed to initialize QP-problem.')
-            else:
-                success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
-                if success == PyReturnValue.MAX_NWSR_REACHED:
-                    logging.logwarn('max nwsr or cpu time reached')
-                    success = PyReturnValue.SUCCESSFUL_RETURN
-                    # self.started = False
-                    # raise MAX_NWSR_REACHEDException('Failed to hot start QP-problem.')
-            if success == PyReturnValue.SUCCESSFUL_RETURN:
-                self.started = True
-                break
-            elif success == PyReturnValue.NAN_IN_LB:
-                # TODO nans get replaced with 0 document this somewhere
-                # TODO might still be buggy when nan occur when the qp problem is already initialized
-                lb[np.isnan(lb)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_UB:
-                ub[np.isnan(ub)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_LBA:
-                lbA[np.isnan(lbA)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_UBA:
-                ubA[np.isnan(ubA)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            else:
-                logging.loginfo('{}; retrying with A rounded to 5 decimal places'.format(self.STATUS_VALUE_DICT[success]))
-                r = 5
-                A = np.round(A, r)
-                nWSR = None
-                self.started = False
-        else:  # if not break
-            self.started = False
-            message = '{}'.format(self.STATUS_VALUE_DICT[success])
-            if success in [PyReturnValue.INIT_FAILED_INFEASIBILITY,
-                           PyReturnValue.QP_INFEASIBLE,
-                           PyReturnValue.HOTSTART_STOPPED_INFEASIBILITY,
-                           PyReturnValue.ADDBOUND_FAILED_INFEASIBILITY,
-                           PyReturnValue.ADDCONSTRAINT_FAILED_INFEASIBILITY]:
-                raise InfeasibleException(message)
-            raise QPSolverException(message)
+    @abc.abstractmethod
+    def solve_and_retry(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray,
+                        lbA: np.ndarray, ubA: np.ndarray) -> np.ndarray:
+        """
+        Calls solve and retries on exception.
+        """
 
-        self.qpProblem.getPrimalSolution(self.xdot_full)
-        return self.xdot_full
+    def compute_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA) \
+            -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        self.retries_with_relaxed_constraints -= 1
+        if self.retries_with_relaxed_constraints <= 0:
+            raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
+        num_of_slack = len(lb) - self.num_non_slack
+        lb_relaxed = lb.copy()
+        ub_relaxed = ub.copy()
+        lb_relaxed[-num_of_slack:] = -self.retry_added_slack
+        ub_relaxed[-num_of_slack:] = self.retry_added_slack
+        try:
+            xdot_full = self.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
+        except QPSolverException as e:
+            self.retries_with_relaxed_constraints += 1
+            raise e
+        upper_violations = ub < xdot_full
+        lower_violations = lb > xdot_full
+        if np.any(upper_violations) or np.any(lower_violations):
+            weights[upper_violations | lower_violations] *= self.retry_weight_factor
+            return weights, lb_relaxed, ub_relaxed
+        self.retries_with_relaxed_constraints += 1
+        raise InfeasibleException('')

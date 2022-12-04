@@ -2,12 +2,14 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 
+from giskardpy.my_types import PrefixName
 from giskardpy.python_interface import GiskardWrapper
 
 
 def call_back(goal: PoseStamped):
     rospy.loginfo('received simple move base goal')
-    tip_link = 'base_footprint'
+    robot_name = giskard.robot_name
+    tip_link = str(PrefixName('base_footprint', robot_name))
     root_link = 'map'
     giskard.set_json_goal(constraint_type='DiffDriveBaseGoal',
                           tip_link=tip_link, root_link=root_link,

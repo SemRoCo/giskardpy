@@ -11,7 +11,6 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.utils import logging
-from test_world import create_world_with_pr2, create_world_with_donbot, allow_all_entry, avoid_all_entry
 
 folder_name = 'tmp_data/'
 
@@ -171,9 +170,9 @@ class TestPyBulletSyncer(object):
             if o.position_name in entry:
                 contains_box |= True
                 if o.position_name == entry[0]:
-                    assert entry[1] not in pr2_world.world.groups['r_hand'].links
+                    assert entry[1] not in pr2_world.world.groups['r_hand']._links
                 if o.position_name == entry[1]:
-                    assert entry[0] not in pr2_world.world.groups['r_hand'].links
+                    assert entry[0] not in pr2_world.world.groups['r_hand']._links
         assert contains_box
         pr2_world.world.delete_branch(o.position_name)
         pr2_world.init_collision_matrix(RobotName)
@@ -310,7 +309,7 @@ class TestPyBulletSyncer(object):
 
     def test_collision_goals_to_collision_matrix_avoid_only_box(self, donbot_world):
         name = 'muh'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
 
         p = Pose()
         p.orientation.w = 1
@@ -339,7 +338,7 @@ class TestPyBulletSyncer(object):
         allow collision with a specific object
         """
         name = 'muh'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
         min_dist = defaultdict(lambda: 0.1)
 
         p = Pose()
@@ -370,7 +369,7 @@ class TestPyBulletSyncer(object):
         """
         name = 'muh'
         name2 = 'muh2'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
         min_dist = defaultdict(lambda: 0.05)
 
         p = Pose()
@@ -401,7 +400,7 @@ class TestPyBulletSyncer(object):
         """
         name = 'muh'
         name2 = 'muh2'
-        robot_link_names = list(donbot_world.robot.link_names_with_collisions)
+        robot_link_names = list(donbot_world.robot().link_names_with_collisions)
         allowed_link = robot_link_names[0]
         min_dist = defaultdict(lambda: 0.05)
 
@@ -424,7 +423,7 @@ class TestPyBulletSyncer(object):
         assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
-            if body_b != donbot_world.robot.position_name:
+            if body_b != donbot_world.robot().name:
                 assert body_b_link == name or body_b_link == name2
             assert robot_link in robot_link_names
             if body_b == name2:
@@ -441,7 +440,7 @@ class TestPyBulletSyncer(object):
         collision_entry.robot_links = ['l_gripper_l_finger_tip_link', 'l_gripper_r_finger_tip_link',
                                        'l_gripper_l_finger_link', 'l_gripper_r_finger_link',
                                        'l_gripper_r_finger_link', 'l_gripper_palm_link']
-        collision_entry.body_b = pr2_world.robot.position_name
+        collision_entry.body_b = pr2_world.robot().name
         collision_entry.link_bs = ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link',
                                    'r_forearm_link', 'r_forearm_link']
         ces.append(collision_entry)

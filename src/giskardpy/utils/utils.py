@@ -1,7 +1,5 @@
 from __future__ import division
 
-import subprocess
-
 import errno
 import inspect
 import json
@@ -11,16 +9,20 @@ import sys
 import traceback
 from collections import OrderedDict
 from contextlib import contextmanager
+from copy import deepcopy
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
-import pybullet
+from typing import Type, Optional, Dict
+
 import matplotlib.colors as mcolors
 import numpy as np
 import pylab as plt
+import roslaunch
 import rospkg
 import rospy
 import trimesh
+from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import Status, Blackboard
@@ -31,6 +33,8 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
+from giskardpy.exceptions import DontPrintStackTrace
+from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
 
@@ -68,12 +72,13 @@ class NullContextManager(object):
         pass
 
 
-def get_all_classes_in_package(package, parent_class=None):
+def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] = None) -> Dict[str, Type]:
     classes = {}
+    package = __import__(package_name, fromlist="dummy")
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-        module = __import__('{}.{}'.format(package.__name__, modname), fromlist="dummy")
+        module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
         for name2, value2 in inspect.getmembers(module, inspect.isclass):
-            if parent_class is None or issubclass(value2, parent_class):
+            if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
                 classes[name2] = value2
     return classes
 
@@ -356,11 +361,9 @@ def resolve_ros_iris_in_urdf(input_urdf):
 rospack = rospkg.RosPack()
 
 
-def resolve_ros_iris(path):
+def resolve_ros_iris(path: str) -> str:
     """
     e.g. 'package://giskardpy/data'
-    :param path:
-    :return:
     """
     if 'package://' in path:
         split = path.split('package://')
@@ -369,7 +372,7 @@ def resolve_ros_iris(path):
         for suffix in split[1:]:
             package_name, suffix = suffix.split('/', 1)
             real_path = rospack.get_path(package_name)
-            result += '{}/{}'.format(real_path, suffix)
+            result += f'{real_path}/{suffix}'
         return result
     else:
         return path
@@ -460,6 +463,34 @@ def memoize(function):
     return wrapper
 
 
+def copy_memoize(function):
+    memo = function.memo = {}
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        # key = cPickle.dumps((args, kwargs))
+        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
+        key = (args, frozenset(kwargs.items()))
+        try:
+            return deepcopy(memo[key])
+        except KeyError:
+            rv = function(*args, **kwargs)
+            memo[key] = rv
+            return rv
+
+    return wrapper
+
+
+def launch_launchfile(file_name: str):
+    launch_file = resolve_ros_iris(file_name)
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_file])
+    with suppress_stderr():
+        launch.start()
+        # launch.shutdown()
+
+
 blackboard_exception_name = 'exception'
 
 
@@ -488,7 +519,8 @@ def catch_and_raise_to_blackboard(function):
         try:
             r = function(*args, **kwargs)
         except Exception as e:
-            traceback.print_exc()
+            if not isinstance(e, DontPrintStackTrace):
+                traceback.print_exc()
             raise_to_blackboard(e)
             return Status.FAILURE
         return r
@@ -506,16 +538,27 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
     return pose
 
 
-def convert_ros_message_to_dictionary(message):
-    # TODO there is probably a lib for that, but i'm to lazy to search
+def convert_ros_message_to_dictionary(message: Message) -> dict:
     type_str_parts = str(type(message)).split('.')
     part1 = type_str_parts[0].split('\'')[1]
     part2 = type_str_parts[-1].split('\'')[0]
-    message_type = '{}/{}'.format(part1, part2)
+    message_type = f'{part1}/{part2}'
     d = {'message_type': message_type,
          'message': original_convert_ros_message_to_dictionary(message)}
     return d
 
+
+def replace_prefix_name_with_str(d: dict) -> dict:
+    new_d = d.copy()
+    for k, v in d.items():
+        if isinstance(k, PrefixName):
+            del new_d[k]
+            new_d[str(k)] = v
+        if isinstance(v, PrefixName):
+            new_d[k] = str(v)
+        if isinstance(v, dict):
+            new_d[k] = replace_prefix_name_with_str(v)
+    return new_d
 
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?

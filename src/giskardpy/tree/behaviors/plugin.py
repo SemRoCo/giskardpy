@@ -1,14 +1,15 @@
 from time import time
+from typing import Dict
 
 from py_trees import Behaviour, Blackboard
 
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
-import giskardpy.utils.tfwrapper as tf
 
 
 class GiskardBehavior(Behaviour):
@@ -28,8 +29,8 @@ class GiskardBehavior(Behaviour):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @property
-    def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
-        return self.god_map.unsafe_get_data(identifier.collision_avoidance_config)
+    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceConfig]:
+        return self.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
 
     def get_god_map(self):
         """
@@ -58,12 +59,20 @@ class GiskardBehavior(Behaviour):
     def collision_scene(self, value):
         self.god_map.unsafe_set_data(identifier.collision_scene, value)
 
-    @property
-    def robot(self):
+    def robot(self, robot_name=''):
         """
         :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+        return self.collision_scene.robot(robot_name=robot_name)
+
+    def robot_names(self):
+        return self.collision_scene.robot_names
+
+    def robot_namespaces(self):
+        """
+        :rtype: list of str
+        """
+        return self.collision_scene.robot_namespaces
 
     def get_world(self):
         """
@@ -77,17 +86,8 @@ class GiskardBehavior(Behaviour):
         """
         return self.world
 
-    def get_robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.robot
-
-    def unsafe_get_robot(self):
-        """
-        :rtype: giskardpy.model.world.SubWorldTree
-        """
-        return self.robot
+    def raise_to_blackboard(self, exception):
+        Blackboard().set('exception', exception)
 
     def get_blackboard(self):
         return Blackboard()

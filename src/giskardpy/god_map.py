@@ -3,14 +3,14 @@ import numbers
 from collections import defaultdict
 from copy import copy, deepcopy
 from multiprocessing import RLock
+from typing import Sequence, Union, Any
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
     Quaternion
 
-from giskardpy import casadi_wrapper as w, identifier
+from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import KeyDefaultDict
-from giskardpy.model.utils import robot_name_from_urdf_string
 
 
 def set_default_in_override_block(block_identifier, god_map):
@@ -107,7 +107,7 @@ class GetMember(object):
         return self.child.c(a(*self.member))
 
 
-class GetMemberLeaf(object):
+class GetMemberLeaf:
     def __init__(self):
         self.member = None
         self.child = None
@@ -156,7 +156,7 @@ class GetMemberLeaf(object):
         return a(*self.member)
 
 
-def get_data(identifier, data):
+def get_data(identifier: Sequence[Union[str, int, Sequence[Union[str, int]]]], data: Any):
     """
     :param identifier: Identifier in the form of ['pose', 'position', 'x'],
                        to access class member: robot.joint_state = ['robot', 'joint_state']
@@ -164,7 +164,6 @@ def get_data(identifier, data):
                        to access lists or other indexable stuff: robot.l[-1] = ['robot', 'l', -1]
                        to access functions: lib.str_to_ascii('muh') = ['lib', 'str_to_acii', ['muh']]
                        to access functions without params: robot.get_pybullet_id() = ['robot', 'get_pybullet_id', []]
-    :type identifier: list
     :return: object that is saved at key
     """
     try:
@@ -195,18 +194,6 @@ class GodMap(object):
         self.shortcuts = {}
         self.lock = RLock()
 
-    @classmethod
-    @profile
-    def init_from_paramserver(cls):
-        import rospy
-
-        self = cls()
-        robot_urdf = rospy.get_param('robot_description')
-        self.set_data(identifier.robot_description, robot_urdf)
-        self.set_data(identifier.robot_group_name, robot_name_from_urdf_string(robot_urdf))
-
-        return self
-
     def __copy__(self):
         god_map_copy = GodMap()
         god_map_copy._data = copy(self._data)
@@ -221,7 +208,7 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
-    def unsafe_get_data(self, identifier):
+    def unsafe_get_data(self, identifier: Sequence):
         """
 
         :param identifier: Identifier in the form of ['pose', 'position', 'x'],
@@ -230,7 +217,6 @@ class GodMap(object):
                            to access lists or other indexable stuff: robot.l[-1] = ['robot', 'l', -1]
                            to access functions: lib.str_to_ascii('muh') = ['lib', 'str_to_acii', ['muh']]
                            to access functions without params: robot.get_pybullet_id() = ['robot', 'get_pybullet_id', []]
-        :type identifier: list
         :return: object that is saved at key
         """
         identifier = tuple(identifier)
@@ -257,7 +243,6 @@ class GodMap(object):
         return r
 
     def clear_cache(self):
-        # TODO should be possible without clear cache
         self.shortcuts = {}
 
     def to_symbol(self, identifier):
@@ -273,7 +258,7 @@ class GodMap(object):
         if identifier not in self.key_to_expr:
             expr = w.Symbol(self.expr_separator.join([str(x) for x in identifier]))
             if expr in self.expr_to_key:
-                raise Exception('{} not allowed in key'.format(self.expr_separator))
+                raise Exception(f'{self.expr_separator} not allowed in key')
             self.key_to_expr[identifier] = expr
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
@@ -323,31 +308,27 @@ class GodMap(object):
                     result.append(f(index))
             return result
 
-        return w.Matrix(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
+        return w.Expression(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
-    def list_to_point3(self, identifier):
-        return w.point3(
-            x=self.to_symbol(identifier + [0]),
-            y=self.to_symbol(identifier + [1]),
-            z=self.to_symbol(identifier + [2]),
-        )
+    def list_to_point3(self, identifier) -> w.Point3:
+        return w.Point3((self.to_symbol(identifier + [0]),
+                         self.to_symbol(identifier + [1]),
+                         self.to_symbol(identifier + [2])))
 
-    def list_to_vector3(self, identifier):
-        return w.vector3(
-            x=self.to_symbol(identifier + [0]),
-            y=self.to_symbol(identifier + [1]),
-            z=self.to_symbol(identifier + [2]),
-        )
+    def list_to_vector3(self, identifier) -> w.Vector3:
+        return w.Vector3((self.to_symbol(identifier + [0]),
+                          self.to_symbol(identifier + [1]),
+                          self.to_symbol(identifier + [2])))
 
-    def list_to_translation3(self, identifier):
-        return w.translation3(
+    def list_to_translation3(self, identifier) -> w.TransMatrix:
+        return w.TransMatrix.from_xyz_rpy(
             x=self.to_symbol(identifier + [0]),
             y=self.to_symbol(identifier + [1]),
             z=self.to_symbol(identifier + [2]),
         )
 
     def list_to_frame(self, identifier):
-        return w.Matrix(
+        return w.TransMatrix(
             [
                 [
                     self.to_symbol(identifier + [0, 0]),
@@ -374,33 +355,30 @@ class GodMap(object):
         )
 
     def pose_msg_to_frame(self, identifier):
-        return w.frame_quaternion(
-            x=self.to_symbol(identifier + ['position', 'x']),
-            y=self.to_symbol(identifier + ['position', 'y']),
-            z=self.to_symbol(identifier + ['position', 'z']),
-            qx=self.to_symbol(identifier + ['orientation', 'x']),
-            qy=self.to_symbol(identifier + ['orientation', 'y']),
-            qz=self.to_symbol(identifier + ['orientation', 'z']),
-            qw=self.to_symbol(identifier + ['orientation', 'w']),
-        )
+        p = w.Point3.from_xyz(x=self.to_symbol(identifier + ['position', 'x']),
+                              y=self.to_symbol(identifier + ['position', 'y']),
+                              z=self.to_symbol(identifier + ['position', 'z']))
+        q = w.Quaternion.from_xyzw(x=self.to_symbol(identifier + ['orientation', 'x']),
+                                   y=self.to_symbol(identifier + ['orientation', 'y']),
+                                   z=self.to_symbol(identifier + ['orientation', 'z']),
+                                   w=self.to_symbol(identifier + ['orientation', 'w'])).to_rotation_matrix()
+        return w.TransMatrix.from_point_rotation_matrix(p, q)
 
     def quaternion_msg_to_rotation(self, identifier):
-        return w.rotation_matrix_from_quaternion(
-            x=self.to_symbol(identifier + ['x']),
-            y=self.to_symbol(identifier + ['y']),
-            z=self.to_symbol(identifier + ['z']),
-            w=self.to_symbol(identifier + ['w']),
-        )
+        return w.Quaternion.from_xyzw(x=self.to_symbol(identifier + ['x']),
+                                      y=self.to_symbol(identifier + ['y']),
+                                      z=self.to_symbol(identifier + ['z']),
+                                      w=self.to_symbol(identifier + ['w'])).to_rotation_matrix()
 
     def point_msg_to_point3(self, identifier):
-        return w.point3(
+        return w.Point3.from_xyz(
             x=self.to_symbol(identifier + ['x']),
             y=self.to_symbol(identifier + ['y']),
             z=self.to_symbol(identifier + ['z']),
         )
 
     def vector_msg_to_vector3(self, identifier):
-        return w.vector3(
+        return w.Vector3.from_xyz(
             x=self.to_symbol(identifier + ['x']),
             y=self.to_symbol(identifier + ['y']),
             z=self.to_symbol(identifier + ['z']),
@@ -411,7 +389,6 @@ class GodMap(object):
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
         :rtype: list
         """
-        # TODO potential speedup by only updating entries that have changed
         # its a trap, this function only looks slow with lineprofiler
         with self.lock:
             return self.unsafe_get_values(symbols)
@@ -423,13 +400,13 @@ class GodMap(object):
         """
         return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
-    def evaluate_expr(self, expr):
+    def evaluate_expr(self, expr: w.Expression):
         if isinstance(expr, (int, float)):
             return expr
-        fs = w.free_symbols(expr)
-        fss = [str(s) for s in fs]
-        f = w.speed_up(expr, fs)
-        result = f.call2(self.get_values(fss))
+        f = expr.compile()
+        if len(f.str_params) == 0:
+            return expr.evaluate()
+        result = f.call2(self.get_values(f.str_params))
         if len(result) == 1:
             return result[0][0]
         else:

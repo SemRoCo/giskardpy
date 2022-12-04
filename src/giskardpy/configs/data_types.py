@@ -4,8 +4,19 @@ from typing import Optional, List, Tuple, Dict, Union
 
 from std_msgs.msg import ColorRGBA
 
-from giskardpy.utils import logging
+from giskardpy.data_types import Derivatives
+from giskardpy.model.utils import robot_name_from_urdf_string
+from giskardpy.my_types import PrefixName
 from giskardpy.utils.utils import resolve_ros_iris
+
+
+class TfPublishingModes(Enum):
+    nothing = 0
+    all = 1
+    attached_objects = 2
+
+    world_objects = 4
+    attached_and_world_objects = 6
 
 
 class CollisionCheckerLib(Enum):
@@ -29,14 +40,15 @@ class ControlModes(Enum):
 class GeneralConfig:
     def __init__(self):
         self.control_mode: ControlModes = ControlModes.open_loop
+        self.maximum_derivative: Derivatives = Derivatives.jerk
         self.action_server_name: str = '~command'
         self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
         self.test_mode: bool = False
         self.debug: bool = False
-        self.joint_limits: Dict[str, Dict[str, float]] = {
-            'velocity': defaultdict(lambda: 1),
-            'acceleration': defaultdict(lambda: 1e3),
-            'jerk': defaultdict(lambda: 30)
+        self.joint_limits: Dict[Derivatives, Dict[PrefixName, float]] = {
+            Derivatives.velocity: defaultdict(lambda: 1),
+            Derivatives.acceleration: defaultdict(lambda: 1e3),
+            Derivatives.jerk: defaultdict(lambda: 30)
         }
         self.default_link_color = ColorRGBA(1, 1, 1, 0.5)
 
@@ -49,7 +61,7 @@ class QPSolverConfig:
                  added_slack: float = 100,
                  sample_period: float = 0.05,
                  weight_factor: float = 100,
-                 joint_weights: Optional[Dict[str, Dict[str, float]]] = None):
+                 joint_weights: Optional[Dict[Derivatives, Dict[PrefixName, float]]] = None):
         self.qp_solver = qp_solver
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
@@ -58,49 +70,58 @@ class QPSolverConfig:
         self.weight_factor = weight_factor
         if joint_weights is None:
             self.joint_weights = {
-                'velocity': defaultdict(lambda: 0.001),
-                'acceleration': defaultdict(float),
-                'jerk': defaultdict(lambda: 0.001)
+                Derivatives.velocity: defaultdict(lambda: 0.001),
+                Derivatives.acceleration: defaultdict(float),
+                Derivatives.jerk: defaultdict(lambda: 0.001)
             }
         else:
             self.joint_weights = joint_weights
 
 
-class CollisionAvoidanceConfig:
-    class CollisionAvoidanceEntry:
-        def __init__(self,
-                     number_of_repeller: int = 1,
-                     soft_threshold: float = 0.05,
-                     hard_threshold: float = 0.0,
-                     max_velocity: float = 0.2):
-            self.number_of_repeller = number_of_repeller
-            self.soft_threshold = soft_threshold
-            self.hard_threshold = hard_threshold
-            self.max_velocity = max_velocity
-
-        @classmethod
-        def init_50mm(cls):
-            return cls(soft_threshold=0.05, hard_threshold=0.0)
-
-        @classmethod
-        def init_100mm(cls):
-            return cls(soft_threshold=0.1, hard_threshold=0.0)
-
-        @classmethod
-        def init_25mm(cls):
-            return cls(soft_threshold=0.025, hard_threshold=0.0)
-
+class HardwareConfig:
     def __init__(self):
-        self.collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
+        self.send_trajectory_to_cmd_vel_kwargs: List[dict] = []
+        self.follow_joint_trajectory_interfaces_kwargs: List[dict] = []
+        self.joint_state_topics_kwargs: List[dict] = []
+        self.odometry_node_kwargs: List[dict] = []
 
-        self.add_self_collisions: List[Tuple[str, str]] = []
-        self.ignored_self_collisions: List[Union[str, Tuple[str, str]]] = []
-        self.ignored_collisions: List[str] = []
+
+class CollisionAvoidanceConfigEntry:
+    def __init__(self,
+                 number_of_repeller: int = 1,
+                 soft_threshold: float = 0.05,
+                 hard_threshold: float = 0.0,
+                 max_velocity: float = 0.2):
+        self.number_of_repeller = number_of_repeller
+        self.soft_threshold = soft_threshold
+        self.hard_threshold = hard_threshold
+        self.max_velocity = max_velocity
+
+    @classmethod
+    def init_50mm(cls):
+        return cls(soft_threshold=0.05, hard_threshold=0.0)
+
+    @classmethod
+    def init_100mm(cls):
+        return cls(soft_threshold=0.1, hard_threshold=0.0)
+
+    @classmethod
+    def init_25mm(cls):
+        return cls(soft_threshold=0.025, hard_threshold=0.0)
+
+
+class CollisionAvoidanceConfig:
+    def __init__(self):
+        self.add_self_collisions: List[Tuple[PrefixName, PrefixName]] = []
+        self.ignored_self_collisions: List[Union[PrefixName, Tuple[PrefixName, PrefixName]]] = []
+        self.ignored_collisions: List[PrefixName] = []
         self.fixed_joints_for_self_collision_avoidance = []
         self.fixed_joints_for_external_collision_avoidance = []
 
-        self.external_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
-        self.self_collision_avoidance: Dict[str, CollisionAvoidanceConfig.CollisionAvoidanceEntry] = defaultdict(self.CollisionAvoidanceEntry)
+        self.external_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
+            CollisionAvoidanceConfigEntry)
+        self.self_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
+            CollisionAvoidanceConfigEntry)
 
     def cal_max_param(self, parameter_name):
         external_distances = self.external_collision_avoidance
@@ -112,89 +133,6 @@ class CollisionAvoidanceConfig:
         for value in self_distances.values():
             default_distance = max(default_distance, getattr(value, parameter_name))
         return default_distance
-
-    def ignore_all_self_collisions_of_link(self, link_name):
-        self.ignored_self_collisions.append(link_name)
-
-    def fix_joints_for_self_collision_avoidance(self, joint_names: List[str]):
-        self.fixed_joints_for_self_collision_avoidance.extend(joint_names)
-
-    def fix_joints_for_external_collision_avoidance(self, joint_names: List[str]):
-        self.fixed_joints_for_external_collision_avoidance.extend(joint_names)
-
-    def ignore_self_collisions_of_pair(self, link_name1, link_name2):
-        self.ignored_self_collisions.append((link_name1, link_name2))
-
-    def load_moveit_self_collision_matrix(self, path_to_srdf):
-        import lxml.etree as ET
-        path_to_srdf = resolve_ros_iris(path_to_srdf)
-        srdf = ET.parse(path_to_srdf)
-        srdf_root = srdf.getroot()
-        for child in srdf_root:
-            if hasattr(child, 'tag') and child.tag == 'disable_collisions':
-                link1 = child.attrib['link1']
-                link2 = child.attrib['link2']
-                reason = child.attrib['reason']
-                if reason in ['Never', 'Adjacent']:
-                    self.ignore_self_collisions_of_pair(link1, link2)
-        logging.loginfo(f'loaded {path_to_srdf} for self collision avoidance matrix')
-
-    def add_self_collision(self, link_name1, link_name2):
-        self.add_self_collisions.append((link_name1, link_name2))
-
-    def set_default_external_collision_avoidance(self,
-                                                 number_of_repeller: int = 1,
-                                                 soft_threshold: float = 0.05,
-                                                 hard_threshold: float = 0.0,
-                                                 max_velocity: float = 0.2):
-        self.external_collision_avoidance.default_factory = lambda: self.CollisionAvoidanceEntry(
-            number_of_repeller=number_of_repeller,
-            soft_threshold=soft_threshold,
-            hard_threshold=hard_threshold,
-            max_velocity=max_velocity
-        )
-
-    def overwrite_external_collision_avoidance(self,
-                                               joint_name: str,
-                                               number_of_repeller: Optional[int] = None,
-                                               soft_threshold: Optional[float] = None,
-                                               hard_threshold: Optional[float] = None,
-                                               max_velocity: Optional[float] = None):
-        if number_of_repeller is not None:
-            self.external_collision_avoidance[joint_name].number_of_repeller = number_of_repeller
-        if soft_threshold is not None:
-            self.external_collision_avoidance[joint_name].soft_threshold = soft_threshold
-        if hard_threshold is not None:
-            self.external_collision_avoidance[joint_name].hard_threshold = hard_threshold
-        if max_velocity is not None:
-            self.external_collision_avoidance[joint_name].max_velocity = max_velocity
-
-    def set_default_self_collision_avoidance(self,
-                                             number_of_repeller: int = 1,
-                                             soft_threshold: float = 0.05,
-                                             hard_threshold: float = 0.0,
-                                             max_velocity: float = 0.2):
-        self.self_collision_avoidance.default_factory = lambda: self.CollisionAvoidanceEntry(
-            number_of_repeller=number_of_repeller,
-            soft_threshold=soft_threshold,
-            hard_threshold=hard_threshold,
-            max_velocity=max_velocity
-        )
-
-    def overwrite_self_collision_avoidance(self,
-                                           link_name: str,
-                                           number_of_repeller: Optional[int] = None,
-                                           soft_threshold: Optional[float] = None,
-                                           hard_threshold: Optional[float] = None,
-                                           max_velocity: Optional[float] = None):
-        if number_of_repeller is not None:
-            self.self_collision_avoidance[link_name].number_of_repeller = number_of_repeller
-        if soft_threshold is not None:
-            self.self_collision_avoidance[link_name].soft_threshold = soft_threshold
-        if hard_threshold is not None:
-            self.self_collision_avoidance[link_name].hard_threshold = hard_threshold
-        if max_velocity is not None:
-            self.self_collision_avoidance[link_name].max_velocity = max_velocity
 
 
 class BehaviorTreeConfig:
@@ -219,19 +157,19 @@ class BehaviorTreeConfig:
             'expression_filter': None
         },
         'PlotTrajectory': {
-            'enabled': True,
+            'enabled': False,
             'history': 5,
             'velocity_threshold': 0.0,
             'cm_per_second': 2.5,
             'height_per_derivative': 6,
-            'normalize_position': True,
+            'normalize_position': False,
             'order': 4,
             'tick_stride': 0.5,
             # 'joint_filter': ['arm_left_2_joint'],
             'diff_after': 4,
         },
         'PlotDebugExpressions': {
-            'enabled': True,
+            'enabled': False,
             'history': 5,
             'cm_per_second': 2.5,
             'height_per_derivative': 6,
@@ -246,13 +184,12 @@ class BehaviorTreeConfig:
         },
         'TFPublisher': {
             'enabled': True,
-            'publish_attached_objects': True,
-            'publish_world_objects': False,
+            'mode': TfPublishingModes.attached_objects,
             'tf_topic': '/tf',
         },
         'MaxTrajectoryLength': {
             'enabled': True,
-            'length': 60 # seconds
+            'length': 60  # seconds
         },
         'LoopDetector': {
             'precision': 4
@@ -277,7 +214,8 @@ class BehaviorTreeConfig:
 
 
 class RobotInterfaceConfig:
-    def __init__(self, urdf: str, name: Optional[str] = None, joint_state_topic: str = '/joint_states'):
+    def __init__(self, urdf: str, name: Optional[str] = None):
+        if name is None:
+            name = robot_name_from_urdf_string(urdf)
         self.urdf = urdf
         self.name = name
-        self.joint_state_topic = joint_state_topic

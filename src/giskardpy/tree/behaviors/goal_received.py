@@ -1,4 +1,3 @@
-import rospy
 from py_trees import Status
 
 from giskardpy.tree.behaviors.action_server import ActionServerBehavior

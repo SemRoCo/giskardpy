@@ -1,6 +1,5 @@
-import numpy as np
-
 import PyKDL as kdl
+import numpy as np
 import urdf_parser_py.urdf as up
 
 from giskardpy.model.utils import hacky_urdf_parser_fix

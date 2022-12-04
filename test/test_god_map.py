@@ -13,8 +13,6 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length
 
-PKG = 'giskardpy'
-
 
 class TestGodMap(unittest.TestCase):
     @given(variable_name(),
@@ -305,7 +303,7 @@ class TestGodMap(unittest.TestCase):
     def test_to_symbol(self, key, value):
         gm = GodMap()
         gm.set_data([key], value)
-        self.assertTrue(w.is_symbol(gm.to_symbol([key])))
+        self.assertTrue(isinstance(gm.to_symbol([key]), w.Symbol))
         self.assertTrue(key in str(gm.to_symbol([key])))
 
     def test_to_symbol_pose_stamped(self):
@@ -337,14 +335,6 @@ class TestGodMap(unittest.TestCase):
         data = [1, 2, 3]
         gm.set_data(['muh'], data)
         expr = gm.to_expr(['muh'])
-        data[0]
-        data[1]
-        data[2]
-
-
-if __name__ == '__main__':
-    import rosunit
-
-    rosunit.unitrun(package=PKG,
-                    test_name='TestDataBus',
-                    test=TestGodMap)
+        assert gm.evaluate_expr(expr)[0][0] == data[0]
+        assert gm.evaluate_expr(expr)[1][0] == data[1]
+        assert gm.evaluate_expr(expr)[2][0] == data[2]

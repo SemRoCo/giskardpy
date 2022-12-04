@@ -5,7 +5,7 @@ from giskardpy.goals.goal import Goal
 
 class OverwriteWeights(Goal):
 
-    def __init__(self, updates: dict, **kwargs):
+    def __init__(self, updates: dict):
         """
         Changes the weights for one goal.
         :param updates:  e.g.
@@ -21,7 +21,7 @@ class OverwriteWeights(Goal):
                         }
                     }
         """
-        super().__init__(**kwargs)
+        super().__init__()
         # ints get parsed as strings, when they arrive here...
         updates = {int(k): v for k, v in updates.items()}
         self.world.overwrite_joint_weights(updates)

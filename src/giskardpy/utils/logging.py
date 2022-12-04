@@ -1,5 +1,7 @@
-import rospy
 from inspect import currentframe, getframeinfo
+
+import rospy
+
 from giskardpy import identifier
 
 debug_param = None

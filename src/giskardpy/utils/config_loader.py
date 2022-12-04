@@ -5,6 +5,7 @@ import rospkg
 import rospy
 import yaml
 
+from giskardpy import identifier
 from giskardpy.utils.utils import resolve_ros_iris
 
 rospack = rospkg.RosPack()
@@ -114,10 +115,9 @@ def update_parents(d, merge_key):
     return root_data
 
 
-def get_filename(loader, node, root):
+def get_filename(file_or_ros_path_str, loader, node, root):
     """Returns file name referenced at given node by using the given loader."""
 
-    file_or_ros_path_str = loader.construct_scalar(node)
     indices = [i for i, x in enumerate(loader.ros_package_keywords) if x in file_or_ros_path_str]
     if indices:
         if len(indices) != 1:
@@ -134,19 +134,38 @@ def get_filename(loader, node, root):
 def construct_include(loader, node):
     """Load config file referenced at given node by using the given loader."""
 
-    filename = get_filename(loader, node, loader.config_root)
-    extension = os.path.splitext(filename)[1].lstrip('.')
+    try:
+        file_str_or_list = loader.construct_scalar(node)
+    except Exception:
+        file_str_or_list = loader.construct_sequence(node)
 
-    with open(filename, 'r') as f:
-        if extension in ('yaml', 'yml'):
-            return yaml.load(f, Loader)
-        else:
-            return ''.join(f.readlines())
+    if isinstance(file_str_or_list, list):
+        splitt = [f.split(' ') for f in file_str_or_list]
+    else:
+        splitt = [file_str_or_list.split(' ')]
+
+    files_to_load = [file for e in splitt for file in e]
+    ret = dict()
+
+    for file_or_ros_path_str in files_to_load:
+        filename = get_filename(file_or_ros_path_str, loader, node, loader.config_root)
+        extension = os.path.splitext(filename)[1].lstrip('.')
+
+        with open(filename, 'r') as f:
+            if extension in ('yaml', 'yml'):
+                loaded_dict = yaml.load(f, Loader)
+                update_nested_dicts(ret, loaded_dict)
+            else:
+                loaded_str = ''.join(f.readlines())
+                update_nested_dicts(ret, {file_or_ros_path_str: loaded_str})
+
+    return ret
 
 
 def construct_find(loader, node):
     """Find directory or file referenced at given node by using the given loader."""
-    return get_filename(loader, node, loader.giskardpy_root)
+    file_or_ros_path_str = loader.construct_scalar(node)
+    return get_filename(file_or_ros_path_str, loader, node, loader.giskardpy_root)
 
 
 def load_robot_yaml(path, merge_key='parent'):
@@ -190,6 +209,9 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     if test:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/test.yaml'))
+    if identifier.robot_interface[-1] not in config:
+        config = update_nested_dicts(deepcopy(config),
+                                     load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/action_server.yaml'))
     if config and not rospy.is_shutdown():
         if old_data is None:
             old_data = {}
@@ -206,6 +228,87 @@ def upload_config_file_to_paramserver():
         test = False
     config_file_name = rospy.get_param('~{}'.format('config'))
     ros_load_robot_config(config_file_name, old_data=old_params, test=test)
+
+
+def get_namespaces(d, namespace_seperator='/'):
+    """
+    This function tries to find namespaces in the given dictionary by searching its top level keys
+    for the namespace_seperator. Moreover, the prefix entry in the values is checked too (see example below).
+    Therefore, a namespace is registered if it is specified in the top level key name or in the value part
+    with the key word 'prefix'.
+    If no namespaces are found a list is returned holding as many empty strings entries as top level keys
+    exist in the given dictionary.
+
+    Valid dict with namespacing:
+        dict = {
+        namespace1/something:
+            something: 2
+            other: 1
+            prefix: namespace1 (optional)
+        something:
+            ...
+            prefix: namespace2 (optional)
+        /something:
+            ...
+            prefix: namespace3 (optional)
+        /namespace4/something: (also okay)
+            ...
+            prefix: namespace4 (optional)
+        }
+
+    :type d: dict
+    :type namespace_seperator: str
+    :rtype: list of str
+    """
+    single_robot_namespace = ''
+    no_namespaces = list()
+    namespaces = list()
+    for i, (key_name, values) in enumerate(d.items()):
+        prefix_namespace = None
+        name_namespace = None
+
+        # Namespacing by specifying the prefix keyword
+        if 'prefix' in values:
+            prefix_namespace = values['prefix']
+
+        # Namespacing by the action server name
+        # Namespacing: e.g. pr2_a/base
+        if key_name.count(namespace_seperator) > 0:
+            if key_name.count(namespace_seperator) == 1:
+                pass
+            # Namespacing: e.g. /pr2_a/base
+            elif key_name.count(namespace_seperator) == 2 and \
+                    key_name.index(namespace_seperator) == 0:
+                key_name = key_name[1:]
+            else:
+                raise Exception('{} is an invalid combination of a namespace and'
+                                ' the action server name.'.format(key_name))
+            name_namespace = key_name[:key_name.index(namespace_seperator)]
+            if name_namespace == single_robot_namespace:
+                name_namespace = None
+
+        # Check prefix_namespace with the namespace in the action server name
+        if prefix_namespace is None and name_namespace is None:
+            no_namespaces.append(key_name)
+            continue
+        else:
+            if prefix_namespace is not None:
+                if name_namespace is None:
+                    namespaces.append(prefix_namespace)
+                elif prefix_namespace != name_namespace:
+                    raise ('Prefix namespace {} differs from the namespace specified '
+                            'in the action server name {}'.format(prefix_namespace, name_namespace))
+                else:
+                    namespaces.append(prefix_namespace)
+            else:
+                namespaces.append(name_namespace)
+
+    if len(namespaces) == 0:
+        namespaces = [single_robot_namespace] * len(d.items())
+    elif len(namespaces) != len(d.items()):
+        raise Exception('The entries {} have no namespacing but the others do.'.format(str(no_namespaces)))
+
+    return namespaces
 
 
 yaml.add_constructor('!include', construct_include, Loader)

@@ -1,15 +1,14 @@
-from giskardpy.data_types import JointStates
-from giskardpy.model.world import SubWorldTree
-
 from queue import Queue, Empty
 
 import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
 
-import giskardpy.identifier as identifier
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.data_types import JointStates
+from giskardpy.model.world import SubWorldTree
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
+
 
 class SyncConfiguration2(GiskardBehavior):
     """

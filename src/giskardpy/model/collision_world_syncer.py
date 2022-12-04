@@ -1,7 +1,7 @@
 from collections import defaultdict
 from itertools import product, combinations_with_replacement, combinations
 from time import time
-from typing import List, Dict, Tuple, Optional, Set
+from typing import List, Dict, Optional
 
 import numpy as np
 from sortedcontainers import SortedKeyList
@@ -12,14 +12,12 @@ from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
-from giskardpy.model.links import Link
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string
 from giskardpy.utils import logging
 
 np.random.seed(1337)
-
 
 class Collision:
     def __init__(self, link_a, link_b, contact_distance,
@@ -74,12 +72,10 @@ class Collisions:
     @profile
     def __init__(self, god_map: GodMap, collision_list_size):
         self.god_map = god_map
-        self.collision_avoidance_config: CollisionAvoidanceConfig = self.god_map.get_data(identifier.collision_avoidance_config)
-        self.fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+        self.collision_scene: CollisionWorldSynchronizer = self.god_map.get_data(identifier.collision_scene)
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(identifier.collision_avoidance_configs)
+        self.fixed_joints = self.collision_scene.fixed_joints
         self.world: WorldTree = self.god_map.get_data(identifier.world)
-        self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
-        self.robot_root = self.robot.root_link_name
-        self.root_T_map = self.robot.compute_fk_np(self.robot_root, self.world.root_link_name)
         self.collision_list_size = collision_list_size
 
         # @profile
@@ -100,12 +96,19 @@ class Collisions:
         self.number_of_self_collisions = defaultdict(int)
         self.number_of_external_collisions = defaultdict(int)
 
+    def get_robot_from_self_collision(self, collision):
+        link_a, link_b = collision.link_a, collision.link_b
+        for robot in self.collision_scene.robots:
+            if link_a in robot.link_names_as_set and link_b in robot.link_names_as_set:
+                return robot
+
     @profile
     def add(self, collision: Collision):
-        is_external = collision.link_b not in self.robot.link_names_with_collisions \
-                or collision.link_a not in self.robot.link_names_with_collisions
-        collision.is_external = is_external
-        if is_external:
+        robot = self.get_robot_from_self_collision(collision)
+        # is_external = collision.link_b not in robot.link_names_with_collisions \
+        #               or collision.link_a not in robot.link_names_with_collisions
+        collision.is_external = robot is None
+        if collision.is_external:
             collision = self.transform_external_collision(collision)
             key = collision.link_a
             self.external_collision[key].add(collision)
@@ -118,7 +121,7 @@ class Collisions:
                 self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
                                                                  key=lambda x: x.contact_distance)
         else:
-            collision = self.transform_self_collision(collision)
+            collision = self.transform_self_collision(collision, robot)
             key = collision.link_a, collision.link_b
             self.self_collisions[key].add(collision)
             self.number_of_self_collisions[key] = min(self.collision_list_size,
@@ -126,7 +129,7 @@ class Collisions:
         self.all_collisions.add(collision)
 
     @profile
-    def transform_self_collision(self, collision: Collision) -> Collision:
+    def transform_self_collision(self, collision: Collision, robot: SubWorldTree) -> Collision:
         link_a = collision.original_link_a
         link_b = collision.original_link_b
         new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b, self.fixed_joints)
@@ -136,13 +139,14 @@ class Collisions:
         collision.link_a = new_link_a
         collision.link_b = new_link_b
 
-        new_b_T_r = self.world.compute_fk_np(new_link_b, self.robot_root)
-        new_b_T_map = np.dot(new_b_T_r, self.root_T_map)
+        new_b_T_r = self.world.compute_fk_np(new_link_b, robot.root_link_name)
+        root_T_map = self.world.compute_fk_np(robot.root_link_name, self.world.root_link_name)
+        new_b_T_map = np.dot(new_b_T_r, root_T_map)
         collision.new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
 
         if collision.map_P_pa is not None:
-            new_a_T_r = self.world.compute_fk_np(new_link_a, self.robot_root)
-            new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_pa)
+            new_a_T_r = self.world.compute_fk_np(new_link_a, robot.root_link_name)
+            new_a_P_pa = np.dot(np.dot(new_a_T_r, root_T_map), collision.map_P_pa)
             new_b_P_pb = np.dot(new_b_T_map, collision.map_P_pb)
         else:
             new_a_T_a = self.world.compute_fk_np(new_link_a, collision.original_link_a)
@@ -157,7 +161,7 @@ class Collisions:
     def transform_external_collision(self, collision: Collision) -> Collision:
         try:
             link_name = collision.original_link_a
-            joint = self.world.links[link_name].parent_joint_name
+            joint = self.world._links[link_name].parent_joint_name
             if self.world.is_joint_controlled(joint) and joint not in self.fixed_joints:
                 movable_joint = joint
             def stopper(joint_name):
@@ -166,7 +170,7 @@ class Collisions:
             # movable_joint = self.world.get_controlled_parent_joint_of_link(collision.original_link_a)
         except Exception as e:
             pass
-        new_a = self.world.joints[movable_joint].child_link_name
+        new_a = self.world._joints[movable_joint].child_link_name
         collision.link_a = new_a
         if collision.map_P_pa is not None:
             new_a_T_map = self.world.compute_fk_np(new_a, self.world.root_link_name)
@@ -193,11 +197,9 @@ class Collisions:
         return c
 
     @profile
-    def get_external_collisions(self, joint_name):
+    def get_external_collisions(self, joint_name: str) -> SortedKeyList:
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
-        :type joint_name: str
-        :rtype: SortedKeyList
         """
         if joint_name in self.external_collision:
             return self.external_collision[joint_name]
@@ -216,15 +218,10 @@ class Collisions:
         return self.number_of_external_collisions[joint_name]
 
     # @profile
-    def get_self_collisions(self, link_a, link_b):
+    def get_self_collisions(self, link_a: my_string, link_b: my_string) -> SortedKeyList:
         """
         Make sure that link_a < link_b, the reverse collision is not saved.
-        :type link_a: str
-        :type link_b: str
-        :return:
-        :rtype: SortedKeyList
         """
-        # FIXME maybe check for reverse key?
         if (link_a, link_b) in self.self_collisions:
             return self.self_collisions[link_a, link_b]
         return self.default_result
@@ -244,19 +241,19 @@ class CollisionWorldSynchronizer:
 
     def __init__(self, world):
         self.world = world  # type: WorldTree
-        self.collision_avoidance_config: CollisionAvoidanceConfig = self.god_map.get_data(identifier.collision_avoidance_config)
-        self.fixed_joints = tuple(self.collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-        self.links_to_ignore = set(self.collision_avoidance_config.ignored_collisions)
-        try:
-            self.ignored_pairs = set(self.god_map.get_data(identifier.ignored_self_collisions))
-        except KeyError as e:
-            self.ignored_pairs = set()
-        try:
-            self.white_list_pairs = self.god_map.get_data(identifier.added_self_collisions)
-            self.white_list_pairs = set(
-                tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
-        except KeyError as e:
-            self.white_list_pairs = set()
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(identifier.collision_avoidance_configs)
+        self.fixed_joints = []
+        self.links_to_ignore = set()
+        self.ignored_self_collion_pairs = set()
+        self.white_list_pairs = set()
+        for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
+            self.fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+            self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))
+            self.ignored_self_collion_pairs.update(collision_avoidance_config.ignored_self_collisions)
+            self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
+        self.white_list_pairs = set(
+            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
+        self.fixed_joints = tuple(self.fixed_joints)
 
         self.world_version = -1
 
@@ -266,12 +263,30 @@ class CollisionWorldSynchronizer:
             return True
         return False
 
-    @property
-    def robot(self):
+    def robot(self, robot_name=''):
         """
         :rtype: SubWorldTree
         """
-        return self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
+        for robot in self.robots:
+            if robot.name == robot_name:
+                return robot
+        raise KeyError(f'robot names {robot_name} does not exist')
+
+    @property
+    def robots(self):
+        """
+        :rtype: list of SubWorldTree
+        """
+        return [self.world.groups[robot_name] for robot_name in self.world.groups.keys()
+                if self.world.groups[robot_name].actuated]
+
+    @property
+    def group_names(self):
+        return list(self.world.groups.keys())
+
+    @property
+    def robot_names(self):
+        return [r.name for r in self.robots]
 
     @property
     def god_map(self):
@@ -316,11 +331,12 @@ class CollisionWorldSynchronizer:
                 if link_a == link_b \
                         or link_a in self.links_to_ignore \
                         or link_b in self.links_to_ignore \
-                        or link_a in self.ignored_pairs \
-                        or link_b in self.ignored_pairs \
-                        or (link_a, link_b) in self.ignored_pairs \
-                        or (link_b, link_a) in self.ignored_pairs \
-                        or group.are_linked(link_a, link_b, non_controlled=non_controlled, exception=self.fixed_joints) \
+                        or link_a in self.ignored_self_collion_pairs \
+                        or link_b in self.ignored_self_collion_pairs \
+                        or (link_a, link_b) in self.ignored_self_collion_pairs \
+                        or (link_b, link_a) in self.ignored_self_collion_pairs \
+                        or group.are_linked(link_a, link_b, do_not_ignore_non_controlled_joints=non_controlled,
+                                            joints_to_be_assumed_fixed=self.fixed_joints) \
                         or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
                     self.add_black_list_entry(*link_combination)
             except Exception as e:
@@ -397,7 +413,7 @@ class CollisionWorldSynchronizer:
 
     def blacklist_inter_group_collisions(self):
         for group_a_name, group_b_name in combinations(self.world.minimal_group_names, 2):
-            if self.god_map.unsafe_get_data(identifier.robot_group_name) in (group_a_name, group_b_name):
+            if group_a_name in self.robot_names or group_b_name in self.robot_names:
                 continue
             group_a: SubWorldTree = self.world.groups[group_a_name]
             group_b: SubWorldTree = self.world.groups[group_b_name]
@@ -461,16 +477,10 @@ class CollisionWorldSynchronizer:
                 in_collision.add((link_a_name, link_b_name))
         return in_collision
 
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
+    def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15) -> Collisions:
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
-        :type cut_off_distances: dict
-        :param self_collision_d: distances grater than this value will be ignored
-        :type self_collision_d: float
-        :type enable_self_collision: bool
-        :return: (robot_link, body_b, link_b) -> Collision
-        :rtype: Collisions
         """
         pass
 
@@ -485,8 +495,7 @@ class CollisionWorldSynchronizer:
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
-                                            min_dist: dict,
-                                            ignored_collisions: Set[str]) -> dict:
+                                            min_dist: dict) -> dict:
         """
         :param collision_goals: list of CollisionEntry
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
@@ -503,10 +512,10 @@ class CollisionWorldSynchronizer:
             else:
                 group2_links = self.world.groups[collision_entry.group2].link_names_with_collisions
             for link1 in group1_links:
-                if link1 in ignored_collisions:
+                if link1 in self.links_to_ignore:
                     continue
                 for link2 in group2_links:
-                    if link2 in ignored_collisions:
+                    if link2 in self.links_to_ignore:
                         continue
                     key = self.world.sort_links(link1, link2)
                     r_key = (key[1], key[0])
@@ -517,7 +526,10 @@ class CollisionWorldSynchronizer:
                             del min_allowed_distance[r_key]
                     elif self.is_avoid_collision(collision_entry):
                         if key not in self.black_list:
-                            min_allowed_distance[key] = max(min_dist[key[0]], collision_entry.distance)
+                            if collision_entry.distance == -1:
+                                min_allowed_distance[key] = min_dist[key[0]]
+                            else:
+                                min_allowed_distance[key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
         return min_allowed_distance
@@ -555,13 +567,13 @@ class CollisionWorldSynchronizer:
 
     def is_avoid_all_self_collision(self, collision_entry: CollisionEntry) -> bool:
         return self.is_avoid_collision(collision_entry) \
-               and collision_entry.group1 == self.god_map.unsafe_get_data(identifier.robot_group_name) \
-               and collision_entry.group2 == self.god_map.unsafe_get_data(identifier.robot_group_name)
+               and collision_entry.group1 == collision_entry.group2 \
+               and collision_entry.group1 in self.robot_names
 
     def is_allow_all_self_collision(self, collision_entry: CollisionEntry) -> bool:
         return self.is_allow_collision(collision_entry) \
-               and collision_entry.group1 == self.god_map.unsafe_get_data(identifier.robot_group_name) \
-               and collision_entry.group2 == self.god_map.unsafe_get_data(identifier.robot_group_name)
+               and collision_entry.group1 == collision_entry.group2 \
+               and collision_entry.group1 in self.robot_names
 
     def is_avoid_all_collision(self, collision_entry: CollisionEntry) -> bool:
         """

@@ -3,18 +3,14 @@ import random
 import string
 from collections import namedtuple
 
-import numpy as np
 import pybullet as p
-from pybullet import resetJointState, getNumJoints, resetBasePositionAndOrientation, getBasePositionAndOrientation, \
-    removeBody, getClosestPoints
-from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
+from geometry_msgs.msg import Pose, PoseStamped
 
 import giskardpy
 from giskardpy import DEBUG
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
 
 JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
@@ -101,7 +97,6 @@ def stop_pybullet():
 def start_pybullet(gui, gravity=0):
     if not p.isConnected():
         if gui:
-            # TODO expose opengl2 option for gui?
             server_id = p.connect(p.GUI, options='--opengl2')  # or p.DIRECT for non-graphical version
         else:
             server_id = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version

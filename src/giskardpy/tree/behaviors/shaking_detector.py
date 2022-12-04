@@ -3,9 +3,11 @@ import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.utils import logging
 from giskardpy.exceptions import ShakingException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils import logging
+
+
 # fast
 # from giskardpy.tree.goal_reached import make_velocity_threshold
 
@@ -41,7 +43,8 @@ class WiggleCancel(GiskardBehavior):
         self.keys = []
         self.thresholds = []
         self.velocity_limits = []
-        for joint_name, threshold in zip(self.get_robot().controlled_joints,
+        # FIXME check for free variables and not joints
+        for joint_name, threshold in zip(self.world.controlled_joints,
                                          self.make_velocity_threshold()):
             _, velocity_limit = self.world.get_joint_velocity_limits(joint_name)
             if self.world.is_joint_prismatic(joint_name):

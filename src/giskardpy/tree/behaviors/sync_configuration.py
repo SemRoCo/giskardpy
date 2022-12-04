@@ -1,29 +1,26 @@
-from typing import Optional
-
-from rospy import ROSException
-
-from giskardpy.data_types import JointStates
-from giskardpy.model.world import SubWorldTree
-
 from queue import Queue, Empty
+from typing import Optional
 
 import rospy
 from py_trees import Status
+from rospy import ROSException
 from sensor_msgs.msg import JointState
 
-import giskardpy.identifier as identifier
+from giskardpy.data_types import JointStates
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-import giskardpy.utils.tfwrapper as tf
 
 
 class SyncConfiguration(GiskardBehavior):
 
     @profile
-    def __init__(self, joint_state_topic: str):
-        self.joint_state_topic: str = joint_state_topic
+    def __init__(self, group_name: str, joint_state_topic: str = 'joint_states'):
+        self.joint_state_topic = joint_state_topic
+        if not self.joint_state_topic.startswith('/'):
+            self.joint_state_topic = '/' + self.joint_state_topic
         super().__init__(str(self))
         self.mjs: Optional[JointStates] = None
+        self.group_name = group_name
         self.lock = Queue(maxsize=1)
 
     @profile
@@ -34,7 +31,7 @@ class SyncConfiguration(GiskardBehavior):
                 msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
                 self.lock.put(msg)
             except ROSException as e:
-                logging.logwarn(f'Waiting for topic \'/{self.joint_state_topic}\' to appear.')
+                logging.logwarn(f'Waiting for topic \'{self.joint_state_topic}\' to appear.')
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
         return super().setup(timeout)
 
@@ -52,7 +49,7 @@ class SyncConfiguration(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = JointStates.from_msg(js, None)
+            self.mjs = JointStates.from_msg(js, self.group_name)
         except Empty:
             pass
 

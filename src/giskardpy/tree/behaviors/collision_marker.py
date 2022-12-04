@@ -2,12 +2,11 @@ from typing import List, Set, Union
 
 import numpy as np
 import rospy
-from colour import Color
 from geometry_msgs.msg import Point, Vector3
 from py_trees import Status
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
-import giskardpy.utils.tfwrapper as tf
+
 import giskardpy.identifier as identifier
 from giskardpy.model.collision_world_syncer import Collision, Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -51,10 +50,12 @@ class CollisionMarker(GiskardBehavior):
         m.pose.orientation.w = 1
         if len(collisions) > 0:
             for collision in collisions:  # type: Collision
+                group_name = collision.link_a.prefix
+                config = self.collision_avoidance_configs[group_name]
                 if collision.is_external:
-                    thresholds = self.collision_avoidance_config.external_collision_avoidance[collision.link_a]
+                    thresholds = config.external_collision_avoidance[collision.link_a]
                 else:
-                    thresholds = self.collision_avoidance_config.self_collision_avoidance[collision.link_a]
+                    thresholds = config.self_collision_avoidance[collision.link_a]
                 red_threshold = thresholds.hard_threshold
                 yellow_threshold = thresholds.soft_threshold
                 contact_distance = collision.contact_distance

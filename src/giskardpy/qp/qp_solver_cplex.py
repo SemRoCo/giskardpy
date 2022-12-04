@@ -1,9 +1,9 @@
-import numpy as np
 import cplex
+import numpy as np
 
 from giskardpy.exceptions import QPSolverException, InfeasibleException
-from giskardpy.utils import logging
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.utils import logging
 
 error_info = {
     # https://www.ibm.com/docs/en/icos/20.1.0?topic=manual-cplexexceptionserror-codes

@@ -15,6 +15,7 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
+from giskardpy.my_types import PrefixName
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging
 from giskardpy.utils.math import qv_mult
@@ -37,6 +38,7 @@ class IMServer(object):
         """
         self.enable_self_collision = rospy.get_param('~enable_self_collision', True)
         self.giskard = GiskardWrapper()
+        self.robot_name = self.giskard.robot_name
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
         else:
@@ -51,6 +53,8 @@ class IMServer(object):
 
 
         for root, tip in zip(self.roots, self.tips):
+            root = root
+            tip = tip
             int_marker = self.make_6dof_marker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
             self.server.insert(int_marker,
                                self.process_feedback(self.server,

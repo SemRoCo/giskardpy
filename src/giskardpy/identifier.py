@@ -37,13 +37,14 @@ result_message = ['result_message']
 tracking_start_time = ['tracking_start_time']
 
 # stuff from rosparam
-robot_description = ['robot_description']
+robot_descriptions = ['robot_descriptions']
 
 giskard = ['giskard']
 
 # config file
 # general options
-general_options = giskard + ['general_config']
+general_options = giskard + ['_general_config']
+max_derivative = general_options + ['maximum_derivative']
 action_server_name = general_options + ['action_server_name']
 tmp_folder = general_options + ['path_to_data_folder']
 debug = general_options + ['debug']
@@ -60,7 +61,7 @@ joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk']
 
 
 # qp solver
-qp_solver_config = giskard + ['qp_solver_config']
+qp_solver_config = giskard + ['_qp_solver_config']
 sample_period = qp_solver_config + ['sample_period']
 qp_controller = giskard + ['qp_controller']
 joint_weights = qp_solver_config + ['joint_weights']
@@ -116,16 +117,13 @@ tree_manager = giskard + ['_tree']
 tree_tick_rate = giskard + ['behavior_tree_config', 'tree_tick_rate']
 
 # collision avoidance
-collision_avoidance_config = giskard + ['collision_avoidance_config']
+collision_avoidance_configs = giskard + ['_collision_avoidance_configs']
 collision_scene = ['collision_scene']
 collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
-collision_checker = collision_avoidance_config + ['collision_checker']
-
-added_self_collisions = collision_avoidance_config + ['add_self_collisions']
-ignored_self_collisions = collision_avoidance_config + ['ignored_self_collisions']
+collision_checker = giskard + ['collision_checker']
 
 # robot interface
 robot_interface_configs = giskard + ['robot_interface_configs']

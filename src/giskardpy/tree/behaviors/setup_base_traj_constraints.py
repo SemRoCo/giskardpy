@@ -15,5 +15,5 @@ class SetDriveGoals(GiskardBehavior):
         self.god_map.set_data(identifier.goals, {})
         drive_goals: List[Goal] = self.god_map.get_data(identifier.drive_goals)
         for drive_goal in drive_goals:
-            drive_goal.save_self_on_god_map()
+            drive_goal._save_self_on_god_map()
         return Status.SUCCESS

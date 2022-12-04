@@ -3,6 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveResult
 from giskardpy.exceptions import *
+from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 
@@ -27,7 +28,7 @@ class SetErrorCode(GiskardBehavior):
         result.error_codes[cmd_id] = error_code
         result.error_messages[cmd_id] = error_message
         trajectory = self.god_map.get_data(identifier.trajectory)
-        joints = [self.world.joints[joint_name] for joint_name in self.world.movable_joints]
+        joints = [self.world._joints[joint_name] for joint_name in self.world.movable_joints]
         sample_period = self.god_map.get_data(identifier.sample_period)
         result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if error_code == MoveResult.PREEMPTED:
@@ -58,12 +59,18 @@ class SetErrorCode(GiskardBehavior):
         # qp exceptions
         if isinstance(exception, QPSolverException):
             error_code = MoveResult.QP_SOLVER_ERROR
-            if isinstance(exception, MAX_NWSR_REACHEDException):
-                error_code = MoveResult.MAX_NWSR_REACHED
-            elif isinstance(exception, OutOfJointLimitsException):
+            if isinstance(exception, OutOfJointLimitsException):
                 error_code = MoveResult.OUT_OF_JOINT_LIMITS
             elif isinstance(exception, HardConstraintsViolatedException):
                 error_code = MoveResult.HARD_CONSTRAINTS_VIOLATED
+            elif isinstance(exception, EmptyProblemException):
+                goals = list(self.god_map.get_data(identifier.goals).values())
+                non_motion_goals = [x for x in goals if isinstance(x, NonMotionGoal)]
+                if len(non_motion_goals) == 0:
+                    error_code = MoveResult.EMPTY_PROBLEM
+                else:
+                    error_code = MoveResult.SUCCESS
+                    error_message = ''
         # world exceptions
         elif isinstance(exception, PhysicsWorldException):
             error_code = MoveResult.WORLD_ERROR

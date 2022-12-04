@@ -1,16 +1,14 @@
 from itertools import chain
-from time import time
 from typing import Dict
 
 from py_trees import Status
 
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
-from giskardpy.exceptions import GiskardException
+from giskardpy.exceptions import EmptyProblemException
 from giskardpy.goals.goal import Goal
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
@@ -57,13 +55,12 @@ class InitQPController(GiskardBehavior):
         return constraints, vel_constraints, debug_expressions
 
     def get_active_free_symbols(self, constraints, vel_constraints):
-        # fixme shoudn't this use vel constraints as well?
         symbols = set()
         for c in chain(constraints.values(), vel_constraints.values()):
             symbols.update(str(s) for s in w.free_symbols(c.expression))
         free_variables = list(sorted([v for v in self.world.joint_constraints if v.position_name in symbols],
                                      key=lambda x: x.position_name))
         if len(free_variables) == 0:
-            raise GiskardException('Goal parsing resulted in no free variables.')
+            raise EmptyProblemException('Goal parsing resulted in no free variables.')
         self.get_god_map().set_data(identifier.free_variables, free_variables)
         return free_variables

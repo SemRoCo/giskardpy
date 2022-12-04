@@ -4,11 +4,10 @@ from threading import RLock, Thread
 from time import time
 
 import rospy
-from py_trees import Status, Blackboard
+from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
 from giskardpy.utils.utils import raise_to_blackboard
 
 
@@ -75,9 +74,9 @@ class AsyncBehavior(GiskardBehavior):
         try:
             self.update_thread.join()
         except Exception as e:
-            # FIXME sometimes terminate gets called without init being called
             # happens when a previous plugin fails
-            logging.logwarn('terminate was called before init')
+            # logging.logwarn('terminate was called before init')
+            pass
         self.stop_children()
         super().terminate(new_status)
 

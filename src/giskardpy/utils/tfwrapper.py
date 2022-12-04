@@ -56,27 +56,29 @@ def get_tf_root() -> str:
     return tf_roots.pop()
 
 
-def get_full_frame_name(frame_name):
+def get_full_frame_names(frame_name):
     """
     Gets the full tf frame name if the frame with the name frame_name
     is in a separate namespace.
 
     :rtype: str
     """
-    global tfBuffer
+    tfBuffer = get_tf_buffer()
+    ret = list()
     tf_frames = tfBuffer._getFrameStrings()
     for tf_frame in tf_frames:
         try:
             frame = tf_frame[tf_frame.index("/") + 1:]
             if frame == frame_name or frame_name == tf_frame:
-                return tf_frame
+                ret.append(tf_frame)
         except ValueError:
             continue
-    raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
-
+    if len(ret) == 0:
+        raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
+    return ret
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
-    global tfBuller
+    tfBuffer = get_tf_buffer()
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
@@ -114,13 +116,23 @@ def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
         raise InvalidArgumentException('source frame can not be empty')
     if time is None:
         time = rospy.Time()
-    global tfBuffer
-    if tfBuffer is None:
-        init()
+    tfBuffer = get_tf_buffer()
     return tfBuffer.lookup_transform(str(target_frame),
                                      str(source_frame),  # source frame
                                      time,
                                      rospy.Duration(timeout))
+
+
+def make_transform(parent_frame, child_frame, pose):
+    tf = TransformStamped()
+    tf.header.frame_id = str(parent_frame)
+    tf.header.stamp = rospy.get_rostime()
+    tf.child_frame_id = str(child_frame)
+    tf.transform.translation.x = pose.position.x
+    tf.transform.translation.y = pose.position.y
+    tf.transform.translation.z = pose.position.z
+    tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
+    return tf
 
 
 def transform_vector(target_frame, vector, timeout=5):

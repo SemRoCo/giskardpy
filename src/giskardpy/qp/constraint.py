@@ -1,7 +1,7 @@
 from collections import namedtuple
 from typing import List, Union, Optional, Callable
+
 import giskardpy.casadi_wrapper as w
-from giskardpy.my_types import expr_symbol
 
 DebugConstraint = namedtuple('debug', ['expr'])
 
@@ -13,11 +13,15 @@ class Constraint:
     upper_slack_limit = 1e4
     linear_weight = 0
 
-    def __init__(self, name, expression,
-                 lower_error, upper_error,
-                 velocity_limit,
-                 quadratic_weight, control_horizon, linear_weight=None,
-                 lower_slack_limit=None, upper_slack_limit=None, ):
+    def __init__(self,
+                 name: str,
+                 expression: w.Expression,
+                 lower_error: w.symbol_expr_float, upper_error: w.symbol_expr_float,
+                 velocity_limit: w.symbol_expr_float,
+                 quadratic_weight: w.symbol_expr_float, control_horizon: int,
+                 linear_weight: Optional[w.symbol_expr_float] = None,
+                 lower_slack_limit: Optional[w.symbol_expr_float] = None,
+                 upper_slack_limit: Optional[w.symbol_expr_float] = None):
         self.name = name
         self.expression = expression
         self.quadratic_weight = quadratic_weight
@@ -46,24 +50,24 @@ class VelocityConstraint:
     lower_slack_limit = -1e3
     upper_slack_limit = 1e3
     linear_weight = 0
-
+    
     def __init__(self,
                  name,
                  expression,
-                 lower_velocity_limit: Union[expr_symbol, List[expr_symbol]],
-                 upper_velocity_limit: Union[expr_symbol, List[expr_symbol]],
+                 lower_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                 upper_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                  velocity_limit,
                  quadratic_weight,
                  control_horizon,
-                 lower_slack_limit: Union[expr_symbol, List[expr_symbol]],
-                 upper_slack_limit: Union[expr_symbol, List[expr_symbol]],
+                 lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                 upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                  linear_weight=None,
                  horizon_function: Optional[Callable[[float, int], float]] = None):
         self.name = name
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         self.control_horizon = control_horizon
-        self.velocity_limit = velocity_limit # TODO rename
+        self.velocity_limit = velocity_limit
         if self.is_iterable(lower_velocity_limit):
             self.lower_velocity_limit = lower_velocity_limit
         else:

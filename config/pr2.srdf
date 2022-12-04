@@ -1086,4 +1086,5 @@
     <disable_collisions link1="r_wrist_flex_link" link2="sensor_mount_link" reason="Never" />
     <disable_collisions link1="r_wrist_roll_link" link2="sensor_mount_link" reason="Never" />
     <disable_collisions link1="sensor_mount_link" link2="torso_lift_link" reason="Never" />
+    <disable_collisions link1="l_shoulder_pan_link" link2="r_shoulder_pan_link" reason="Never" />
 </robot>

@@ -1,10 +1,7 @@
-from copy import deepcopy
-
 from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.model.collision_world_syncer import Collisions
-from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
@@ -12,13 +9,11 @@ class CleanUp(GiskardBehavior):
     @profile
     def __init__(self, name):
         super().__init__(name)
-        # FIXME this is the smallest hack to reverse (some) update godmap changes, constraints need some kind of finalize
-        # self.rosparams = deepcopy(self.get_god_map().get_data(identifier.giskard))
 
     @profile
     def initialise(self):
         self.god_map.clear_cache()
-        self.god_map.get_data(identifier.giskard).reset_config()
+        self.god_map.get_data(identifier.giskard)._reset_config()
         self.god_map.set_data(identifier.goal_msg, None)
         self.world.fast_all_fks = None
         self.collision_scene.reset_cache()
@@ -28,7 +23,7 @@ class CleanUp(GiskardBehavior):
 
         # to reverse update godmap changes
         # self.get_god_map().set_data(identifier.giskard, deepcopy(self.rosparams))
-        self.world.sync_with_paramserver()
+        self.world.apply_default_limits_and_weights()
         self.god_map.set_data(identifier.next_move_goal, None)
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime

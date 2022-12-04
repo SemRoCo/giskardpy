@@ -3,7 +3,6 @@ from multiprocessing import Lock
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-import giskardpy.utils.tfwrapper as tf
 from giskardpy.exceptions import SelfCollisionViolatedException
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -38,7 +37,8 @@ class CollisionChecker(GiskardBehavior):
         try:
             self.collision_matrix = self.god_map.get_data(identifier.collision_matrix)
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
-            self.collision_list_size = self.collision_avoidance_config.cal_max_param('number_of_repeller')
+            self.collision_list_size = sum([config.cal_max_param('number_of_repeller')
+                                            for config in self.collision_avoidance_configs.values()])
             self.collision_scene.sync()
             super().initialise()
         except Exception as e:

@@ -1,3 +1,9 @@
+from typing import Optional
+
+
+class DontPrintStackTrace:
+    pass
+
 class GiskardException(Exception):
     pass
 
@@ -5,25 +11,25 @@ class GiskardException(Exception):
 # solver exceptions-----------------------------------------------------------------------------------------------------
 # int64 QP_SOLVER_ERROR=5 # if no solver code fits
 class QPSolverException(GiskardException):
-    pass
 
-
-# int64 MAX_NWSR_REACHED=2 # increasing NWSR in config file might fix this
-class MAX_NWSR_REACHEDException(QPSolverException):
-    pass
+    def __init__(self, error_message: str, error_code: Optional[int] = None):
+        super().__init__(error_message)
+        self.error_code = error_code
 
 
 class InfeasibleException(QPSolverException):
     pass
 
 
-# int64 OUT_OF_JOINT_LIMITS=3
 class OutOfJointLimitsException(InfeasibleException):
     pass
 
 
-# int64 HARD_CONSTRAINTS_VIOLATED=4 # conflicting hard constraints, prob because of collision avoidance
 class HardConstraintsViolatedException(InfeasibleException):
+    pass
+
+
+class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
     pass
 
 

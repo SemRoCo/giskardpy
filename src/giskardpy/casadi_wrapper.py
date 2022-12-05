@@ -6,6 +6,7 @@ from typing import Union
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
+import six
 
 _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
@@ -723,6 +724,7 @@ class Point3(Symbol_):
         raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
                         f'and \'{other.__class__.__name__}\'')
 
+
 class Vector3(Symbol_):
     @profile
     def __init__(self, data=None):
@@ -1155,12 +1157,20 @@ def if_else(condition, if_result, else_result):
     return return_type(ca.if_else(condition, if_result, else_result))
 
 
+def equal(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.eq(x, y))
+
+
 def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
-        return Expression(ca.logic_and(args[0], args[1]))
+        return Expression(ca.logic_and(args[0].s, args[1].s))
     else:
-        return Expression(ca.logic_and(args[0], logic_and(*args[1:])))
+        return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
 
 
 def logic_or(*args):

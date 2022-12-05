@@ -1497,14 +1497,10 @@ def publish_marker_sphere(position, frame_id='map', radius=0.05, id_=0):
     pub.publish(m)
 
 
-def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, id_=0):
+def publish_marker_vector(start: Point, end: Point, diameter_shaft: float = 0.01, diameter_head: float = 0.02,
+                          id_: int = 0):
     """
     assumes points to be in frame map
-    :type start: Point
-    :type end: Point
-    :type diameter_shaft: float
-    :type diameter_head: float
-    :type id_: int
     """
     m = Marker()
     m.action = m.ADD

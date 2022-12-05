@@ -6,7 +6,8 @@ from typing import Union
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
-import six
+
+from giskardpy.my_types import PrefixName
 
 _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
@@ -730,6 +731,7 @@ class Vector3(Symbol_):
     def __init__(self, data=None):
         self.s = Point3(data).s
         self[3] = 0
+        self.reference_frame = None
 
     @classmethod
     def from_xyz(cls, x=None, y=None, z=None):

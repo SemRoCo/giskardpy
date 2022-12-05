@@ -326,7 +326,7 @@ class Goal(ABC):
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
 
-    def add_debug_expr(self, name: str, expr: w.symbol_expr_float):
+    def add_debug_expr(self, name: str, expr: w.all_expressions_float):
         """
         Add any expression for debug purposes. They will be evaluated as well and can be plotted by activating
         the debug plotter in this Giskard config.
@@ -334,26 +334,28 @@ class Goal(ABC):
         :param expr:
         """
         name = f'{self}/{name}'
+        if not isinstance(expr, w.Symbol_):
+            expr = w.Expression(expr)
         self._debug_expressions[name] = expr
 
-    def add_debug_matrix(self, name: str, matrix_expr: w.Expression):
-        """
-        Calls add_debug_expr for a matrix.
-        """
-        for x in range(matrix_expr.shape[0]):
-            for y in range(matrix_expr.shape[1]):
-                self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
-
-    def add_debug_vector(self, name: str, vector_expr: Union[w.Expression, w.Vector3, w.Point3]):
-        """
-        Calls add_debug_expr for a vector.
-        """
-        if isinstance(vector_expr, (w.Vector3, w.Point3)):
-            last = 3
-        else:
-            last = vector_expr.shape[0]
-        for x in range(last):
-            self.add_debug_expr(f'{name}/{x}', vector_expr[x])
+    # def add_debug_matrix(self, name: str, matrix_expr: w.Expression):
+    #     """
+    #     Calls add_debug_expr for a matrix.
+    #     """
+    #     for x in range(matrix_expr.shape[0]):
+    #         for y in range(matrix_expr.shape[1]):
+    #             self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
+    #
+    # def add_debug_vector(self, name: str, vector_expr: Union[w.Expression, w.Vector3, w.Point3]):
+    #     """
+    #     Calls add_debug_expr for a vector.
+    #     """
+    #     if isinstance(vector_expr, (w.Vector3, w.Point3)):
+    #         last = 3
+    #     else:
+    #         last = vector_expr.shape[0]
+    #     for x in range(last):
+    #         self.add_debug_expr(f'{name}/{x}', vector_expr[x])
 
     def add_position_constraint(self,
                                 expr_current: Union[w.Symbol, float],

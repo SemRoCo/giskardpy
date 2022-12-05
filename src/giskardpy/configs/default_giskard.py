@@ -128,6 +128,9 @@ class Giskard:
     def configure_PlotDebugExpressions(self, enabled: bool = False):
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
 
+    def publish_debug_markers(self, enabled: bool = False):
+        self.behavior_tree_config.plugin_config['PlotDebugTF']['enabled'] = enabled
+
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """
         Tell Giskard which joints can be controlled. Only used in standalone mode.

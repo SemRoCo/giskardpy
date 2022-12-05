@@ -6,6 +6,8 @@ import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
 
+from giskardpy.my_types import PrefixName
+
 all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
@@ -21,7 +23,7 @@ class CompiledFunction:
     f_eval: functools.partial
     out: np.ndarray
 
-    def __init__(self, str_params: Iterable[str], fast_f: ca.Function, shape: Tuple[int, int]): ...
+    def __init__(self, str_params: Sequence[str], fast_f: ca.Function, shape: Tuple[int, int]): ...
 
     def __call__(self, **kwargs) -> np.ndarray: ...
 
@@ -243,6 +245,8 @@ class Point3(Symbol_):
 
 
 class Vector3(Symbol_):
+    reference_frame: Optional[PrefixName]
+
     @property
     def x(self) -> Expression: ...
     @x.setter

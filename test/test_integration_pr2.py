@@ -431,6 +431,18 @@ class TestJointGoals:
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
+    def test_circle(self, zero_pose: PR2TestWrapper):
+        center = PointStamped()
+        center.header.frame_id = zero_pose.default_root
+        zero_pose.set_json_goal(constraint_type='Circle',
+                                center=center,
+                                radius=0.5,
+                                tip_link='base_footprint',
+                                scale=0.05)
+        zero_pose.set_max_traj_length(new_length=120)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
@@ -1403,15 +1415,16 @@ class TestCartGoals:
     #     zero_pose.allow_all_collisions()
     #     zero_pose.plan_and_execute()
     #
-    # def test_move_base_left(self, zero_pose: PR2TestWrapper):
-    #     # zero_pose.set_prediction_horizon(1)
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.position.y = 1
-    #     base_goal.pose.orientation.w = 1
-    #     zero_pose.set_cart_goal(base_goal, 'base_footprint')
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
+    def test_move_base_left(self, zero_pose: PR2TestWrapper):
+        # zero_pose.set_prediction_horizon(1)
+        zero_pose.set_json_goal('Caster')
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.y = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
     #
     # def test_move_base_forward_left(self, zero_pose: PR2TestWrapper):
     #     base_goal = PoseStamped()

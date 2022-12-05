@@ -193,10 +193,10 @@ class URDFJoint(Joint, ABC):
             elif urdf_joint.type == 'revolute':
                 joint_class = RevoluteURDFJoint
             elif urdf_joint.type == 'continuous':
-                # if 'caster_rotation' in urdf_joint.name:
-                #     joint_class = PR2CasterJoint
-                # else:
-                joint_class = ContinuousURDFJoint
+                if 'caster_rotation' in urdf_joint.name:
+                    joint_class = PR2CasterJoint
+                else:
+                    joint_class = ContinuousURDFJoint
             else:
                 raise NotImplementedError(
                     f'Joint type \'{urdf_joint.type}\' of \'{urdf_joint.name}\' is not implemented.')
@@ -651,7 +651,7 @@ class OmniDrive(Joint):
 class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
     def __init__(self, urdf_joint: up.Joint, prefix: str):
         super().__init__(urdf_joint, prefix)
-        self.mimiced_joint_name = 'brumbrum'
+        self.mimiced_joint_name = 'pr2/brumbrum'
 
     def create_free_variables(self):
         pass
@@ -679,15 +679,16 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
                                                x_vel,
                                                y_vel,
                                                yaw_vel)
-        steer_angle_desired = w.if_else(condition=w.logic_and(w.ca.eq(x_vel, 0),
-                                                              w.ca.eq(y_vel, 0),
-                                                              w.ca.eq(yaw_vel, 0)),
+        steer_angle_desired = w.if_else(condition=w.logic_and(w.equal(x_vel, 0),
+                                                              w.equal(y_vel, 0),
+                                                              w.equal(yaw_vel, 0)),
                                         if_result=0,
-                                        else_result=np.arctan2(new_vel_y, new_vel_x))
+                                        else_result=w.atan2(new_vel_y, new_vel_x))
 
         rotation_axis = w.Vector3(self.axis)
         parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis, steer_angle_desired)
-        return parent_R_child
+        parent_T_child = w.TransMatrix(parent_R_child)
+        return parent_T_child
 
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
         pass

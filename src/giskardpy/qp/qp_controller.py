@@ -885,7 +885,7 @@ class QPController:
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
             params = self.god_map.get_values(f.str_params)
-            self.evaluated_debug_expressions[name] = f.call2(params)
+            self.evaluated_debug_expressions[name] = f.call2(params).copy()
         return self.evaluated_debug_expressions
 
     @profile

@@ -185,7 +185,6 @@ class TestRotationMatrix(unittest.TestCase):
         m = rotation_matrix(expected_angle, expected_axis)
         actual_axis = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[0], [m])
         actual_angle = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[1], [m])
-        expected_angle, expected_axis, _ = rotation_from_matrix(m)
         compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
         assert actual_axis[-1] == 0
 

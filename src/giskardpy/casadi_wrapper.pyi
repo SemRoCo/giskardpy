@@ -383,6 +383,7 @@ class TransMatrix(Symbol_):
 
 
 class RotationMatrix(Symbol_):
+    reference_frame: Optional[PrefixName]
     def __init__(self, data: Optional[Union[TransMatrix,
                                             RotationMatrix,
                                             Expression,

@@ -93,6 +93,10 @@ class Goal(ABC):
             raise AttributeError(
                 f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
+    def traj_time_in_seconds(self) -> w.Expression:
+        t = self.god_map.to_expr(identifier.time)
+        return t * self.get_sampling_period_symbol()
+
     def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
             -> transformable_message:
         """
@@ -340,11 +344,15 @@ class Goal(ABC):
             for y in range(matrix_expr.shape[1]):
                 self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
 
-    def add_debug_vector(self, name: str, vector_expr: w.Expression):
+    def add_debug_vector(self, name: str, vector_expr: Union[w.Expression, w.Vector3, w.Point3]):
         """
         Calls add_debug_expr for a vector.
         """
-        for x in range(vector_expr.shape[0]):
+        if isinstance(vector_expr, (w.Vector3, w.Point3)):
+            last = 3
+        else:
+            last = vector_expr.shape[0]
+        for x in range(last):
             self.add_debug_expr(f'{name}/{x}', vector_expr[x])
 
     def add_position_constraint(self,

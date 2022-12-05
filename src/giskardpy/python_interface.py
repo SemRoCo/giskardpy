@@ -303,7 +303,7 @@ class GiskardWrapper:
                            prediction_horizon=prediction_horizon,
                            **kwargs)
 
-    def set_max_traj_length(self, new_length: int, **kwargs: goal_parameter):
+    def set_max_traj_length(self, new_length: float, **kwargs: goal_parameter):
         """
         Overwrites Giskard trajectory length limit for planning.
         If the trajectory is longer than new_length, Giskard will prempt the goal.

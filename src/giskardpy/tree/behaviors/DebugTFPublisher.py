@@ -49,15 +49,21 @@ class DebugTFPublisher(GiskardBehavior):
                 m.header.frame_id = 'map'
                 if expr.reference_frame is not None:
                     map_T_ref = self.world.compute_fk_np(self.world.root_link_name, expr.reference_frame)
+                    map_T_vis = self.world.compute_fk_np(self.world.root_link_name, expr.vis_frame)
                     map_V_d = np.dot(map_T_ref, ref_V_d)
+                    map_P_vis = map_T_vis[:4, 3:]
+                    map_P_p1 = map_P_vis
+                    map_P_p2 = map_P_vis + map_V_d
+                    m.points.append(Point(map_P_p1[0][0], map_P_p1[1][0], map_P_p1[2][0]))
+                    m.points.append(Point(map_P_p2[0][0], map_P_p2[1][0], map_P_p2[2][0]))
                 else:
                     map_V_d = ref_V_d
+                    m.points.append(Point())
+                    m.points.append(Point(map_V_d[0][0], map_V_d[1][0], map_V_d[2][0]))
                 m.action = m.ADD
                 m.ns = f'debug/{name}'
                 m.id = 0
                 m.type = m.ARROW
-                m.points.append(Point())
-                m.points.append(Point(map_V_d[0][0], map_V_d[1][0], map_V_d[2][0]))
                 m.color = self.colors[i]
                 m.scale.x = width
                 m.scale.y = width

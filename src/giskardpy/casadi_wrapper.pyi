@@ -246,6 +246,7 @@ class Point3(Symbol_):
 
 class Vector3(Symbol_):
     reference_frame: Optional[PrefixName]
+    vis_frame: Optional[PrefixName]
 
     @property
     def x(self) -> Expression: ...

@@ -166,6 +166,8 @@ class Expression(Symbol_):
 
 
 class Point3(Symbol_):
+    reference_frame: Optional[PrefixName]
+
     @property
     def x(self) -> Expression: ...
     @x.setter
@@ -337,6 +339,9 @@ class Vector3(Symbol_):
 
 
 class TransMatrix(Symbol_):
+    reference_frame: Optional[PrefixName]
+    child_frame: Optional[PrefixName]
+
     def __init__(self, data: Optional[Union[TransMatrix,
                                             RotationMatrix,
                                             ca.SX,

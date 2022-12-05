@@ -40,12 +40,16 @@ class DebugTFPublisher(GiskardBehavior):
         ms.markers.extend(self.to_vectors_markers())
         self.marker_pub.publish(ms)
 
-    def to_vectors_markers(self, width: float = 0.02) -> List[Marker]:
+    def to_vectors_markers(self, width: float = 0.05) -> List[Marker]:
         ms = []
-        for i, (name, ref_V_d) in enumerate(self.debugs_evaluated.items()):
+        for i, (name, value) in enumerate(self.debugs_evaluated.items()):
             expr = self.debugs[name]
+            m = Marker()
+            m.action = m.ADD
+            m.ns = f'debug/{name}'
+            m.id = 0
             if isinstance(expr, w.Vector3):
-                m = Marker()
+                ref_V_d = value
                 m.header.frame_id = 'map'
                 if expr.reference_frame is not None:
                     map_T_ref = self.world.compute_fk_np(self.world.root_link_name, expr.reference_frame)
@@ -60,15 +64,29 @@ class DebugTFPublisher(GiskardBehavior):
                     map_V_d = ref_V_d
                     m.points.append(Point())
                     m.points.append(Point(map_V_d[0][0], map_V_d[1][0], map_V_d[2][0]))
-                m.action = m.ADD
-                m.ns = f'debug/{name}'
-                m.id = 0
                 m.type = m.ARROW
+                m.color = self.colors[i]
+                m.scale.x = width/2
+                m.scale.y = width
+                m.scale.z = 0
+            elif isinstance(expr, w.Point3):
+                ref_P_d = value
+                m.header.frame_id = 'map'
+                if expr.reference_frame is not None:
+                    map_T_ref = self.world.compute_fk_np(self.world.root_link_name, expr.reference_frame)
+                    map_P_d = np.dot(map_T_ref, ref_P_d)
+                else:
+                    map_P_d = ref_P_d
+                m.pose.position.x = map_P_d[0][0]
+                m.pose.position.y = map_P_d[1][0]
+                m.pose.position.z = map_P_d[2][0]
+                m.pose.orientation.w = 1
+                m.type = m.SPHERE
                 m.color = self.colors[i]
                 m.scale.x = width
                 m.scale.y = width
-                m.scale.z = 0
-                ms.append(m)
+                m.scale.z = width
+            ms.append(m)
         return ms
 
     def clear_markers(self):

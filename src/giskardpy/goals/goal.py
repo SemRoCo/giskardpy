@@ -138,14 +138,20 @@ class Goal(ABC):
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
         """
-        return self.world.compose_fk_expression(root, tip)
+        result: w.TransMatrix = self.world.compose_fk_expression(root, tip)
+        result.reference_frame = root
+        result.child_frame = tip
+        return result
 
     def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
         This means that the derivative towards the joint symbols will be 0.
         """
-        return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
+        result: w.TransMatrix = self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
+        result.reference_frame = root
+        result.child_frame = tip
+        return result
 
     def get_parameter_as_symbolic_expression(self, name: str) -> Union[Union[w.Symbol, float], w.Expression]:
         """

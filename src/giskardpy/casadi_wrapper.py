@@ -8,6 +8,7 @@ import numpy as np
 import geometry_msgs.msg as geometry_msgs
 
 from giskardpy.my_types import PrefixName
+from giskardpy.utils import logging
 
 _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
@@ -358,6 +359,8 @@ class Expression(Symbol_):
 class TransMatrix(Symbol_):
     @profile
     def __init__(self, data=None):
+        self.reference_frame = None
+        self.child_frame = None
         if isinstance(data, geometry_msgs.PoseStamped):
             data = data.pose
         if isinstance(data, geometry_msgs.Pose):
@@ -392,13 +395,31 @@ class TransMatrix(Symbol_):
     def dot(self, other):
         result = ca.mtimes(self.s, other.s)
         if isinstance(other, Vector3):
-            return Vector3(result)
+            # if other.reference_frame is not None \
+            #         and self.child_frame is not None \
+            #         and other.reference_frame != self.child_frame:
+            #     logging.logwarn(f'frames dont match, you might have a bug: '
+            #                     f'{self.reference_frame}_T_{self.child_frame} * {other.reference_frame}_V')
+            result = Vector3(result)
+            result.reference_frame = self.reference_frame
+            return result
         if isinstance(other, Point3):
-            return Point3(result)
+            result = Point3(result)
+            result.reference_frame = self.reference_frame
+            return result
         if isinstance(other, RotationMatrix):
             return RotationMatrix(result)
         if isinstance(other, TransMatrix):
-            return TransMatrix(result)
+            # if other.reference_frame is not None \
+            #         and self.child_frame is not None \
+            #         and other.reference_frame != self.child_frame:
+            #     logging.logwarn(f'frames dont match, you might have a bug: '
+            #                     f'{self.reference_frame}_T_{self.child_frame} '
+            #                     f'* {other.reference_frame}_T_{other.child_frame}')
+            result = TransMatrix(result)
+            result.reference_frame = self.reference_frame
+            result.child_frame = other.child_frame
+            return result
         raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
                         f'and \'{other.__class__.__name__}\'')
 
@@ -618,11 +639,14 @@ class RotationMatrix(Symbol_):
 class Point3(Symbol_):
     @profile
     def __init__(self, data=None):
+        self.reference_frame = None
         if data is None:
             data = (0, 0, 0)
         if isinstance(data, geometry_msgs.PointStamped):
+            self.reference_frame = data.header.frame_id
             data = data.point
         if isinstance(data, geometry_msgs.Vector3Stamped):
+            self.reference_frame = data.header.frame_id
             data = data.vector
         if isinstance(data, (Point3, Vector3, geometry_msgs.Point, geometry_msgs.Vector3)):
             x, y, z = data.x, data.y, data.z
@@ -684,10 +708,13 @@ class Point3(Symbol_):
 
     def __sub__(self, other):
         if isinstance(other, Point3):
-            return Vector3(self.s.__sub__(other.s))
-        if isinstance(other, (Symbol, Expression, Vector3)):
-            return Point3(self.s.__sub__(other.s))
-        return Point3(self.s.__sub__(other))
+            result = Vector3(self.s.__sub__(other.s))
+        elif isinstance(other, (Symbol, Expression, Vector3)):
+            result = Point3(self.s.__sub__(other.s))
+        else:
+            result = Point3(self.s.__sub__(other))
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rsub__(self, other):
         return Point3(self.s.__sub__(other))
@@ -729,9 +756,10 @@ class Point3(Symbol_):
 class Vector3(Symbol_):
     @profile
     def __init__(self, data=None):
-        self.s = Point3(data).s
+        point = Point3(data)
+        self.s = point.s
+        self.reference_frame = point.reference_frame
         self[3] = 0
-        self.reference_frame = None
 
     @classmethod
     def from_xyz(cls, x=None, y=None, z=None):

@@ -442,8 +442,16 @@ class TestConstraints:
                                 center=center,
                                 radius=0.5,
                                 tip_link='base_footprint',
-                                scale=0.05)
-        zero_pose.set_max_traj_length(new_length=120)
+                                scale=0.1)
+        zero_pose.set_json_goal('Caster',
+                                joint_name='fl_caster_rotation_joint')
+        zero_pose.set_json_goal('Caster',
+                                joint_name='fr_caster_rotation_joint')
+        zero_pose.set_json_goal('Caster',
+                                joint_name='bl_caster_rotation_joint')
+        zero_pose.set_json_goal('Caster',
+                                joint_name='br_caster_rotation_joint')
+        zero_pose.set_max_traj_length(new_length=60)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 

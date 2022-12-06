@@ -179,10 +179,17 @@ class Goal(ABC):
 
     @property
     def joint_velocity_symbols(self) -> List[Union[w.Symbol, float]]:
-        position_symbols = []
+        velocity_symbols = []
         for joint in self.world.controlled_joints:
-            position_symbols.extend(self.world._joints[joint].free_variable_list)
-        return [x.get_symbol(Derivatives.velocity) for x in position_symbols]
+            velocity_symbols.extend(self.world._joints[joint].free_variable_list)
+        return [x.get_symbol(Derivatives.velocity) for x in velocity_symbols]
+
+    @property
+    def joint_acceleration_symbols(self) -> List[Union[w.Symbol, float]]:
+        acceleration_symbols = []
+        for joint in self.world.controlled_joints:
+            acceleration_symbols.extend(self.world._joints[joint].free_variable_list)
+        return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
 
     def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:
         r_T_t = self.get_fk(root, tip)

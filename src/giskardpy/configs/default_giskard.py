@@ -128,7 +128,7 @@ class Giskard:
     def configure_PlotDebugExpressions(self, enabled: bool = False):
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
 
-    def publish_DebugMarkerPublisher(self, enabled: bool = False):
+    def configure_DebugMarkerPublisher(self, enabled: bool = False):
         self.behavior_tree_config.plugin_config['PlotDebugTF']['enabled'] = enabled
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):

@@ -796,6 +796,7 @@ class Vector3(Symbol_):
         point = Point3(data)
         self.s = point.s
         self.reference_frame = point.reference_frame
+        self.vis_frame = self.reference_frame
         self[3] = 0
 
     @classmethod

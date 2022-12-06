@@ -431,6 +431,10 @@ class TestJointGoals:
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
+    def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
+        zero_pose.set_json_goal(constraint_type='DebugGoal')
+        zero_pose.plan_and_execute()
+
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)

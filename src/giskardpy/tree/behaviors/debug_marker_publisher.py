@@ -44,6 +44,8 @@ class DebugMarkerPublisher(GiskardBehavior):
         ms = []
         for i, (name, value) in enumerate(self.debugs_evaluated.items()):
             expr = self.debugs[name]
+            if not hasattr(expr, 'reference_frame'):
+                continue
             if expr.reference_frame is not None:
                 map_T_ref = self.world.compute_fk_np(self.world.root_link_name, expr.reference_frame)
             else:
@@ -119,7 +121,10 @@ class DebugMarkerPublisher(GiskardBehavior):
                 m.pose.orientation.w = 1
                 if isinstance(expr, w.Vector3):
                     ref_V_d = value
-                    map_T_vis = self.world.compute_fk_np(self.world.root_link_name, expr.vis_frame)
+                    if expr.vis_frame is not None:
+                        map_T_vis = self.world.compute_fk_np(self.world.root_link_name, expr.vis_frame)
+                    else:
+                        map_T_vis = np.eye(4)
                     map_V_d = np.dot(map_T_ref, ref_V_d)
                     map_P_vis = map_T_vis[:4, 3:]
                     map_P_p1 = map_P_vis

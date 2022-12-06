@@ -764,12 +764,12 @@ class QPController:
                 [self.p_weights, self.p_A, self.p_Ax, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
                  self.p_xdot],
                 ['weights', 'A', 'Ax', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
-                '../tmp_data')
+                self.god_map.get_data(identifier.tmp_folder))
         else:
             save_pandas(
                 [self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
                 ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
-                '../tmp_data')
+                self.god_map.get_data(identifier.tmp_folder))
 
     def _is_inf_in_data(self):
         logging.logerr(f'The following weight entries contain inf:\n'
@@ -941,6 +941,7 @@ class QPController:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
+            self._create_debug_pandas()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
@@ -1079,8 +1080,8 @@ class QPController:
         num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
         num_of_slack = len(lb) - num_non_slack
 
-        debug_exprs = self._eval_debug_exprs(substitutions)
-        # self.p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
+        self._eval_debug_exprs()
+        self.p_debug = pd.DataFrame.from_dict(self.evaluated_debug_expressions, orient='index', columns=['data']).sort_index()
 
         self.p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
         self.p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)

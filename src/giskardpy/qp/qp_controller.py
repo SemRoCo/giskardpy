@@ -941,7 +941,6 @@ class QPController:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
-            self._create_debug_pandas()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
@@ -1081,7 +1080,13 @@ class QPController:
         num_of_slack = len(lb) - num_non_slack
 
         self._eval_debug_exprs()
-        self.p_debug = pd.DataFrame.from_dict(self.evaluated_debug_expressions, orient='index', columns=['data']).sort_index()
+        p_debug = {}
+        for name, value in self.evaluated_debug_expressions.items():
+            if isinstance(value, np.ndarray):
+                p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
+            else:
+                p_debug[name] = np.array(value)
+        self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
         self.p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
         self.p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)

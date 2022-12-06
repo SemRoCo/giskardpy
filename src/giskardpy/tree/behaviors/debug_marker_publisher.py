@@ -16,15 +16,15 @@ from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point
     quaternion_to_kdl, transform_to_kdl, kdl_to_transform_stamped
 
 
-class DebugTFPublisher(GiskardBehavior):
-    colors = [ColorRGBA(0, 0, 0, 1),
-              ColorRGBA(1, 0, 0, 1),
-              ColorRGBA(0, 1, 0, 1),
-              ColorRGBA(1, 1, 0, 1),
-              ColorRGBA(0, 0, 1, 1),
-              ColorRGBA(1, 0, 1, 1),
-              ColorRGBA(0, 1, 1, 1),
-              ColorRGBA(1, 1, 1, 1)]
+class DebugMarkerPublisher(GiskardBehavior):
+    colors = [ColorRGBA(0, 0, 0, 1),  # black
+              ColorRGBA(1, 0, 0, 1),  # red
+              ColorRGBA(0, 1, 0, 1),  # green
+              ColorRGBA(1, 1, 0, 1),  # yellow
+              ColorRGBA(0, 0, 1, 1),  # blue
+              ColorRGBA(1, 0, 1, 1),  # violet
+              ColorRGBA(0, 1, 1, 1),  # cyan
+              ColorRGBA(1, 1, 1, 1)]  # white
 
     @profile
     def __init__(self, name, tf_topic='/tf'):
@@ -104,8 +104,6 @@ class DebugTFPublisher(GiskardBehavior):
                 mz.pose.position.x = map_P_d[0][0] + map_V_z_offset[0]
                 mz.pose.position.y = map_P_d[1][0] + map_V_z_offset[1]
                 mz.pose.position.z = map_P_d[2][0] + map_V_z_offset[2]
-                # d_R_z = rotation_matrix(np.pi / 2, [0, 1, 0])
-                # map_R_z = np.dot(map_T_d, d_R_z)
                 mz.pose.orientation = Quaternion(*quaternion_from_matrix(map_T_d))
                 mz.color = ColorRGBA(0, 0, 1, 1)
                 mz.scale.x = width / 4
@@ -158,8 +156,8 @@ class DebugTFPublisher(GiskardBehavior):
     @profile
     def update(self):
         with self.get_god_map() as god_map:
-            self.debugs_evaluated = self.god_map.unsafe_get_data(identifier.debug_expressions_evaluated)
             self.debugs = self.god_map.unsafe_get_data(identifier.debug_expressions)
             if len(self.debugs) > 0:
+                self.debugs_evaluated = self.god_map.unsafe_get_data(identifier.debug_expressions_evaluated)
                 self.publish_debug_markers()
         return Status.RUNNING

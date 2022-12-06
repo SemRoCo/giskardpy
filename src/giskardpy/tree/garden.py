@@ -15,7 +15,7 @@ from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, HardwareConfig
 from giskardpy.god_map import GodMap
-from giskardpy.tree.behaviors.DebugTFPublisher import DebugTFPublisher
+from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
@@ -628,7 +628,7 @@ class StandAlone(TreeManager):
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
             planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-            planning_4.add_child(DebugTFPublisher('debug tf publisher'))
+            planning_4.add_child(DebugMarkerPublisher('debug tf publisher'))
         if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
             planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                          **self.god_map.unsafe_get_data(

@@ -438,7 +438,7 @@ class Goal(ABC):
                                     name: str = ''):
         """
         Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
-        relative to the same frame.
+        relative to the same frame and are normalized to a length of 1.
         :param frame_V_current: a vector describing a 3D vector
         :param frame_V_goal: a vector describing a 3D vector
         :param reference_velocity: rad/s

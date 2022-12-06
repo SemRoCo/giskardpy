@@ -6,6 +6,8 @@ import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
 
+from giskardpy.my_types import PrefixName
+
 all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
@@ -21,7 +23,7 @@ class CompiledFunction:
     f_eval: functools.partial
     out: np.ndarray
 
-    def __init__(self, str_params: Iterable[str], fast_f: ca.Function, shape: Tuple[int, int]): ...
+    def __init__(self, str_params: Sequence[str], fast_f: ca.Function, shape: Tuple[int, int]): ...
 
     def __call__(self, **kwargs) -> np.ndarray: ...
 
@@ -164,6 +166,8 @@ class Expression(Symbol_):
 
 
 class Point3(Symbol_):
+    reference_frame: Optional[PrefixName]
+
     @property
     def x(self) -> Expression: ...
     @x.setter
@@ -243,6 +247,9 @@ class Point3(Symbol_):
 
 
 class Vector3(Symbol_):
+    reference_frame: Optional[PrefixName]
+    vis_frame: Optional[PrefixName]
+
     @property
     def x(self) -> Expression: ...
     @x.setter
@@ -332,6 +339,9 @@ class Vector3(Symbol_):
 
 
 class TransMatrix(Symbol_):
+    reference_frame: Optional[PrefixName]
+    child_frame: Optional[PrefixName]
+
     def __init__(self, data: Optional[Union[TransMatrix,
                                             RotationMatrix,
                                             ca.SX,
@@ -373,6 +383,7 @@ class TransMatrix(Symbol_):
 
 
 class RotationMatrix(Symbol_):
+    reference_frame: Optional[PrefixName]
     def __init__(self, data: Optional[Union[TransMatrix,
                                             RotationMatrix,
                                             Expression,
@@ -542,9 +553,11 @@ def limit(x: symbol_expr_float,
           lower_limit: symbol_expr_float,
           upper_limit: symbol_expr_float) -> Expression: ...
 
-def logic_and(*args: List[symbol_expr_float]) -> symbol_expr_float: ...
+def equal(x: symbol_expr_float, y: symbol_expr_float) -> Expression: ...
 
-def logic_or(*args: List[symbol_expr_float]) -> symbol_expr_float: ...
+def logic_and(*args: symbol_expr_float) -> symbol_expr_float: ...
+
+def logic_or(*args: symbol_expr_float) -> symbol_expr_float: ...
 
 @overload
 def if_else(condition: symbol_expr_float, if_result: Vector3, else_result: Vector3) -> Vector3: ...

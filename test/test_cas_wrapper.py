@@ -185,7 +185,6 @@ class TestRotationMatrix(unittest.TestCase):
         m = rotation_matrix(expected_angle, expected_axis)
         actual_axis = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[0], [m])
         actual_angle = w.compile_and_execute(lambda x: w.RotationMatrix(x).to_axis_angle()[1], [m])
-        expected_angle, expected_axis, _ = rotation_from_matrix(m)
         compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
         assert actual_axis[-1] == 0
 
@@ -548,6 +547,13 @@ class TestQuaternion(unittest.TestCase):
 
 
 class TestCASWrapper(unittest.TestCase):
+    def test_empty_compiled_function(self):
+        expected = np.array([1,2,3], ndmin=2)
+        e = w.Expression(expected)
+        f = e.compile()
+        np.testing.assert_array_almost_equal(f(), expected)
+        np.testing.assert_array_almost_equal(f.call2([]), expected)
+
     def test_add(self):
         f = 1.0
         s = w.Symbol('s')

@@ -1,5 +1,6 @@
-from collections import OrderedDict
-from typing import List, Union
+from __future__ import annotations
+from collections import OrderedDict, defaultdict
+from typing import List, Union, Dict
 
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -10,6 +11,8 @@ from giskardpy.my_types import PrefixName
 
 
 class Trajectory:
+    _points: Dict[int, JointStates]
+
     def __init__(self):
         self.clear()
 
@@ -19,12 +22,12 @@ class Trajectory:
     def get_exact(self, time):
         return self._points[time]
 
-    def set(self, time, point: JointStates):
+    def set(self, time: int, point: JointStates):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:
             raise KeyError('Cannot append a trajectory point that is before the current end time of the trajectory.')
         self._points[time] = point
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._points)
 
     def get_joint_names(self):

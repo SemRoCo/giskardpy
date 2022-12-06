@@ -93,6 +93,10 @@ class Goal(ABC):
             raise AttributeError(
                 f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
+    def traj_time_in_seconds(self) -> w.Expression:
+        t = self.god_map.to_expr(identifier.time)
+        return t * self.get_sampling_period_symbol()
+
     def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
             -> transformable_message:
         """
@@ -134,14 +138,20 @@ class Goal(ABC):
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
         """
-        return self.world.compose_fk_expression(root, tip)
+        result: w.TransMatrix = self.world.compose_fk_expression(root, tip)
+        result.reference_frame = root
+        result.child_frame = tip
+        return result
 
     def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
         This means that the derivative towards the joint symbols will be 0.
         """
-        return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
+        result: w.TransMatrix = self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
+        result.reference_frame = root
+        result.child_frame = tip
+        return result
 
     def get_parameter_as_symbolic_expression(self, name: str) -> Union[Union[w.Symbol, float], w.Expression]:
         """
@@ -322,7 +332,7 @@ class Goal(ABC):
                                 lower_slack_limit=lower_slack_limit,
                                 upper_slack_limit=upper_slack_limit)
 
-    def add_debug_expr(self, name: str, expr: w.symbol_expr_float):
+    def add_debug_expr(self, name: str, expr: w.all_expressions_float):
         """
         Add any expression for debug purposes. They will be evaluated as well and can be plotted by activating
         the debug plotter in this Giskard config.
@@ -330,22 +340,28 @@ class Goal(ABC):
         :param expr:
         """
         name = f'{self}/{name}'
+        if not isinstance(expr, w.Symbol_):
+            expr = w.Expression(expr)
         self._debug_expressions[name] = expr
 
-    def add_debug_matrix(self, name: str, matrix_expr: w.Expression):
-        """
-        Calls add_debug_expr for a matrix.
-        """
-        for x in range(matrix_expr.shape[0]):
-            for y in range(matrix_expr.shape[1]):
-                self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
-
-    def add_debug_vector(self, name: str, vector_expr: w.Expression):
-        """
-        Calls add_debug_expr for a vector.
-        """
-        for x in range(vector_expr.shape[0]):
-            self.add_debug_expr(f'{name}/{x}', vector_expr[x])
+    # def add_debug_matrix(self, name: str, matrix_expr: w.Expression):
+    #     """
+    #     Calls add_debug_expr for a matrix.
+    #     """
+    #     for x in range(matrix_expr.shape[0]):
+    #         for y in range(matrix_expr.shape[1]):
+    #             self.add_debug_expr(f'{name}/{x},{y}', matrix_expr[x, y])
+    #
+    # def add_debug_vector(self, name: str, vector_expr: Union[w.Expression, w.Vector3, w.Point3]):
+    #     """
+    #     Calls add_debug_expr for a vector.
+    #     """
+    #     if isinstance(vector_expr, (w.Vector3, w.Point3)):
+    #         last = 3
+    #     else:
+    #         last = vector_expr.shape[0]
+    #     for x in range(last):
+    #         self.add_debug_expr(f'{name}/{x}', vector_expr[x])
 
     def add_position_constraint(self,
                                 expr_current: Union[w.Symbol, float],

@@ -547,6 +547,13 @@ class TestQuaternion(unittest.TestCase):
 
 
 class TestCASWrapper(unittest.TestCase):
+    def test_empty_compiled_function(self):
+        expected = np.array([1,2,3], ndmin=2)
+        e = w.Expression(expected)
+        f = e.compile()
+        np.testing.assert_array_almost_equal(f(), expected)
+        np.testing.assert_array_almost_equal(f.call2([]), expected)
+
     def test_add(self):
         f = 1.0
         s = w.Symbol('s')

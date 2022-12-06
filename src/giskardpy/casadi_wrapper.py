@@ -22,6 +22,10 @@ class CompiledFunction:
         self.buf, self.f_eval = fast_f.buffer()
         self.out = np.zeros(self.shape, order='F')
         self.buf.set_res(0, memoryview(self.out))  # type: ignore
+        if len(str_params) == 0:
+            self.f_eval()
+            self.__call__ = lambda **kwargs: self.out
+            self.call2 = lambda filtered_args: self.out
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]

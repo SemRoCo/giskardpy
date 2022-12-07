@@ -421,6 +421,7 @@ class Goal(ABC):
         :param name:
         """
         trans_error = w.norm(frame_P_current)
+        trans_error = w.if_eq_zero(trans_error, 0.01, trans_error)
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
                                      lower_velocity_limit=-max_velocity,
                                      weight=weight,

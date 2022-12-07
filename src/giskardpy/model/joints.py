@@ -120,7 +120,7 @@ class FixedJoint(Joint):
             parent_T_child = w.eye(4)
         super().__init__(name, parent_link_name, child_link_name, parent_T_child)
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[w.Expression, w.Expression]]:
         return None
 
     def update_limits(self, linear_limits, angular_limits):
@@ -288,8 +288,7 @@ class OneDofJoint(Joint, ABC):
                 # can't do if in, because the dict may be a defaultdict
                 pass
 
-    def get_limit_expressions(self, order: Derivatives) \
-            -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: Derivatives) -> Optional[Tuple[w.Expression, w.Expression]]:
         return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
 
     def has_free_variables(self) -> bool:
@@ -699,7 +698,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
     def update_weights(self, weights: derivative_joint_map):
         pass
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[w.Expression, w.Expression]]:
         pass
 
     def has_free_variables(self) -> bool:

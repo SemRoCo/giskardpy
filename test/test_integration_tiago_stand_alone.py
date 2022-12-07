@@ -647,6 +647,8 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
         joint_name = PrefixName('arm_right_5_joint', zero_pose.robot_name)
         lower_limit, upper_limit = zero_pose.world._joints[joint_name].get_limit_expressions(0)
+        lower_limit = lower_limit.evaluate()
+        upper_limit = upper_limit.evaluate()
         assert lower_limit <= zero_pose.world.state[
             PrefixName('arm_right_5_joint', zero_pose.robot_name)].position <= upper_limit
 

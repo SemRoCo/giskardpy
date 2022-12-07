@@ -4,10 +4,28 @@ from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import PrefixName
 
 
+class PR2CasterConstraints(Goal):
+    def __init__(self, velocity_limit: float = 1):
+        super().__init__()
+        casters = ['fl_caster_rotation_joint',
+                   'fr_caster_rotation_joint',
+                   'bl_caster_rotation_joint',
+                   'br_caster_rotation_joint']
+        for caster in casters:
+            self.add_constraints_of_goal(Caster(joint_name=caster, velocity_limit=velocity_limit))
+
+    def make_constraints(self):
+        pass
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
 class Caster(Goal):
-    def __init__(self, joint_name: str):
+    def __init__(self, joint_name: str, velocity_limit: float = 1):
         super().__init__()
         self.joint_name = self.world.get_joint_name(joint_name)
+        self.velocity_limit = velocity_limit
 
     def make_constraints(self):
         joint = self.world.get_joint(self.joint_name)
@@ -15,14 +33,16 @@ class Caster(Goal):
         bf_T_caster = self.get_fk(PrefixName('base_footprint', 'pr2'), link_name)
         bf_R_caster = bf_T_caster.to_rotation()
         axis, angle = bf_R_caster.to_axis_angle()
-        limit = 1
-        self.add_velocity_constraint(lower_velocity_limit=-limit,
-                                     upper_velocity_limit=limit,
-                                     weight=WEIGHT_ABOVE_CA,
+        # self.add_debug_expr('angle', angle)
+        self.add_debug_expr('angle_vel', w.total_derivative(angle, self.joint_velocity_symbols, self.joint_acceleration_symbols))
+        self.add_velocity_constraint(lower_velocity_limit=0,
+                                     upper_velocity_limit=0,
+                                     weight=0.01,
                                      task_expression=angle,
-                                     velocity_limit=limit,
+                                     velocity_limit=self.velocity_limit,
+                                     # lower_slack_limit=-self.velocity_limit,
+                                     # upper_slack_limit=self.velocity_limit,
                                      name_suffix='angle')
-        self.add_debug_expr('angle', angle)
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.joint_name}'
@@ -52,8 +72,8 @@ class Circle(Goal):
         map_V_bf_to_center.vis_frame = self.tip_link_name
         map_V_y.scale(1)
         map_V_bf_to_center.scale(1)
-        self.add_debug_expr('map_V_y', map_V_y)
-        self.add_debug_expr('map_V_bf_to_center', map_V_bf_to_center)
+        # self.add_debug_expr('map_V_y', map_V_y)
+        # self.add_debug_expr('map_V_bf_to_center', map_V_bf_to_center)
         self.add_vector_goal_constraints(frame_V_current=map_V_y,
                                          frame_V_goal=map_V_bf_to_center,
                                          reference_velocity=0.1,
@@ -63,7 +83,7 @@ class Circle(Goal):
         center_P_bf_goal = w.Point3((x, y, 0))
         map_P_bf_goal = map_T_center.dot(center_P_bf_goal)
         map_P_bf = map_T_bf.to_position()
-        self.add_debug_expr('map_P_bf_goal', map_P_bf_goal)
+        # self.add_debug_expr('map_P_bf_goal', map_P_bf_goal)
         self.add_point_goal_constraints(frame_P_current=map_P_bf,
                                         frame_P_goal=map_P_bf_goal,
                                         reference_velocity=0.1,

@@ -1171,7 +1171,7 @@ class TestConstraints:
         goal_state.name = ['r_elbow_flex_joint']
         goal_state.position = [-1.0]
         kwargs = {'goal_state': goal_state}
-        zero_pose.set_json_goal('print("asd")', **kwargs)
+        zero_pose.set_json_goal('print("muh")', **kwargs)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT])
 
     def test_wrong_params1(self, zero_pose: PR2TestWrapper):

@@ -754,6 +754,8 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint in joints:
             try:
                 lower_limit, upper_limit = self.world._joints[joint].get_limit_expressions(0)
+                lower_limit = lower_limit.evaluate()
+                upper_limit = upper_limit.evaluate()
             except:
                 continue
             assert lower_limit <= self.world.state[joint].position <= upper_limit, \

@@ -84,7 +84,7 @@ class Joint(ABC):
         """
 
     @abc.abstractmethod
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[w.Expression, w.Expression]]:
         """
         """
 

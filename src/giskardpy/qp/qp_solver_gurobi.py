@@ -1,5 +1,6 @@
 import gurobipy
 import numpy as np
+from gurobipy import GRB
 from scipy import sparse
 
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
@@ -54,20 +55,21 @@ class QPSolverGurobi(QPSolver):
     def init(self, H, g, A, lb, ub, lbA, ubA):
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(lb.shape, lb=lb, ub=ub)
+        self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
         # H = sparse.csc_matrix(H)
         A = sparse.csc_matrix(A)
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
-        self.qpProblem.setMObjective(H, None, 0.0)
         self.started = False
 
-    def update(self, H, g, A, lb, ub, lbA, ubA):
-        self.x.lb = lb
-        self.x.ub = ub
-        self.qpProblem.remove(self.qpProblem.getConstrs())
-        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
-        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
-        self.qpProblem.setMObjective(H, None, 0.0)
+    # def update(self, H, g, A, lb, ub, lbA, ubA):
+    #     self.x.lb = lb
+    #     self.x.ub = ub
+    #     # self.qpProblem.setMObjective()
+    #     self.qpProblem.remove(self.qpProblem.getConstrs())
+    #     self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
+    #     self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
+    #     self.qpProblem.setMObjective(H, None, 0.0)
 
     def print_debug(self):
         gurobipy.setParam('LogToConsole', True)
@@ -81,6 +83,7 @@ class QPSolverGurobi(QPSolver):
     def round(self, data, decimal_places):
         return np.round(data, decimal_places)
 
+    @profile
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         H = np.diag(weights)

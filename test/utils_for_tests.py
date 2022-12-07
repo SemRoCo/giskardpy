@@ -173,9 +173,10 @@ def hsr_urdf():
     return urdf_string
 
 
-def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
+def float_no_nan_no_inf(outer_limit=1e5, min_dist_to_zero=None):
     if outer_limit is not None:
-        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit,
+                         allow_subnormal=False)
     else:
         return st.floats(allow_nan=False, allow_infinity=False)
     # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)

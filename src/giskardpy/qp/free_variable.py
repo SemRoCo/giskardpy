@@ -88,6 +88,7 @@ class FreeVariable:
         except KeyError:
             return False
 
+    @profile
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
                           evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
         weight = self.quadratic_weights[derivative]

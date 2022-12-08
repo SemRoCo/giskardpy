@@ -445,6 +445,7 @@ class TransMatrix(Symbol_):
                 return result
         raise _operation_type_error(self, 'dot', other)
 
+    @profile
     def inverse(self):
         inv = TransMatrix()
         inv[:3, :3] = self[:3, :3].T
@@ -484,16 +485,16 @@ class RotationMatrix(Symbol_):
             self.reference_frame = data.reference_frame
         else:
             self.reference_frame = None
-        if isinstance(data, (geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped)):
+        if isinstance(data, ca.SX):
+            self.s = data
+        elif isinstance(data, (geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped)):
             if isinstance(data, geometry_msgs.QuaternionStamped):
                 self.reference_frame = data.header.frame_id
                 data = data.quaternion
             if isinstance(data, geometry_msgs.Quaternion):
-                data = Quaternion(data)
-        if isinstance(data, Quaternion):
+                self.s = self.__quaternion_to_rotation_matrix(Quaternion(data)).s
+        elif isinstance(data, Quaternion):
             self.s = self.__quaternion_to_rotation_matrix(data).s
-        elif isinstance(data, ca.SX):
-            self.s = data
         elif data is None:
             self.s = ca.SX.eye(4)
             return
@@ -512,27 +513,37 @@ class RotationMatrix(Symbol_):
             self[3, 3] = 1
 
     @classmethod
+    @profile
     def from_axis_angle(cls, axis, angle):
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
         https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
         """
-        ct = cos(angle)
-        st = sin(angle)
+        # use casadi to prevent a bunch of Expression.__init__ calls
+        axis = axis.s
+        try:
+            angle = angle.s
+        except AttributeError:
+            pass
+        ct = ca.cos(angle)
+        st = ca.sin(angle)
         vt = 1 - ct
-        m_vt_0 = vt * axis[0]
-        m_vt_1 = vt * axis[1]
-        m_vt_2 = vt * axis[2]
-        m_st_0 = axis[0] * st
-        m_st_1 = axis[1] * st
-        m_st_2 = axis[2] * st
-        m_vt_0_1 = m_vt_0 * axis[1]
-        m_vt_0_2 = m_vt_0 * axis[2]
-        m_vt_1_2 = m_vt_1 * axis[2]
-        return cls([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
-                    [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
-                    [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
-                    [0, 0, 0, 1]])
+        m_vt = axis * vt
+        m_st = axis * st
+        m_vt_0_ax = (m_vt[0] * axis)[1:]
+        m_vt_1_2 = m_vt[1] * axis[2]
+        s = ca.SX.eye(4)
+        ct__m_vt__axis = ct + m_vt * axis
+        s[0, 0] = ct__m_vt__axis[0]
+        s[0, 1] = -m_st[2] + m_vt_0_ax[0]
+        s[0, 2] = m_st[1] + m_vt_0_ax[1]
+        s[1, 0] = m_st[2] + m_vt_0_ax[0]
+        s[1, 1] = ct__m_vt__axis[1]
+        s[1, 2] = -m_st[0] + m_vt_1_2
+        s[2, 0] = -m_st[1] + m_vt_0_ax[1]
+        s[2, 1] = m_st[0] + m_vt_1_2
+        s[2, 2] = ct__m_vt__axis[2]
+        return cls(s, sanity_check=False)
 
     @classmethod
     def __quaternion_to_rotation_matrix(cls, q):
@@ -1210,6 +1221,7 @@ def diag(args):
         return Expression(ca.diag(Expression(args).s))
 
 
+@profile
 def jacobian(expressions, symbols, order=1):
     expressions = Expression(expressions)
     if order == 1:

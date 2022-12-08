@@ -38,6 +38,7 @@ class InitQPController(GiskardBehavior):
 
         return Status.SUCCESS
 
+    @profile
     def get_constraints_from_goals(self):
         constraints = {}
         vel_constraints = {}

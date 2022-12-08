@@ -36,6 +36,7 @@ class Joint(ABC):
         return self.god_map.get_data(identifier.world)
 
     @property
+    @profile
     def parent_T_child(self) -> w.TransMatrix:
         return self._parent_T_child.dot(self._joint_transformation())
 
@@ -357,6 +358,7 @@ class PrismaticJoint(OneDofJoint):
 
 
 class RevoluteJoint(OneDofJoint):
+    @profile
     def _joint_transformation(self) -> w.TransMatrix:
         rotation_axis = w.Vector3(self.axis)
         parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis, self.position_expression)

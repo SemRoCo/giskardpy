@@ -198,6 +198,7 @@ class Goal(ABC):
                            r_R_t_axis_angle[2]])
         return self.get_expr_velocity(fk)
 
+    @profile
     def get_constraints(self) -> Tuple[Dict[str, Constraint],
                                        Dict[str, VelocityConstraint],
                                        Dict[str, Union[w.Symbol, float]]]:

@@ -54,6 +54,7 @@ class CartesianPosition(Goal):
                                                                   max_velocity=max_velocity,
                                                                   hard=False))
 
+    @profile
     def make_constraints(self):
         r_P_g = w.Point3(self.goal_point)
         r_P_c = self.get_fk(self.root_link, self.tip_link).to_position()

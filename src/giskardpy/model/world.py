@@ -1137,7 +1137,8 @@ class WorldTree:
             p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
             p_T_c = make_transform(parent_frame=joint.parent_link_name,
                                    child_frame=joint.child_link_name,
-                                   pose=p_T_c.pose)
+                                   pose=p_T_c.pose,
+                                   normalize_quaternion=False)
             tf_msg.transforms.append(p_T_c)
         return tf_msg
 

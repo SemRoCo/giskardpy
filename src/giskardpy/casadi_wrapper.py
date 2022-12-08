@@ -6,6 +6,7 @@ from typing import Union
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
+import rospy
 
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
@@ -63,8 +64,10 @@ class Symbol_:
         return Expression(self.s[item])
 
     def __setitem__(self, key, value):
-        if isinstance(value, Symbol_):
+        try:
             value = value.s
+        except AttributeError:
+            pass
         self.s[key] = value
 
     @property
@@ -370,31 +373,42 @@ class Expression(Symbol_):
 
 class TransMatrix(Symbol_):
     @profile
-    def __init__(self, data=None):
-        if hasattr(data, 'reference_frame'):
+    def __init__(self, data=None, sanity_check=True):
+        try:
             self.reference_frame = data.reference_frame
-        else:
+        except AttributeError:
             self.reference_frame = None
-        self.child_frame = None
-        if isinstance(data, geometry_msgs.PoseStamped):
-            self.reference_frame = data.header.frame_id
-            data = data.pose
-        if isinstance(data, geometry_msgs.Pose):
-            r = RotationMatrix(data.orientation)
-            self.s = r.s
-            self.s[0, 3] = data.position.x
-            self.s[1, 3] = data.position.y
-            self.s[2, 3] = data.position.z
+        try:
+            self.child_frame = data.child_frame
+        except AttributeError:
+            self.child_frame = None
+        if isinstance(data, (geometry_msgs.Pose, geometry_msgs.PoseStamped)):
+            if isinstance(data, geometry_msgs.PoseStamped):
+                self.reference_frame = data.header.frame_id
+                data = data.pose
+            if isinstance(data, geometry_msgs.Pose):
+                r = RotationMatrix(data.orientation)
+                self.s = r.s
+                self.s[0, 3] = data.position.x
+                self.s[1, 3] = data.position.y
+                self.s[2, 3] = data.position.z
+                return
+        elif data is None:
+            self.s = ca.SX.eye(4)
             return
-        if data is None:
-            data = ca.SX.eye(4)
-        self.s = deepcopy(Expression(data).s)
-        if self.shape[0] != 4 or self.shape[1] != 4:
-            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
-        self[3, 0] = 0
-        self[3, 1] = 0
-        self[3, 2] = 0
-        self[3, 3] = 1
+        elif isinstance(data, ca.SX):
+            self.s = data
+        elif isinstance(data, (Expression, RotationMatrix, TransMatrix)):
+            self.s = deepcopy(data.s)
+        else:
+            self.s = deepcopy(Expression(data).s)
+        if sanity_check:
+            if self.shape[0] != 4 or self.shape[1] != 4:
+                raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
+            self[3, 0] = 0
+            self[3, 1] = 0
+            self[3, 2] = 0
+            self[3, 3] = 1
 
     @classmethod
     def from_point_rotation_matrix(cls, point=None, rotation_matrix=None):
@@ -408,6 +422,7 @@ class TransMatrix(Symbol_):
             a_T_b[2, 3] = point.z
         return a_T_b
 
+    @profile
     def dot(self, other):
         if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
             result = ca.mtimes(self.s, other.s)
@@ -420,11 +435,11 @@ class TransMatrix(Symbol_):
                 result.reference_frame = self.reference_frame
                 return result
             if isinstance(other, RotationMatrix):
-                result = RotationMatrix(result)
+                result = RotationMatrix(result, sanity_check=False)
                 result.reference_frame = self.reference_frame
                 return result
             if isinstance(other, TransMatrix):
-                result = TransMatrix(result)
+                result = TransMatrix(result, sanity_check=False)
                 result.reference_frame = self.reference_frame
                 result.child_frame = other.child_frame
                 return result
@@ -464,31 +479,37 @@ class TransMatrix(Symbol_):
 
 class RotationMatrix(Symbol_):
     @profile
-    def __init__(self, data=None):
+    def __init__(self, data=None, sanity_check=True):
         if hasattr(data, 'reference_frame'):
             self.reference_frame = data.reference_frame
         else:
             self.reference_frame = None
-        if isinstance(data, geometry_msgs.QuaternionStamped):
-            self.reference_frame = data.header.frame_id
-            data = data.quaternion
-        if isinstance(data, geometry_msgs.Quaternion):
-            data = Quaternion(data)
+        if isinstance(data, (geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped)):
+            if isinstance(data, geometry_msgs.QuaternionStamped):
+                self.reference_frame = data.header.frame_id
+                data = data.quaternion
+            if isinstance(data, geometry_msgs.Quaternion):
+                data = Quaternion(data)
         if isinstance(data, Quaternion):
-            data = self.__quaternion_to_rotation_matrix(data)
-        if data is None:
-            data = ca.SX.eye(4)
-        self.s = Expression(data).s
-        if self.shape[0] != 4 or self.shape[1] != 4:
-            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data, '
-                             f'you have{self.shape}.')
-        self[0, 3] = 0
-        self[1, 3] = 0
-        self[2, 3] = 0
-        self[3, 0] = 0
-        self[3, 1] = 0
-        self[3, 2] = 0
-        self[3, 3] = 1
+            self.s = self.__quaternion_to_rotation_matrix(data).s
+        elif isinstance(data, ca.SX):
+            self.s = data
+        elif data is None:
+            self.s = ca.SX.eye(4)
+            return
+        else:
+            self.s = Expression(data).s
+        if sanity_check:
+            if self.shape[0] != 4 or self.shape[1] != 4:
+                raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data, '
+                                 f'you have{self.shape}.')
+            self[0, 3] = 0
+            self[1, 3] = 0
+            self[2, 3] = 0
+            self[3, 0] = 0
+            self[3, 1] = 0
+            self[3, 2] = 0
+            self[3, 3] = 1
 
     @classmethod
     def from_axis_angle(cls, axis, angle):
@@ -527,14 +548,14 @@ class RotationMatrix(Symbol_):
         y2 = y * y
         z2 = z * z
         w2 = w * w
-        return [[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                [0, 0, 0, 1]]
+        return cls([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                    [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                    [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                    [0, 0, 0, 1]])
 
     @classmethod
     def from_quaternion(cls, q):
-        return cls(cls.__quaternion_to_rotation_matrix(q))
+        return cls.__quaternion_to_rotation_matrix(q)
 
     def dot(self, other):
         if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
@@ -544,9 +565,9 @@ class RotationMatrix(Symbol_):
             elif isinstance(other, Point3):
                 result = Point3(result)
             elif isinstance(other, RotationMatrix):
-                result = RotationMatrix(result)
+                result = RotationMatrix(result, sanity_check=False)
             elif isinstance(other, TransMatrix):
-                result = TransMatrix(result)
+                result = TransMatrix(result, sanity_check=False)
             result.reference_frame = self.reference_frame
             return result
         raise _operation_type_error(self, 'dot', other)
@@ -656,27 +677,32 @@ class RotationMatrix(Symbol_):
 class Point3(Symbol_):
     @profile
     def __init__(self, data=None):
-        if hasattr(data, 'reference_frame'):
+        try:
             self.reference_frame = data.reference_frame
-        else:
+        except AttributeError:
             self.reference_frame = None
         if data is None:
-            data = (0, 0, 0)
-        if isinstance(data, geometry_msgs.PointStamped):
-            self.reference_frame = data.header.frame_id
-            data = data.point
-        if isinstance(data, geometry_msgs.Vector3Stamped):
-            self.reference_frame = data.header.frame_id
-            data = data.vector
-        if isinstance(data, (Point3, Vector3, geometry_msgs.Point, geometry_msgs.Vector3)):
-            x, y, z = data.x, data.y, data.z
+            self.s = ca.SX([0, 0, 0, 1])
+            return
+        if isinstance(data, rospy.Message):
+            if isinstance(data, geometry_msgs.PointStamped):
+                self.reference_frame = data.header.frame_id
+                data = data.point
+            if isinstance(data, geometry_msgs.Vector3Stamped):
+                self.reference_frame = data.header.frame_id
+                data = data.vector
+            if isinstance(data, (Point3, Vector3, geometry_msgs.Point, geometry_msgs.Vector3)):
+                self.s = ca.SX([data.x, data.y, data.z, 1])
+        elif isinstance(data, Symbol_):
+            self.s = ca.SX([0, 0, 0, 1])
+            self[0] = data.s[0]
+            self[1] = data.s[1]
+            self[2] = data.s[2]
         else:
-            x, y, z = data[0], data[1], data[2]
-        self.s = ca.SX(4, 1)
-        self[0] = x
-        self[1] = y
-        self[2] = z
-        self[3] = 1
+            self.s = ca.SX([0, 0, 0, 1])
+            self[0] = data[0]
+            self[1] = data[1]
+            self[2] = data[2]
 
     @classmethod
     def from_xyz(cls, x=None, y=None, z=None):
@@ -1178,7 +1204,10 @@ def var(variables_names: str):
 
 
 def diag(args):
-    return Expression(ca.diag(Expression(args).s))
+    try:
+        return Expression(ca.diag(args.s))
+    except AttributeError:
+        return Expression(ca.diag(Expression(args).s))
 
 
 def jacobian(expressions, symbols, order=1):
@@ -1458,8 +1487,7 @@ def dot(e1, e2):
     try:
         return e1.dot(e2)
     except Exception as e:
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{e1.__class__.__name__}\' '
-                        f'and \'{e2.__class__.__name__}\'')
+        raise _operation_type_error(e1, 'dot', e2)
 
 
 def eye(size):

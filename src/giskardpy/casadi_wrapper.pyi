@@ -15,6 +15,8 @@ symbol_expr = Union[Symbol, Expression]
 
 pi: float
 
+def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeError: ...
+
 class CompiledFunction:
     str_params: Sequence[str]
     fast_f: ca.Function

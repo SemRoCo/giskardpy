@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import numpy as np
 from enum import IntEnum
 from typing import Union, Dict
 
@@ -71,6 +71,7 @@ class Derivatives(IntEnum):
     pop = 6
 
 
+number = Union[int, float, np.number]
 my_string = Union[str, PrefixName]
 goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, None]
 derivative_map = Dict[Derivatives, float]

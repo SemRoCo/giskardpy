@@ -87,10 +87,6 @@ jobs:
     - name: start roscore
       run: |
         roscore &
-    - name: PR2 TestConstraints
-      run: |
-        roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestConstraints
     - name: PR2 TestWorldManipulation
       run: |
         roscd giskardpy
@@ -103,6 +99,10 @@ jobs:
       run: |
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestCartGoals
+    - name: PR2 TestConstraints
+      run: |
+        roscd giskardpy
+        python3 -m pytest -s test/test_integration_pr2.py::TestConstraints
     - name: PR2 TestWayPoints
       run: |
         roscd giskardpy
@@ -119,7 +119,7 @@ jobs:
       run: |
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals
-#    - name: Setup upterm session
-##      if: always()
-#      if: failure()
-#      uses: lhotari/action-upterm@v1
+    - name: Setup upterm session
+#      if: always()
+      if: failure()
+      uses: lhotari/action-upterm@v1

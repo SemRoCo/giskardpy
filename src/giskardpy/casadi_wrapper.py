@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import copy
 from typing import Union
 
 import casadi as ca  # type: ignore
@@ -238,10 +238,8 @@ class Expression(Symbol_):
         if isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, Symbol_):
-            self.s = deepcopy(data.s)
-        elif isinstance(data, (int, float)):
-            self.s = ca.SX(data)
-        elif isinstance(data, np.ndarray):
+            self.s = copy(data.s)
+        elif isinstance(data, (int, float, np.ndarray)):
             self.s = ca.SX(data)
         else:
             x = len(data)
@@ -399,9 +397,9 @@ class TransMatrix(Symbol_):
         elif isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, (Expression, RotationMatrix, TransMatrix)):
-            self.s = deepcopy(data.s)
+            self.s = copy(data.s)
         else:
-            self.s = deepcopy(Expression(data).s)
+            self.s = copy(Expression(data).s)
         if sanity_check:
             if self.shape[0] != 4 or self.shape[1] != 4:
                 raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
@@ -415,7 +413,7 @@ class TransMatrix(Symbol_):
         if rotation_matrix is None:
             a_T_b = cls()
         else:
-            a_T_b = cls(rotation_matrix)
+            a_T_b = cls(rotation_matrix, sanity_check=False)
         if point is not None:
             a_T_b[0, 3] = point.x
             a_T_b[1, 3] = point.y
@@ -453,6 +451,7 @@ class TransMatrix(Symbol_):
         return inv
 
     @classmethod
+    @profile
     def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None):
         p = Point3.from_xyz(x, y, z)
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
@@ -624,6 +623,7 @@ class RotationMatrix(Symbol_):
         return R
 
     @classmethod
+    @profile
     def from_rpy(cls, roll=None, pitch=None, yaw=None):
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
@@ -632,19 +632,30 @@ class RotationMatrix(Symbol_):
         roll = 0 if roll is None else roll
         pitch = 0 if pitch is None else pitch
         yaw = 0 if yaw is None else yaw
-        rx = cls([[1, 0, 0, 0],
-                  [0, cos(roll), -sin(roll), 0],
-                  [0, sin(roll), cos(roll), 0],
-                  [0, 0, 0, 1]])
-        ry = cls([[cos(pitch), 0, sin(pitch), 0],
-                  [0, 1, 0, 0],
-                  [-sin(pitch), 0, cos(pitch), 0],
-                  [0, 0, 0, 1]])
-        rz = cls([[cos(yaw), -sin(yaw), 0, 0],
-                  [sin(yaw), cos(yaw), 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]])
-        return rz.dot(ry).dot(rx)
+        try:
+            roll = roll.s
+        except AttributeError:
+            pass
+        try:
+            pitch = pitch.s
+        except AttributeError:
+            pass
+        try:
+            yaw = yaw.s
+        except AttributeError:
+            pass
+        s = ca.SX.eye(4)
+
+        s[0,0] = ca.cos(yaw) * ca.cos(pitch)
+        s[0,1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
+        s[0,2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
+        s[1,0] = ca.sin(yaw) * ca.cos(pitch)
+        s[1,1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
+        s[1,2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
+        s[2,0] = -ca.sin(pitch)
+        s[2,1] = ca.cos(pitch) * ca.sin(roll)
+        s[2,2] = ca.cos(pitch) * ca.cos(roll)
+        return cls(s, sanity_check=False)
 
     def inverse(self):
         return RotationMatrix(self.T)
@@ -1595,6 +1606,7 @@ def normalize_angle(angle):
     return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
 
 
+@profile
 def shortest_angular_distance(from_angle, to_angle):
     """
     Given 2 angles, this returns the shortest angular

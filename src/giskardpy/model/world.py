@@ -848,7 +848,7 @@ class WorldTree:
         new_parent_link = self._links[new_parent_link_name]
 
         joint.parent_link_name = new_parent_link_name
-        joint.parent_T_child = fk
+        joint.update_parent_T_child(fk)
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()
@@ -859,7 +859,7 @@ class WorldTree:
                                     new_parent_T_child: w.TransMatrix,
                                     notify: bool = True):
         joint = self._joints[joint_name]
-        joint.parent_T_child = new_parent_T_child
+        joint.update_parent_T_child(new_parent_T_child)
         if notify:
             self.notify_model_change()
 
@@ -1068,9 +1068,12 @@ class WorldTree:
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, add_joints=True, add_links=False,
                                                             add_fixed_joints=True, add_non_controlled_joints=True)
         for joint_name in root_chain:
-            fk = fk.dot(self._joints[joint_name].parent_T_child.inverse())
+            a = self._joints[joint_name].parent_T_child
+            ai = a.inverse()
+            fk = fk.dot(ai)
         for joint_name in tip_chain:
-            fk = fk.dot(self._joints[joint_name].parent_T_child)
+            a = self._joints[joint_name].parent_T_child
+            fk = fk.dot(a)
         return fk
 
     @memoize

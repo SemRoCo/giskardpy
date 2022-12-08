@@ -154,6 +154,8 @@ class TestRotationMatrix(unittest.TestCase):
            random_angle(),
            random_angle())
     def test_rotation_matrix_from_rpy(self, roll, pitch, yaw):
+        # r, p, y = w.var('roll pitch yaw')
+        # w.RotationMatrix.from_rpy(r, p, y)
         m1 = w.compile_and_execute(w.RotationMatrix.from_rpy, [roll, pitch, yaw])
         m2 = euler_matrix(roll, pitch, yaw)
         np.testing.assert_array_almost_equal(m1, m2)

@@ -1,7 +1,7 @@
 import abc
 from abc import ABC
 from typing import Dict, Tuple, Optional, List, Union
-
+from functools import cached_property
 import numpy as np
 import urdf_parser_py.urdf as up
 
@@ -24,7 +24,7 @@ class Joint(ABC):
         self.name: my_string = name
         self.parent_link_name: my_string = parent_link_name
         self.child_link_name: my_string = child_link_name
-        self.parent_T_child: w.TransMatrix = w.TransMatrix(parent_T_child)
+        self._parent_T_child: w.TransMatrix = w.TransMatrix(parent_T_child)
         self.create_free_variables()
 
     @property
@@ -35,13 +35,14 @@ class Joint(ABC):
     def world(self):
         return self.god_map.get_data(identifier.world)
 
-    @property
+    @cached_property
     @profile
     def parent_T_child(self) -> w.TransMatrix:
         return self._parent_T_child.dot(self._joint_transformation())
 
-    @parent_T_child.setter
-    def parent_T_child(self, value: w.TransMatrix):
+    # @parent_T_child.setter
+    def update_parent_T_child(self, value: w.TransMatrix):
+        del self.parent_T_child
         self._parent_T_child = value
 
     def create_free_variable(self, name: my_string, lower_limits: derivative_map, upper_limits: derivative_map):
@@ -343,6 +344,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
 
 class PrismaticJoint(OneDofJoint):
+    @profile
     def _joint_transformation(self) -> w.TransMatrix:
         translation_axis = w.Point3(self.axis) * self.position_expression
         parent_T_child = w.TransMatrix.from_xyz_rpy(x=translation_axis[0],
@@ -531,6 +533,7 @@ class OmniDrive(Joint):
     def position_variable_names(self):
         return [self.x_name, self.y_name, self.yaw_name]
 
+    @profile
     def _joint_transformation(self):
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),
@@ -663,6 +666,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
         new_vel_y = vel_y + pos_x * vel_z
         return new_vel_x, new_vel_y
 
+    @profile
     def _joint_transformation(self):
         try:
             x_vel = self.x_vel.get_symbol(Derivatives.velocity)
@@ -1258,6 +1262,7 @@ class DiffDrive(Joint):
                                                  rotation_lower_limits,
                                                  rotation_upper_limits)
 
+    @profile
     def _joint_transformation(self):
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),

@@ -45,6 +45,7 @@ class TravelCompanion:
 
 class WorldTree:
     _joints: Dict[PrefixName, Union[Joint, OmniDrive]]
+    _links: Dict[PrefixName, Link]
 
     def __init__(self, root_link_name: PrefixName, god_map: GodMap):
         self.root_link_name = root_link_name
@@ -715,7 +716,7 @@ class WorldTree:
 
     def _clear(self):
         self.state = JointStates()
-        self._links: Dict[PrefixName, Link] = {self.root_link_name: Link(self.root_link_name)}
+        self._links = {self.root_link_name: Link(self.root_link_name)}
         self._joints = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()

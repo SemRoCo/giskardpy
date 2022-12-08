@@ -5,7 +5,7 @@ from py_trees import Status
 
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
-from giskardpy.exceptions import EmptyProblemException
+from giskardpy.exceptions import EmptyProblemException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -44,7 +44,10 @@ class InitQPController(GiskardBehavior):
         debug_expressions = {}
         goals: Dict[str, Goal] = self.god_map.get_data(identifier.goals)
         for goal_name, goal in list(goals.items()):
-            _constraints, _vel_constraints, _debug_expressions = goal.get_constraints()
+            try:
+                _constraints, _vel_constraints, _debug_expressions = goal.get_constraints()
+            except Exception as e:
+                raise ConstraintInitalizationException(str(e))
             constraints.update(_constraints)
             vel_constraints.update(_vel_constraints)
             debug_expressions.update(_debug_expressions)

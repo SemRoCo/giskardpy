@@ -11,7 +11,6 @@ import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
 from numpy import pi
-from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
@@ -1159,33 +1158,25 @@ class TestConstraints:
         zero_pose.plan_and_execute()
 
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
-        goal_state = JointState()
-        goal_state.name = ['r_elbow_flex_joint']
-        goal_state.position = [-1.0]
+        goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
         zero_pose.set_json_goal('jointpos', **kwargs)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT])
 
     def test_python_code_in_constraint_type(self, zero_pose: PR2TestWrapper):
-        goal_state = JointState()
-        goal_state.name = ['r_elbow_flex_joint']
-        goal_state.position = [-1.0]
+        goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
         zero_pose.set_json_goal('print("muh")', **kwargs)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT])
 
     def test_wrong_params1(self, zero_pose: PR2TestWrapper):
-        goal_state = JointState()
-        goal_state.name = 'r_elbow_flex_joint'
-        goal_state.position = [-1.0]
+        goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.set_json_goal('JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_GROUP])
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
-        goal_state = JointState()
-        goal_state.name = [5432]
-        goal_state.position = 'test'
+        goal_state = {'r_elbow_flex_joint': 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.set_json_goal('JointPositionList', **kwargs)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])

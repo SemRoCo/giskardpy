@@ -1126,6 +1126,7 @@ class WorldTree:
             result[link] = fks_evaluated[self.fk_idx[link], :]
         return result
 
+    @profile
     def as_tf_msg(self):
         """
         Create a tfmessage for the whole world tree.

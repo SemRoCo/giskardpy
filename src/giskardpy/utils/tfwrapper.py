@@ -601,6 +601,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     pub.publish(ma)
 
 
+@profile
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
     rotation = np.array([quaternion.x,

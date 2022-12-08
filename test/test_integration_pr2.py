@@ -4119,7 +4119,7 @@ class TestWorld:
             world_setup.compute_chain_reduced_to_controlled_joints(world_setup.get_link_name('l_wrist_roll_link'),
                                                                    world_setup.get_link_name('l_gripper_r_finger_link'))
 
-# time: *[1-9].[1-9]* s
+# time: [1-9][1-9]*.[1-9]* s
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal2'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])

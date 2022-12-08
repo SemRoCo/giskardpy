@@ -95,6 +95,7 @@ class LinkGeometry:
             raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
+    @profile
     def as_visualization_marker(self) -> Marker:
         marker = Marker()
         marker.color = self.color

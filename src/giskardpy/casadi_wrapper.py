@@ -1262,6 +1262,38 @@ def equal(x, y):
     return Expression(ca.eq(x, y))
 
 
+def less_equal(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.le(x, y))
+
+
+def greater_equal(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.ge(x, y))
+
+
+def less(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.lt(x, y))
+
+
+def greater(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.gt(x, y))
+
+
 def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:

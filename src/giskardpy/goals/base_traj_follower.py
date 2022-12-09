@@ -17,10 +17,12 @@ class BaseTrajFollower(Goal):
         self.track_only_velocity = track_only_velocity
         # self.control_horizon = 1
 
+    @profile
     def x_symbol(self, t: int, free_variable_name: str, derivative: Derivatives = Derivatives.position) \
             -> w.Symbol:
         return self.god_map.to_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, derivative])
 
+    @profile
     def current_traj_point(self, free_variable_name: str, start_t: float,
                            derivative: Derivatives = Derivatives.position) \
             -> w.Expression:
@@ -35,6 +37,7 @@ class BaseTrajFollower(Goal):
                                   b_result_cases=b_result_cases,
                                   else_result=self.x_symbol(self.trajectory_length - 1, free_variable_name, derivative))
 
+    @profile
     def make_odom_T_base_footprint_goal(self, t: float, derivative: Derivatives = Derivatives.position):
         x = self.current_traj_point(self.joint.x_name, t, derivative)
         if isinstance(self.joint, OmniDrive) or derivative == 0:
@@ -46,6 +49,7 @@ class BaseTrajFollower(Goal):
         # self.add_debug_expr('x goal in odom', x)
         return odom_T_base_footprint_goal
 
+    @profile
     def trans_error_at(self, t: float):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t)
         map_T_odom = self.get_fk_evaluated(self.world.root_link_name, self.odom_link)
@@ -75,6 +79,7 @@ class BaseTrajFollower(Goal):
         #                                           '{}/y'.format(name_suffix),
         #                                           '{}/z'.format(name_suffix)])
 
+    @profile
     def add_trans_constraints(self):
         tube_size = 0.0
         errors_x = []
@@ -166,6 +171,7 @@ class BaseTrajFollower(Goal):
         # self.add_debug_expr('ref y vel traj/0', self.current_traj_point(self.joint.y_vel_name, 0, 1))
         # self.add_debug_expr('error sum', errors_x[0] + errors_y[0])
 
+    @profile
     def rot_error_at(self, t: int):
         # odom_link = self.joint.parent_link_name
         # base_footprint_link = self.joint.child_link_name
@@ -186,6 +192,7 @@ class BaseTrajFollower(Goal):
         # self.add_debug_expr('rot current', rotation_current)
         return error
 
+    @profile
     def add_rot_constraints(self):
         errors = []
         for t in range(self.prediction_horizon):
@@ -218,6 +225,7 @@ class BaseTrajFollower(Goal):
         # self.add_debug_expr('ref jerk traj', self.current_traj_point(self.joint.rot_name, 0, 3))
         # self.add_debug_vector('axis_current', axis_current)
 
+    @profile
     def make_constraints(self):
         trajectory = self.god_map.get_data(identifier.trajectory)
         self.trajectory_length = len(trajectory.items())

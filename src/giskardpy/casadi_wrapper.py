@@ -1467,29 +1467,34 @@ def if_eq(a, b, if_result, else_result):
 
 @profile
 def if_eq_cases(a, b_result_cases, else_result):
-    a = Expression(a).s
-    result = Expression(else_result).s
-    # b_result_cases = Expression(b_result_cases).s
-    len_ = len(b_result_cases)
-    for i in range(len_):
-        b = b_result_cases[i][0]
-        b_result = b_result_cases[i][1]
+    a = _to_sx(a)
+    result = _to_sx(else_result)
+    for i in range(len(b_result_cases)):
+        b = _to_sx(b_result_cases[i][0])
+        b_result = _to_sx(b_result_cases[i][1])
         result = ca.if_else(ca.eq(a, b), b_result, else_result)
     return Expression(result)
 
 
+@profile
 def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
     """
-    a = Expression(a).s
-    result = else_result
-    b_result_cases = Expression(b_result_cases)
-    for i in reversed(range(b_result_cases.shape[0] - 1)):
-        b = b_result_cases[i, 0]
-        b_result = b_result_cases[i, 1]
-        result = if_less_eq(a, b, b_result, result)
-    return result
+    a = _to_sx(a)
+    result = _to_sx(else_result)
+    for i in reversed(range(len(b_result_cases) - 1)):
+        b = _to_sx(b_result_cases[i][0])
+        b_result = _to_sx(b_result_cases[i][1])
+        result = ca.if_else(ca.le(a, b), b_result, result)
+    return Expression(result)
+
+
+def _to_sx(thing):
+    try:
+        return thing.s
+    except AttributeError:
+        return thing
 
 
 def cross(u, v):

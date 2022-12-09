@@ -56,6 +56,11 @@ class TestSymbol:
 
 
 class TestExpression(unittest.TestCase):
+    def test_get_item(self):
+        data = np.array(range(9)).reshape((3,3))
+        e = w.Expression(data)
+        np.testing.assert_array_almost_equal(e[0].evaluate(), data[0])
+
     def test_create(self):
         w.Expression(w.Symbol('muh'))
         w.Expression([w.ca.SX(1), w.ca.SX.sym('muh')])
@@ -1237,9 +1242,9 @@ class TestCASWrapper(unittest.TestCase):
                 if a_ == b:
                     return if_result
             return else_result
-
-        self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq_cases, [a, b_result_cases, 0]),
-                                   np.float(reference(a, b_result_cases, 0))))
+        actual = w.compile_and_execute(lambda a, default: w.if_eq_cases(a, b_result_cases, default), [a, 0])
+        expected = np.float(reference(a, b_result_cases, 0))
+        self.assertTrue(np.isclose(actual, expected))
 
     @given(float_no_nan_no_inf())
     def test_if_less_eq_cases(self, a):
@@ -1258,7 +1263,8 @@ class TestCASWrapper(unittest.TestCase):
                     return if_result
             return else_result
 
-        self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq_cases, [a, b_result_cases, 0]),
+        self.assertAlmostEqual(w.compile_and_execute(lambda a, default: w.if_less_eq_cases(a, b_result_cases, default),
+                                                     [a, 0]),
                                np.float(reference(a, b_result_cases, 0)))
 
     @given(float_no_nan_no_inf(),

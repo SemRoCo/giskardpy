@@ -1465,13 +1465,15 @@ def if_eq(a, b, if_result, else_result):
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
+@profile
 def if_eq_cases(a, b_result_cases, else_result):
     a = Expression(a).s
     result = Expression(else_result).s
-    b_result_cases = Expression(b_result_cases).s
-    for i in range(b_result_cases.shape[0]):
-        b = b_result_cases[i, 0]
-        b_result = b_result_cases[i, 1]
+    # b_result_cases = Expression(b_result_cases).s
+    len_ = len(b_result_cases)
+    for i in range(len_):
+        b = b_result_cases[i][0]
+        b_result = b_result_cases[i][1]
         result = ca.if_else(ca.eq(a, b), b_result, else_result)
     return Expression(result)
 

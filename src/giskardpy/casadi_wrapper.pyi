@@ -672,7 +672,7 @@ def if_eq(a: symbol_expr_float,
           else_result: symbol_expr_float) -> Expression: ...
 
 def if_eq_cases(a: symbol_expr_float,
-                b_result_cases: Union[Expression, Sequence[Tuple[symbol_expr_float, symbol_expr_float]]],
+                b_result_cases: Sequence[Tuple[symbol_expr_float, symbol_expr_float]],
                 else_result: symbol_expr_float) -> Expression: ...
 
 def if_less_eq_cases(a: symbol_expr_float,

@@ -75,7 +75,7 @@ class Symbol_:
         return self.s.shape
 
     def __len__(self):
-        return self.shape[0] * self.shape[1]
+        return self.shape[0]
 
     def free_symbols(self):
         return free_symbols(self.s)

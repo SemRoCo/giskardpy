@@ -262,6 +262,7 @@ class JointPositionRevolute(Goal):
         if not self.world.is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
+    @profile
     def make_constraints(self):
         current_joint = self.get_joint_position_symbol(self.joint_name)
 

@@ -3426,6 +3426,7 @@ class TestCollisionAvoidanceGoals:
         # spawn cup
         cup_pose = PoseStamped()
         cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        cup_pose.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
         cup_pose.pose.position = Point(0.1, 0.2, -.05)
         cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 

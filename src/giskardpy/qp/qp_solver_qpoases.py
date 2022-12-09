@@ -93,16 +93,22 @@ class QPSolverQPOases(QPSolver):
                     ub = np.round(ub, self.on_fail_round_to)
                     lbA = np.round(lbA, self.on_fail_round_to)
                     ubA = np.round(ubA, self.on_fail_round_to)
-                elif isinstance(e, InfeasibleException) and not relaxed:
+                    continue
+                if isinstance(e, InfeasibleException) and not relaxed:
                     logging.loginfo(f'{e}; retrying with relaxed hard constraints')
                     try:
                         weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
                         relaxed = True
+                        continue
                     except InfeasibleException as e2:
+                        if self.mode < QPoasesModes.Reliable:
+                            self.mode = QPoasesModes(self.mode + 1)
+                            logging.loginfo(f'{e}; retrying with {repr(self.mode)} mode.')
+                            continue
                         if isinstance(e2, HardConstraintsViolatedException):
                             raise e2
                         raise e
-                else:
-                    self.mode = QPoasesModes(self.mode + 1)
-                    logging.loginfo(f'{e}; retrying with {repr(self.mode)} mode.')
+
+                self.mode = QPoasesModes(self.mode + 1)
+                logging.loginfo(f'{e}; retrying with {repr(self.mode)} mode.')
         raise e

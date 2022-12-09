@@ -1467,12 +1467,13 @@ def if_eq(a, b, if_result, else_result):
 
 def if_eq_cases(a, b_result_cases, else_result):
     a = Expression(a).s
-    result = else_result
+    result = Expression(else_result).s
+    b_result_cases = Expression(b_result_cases).s
     for i in range(b_result_cases.shape[0]):
         b = b_result_cases[i, 0]
         b_result = b_result_cases[i, 1]
-        result = if_eq(a, b, b_result, result)
-    return result
+        result = ca.if_else(ca.eq(a, b), b_result, else_result)
+    return Expression(result)
 
 
 def if_less_eq_cases(a, b_result_cases, else_result):

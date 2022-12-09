@@ -325,6 +325,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
     def connect_to_existing_free_variables(self):
         mimed_joint: OneDofJoint = self.god_map.unsafe_get_data(identifier.world)._joints[self.mimed_joint_name]
         self.free_variable = mimed_joint.free_variable
+        del self.parent_T_child
 
     def has_free_variables(self) -> bool:
         return False

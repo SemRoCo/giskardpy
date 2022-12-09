@@ -81,7 +81,7 @@ class Symbol_:
         return free_symbols(self.s)
 
     def evaluate(self):
-        if len(self) <= 1:
+        if self.s.shape[0] * self.s.shape[1] <= 1:
             return float(ca.evalf(self.s))
         else:
             return np.array(ca.evalf(self.s))
@@ -1473,7 +1473,7 @@ def if_eq_cases(a, b_result_cases, else_result):
     for i in range(len(b_result_cases)):
         b = _to_sx(b_result_cases[i][0])
         b_result = _to_sx(b_result_cases[i][1])
-        result = ca.if_else(ca.eq(a, b), b_result, else_result)
+        result = ca.if_else(ca.eq(a, b), b_result, result)
     return Expression(result)
 
 

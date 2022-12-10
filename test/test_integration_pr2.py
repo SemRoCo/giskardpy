@@ -1011,6 +1011,7 @@ class TestConstraints:
         # kitchen_setup.plan_and_execute()
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
     def test_open_drawer(self, kitchen_setup: PR2TestWrapper):

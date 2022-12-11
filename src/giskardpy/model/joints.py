@@ -1,7 +1,7 @@
 import abc
 from abc import ABC
 from typing import Dict, Tuple, Optional, List, Union
-
+from functools import cached_property
 import numpy as np
 import urdf_parser_py.urdf as up
 
@@ -24,7 +24,7 @@ class Joint(ABC):
         self.name: my_string = name
         self.parent_link_name: my_string = parent_link_name
         self.child_link_name: my_string = child_link_name
-        self.parent_T_child: w.TransMatrix = w.TransMatrix(parent_T_child)
+        self._parent_T_child: w.TransMatrix = w.TransMatrix(parent_T_child)
         self.create_free_variables()
 
     @property
@@ -35,12 +35,14 @@ class Joint(ABC):
     def world(self):
         return self.god_map.get_data(identifier.world)
 
-    @property
+    @cached_property
+    @profile
     def parent_T_child(self) -> w.TransMatrix:
         return self._parent_T_child.dot(self._joint_transformation())
 
-    @parent_T_child.setter
-    def parent_T_child(self, value: w.TransMatrix):
+    # @parent_T_child.setter
+    def update_parent_T_child(self, value: w.TransMatrix):
+        del self.parent_T_child
         self._parent_T_child = value
 
     def create_free_variable(self, name: my_string, lower_limits: derivative_map, upper_limits: derivative_map):
@@ -84,7 +86,7 @@ class Joint(ABC):
         """
 
     @abc.abstractmethod
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[w.Expression, w.Expression]]:
         """
         """
 
@@ -120,7 +122,7 @@ class FixedJoint(Joint):
             parent_T_child = w.eye(4)
         super().__init__(name, parent_link_name, child_link_name, parent_T_child)
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[w.Expression, w.Expression]]:
         return None
 
     def update_limits(self, linear_limits, angular_limits):
@@ -288,8 +290,7 @@ class OneDofJoint(Joint, ABC):
                 # can't do if in, because the dict may be a defaultdict
                 pass
 
-    def get_limit_expressions(self, order: Derivatives) \
-            -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: Derivatives) -> Optional[Tuple[w.Expression, w.Expression]]:
         return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
 
     def has_free_variables(self) -> bool:
@@ -324,6 +325,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
     def connect_to_existing_free_variables(self):
         mimed_joint: OneDofJoint = self.god_map.unsafe_get_data(identifier.world)._joints[self.mimed_joint_name]
         self.free_variable = mimed_joint.free_variable
+        del self.parent_T_child
 
     def has_free_variables(self) -> bool:
         return False
@@ -343,6 +345,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
 
 
 class PrismaticJoint(OneDofJoint):
+    @profile
     def _joint_transformation(self) -> w.TransMatrix:
         translation_axis = w.Point3(self.axis) * self.position_expression
         parent_T_child = w.TransMatrix.from_xyz_rpy(x=translation_axis[0],
@@ -358,6 +361,7 @@ class PrismaticJoint(OneDofJoint):
 
 
 class RevoluteJoint(OneDofJoint):
+    @profile
     def _joint_transformation(self) -> w.TransMatrix:
         rotation_axis = w.Vector3(self.axis)
         parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis, self.position_expression)
@@ -530,6 +534,7 @@ class OmniDrive(Joint):
     def position_variable_names(self):
         return [self.x_name, self.y_name, self.yaw_name]
 
+    @profile
     def _joint_transformation(self):
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),
@@ -662,6 +667,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
         new_vel_y = vel_y + pos_x * vel_z
         return new_vel_x, new_vel_y
 
+    @profile
     def _joint_transformation(self):
         try:
             x_vel = self.x_vel.get_symbol(Derivatives.velocity)
@@ -699,7 +705,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
     def update_weights(self, weights: derivative_joint_map):
         pass
 
-    def get_limit_expressions(self, order: int) -> Optional[Tuple[Union[w.Symbol, float], Union[w.Symbol, float]]]:
+    def get_limit_expressions(self, order: int) -> Optional[Tuple[w.Expression, w.Expression]]:
         pass
 
     def has_free_variables(self) -> bool:
@@ -1257,6 +1263,7 @@ class DiffDrive(Joint):
                                                  rotation_lower_limits,
                                                  rotation_upper_limits)
 
+    @profile
     def _joint_transformation(self):
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),

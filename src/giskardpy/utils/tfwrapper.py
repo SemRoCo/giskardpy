@@ -14,6 +14,7 @@ from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
+from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.utils import memoize
 
@@ -123,7 +124,8 @@ def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
                                      rospy.Duration(timeout))
 
 
-def make_transform(parent_frame, child_frame, pose):
+def make_transform(parent_frame: PrefixName, child_frame: PrefixName, pose: Pose, normalize_quaternion: bool = True) \
+        -> TransformStamped:
     tf = TransformStamped()
     tf.header.frame_id = str(parent_frame)
     tf.header.stamp = rospy.get_rostime()
@@ -131,7 +133,10 @@ def make_transform(parent_frame, child_frame, pose):
     tf.transform.translation.x = pose.position.x
     tf.transform.translation.y = pose.position.y
     tf.transform.translation.z = pose.position.z
-    tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
+    if normalize_quaternion:
+        tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
+    else:
+        tf.transform.rotation = pose.orientation
     return tf
 
 
@@ -601,6 +606,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     pub.publish(ma)
 
 
+@profile
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
     rotation = np.array([quaternion.x,

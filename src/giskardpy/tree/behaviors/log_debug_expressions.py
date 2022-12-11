@@ -1,3 +1,4 @@
+import numpy as np
 from py_trees import Status
 
 from giskardpy import identifier
@@ -29,7 +30,10 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
                 if last_mjs is not None:
                     velocity = value - last_mjs[name].position
                 else:
-                    velocity = 0
+                    if isinstance(value, np.ndarray):
+                        velocity = np.zeros(value.shape)
+                    else:
+                        velocity = 0
                 js[name].position = value
                 js[name].velocity = velocity/self.sample_period
             self.trajectory.set(time, js)

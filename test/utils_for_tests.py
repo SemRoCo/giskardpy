@@ -173,9 +173,10 @@ def hsr_urdf():
     return urdf_string
 
 
-def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
+def float_no_nan_no_inf(outer_limit=1e5, min_dist_to_zero=None):
     if outer_limit is not None:
-        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit,
+                         allow_subnormal=False)
     else:
         return st.floats(allow_nan=False, allow_infinity=False)
     # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
@@ -753,6 +754,8 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint in joints:
             try:
                 lower_limit, upper_limit = self.world._joints[joint].get_limit_expressions(0)
+                lower_limit = lower_limit.evaluate()
+                upper_limit = upper_limit.evaluate()
             except:
                 continue
             assert lower_limit <= self.world.state[joint].position <= upper_limit, \
@@ -1497,14 +1500,10 @@ def publish_marker_sphere(position, frame_id='map', radius=0.05, id_=0):
     pub.publish(m)
 
 
-def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, id_=0):
+def publish_marker_vector(start: Point, end: Point, diameter_shaft: float = 0.01, diameter_head: float = 0.02,
+                          id_: int = 0):
     """
     assumes points to be in frame map
-    :type start: Point
-    :type end: Point
-    :type diameter_shaft: float
-    :type diameter_head: float
-    :type id_: int
     """
     m = Marker()
     m.action = m.ADD

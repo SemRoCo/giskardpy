@@ -1,4 +1,6 @@
+import rospy
 from py_trees import Status
+from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import identifier
 from giskardpy.model.collision_world_syncer import Collisions
@@ -9,9 +11,18 @@ class CleanUp(GiskardBehavior):
     @profile
     def __init__(self, name):
         super().__init__(name)
+        self.marker_pub = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
+
+    def clear_markers(self):
+        msg = MarkerArray()
+        marker = Marker()
+        marker.action = Marker.DELETEALL
+        msg.markers.append(marker)
+        self.marker_pub.publish(msg)
 
     @profile
     def initialise(self):
+        self.clear_markers()
         self.god_map.clear_cache()
         self.god_map.get_data(identifier.giskard)._reset_config()
         self.god_map.set_data(identifier.goal_msg, None)

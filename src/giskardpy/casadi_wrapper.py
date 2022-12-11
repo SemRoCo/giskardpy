@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import copy
 from typing import Union
 
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
+import rospy
+
+from giskardpy.my_types import PrefixName
+from giskardpy.utils import logging
 
 _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
@@ -19,6 +23,10 @@ class CompiledFunction:
         self.buf, self.f_eval = fast_f.buffer()
         self.out = np.zeros(self.shape, order='F')
         self.buf.set_res(0, memoryview(self.out))  # type: ignore
+        if len(str_params) == 0:
+            self.f_eval()
+            self.__call__ = lambda **kwargs: self.out
+            self.call2 = lambda filtered_args: self.out
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
@@ -33,6 +41,11 @@ class CompiledFunction:
         self.buf.set_arg(0, memoryview(filtered_args))  # type: ignore
         self.f_eval()
         return self.out
+
+
+def _operation_type_error(arg1, operation, arg2):
+    return TypeError(f'unsupported operand type(s) for {operation}: \'{arg1.__class__.__name__}\' '
+                     f'and \'{arg2.__class__.__name__}\'')
 
 
 class Symbol_:
@@ -51,8 +64,10 @@ class Symbol_:
         return Expression(self.s[item])
 
     def __setitem__(self, key, value):
-        if isinstance(value, Symbol_):
+        try:
             value = value.s
+        except AttributeError:
+            pass
         self.s[key] = value
 
     @property
@@ -60,13 +75,13 @@ class Symbol_:
         return self.s.shape
 
     def __len__(self):
-        return self.shape[0] * self.shape[1]
+        return self.shape[0]
 
     def free_symbols(self):
         return free_symbols(self.s)
 
     def evaluate(self):
-        if len(self) <= 1:
+        if self.s.shape[0] * self.s.shape[1] <= 1:
             return float(ca.evalf(self.s))
         else:
             return np.array(ca.evalf(self.s))
@@ -89,6 +104,8 @@ class Symbol(Symbol_):
         self.s: ca.SX = ca.SX.sym(name)
 
     def __add__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__add__(other))
         if isinstance(other, Symbol_):
             sum_ = self.s.__add__(other.s)
             if isinstance(other, (Symbol, Expression)):
@@ -97,18 +114,16 @@ class Symbol(Symbol_):
                 return Vector3(sum_)
             elif isinstance(other, Point3):
                 return Point3(sum_)
-            else:
-                raise TypeError(f'unsupported operand type(s) for +: \'{self.__class__.__name__}\' '
-                                f'and \'{other.__class__.__name__}\'')
-        return Expression(self.s.__add__(other))
+        raise _operation_type_error(self, '+', other)
 
     def __radd__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for +: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Expression(self.s.__radd__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__radd__(other))
+        raise _operation_type_error(other, '+', self)
 
     def __sub__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__sub__(other))
         if isinstance(other, Symbol_):
             result = self.s.__sub__(other.s)
             if isinstance(other, (Symbol, Expression)):
@@ -117,18 +132,16 @@ class Symbol(Symbol_):
                 return Vector3(result)
             elif isinstance(other, Point3):
                 return Point3(result)
-            else:
-                raise TypeError(f'unsupported operand type(s) for -: \'{self.__class__.__name__}\' '
-                                f'and \'{other.__class__.__name__}\'')
-        return Expression(self.s.__sub__(other))
+        raise _operation_type_error(self, '-', other)
 
     def __rsub__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for -: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Expression(self.s.__rsub__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rsub__(other))
+        raise _operation_type_error(other, '-', self)
 
     def __mul__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__mul__(other))
         if isinstance(other, Symbol_):
             result = self.s.__mul__(other.s)
             if isinstance(other, (Symbol, Expression)):
@@ -137,18 +150,16 @@ class Symbol(Symbol_):
                 return Vector3(result)
             elif isinstance(other, Point3):
                 return Point3(result)
-            else:
-                raise TypeError(f'unsupported operand type(s) for *: \'{self.__class__.__name__}\' '
-                                f'and \'{other.__class__.__name__}\'')
-        return Expression(self.s.__mul__(other))
+        raise _operation_type_error(self, '*', other)
 
     def __rmul__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for *: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Expression(self.s.__rmul__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rmul__(other))
+        raise _operation_type_error(other, '*', self)
 
     def __truediv__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__truediv__(other))
         if isinstance(other, Symbol_):
             result = self.s.__truediv__(other.s)
             if isinstance(other, (Symbol, Expression)):
@@ -157,16 +168,12 @@ class Symbol(Symbol_):
                 return Vector3(result)
             elif isinstance(other, Point3):
                 return Point3(result)
-            else:
-                raise TypeError(f'unsupported operand type(s) for /: \'{self.__class__.__name__}\' '
-                                f'and \'{other.__class__.__name__}\'')
-        return Expression(self.s.__truediv__(other))
+        raise _operation_type_error(self, '/', other)
 
     def __rtruediv__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for /: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Expression(self.s.__rtruediv__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rtruediv__(other))
+        raise _operation_type_error(other, '/', self)
 
     def __lt__(self, other):
         if isinstance(other, Symbol_):
@@ -202,6 +209,8 @@ class Symbol(Symbol_):
         return Expression(self.s.__neg__())
 
     def __pow__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__pow__(other))
         if isinstance(other, Symbol_):
             result = self.s.__pow__(other.s)
             if isinstance(other, (Symbol, Expression)):
@@ -210,16 +219,12 @@ class Symbol(Symbol_):
                 return Vector3(result)
             elif isinstance(other, Point3):
                 return Point3(result)
-            else:
-                raise TypeError(f'unsupported operand type(s) for **: \'{self.__class__.__name__}\' '
-                                f'and \'{other.__class__.__name__}\'')
-        return Expression(self.s.__pow__(other))
+        raise _operation_type_error(self, '**', other)
 
     def __rpow__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for **: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Expression(self.s.__rpow__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rpow__(other))
+        raise _operation_type_error(other, '**', self)
 
     def __hash__(self):
         return self.s.__hash__()
@@ -233,10 +238,8 @@ class Expression(Symbol_):
         if isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, Symbol_):
-            self.s = deepcopy(data.s)
-        elif isinstance(data, (int, float)):
-            self.s = ca.SX(data)
-        elif isinstance(data, np.ndarray):
+            self.s = copy(data.s)
+        elif isinstance(data, (int, float, np.ndarray)):
             self.s = ca.SX(data)
         else:
             x = len(data)
@@ -262,73 +265,87 @@ class Expression(Symbol_):
         self.s.remove(rows, columns)
 
     def __add__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__add__(other))
         if isinstance(other, Point3):
             return Point3(self.s.__add__(other.s))
         if isinstance(other, Vector3):
             return Vector3(self.s.__add__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__add__(other.s))
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for +: \'{self.__class__.__name__}\' '
-                            f'and \'{other.__class__.__name__}\'')
-        return Expression(self.s.__add__(other))
+        raise _operation_type_error(self, '+', other)
 
     def __radd__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for +: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Expression(self.s.__radd__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__radd__(other))
+        raise _operation_type_error(other, '+', self)
 
     def __sub__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__sub__(other))
         if isinstance(other, Point3):
             return Point3(self.s.__sub__(other.s))
         if isinstance(other, Vector3):
             return Vector3(self.s.__sub__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__sub__(other.s))
-        return Expression(self.s.__sub__(other))
+        raise _operation_type_error(self, '-', other)
 
     def __rsub__(self, other):
-        return Expression(self.s.__rsub__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rsub__(other))
+        raise _operation_type_error(other, '-', self)
 
     def __truediv__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__truediv__(other))
         if isinstance(other, Point3):
             return Point3(self.s.__truediv__(other.s))
         if isinstance(other, Vector3):
             return Vector3(self.s.__truediv__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__truediv__(other.s))
-        return Expression(self.s.__truediv__(other))
+        raise _operation_type_error(self, '/', other)
 
     def __rtruediv__(self, other):
-        return Expression(self.s.__rtruediv__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rtruediv__(other))
+        raise _operation_type_error(other, '/', self)
 
     def __mul__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__mul__(other))
         if isinstance(other, Point3):
             return Point3(self.s.__mul__(other.s))
         if isinstance(other, Vector3):
             return Vector3(self.s.__mul__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__mul__(other.s))
-        return Expression(self.s.__mul__(other))
+        raise _operation_type_error(self, '*', other)
 
     def __rmul__(self, other):
-        return Expression(self.s.__rmul__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rmul__(other))
+        raise _operation_type_error(other, '*', self)
 
     def __neg__(self):
         return Expression(self.s.__neg__())
 
     def __pow__(self, other):
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__pow__(other))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__pow__(other.s))
         if isinstance(other, (Vector3)):
             return Vector3(self.s.__pow__(other.s))
         if isinstance(other, (Point3)):
             return Point3(self.s.__pow__(other.s))
-        return Expression(self.s.__pow__(other))
+        raise _operation_type_error(self, '**', other)
 
     def __rpow__(self, other):
-        return Expression(self.s.__rpow__(other))
+        if isinstance(other, (int, float)):
+            return Expression(self.s.__rpow__(other))
+        raise _operation_type_error(other, '**', self)
 
     def __eq__(self, other):
         if isinstance(other, Symbol_):
@@ -345,8 +362,7 @@ class Expression(Symbol_):
             if self.shape[1] == 1 and other.shape[1] == 1:
                 return Expression(ca.mtimes(self.T.s, other.s))
             return Expression(ca.mtimes(self.s, other.s))
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
-                        f'and \'{other.__class__.__name__}\'')
+        raise _operation_type_error(self, 'dot', other)
 
     @property
     def T(self):
@@ -355,51 +371,79 @@ class Expression(Symbol_):
 
 class TransMatrix(Symbol_):
     @profile
-    def __init__(self, data=None):
-        if isinstance(data, geometry_msgs.PoseStamped):
-            data = data.pose
-        if isinstance(data, geometry_msgs.Pose):
-            r = RotationMatrix(data.orientation)
-            self.s = r.s
-            self.s[0, 3] = data.position.x
-            self.s[1, 3] = data.position.y
-            self.s[2, 3] = data.position.z
+    def __init__(self, data=None, sanity_check=True):
+        try:
+            self.reference_frame = data.reference_frame
+        except AttributeError:
+            self.reference_frame = None
+        try:
+            self.child_frame = data.child_frame
+        except AttributeError:
+            self.child_frame = None
+        if isinstance(data, (geometry_msgs.Pose, geometry_msgs.PoseStamped)):
+            if isinstance(data, geometry_msgs.PoseStamped):
+                self.reference_frame = data.header.frame_id
+                data = data.pose
+            if isinstance(data, geometry_msgs.Pose):
+                r = RotationMatrix(data.orientation)
+                self.s = r.s
+                self.s[0, 3] = data.position.x
+                self.s[1, 3] = data.position.y
+                self.s[2, 3] = data.position.z
+                return
+        elif data is None:
+            self.s = ca.SX.eye(4)
             return
-        if data is None:
-            data = ca.SX.eye(4)
-        self.s = deepcopy(Expression(data).s)
-        if self.shape[0] != 4 or self.shape[1] != 4:
-            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
-        self[3, 0] = 0
-        self[3, 1] = 0
-        self[3, 2] = 0
-        self[3, 3] = 1
+        elif isinstance(data, ca.SX):
+            self.s = data
+        elif isinstance(data, (Expression, RotationMatrix, TransMatrix)):
+            self.s = copy(data.s)
+        else:
+            self.s = copy(Expression(data).s)
+        if sanity_check:
+            if self.shape[0] != 4 or self.shape[1] != 4:
+                raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
+            self[3, 0] = 0
+            self[3, 1] = 0
+            self[3, 2] = 0
+            self[3, 3] = 1
 
     @classmethod
     def from_point_rotation_matrix(cls, point=None, rotation_matrix=None):
         if rotation_matrix is None:
             a_T_b = cls()
         else:
-            a_T_b = cls(rotation_matrix)
+            a_T_b = cls(rotation_matrix, sanity_check=False)
         if point is not None:
             a_T_b[0, 3] = point.x
             a_T_b[1, 3] = point.y
             a_T_b[2, 3] = point.z
         return a_T_b
 
+    @profile
     def dot(self, other):
-        result = ca.mtimes(self.s, other.s)
-        if isinstance(other, Vector3):
-            return Vector3(result)
-        if isinstance(other, Point3):
-            return Point3(result)
-        if isinstance(other, RotationMatrix):
-            return RotationMatrix(result)
-        if isinstance(other, TransMatrix):
-            return TransMatrix(result)
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
-                        f'and \'{other.__class__.__name__}\'')
+        if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
+            result = ca.mtimes(self.s, other.s)
+            if isinstance(other, Vector3):
+                result = Vector3(result)
+                result.reference_frame = self.reference_frame
+                return result
+            if isinstance(other, Point3):
+                result = Point3(result)
+                result.reference_frame = self.reference_frame
+                return result
+            if isinstance(other, RotationMatrix):
+                result = RotationMatrix(result, sanity_check=False)
+                result.reference_frame = self.reference_frame
+                return result
+            if isinstance(other, TransMatrix):
+                result = TransMatrix(result, sanity_check=False)
+                result.reference_frame = self.reference_frame
+                result.child_frame = other.child_frame
+                return result
+        raise _operation_type_error(self, 'dot', other)
 
+    @profile
     def inverse(self):
         inv = TransMatrix()
         inv[:3, :3] = self[:3, :3].T
@@ -407,13 +451,16 @@ class TransMatrix(Symbol_):
         return inv
 
     @classmethod
+    @profile
     def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None):
         p = Point3.from_xyz(x, y, z)
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
         return cls.from_point_rotation_matrix(p, r)
 
     def to_position(self):
-        return Point3(self[:4, 3:])
+        result = Point3(self[:4, 3:])
+        result.reference_frame = self.reference_frame
+        return result
 
     def to_translation(self):
         """
@@ -423,6 +470,7 @@ class TransMatrix(Symbol_):
         r[0, 3] = self[0, 3]
         r[1, 3] = self[1, 3]
         r[2, 3] = self[2, 3]
+        r.reference_frame = self.reference_frame
         return TransMatrix(r)
 
     def to_rotation(self):
@@ -431,49 +479,70 @@ class TransMatrix(Symbol_):
 
 class RotationMatrix(Symbol_):
     @profile
-    def __init__(self, data=None):
-        if isinstance(data, geometry_msgs.QuaternionStamped):
-            data = data.quaternion
-        if isinstance(data, geometry_msgs.Quaternion):
-            data = Quaternion(data)
-        if isinstance(data, Quaternion):
-            data = self.__quaternion_to_rotation_matrix(data)
-        if data is None:
-            data = ca.SX.eye(4)
-        self.s = Expression(data).s
-        if self.shape[0] != 4 or self.shape[1] != 4:
-            raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data, '
-                             f'you have{self.shape}.')
-        self[0, 3] = 0
-        self[1, 3] = 0
-        self[2, 3] = 0
-        self[3, 0] = 0
-        self[3, 1] = 0
-        self[3, 2] = 0
-        self[3, 3] = 1
+    def __init__(self, data=None, sanity_check=True):
+        if hasattr(data, 'reference_frame'):
+            self.reference_frame = data.reference_frame
+        else:
+            self.reference_frame = None
+        if isinstance(data, ca.SX):
+            self.s = data
+        elif isinstance(data, (geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped)):
+            if isinstance(data, geometry_msgs.QuaternionStamped):
+                self.reference_frame = data.header.frame_id
+                data = data.quaternion
+            if isinstance(data, geometry_msgs.Quaternion):
+                self.s = self.__quaternion_to_rotation_matrix(Quaternion(data)).s
+        elif isinstance(data, Quaternion):
+            self.s = self.__quaternion_to_rotation_matrix(data).s
+        elif data is None:
+            self.s = ca.SX.eye(4)
+            return
+        else:
+            self.s = Expression(data).s
+        if sanity_check:
+            if self.shape[0] != 4 or self.shape[1] != 4:
+                raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data, '
+                                 f'you have{self.shape}.')
+            self[0, 3] = 0
+            self[1, 3] = 0
+            self[2, 3] = 0
+            self[3, 0] = 0
+            self[3, 1] = 0
+            self[3, 2] = 0
+            self[3, 3] = 1
 
     @classmethod
+    @profile
     def from_axis_angle(cls, axis, angle):
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
         https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
         """
-        ct = cos(angle)
-        st = sin(angle)
+        # use casadi to prevent a bunch of Expression.__init__ calls
+        axis = axis.s
+        try:
+            angle = angle.s
+        except AttributeError:
+            pass
+        ct = ca.cos(angle)
+        st = ca.sin(angle)
         vt = 1 - ct
-        m_vt_0 = vt * axis[0]
-        m_vt_1 = vt * axis[1]
-        m_vt_2 = vt * axis[2]
-        m_st_0 = axis[0] * st
-        m_st_1 = axis[1] * st
-        m_st_2 = axis[2] * st
-        m_vt_0_1 = m_vt_0 * axis[1]
-        m_vt_0_2 = m_vt_0 * axis[2]
-        m_vt_1_2 = m_vt_1 * axis[2]
-        return cls([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
-                    [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
-                    [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
-                    [0, 0, 0, 1]])
+        m_vt = axis * vt
+        m_st = axis * st
+        m_vt_0_ax = (m_vt[0] * axis)[1:]
+        m_vt_1_2 = m_vt[1] * axis[2]
+        s = ca.SX.eye(4)
+        ct__m_vt__axis = ct + m_vt * axis
+        s[0, 0] = ct__m_vt__axis[0]
+        s[0, 1] = -m_st[2] + m_vt_0_ax[0]
+        s[0, 2] = m_st[1] + m_vt_0_ax[1]
+        s[1, 0] = m_st[2] + m_vt_0_ax[0]
+        s[1, 1] = ct__m_vt__axis[1]
+        s[1, 2] = -m_st[0] + m_vt_1_2
+        s[2, 0] = -m_st[1] + m_vt_0_ax[1]
+        s[2, 1] = m_st[0] + m_vt_1_2
+        s[2, 2] = ct__m_vt__axis[2]
+        return cls(s, sanity_check=False)
 
     @classmethod
     def __quaternion_to_rotation_matrix(cls, q):
@@ -489,27 +558,29 @@ class RotationMatrix(Symbol_):
         y2 = y * y
         z2 = z * z
         w2 = w * w
-        return [[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                [0, 0, 0, 1]]
+        return cls([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                    [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                    [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                    [0, 0, 0, 1]])
 
     @classmethod
     def from_quaternion(cls, q):
-        return cls(cls.__quaternion_to_rotation_matrix(q))
+        return cls.__quaternion_to_rotation_matrix(q)
 
     def dot(self, other):
-        result = ca.mtimes(self.s, other.s)
-        if isinstance(other, Vector3):
-            return Vector3(result)
-        if isinstance(other, Point3):
-            return Point3(result)
-        if isinstance(other, RotationMatrix):
-            return RotationMatrix(result)
-        if isinstance(other, TransMatrix):
-            return TransMatrix(result)
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
-                        f'and \'{other.__class__.__name__}\'')
+        if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
+            result = ca.mtimes(self.s, other.s)
+            if isinstance(other, Vector3):
+                result = Vector3(result)
+            elif isinstance(other, Point3):
+                result = Point3(result)
+            elif isinstance(other, RotationMatrix):
+                result = RotationMatrix(result, sanity_check=False)
+            elif isinstance(other, TransMatrix):
+                result = TransMatrix(result, sanity_check=False)
+            result.reference_frame = self.reference_frame
+            return result
+        raise _operation_type_error(self, 'dot', other)
 
     def to_axis_angle(self):
         return self.to_quaternion().to_axis_angle()
@@ -552,6 +623,7 @@ class RotationMatrix(Symbol_):
         return R
 
     @classmethod
+    @profile
     def from_rpy(cls, roll=None, pitch=None, yaw=None):
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
@@ -560,19 +632,30 @@ class RotationMatrix(Symbol_):
         roll = 0 if roll is None else roll
         pitch = 0 if pitch is None else pitch
         yaw = 0 if yaw is None else yaw
-        rx = cls([[1, 0, 0, 0],
-                  [0, cos(roll), -sin(roll), 0],
-                  [0, sin(roll), cos(roll), 0],
-                  [0, 0, 0, 1]])
-        ry = cls([[cos(pitch), 0, sin(pitch), 0],
-                  [0, 1, 0, 0],
-                  [-sin(pitch), 0, cos(pitch), 0],
-                  [0, 0, 0, 1]])
-        rz = cls([[cos(yaw), -sin(yaw), 0, 0],
-                  [sin(yaw), cos(yaw), 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]])
-        return rz.dot(ry).dot(rx)
+        try:
+            roll = roll.s
+        except AttributeError:
+            pass
+        try:
+            pitch = pitch.s
+        except AttributeError:
+            pass
+        try:
+            yaw = yaw.s
+        except AttributeError:
+            pass
+        s = ca.SX.eye(4)
+
+        s[0,0] = ca.cos(yaw) * ca.cos(pitch)
+        s[0,1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
+        s[0,2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
+        s[1,0] = ca.sin(yaw) * ca.cos(pitch)
+        s[1,1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
+        s[1,2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
+        s[2,0] = -ca.sin(pitch)
+        s[2,1] = ca.cos(pitch) * ca.sin(roll)
+        s[2,2] = ca.cos(pitch) * ca.cos(roll)
+        return cls(s, sanity_check=False)
 
     def inverse(self):
         return RotationMatrix(self.T)
@@ -616,21 +699,32 @@ class RotationMatrix(Symbol_):
 class Point3(Symbol_):
     @profile
     def __init__(self, data=None):
+        try:
+            self.reference_frame = data.reference_frame
+        except AttributeError:
+            self.reference_frame = None
         if data is None:
-            data = (0, 0, 0)
-        if isinstance(data, geometry_msgs.PointStamped):
-            data = data.point
-        if isinstance(data, geometry_msgs.Vector3Stamped):
-            data = data.vector
-        if isinstance(data, (Point3, Vector3, geometry_msgs.Point, geometry_msgs.Vector3)):
-            x, y, z = data.x, data.y, data.z
+            self.s = ca.SX([0, 0, 0, 1])
+            return
+        if isinstance(data, rospy.Message):
+            if isinstance(data, geometry_msgs.PointStamped):
+                self.reference_frame = data.header.frame_id
+                data = data.point
+            if isinstance(data, geometry_msgs.Vector3Stamped):
+                self.reference_frame = data.header.frame_id
+                data = data.vector
+            if isinstance(data, (Point3, Vector3, geometry_msgs.Point, geometry_msgs.Vector3)):
+                self.s = ca.SX([data.x, data.y, data.z, 1])
+        elif isinstance(data, Symbol_):
+            self.s = ca.SX([0, 0, 0, 1])
+            self[0] = data.s[0]
+            self[1] = data.s[1]
+            self[2] = data.s[2]
         else:
-            x, y, z = data[0], data[1], data[2]
-        self.s = ca.SX(4, 1)
-        self[0] = x
-        self[1] = y
-        self[2] = z
-        self[3] = 1
+            self.s = ca.SX([0, 0, 0, 1])
+            self[0] = data[0]
+            self[1] = data[1]
+            self[2] = data[2]
 
     @classmethod
     def from_xyz(cls, x=None, y=None, z=None):
@@ -667,66 +761,115 @@ class Point3(Symbol_):
         self[2] = value
 
     def __add__(self, other):
-        if isinstance(other, (Vector3, Expression, Symbol)):
-            return Point3(self.s.__add__(other.s))
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for +: \'{self.__class__.__name__}\' '
-                            f'and \'{other.__class__.__name__}\'')
-        return Point3(self.s.__add__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__add__(other))
+        elif isinstance(other, (Vector3, Expression, Symbol)):
+            result = Point3(self.s.__add__(other.s))
+        else:
+            raise _operation_type_error(self, '+', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __radd__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for +: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Point3(self.s.__add__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__add__(other))
+        else:
+            raise _operation_type_error(other, '+', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __sub__(self, other):
-        if isinstance(other, Point3):
-            return Vector3(self.s.__sub__(other.s))
-        if isinstance(other, (Symbol, Expression, Vector3)):
-            return Point3(self.s.__sub__(other.s))
-        return Point3(self.s.__sub__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__sub__(other))
+        elif isinstance(other, Point3):
+            result = Vector3(self.s.__sub__(other.s))
+        elif isinstance(other, (Symbol, Expression, Vector3)):
+            result = Point3(self.s.__sub__(other.s))
+        else:
+            raise _operation_type_error(self, '-', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rsub__(self, other):
-        return Point3(self.s.__sub__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__rsub__(other))
+        else:
+            raise _operation_type_error(other, '-', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __mul__(self, other):
-        if isinstance(other, (Symbol, Expression)):
-            return Point3(self.s.__mul__(other.s))
-        return Point3(self.s.__mul__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__mul__(other))
+        elif isinstance(other, (Symbol, Expression)):
+            result = Point3(self.s.__mul__(other.s))
+        else:
+            raise _operation_type_error(self, '*', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rmul__(self, other):
-        return Point3(self.s.__mul__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__mul__(other))
+        else:
+            raise _operation_type_error(other, '*', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __truediv__(self, other):
-        if isinstance(other, (Symbol, Expression)):
-            return Point3(self.s.__truediv__(other.s))
-        return Point3(self.s.__truediv__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__truediv__(other))
+        elif isinstance(other, (Symbol, Expression)):
+            result = Point3(self.s.__truediv__(other.s))
+        else:
+            raise _operation_type_error(self, '/', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rtruediv__(self, other):
-        return Point3(self.s.__rtruediv__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__rtruediv__(other))
+        else:
+            raise _operation_type_error(other, '/', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __neg__(self) -> Point3:
-        return Point3(self.s.__neg__())
+        result = Point3(self.s.__neg__())
+        result.reference_frame = self.reference_frame
+        return result
 
     def __pow__(self, other):
-        if isinstance(other, (Symbol, Expression)):
-            return Point3(self.s.__pow__(other.s))
-        return Point3(self.s.__pow__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__pow__(other))
+        elif isinstance(other, (Symbol, Expression)):
+            result = Point3(self.s.__pow__(other.s))
+        else:
+            raise _operation_type_error(self, '**', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rpow__(self, other):
-        return Point3(self.s.__rpow__(other))
+        if isinstance(other, (int, float)):
+            result = Point3(self.s.__rpow__(other))
+        else:
+            raise _operation_type_error(other, '**', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def dot(self, other):
         if isinstance(other, (Point3, Vector3)):
             return Expression(ca.mtimes(self[:3].T.s, other[:3].s))
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
-                        f'and \'{other.__class__.__name__}\'')
+        raise _operation_type_error(self, 'dot', other)
+
 
 class Vector3(Symbol_):
     @profile
     def __init__(self, data=None):
-        self.s = Point3(data).s
+        point = Point3(data)
+        self.s = point.s
+        self.reference_frame = point.reference_frame
+        self.vis_frame = self.reference_frame
         self[3] = 0
 
     @classmethod
@@ -761,67 +904,114 @@ class Vector3(Symbol_):
         self[2] = value
 
     def __add__(self, other):
-        if isinstance(other, Point3):
-            return Point3(self.__add__(other.s))
-        if isinstance(other, (Vector3, Expression, Symbol)):
-            return Vector3(self.s.__add__(other.s))
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for +: \'{self.__class__.__name__}\' '
-                            f'and \'{other.__class__.__name__}\'')
-        return Vector3(self.s.__add__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__add__(other))
+        elif isinstance(other, Point3):
+            result = Point3(self.s.__add__(other.s))
+        elif isinstance(other, (Vector3, Expression, Symbol)):
+            result = Vector3(self.s.__add__(other.s))
+        else:
+            raise _operation_type_error(self, '+', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __radd__(self, other):
-        if isinstance(other, Symbol_):
-            raise TypeError(f'unsupported operand type(s) for +: \'{other.__class__.__name__}\' '
-                            f'and \'{self.__class__.__name__}\'')
-        return Vector3(self.s.__add__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__add__(other))
+        else:
+            raise _operation_type_error(other, '+', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __sub__(self, other):
-        if isinstance(other, Point3):
-            return Point3(self.s.__sub__(other.s))
-        if isinstance(other, (Symbol, Expression, Vector3)):
-            return Vector3(self.s.__sub__(other.s))
-        return Vector3(self.s.__sub__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__sub__(other))
+        elif isinstance(other, Point3):
+            result = Point3(self.s.__sub__(other.s))
+        elif isinstance(other, (Symbol, Expression, Vector3)):
+            result = Vector3(self.s.__sub__(other.s))
+        else:
+            raise _operation_type_error(self, '-', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rsub__(self, other):
-        return Vector3(self.s.__rsub__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__rsub__(other))
+        else:
+            raise _operation_type_error(other, '-', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __mul__(self, other):
-        if isinstance(other, (Symbol, Expression)):
-            return Vector3(self.s.__mul__(other.s))
-        return Vector3(self.s.__mul__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__mul__(other))
+        elif isinstance(other, (Symbol, Expression)):
+            result = Vector3(self.s.__mul__(other.s))
+        else:
+            raise _operation_type_error(self, '*', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rmul__(self, other):
-        return Vector3(self.s.__mul__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__mul__(other))
+        else:
+            raise _operation_type_error(other, '*', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __pow__(self, other):
-        if isinstance(other, (Symbol, Expression)):
-            return Vector3(self.s.__pow__(other.s))
-        return Vector3(self.s.__pow__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__pow__(other))
+        elif isinstance(other, (Symbol, Expression)):
+            result = Vector3(self.s.__pow__(other.s))
+        else:
+            raise _operation_type_error(self, '**', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rpow__(self, other):
-        return Vector3(self.s.__rpow__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__rpow__(other))
+        else:
+            raise _operation_type_error(other, '**', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __truediv__(self, other):
-        if isinstance(other, (Symbol, Expression)):
-            return Vector3(self.s.__truediv__(other.s))
-        return Vector3(self.s.__truediv__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__truediv__(other))
+        elif isinstance(other, (Symbol, Expression)):
+            result = Vector3(self.s.__truediv__(other.s))
+        else:
+            raise _operation_type_error(self, '/', other)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __rtruediv__(self, other):
-        return Vector3(self.s.__rtruediv__(other))
+        if isinstance(other, (int, float)):
+            result = Vector3(self.s.__rtruediv__(other))
+        else:
+            raise _operation_type_error(other, '/', self)
+        result.reference_frame = self.reference_frame
+        return result
 
     def __neg__(self):
-        return Vector3(self.s.__neg__())
+        result = Vector3(self.s.__neg__())
+        result.reference_frame = self.reference_frame
+        return result
 
     def dot(self, other):
         if isinstance(other, (Point3, Vector3)):
             return Expression(ca.mtimes(self[:3].T.s, other[:3].s))
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
-                        f'and \'{other.__class__.__name__}\'')
+        raise _operation_type_error(self, 'dot', other)
 
     def cross(self, other):
         result = ca.cross(self.s[:3], other.s[:3])
-        return Vector3(result)
+        result = Vector3(result)
+        result.reference_frame = self.reference_frame
+        return result
 
     def norm(self):
         return norm(self)
@@ -1015,8 +1205,7 @@ class Quaternion(Symbol_):
     def dot(self, other):
         if isinstance(other, Quaternion):
             return Expression(ca.mtimes(self.s.T, other.s))
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{self.__class__.__name__}\' '
-                        f'and \'{other.__class__.__name__}\'')
+        raise _operation_type_error(self, 'dot', other)
 
 
 all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
@@ -1037,9 +1226,13 @@ def var(variables_names: str):
 
 
 def diag(args):
-    return Expression(ca.diag(Expression(args).s))
+    try:
+        return Expression(ca.diag(args.s))
+    except AttributeError:
+        return Expression(ca.diag(Expression(args).s))
 
 
+@profile
 def jacobian(expressions, symbols, order=1):
     expressions = Expression(expressions)
     if order == 1:
@@ -1155,12 +1348,52 @@ def if_else(condition, if_result, else_result):
     return return_type(ca.if_else(condition, if_result, else_result))
 
 
+def equal(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.eq(x, y))
+
+
+def less_equal(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.le(x, y))
+
+
+def greater_equal(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.ge(x, y))
+
+
+def less(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.lt(x, y))
+
+
+def greater(x, y):
+    if isinstance(x, Symbol_):
+        x = x.s
+    if isinstance(y, Symbol_):
+        y = y.s
+    return Expression(ca.gt(x, y))
+
+
 def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
-        return Expression(ca.logic_and(args[0], args[1]))
+        return Expression(ca.logic_and(args[0].s, args[1].s))
     else:
-        return Expression(ca.logic_and(args[0], logic_and(*args[1:])))
+        return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
 
 
 def logic_or(*args):
@@ -1232,28 +1465,37 @@ def if_eq(a, b, if_result, else_result):
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
+@profile
 def if_eq_cases(a, b_result_cases, else_result):
-    a = Expression(a).s
-    result = else_result
-    for i in range(b_result_cases.shape[0]):
-        b = b_result_cases[i, 0]
-        b_result = b_result_cases[i, 1]
-        result = if_eq(a, b, b_result, result)
-    return result
+    a = _to_sx(a)
+    else_result = _to_sx(else_result)
+    result = _to_sx(else_result)
+    for i in range(len(b_result_cases)):
+        b = _to_sx(b_result_cases[i][0])
+        b_result = _to_sx(b_result_cases[i][1])
+        result = ca.if_else(ca.eq(a, b), b_result, result)
+    return Expression(result)
 
 
+@profile
 def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
     """
-    a = Expression(a).s
-    result = else_result
-    b_result_cases = Expression(b_result_cases)
-    for i in reversed(range(b_result_cases.shape[0] - 1)):
-        b = b_result_cases[i, 0]
-        b_result = b_result_cases[i, 1]
-        result = if_less_eq(a, b, b_result, result)
-    return result
+    a = _to_sx(a)
+    result = _to_sx(else_result)
+    for i in reversed(range(len(b_result_cases) - 1)):
+        b = _to_sx(b_result_cases[i][0])
+        b_result = _to_sx(b_result_cases[i][1])
+        result = ca.if_else(ca.le(a, b), b_result, result)
+    return Expression(result)
+
+
+def _to_sx(thing):
+    try:
+        return thing.s
+    except AttributeError:
+        return thing
 
 
 def cross(u, v):
@@ -1277,8 +1519,7 @@ def dot(e1, e2):
     try:
         return e1.dot(e2)
     except Exception as e:
-        raise TypeError(f'unsupported operand type(s) for \'dot\': \'{e1.__class__.__name__}\' '
-                        f'and \'{e2.__class__.__name__}\'')
+        raise _operation_type_error(e1, 'dot', e2)
 
 
 def eye(size):
@@ -1374,6 +1615,7 @@ def normalize_angle(angle):
     return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
 
 
+@profile
 def shortest_angular_distance(from_angle, to_angle):
     """
     Given 2 angles, this returns the shortest angular
@@ -1546,11 +1788,6 @@ def velocity_limit_from_position_limit(acceleration_limit,
     :param eps: 
     :return: 
     """
-    acceleration_limit = Expression(acceleration_limit).s
-    position_limit = Expression(position_limit).s
-    current_position = Expression(current_position).s
-    step_size = Expression(step_size).s
-    eps = Expression(eps).s
     distance_to_position_limit = position_limit - current_position
     acceleration_limit *= step_size
     distance_to_position_limit /= step_size

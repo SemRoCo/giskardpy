@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - master
-      - devel
+#      - devel
   pull_request:
     branches:
       - master
@@ -33,7 +33,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         path: 'ros_ws/src/giskardpy'
-        repository: ichumuh/giskardpy
+        repository: SemRoCo/giskardpy
     - name: Checkout giskard msgs
       uses: actions/checkout@v3
       with:
@@ -73,7 +73,7 @@ jobs:
         ref: master
     - name: install python deps
       run: |
-        sudo pip3 install numpy==1.23.4 pandas
+        sudo pip3 install numpy==1.23.4 pandas hypothesis
     - name: build Giskard
       run: |
         cd ros_ws

@@ -6,12 +6,16 @@ import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
 
+from giskardpy.my_types import PrefixName
+
 all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
 symbol_expr = Union[Symbol, Expression]
 
 pi: float
+
+def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeError: ...
 
 class CompiledFunction:
     str_params: Sequence[str]
@@ -21,7 +25,7 @@ class CompiledFunction:
     f_eval: functools.partial
     out: np.ndarray
 
-    def __init__(self, str_params: Iterable[str], fast_f: ca.Function, shape: Tuple[int, int]): ...
+    def __init__(self, str_params: Sequence[str], fast_f: ca.Function, shape: Tuple[int, int]): ...
 
     def __call__(self, **kwargs) -> np.ndarray: ...
 
@@ -164,6 +168,8 @@ class Expression(Symbol_):
 
 
 class Point3(Symbol_):
+    reference_frame: Optional[PrefixName]
+
     @property
     def x(self) -> Expression: ...
     @x.setter
@@ -243,6 +249,9 @@ class Point3(Symbol_):
 
 
 class Vector3(Symbol_):
+    reference_frame: Optional[PrefixName]
+    vis_frame: Optional[PrefixName]
+
     @property
     def x(self) -> Expression: ...
     @x.setter
@@ -332,6 +341,9 @@ class Vector3(Symbol_):
 
 
 class TransMatrix(Symbol_):
+    reference_frame: Optional[PrefixName]
+    child_frame: Optional[PrefixName]
+
     def __init__(self, data: Optional[Union[TransMatrix,
                                             RotationMatrix,
                                             ca.SX,
@@ -341,7 +353,8 @@ class TransMatrix(Symbol_):
                                             geometry_msgs.PoseStamped,
                                             geometry_msgs.Quaternion,
                                             geometry_msgs.QuaternionStamped,
-                                            Iterable[Iterable[symbol_expr_float]]]] = None): ...
+                                            Iterable[Iterable[symbol_expr_float]]]] = None,
+                 sanity_check: bool = True): ...
 
     @overload
     def dot(self, other: Point3) -> Point3: ...
@@ -373,6 +386,7 @@ class TransMatrix(Symbol_):
 
 
 class RotationMatrix(Symbol_):
+    reference_frame: Optional[PrefixName]
     def __init__(self, data: Optional[Union[TransMatrix,
                                             RotationMatrix,
                                             Expression,
@@ -381,9 +395,10 @@ class RotationMatrix(Symbol_):
                                             np.ndarray,
                                             geometry_msgs.Quaternion,
                                             geometry_msgs.QuaternionStamped,
-                                            Iterable[Iterable[symbol_expr_float]]]] = None): ...
+                                            Iterable[Iterable[symbol_expr_float]]]] = None,
+                 sanity_check: bool = True): ...
     @classmethod
-    def __quaternion_to_rotation_matrix(cls, q) -> List[List[symbol_expr_float]]: ...
+    def __quaternion_to_rotation_matrix(cls, q) -> RotationMatrix: ...
 
     @classmethod
     def from_axis_angle(cls, axis: Vector3, angle: symbol_expr_float) -> RotationMatrix: ...
@@ -542,9 +557,15 @@ def limit(x: symbol_expr_float,
           lower_limit: symbol_expr_float,
           upper_limit: symbol_expr_float) -> Expression: ...
 
-def logic_and(*args: List[symbol_expr_float]) -> symbol_expr_float: ...
+def equal(x: symbol_expr_float, y: symbol_expr_float) -> Expression: ...
+def less_equal(x: symbol_expr_float, y: symbol_expr_float) -> Expression: ...
+def greater_equal(x: symbol_expr_float, y: symbol_expr_float) -> Expression: ...
+def less(x: symbol_expr_float, y: symbol_expr_float) -> Expression: ...
+def greater(x: symbol_expr_float, y: symbol_expr_float) -> Expression: ...
 
-def logic_or(*args: List[symbol_expr_float]) -> symbol_expr_float: ...
+def logic_and(*args: symbol_expr_float) -> symbol_expr_float: ...
+
+def logic_or(*args: symbol_expr_float) -> symbol_expr_float: ...
 
 @overload
 def if_else(condition: symbol_expr_float, if_result: Vector3, else_result: Vector3) -> Vector3: ...
@@ -651,14 +672,16 @@ def if_eq(a: symbol_expr_float,
           else_result: symbol_expr_float) -> Expression: ...
 
 def if_eq_cases(a: symbol_expr_float,
-                b_result_cases: Expression,
+                b_result_cases: Sequence[Tuple[symbol_expr_float, symbol_expr_float]],
                 else_result: symbol_expr_float) -> Expression: ...
 
 def if_less_eq_cases(a: symbol_expr_float,
-                     b_result_cases: Union[Expression, Sequence[Tuple[symbol_expr_float, symbol_expr_float]]],
+                     b_result_cases: Sequence[Tuple[symbol_expr_float, symbol_expr_float]],
                      else_result: symbol_expr_float) -> Expression: ...
 
 def cross(u: Union[Vector3, Expression], v: Union[Vector3, Expression]) -> Vector3: ...
+
+def _to_sx(thing: object) -> ca.SX: ...
 
 @overload
 def scale(v: Vector3, a: symbol_expr_float) -> Vector3: ...

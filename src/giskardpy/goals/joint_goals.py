@@ -262,6 +262,7 @@ class JointPositionRevolute(Goal):
         if not self.world.is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
+    @profile
     def make_constraints(self):
         current_joint = self.get_joint_position_symbol(self.joint_name)
 
@@ -272,9 +273,6 @@ class JointPositionRevolute(Goal):
                              self.world.get_joint_velocity_limits(self.joint_name)[1])
 
         error = joint_goal - current_joint
-        self.add_debug_expr('current_joint', current_joint)
-        self.add_debug_expr('joint_goal', joint_goal)
-        self.add_debug_expr('error', error)
         if self.hard:
             self.add_constraint(reference_velocity=max_velocity,
                                 lower_error=error,

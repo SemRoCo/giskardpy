@@ -582,6 +582,9 @@ class QPController:
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
     time_collector: TimeCollector
+    debug_expressions: Dict[str, w.all_expressions]
+    compiled_debug_expressions: Dict[str, w.CompiledFunction]
+    evaluated_debug_expressions: Dict[str, np.ndarray]
 
     def __init__(self,
                  sample_period: float,
@@ -700,6 +703,7 @@ class QPController:
     def compile(self):
         self._construct_big_ass_M(default_limits=False)
         self._compile_big_ass_M()
+        self._compile_debug_expressions()
 
     def get_parameter_names(self):
         return self.compiled_big_ass_M.str_params
@@ -708,15 +712,25 @@ class QPController:
     def _compile_big_ass_M(self):
         t = time()
         free_symbols = w.free_symbols(self.big_ass_M)
-        debug_free_symbols = w.free_symbols(self.debug_v)
-        free_symbols = set(free_symbols)
-        free_symbols.update(debug_free_symbols)
-        free_symbols = list(free_symbols)
+        # free_symbols = set(free_symbols)
+        # free_symbols = list(free_symbols)
         self.compiled_big_ass_M = self.big_ass_M.compile(free_symbols)
         compilation_time = time() - t
         logging.loginfo(f'Compiled symbolic controller in {compilation_time:.5f}s')
         self.time_collector.compilations.append(compilation_time)
-        self.compiled_debug_v = self.debug_v.compile(free_symbols)
+
+    def _compile_debug_expressions(self):
+        t = time()
+        self.compiled_debug_expressions = {}
+        free_symbols = set()
+        for name, expr in self.debug_expressions.items():
+            free_symbols.update(expr.free_symbols())
+        free_symbols = list(free_symbols)
+        for name, expr in self.debug_expressions.items():
+            self.compiled_debug_expressions[name] = expr.compile(free_symbols)
+        compilation_time = time() - t
+        logging.loginfo(f'Compiled debug expressions in {compilation_time:.5f}s')
+
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]
@@ -750,12 +764,12 @@ class QPController:
                 [self.p_weights, self.p_A, self.p_Ax, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
                  self.p_xdot],
                 ['weights', 'A', 'Ax', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
-                '../tmp_data')
+                self.god_map.get_data(identifier.tmp_folder))
         else:
             save_pandas(
                 [self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
                 ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
-                '../tmp_data')
+                self.god_map.get_data(identifier.tmp_folder))
 
     def _is_inf_in_data(self):
         logging.logerr(f'The following weight entries contain inf:\n'
@@ -795,7 +809,7 @@ class QPController:
     def _init_big_ass_M(self):
         self.big_ass_M = w.zeros(self.A.height + 3,
                                  self.A.width + 2)
-        self.debug_v = w.zeros(len(self.debug_expressions), 1)
+        # self.debug_v = w.zeros(len(self.debug_expressions), 1)
 
     def _set_A_soft(self, A_soft):
         self.big_ass_M[:self.A.height, :self.A.width] = A_soft
@@ -863,12 +877,16 @@ class QPController:
         self._set_lb(w.Expression(lb))
         self._set_ub(w.Expression(ub))
         self.np_g = np.zeros(self.H.width)
-        self.debug_names = list(sorted(self.debug_expressions.keys()))
-        self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
+        # self.debug_names = list(sorted(self.debug_expressions.keys()))
+        # self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
     @profile
-    def _eval_debug_exprs(self, substitutions):
-        return {name: value[0] for name, value in zip(self.debug_names, self.compiled_debug_v.call2(substitutions))}
+    def _eval_debug_exprs(self):
+        self.evaluated_debug_expressions = {}
+        for name, f in self.compiled_debug_expressions.items():
+            params = self.god_map.get_values(f.str_params)
+            self.evaluated_debug_expressions[name] = f.call2(params).copy()
+        return self.evaluated_debug_expressions
 
     @profile
     def make_filters(self):
@@ -916,16 +934,14 @@ class QPController:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:
-        :type substitutions: list
         :return: joint name -> joint command
-        :rtype: [list, dict]
         """
         filtered_stuff = self.evaluate_and_split(substitutions)
         try:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
-            return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
+            return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
@@ -936,7 +952,7 @@ class QPController:
                 self.__swap_compiled_matrices()
                 try:
                     self.xdot_full = self.qp_solver.solve(*self.evaluate_and_split(substitutions))
-                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
+                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())
@@ -1063,8 +1079,14 @@ class QPController:
         num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
         num_of_slack = len(lb) - num_non_slack
 
-        debug_exprs = self._eval_debug_exprs(substitutions)
-        self.p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
+        self._eval_debug_exprs()
+        p_debug = {}
+        for name, value in self.evaluated_debug_expressions.items():
+            if isinstance(value, np.ndarray):
+                p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
+            else:
+                p_debug[name] = np.array(value)
+        self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
         self.p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
         self.p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)

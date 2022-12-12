@@ -2,6 +2,7 @@ from collections import namedtuple
 from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as w
+from giskardpy.my_types import Derivatives
 
 DebugConstraint = namedtuple('debug', ['expr'])
 
@@ -44,39 +45,36 @@ class Constraint:
         return weight_normalized
 
 
-class VelocityConstraint:
-    lower_acceleration_limit = -1e4
-    upper_acceleration_limit = 1e4
-    lower_slack_limit = -1e3
-    upper_slack_limit = 1e3
-    linear_weight = 0
-    
+class DerivativeConstraint:
+
     def __init__(self,
-                 name,
-                 expression,
-                 lower_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
-                 upper_velocity_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
-                 velocity_limit,
-                 quadratic_weight,
-                 control_horizon,
+                 name: str,
+                 derivative: Derivatives,
+                 expression: w.Expression,
+                 lower_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                 upper_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                 quadratic_weight: w.symbol_expr_float,
+                 normalization_factor: Optional[w.symbol_expr_float],
+                 control_horizon: w.symbol_expr_float,
                  lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                  upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
-                 linear_weight=None,
+                 linear_weight: w.symbol_expr_float = None,
                  horizon_function: Optional[Callable[[float, int], float]] = None):
         self.name = name
+        self.derivative = derivative
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         self.control_horizon = control_horizon
-        self.velocity_limit = velocity_limit
-        if self.is_iterable(lower_velocity_limit):
-            self.lower_velocity_limit = lower_velocity_limit
+        self.normalization_factor = normalization_factor
+        if self.is_iterable(lower_limit):
+            self.lower_limit = lower_limit
         else:
-            self.lower_velocity_limit = [lower_velocity_limit] * self.control_horizon
+            self.lower_limit = [lower_limit] * self.control_horizon
 
-        if self.is_iterable(upper_velocity_limit):
-            self.upper_velocity_limit = upper_velocity_limit
+        if self.is_iterable(upper_limit):
+            self.upper_limit = upper_limit
         else:
-            self.upper_velocity_limit = [upper_velocity_limit] * self.control_horizon
+            self.upper_limit = [upper_limit] * self.control_horizon
 
         if self.is_iterable(lower_slack_limit):
             self.lower_slack_limit = lower_slack_limit
@@ -104,5 +102,5 @@ class VelocityConstraint:
         return hasattr(thing, '__iter__')
 
     def normalized_weight(self, t):
-        weight_normalized = self.quadratic_weight * (1 / self.velocity_limit) ** 2
+        weight_normalized = self.quadratic_weight * (1 / self.normalization_factor) ** 2
         return self.horizon_function(weight_normalized, t)

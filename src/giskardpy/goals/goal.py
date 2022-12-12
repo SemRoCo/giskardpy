@@ -15,7 +15,7 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
-from giskardpy.qp.constraint import VelocityConstraint, Constraint
+from giskardpy.qp.constraint import DerivativeConstraint, Constraint
 from giskardpy.utils.utils import blackboard_god_map
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
@@ -207,10 +207,10 @@ class Goal(ABC):
 
     @profile
     def get_constraints(self) -> Tuple[Dict[str, Constraint],
-                                       Dict[str, VelocityConstraint],
+                                       Dict[str, DerivativeConstraint],
                                        Dict[str, Union[w.Symbol, float]]]:
         self._constraints = OrderedDict()
-        self._velocity_constraints = OrderedDict()
+        self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
         self.make_constraints()
         for sub_goal in self._sub_goals:
@@ -218,9 +218,9 @@ class Goal(ABC):
             c, c_vel, debug_expressions = sub_goal.get_constraints()
             # TODO check for duplicates
             self._constraints.update(_prepend_prefix(self.__class__.__name__, c))
-            self._velocity_constraints.update(_prepend_prefix(self.__class__.__name__, c_vel))
+            self._derivative_constraints.update(_prepend_prefix(self.__class__.__name__, c_vel))
             self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))
-        return self._constraints, self._velocity_constraints, self._debug_expressions
+        return self._constraints, self._derivative_constraints, self._debug_expressions
 
     def add_constraints_of_goal(self, goal: Goal):
         self._sub_goals.append(goal)
@@ -252,18 +252,60 @@ class Goal(ABC):
         """
         name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
-        if name in self._velocity_constraints:
+        if name in self._derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self._velocity_constraints[name] = VelocityConstraint(name=name,
-                                                              expression=task_expression,
-                                                              lower_velocity_limit=lower_velocity_limit,
-                                                              upper_velocity_limit=upper_velocity_limit,
-                                                              quadratic_weight=weight,
-                                                              velocity_limit=velocity_limit,
-                                                              lower_slack_limit=lower_slack_limit,
-                                                              upper_slack_limit=upper_slack_limit,
-                                                              control_horizon=self.control_horizon,
-                                                              horizon_function=horizon_function)
+        self._derivative_constraints[name] = DerivativeConstraint(name=name,
+                                                                  derivative=Derivatives.velocity,
+                                                                  expression=task_expression,
+                                                                  lower_limit=lower_velocity_limit,
+                                                                  upper_limit=upper_velocity_limit,
+                                                                  quadratic_weight=weight,
+                                                                  normalization_factor=velocity_limit,
+                                                                  lower_slack_limit=lower_slack_limit,
+                                                                  upper_slack_limit=upper_slack_limit,
+                                                                  control_horizon=self.control_horizon,
+                                                                  horizon_function=horizon_function)
+
+    def add_acceleration_constraint(self,
+                                    lower_acceleration_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                                    upper_acceleration_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                                    weight: w.symbol_expr_float,
+                                    task_expression: w.symbol_expr,
+                                    acceleration_limit: w.symbol_expr_float,
+                                    name_suffix: Optional[str] = None,
+                                    lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = -1e4,
+                                    upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = 1e4,
+                                    horizon_function: Optional[Callable[[float, int], float]] = None):
+        """
+        Add a acceleration constraint. Internally, this will be converted into multiple constraints, to ensure that the
+        acceleration stays within the given bounds.
+        :param lower_acceleration_limit:
+        :param upper_acceleration_limit:
+        :param weight:
+        :param task_expression:
+        :param acceleration_limit:
+        :param name_suffix:
+        :param lower_slack_limit:
+        :param upper_slack_limit:
+        :param horizon_function: A function that can takes 'weight' and the id within the horizon as input and computes
+                                    a new weight. Can be used to give points towards the end of the horizon a different
+                                    weight
+        """
+        name_suffix = name_suffix if name_suffix else ''
+        name = str(self) + name_suffix
+        if name in self._derivative_constraints:
+            raise KeyError(f'a constraint with name \'{name}\' already exists')
+        self._derivative_constraints[name] = DerivativeConstraint(name=name,
+                                                                  derivative=Derivatives.acceleration,
+                                                                  expression=task_expression,
+                                                                  lower_limit=lower_acceleration_limit,
+                                                                  upper_limit=upper_acceleration_limit,
+                                                                  quadratic_weight=weight,
+                                                                  normalization_factor=acceleration_limit,
+                                                                  lower_slack_limit=lower_slack_limit,
+                                                                  upper_slack_limit=upper_slack_limit,
+                                                                  control_horizon=self.control_horizon,
+                                                                  horizon_function=horizon_function)
 
     def add_constraint(self,
                        reference_velocity: w.symbol_expr_float,

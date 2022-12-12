@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple, Type, Union
+from typing import List, Dict, Tuple, Type, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,7 +16,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import derivative_joint_map, Derivatives
-from giskardpy.qp.constraint import VelocityConstraint, Constraint
+from giskardpy.qp.constraint import DerivativeConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
@@ -43,7 +43,8 @@ def save_pandas(dfs, names, path):
 class Parent(object):
     time_collector: TimeCollector
 
-    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
+    def __init__(self, sample_period: float, prediction_horizon: int, order: Derivatives,
+                 time_collector: Optional[TimeCollector] = None):
         self.time_collector = time_collector
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
@@ -80,8 +81,14 @@ class Parent(object):
 
 
 class H(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 default_limits=False):
+    def __init__(self,
+                 free_variables: List[FreeVariable],
+                 constraints: List[Constraint],
+                 velocity_constraints: List[DerivativeConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 order: Derivatives,
+                 default_limits: bool = False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables
         self.constraints = constraints  # type: list[Constraint]
@@ -126,7 +133,7 @@ class H(Parent):
                                                                                        evaluated=self.evaluted)
         slack_weights = {}
         for t in range(self.prediction_horizon):
-            for c in self.velocity_constraints:  # type: VelocityConstraint
+            for c in self.velocity_constraints:  # type: DerivativeConstraint
                 if t < c.control_horizon:
                     slack_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
 
@@ -142,12 +149,22 @@ class H(Parent):
 
 
 class B(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 default_limits=False):
+    free_variables: List[FreeVariable]
+    constraints: List[Constraint]
+    velocity_constraints: List[DerivativeConstraint]
+
+    def __init__(self,
+                 free_variables: List[FreeVariable],
+                 constraints: List[Constraint],
+                 velocity_constraints: List[DerivativeConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 order: Derivatives,
+                 default_limits: bool = False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
+        self.velocity_constraints = velocity_constraints  # type: list[DerivativeConstraint]
         self.no_limits = 1e4
         self.evaluated = True
         self.default_limits = default_limits
@@ -206,7 +223,17 @@ class B(Parent):
 
 
 class BA(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
+    free_variables: List[FreeVariable]
+    constraints: List[Constraint]
+    velocity_constraints: List[DerivativeConstraint]
+
+    def __init__(self,
+                 free_variables: List[FreeVariable],
+                 constraints: List[Constraint],
+                 velocity_constraints: List[DerivativeConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 order: Derivatives,
                  default_limits=False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables
@@ -222,9 +249,9 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
                 if t < c.control_horizon:
-                    result[f't{t:03}/{c.name}'] = w.limit(c.lower_velocity_limit[t] * self.sample_period,
-                                                          -c.velocity_limit * self.sample_period,
-                                                          c.velocity_limit * self.sample_period)
+                    result[f't{t:03}/{c.name}'] = w.limit(c.lower_limit[t] * self.sample_period,
+                                                          -c.normalization_factor * self.sample_period,
+                                                          c.normalization_factor * self.sample_period)
         return result
 
     def get_upper_constraint_velocities(self):
@@ -232,9 +259,9 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
                 if t < c.control_horizon:
-                    result[f't{t:03}/{c.name}'] = w.limit(c.upper_velocity_limit[t] * self.sample_period,
-                                                          -c.velocity_limit * self.sample_period,
-                                                          c.velocity_limit * self.sample_period)
+                    result[f't{t:03}/{c.name}'] = w.limit(c.upper_limit[t] * self.sample_period,
+                                                          -c.normalization_factor * self.sample_period,
+                                                          c.normalization_factor * self.sample_period)
         return result
 
     @memoize
@@ -337,12 +364,23 @@ class BA(Parent):
 
 
 class A(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 time_collector, default_limits=False):
+    free_variables: List[FreeVariable]
+    constraints: List[Constraint]
+    velocity_constraints: List[DerivativeConstraint]
+
+    def __init__(self,
+                 free_variables: List[FreeVariable],
+                 constraints: List[Constraint],
+                 velocity_constraints: List[DerivativeConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 order: Derivatives,
+                 time_collector,
+                 default_limits: bool = False):
         super().__init__(sample_period, prediction_horizon, order, time_collector)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
+        self.velocity_constraints = velocity_constraints  # type: list[DerivativeConstraint]
         self.joints = {}
         self.height = 0
         self._compute_height()
@@ -592,7 +630,7 @@ class QPController:
                  solver_name: str,
                  free_variables: List[FreeVariable] = None,
                  constraints: List[Constraint] = None,
-                 velocity_constraints: List[VelocityConstraint] = None,
+                 velocity_constraints: List[DerivativeConstraint] = None,
                  debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,

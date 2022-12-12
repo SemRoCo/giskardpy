@@ -587,7 +587,7 @@ class RotationMatrix(Symbol_):
 
     def to_angle(self, hint):
         """
-        :param hint: A function who's sign of the result will be used to to determine if angle should be positive or
+        :param hint: A function whose sign of the result will be used to determine if angle should be positive or
                         negative
         :return:
         """

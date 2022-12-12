@@ -941,6 +941,7 @@ class QPController:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
+            self._create_debug_pandas()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
@@ -1076,8 +1077,12 @@ class QPController:
         filtered_bA_names = np.array(bA_names)[bA_filter]
         H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
         # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
-        num_of_slack = len(lb) - num_non_slack
+        # num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
+        # num_of_slack = len(lb) - num_non_slack
+        num_vel_constr = len(self.velocity_constraints) * (self.prediction_horizon - 2)
+        num_task_constr = len(self.constraints)
+        num_constr = num_vel_constr + num_task_constr
+        # num_non_slack = l
 
         self._eval_debug_exprs()
         p_debug = {}
@@ -1096,8 +1101,8 @@ class QPController:
         self.p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
         # remove sample period factor
-        self.p_lbA[-num_of_slack:] /= sample_period
-        self.p_ubA[-num_of_slack:] /= sample_period
+        self.p_lbA[-num_constr:] /= sample_period
+        self.p_ubA[-num_constr:] /= sample_period
         self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, ['data'],
                                       dtype=float)
         self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
@@ -1110,12 +1115,12 @@ class QPController:
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 
             self.p_pure_xdot = deepcopy(self.p_xdot)
-            self.p_pure_xdot[num_non_slack:] = 0
+            self.p_pure_xdot[-num_constr:] = 0
             self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
             self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
                                                        dtype=float)
             self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
-            self.p_Ax_without_slack[-num_of_slack:] /= sample_period
+            self.p_Ax_without_slack[-num_constr:] /= sample_period
 
         else:
             self.p_xdot = None

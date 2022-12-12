@@ -112,6 +112,15 @@ class Giskard:
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
 
+    def configure_PublishDebugExpressions(self, enabled: bool = True):
+        """
+        :param enabled: whether Giskard should publish markers during planning
+        :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
+                                    the system.
+        """
+        self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled'] = enabled
+        # self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
+
     def configure_CollisionMarker(self, enabled: bool = True, in_planning_loop: bool = False):
         """
         :param enabled: whether Giskard should publish collision markers during planning

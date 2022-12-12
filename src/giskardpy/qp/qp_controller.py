@@ -952,7 +952,7 @@ class QPController:
                 self.__swap_compiled_matrices()
                 try:
                     self.xdot_full = self.qp_solver.solve(*self.evaluate_and_split(substitutions))
-                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
+                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())

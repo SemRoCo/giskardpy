@@ -45,6 +45,7 @@ class TravelCompanion:
 
 class WorldTree:
     _joints: Dict[PrefixName, Union[Joint, OmniDrive]]
+    _links: Dict[PrefixName, Link]
 
     def __init__(self, root_link_name: PrefixName, god_map: GodMap):
         self.root_link_name = root_link_name
@@ -715,7 +716,7 @@ class WorldTree:
 
     def _clear(self):
         self.state = JointStates()
-        self._links: Dict[PrefixName, Link] = {self.root_link_name: Link(self.root_link_name)}
+        self._links = {self.root_link_name: Link(self.root_link_name)}
         self._joints = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
         self.reset_cache()
@@ -847,7 +848,7 @@ class WorldTree:
         new_parent_link = self._links[new_parent_link_name]
 
         joint.parent_link_name = new_parent_link_name
-        joint.parent_T_child = fk
+        joint.update_parent_T_child(fk)
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()
@@ -858,7 +859,7 @@ class WorldTree:
                                     new_parent_T_child: w.TransMatrix,
                                     notify: bool = True):
         joint = self._joints[joint_name]
-        joint.parent_T_child = new_parent_T_child
+        joint.update_parent_T_child(new_parent_T_child)
         if notify:
             self.notify_model_change()
 
@@ -1067,9 +1068,12 @@ class WorldTree:
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, add_joints=True, add_links=False,
                                                             add_fixed_joints=True, add_non_controlled_joints=True)
         for joint_name in root_chain:
-            fk = fk.dot(self._joints[joint_name].parent_T_child.inverse())
+            a = self._joints[joint_name].parent_T_child
+            ai = a.inverse()
+            fk = fk.dot(ai)
         for joint_name in tip_chain:
-            fk = fk.dot(self._joints[joint_name].parent_T_child)
+            a = self._joints[joint_name].parent_T_child
+            fk = fk.dot(a)
         return fk
 
     @memoize
@@ -1126,6 +1130,7 @@ class WorldTree:
             result[link] = fks_evaluated[self.fk_idx[link], :]
         return result
 
+    @profile
     def as_tf_msg(self):
         """
         Create a tfmessage for the whole world tree.
@@ -1135,7 +1140,8 @@ class WorldTree:
             p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
             p_T_c = make_transform(parent_frame=joint.parent_link_name,
                                    child_frame=joint.child_link_name,
-                                   pose=p_T_c.pose)
+                                   pose=p_T_c.pose,
+                                   normalize_quaternion=False)
             tf_msg.transforms.append(p_T_c)
         return tf_msg
 

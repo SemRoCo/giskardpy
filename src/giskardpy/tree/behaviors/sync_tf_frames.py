@@ -1,5 +1,5 @@
 from typing import List, Tuple
-
+import giskardpy.casadi_wrapper as w
 from py_trees import Status
 
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -31,6 +31,6 @@ class SyncTfFrames(GiskardBehavior):
                     if len(chain) > 1:
                         raise Exception('todo')
                     joint_name = chain[0]
-                    self.world.update_joint_parent_T_child(joint_name, parent_T_child)
+                    self.world.update_joint_parent_T_child(joint_name, w.TransMatrix(parent_T_child))
 
         return Status.SUCCESS

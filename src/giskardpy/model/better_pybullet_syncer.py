@@ -149,11 +149,9 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             # self.update_collision_blacklist()
         bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
 
+    @profile
     def get_pose(self, link_name, collision_id=0):
-        try:
-            collision_object = self.object_name_to_id[link_name][collision_id]
-        except Exception as e:
-            pass
+        collision_object = self.object_name_to_id[link_name][collision_id]
         map_T_link = PoseStamped()
         map_T_link.header.frame_id = self.world.root_link_name
         map_T_link.pose.position.x = collision_object.transform.origin.x

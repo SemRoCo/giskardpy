@@ -48,7 +48,7 @@ class FreeVariable:
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {derivative}')
 
-    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
+    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[w.Expression, float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
             expr = w.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
         elif derivative in self.default_lower_limits:
@@ -61,7 +61,7 @@ class FreeVariable:
             return self.god_map.evaluate_expr(expr)
         return expr
 
-    def set_lower_limit(self, derivative: Derivatives, limit: Union[Union[w.Symbol, float], float]):
+    def set_lower_limit(self, derivative: Derivatives, limit: Union[w.Expression, float]):
         self.lower_limits[derivative] = limit
 
     def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[w.Symbol, float], float]):
@@ -88,6 +88,7 @@ class FreeVariable:
         except KeyError:
             return False
 
+    @profile
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
                           evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
         weight = self.quadratic_weights[derivative]

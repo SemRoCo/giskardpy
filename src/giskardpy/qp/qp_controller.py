@@ -494,21 +494,18 @@ class A(Parent):
             number_of_joints * self.prediction_horizon * (self.order - 1) +
             len(self.velocity_constraints) * self.prediction_horizon + len(self.constraints)
         )
-        t = time()
-        J_vel = []
-        J_err = []
-        for order in range(self.order):
-            J_vel.append(w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
-                                    symbols=self.get_free_variable_symbols(order),
-                                    order=1) * self.sample_period)
-            J_err.append(w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
-                                    symbols=self.get_free_variable_symbols(order),
-                                    order=1) * self.sample_period)
-        jac_time = time() - t
-        logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
+        # t = time()
+        # J_vel = []
+        num_task_constr = len(self.constraints)
+        # for order in range(self.order):
+        #     J_vel.append(w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
+        #                             symbols=self.get_free_variable_symbols(order),
+        #                             order=1) * self.sample_period)
+        # jac_time = time() - t
+        # logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
-        self.time_collector.jacobians.append(jac_time)
+        # self.time_collector.jacobians.append(jac_time)
 
         # position limits
         vertical_offset = number_of_joints * self.prediction_horizon
@@ -541,8 +538,10 @@ class A(Parent):
         # velocity limits
         next_vertical_offset = vertical_offset
         for order in range(self.order - 1):
-            J_vel_tmp = J_vel[order]
-            J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel_tmp)
+            J_vel = w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
+                               symbols=self.get_free_variable_symbols(order),
+                               order=1) * self.sample_period
+            J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel)
             horizontal_offset = J_vel_limit_block.shape[1]
             if order == 0:
                 next_vertical_offset = vertical_offset + J_vel_limit_block.shape[0]
@@ -550,8 +549,8 @@ class A(Parent):
             horizontal_offset * order:horizontal_offset * (order + 1)] = J_vel_limit_block
         # velocity constraint slack
         I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
-        if J_err[0].shape[0] > 0:
-            A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - J_err[0].shape[0]:-J_err[0].shape[0]] = I
+        if num_task_constr > 0:
+            A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - num_task_constr:-num_task_constr] = I
         else:
             A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
         # delete rows if control horizon of constraint shorter than prediction horizon
@@ -564,7 +563,7 @@ class A(Parent):
 
         # delete columns where control horizon is shorter than prediction horizon
         columns_to_delete = []
-        horizontal_offset = A_soft.shape[1] - I.shape[1] - J_err[0].shape[0]
+        horizontal_offset = A_soft.shape[1] - I.shape[1] - num_task_constr
         for t in range(self.prediction_horizon):
             for i, c in enumerate(self.velocity_constraints):
                 index = horizontal_offset + (t * len(self.velocity_constraints)) + i
@@ -574,7 +573,10 @@ class A(Parent):
         # J stack for total error
         if len(self.constraints) > 0:
             for order in range(self.order - 1):
-                J_hstack = w.hstack([J_err[order] for _ in range(self.prediction_horizon)])
+                J_err = w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
+                                   symbols=self.get_free_variable_symbols(order),
+                                   order=1) * self.sample_period
+                J_hstack = w.hstack([J_err for _ in range(self.prediction_horizon)])
                 if order == 0:
                     vertical_offset = next_vertical_offset
                     next_vertical_offset = vertical_offset + J_hstack.shape[0]
@@ -768,7 +770,6 @@ class QPController:
             self.compiled_debug_expressions[name] = expr.compile(free_symbols)
         compilation_time = time() - t
         logging.loginfo(f'Compiled debug expressions in {compilation_time:.5f}s')
-
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]

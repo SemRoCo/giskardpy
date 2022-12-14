@@ -380,13 +380,21 @@ class A(Parent):
         super().__init__(sample_period, prediction_horizon, order, time_collector)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[DerivativeConstraint]
+        self.derivative_constraints = velocity_constraints  # type: list[DerivativeConstraint]
         self.joints = {}
         self.height = 0
         self._compute_height()
         self.width = 0
         self._compute_width()
         self.default_limits = default_limits
+
+    @property
+    def velocity_constraints(self) -> List[DerivativeConstraint]:
+        return [c for c in self.derivative_constraints if c.derivative == Derivatives.velocity]
+
+    @property
+    def acceleration_constraints(self) -> List[DerivativeConstraint]:
+        return [c for c in self.derivative_constraints if c.derivative == Derivatives.acceleration]
 
     def _compute_height(self):
         # rows for position limits of non continuous joints
@@ -426,10 +434,10 @@ class A(Parent):
     def get_constraint_expressions(self):
         return self._sorter({c.name: c.expression for c in self.constraints})[0]
 
-    def get_velocity_constraint_expressions(self):
-        return self._sorter({c.name: c.expression for c in self.velocity_constraints})[0]
+    def get_derivative_constraint_expressions(self, derivative: Derivatives):
+        return self._sorter({c.name: c.expression for c in self.velocity_constraints if c.derivative == derivative})[0]
 
-    def get_free_variable_symbols(self, order):
+    def get_free_variable_symbols(self, order: Derivatives):
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
 
     @profile
@@ -485,42 +493,49 @@ class A(Parent):
         #         |      sp|      sp|      sp|      sp|
         #         |===================================|
         number_of_joints = self.number_of_joints
-        A_soft = w.zeros(
-            self.prediction_horizon * number_of_joints +  # joint position constraints
-            number_of_joints * self.prediction_horizon * (self.order - 2) +  # links
-            len(self.velocity_constraints) * (self.prediction_horizon) +  # velocity constraints
-            len(self.constraints),  # constraints
-            # (self.num_position_limits() if self.default_limits else 0) +  # weights for position limits
-            number_of_joints * self.prediction_horizon * (self.order - 1) +
-            len(self.velocity_constraints) * self.prediction_horizon + len(self.constraints)
-        )
-        # t = time()
-        # J_vel = []
-        num_task_constr = len(self.constraints)
-        # for order in range(self.order):
-        #     J_vel.append(w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
-        #                             symbols=self.get_free_variable_symbols(order),
-        #                             order=1) * self.sample_period)
-        # jac_time = time() - t
-        # logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
-        # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
-        # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
-        # self.time_collector.jacobians.append(jac_time)
 
-        # position limits
-        vertical_offset = number_of_joints * self.prediction_horizon
+        num_position_constraints = self.prediction_horizon * number_of_joints
+        num_derivative_links = number_of_joints * self.prediction_horizon * (self.order - 2)
+        number_of_vel_rows = len(self.velocity_constraints) * self.prediction_horizon
+        number_of_acc_rows = len(self.acceleration_constraints) * self.prediction_horizon
+        number_of_task_constr_rows = len(self.constraints)
+
+        number_of_non_slack_columns = number_of_joints * self.prediction_horizon * (self.order - 1)
+        number_of_vel_slack_columns = len(self.velocity_constraints) * self.prediction_horizon
+        number_of_acc_slack_columns = len(self.acceleration_constraints) * self.prediction_horizon
+        number_of_integral_slack_columns = len(self.constraints)
+        A_soft = w.zeros(
+            num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows +
+            number_of_task_constr_rows,
+            number_of_non_slack_columns +
+            number_of_vel_slack_columns + number_of_acc_slack_columns + number_of_integral_slack_columns
+        )
+
+        rows_to_delete = []
+        columns_to_delete = []
+        num_task_constr = len(self.constraints)
+
+        # position limits -----------------------------------------
+        vertical_offset = num_position_constraints
         for p in range(1, self.prediction_horizon + 1):
             matrix_size = number_of_joints * p
             I = w.eye(matrix_size) * self.sample_period
             start = vertical_offset - matrix_size
             A_soft[start:vertical_offset, :matrix_size] += I
 
-        # derivative links
-        block_size = number_of_joints * (self.order - 2) * self.prediction_horizon
-        I = w.eye(block_size)
-        A_soft[vertical_offset:vertical_offset + block_size, :block_size] += I
+        # delete rows with position limits of continuous joints
+        continuous_joint_indices = [i for i, v in enumerate(self.free_variables) if not v.has_position_limits()]
+        for o in range(self.prediction_horizon):
+            for i in continuous_joint_indices:
+                rows_to_delete.append(i + len(self.free_variables) * o)
+        # position limits -----------------------------------------
+
+        # derivative links ----------------------------------------
+        I = w.eye(num_derivative_links)
+        A_soft[vertical_offset:vertical_offset + num_derivative_links, :num_derivative_links] += I
         h_offset = number_of_joints * self.prediction_horizon
-        A_soft[vertical_offset:vertical_offset + block_size, h_offset:h_offset + block_size] += -I * self.sample_period
+        A_soft[vertical_offset:vertical_offset + num_derivative_links,
+        h_offset:h_offset + num_derivative_links] += -I * self.sample_period
 
         I_height = number_of_joints * (self.prediction_horizon - 1)
         I = -w.eye(I_height)
@@ -531,55 +546,86 @@ class A(Parent):
             A_soft[offset_v:offset_v + I_height, offset_h:offset_h + I_height] += I
             offset_v += I_height
             offset_h += self.prediction_horizon * number_of_joints
-        vertical_offset = vertical_offset + block_size
+        vertical_offset = vertical_offset + num_derivative_links
+        # derivative links ----------------------------------------
 
-        # constraints
-        # TODO i don't need vel checks for the last 2 entries because the have to be zero with current B's
-        # velocity limits
-        next_vertical_offset = vertical_offset
-        for order in range(self.order - 1):
-            J_vel = w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
-                               symbols=self.get_free_variable_symbols(order),
-                               order=1) * self.sample_period
-            J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel)
-            horizontal_offset = J_vel_limit_block.shape[1]
-            if order == 0:
-                next_vertical_offset = vertical_offset + J_vel_limit_block.shape[0]
+        # velocity constraints ------------------------------------
+        expressions = w.Expression(self.get_derivative_constraint_expressions(Derivatives.velocity))
+        if len(expressions) > 0:
+            vertical_offset = num_position_constraints + num_derivative_links
+            next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows
+            for order in range(self.order - 1):
+                J_vel = w.jacobian(expressions=expressions,
+                                   symbols=self.get_free_variable_symbols(order),
+                                   order=1) * self.sample_period
+                J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel)
+                horizontal_offset = self.number_of_joints * self.prediction_horizon
+                A_soft[vertical_offset:next_vertical_offset,
+                horizontal_offset * order:horizontal_offset * (order + 1)] = J_vel_limit_block
+            # velocity constraint slack
+            I = w.eye(number_of_vel_rows) * self.sample_period
+            A_soft[vertical_offset:next_vertical_offset, number_of_non_slack_columns:number_of_non_slack_columns + number_of_vel_slack_columns] = I
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            # delete columns where control horizon is shorter than prediction horizon
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_constraints):
+                    h_index = number_of_non_slack_columns + i + (t * len(self.velocity_constraints))
+                    v_index = vertical_offset + i + (t * len(self.velocity_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+                        columns_to_delete.append(h_index)
+        # velocity constraints ------------------------------------
+
+        # acceleration constraints --------------------------------
+        expressions = w.Expression(self.get_derivative_constraint_expressions(Derivatives.acceleration))
+        if len(expressions) > 0:
+            # task acceleration = Jd_q * qd + (J_q + Jd_qd) * qdd + J_qd * qddd
+            vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows
+            next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows
+            J_q = w.jacobian(expressions=expressions,
+                             symbols=self.get_free_variable_symbols(Derivatives.position),
+                             order=1) * self.sample_period
+            Jd_q = w.jacobian(expressions=expressions,
+                              symbols=self.get_free_variable_symbols(Derivatives.position),
+                              order=2) * self.sample_period
+            J_qd = w.jacobian(expressions=expressions,
+                              symbols=self.get_free_variable_symbols(Derivatives.velocity),
+                              order=1) * self.sample_period
+            Jd_qd = w.jacobian(expressions=expressions,
+                               symbols=self.get_free_variable_symbols(Derivatives.velocity),
+                               order=2) * self.sample_period
+            J_vel_block = w.kron(w.eye(self.prediction_horizon), Jd_q)
+            J_acc_block = w.kron(w.eye(self.prediction_horizon), J_q + Jd_qd)
+            J_jerk_block = w.kron(w.eye(self.prediction_horizon), J_qd)
+            horizontal_offset = self.number_of_joints * self.prediction_horizon
+            A_soft[vertical_offset:next_vertical_offset, :horizontal_offset] = J_vel_block
+            A_soft[vertical_offset:next_vertical_offset, horizontal_offset:horizontal_offset * 2] = J_acc_block
+            A_soft[vertical_offset:next_vertical_offset, horizontal_offset * 2:horizontal_offset * 3] = J_jerk_block
+            # velocity constraint slack
+            I = w.eye(J_vel_block.shape[0]) * self.sample_period
             A_soft[vertical_offset:next_vertical_offset,
-            horizontal_offset * order:horizontal_offset * (order + 1)] = J_vel_limit_block
-        # velocity constraint slack
-        I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
-        if num_task_constr > 0:
-            A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - num_task_constr:-num_task_constr] = I
-        else:
-            A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
-        # delete rows if control horizon of constraint shorter than prediction horizon
-        rows_to_delete = []
-        for t in range(self.prediction_horizon):
-            for i, c in enumerate(self.velocity_constraints):
-                index = vertical_offset + i + (t * len(self.velocity_constraints))
-                if t + 1 > c.control_horizon:
-                    rows_to_delete.append(index)
-
-        # delete columns where control horizon is shorter than prediction horizon
-        columns_to_delete = []
-        horizontal_offset = A_soft.shape[1] - I.shape[1] - num_task_constr
-        for t in range(self.prediction_horizon):
-            for i, c in enumerate(self.velocity_constraints):
-                index = horizontal_offset + (t * len(self.velocity_constraints)) + i
-                if t + 1 > c.control_horizon:
-                    columns_to_delete.append(index)
+            number_of_non_slack_columns+ number_of_vel_slack_columns:number_of_non_slack_columns + number_of_vel_slack_columns + number_of_acc_slack_columns] = I
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            # delete columns where control horizon is shorter than prediction horizon
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.acceleration_constraints):
+                    h_index = number_of_non_slack_columns + number_of_vel_slack_columns + i + (
+                                t * len(self.acceleration_constraints))
+                    v_index = vertical_offset + number_of_vel_rows + i + (t * len(self.acceleration_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+                        columns_to_delete.append(h_index)
+        # acceleration constraints --------------------------------
 
         # J stack for total error
         if len(self.constraints) > 0:
+            vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows
+            next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows + number_of_task_constr_rows
             for order in range(self.order - 1):
                 J_err = w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
                                    symbols=self.get_free_variable_symbols(order),
                                    order=1) * self.sample_period
                 J_hstack = w.hstack([J_err for _ in range(self.prediction_horizon)])
-                if order == 0:
-                    vertical_offset = next_vertical_offset
-                    next_vertical_offset = vertical_offset + J_hstack.shape[0]
                 # set jacobian entry to 0 if control horizon shorter than prediction horizon
                 for i, c in enumerate(self.constraints):
                     # offset = vertical_offset + i
@@ -588,29 +634,13 @@ class A(Parent):
                 A_soft[vertical_offset:next_vertical_offset,
                 horizontal_offset * (order):horizontal_offset * (order + 1)] = J_hstack
 
-                # sum of vel slack for total error
-                # I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
-                #            w.eye(J_hstack.shape[0])) * self.sample_period
-                # A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
             # extra slack variable for total error
-            I = w.eye(J_hstack.shape[0]) * self.sample_period * self.prediction_horizon
+            I = w.eye(number_of_task_constr_rows) * self.sample_period * self.prediction_horizon
             A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
-
-        # delete rows with position limits of continuous joints
-        continuous_joint_indices = [i for i, v in enumerate(self.free_variables) if not v.has_position_limits()]
-        for o in range(self.prediction_horizon):
-            for i in continuous_joint_indices:
-                rows_to_delete.append(i + len(self.free_variables) * (o))
 
         A_soft.remove(rows_to_delete, [])
         A_soft.remove([], columns_to_delete)
 
-        # position constraints if limits are violated
-        # if self.default_limits:
-        #     A_soft[0:self.num_position_limits() * self.prediction_horizon,
-        #     self.prediction_horizon:self.num_position_limits] = w.eye(self.num_position_limits())
-        # hack = blackboard_god_map().to_symbol(identifier.hack)
-        # A_soft = w.ca.substitute(A_soft, hack, 1)
         return A_soft
 
     def A(self):

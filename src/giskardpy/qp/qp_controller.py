@@ -40,15 +40,33 @@ def save_pandas(dfs, names, path):
             f.write(csv_string)
 
 
-class Parent(object):
+class Parent:
     time_collector: TimeCollector
+    free_variables: List[FreeVariable]
+    constraints: List[Constraint]
+    velocity_constraints: List[DerivativeConstraint]
 
-    def __init__(self, sample_period: float, prediction_horizon: int, order: Derivatives,
+    def __init__(self,
+                 free_variables: List[FreeVariable],
+                 constraints: List[Constraint],
+                 derivative_constraints: List[DerivativeConstraint],
+                 sample_period: float, prediction_horizon: int, order: Derivatives,
                  time_collector: Optional[TimeCollector] = None):
+        self.free_variables = free_variables  # type: list[FreeVariable]
+        self.constraints = constraints  # type: list[Constraint]
+        self.derivative_constraints = derivative_constraints  # type: list[DerivativeConstraint]
         self.time_collector = time_collector
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.order = order
+
+    @property
+    def velocity_constraints(self) -> List[DerivativeConstraint]:
+        return [c for c in self.derivative_constraints if c.derivative == Derivatives.velocity]
+
+    @property
+    def acceleration_constraints(self) -> List[DerivativeConstraint]:
+        return [c for c in self.derivative_constraints if c.derivative == Derivatives.acceleration]
 
     def _sorter(self, *args):
         """
@@ -69,30 +87,17 @@ class Parent(object):
     def __helper_names(self, param):
         return [x for x, _ in sorted(param.items())]
 
-    def blow_up(self, d, num_of_copies, weight_inc_f=None):
-        result = {}
-        for t in range(num_of_copies):
-            for name, value in d.items():
-                if weight_inc_f is not None:
-                    result['t{:03d}/{}'.format(t, name)] = weight_inc_f(value, t)
-                else:
-                    result['t{:03d}/{}'.format(t, name)] = value
-        return result
-
 
 class H(Parent):
     def __init__(self,
                  free_variables: List[FreeVariable],
                  constraints: List[Constraint],
-                 velocity_constraints: List[DerivativeConstraint],
+                 derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  order: Derivatives,
                  default_limits: bool = False):
-        super().__init__(sample_period, prediction_horizon, order)
-        self.free_variables = free_variables
-        self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[velocity_constraints]
+        super().__init__(free_variables, constraints, derivative_constraints, sample_period, prediction_horizon, order)
         self.height = 0
         self._compute_height()
         self.evaluted = True
@@ -100,6 +105,7 @@ class H(Parent):
     def _compute_height(self):
         self.height = self.number_of_free_variables_with_horizon()
         self.height += self.number_of_constraint_vel_variables()
+        self.height += self.number_of_constraint_acc_variables()
         self.height += self.number_of_contraint_error_variables()
 
     @property
@@ -109,12 +115,18 @@ class H(Parent):
     def number_of_free_variables_with_horizon(self):
         h = 0
         for v in self.free_variables:
-            h += (min(v.order, self.order) - 1) * self.prediction_horizon
+            h += (min(v.order, self.order)) * self.prediction_horizon
         return h
 
     def number_of_constraint_vel_variables(self):
         h = 0
         for c in self.velocity_constraints:
+            h += c.control_horizon
+        return h
+
+    def number_of_constraint_acc_variables(self):
+        h = 0
+        for c in self.acceleration_constraints:
             h += c.control_horizon
         return h
 
@@ -126,50 +138,51 @@ class H(Parent):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, min(v.order, self.order)):
+                for o in range(Derivatives.velocity, min(v.order, self.order) + 1):
                     o = Derivatives(o)
                     weights[o][f't{t:03}/{v.position_name}/{o}'] = v.normalized_weight(t, o,
                                                                                        self.prediction_horizon,
                                                                                        evaluated=self.evaluted)
-        slack_weights = {}
+        vel_slack_weights = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:  # type: DerivativeConstraint
                 if t < c.control_horizon:
-                    slack_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
+                    vel_slack_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
+
+        acc_slack_weights = {}
+        for t in range(self.prediction_horizon):
+            for c in self.acceleration_constraints:  # type: DerivativeConstraint
+                if t < c.control_horizon:
+                    acc_slack_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
 
         error_slack_weights = {f'{c.name}/error': c.normalized_weight(self.prediction_horizon) for c in
                                self.constraints}
 
         params = []
-        for o, w in sorted(weights.items()):
-            params.append(w)
-        params.append(slack_weights)
+        for _, weight in sorted(weights.items()):
+            params.append(weight)
+        params.append(vel_slack_weights)
+        params.append(acc_slack_weights)
         params.append(error_slack_weights)
         return self._sorter(*params)[0]
 
 
 class B(Parent):
-    free_variables: List[FreeVariable]
-    constraints: List[Constraint]
-    velocity_constraints: List[DerivativeConstraint]
 
     def __init__(self,
                  free_variables: List[FreeVariable],
                  constraints: List[Constraint],
-                 velocity_constraints: List[DerivativeConstraint],
+                 derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  order: Derivatives,
                  default_limits: bool = False):
-        super().__init__(sample_period, prediction_horizon, order)
-        self.free_variables = free_variables  # type: list[FreeVariable]
-        self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[DerivativeConstraint]
+        super().__init__(free_variables, constraints, derivative_constraints, sample_period, prediction_horizon, order)
         self.no_limits = 1e4
         self.evaluated = True
         self.default_limits = default_limits
 
-    def get_lower_slack_limits(self):
+    def get_lower_vel_slack_limits(self):
         result = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
@@ -177,10 +190,26 @@ class B(Parent):
                     result[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
         return result
 
-    def get_upper_slack_limits(self):
+    def get_upper_vel_slack_limits(self):
         result = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
+                if t < c.control_horizon:
+                    result[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
+        return result
+
+    def get_lower_acc_slack_limits(self):
+        result = {}
+        for t in range(self.prediction_horizon):
+            for c in self.acceleration_constraints:
+                if t < c.control_horizon:
+                    result[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
+        return result
+
+    def get_upper_acc_slack_limits(self):
+        result = {}
+        for t in range(self.prediction_horizon):
+            for c in self.acceleration_constraints:
                 if t < c.control_horizon:
                     result[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
         return result
@@ -196,10 +225,10 @@ class B(Parent):
         ub = defaultdict(dict)
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, min(v.order, self.order)):  # start with velocity
+                for o in range(Derivatives.velocity, min(v.order, self.order) + 1):  # start with velocity
                     o = Derivatives(o)
                     if t == self.prediction_horizon - 1 \
-                            and o < min(v.order, self.order) - 1 \
+                            and o < min(v.order, self.order) \
                             and self.prediction_horizon > 2:  # and False:
                         lb[o][f't{t:03}/{v.position_name}/{o}'] = 0
                         ub[o][f't{t:03}/{v.position_name}/{o}'] = 0
@@ -209,13 +238,15 @@ class B(Parent):
         lb_params = []
         for o, x in sorted(lb.items()):
             lb_params.append(x)
-        lb_params.append(self.get_lower_slack_limits())
+        lb_params.append(self.get_lower_vel_slack_limits())
+        lb_params.append(self.get_lower_acc_slack_limits())
         lb_params.append(self.get_lower_error_slack_limits())
 
         ub_params = []
         for o, x in sorted(ub.items()):
             ub_params.append(x)
-        ub_params.append(self.get_upper_slack_limits())
+        ub_params.append(self.get_upper_vel_slack_limits())
+        ub_params.append(self.get_upper_acc_slack_limits())
         ub_params.append(self.get_upper_error_slack_limits())
 
         lb, self.names = self._sorter(*lb_params)
@@ -223,22 +254,16 @@ class B(Parent):
 
 
 class BA(Parent):
-    free_variables: List[FreeVariable]
-    constraints: List[Constraint]
-    velocity_constraints: List[DerivativeConstraint]
 
     def __init__(self,
                  free_variables: List[FreeVariable],
                  constraints: List[Constraint],
-                 velocity_constraints: List[DerivativeConstraint],
+                 derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  order: Derivatives,
                  default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order)
-        self.free_variables = free_variables
-        self.constraints = constraints
-        self.velocity_constraints = velocity_constraints
+        super().__init__(free_variables, constraints, derivative_constraints, sample_period, prediction_horizon, order)
         self.round_to = 5
         self.round_to2 = 10
         self.default_limits = default_limits
@@ -258,6 +283,26 @@ class BA(Parent):
         result = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:
+                if t < c.control_horizon:
+                    result[f't{t:03}/{c.name}'] = w.limit(c.upper_limit[t] * self.sample_period,
+                                                          -c.normalization_factor * self.sample_period,
+                                                          c.normalization_factor * self.sample_period)
+        return result
+
+    def get_lower_constraint_acceleration(self):
+        result = {}
+        for t in range(self.prediction_horizon):
+            for c in self.acceleration_constraints:
+                if t < c.control_horizon:
+                    result[f't{t:03}/{c.name}'] = w.limit(c.lower_limit[t] * self.sample_period,
+                                                          -c.normalization_factor * self.sample_period,
+                                                          c.normalization_factor * self.sample_period)
+        return result
+
+    def get_upper_constraint_acceleration(self):
+        result = {}
+        for t in range(self.prediction_horizon):
+            for c in self.acceleration_constraints:
                 if t < c.control_horizon:
                     result[f't{t:03}/{c.name}'] = w.limit(c.upper_limit[t] * self.sample_period,
                                                           -c.normalization_factor * self.sample_period,
@@ -294,7 +339,7 @@ class BA(Parent):
                                           False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
                         self.round_to2)
                     if self.default_limits:
-                        if self.order >= 4:
+                        if self.order >= Derivatives.jerk:
                             lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
                                                                 default=False,
                                                                 evaluated=True) * self.sample_period,
@@ -336,7 +381,7 @@ class BA(Parent):
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
-            for o in range(1, min(v.order, self.order) - 1):
+            for o in range(Derivatives.velocity, min(v.order, self.order)+1):
                 o = Derivatives(o)
                 l_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
@@ -344,19 +389,21 @@ class BA(Parent):
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
-                for o in range(1, min(v.order, self.order) - 1):
+                for o in range(1, min(v.order, self.order)):
                     derivative_link[o][f't{t:03}/{o}/{v.position_name}/link'] = 0
 
         lb_params = [lb]
         ub_params = [ub]
-        for o in range(1, self.order - 1):
+        for o in range(1, self.order):
             lb_params.append(l_last_stuff[o])
             lb_params.append(derivative_link[o])
             ub_params.append(u_last_stuff[o])
             ub_params.append(derivative_link[o])
         lb_params.append(self.get_lower_constraint_velocities())
+        lb_params.append(self.get_lower_constraint_acceleration())
         lb_params.append(self.get_lower_constraint_error())
         ub_params.append(self.get_upper_constraint_velocities())
+        ub_params.append(self.get_upper_constraint_acceleration())
         ub_params.append(self.get_upper_constraint_error())
 
         lbA, self.names = self._sorter(*lb_params)
@@ -364,23 +411,17 @@ class BA(Parent):
 
 
 class A(Parent):
-    free_variables: List[FreeVariable]
-    constraints: List[Constraint]
-    velocity_constraints: List[DerivativeConstraint]
-
     def __init__(self,
                  free_variables: List[FreeVariable],
                  constraints: List[Constraint],
-                 velocity_constraints: List[DerivativeConstraint],
+                 derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  order: Derivatives,
                  time_collector,
                  default_limits: bool = False):
-        super().__init__(sample_period, prediction_horizon, order, time_collector)
-        self.free_variables = free_variables  # type: list[FreeVariable]
-        self.constraints = constraints  # type: list[Constraint]
-        self.derivative_constraints = velocity_constraints  # type: list[DerivativeConstraint]
+        super().__init__(free_variables, constraints, derivative_constraints,
+                         sample_period, prediction_horizon, order, time_collector)
         self.joints = {}
         self.height = 0
         self._compute_height()
@@ -388,30 +429,28 @@ class A(Parent):
         self._compute_width()
         self.default_limits = default_limits
 
-    @property
-    def velocity_constraints(self) -> List[DerivativeConstraint]:
-        return [c for c in self.derivative_constraints if c.derivative == Derivatives.velocity]
-
-    @property
-    def acceleration_constraints(self) -> List[DerivativeConstraint]:
-        return [c for c in self.derivative_constraints if c.derivative == Derivatives.acceleration]
-
     def _compute_height(self):
         # rows for position limits of non continuous joints
         self.height = self.prediction_horizon * (self.num_position_limits())
         # rows for linking vel/acc/jerk
-        self.height += self.number_of_joints * self.prediction_horizon * (self.order - 2)
+        self.height += self.number_of_joints * self.prediction_horizon * (self.order - 1)
         # rows for velocity constraints
         for i, c in enumerate(self.velocity_constraints):
+            self.height += c.control_horizon
+        # rows for acceleration constraints
+        for i, c in enumerate(self.acceleration_constraints):
             self.height += c.control_horizon
         # row for constraint error
         self.height += len(self.constraints)
 
     def _compute_width(self):
         # columns for joint vel/acc/jerk symbols
-        self.width = self.number_of_joints * self.prediction_horizon * (self.order - 1)
+        self.width = self.number_of_joints * self.prediction_horizon * self.order
         # columns for velocity constraints
         for i, c in enumerate(self.velocity_constraints):
+            self.width += c.control_horizon
+        # columns for acceleration constraints
+        for i, c in enumerate(self.acceleration_constraints):
             self.width += c.control_horizon
         # slack variable for constraint error
         self.width += len(self.constraints)
@@ -435,7 +474,8 @@ class A(Parent):
         return self._sorter({c.name: c.expression for c in self.constraints})[0]
 
     def get_derivative_constraint_expressions(self, derivative: Derivatives):
-        return self._sorter({c.name: c.expression for c in self.velocity_constraints if c.derivative == derivative})[0]
+        return self._sorter({c.name: c.expression for c in self.derivative_constraints if c.derivative == derivative})[
+            0]
 
     def get_free_variable_symbols(self, order: Derivatives):
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
@@ -495,12 +535,12 @@ class A(Parent):
         number_of_joints = self.number_of_joints
 
         num_position_constraints = self.prediction_horizon * number_of_joints
-        num_derivative_links = number_of_joints * self.prediction_horizon * (self.order - 2)
+        num_derivative_links = number_of_joints * self.prediction_horizon * (self.order - 1)
         number_of_vel_rows = len(self.velocity_constraints) * self.prediction_horizon
         number_of_acc_rows = len(self.acceleration_constraints) * self.prediction_horizon
         number_of_task_constr_rows = len(self.constraints)
 
-        number_of_non_slack_columns = number_of_joints * self.prediction_horizon * (self.order - 1)
+        number_of_non_slack_columns = number_of_joints * self.prediction_horizon * (self.order)
         number_of_vel_slack_columns = len(self.velocity_constraints) * self.prediction_horizon
         number_of_acc_slack_columns = len(self.acceleration_constraints) * self.prediction_horizon
         number_of_integral_slack_columns = len(self.constraints)
@@ -541,7 +581,7 @@ class A(Parent):
         I = -w.eye(I_height)
         offset_v = vertical_offset
         offset_h = 0
-        for o in range(self.order - 2):
+        for o in range(self.order - 1):
             offset_v += number_of_joints
             A_soft[offset_v:offset_v + I_height, offset_h:offset_h + I_height] += I
             offset_v += I_height
@@ -554,7 +594,8 @@ class A(Parent):
         if len(expressions) > 0:
             vertical_offset = num_position_constraints + num_derivative_links
             next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows
-            for order in range(self.order - 1):
+            for order in range(self.order):
+                order = Derivatives(order)
                 J_vel = w.jacobian(expressions=expressions,
                                    symbols=self.get_free_variable_symbols(order),
                                    order=1) * self.sample_period
@@ -564,7 +605,8 @@ class A(Parent):
                 horizontal_offset * order:horizontal_offset * (order + 1)] = J_vel_limit_block
             # velocity constraint slack
             I = w.eye(number_of_vel_rows) * self.sample_period
-            A_soft[vertical_offset:next_vertical_offset, number_of_non_slack_columns:number_of_non_slack_columns + number_of_vel_slack_columns] = I
+            A_soft[vertical_offset:next_vertical_offset,
+            number_of_non_slack_columns:number_of_non_slack_columns + number_of_vel_slack_columns] = I
             # delete rows if control horizon of constraint shorter than prediction horizon
             # delete columns where control horizon is shorter than prediction horizon
             for t in range(self.prediction_horizon):
@@ -579,6 +621,7 @@ class A(Parent):
         # acceleration constraints --------------------------------
         expressions = w.Expression(self.get_derivative_constraint_expressions(Derivatives.acceleration))
         if len(expressions) > 0:
+            assert self.order >= Derivatives.jerk
             # task acceleration = Jd_q * qd + (J_q + Jd_qd) * qdd + J_qd * qddd
             vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows
             next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows
@@ -604,13 +647,13 @@ class A(Parent):
             # velocity constraint slack
             I = w.eye(J_vel_block.shape[0]) * self.sample_period
             A_soft[vertical_offset:next_vertical_offset,
-            number_of_non_slack_columns+ number_of_vel_slack_columns:number_of_non_slack_columns + number_of_vel_slack_columns + number_of_acc_slack_columns] = I
+            number_of_non_slack_columns + number_of_vel_slack_columns:number_of_non_slack_columns + number_of_vel_slack_columns + number_of_acc_slack_columns] = I
             # delete rows if control horizon of constraint shorter than prediction horizon
             # delete columns where control horizon is shorter than prediction horizon
             for t in range(self.prediction_horizon):
                 for i, c in enumerate(self.acceleration_constraints):
                     h_index = number_of_non_slack_columns + number_of_vel_slack_columns + i + (
-                                t * len(self.acceleration_constraints))
+                            t * len(self.acceleration_constraints))
                     v_index = vertical_offset + number_of_vel_rows + i + (t * len(self.acceleration_constraints))
                     if t + 1 > c.control_horizon:
                         rows_to_delete.append(v_index)
@@ -621,7 +664,8 @@ class A(Parent):
         if len(self.constraints) > 0:
             vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows
             next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows + number_of_task_constr_rows
-            for order in range(self.order - 1):
+            for order in range(self.order):
+                order = Derivatives(order)
                 J_err = w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
                                    symbols=self.get_free_variable_symbols(order),
                                    order=1) * self.sample_period
@@ -698,7 +742,7 @@ class QPController:
         else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
             qp_solver_class = QPSolverQPOases
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
         self.qp_solver = qp_solver_class(num_non_slack=num_non_slack,
                                          retry_added_slack=self.retry_added_slack,
                                          retry_weight_factor=self.retry_weight_factor,
@@ -715,7 +759,7 @@ class QPController:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = min(self.prediction_horizon + 1, max(v.order for v in self.free_variables))
+        self.order = Derivatives(min(self.prediction_horizon + 1, max(v.order for v in self.free_variables)))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def get_free_variable(self, name):
@@ -902,28 +946,28 @@ class QPController:
     def _construct_big_ass_M(self, default_limits=False):
         self.b = B(free_variables=self.free_variables,
                    constraints=self.constraints,
-                   velocity_constraints=self.velocity_constraints,
+                   derivative_constraints=self.velocity_constraints,
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
                    order=self.order,
                    default_limits=default_limits)
         self.H = H(free_variables=self.free_variables,
                    constraints=self.constraints,
-                   velocity_constraints=self.velocity_constraints,
+                   derivative_constraints=self.velocity_constraints,
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
                    order=self.order,
                    default_limits=default_limits)
         self.bA = BA(free_variables=self.free_variables,
                      constraints=self.constraints,
-                     velocity_constraints=self.velocity_constraints,
+                     derivative_constraints=self.velocity_constraints,
                      sample_period=self.sample_period,
                      prediction_horizon=self.prediction_horizon,
                      order=self.order,
                      default_limits=default_limits)
         self.A = A(free_variables=self.free_variables,
                    constraints=self.constraints,
-                   velocity_constraints=self.velocity_constraints,
+                   derivative_constraints=self.velocity_constraints,
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
                    order=self.order,
@@ -1049,7 +1093,7 @@ class QPController:
         return filtered_stuff
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
         num_of_slack = len(lb) - num_non_slack
         lb[-num_of_slack:] = -100
         ub[-num_of_slack:] = 100
@@ -1076,10 +1120,10 @@ class QPController:
     def split_xdot(self, xdot) -> derivative_joint_map:
         split = {}
         offset = len(self.free_variables)
-        for derivative in range(self.order - 1):
-            split[Derivatives(derivative + 1)] = OrderedDict((x.position_name,
-                                                              xdot[i + offset * self.prediction_horizon * derivative])
-                                                             for i, x in enumerate(self.free_variables))
+        for derivative in range(Derivatives.velocity, self.order+1):
+            split[Derivatives(derivative)] = OrderedDict((x.position_name,
+                                                          xdot[i + offset * self.prediction_horizon * (derivative-1)])
+                                                         for i, x in enumerate(self.free_variables))
         return split
 
     def b_names(self):

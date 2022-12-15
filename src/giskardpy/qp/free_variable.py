@@ -40,7 +40,7 @@ class FreeVariable:
 
     @property
     def order(self) -> Derivatives:
-        return Derivatives(len(self.quadratic_weights) + 1)
+        return max(self.quadratic_weights.keys())
 
     def get_symbol(self, derivative: Derivatives) -> Union[w.Symbol, float]:
         try:

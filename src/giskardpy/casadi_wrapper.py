@@ -1233,23 +1233,20 @@ def diag(args):
 
 
 @profile
-def jacobian(expressions, symbols, order=1):
+def jacobian(expressions, symbols):
     expressions = Expression(expressions)
-    if order == 1:
-        return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
-    elif order == 2:
-        j = jacobian(expressions, symbols, order=1)
-        for i, symbol in enumerate(symbols):
-            j[:, i] = jacobian(j[:, i], [symbol])
-        return j
-    else:
-        raise NotImplementedError('jacobian only supports order 1 and 2')
+    return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
+
+
+def jacobian_dot(expressions, symbols, symbols_dot):
+    ed = total_derivative(expressions, symbols, symbols_dot)
+    return jacobian(ed, symbols)
 
 
 def equivalent(expression1, expression2):
     expression1 = Expression(expression1).s
     expression2 = Expression(expression2).s
-    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
+    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 5)
 
 
 def free_symbols(expression):

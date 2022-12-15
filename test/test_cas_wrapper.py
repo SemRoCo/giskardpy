@@ -1083,12 +1083,13 @@ class TestCASWrapper(unittest.TestCase):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
 
-    def test_jacobian_order2(self):
+    def test_jacobian_dot(self):
         a = w.Symbol('a')
         b = w.Symbol('b')
-        m = w.Expression([a + b, a ** 2 + b, a ** 3 + b ** 2])
-        jac = w.jacobian(m, [a, b], order=2)
-        expected = w.Expression([[0, 0], [2, 0], [6 * a, 2]])
+        bd = w.Symbol('bd')
+        m = w.Expression(-a * w.cos(b))
+        jac = w.jacobian_dot(m, [b], [bd])
+        expected = w.Expression([bd*(a*w.cos(b))])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])

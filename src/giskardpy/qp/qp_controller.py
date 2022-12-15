@@ -381,7 +381,7 @@ class BA(Parent):
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
-            for o in range(Derivatives.velocity, min(v.order, self.order)+1):
+            for o in range(Derivatives.velocity, min(v.order, self.order) + 1):
                 o = Derivatives(o)
                 l_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
@@ -586,7 +586,7 @@ class A(Parent):
             A_soft[offset_v:offset_v + I_height, offset_h:offset_h + I_height] += I
             offset_v += I_height
             offset_h += self.prediction_horizon * number_of_joints
-        vertical_offset = vertical_offset + num_derivative_links
+        # vertical_offset = vertical_offset + num_derivative_links
         # derivative links ----------------------------------------
 
         # velocity constraints ------------------------------------
@@ -597,8 +597,7 @@ class A(Parent):
             for order in range(self.order):
                 order = Derivatives(order)
                 J_vel = w.jacobian(expressions=expressions,
-                                   symbols=self.get_free_variable_symbols(order),
-                                   order=1) * self.sample_period
+                                   symbols=self.get_free_variable_symbols(order)) * self.sample_period
                 J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel)
                 horizontal_offset = self.number_of_joints * self.prediction_horizon
                 A_soft[vertical_offset:next_vertical_offset,
@@ -626,17 +625,15 @@ class A(Parent):
             vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows
             next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows
             J_q = w.jacobian(expressions=expressions,
-                             symbols=self.get_free_variable_symbols(Derivatives.position),
-                             order=1) * self.sample_period
-            Jd_q = w.jacobian(expressions=expressions,
-                              symbols=self.get_free_variable_symbols(Derivatives.position),
-                              order=2) * self.sample_period
+                             symbols=self.get_free_variable_symbols(Derivatives.position)) * self.sample_period
+            Jd_q = w.jacobian_dot(expressions=expressions,
+                                  symbols=self.get_free_variable_symbols(Derivatives.position),
+                                  symbols_dot=self.get_free_variable_symbols(Derivatives.velocity)) * self.sample_period
             J_qd = w.jacobian(expressions=expressions,
-                              symbols=self.get_free_variable_symbols(Derivatives.velocity),
-                              order=1) * self.sample_period
-            Jd_qd = w.jacobian(expressions=expressions,
-                               symbols=self.get_free_variable_symbols(Derivatives.velocity),
-                               order=2) * self.sample_period
+                              symbols=self.get_free_variable_symbols(Derivatives.velocity)) * self.sample_period
+            Jd_qd = w.jacobian_dot(expressions=expressions,
+                                   symbols=self.get_free_variable_symbols(Derivatives.velocity),
+                                   symbols_dot=self.get_free_variable_symbols(Derivatives.acceleration)) * self.sample_period
             J_vel_block = w.kron(w.eye(self.prediction_horizon), Jd_q)
             J_acc_block = w.kron(w.eye(self.prediction_horizon), J_q + Jd_qd)
             J_jerk_block = w.kron(w.eye(self.prediction_horizon), J_qd)
@@ -654,7 +651,7 @@ class A(Parent):
                 for i, c in enumerate(self.acceleration_constraints):
                     h_index = number_of_non_slack_columns + number_of_vel_slack_columns + i + (
                             t * len(self.acceleration_constraints))
-                    v_index = vertical_offset + number_of_vel_rows + i + (t * len(self.acceleration_constraints))
+                    v_index = vertical_offset + i + (t * len(self.acceleration_constraints))
                     if t + 1 > c.control_horizon:
                         rows_to_delete.append(v_index)
                         columns_to_delete.append(h_index)
@@ -667,8 +664,7 @@ class A(Parent):
             for order in range(self.order):
                 order = Derivatives(order)
                 J_err = w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
-                                   symbols=self.get_free_variable_symbols(order),
-                                   order=1) * self.sample_period
+                                   symbols=self.get_free_variable_symbols(order)) * self.sample_period
                 J_hstack = w.hstack([J_err for _ in range(self.prediction_horizon)])
                 # set jacobian entry to 0 if control horizon shorter than prediction horizon
                 for i, c in enumerate(self.constraints):
@@ -1120,9 +1116,9 @@ class QPController:
     def split_xdot(self, xdot) -> derivative_joint_map:
         split = {}
         offset = len(self.free_variables)
-        for derivative in range(Derivatives.velocity, self.order+1):
+        for derivative in range(Derivatives.velocity, self.order + 1):
             split[Derivatives(derivative)] = OrderedDict((x.position_name,
-                                                          xdot[i + offset * self.prediction_horizon * (derivative-1)])
+                                                          xdot[i + offset * self.prediction_horizon * (derivative - 1)])
                                                          for i, x in enumerate(self.free_variables))
         return split
 

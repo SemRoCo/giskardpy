@@ -27,6 +27,9 @@ class Joint(ABC):
         self._parent_T_child: w.TransMatrix = w.TransMatrix(parent_T_child)
         self.create_free_variables()
 
+    def clear_cache(self):
+        del self.parent_T_child
+
     @property
     def god_map(self):
         return blackboard_god_map()
@@ -42,7 +45,7 @@ class Joint(ABC):
 
     # @parent_T_child.setter
     def update_parent_T_child(self, value: w.TransMatrix):
-        del self.parent_T_child
+        self.clear_cache()
         self._parent_T_child = value
 
     def create_free_variable(self, name: my_string, lower_limits: derivative_map, upper_limits: derivative_map):
@@ -325,7 +328,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
     def connect_to_existing_free_variables(self):
         mimed_joint: OneDofJoint = self.god_map.unsafe_get_data(identifier.world)._joints[self.mimed_joint_name]
         self.free_variable = mimed_joint.free_variable
-        del self.parent_T_child
+        self.clear_cache()
 
     def has_free_variables(self) -> bool:
         return False
@@ -721,6 +724,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
         self.x_vel = self.brumbrum.x_vel
         self.y_vel = self.brumbrum.y_vel
         self.yaw_vel = self.brumbrum.yaw_vel
+        self.clear_cache()
 
 
 # class OmniDriveWithCaster(Joint):

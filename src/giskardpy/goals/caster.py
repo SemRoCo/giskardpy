@@ -5,7 +5,7 @@ from giskardpy.my_types import PrefixName
 
 
 class PR2CasterConstraints(Goal):
-    def __init__(self, velocity_limit: float = 1):
+    def __init__(self, velocity_limit: float = 1000):
         super().__init__()
         casters = ['fl_caster_rotation_joint',
                    'fr_caster_rotation_joint',
@@ -31,18 +31,36 @@ class Caster(Goal):
         joint = self.world.get_joint(self.joint_name)
         link_name = joint.child_link_name
         bf_T_caster = self.get_fk(PrefixName('base_footprint', 'pr2'), link_name)
-        bf_R_caster = bf_T_caster.to_rotation()
-        axis, angle = bf_R_caster.to_axis_angle()
-        # self.add_debug_expr('angle', angle)
-        self.add_debug_expr('angle_vel', w.total_derivative(angle, self.joint_velocity_symbols, self.joint_acceleration_symbols))
-        self.add_velocity_constraint(lower_velocity_limit=0,
-                                     upper_velocity_limit=0,
-                                     weight=0.01,
-                                     task_expression=angle,
-                                     velocity_limit=self.velocity_limit,
-                                     # lower_slack_limit=-self.velocity_limit,
-                                     # upper_slack_limit=self.velocity_limit,
-                                     name_suffix='angle')
+        bf_V_x = w.Vector3((1, 0, 0))
+        bf_V_caster_x = bf_T_caster.dot(w.Vector3((1, 0, 0)))
+        yaw = w.angle_between_vector(bf_V_x, bf_V_caster_x)
+        # bf_R_caster = bf_T_caster.to_rotation()
+        # yaw = bf_R_caster.to_angle(lambda axis: axis[2])
+        # roll, pitch, yaw = bf_R_caster.to_rpy()
+        # axis.vis_frame = link_name
+        # axis.scale(angle)
+        self.add_debug_expr('angle', yaw)
+        # self.add_debug_expr('axis', axis)
+        # self.add_debug_expr('angle_vel', w.total_derivative(angle, self.joint_velocity_symbols, self.joint_acceleration_symbols))
+        # self.add_velocity_constraint(lower_velocity_limit=-1000,
+        #                              upper_velocity_limit=1000,
+        #                              weight=0.01,
+        #                              task_expression=yaw,
+        #                              velocity_limit=self.velocity_limit,
+        #                              # lower_slack_limit=-1000,
+        #                              # upper_slack_limit=0,
+        #                              name_suffix='angle/vel')
+        a1 = 0
+        a2 = 50
+        a3 = 50
+        self.add_acceleration_constraint(lower_acceleration_limit=-a1,
+                                         upper_acceleration_limit=a1,
+                                         weight=0.01,
+                                         task_expression=yaw,
+                                         acceleration_limit=a2,
+                                         lower_slack_limit=-a3,
+                                         upper_slack_limit=a3,
+                                         name_suffix='angle/acc')
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.joint_name}'

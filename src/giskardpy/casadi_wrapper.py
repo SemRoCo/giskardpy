@@ -646,15 +646,15 @@ class RotationMatrix(Symbol_):
             pass
         s = ca.SX.eye(4)
 
-        s[0,0] = ca.cos(yaw) * ca.cos(pitch)
-        s[0,1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
-        s[0,2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
-        s[1,0] = ca.sin(yaw) * ca.cos(pitch)
-        s[1,1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
-        s[1,2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
-        s[2,0] = -ca.sin(pitch)
-        s[2,1] = ca.cos(pitch) * ca.sin(roll)
-        s[2,2] = ca.cos(pitch) * ca.cos(roll)
+        s[0, 0] = ca.cos(yaw) * ca.cos(pitch)
+        s[0, 1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
+        s[0, 2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
+        s[1, 0] = ca.sin(yaw) * ca.cos(pitch)
+        s[1, 1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
+        s[1, 2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
+        s[2, 0] = -ca.sin(pitch)
+        s[2, 1] = ca.cos(pitch) * ca.sin(roll)
+        s[2, 2] = ca.cos(pitch) * ca.cos(roll)
         return cls(s, sanity_check=False)
 
     def inverse(self):
@@ -1240,6 +1240,12 @@ def jacobian(expressions, symbols):
 
 def jacobian_dot(expressions, symbols, symbols_dot):
     ed = total_derivative(expressions, symbols, symbols_dot)
+    return jacobian(ed, symbols)
+
+
+def jacobian_ddot(expressions, symbols, symbols_dot, symbols_ddot):
+    symbols_ddot = Expression(symbols_ddot)
+    ed = dot(jacobian_dot(expressions, symbols, symbols_dot), symbols_ddot)
     return jacobian(ed, symbols)
 
 

@@ -1094,6 +1094,18 @@ class TestCASWrapper(unittest.TestCase):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
 
+    def test_jacobian_ddot(self):
+        a = w.Symbol('a')
+        b = w.Symbol('b')
+        bd = w.Symbol('bd')
+        bdd = w.Symbol('bdd')
+        m = w.Expression(-a * w.cos(b))
+        jac = w.jacobian_ddot(m, [b], [bd], [bdd])
+        expected = w.Expression([-(bdd*(bd*(a*(w.sin(b)))))])
+        for i in range(expected.shape[0]):
+            for j in range(expected.shape[1]):
+                assert w.equivalent(jac[i, j], expected[i, j])
+
     def test_var(self):
         result = w.var('a b c')
         assert str(result[0]) == 'a'

@@ -53,12 +53,6 @@ control_mode = general_options + ['control_mode']
 
 joint_limits = general_options + ['joint_limits']
 
-joint_acceleration_linear_limit = general_options + ['joint_limits', 'acceleration']
-joint_acceleration_angular_limit = general_options + ['joint_limits', 'acceleration']
-
-joint_jerk_linear_limit = general_options + ['joint_limits', 'jerk']
-joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk']
-
 
 # qp solver
 qp_solver_config = giskard + ['_qp_solver_config']

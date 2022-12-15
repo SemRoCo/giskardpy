@@ -43,6 +43,8 @@ class Giskard:
         blackboard.god_map = self._god_map
         self._backup = {}
         self.goal_package_paths = ['giskardpy.goals']
+        self.set_default_joint_limits()
+        self.set_default_weights()
 
     def add_goal_package_name(self, package_name: str):
         new_goals = get_all_classes_in_package(package_name, Goal)
@@ -651,7 +653,8 @@ class Giskard:
     def set_default_joint_limits(self,
                                  velocity_limit: float = 1,
                                  acceleration_limit: Optional[float] = 1e3,
-                                 jerk_limit: Optional[float] = 30):
+                                 jerk_limit: Optional[float] = 30,
+                                 snap_limit: Optional[float] = 500):
         """
         The default values will be set automatically, even if this function is not called.
         :param velocity_limit: in m/s or rad/s
@@ -659,14 +662,11 @@ class Giskard:
         :param jerk_limit: in m/s**3 or rad/s**3
         """
         if jerk_limit is not None and acceleration_limit is None:
-            raise AttributeError('If jerk limits are set, acceleration limits also have to be set/')
-        self._general_config.joint_limits = {
-            Derivatives.velocity: defaultdict(lambda: velocity_limit)
-        }
-        if acceleration_limit is not None:
-            self._general_config.joint_limits[Derivatives.acceleration] = defaultdict(lambda: acceleration_limit)
-        if jerk_limit is not None:
-            self._general_config.joint_limits[Derivatives.jerk] = defaultdict(lambda: jerk_limit)
+            raise AttributeError('If jerk limits are set, acceleration limits also have to be set.')
+        self._general_config.joint_limits = {Derivatives.velocity: defaultdict(lambda: velocity_limit),
+                                             Derivatives.acceleration: defaultdict(lambda: acceleration_limit),
+                                             Derivatives.jerk: defaultdict(lambda: jerk_limit),
+                                             Derivatives.snap: defaultdict(lambda: snap_limit)}
 
     def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
         if group_name is None:
@@ -689,20 +689,17 @@ class Giskard:
 
     def set_default_weights(self,
                             velocity_weight: float = 0.001,
-                            acceleration_weight: Optional[float] = None,
-                            jerk_weight: Optional[float] = 0.001):
+                            acceleration_weight: float = 0,
+                            jerk_weight: float = 0.001,
+                            snap_weight: float = 0):
         """
         The default values are set automatically, even if this function is not called.
         A typical goal has a weight of 1, so the values in here should be sufficiently below that.
         """
-        self._qp_solver_config.joint_weights = {
-            Derivatives.velocity: defaultdict(lambda: velocity_weight)
-        }
-        if jerk_weight is not None:
-            self._qp_solver_config.joint_weights[Derivatives.acceleration] = defaultdict(lambda: acceleration_weight)
-            self._qp_solver_config.joint_weights[Derivatives.jerk] = defaultdict(lambda: jerk_weight)
-        elif acceleration_weight is not None:
-            self._qp_solver_config.joint_weights[Derivatives.acceleration] = defaultdict(lambda: acceleration_weight)
+        self._qp_solver_config.joint_weights = {Derivatives.velocity: defaultdict(lambda: velocity_weight),
+                                                Derivatives.acceleration: defaultdict(lambda: acceleration_weight),
+                                                Derivatives.jerk: defaultdict(lambda: jerk_weight),
+                                                Derivatives.snap: defaultdict(lambda: snap_weight)}
 
     def overwrite_joint_velocity_weight(self,
                                         joint_name: str,

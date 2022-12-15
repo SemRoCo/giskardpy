@@ -38,6 +38,8 @@ class ControlModes(Enum):
 
 
 class GeneralConfig:
+    joint_limits: Dict[Derivatives, Dict[PrefixName, float]]
+
     def __init__(self):
         self.control_mode: ControlModes = ControlModes.open_loop
         self.maximum_derivative: Derivatives = Derivatives.jerk
@@ -45,37 +47,27 @@ class GeneralConfig:
         self.path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
         self.test_mode: bool = False
         self.debug: bool = False
-        self.joint_limits: Dict[Derivatives, Dict[PrefixName, float]] = {
-            Derivatives.velocity: defaultdict(lambda: 1),
-            Derivatives.acceleration: defaultdict(lambda: 1e3),
-            Derivatives.jerk: defaultdict(lambda: 30)
-        }
+        self.joint_limits = {d: defaultdict(lambda: 1e4) for d in Derivatives}
         self.default_link_color = ColorRGBA(1, 1, 1, 0.5)
 
 
 class QPSolverConfig:
+    joint_weights: Dict[Derivatives, Dict[PrefixName, float]]
+
     def __init__(self,
                  qp_solver: SupportedQPSolver = SupportedQPSolver.gurobi,
                  prediction_horizon: int = 9,
                  retries_with_relaxed_constraints: int = 5,
                  added_slack: float = 100,
                  sample_period: float = 0.05,
-                 weight_factor: float = 100,
-                 joint_weights: Optional[Dict[Derivatives, Dict[PrefixName, float]]] = None):
+                 weight_factor: float = 100):
         self.qp_solver = qp_solver
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.added_slack = added_slack
         self.sample_period = sample_period
         self.weight_factor = weight_factor
-        if joint_weights is None:
-            self.joint_weights = {
-                Derivatives.velocity: defaultdict(lambda: 0.001),
-                Derivatives.acceleration: defaultdict(float),
-                Derivatives.jerk: defaultdict(lambda: 0.001)
-            }
-        else:
-            self.joint_weights = joint_weights
+        self.joint_weights = {d: defaultdict(float) for d in Derivatives}
 
 
 class HardwareConfig:
@@ -163,7 +155,7 @@ class BehaviorTreeConfig:
             'cm_per_second': 2.5,
             'height_per_derivative': 6,
             'normalize_position': False,
-            'order': 4,
+            'order': 5,
             'tick_stride': 0.5,
             # 'joint_filter': ['arm_left_2_joint'],
             'diff_after': 4,

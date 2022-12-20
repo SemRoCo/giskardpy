@@ -1833,7 +1833,7 @@ def total_derivative(expr,
     expr_jacobian = jacobian(expr, symbols)
     last_velocities = Expression(symbols_dot)
     velocity = dot(expr_jacobian, last_velocities)
-    if velocity.shape[0] * velocity.shape[0] == 1:
+    if velocity.shape[0] * velocity.shape[1] == 1:
         return velocity[0]
     else:
         return velocity

@@ -1083,28 +1083,71 @@ class TestCASWrapper(unittest.TestCase):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
 
-    def test_jacobian_dot(self):
-        a = w.Symbol('a')
-        b = w.Symbol('b')
-        bd = w.Symbol('bd')
-        m = w.Expression(-a * w.cos(b))
-        jac = w.jacobian_dot(m, [b], [bd])
-        expected = w.Expression([bd*(a*w.cos(b))])
-        for i in range(expected.shape[0]):
-            for j in range(expected.shape[1]):
-                assert w.equivalent(jac[i, j], expected[i, j])
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_jacobian_dot(self, a, ad, b, bd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'b': b,
+            'bd': bd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        m = w.Expression([
+            b_s ** 2,
+            -a_s * w.cos(b_s),
+            a_s * b_s ** 4
+        ])
+        jac = w.jacobian_dot(m, [a_s, b_s], [ad_s, bd_s])
+        expected_expr = w.Expression([
+            [0, 2 * bd_s],
+            [bd * w.sin(b), ad * w.sin(b) + a * bd * w.cos(b)],
+            [4 * bd * b ** 3, 4 * ad * b ** 3 + 12 * a * bd * b ** 2]
+        ])
+        actual = jac.compile()(**kwargs)
+        expected = expected_expr.compile()(**kwargs)
+        assert np.allclose(actual, expected)
 
-    def test_jacobian_ddot(self):
-        a = w.Symbol('a')
-        b = w.Symbol('b')
-        bd = w.Symbol('bd')
-        bdd = w.Symbol('bdd')
-        m = w.Expression(-a * w.cos(b))
-        jac = w.jacobian_ddot(m, [b], [bd], [bdd])
-        expected = w.Expression([-(bdd*(bd*(a*(w.sin(b)))))])
-        for i in range(expected.shape[0]):
-            for j in range(expected.shape[1]):
-                assert w.equivalent(jac[i, j], expected[i, j])
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_jacobian_ddot(self, a, ad, add, b, bd, bdd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'add': add,
+            'b': b,
+            'bd': bd,
+            'bdd': bdd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        add_s = w.Symbol('add')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        bdd_s = w.Symbol('bdd')
+        m = w.Expression([
+            b_s ** 2,
+            -a_s * w.cos(b_s),
+            a_s * b_s ** 4
+        ])
+        jac = w.jacobian_ddot(m, [a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
+        expected_expr = w.Expression([
+            [0, 0],
+            [bd * bdd * w.cos(b), add * bd * w.cos(b) + ad * bdd * w.cos(b) - a * bd * bdd * w.sin(b)],
+            [12 * bd * bdd * b ** 2, 12 * add * bd * b ** 2 + 12 * ad * bdd * b ** 2 + 24 * a * bd * bdd * b],
+        ])
+        actual = jac.compile()(**kwargs)
+        expected = expected_expr.compile()(**kwargs)
+        assert np.allclose(actual, expected)
 
     def test_var(self):
         result = w.var('a b c')
@@ -1245,11 +1288,13 @@ class TestCASWrapper(unittest.TestCase):
                           (-1, -1),
                           (0.5, 0.5),
                           (-0.5, -0.5)]
+
         def reference(a_, b_result_cases_, else_result):
             for b, if_result in b_result_cases_:
                 if a_ == b:
                     return if_result
             return else_result
+
         actual = w.compile_and_execute(lambda a: w.if_eq_cases(a, b_result_cases, 0), [a])
         expected = np.float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)

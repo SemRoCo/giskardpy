@@ -368,6 +368,9 @@ class Expression(Symbol_):
     def T(self):
         return Expression(self.s.T)
 
+    def reshape(self, new_shape):
+        return Expression(self.s.reshape(new_shape))
+
 
 class TransMatrix(Symbol_):
     @profile
@@ -1239,14 +1242,20 @@ def jacobian(expressions, symbols):
 
 
 def jacobian_dot(expressions, symbols, symbols_dot):
-    ed = total_derivative(expressions, symbols, symbols_dot)
-    return jacobian(ed, symbols)
+    Jd = jacobian(expressions, symbols)
+    for i in range(Jd.shape[0]):
+        for j in range(Jd.shape[1]):
+            Jd[i, j] = total_derivative(Jd[i, j], symbols, symbols_dot)
+    return Jd
 
 
 def jacobian_ddot(expressions, symbols, symbols_dot, symbols_ddot):
     symbols_ddot = Expression(symbols_ddot)
-    ed = dot(jacobian_dot(expressions, symbols, symbols_dot), symbols_ddot)
-    return jacobian(ed, symbols)
+    Jdd = jacobian(expressions, symbols)
+    for i in range(Jdd.shape[0]):
+        for j in range(Jdd.shape[1]):
+            Jdd[i, j] = total_derivative2(Jdd[i, j], symbols, symbols_dot, symbols_ddot)
+    return Jdd
 
 
 def equivalent(expression1, expression2):
@@ -1830,13 +1839,32 @@ def to_str(expression):
 def total_derivative(expr,
                      symbols,
                      symbols_dot):
-    expr_jacobian = jacobian(expr, symbols)
-    last_velocities = Expression(symbols_dot)
-    velocity = dot(expr_jacobian, last_velocities)
-    if velocity.shape[0] * velocity.shape[1] == 1:
-        return velocity[0]
-    else:
-        return velocity
+    symbols = Expression(symbols)
+    symbols_dot = Expression(symbols_dot)
+    return Expression(ca.jtimes(expr.s, symbols.s, symbols_dot.s))
+    # expr_jacobian = jacobian(expr, symbols)
+    # velocity = dot(expr_jacobian, last_velocities)
+    # if velocity.shape[0] * velocity.shape[1] == 1:
+    #     return velocity[0]
+    # else:
+    #     return velocity
+
+
+def total_derivative2(expr, symbols, symbols_dot, symbols_ddot):
+    symbols = Expression(symbols)
+    symbols_dot = Expression(symbols_dot)
+    symbols_ddot = Expression(symbols_ddot)
+    v = []
+    for i in range(len(symbols)):
+        for j in range(len(symbols)):
+            if i == j:
+                v.append(symbols_ddot[i].s)
+            else:
+                v.append(symbols_dot[i].s*symbols_dot[j].s)
+    v = Expression(v)
+    H = Expression(ca.hessian(expr.s, symbols.s)[0])
+    H = H.reshape((1, len(H)**2))
+    return H.dot(v)
 
 
 def quaternion_multiply(q1, q2):

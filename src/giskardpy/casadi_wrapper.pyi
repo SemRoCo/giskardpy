@@ -166,6 +166,8 @@ class Expression(Symbol_):
 
     def dot(self, other: Expression) -> Expression: ...
 
+    def reshape(self, new_shape: Tuple[int, int]) -> Expression:
+
 
 class Point3(Symbol_):
     reference_frame: Optional[PrefixName]
@@ -795,6 +797,11 @@ def total_derivative(expr: Union[Symbol, Expression],
                      symbols: Iterable[Symbol],
                      symbols_dot: Iterable[Symbol]) \
         -> Expression: ...
+
+def total_derivative2(expr: Union[Symbol, Expression],
+                      symbols: Iterable[Symbol],
+                      symbols_dot: Iterable[Symbol],
+                      symbols_ddot: Iterable[Symbol]) -> Expression:
 
 def quaternion_multiply(q1: Quaternion, q2: Quaternion) -> Quaternion: ...
 

@@ -1099,15 +1099,18 @@ class TestCASWrapper(unittest.TestCase):
         b_s = w.Symbol('b')
         bd_s = w.Symbol('bd')
         m = w.Expression([
-            b_s ** 2,
+            a_s ** 3 * b_s ** 3,
+            # b_s ** 2,
             -a_s * w.cos(b_s),
-            a_s * b_s ** 4
+            # a_s * b_s ** 4
         ])
         jac = w.jacobian_dot(m, [a_s, b_s], [ad_s, bd_s])
         expected_expr = w.Expression([
-            [0, 2 * bd_s],
-            [bd * w.sin(b), ad * w.sin(b) + a * bd * w.cos(b)],
-            [4 * bd * b ** 3, 4 * ad * b ** 3 + 12 * a * bd * b ** 2]
+            [6 * ad_s * a_s * b_s ** 3 + 9 * a_s ** 2 * bd_s * b_s ** 2,
+             9 * ad_s * a_s ** 2 * b_s ** 2 + 6 * a_s ** 3 * bd_s * b],
+            # [0, 2 * bd_s],
+            [bd_s * w.sin(b_s), ad_s * w.sin(b_s) + a_s * bd_s * w.cos(b_s)],
+            # [4 * bd * b ** 3, 4 * ad * b ** 3 + 12 * a * bd * b ** 2]
         ])
         actual = jac.compile()(**kwargs)
         expected = expected_expr.compile()(**kwargs)
@@ -1135,18 +1138,88 @@ class TestCASWrapper(unittest.TestCase):
         bd_s = w.Symbol('bd')
         bdd_s = w.Symbol('bdd')
         m = w.Expression([
+            a_s ** 3 * b_s ** 3,
             b_s ** 2,
             -a_s * w.cos(b_s),
-            a_s * b_s ** 4
         ])
         jac = w.jacobian_ddot(m, [a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
-        expected_expr = w.Expression([
+        expected = np.array([
+            [add * 6 * b ** 3 + bdd * 18 * a ** 2 * b + 2 * ad * bd * 18 * a * b ** 2,
+             bdd * 6 * a ** 3 + add * 18 * b ** 2 * a + 2 * ad * bd * 18 * b * a ** 2],
             [0, 0],
-            [bd * bdd * w.cos(b), add * bd * w.cos(b) + ad * bdd * w.cos(b) - a * bd * bdd * w.sin(b)],
-            [12 * bd * bdd * b ** 2, 12 * add * bd * b ** 2 + 12 * ad * bdd * b ** 2 + 24 * a * bd * bdd * b],
+            [bdd * np.cos(b),
+             bdd * -a * np.sin(b) + 2 * ad * bd * np.cos(b)],
         ])
         actual = jac.compile()(**kwargs)
-        expected = expected_expr.compile()(**kwargs)
+        assert np.allclose(actual, expected)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_total_derivative2(self, a, b, ad, bd, add, bdd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'add': add,
+            'b': b,
+            'bd': bd,
+            'bdd': bdd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        add_s = w.Symbol('add')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        bdd_s = w.Symbol('bdd')
+        m = w.Expression(a_s * b_s ** 2)
+        jac = w.total_derivative2(m, [a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
+        actual = jac.compile()(**kwargs)
+        expected = bdd * 2 * a + 2 * ad * bd * 2 * b
+        assert np.allclose(actual, expected)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_total_derivative2_2(self, a, b, c, ad, bd, cd, add, bdd, cdd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'add': add,
+            'b': b,
+            'bd': bd,
+            'bdd': bdd,
+            'c': c,
+            'cd': cd,
+            'cdd': cdd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        add_s = w.Symbol('add')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        bdd_s = w.Symbol('bdd')
+        c_s = w.Symbol('c')
+        cd_s = w.Symbol('cd')
+        cdd_s = w.Symbol('cdd')
+        m = w.Expression(a_s * b_s ** 2 * c_s ** 3)
+        jac = w.total_derivative2(m, [a_s, b_s, c_s], [ad_s, bd_s, cd_s], [add_s, bdd_s, cdd_s])
+        # expected_expr = w.Expression(add_s + bdd_s*2*a*c**3 + 4*ad_s*)
+        actual = jac.compile()(**kwargs)
+        # expected = expected_expr.compile()(**kwargs)
+        expected = bdd * 2 * a * c ** 3 \
+                   + cdd * 6 * a * b ** 2 * c \
+                   + 4 * ad * bd * b * c ** 3 \
+                   + 6 * ad * b ** 2 * cd * c ** 2 \
+                   + 12 * a * bd * b * cd * c ** 2
         assert np.allclose(actual, expected)
 
     def test_var(self):

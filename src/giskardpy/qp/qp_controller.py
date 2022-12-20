@@ -149,14 +149,14 @@ class H(Parent):
         for _, weight in sorted(weights.items()):
             params.append(weight)
 
-        derivative_constr_weights = {}
-        for t in range(self.prediction_horizon):
-            for d in range(Derivatives.velocity, self.order + 1):
+        for d in range(Derivatives.velocity, self.order + 1):
+            derivative_constr_weights = {}
+            for t in range(self.prediction_horizon):
                 d = Derivatives(d)
                 for c in self.get_derivative_constraints(d):  # type: DerivativeConstraint
                     if t < c.control_horizon:
                         derivative_constr_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
-        params.append(derivative_constr_weights)
+            params.append(derivative_constr_weights)
 
         error_slack_weights = {f'{c.name}/error': c.normalized_weight(self.prediction_horizon) for c in
                                self.constraints}
@@ -584,9 +584,9 @@ class A(Parent):
 
         # acceleration constraints --------------------------------
         v_acc_start = num_position_constraints + num_derivative_links + number_of_vel_rows
-        v_acc_end = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows
+        v_acc_end = v_acc_start + number_of_acc_rows
         h_acc_start = number_of_non_slack_columns + number_of_vel_slack_columns
-        h_acc_end = number_of_non_slack_columns + number_of_vel_slack_columns + number_of_acc_slack_columns
+        h_acc_end = h_acc_start + number_of_acc_slack_columns
         expressions = w.Expression(self.get_derivative_constraint_expressions(Derivatives.acceleration))
         if len(expressions) > 0:
             assert self.order >= Derivatives.jerk
@@ -675,8 +675,9 @@ class A(Parent):
 
         # J stack for total error
         if len(self.constraints) > 0:
-            vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows
-            next_vertical_offset = num_position_constraints + num_derivative_links + number_of_vel_rows + number_of_acc_rows + number_of_task_constr_rows
+            vertical_offset = num_position_constraints + num_derivative_links \
+                              + number_of_vel_rows + number_of_acc_rows + number_of_jerk_rows
+            next_vertical_offset = vertical_offset + number_of_task_constr_rows
             for order in range(self.order):
                 order = Derivatives(order)
                 J_err = w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),

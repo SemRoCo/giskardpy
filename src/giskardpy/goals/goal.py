@@ -307,6 +307,32 @@ class Goal(ABC):
                                                                   control_horizon=self.control_horizon,
                                                                   horizon_function=horizon_function)
 
+    def add_jerk_constraint(self,
+                            lower_jerk_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                            upper_jerk_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                            weight: w.symbol_expr_float,
+                            task_expression: w.symbol_expr,
+                            acceleration_limit: w.symbol_expr_float,
+                            name_suffix: Optional[str] = None,
+                            lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = -1e4,
+                            upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = 1e4,
+                            horizon_function: Optional[Callable[[float, int], float]] = None):
+        name_suffix = name_suffix if name_suffix else ''
+        name = str(self) + name_suffix
+        if name in self._derivative_constraints:
+            raise KeyError(f'a constraint with name \'{name}\' already exists')
+        self._derivative_constraints[name] = DerivativeConstraint(name=name,
+                                                                  derivative=Derivatives.jerk,
+                                                                  expression=task_expression,
+                                                                  lower_limit=lower_jerk_limit,
+                                                                  upper_limit=upper_jerk_limit,
+                                                                  quadratic_weight=weight,
+                                                                  normalization_factor=acceleration_limit,
+                                                                  lower_slack_limit=lower_slack_limit,
+                                                                  upper_slack_limit=upper_slack_limit,
+                                                                  control_horizon=self.control_horizon,
+                                                                  horizon_function=horizon_function)
+
     def add_constraint(self,
                        reference_velocity: w.symbol_expr_float,
                        lower_error: symbol_expr_float,

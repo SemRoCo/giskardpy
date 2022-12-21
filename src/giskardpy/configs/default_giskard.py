@@ -56,7 +56,7 @@ class Giskard:
         """
         Set the name of the root link of the world. Only required in standalone mode.
         """
-        self._root_link_name = PrefixName.from_string(link_name)
+        self._root_link_name = PrefixName.from_string(link_name, set_none_if_no_slash=True)
 
     def _get_collision_avoidance_config(self, group_name: Optional[str] = None):
         if group_name is None:

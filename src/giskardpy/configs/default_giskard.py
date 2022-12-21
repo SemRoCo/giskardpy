@@ -37,6 +37,7 @@ class Giskard:
         self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
+        self._god_map.set_data(identifier.joints_to_add, [])
         self._controlled_joints = []
         self._root_link_name = None
         blackboard = Blackboard
@@ -55,7 +56,7 @@ class Giskard:
         """
         Set the name of the root link of the world. Only required in standalone mode.
         """
-        self._root_link_name = link_name
+        self._root_link_name = PrefixName.from_string(link_name)
 
     def _get_collision_avoidance_config(self, group_name: Optional[str] = None):
         if group_name is None:

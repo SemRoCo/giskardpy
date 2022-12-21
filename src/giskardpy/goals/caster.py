@@ -50,9 +50,9 @@ class Caster(Goal):
         #                              # lower_slack_limit=-1000,
         #                              # upper_slack_limit=0,
         #                              name_suffix='angle/vel')
-        a1 = 0
+        a1 = 10000
         a2 = 50
-        a3 = 50
+        a3 = 1000
         self.add_acceleration_constraint(lower_acceleration_limit=-a1,
                                          upper_acceleration_limit=a1,
                                          weight=0.01,
@@ -60,7 +60,18 @@ class Caster(Goal):
                                          acceleration_limit=a2,
                                          lower_slack_limit=-a3,
                                          upper_slack_limit=a3,
-                                         name_suffix='angle/acc')
+                                         name_suffix='/angle/acc')
+        j1 = 0
+        j2 = 1000
+        j3 = 5000000
+        self.add_jerk_constraint(lower_jerk_limit=-j1,
+                                 upper_jerk_limit=j1,
+                                 weight=0.0001,
+                                 task_expression=yaw,
+                                 acceleration_limit=j2,
+                                 lower_slack_limit=-j3,
+                                 upper_slack_limit=j3,
+                                 name_suffix='/angle/jerk')
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.joint_name}'

@@ -9,8 +9,9 @@ class PR2_Base(Giskard):
         # self.set_collision_checker(CollisionCheckerLib.none)
         # self.set_qp_solver(SupportedQPSolver.qp_oases)
         self.configure_PlotTrajectory(enabled=True)
-        self.configure_PlotDebugExpressions(enabled=True)
-        self.configure_DebugMarkerPublisher(enabled=True)
+        # self.configure_PlotDebugExpressions(enabled=True)
+        # self.configure_DebugMarkerPublisher(enabled=True)
+        self.configure_PublishDebugExpressions(enabled=True)
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
@@ -45,21 +46,21 @@ class PR2_Base(Giskard):
                                                       'l_gripper_l_finger_joint'])
         self.fix_joints_for_external_collision_avoidance(['r_gripper_l_finger_joint',
                                                           'l_gripper_l_finger_joint'])
-        self.set_maximum_derivative(Derivatives.acceleration)
-        self.set_default_joint_limits(velocity_limit=1,
-                                      acceleration_limit=1.5,
-                                      jerk_limit=None)
-        self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
-                                             velocity_limit=2)
-        self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
-                                                 acceleration_limit=4)
-        self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
-                                             velocity_limit=2)
-        self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
-                                                 acceleration_limit=4)
-        self.set_default_weights(velocity_weight=0.001,
-                                 acceleration_weight=0.001,
-                                 jerk_weight=None)
+        self.set_maximum_derivative(Derivatives.snap)
+        # self.set_default_joint_limits(velocity_limit=1,
+        #                               acceleration_limit=1.5,
+        #                               jerk_limit=None)
+        # self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
+        #                                      velocity_limit=2)
+        # self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
+        #                                          acceleration_limit=4)
+        # self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
+        #                                      velocity_limit=2)
+        # self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
+        #                                          acceleration_limit=4)
+        # self.set_default_weights(velocity_weight=0.001,
+        #                          acceleration_weight=0.001,
+        #                          jerk_weight=None)
 
 
 class PR2_Mujoco(PR2_Base):

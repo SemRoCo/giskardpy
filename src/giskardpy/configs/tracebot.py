@@ -27,8 +27,6 @@ class Tracebot_StandAlone(Tracebot):
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.set_root_link_name('tracebot_base_link')
-        # self.add_fixed_joint(parent_link='map', child_link='tracebot_baselink')
         self.register_controlled_joints([
             'tracebot_left_arm_shoulder_pan_joint',
             'tracebot_left_arm_shoulder_lift_joint',
@@ -36,7 +34,6 @@ class Tracebot_StandAlone(Tracebot):
             'tracebot_left_arm_wrist_1_joint',
             'tracebot_left_arm_wrist_2_joint',
             'tracebot_left_arm_wrist_3_joint',
-            'tracebot_left_gripper_base_gripper_left_joint:',
             'tracebot_left_gripper_joint',
             'tracebot_right_arm_shoulder_pan_joint',
             'tracebot_right_arm_shoulder_lift_joint',
@@ -44,6 +41,5 @@ class Tracebot_StandAlone(Tracebot):
             'tracebot_right_arm_wrist_1_joint',
             'tracebot_right_arm_wrist_2_joint',
             'tracebot_right_arm_wrist_3_joint',
-            'tracebot_right_gripper_base_gripper_left_joint:',
             'tracebot_right_gripper_joint',
         ])

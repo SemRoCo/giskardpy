@@ -14,9 +14,9 @@ from utils_for_tests import GiskardTestWrapper
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    # launch_launchfile('package://tracebot_description/launch/upload.launch')
-    # c = TracebotTestWrapper()
-    c = TracebotTestWrapperMujoco()
+    launch_launchfile('package://tracebot_description/launch/upload.launch')
+    c = TracebotTestWrapper()
+    # c = TracebotTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -73,7 +73,7 @@ class TracebotTestWrapperMujoco(GiskardTestWrapper):
         self.clear_world()
 
 
-class TestCartGoals(object):
+class TestCartGoals:
     def test_drive(self, zero_pose: TracebotTestWrapper):
         tip = 'tracebot_left_gripper_tool_frame'
         goal = PoseStamped()

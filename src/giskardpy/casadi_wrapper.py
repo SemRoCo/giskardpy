@@ -54,6 +54,9 @@ class Symbol_:
     def __str__(self):
         return str(self.s)
 
+    def pretty_str(self):
+        return to_str(self)
+
     def __repr__(self):
         return repr(self.s)
 
@@ -1211,7 +1214,7 @@ class Quaternion(Symbol_):
         raise _operation_type_error(self, 'dot', other)
 
 
-all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
+all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
 symbol_expr = Union[Symbol, Expression]
@@ -1354,6 +1357,8 @@ def if_else(condition, if_result, else_result):
         assert type(if_result) == type(else_result)
     return_type = type(if_result)
     if return_type in (int, float):
+        return_type = Expression
+    if return_type == Symbol:
         return_type = Expression
     if_result = Expression(if_result).s
     else_result = Expression(else_result).s
@@ -1829,7 +1834,9 @@ def to_str(expression):
     parts = s.split(', ')
     result = parts[-1]
     for x in reversed(parts[:-1]):
-        index, sub = x.split('=')
+        equal_position = len(x.split('=')[0])
+        index = x[:equal_position]
+        sub = x[equal_position+1:]
         if index not in result:
             raise Exception('fuck')
         result = result.replace(index, sub)

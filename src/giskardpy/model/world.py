@@ -15,7 +15,7 @@ from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates, KeyDefaultDict
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
-    PhysicsWorldException
+    PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
     PrismaticJoint, RevoluteJoint, ContinuousJoint, OmniDrive
@@ -429,7 +429,7 @@ class WorldTree:
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
             if short_name not in urdf.child_map:
-                return
+                return  # stop because link has no child links
             for child_joint_name, child_link_name in urdf.child_map[short_name]:
                 urdf_link = urdf.link_map[child_link_name]
                 child_link = Link.from_urdf(urdf_link=urdf_link,
@@ -444,7 +444,13 @@ class WorldTree:
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
 
+        if urdf_root_link.name.short_name not in parsed_urdf.child_map:
+            raise UnknownLinkException(f'Root link \'{urdf_root_link_name}\' of urdf \'{group_name}\' not in world.')
+        number_of_links_before = len(self._links)
         helper(parsed_urdf, urdf_root_link)
+        if number_of_links_before + len(parsed_urdf.links) - 1 != len(self._links):
+            # -1 because root link already exists
+            raise GiskardException(f'Failed to add urdf \'{group_name}\' to world')
 
         self.register_group(group_name, urdf_root_link_name, actuated=actuated)
         if self.god_map is not None:

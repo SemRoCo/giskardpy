@@ -8,7 +8,7 @@ import geometry_msgs.msg as geometry_msgs
 
 from giskardpy.my_types import PrefixName
 
-all_expressions = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
+all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
 symbol_expr = Union[Symbol, Expression]
@@ -51,6 +51,8 @@ class Symbol_:
     def compile(self, parameters: Optional[List[Symbol]] = None) -> CompiledFunction: ...
 
     def __hash__(self) -> int: ...
+
+    def pretty_str(self) -> str: ...
 
 
 class Symbol(Symbol_):

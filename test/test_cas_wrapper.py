@@ -1693,3 +1693,10 @@ class TestCASWrapper(unittest.TestCase):
                                  '+sq((v2*sin((alpha/2)))))' \
                                  '+sq((v3*sin((alpha/2)))))' \
                                  '+sq(cos((alpha/2)))))'
+        assert w.to_str(expr) == expr.pretty_str()
+
+    def test_to_str2(self):
+        a, b = w.var('a b')
+        e = w.if_eq(a, 0, a, b)
+        assert w.to_str(e) == '(((a==0)?a:0)+((!(a==0))?b:0))'
+        assert w.to_str(e) == e.pretty_str()

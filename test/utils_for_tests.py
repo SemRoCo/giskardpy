@@ -35,7 +35,7 @@ from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import OneDofJoint
+from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
@@ -270,6 +270,12 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def is_standalone(self):
         return self.general_config.control_mode == self.general_config.control_mode.stand_alone
+
+    def has_odometry_joint(self, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.robot_name
+        joint = self.world.get_joint(self.world.groups[group_name].root_link.parent_joint_name)
+        return isinstance(joint, (OmniDrive, DiffDrive))
 
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
         if group_name is None:

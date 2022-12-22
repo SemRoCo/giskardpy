@@ -28,6 +28,7 @@ class TracyReal(Tracebot):
         self.add_follow_joint_trajectory_server(
             namespace='/right_arm/scaled_pos_joint_traj_controller_right/follow_joint_trajectory',
             state_topic='/right_arm/scaled_pos_joint_traj_controller_right/state')
+        self.set_default_joint_limits(velocity_limit=0.2)
 
 
 class Tracebot_StandAlone(Tracebot):

@@ -29,6 +29,7 @@ from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
+from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
@@ -752,52 +753,43 @@ class OpenLoop(StandAlone):
 
 
 class ClosedLoop(OpenLoop):
-
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
-        root.add_child(CleanUp('cleanup'))
+        root.add_child(CleanUpPlanning('CleanUpPlanning'))
+        root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
 
-    # def grow_sync_branch(self):
-    #     sync = Sequence('Synchronize')
-    #     sync.add_child(WorldUpdater('update world'))
-    #     sync.add_child(running_is_success(SyncConfiguration)('update robot configuration', RobotName))
-    #     sync.add_child(SyncLocalization('update robot localization', RobotName))
-    #     sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
-    #     sync.add_child(CollisionSceneUpdater('update collision scene'))
-    #     sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
-    #     return sync
-
-    def grow_planning3(self):
-        planning_3 = Sequence('planning III', sleep=0)
-        planning_3.add_child(self.grow_closed_loop_control())
-        return planning_3
-
     def grow_closed_loop_control(self):
-        planning_4 = AsyncBehavior('planning IIII')
-        action_servers = self.god_map.get_data(identifier.robot_interface)
-        behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
-        for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-            C = behaviors[params['plugin']]
-            del params['plugin']
-            planning_4.add_child(C(execution_action_server_name, **params))
-        #planning_4.add_child(SyncConfiguration2('update robot configuration',
-        #                                         self.god_map.unsafe_get_data(identifier.robot_group_name)))
-        planning_4.add_child(LogTrajPlugin('log'))
-        if self.god_map.get_data(identifier.collision_checker) is not None:
+        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
+        planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
+        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+                and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+            planning_4.add_child(VisualizationBehavior('visualization'))
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
+            if self.god_map.get_data(identifier.enable_CPIMarker) \
+                    and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+                planning_4.add_child(CollisionMarker('cpi marker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(KinSimPlugin('kin sim'))
-
+        for joint_group_position_controller_config in hardware_config.joint_group_position_controllers_kwargs:
+            planning_4.add_child(JointGroupPosController(**joint_group_position_controller_config))
+        planning_4.add_child(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
             planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
-        # planning_4.add_plugin(WiggleCancel('wiggle'))
-        # planning_4.add_plugin(LoopDetector('loop detector'))
+        if self.god_map.get_data(identifier.PlotDebugTF_enabled):
+            planning_4.add_child(DebugMarkerPublisher('debug tf publisher'))
+        if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
+            planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
+                                                         **self.god_map.unsafe_get_data(
+                                                             identifier.PublishDebugExpressions)))
+        # planning_4.add_child(WiggleCancel('wiggle'))
+        planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin('time'))
+        planning_4.add_child(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))

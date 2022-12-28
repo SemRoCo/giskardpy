@@ -12,9 +12,8 @@ class CommandPublisher(GiskardBehavior):
     def __init__(self, name, hz=100):
         super().__init__(name)
         self.hz = hz
-        if not hasattr(self, 'joint_names'):
-            raise NotImplementedError('you need to set joint names')
-        self.world.register_controlled_joints(self.joint_names)
+        # if not hasattr(self, 'joint_names'):
+        #     raise NotImplementedError('you need to set joint names')
         self.stamp = None
 
     @profile

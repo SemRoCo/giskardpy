@@ -4,9 +4,12 @@ from typing import Dict, Optional, List
 
 import numpy as np
 import rospy
+import rosservice
+from controller_manager_msgs.srv import ListControllers, ListControllersRequest
 from numpy.typing import NDArray
 from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
+from std_srvs.srv import Trigger
 from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
@@ -223,6 +226,14 @@ class Giskard:
                                                                                'state_topic': state_topic,
                                                                                'group_name': group_name,
                                                                                'fill_velocity_values': fill_velocity_values})
+
+    def add_joint_group_position_controller(self, namespace: str, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self.hardware_config.joint_group_position_controllers_kwargs.append({'namespace': namespace,
+                                                                             'group_name': group_name})
+
+
 
     def add_omni_drive_joint(self,
                              parent_link_name: str,

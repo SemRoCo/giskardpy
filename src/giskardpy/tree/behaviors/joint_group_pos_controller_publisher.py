@@ -10,12 +10,15 @@ from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 
 class JointGroupPosController(CommandPublisher):
     @profile
-    def __init__(self, name, namespace='/joint_group_pos_controller', hz=100):
+    def __init__(self, namespace='/joint_group_pos_controller', group_name: str = None, hz=100):
+        super().__init__(namespace, hz)
         self.namespace = namespace
-        self.cmd_topic = '{}/command'.format(self.namespace)
+        self.cmd_topic = f'{self.namespace}/command'
         self.cmd_pub = rospy.Publisher(self.cmd_topic, Float64MultiArray, queue_size=10)
-        self.joint_names = rospy.get_param('{}/joints'.format(self.namespace))
-        super().__init__(name, hz)
+        self.joint_names = rospy.get_param(f'{self.namespace}/joints')
+        for i in range(len(self.joint_names)):
+            self.joint_names[i] = self.world.get_joint_name(self.joint_names[i])
+        self.world.register_controlled_joints(self.joint_names)
 
     @profile
     def initialise(self):

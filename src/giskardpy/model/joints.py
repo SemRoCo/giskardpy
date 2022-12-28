@@ -73,6 +73,18 @@ class Joint(ABC):
         :param new_cmds: result from the qp solver
         :param dt: delta time
         """
+        state = self.world.state
+        for free_variable in self.free_variable_list:
+            try:
+                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
+            except KeyError as e:
+                # joint is currently not part of the optimization problem
+                continue
+            state[self.name][Derivatives.position] += vel * dt
+            state[free_variable.name][Derivatives.velocity] = vel
+            for derivative, cmd in new_cmds.items():
+                cmd_ = cmd[free_variable.position_name]
+                state[free_variable.name][derivative] = cmd_
 
     @abc.abstractmethod
     def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
@@ -260,20 +272,7 @@ class OneDofJoint(Joint, ABC):
         self.free_variable = self.create_free_variable(self.name, self.lower_limits, self.upper_limits)
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
-        world = self.god_map.unsafe_get_data(identifier.world)
-        try:
-            vel = new_cmds[Derivatives.velocity][self.free_variable.position_name]
-        except KeyError as e:
-            # joint is currently not part of the optimization problem
-            return
-        world.state[self.name].position += vel * dt
-        world.state[self.name].velocity = vel
-        if len(new_cmds) >= 2:
-            acc = new_cmds[Derivatives.acceleration][self.free_variable.position_name]
-            world.state[self.name].acceleration = acc
-        if len(new_cmds) >= 3:
-            jerk = new_cmds[Derivatives.jerk][self.free_variable.position_name]
-            world.state[self.name].jerk = jerk
+        super().update_state(new_cmds, dt)
 
     @property
     def position_expression(self) -> Union[w.Symbol, float]:
@@ -591,19 +590,7 @@ class OmniDrive(Joint):
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         state = self.world.state
-        for free_variable in self.free_variable_list:
-            try:
-                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
-            except KeyError as e:
-                # joint is currently not part of the optimization problem
-                continue
-            state[free_variable.name].velocity = vel
-            if len(new_cmds) >= 2:
-                acc = new_cmds[Derivatives.acceleration][free_variable.position_name]
-                state[free_variable.name].acceleration = acc
-            if len(new_cmds) >= 3:
-                jerk = new_cmds[Derivatives.jerk][free_variable.position_name]
-                state[free_variable.name].jerk = jerk
+        super().update_state(new_cmds, dt)
         x_vel = state[self.x_vel_name].velocity
         y_vel = state[self.y_vel_name].velocity
         rot_vel = state[self.rot_vel_name].velocity
@@ -651,6 +638,235 @@ class OmniDrive(Joint):
     @property
     def free_variable_list(self) -> List[FreeVariable]:
         return [self.x_vel, self.y_vel, self.yaw_vel]
+
+    def _all_symbols(self) -> List[FreeVariable]:
+        return self.free_variable_list + self.translation_variables + self.orientation_variables
+
+
+
+class OmniDrivePR2(Joint):
+    def __init__(self,
+                 parent_link_name: my_string,
+                 child_link_name: my_string,
+                 name: Optional[my_string] = 'brumbrum',
+                 group_name: Optional[str] = None,
+                 translation_velocity_limit: Optional[float] = 0.5,
+                 rotation_velocity_limit: Optional[float] = 0.6,
+                 translation_acceleration_limit: Optional[float] = None,
+                 rotation_acceleration_limit: Optional[float] = None,
+                 translation_jerk_limit: Optional[float] = 5,
+                 rotation_jerk_limit: Optional[float] = 10,
+                 odom_x_name: Optional[str] = None,
+                 odom_y_name: Optional[str] = None,
+                 odom_yaw_name: Optional[str] = None,
+                 **kwargs):
+        name = PrefixName(name, group_name)
+        self.translation_velocity_limit = translation_velocity_limit
+        self.rotation_velocity_limit = rotation_velocity_limit
+        self.translation_acceleration_limit = translation_acceleration_limit
+        self.rotation_acceleration_limit = rotation_acceleration_limit
+        self.translation_jerk_limit = translation_jerk_limit
+        self.rotation_jerk_limit = rotation_jerk_limit
+        self.translation_names = [PrefixName('odom_x', group_name),
+                                  PrefixName('odom_y', group_name),
+                                  PrefixName('odom_z', group_name)]
+        if odom_x_name is not None:
+            self.translation_names[0] = PrefixName(odom_x_name, group_name)
+        if odom_y_name is not None:
+            self.translation_names[1] = PrefixName(odom_y_name, group_name)
+        self.orientation_names = [PrefixName('odom_roll', group_name),
+                                  PrefixName('odom_pitch', group_name),
+                                  PrefixName('odom_yaw', group_name)]
+        if odom_yaw_name is not None:
+            self.orientation_names[2] = PrefixName(odom_yaw_name, group_name)
+        # self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
+        # self.rot_name = 'odom_rot'
+        self.x_vel_name = PrefixName('odom_x_vel', group_name)
+        self.y_vel_name = PrefixName('odom_y_vel', group_name)
+        self.rot_vel_name = PrefixName('odom_yaw_vel', group_name)
+        self.translation_variables: List[FreeVariable] = []
+        self.orientation_variables: List[FreeVariable] = []
+        self.caster_x_name = PrefixName('caster_x', group_name)
+        self.caster_y_name = PrefixName('caster_y', group_name)
+        self.caster_yaw_name = PrefixName('caster_yaw', group_name)
+        super().__init__(name, parent_link_name, child_link_name, w.TransMatrix())
+
+    def create_free_variables(self):
+        translation_upper_limits = {}
+        if self.translation_velocity_limit is not None:
+            translation_upper_limits[Derivatives.velocity] = self.translation_velocity_limit
+        if self.translation_acceleration_limit is not None:
+            translation_upper_limits[Derivatives.acceleration] = self.translation_acceleration_limit
+        if self.translation_jerk_limit is not None:
+            translation_upper_limits[Derivatives.jerk] = self.translation_jerk_limit
+        translation_lower_limits = {k: -v for k, v in translation_upper_limits.items()}
+
+        rotation_upper_limits = {}
+        if self.rotation_velocity_limit is not None:
+            rotation_upper_limits[Derivatives.velocity] = self.rotation_velocity_limit
+        if self.rotation_acceleration_limit is not None:
+            rotation_upper_limits[Derivatives.acceleration] = self.rotation_acceleration_limit
+        if self.rotation_jerk_limit is not None:
+            rotation_upper_limits[Derivatives.jerk] = self.rotation_jerk_limit
+        rotation_lower_limits = {k: -v for k, v in rotation_upper_limits.items()}
+
+        for translation_variable_name in self.translation_names:
+            self.translation_variables.append(self.create_free_variable(name=translation_variable_name,
+                                                                        lower_limits=translation_lower_limits,
+                                                                        upper_limits=translation_upper_limits))
+
+        for orientation_variable_name in self.orientation_names:
+            self.orientation_variables.append(self.create_free_variable(name=orientation_variable_name,
+                                                                        lower_limits=rotation_lower_limits,
+                                                                        upper_limits=rotation_upper_limits))
+        self.yaw = self.orientation_variables[-1]
+        self.x_vel = self.create_free_variable(self.x_vel_name,
+                                               translation_lower_limits,
+                                               translation_upper_limits)
+        self.y_vel = self.create_free_variable(self.y_vel_name,
+                                               translation_lower_limits,
+                                               translation_upper_limits)
+        self.yaw_vel = self.create_free_variable(self.rot_vel_name,
+                                                 rotation_lower_limits,
+                                                 rotation_upper_limits)
+        self.caster_x = self.create_free_variable(self.caster_x_name,
+                                                  translation_lower_limits,
+                                                  translation_upper_limits)
+        self.caster_y = self.create_free_variable(self.caster_y_name,
+                                                  translation_lower_limits,
+                                                  translation_upper_limits)
+        self.caster_yaw = self.create_free_variable(self.caster_yaw_name,
+                                                    rotation_lower_limits,
+                                                    rotation_upper_limits)
+
+    @property
+    def position_variable_names(self):
+        return [self.x_name, self.y_name, self.yaw_name]
+
+    @profile
+    def _joint_transformation(self):
+        odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
+                                               y=self.y.get_symbol(Derivatives.position),
+                                               yaw=self.yaw.get_symbol(Derivatives.position))
+        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.caster_x.get_symbol(Derivatives.position)*self.x_vel.get_symbol(Derivatives.position),
+                                                 y=self.caster_y.get_symbol(Derivatives.position)*self.x_vel.get_symbol(Derivatives.position),
+                                                 yaw=self.caster_yaw.get_symbol(Derivatives.position)*self.x_vel.get_symbol(Derivatives.position))
+        bf_vel_T_bf = w.TransMatrix.from_xyz_rpy(x=0,
+                                                 y=0,
+                                                 z=self.translation_variables[2].get_symbol(Derivatives.position),
+                                                 roll=self.orientation_variables[0].get_symbol(Derivatives.position),
+                                                 pitch=self.orientation_variables[1].get_symbol(Derivatives.position),
+                                                 yaw=0)
+        return odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
+
+    @property
+    def x(self):
+        return self.translation_variables[0]
+
+    @property
+    def y(self):
+        return self.translation_variables[1]
+
+    @property
+    def z(self):
+        return self.translation_variables[2]
+
+    @property
+    def x_name(self):
+        return self.translation_names[0]
+
+    @property
+    def y_name(self):
+        return self.translation_names[1]
+
+    @property
+    def z_name(self):
+        return self.translation_names[2]
+
+    @property
+    def roll_name(self):
+        return self.orientation_names[0]
+
+    @property
+    def pitch_name(self):
+        return self.orientation_names[1]
+
+    @property
+    def yaw_name(self):
+        return self.orientation_names[2]
+
+    def update_state(self, new_cmds: derivative_joint_map, dt: float):
+        state = self.world.state
+        for free_variable in self.free_variable_list:
+            try:
+                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
+            except KeyError as e:
+                # joint is currently not part of the optimization problem
+                continue
+            state[free_variable.name].velocity = vel
+            if len(new_cmds) >= 2:
+                acc = new_cmds[Derivatives.acceleration][free_variable.position_name]
+                state[free_variable.name].acceleration = acc
+            if len(new_cmds) >= 3:
+                jerk = new_cmds[Derivatives.jerk][free_variable.position_name]
+                state[free_variable.name].jerk = jerk
+        x_vel = state[self.x_vel_name].velocity
+        caster_x_vel = state[self.caster_x].velocity
+        caster_y_vel = state[self.caster_y].velocity
+        caster_yaw_vel = state[self.caster_yaw].velocity
+        # rot_vel = state[self.rot_vel_name].velocity
+        delta = state[self.yaw_name].position
+        state[self.x_name].velocity = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
+        state[self.x_name].position += state[self.x_name].velocity * dt
+        state[self.y_name].velocity = (np.sin(delta) * x_vel + np.cos(delta) * y_vel)
+        state[self.y_name].position += state[self.y_name].velocity * dt
+        state[self.yaw_name].velocity = rot_vel
+        state[self.yaw_name].position += rot_vel * dt
+
+    def update_limits(self, linear_limits: derivative_joint_map, angular_limits: derivative_joint_map):
+        for free_variable in self._all_symbols():
+            free_variable.lower_limits = {}
+            free_variable.upper_limits = {}
+
+        for order, linear_limit in linear_limits.items():
+            self.x_vel.set_upper_limit(order, linear_limit[self.x_vel_name])
+            self.y_vel.set_upper_limit(order, linear_limit[self.y_vel_name])
+
+            self.x_vel.set_lower_limit(order, -linear_limit[self.x_vel_name])
+            self.y_vel.set_lower_limit(order, -linear_limit[self.y_vel_name])
+
+            self.caster_x.set_upper_limit(order, linear_limit[self.caster_x_name])
+            self.caster_y.set_upper_limit(order, linear_limit[self.caster_y_name])
+
+            self.caster_x.set_lower_limit(order, -linear_limit[self.caster_x_name])
+            self.caster_y.set_lower_limit(order, -linear_limit[self.caster_y_name])
+
+        for order, angular_limit in angular_limits.items():
+            self.yaw_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
+            self.yaw_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
+            self.caster_yaw.set_upper_limit(order, angular_limit[self.caster_yaw_name])
+            self.caster_yaw.set_lower_limit(order, -angular_limit[self.caster_yaw_name])
+
+    def update_weights(self, weights: derivative_joint_map):
+        # self.delete_weights()
+        for order, weight in weights.items():
+            try:
+                for free_variable in self._all_symbols():
+                    free_variable.quadratic_weights[order] = weight[self.name]
+            except KeyError:
+                # can't do "if in", because the dict may be a defaultdict
+                pass
+
+    def get_limit_expressions(self, order: int) -> Tuple[
+        Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
+        return None, None
+
+    def has_free_variables(self) -> bool:
+        return True
+
+    @property
+    def free_variable_list(self) -> List[FreeVariable]:
+        return [self.x_vel, self.caster_x, self.caster_y, self.caster_yaw]
 
     def _all_symbols(self) -> List[FreeVariable]:
         return self.free_variable_list + self.translation_variables + self.orientation_variables
@@ -1280,19 +1496,7 @@ class DiffDrive(Joint):
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         world = self.god_map.unsafe_get_data(identifier.world)
-        for free_variable in self.free_variable_list:
-            try:
-                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
-            except KeyError as e:
-                # joint is currently not part of the optimization problem
-                continue
-            world.state[free_variable.name].velocity = vel
-            if len(new_cmds) >= 2:
-                acc = new_cmds[Derivatives.acceleration][free_variable.position_name]
-                world.state[free_variable.name].acceleration = acc
-            if len(new_cmds) >= 3:
-                jerk = new_cmds[Derivatives.jerk][free_variable.position_name]
-                world.state[free_variable.name].jerk = jerk
+        super().update_state(new_cmds, dt)
         x = world.state[self.x_vel_name].velocity
         rot = world.state[self.rot_vel_name].velocity
         delta = world.state[self.yaw_name].position

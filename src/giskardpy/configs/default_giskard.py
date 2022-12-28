@@ -133,12 +133,14 @@ class Giskard:
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
 
-    def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False):
+    def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
         self.behavior_tree_config.plugin_config['PlotTrajectory']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PlotTrajectory']['wait'] = wait
         self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
 
-    def configure_PlotDebugExpressions(self, enabled: bool = False):
+    def configure_PlotDebugExpressions(self, enabled: bool = False, wait: bool = False):
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['wait'] = wait
 
     def configure_DebugMarkerPublisher(self, enabled: bool = False):
         self.behavior_tree_config.plugin_config['PlotDebugTF']['enabled'] = enabled

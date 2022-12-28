@@ -67,6 +67,9 @@ class _JointState:
     def __getitem__(self, derivative):
         return self.state[derivative]
 
+    def __setitem__(self, derivative, value):
+        self.state[derivative] = value
+
     @property
     def position(self) -> float:
         return self.state[Derivatives.position]

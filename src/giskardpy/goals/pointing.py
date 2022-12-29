@@ -49,13 +49,17 @@ class Pointing(Goal):
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root, self.tip)
-        root_P_goal_point = w.Point3(self.root_P_goal_point)
+        root_P_goal_point: w.Point3 = self.get_parameter_as_symbolic_expression('root_P_goal_point')
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
-
+        root_V_pointing_axis.vis_frame = self.tip
+        root_V_goal_axis.vis_frame = self.tip
+        self.add_debug_expr('goal_point', root_P_goal_point)
+        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
         self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,

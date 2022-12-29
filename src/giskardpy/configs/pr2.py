@@ -10,7 +10,7 @@ class PR2_Base(Giskard):
         # self.set_qp_solver(SupportedQPSolver.qp_oases)
         # self.configure_PlotTrajectory(enabled=True)
         # self.configure_PlotDebugExpressions(enabled=True)
-        # self.configure_DebugMarkerPublisher(enabled=True)
+        self.configure_DebugMarkerPublisher(enabled=True)
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
@@ -90,6 +90,7 @@ class PR2_Mujoco(PR2_Base):
                                                     soft_threshold=0.2,
                                                     hard_threshold=0.1)
 
+
 class PR2_MujocoRealTime(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
@@ -97,15 +98,16 @@ class PR2_MujocoRealTime(PR2_Base):
         self.set_control_mode(ControlModes.close_loop)
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(parent_link_name='odom_combined',
-                                  child_link_name='base_footprint',
-                                  translation_velocity_limit=0.4,
-                                  rotation_velocity_limit=0.2,
-                                  translation_acceleration_limit=1,
-                                  rotation_acceleration_limit=1,
-                                  translation_jerk_limit=5,
-                                  rotation_jerk_limit=5,
-                                  odometry_topic='/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
+        self.add_fixed_joint('odom_combined', 'pr2/base_footprint')
+        # self.add_omni_drive_joint(parent_link_name='odom_combined',
+        #                           child_link_name='base_footprint',
+        #                           translation_velocity_limit=0.4,
+        #                           rotation_velocity_limit=0.2,
+        #                           translation_acceleration_limit=1,
+        #                           rotation_acceleration_limit=1,
+        #                           translation_jerk_limit=5,
+        #                           rotation_jerk_limit=5,
+        #                           odometry_topic='/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
         self.add_joint_group_position_controller(namespace='/pr2/real_time_position_controller')
         # self.add_base_cmd_velocity(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
         #                            track_only_velocity=False)

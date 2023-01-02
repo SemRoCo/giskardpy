@@ -27,6 +27,9 @@ class Joint(ABC):
         self._parent_T_child: w.TransMatrix = w.TransMatrix(parent_T_child)
         self.create_free_variables()
 
+    def set_initial_state(self):
+        pass
+
     def clear_cache(self):
         del self.parent_T_child
 
@@ -80,7 +83,7 @@ class Joint(ABC):
             except KeyError as e:
                 # joint is currently not part of the optimization problem
                 continue
-            state[self.name][Derivatives.position] += vel * dt
+            state[free_variable.name][Derivatives.position] += vel * dt
             state[free_variable.name][Derivatives.velocity] = vel
             for derivative, cmd in new_cmds.items():
                 cmd_ = cmd[free_variable.position_name]
@@ -643,7 +646,6 @@ class OmniDrive(Joint):
         return self.free_variable_list + self.translation_variables + self.orientation_variables
 
 
-
 class OmniDrivePR2(Joint):
     def __init__(self,
                  parent_link_name: my_string,
@@ -681,7 +683,7 @@ class OmniDrivePR2(Joint):
             self.orientation_names[2] = PrefixName(odom_yaw_name, group_name)
         # self.orientation_names = ['odom_qx', 'odom_qy', 'odom_qz', 'odom_qw']
         # self.rot_name = 'odom_rot'
-        self.x_vel_name = PrefixName('odom_x_vel', group_name)
+        self.x_vel_name = PrefixName('odom_vel', group_name)
         self.y_vel_name = PrefixName('odom_y_vel', group_name)
         self.rot_vel_name = PrefixName('odom_yaw_vel', group_name)
         self.translation_variables: List[FreeVariable] = []
@@ -690,6 +692,9 @@ class OmniDrivePR2(Joint):
         self.caster_y_name = PrefixName('caster_y', group_name)
         self.caster_yaw_name = PrefixName('caster_yaw', group_name)
         super().__init__(name, parent_link_name, child_link_name, w.TransMatrix())
+
+    def set_initial_state(self):
+        self.world.state[self.caster_x_name].position = 1
 
     def create_free_variables(self):
         translation_upper_limits = {}
@@ -719,25 +724,35 @@ class OmniDrivePR2(Joint):
             self.orientation_variables.append(self.create_free_variable(name=orientation_variable_name,
                                                                         lower_limits=rotation_lower_limits,
                                                                         upper_limits=rotation_upper_limits))
+
+        caster_upper_limits = {
+            Derivatives.velocity: 100,
+            Derivatives.acceleration: 1000,
+            Derivatives.jerk: 5000,
+        }
+        caster_lower_limits = {
+            Derivatives.velocity: -100,
+            Derivatives.acceleration: -1000,
+            Derivatives.jerk: -5000,
+        }
+
         self.yaw = self.orientation_variables[-1]
-        self.x_vel = self.create_free_variable(self.x_vel_name,
-                                               translation_lower_limits,
-                                               translation_upper_limits)
-        self.y_vel = self.create_free_variable(self.y_vel_name,
-                                               translation_lower_limits,
-                                               translation_upper_limits)
-        self.yaw_vel = self.create_free_variable(self.rot_vel_name,
-                                                 rotation_lower_limits,
-                                                 rotation_upper_limits)
+        self.vel = self.create_free_variable(self.x_vel_name,
+                                             {Derivatives.velocity: -0.5,
+                                              Derivatives.acceleration: -100,
+                                              Derivatives.jerk: -20},
+                                             {Derivatives.velocity: 0.5,
+                                              Derivatives.acceleration: 100,
+                                              Derivatives.jerk: 20})
         self.caster_x = self.create_free_variable(self.caster_x_name,
-                                                  translation_lower_limits,
-                                                  translation_upper_limits)
+                                                  caster_lower_limits,
+                                                  caster_upper_limits)
         self.caster_y = self.create_free_variable(self.caster_y_name,
-                                                  translation_lower_limits,
-                                                  translation_upper_limits)
+                                                  caster_lower_limits,
+                                                  caster_upper_limits)
         self.caster_yaw = self.create_free_variable(self.caster_yaw_name,
-                                                    rotation_lower_limits,
-                                                    rotation_upper_limits)
+                                                    caster_lower_limits,
+                                                    caster_upper_limits)
 
     @property
     def position_variable_names(self):
@@ -745,12 +760,19 @@ class OmniDrivePR2(Joint):
 
     @profile
     def _joint_transformation(self):
+        hack = self.god_map.to_symbol(identifier.hack)
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),
                                                yaw=self.yaw.get_symbol(Derivatives.position))
-        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.caster_x.get_symbol(Derivatives.position)*self.x_vel.get_symbol(Derivatives.position),
-                                                 y=self.caster_y.get_symbol(Derivatives.position)*self.x_vel.get_symbol(Derivatives.position),
-                                                 yaw=self.caster_yaw.get_symbol(Derivatives.position)*self.x_vel.get_symbol(Derivatives.position))
+        x = self.caster_x.get_symbol(Derivatives.position)
+        y = self.caster_y.get_symbol(Derivatives.position)
+        yaw = self.caster_yaw.get_symbol(Derivatives.position)
+        v = self.vel.get_symbol(Derivatives.position)
+        scale = 0.001
+        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(
+            x=scale * hack * (v * x + x),
+            y=scale * hack * (v * y + y),
+            yaw=scale * hack * (v * yaw + yaw))
         bf_vel_T_bf = w.TransMatrix.from_xyz_rpy(x=0,
                                                  y=0,
                                                  z=self.translation_variables[2].get_symbol(Derivatives.position),
@@ -795,25 +817,25 @@ class OmniDrivePR2(Joint):
     def yaw_name(self):
         return self.orientation_names[2]
 
+    def normalize_and_return_vel_direction(self):
+        state = self.world.state
+        caster_x_pos = state[self.caster_x_name].position
+        caster_y_pos = state[self.caster_y_name].position
+        caster_yaw_pos = state[self.caster_yaw_name].position
+        vel_vector = np.array([caster_x_pos, caster_y_pos, caster_yaw_pos])
+        vel_vector = vel_vector / np.linalg.norm(vel_vector)
+        state[self.caster_x_name].position = vel_vector[0]
+        state[self.caster_y_name].position = vel_vector[1]
+        state[self.caster_yaw_name].position = vel_vector[2]
+        return vel_vector
+
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         state = self.world.state
-        for free_variable in self.free_variable_list:
-            try:
-                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
-            except KeyError as e:
-                # joint is currently not part of the optimization problem
-                continue
-            state[free_variable.name].velocity = vel
-            if len(new_cmds) >= 2:
-                acc = new_cmds[Derivatives.acceleration][free_variable.position_name]
-                state[free_variable.name].acceleration = acc
-            if len(new_cmds) >= 3:
-                jerk = new_cmds[Derivatives.jerk][free_variable.position_name]
-                state[free_variable.name].jerk = jerk
-        x_vel = state[self.x_vel_name].velocity
-        caster_x_vel = state[self.caster_x].velocity
-        caster_y_vel = state[self.caster_y].velocity
-        caster_yaw_vel = state[self.caster_yaw].velocity
+        super().update_state(new_cmds, dt)
+        state[self.x_vel_name].position = 0
+        vel = state[self.x_vel_name].velocity
+        vel_direction = self.normalize_and_return_vel_direction()
+        x_vel, y_vel, rot_vel = vel_direction * vel
         # rot_vel = state[self.rot_vel_name].velocity
         delta = state[self.yaw_name].position
         state[self.x_name].velocity = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
@@ -829,33 +851,44 @@ class OmniDrivePR2(Joint):
             free_variable.upper_limits = {}
 
         for order, linear_limit in linear_limits.items():
-            self.x_vel.set_upper_limit(order, linear_limit[self.x_vel_name])
-            self.y_vel.set_upper_limit(order, linear_limit[self.y_vel_name])
+            self.vel.set_upper_limit(order, linear_limit[self.x_vel_name])
 
-            self.x_vel.set_lower_limit(order, -linear_limit[self.x_vel_name])
-            self.y_vel.set_lower_limit(order, -linear_limit[self.y_vel_name])
+            self.vel.set_lower_limit(order, -linear_limit[self.x_vel_name])
 
-            self.caster_x.set_upper_limit(order, linear_limit[self.caster_x_name])
-            self.caster_y.set_upper_limit(order, linear_limit[self.caster_y_name])
+            # self.caster_x.set_upper_limit(order, linear_limit[self.caster_x_name])
+            # self.caster_y.set_upper_limit(order, linear_limit[self.caster_y_name])
 
-            self.caster_x.set_lower_limit(order, -linear_limit[self.caster_x_name])
-            self.caster_y.set_lower_limit(order, -linear_limit[self.caster_y_name])
+            # self.caster_x.set_lower_limit(order, -linear_limit[self.caster_x_name])
+            # self.caster_y.set_lower_limit(order, -linear_limit[self.caster_y_name])
 
-        for order, angular_limit in angular_limits.items():
-            self.yaw_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
-            self.yaw_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
-            self.caster_yaw.set_upper_limit(order, angular_limit[self.caster_yaw_name])
-            self.caster_yaw.set_lower_limit(order, -angular_limit[self.caster_yaw_name])
+        # for order, angular_limit in angular_limits.items():
+        #     self.yaw_vel.set_upper_limit(order, angular_limit[self.rot_vel_name])
+        #     self.yaw_vel.set_lower_limit(order, -angular_limit[self.rot_vel_name])
+        # self.caster_yaw.set_upper_limit(order, angular_limit[self.caster_yaw_name])
+        # self.caster_yaw.set_lower_limit(order, -angular_limit[self.caster_yaw_name])
 
     def update_weights(self, weights: derivative_joint_map):
         # self.delete_weights()
-        for order, weight in weights.items():
-            try:
-                for free_variable in self._all_symbols():
-                    free_variable.quadratic_weights[order] = weight[self.name]
-            except KeyError:
-                # can't do "if in", because the dict may be a defaultdict
-                pass
+        # for order, weight in weights.items():
+        #     try:
+        #         for free_variable in self._all_symbols():
+        #             free_variable.quadratic_weights[order] = weight[self.name]
+        #     except KeyError:
+        #         # can't do "if in", because the dict may be a defaultdict
+        #         pass
+        self.vel.quadratic_weights[Derivatives.velocity] = 0.01
+        self.vel.quadratic_weights[Derivatives.acceleration] = 0.0
+        self.vel.quadratic_weights[Derivatives.jerk] = 0.01
+
+        self.caster_x.quadratic_weights[Derivatives.velocity] = 0
+        self.caster_y.quadratic_weights[Derivatives.velocity] = 0
+        self.caster_yaw.quadratic_weights[Derivatives.velocity] = 0
+        self.caster_x.quadratic_weights[Derivatives.acceleration] = 0
+        self.caster_y.quadratic_weights[Derivatives.acceleration] = 0
+        self.caster_yaw.quadratic_weights[Derivatives.acceleration] = 0
+        self.caster_x.quadratic_weights[Derivatives.jerk] = 1
+        self.caster_y.quadratic_weights[Derivatives.jerk] = 1
+        self.caster_yaw.quadratic_weights[Derivatives.jerk] = 1
 
     def get_limit_expressions(self, order: int) -> Tuple[
         Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
@@ -866,7 +899,7 @@ class OmniDrivePR2(Joint):
 
     @property
     def free_variable_list(self) -> List[FreeVariable]:
-        return [self.x_vel, self.caster_x, self.caster_y, self.caster_yaw]
+        return [self.vel, self.caster_x, self.caster_y, self.caster_yaw]
 
     def _all_symbols(self) -> List[FreeVariable]:
         return self.free_variable_list + self.translation_variables + self.orientation_variables
@@ -889,9 +922,9 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
     @profile
     def _joint_transformation(self):
         try:
-            x_vel = self.x_vel.get_symbol(Derivatives.velocity)
-            y_vel = self.y_vel.get_symbol(Derivatives.velocity)
-            yaw_vel = self.yaw_vel.get_symbol(Derivatives.velocity)
+            x_vel = self.x_vel.get_symbol(Derivatives.position)
+            y_vel = self.y_vel.get_symbol(Derivatives.position)
+            yaw_vel = self.yaw_vel.get_symbol(Derivatives.position)
         except:
             x_vel = 0
             y_vel = 0
@@ -936,10 +969,10 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
         return []
 
     def connect_to_existing_free_variables(self):
-        self.brumbrum: OmniDrive = self.world._joints[self.mimiced_joint_name]
-        self.x_vel = self.brumbrum.x_vel
-        self.y_vel = self.brumbrum.y_vel
-        self.yaw_vel = self.brumbrum.yaw_vel
+        self.brumbrum: OmniDrivePR2 = self.world._joints[self.mimiced_joint_name]
+        self.x_vel = self.brumbrum.caster_x
+        self.y_vel = self.brumbrum.caster_y
+        self.yaw_vel = self.brumbrum.caster_yaw
         self.clear_cache()
 
 

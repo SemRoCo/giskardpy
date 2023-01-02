@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.colors as mcolors
 import pylab as plt
 import rospy
+from sortedcontainers import SortedDict
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.data_types import JointStates
@@ -100,10 +101,16 @@ class Trajectory:
                 for derivative, state in joint_state.state.items():
                     data[derivative][free_variable].append(state)
         for derivative, d_data in data.items():
-            for free_variable, f_data in d_data.items():
-                d_data[free_variable] = np.array(f_data)
+            for free_variable, trajectory in d_data.items():
+                d_data[free_variable] = np.array(trajectory)
                 if normalize_position and derivative == Derivatives.position:
                     d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2
+        for free_variable, trajectory in list(data[Derivatives.velocity].items()):
+            if abs(trajectory.max() - trajectory.min()) < 1e-5:
+                for derivative, d_data in list(data.items()):
+                    del d_data[free_variable]
+        for derivative, d_data in data.items():
+            data[derivative] = SortedDict(sorted(d_data.items()))
         return data
 
     @profile

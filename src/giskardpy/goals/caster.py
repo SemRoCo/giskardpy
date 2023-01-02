@@ -42,14 +42,14 @@ class Caster(Goal):
         self.add_debug_expr('angle', yaw)
         # self.add_debug_expr('axis', axis)
         # self.add_debug_expr('angle_vel', w.total_derivative(angle, self.joint_velocity_symbols, self.joint_acceleration_symbols))
-        # self.add_velocity_constraint(lower_velocity_limit=-1000,
-        #                              upper_velocity_limit=1000,
-        #                              weight=0.01,
-        #                              task_expression=yaw,
-        #                              velocity_limit=self.velocity_limit,
-        #                              # lower_slack_limit=-1000,
-        #                              # upper_slack_limit=0,
-        #                              name_suffix='angle/vel')
+        self.add_velocity_constraint(lower_velocity_limit=-1000,
+                                     upper_velocity_limit=1000,
+                                     weight=0.01,
+                                     task_expression=yaw,
+                                     velocity_limit=self.velocity_limit,
+                                     # lower_slack_limit=-1000,
+                                     # upper_slack_limit=0,
+                                     name_suffix='/angle/vel')
         a1 = 10000
         a2 = 50
         a3 = 1000
@@ -64,9 +64,9 @@ class Caster(Goal):
         j1 = 0
         j2 = 1000
         j3 = 5000000
-        self.add_jerk_constraint(lower_jerk_limit=-j1,
-                                 upper_jerk_limit=j1,
-                                 weight=0.0001,
+        self.add_jerk_constraint(lower_jerk_limit=-j3,
+                                 upper_jerk_limit=j3,
+                                 weight=0.0,
                                  task_expression=yaw,
                                  acceleration_limit=j2,
                                  lower_slack_limit=-j3,

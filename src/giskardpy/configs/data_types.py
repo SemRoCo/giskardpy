@@ -157,6 +157,8 @@ class BehaviorTreeConfig:
             # 'order': 5,
             'tick_stride': 0.5,
             'wait': False,
+            # 'y_limits': [-0.5, 0.5]
+            # 'y_limits': [-5, 5]
         },
         'PlotDebugExpressions': {
             'enabled': False,

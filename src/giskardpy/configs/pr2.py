@@ -9,7 +9,7 @@ class PR2_Base(Giskard):
         # self.set_collision_checker(CollisionCheckerLib.none)
         # self.set_qp_solver(SupportedQPSolver.qp_oases)
         self.configure_PlotTrajectory(enabled=True, wait=True)
-        self.configure_PlotDebugExpressions(enabled=True, wait=True)
+        # self.configure_PlotDebugExpressions(enabled=True, wait=True)
         # self.configure_DebugMarkerPublisher(enabled=True)
         self.configure_PublishDebugExpressions(enabled=True)
         self.configure_MaxTrajectoryLength(length=30)
@@ -46,7 +46,7 @@ class PR2_Base(Giskard):
                                                       'l_gripper_l_finger_joint'])
         self.fix_joints_for_external_collision_avoidance(['r_gripper_l_finger_joint',
                                                           'l_gripper_l_finger_joint'])
-        self.set_maximum_derivative(Derivatives.snap)
+        self.set_maximum_derivative(Derivatives.jerk)
         # self.set_default_joint_limits(velocity_limit=1,
         #                               acceleration_limit=1.5,
         #                               jerk_limit=None)

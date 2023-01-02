@@ -17,7 +17,7 @@ from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
+from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, OmniDrivePR2
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives
@@ -38,6 +38,7 @@ class Giskard:
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
         self._god_map.set_data(identifier.joints_to_add, [])
+        self._god_map.set_data(identifier.hack, 0)
         self._controlled_joints = []
         self._root_link_name = None
         blackboard = Blackboard
@@ -262,19 +263,19 @@ class Giskard:
         """
         if robot_group_name is None:
             robot_group_name = self.get_default_group_name()
-        brumbrum_joint = OmniDrive(parent_link_name=parent_link_name,
-                                   child_link_name=PrefixName(child_link_name, robot_group_name),
-                                   name=name,
-                                   group_name=robot_group_name,
-                                   odom_x_name=odom_x_name,
-                                   odom_y_name=odom_y_name,
-                                   odom_yaw_name=odom_yaw_name,
-                                   translation_velocity_limit=translation_velocity_limit,
-                                   rotation_velocity_limit=rotation_velocity_limit,
-                                   translation_acceleration_limit=translation_acceleration_limit,
-                                   rotation_acceleration_limit=rotation_acceleration_limit,
-                                   translation_jerk_limit=translation_jerk_limit,
-                                   rotation_jerk_limit=rotation_jerk_limit)
+        brumbrum_joint = OmniDrivePR2(parent_link_name=parent_link_name,
+                                      child_link_name=PrefixName(child_link_name, robot_group_name),
+                                      name=name,
+                                      group_name=robot_group_name,
+                                      odom_x_name=odom_x_name,
+                                      odom_y_name=odom_y_name,
+                                      odom_yaw_name=odom_yaw_name,
+                                      translation_velocity_limit=translation_velocity_limit,
+                                      rotation_velocity_limit=rotation_velocity_limit,
+                                      translation_acceleration_limit=translation_acceleration_limit,
+                                      rotation_acceleration_limit=rotation_acceleration_limit,
+                                      translation_jerk_limit=translation_jerk_limit,
+                                      rotation_jerk_limit=rotation_jerk_limit)
         self._add_joint(brumbrum_joint)
         if odometry_topic is not None:
             self._add_odometry_topic(odometry_topic=odometry_topic,

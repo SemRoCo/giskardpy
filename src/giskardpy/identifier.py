@@ -1,3 +1,4 @@
+hack = ['hack']
 world = ['world']
 robot_group_name = ['robot_name']
 fk_pose = world + ['compute_fk_pose']

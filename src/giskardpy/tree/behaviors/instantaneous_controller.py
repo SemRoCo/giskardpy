@@ -17,12 +17,14 @@ class ControllerPlugin(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @profile
     def update(self):
+        self.god_map.set_data(identifier.hack, 1)
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)
 
         next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
         self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
         self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
+        self.god_map.set_data(identifier.hack, 0)
 
         return Status.RUNNING
 

@@ -721,11 +721,16 @@ class WorldTree:
         return set(self.movable_joints)
 
     def _clear(self):
-        self.state = JointStates()
-        self._links = {self.root_link_name: Link(self.root_link_name)}
-        self._joints = {}
         self.groups: Dict[my_string, SubWorldTree] = {}
+        self._joints = {}
+        self._links = {self.root_link_name: Link(self.root_link_name)}
+        self.state = JointStates()
         self.reset_cache()
+
+    def set_inital_state(self):
+        self.state = JointStates()
+        for joint_name in self.movable_joints:
+            self._joints[joint_name].set_initial_state()
 
     def delete_all_but_robots(self):
         """
@@ -740,6 +745,7 @@ class WorldTree:
                           group_name=robot_config.name,
                           actuated=True)
         self.fast_all_fks = None
+        self.set_inital_state()
         self.notify_model_change()
 
     def _add_joint_and_create_child(self, joint: Joint):

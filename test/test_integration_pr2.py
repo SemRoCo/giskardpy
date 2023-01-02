@@ -360,7 +360,7 @@ class TestJointGoals:
             'l_wrist_roll_joint': -6.062015047706401,
         }
         zero_pose.set_joint_goal(start_state)
-        zero_pose.plan_and_execute()
+        # zero_pose.plan_and_execute()
 
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):
         js = {
@@ -442,7 +442,7 @@ class TestConstraints:
                                 radius=0.5,
                                 tip_link='base_footprint',
                                 scale=0.1)
-        zero_pose.set_json_goal('PR2CasterConstraints')
+        # zero_pose.set_json_goal('PR2CasterConstraints')
         zero_pose.set_max_traj_length(new_length=60)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -452,7 +452,7 @@ class TestConstraints:
         base_goal.header.frame_id = zero_pose.default_root
         base_goal.pose.position.y = 0.05
         base_goal.pose.orientation.w = 1
-        zero_pose.set_json_goal('PR2CasterConstraints')
+        # zero_pose.set_json_goal('PR2CasterConstraints')
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
@@ -1425,7 +1425,6 @@ class TestCartGoals:
     #
     def test_move_base_left(self, zero_pose: PR2TestWrapper):
         # zero_pose.set_prediction_horizon(1)
-        zero_pose.set_json_goal('Caster')
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.y = 1

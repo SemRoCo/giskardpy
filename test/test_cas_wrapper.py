@@ -56,6 +56,9 @@ class TestSymbol:
 
 
 class TestExpression(unittest.TestCase):
+    def test_pretty_str(self):
+        e = w.eye(4)
+        e.pretty_str()
 
     def test_create(self):
         w.Expression(w.Symbol('muh'))
@@ -1689,14 +1692,14 @@ class TestCASWrapper(unittest.TestCase):
         angle = w.Symbol('alpha')
         q = w.Quaternion.from_axis_angle(axis, angle)
         expr = w.norm(q)
-        assert w.to_str(expr) == 'sqrt((((sq((v1*sin((alpha/2))))' \
-                                 '+sq((v2*sin((alpha/2)))))' \
-                                 '+sq((v3*sin((alpha/2)))))' \
-                                 '+sq(cos((alpha/2)))))'
+        assert w.to_str(expr) == [['sqrt((((sq((v1*sin((alpha/2))))'
+                                   '+sq((v2*sin((alpha/2)))))'
+                                   '+sq((v3*sin((alpha/2)))))'
+                                   '+sq(cos((alpha/2)))))']]
         assert w.to_str(expr) == expr.pretty_str()
 
     def test_to_str2(self):
         a, b = w.var('a b')
         e = w.if_eq(a, 0, a, b)
-        assert w.to_str(e) == '(((a==0)?a:0)+((!(a==0))?b:0))'
+        assert w.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert w.to_str(e) == e.pretty_str()

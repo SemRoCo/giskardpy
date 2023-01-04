@@ -1830,17 +1830,21 @@ def to_str(expression):
     """
     Turns expression into a more or less readable string.
     """
-    s = str(expression)
-    parts = s.split(', ')
-    result = parts[-1]
-    for x in reversed(parts[:-1]):
-        equal_position = len(x.split('=')[0])
-        index = x[:equal_position]
-        sub = x[equal_position+1:]
-        if index not in result:
-            raise Exception('fuck')
-        result = result.replace(index, sub)
-    return result
+    result_list = np.zeros(expression.shape).tolist()
+    for x_index in range(expression.shape[0]):
+        for y_index in range(expression.shape[1]):
+            s = str(expression[x_index, y_index])
+            parts = s.split(', ')
+            result = parts[-1]
+            for x in reversed(parts[:-1]):
+                equal_position = len(x.split('=')[0])
+                index = x[:equal_position]
+                sub = x[equal_position + 1:]
+                if index not in result:
+                    raise Exception('fuck')
+                result = result.replace(index, sub)
+            result_list[x_index][y_index] = result
+    return result_list
 
 
 def total_derivative(expr,
@@ -1867,10 +1871,10 @@ def total_derivative2(expr, symbols, symbols_dot, symbols_ddot):
             if i == j:
                 v.append(symbols_ddot[i].s)
             else:
-                v.append(symbols_dot[i].s*symbols_dot[j].s)
+                v.append(symbols_dot[i].s * symbols_dot[j].s)
     v = Expression(v)
     H = Expression(ca.hessian(expr.s, symbols.s)[0])
-    H = H.reshape((1, len(H)**2))
+    H = H.reshape((1, len(H) ** 2))
     return H.dot(v)
 
 

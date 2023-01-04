@@ -14,7 +14,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 import giskardpy.casadi_wrapper as w
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
-    GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup
+    GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup, \
+    DyeGroupRequest
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
@@ -88,11 +89,12 @@ class WorldUpdater(GiskardBehavior):
         # self.dump_state_srv = rospy.Service('~dump_state', Trigger, self.dump_state_cb)
         return super(WorldUpdater, self).setup(timeout)
 
-    def dye_group(self, req):
+    def dye_group(self, req: DyeGroupRequest):
         res = DyeGroupResponse()
         try:
             self.world.dye_group(req.group_name, req.color)
             res.error_codes = DyeGroupResponse.SUCCESS
+            logging.loginfo(f'dyed group \'{req.group_name}\' to r:{req.color.r} g:{req.color.g} b:{req.color.b} a:{req.color.a}')
         except UnknownGroupException:
             res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
         return res

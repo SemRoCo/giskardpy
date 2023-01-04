@@ -17,7 +17,7 @@ from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, OmniDrivePR2
+from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, OmniDrivePR2, OmniDrivePR22
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives
@@ -263,7 +263,7 @@ class Giskard:
         """
         if robot_group_name is None:
             robot_group_name = self.get_default_group_name()
-        brumbrum_joint = OmniDrivePR2(parent_link_name=parent_link_name,
+        brumbrum_joint = OmniDrivePR22(parent_link_name=parent_link_name,
                                       child_link_name=PrefixName(child_link_name, robot_group_name),
                                       name=name,
                                       group_name=robot_group_name,

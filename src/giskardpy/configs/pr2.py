@@ -46,21 +46,20 @@ class PR2_Base(Giskard):
                                                       'l_gripper_l_finger_joint'])
         self.fix_joints_for_external_collision_avoidance(['r_gripper_l_finger_joint',
                                                           'l_gripper_l_finger_joint'])
-        self.set_maximum_derivative(Derivatives.jerk)
-        # self.set_default_joint_limits(velocity_limit=1,
-        #                               acceleration_limit=1.5,
-        #                               jerk_limit=None)
-        # self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
-        #                                      velocity_limit=2)
-        # self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
-        #                                          acceleration_limit=4)
-        # self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
-        #                                      velocity_limit=2)
-        # self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
-        #                                          acceleration_limit=4)
-        # self.set_default_weights(velocity_weight=0.001,
-        #                          acceleration_weight=0.001,
-        #                          jerk_weight=None)
+        # self.set_maximum_derivative(Derivatives.jerk)
+        self.set_maximum_derivative(Derivatives.acceleration)
+        self.set_default_joint_limits(velocity_limit=1,
+                                      acceleration_limit=1.5)
+        self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
+                                             velocity_limit=2)
+        self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
+                                                 acceleration_limit=4)
+        self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
+                                             velocity_limit=2)
+        self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
+                                                 acceleration_limit=4)
+        self.set_default_weights(velocity_weight=0.001,
+                                 acceleration_weight=0.001)
 
 
 class PR2_Mujoco(PR2_Base):
@@ -170,10 +169,10 @@ class PR2_StandAlone(PR2_Base):
         self.add_omni_drive_joint(parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
                                   name='brumbrum',
-                                  translation_velocity_limit=0.4,
-                                  rotation_velocity_limit=0.2,
-                                  translation_acceleration_limit=1,
-                                  rotation_acceleration_limit=1,
+                                  translation_velocity_limit=0.5,
+                                  rotation_velocity_limit=1,
+                                  translation_acceleration_limit=5,
+                                  rotation_acceleration_limit=5,
                                   translation_jerk_limit=5,
                                   rotation_jerk_limit=5)
         self.register_controlled_joints([

@@ -453,9 +453,8 @@ class WorldTree:
             raise GiskardException(f'Failed to add urdf \'{group_name}\' to world')
 
         self.register_group(group_name, urdf_root_link_name, actuated=actuated)
-        if self.god_map is not None:
-            self.apply_default_limits_and_weights()
         self._set_free_variables_on_mimic_joints(group_name)
+        self.apply_default_limits_and_weights()
 
     def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
                          transform: Optional[w.TransMatrix] = None):

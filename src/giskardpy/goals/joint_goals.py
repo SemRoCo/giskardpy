@@ -8,7 +8,7 @@ from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.default_giskard import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
-from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR2
+from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR2, OmniDrivePR22
 from giskardpy.my_types import PrefixName
 from giskardpy.utils.math import axis_angle_from_quaternion
 
@@ -50,7 +50,7 @@ class SetOdometry(NonMotionGoal):
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = self.world.groups[group_name].root_link.parent_joint_name
         brumbrum_joint = self.world._joints[brumbrum_joint_name]
-        if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR2)):
+        if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR2, OmniDrivePR22)):
             raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
         base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
         self.world.state[brumbrum_joint.x_name].position = base_pose.position.x
@@ -61,7 +61,12 @@ class SetOdometry(NonMotionGoal):
                                                  base_pose.orientation.w)
         if axis[-1] < 0:
             angle = -angle
-        self.world.state[brumbrum_joint.yaw_name].position = angle
+        if isinstance(brumbrum_joint, OmniDrivePR22):
+            self.world.state[brumbrum_joint.caster_yaw1_name].position = 0
+            # self.world.state[brumbrum_joint.yaw2_name].position = angle
+            self.world.state[brumbrum_joint.caster_yaw2_name].position = angle
+        else:
+            self.world.state[brumbrum_joint.yaw_name].position = angle
         self.world.notify_state_change()
 
     def __str__(self) -> str:

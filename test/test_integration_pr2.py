@@ -184,6 +184,26 @@ class PR2TestWrapper(GiskardTestWrapper):
                             root_link_group_name=self.robot_name,
                             root_link_name='r_wrist_roll_link')
 
+        self.register_group('fl_l',
+                            root_link_group_name=self.robot_name,
+                            root_link_name='fl_caster_l_wheel_link')
+        self.dye_group('fl_l', rgba=(1,0,0,1))
+
+        self.register_group('fr_l',
+                            root_link_group_name=self.robot_name,
+                            root_link_name='fr_caster_l_wheel_link')
+        self.dye_group('fr_l', rgba=(1,0,0,1))
+
+        self.register_group('bl_l',
+                            root_link_group_name=self.robot_name,
+                            root_link_name='bl_caster_l_wheel_link')
+        self.dye_group('bl_l', rgba=(1,0,0,1))
+
+        self.register_group('br_l',
+                            root_link_group_name=self.robot_name,
+                            root_link_name='br_caster_l_wheel_link')
+        self.dye_group('br_l', rgba=(1,0,0,1))
+
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
     def __init__(self):
@@ -1432,6 +1452,7 @@ class TestCartGoals:
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
+
     #
     # def test_move_base_forward_left(self, zero_pose: PR2TestWrapper):
     #     base_goal = PoseStamped()
@@ -1465,19 +1486,22 @@ class TestCartGoals:
     #     zero_pose.plan_and_execute()
 
     def test_move_base(self, zero_pose: PR2TestWrapper):
-        map_T_odom = PoseStamped()
-        map_T_odom.header.frame_id = 'map'
-        map_T_odom.pose.position.x = 1
-        map_T_odom.pose.position.y = 1
-        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.set_localization(map_T_odom)
+        # map_T_odom = PoseStamped()
+        # map_T_odom.header.frame_id = 'map'
+        # map_T_odom.pose.position.x = 1
+        # map_T_odom.pose.position.y = 1
+        # map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        # zero_pose.set_localization(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
-        base_goal.pose.position.x = 1
+        # base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
-        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        base_goal.pose.orientation.w = 1
+        # base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        zero_pose.set_cart_goal(goal_pose=base_goal,
+                                tip_link='base_footprint',
+                                root_link=zero_pose.default_root)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -2319,7 +2343,7 @@ class TestWorldManipulation:
 
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
         object_name = kitchen_setup.kitchen_name
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint' : 0.1})
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.1})
         kitchen_setup.clear_world()
         try:
             GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
@@ -2330,7 +2354,7 @@ class TestWorldManipulation:
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.position.x = 1
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         if kitchen_setup.is_standalone():
             js_topic = ''
             set_js_topic = ''
@@ -2876,7 +2900,6 @@ class TestCollisionAvoidanceGoals:
         box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_BELOW_CA)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(['base_link'], 0.09)
-
 
     def test_avoid_collision_lower_soft_threshold(self, box_setup: PR2TestWrapper):
         base_goal = PoseStamped()

@@ -60,6 +60,13 @@ class Parent:
         self.dt = sample_period
         self.order = order
 
+    def replace_hack(self, expression: Union[float, w.Expression], new_value):
+        if not isinstance(expression, w.Expression):
+            return expression
+        hack = blackboard_god_map().to_symbol(identifier.hack)
+        expression.s = w.ca.substitute(expression.s, hack.s, new_value)
+        return expression
+
     def get_derivative_constraints(self, derivative: Derivatives) -> List[DerivativeConstraint]:
         return [c for c in self.derivative_constraints if c.derivative == derivative]
 
@@ -162,7 +169,10 @@ class H(Parent):
                                self.constraints}
 
         params.append(error_slack_weights)
-        return self._sorter(*params)[0]
+        weights, _ = self._sorter(*params)
+        for i in range(len(weights)):
+            weights[i] = self.replace_hack(weights[i], 0)
+        return weights
 
 
 class B(Parent):
@@ -229,7 +239,11 @@ class B(Parent):
         ub_params.append(self.get_upper_error_slack_limits())
 
         lb, self.names = self._sorter(*lb_params)
-        return lb, self._sorter(*ub_params)[0]
+        ub, _ = self._sorter(*ub_params)
+        for i in range(len(lb)):
+            lb[i] = self.replace_hack(lb[i], 0)
+            ub[i] = self.replace_hack(ub[i], 0)
+        return lb, ub
 
 
 class BA(Parent):
@@ -364,7 +378,12 @@ class BA(Parent):
         ub_params.append(self.get_upper_constraint_error())
 
         lbA, self.names = self._sorter(*lb_params)
-        return lbA, self._sorter(*ub_params)[0]
+        ubA, _ = self._sorter(*ub_params)
+
+        for i in range(len(lbA)):
+            lbA[i] = self.replace_hack(lbA[i], 0)
+            ubA[i] = self.replace_hack(ubA[i], 0)
+        return lbA, ubA
 
 
 class A(Parent):
@@ -697,6 +716,8 @@ class A(Parent):
 
         A_soft.remove(rows_to_delete, [])
         A_soft.remove([], columns_to_delete)
+
+        A_soft = self.replace_hack(A_soft, 1)
 
         return A_soft
 

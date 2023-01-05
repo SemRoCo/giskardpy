@@ -42,15 +42,15 @@ class Caster(Goal):
         self.add_debug_expr('angle', yaw)
         # self.add_debug_expr('axis', axis)
         # self.add_debug_expr('angle_vel', w.total_derivative(angle, self.joint_velocity_symbols, self.joint_acceleration_symbols))
-        self.add_velocity_constraint(lower_velocity_limit=-1000,
-                                     upper_velocity_limit=1000,
-                                     weight=0.01,
-                                     task_expression=yaw,
-                                     velocity_limit=self.velocity_limit,
-                                     # lower_slack_limit=-1000,
-                                     # upper_slack_limit=0,
-                                     name_suffix='/angle/vel')
-        a1 = 10000
+        # self.add_velocity_constraint(lower_velocity_limit=-1000,
+        #                              upper_velocity_limit=1000,
+        #                              weight=0.01,
+        #                              task_expression=yaw,
+        #                              velocity_limit=self.velocity_limit,
+        #                              # lower_slack_limit=-1000,
+        #                              # upper_slack_limit=0,
+        #                              name_suffix='/angle/vel')
+        a1 = 100
         a2 = 50
         a3 = 1000
         self.add_acceleration_constraint(lower_acceleration_limit=-a1,
@@ -61,17 +61,17 @@ class Caster(Goal):
                                          lower_slack_limit=-a3,
                                          upper_slack_limit=a3,
                                          name_suffix='/angle/acc')
-        j1 = 0
+        # j1 = 0
         j2 = 1000
         j3 = 5000000
-        self.add_jerk_constraint(lower_jerk_limit=-j3,
-                                 upper_jerk_limit=j3,
-                                 weight=0.0,
-                                 task_expression=yaw,
-                                 acceleration_limit=j2,
-                                 lower_slack_limit=-j3,
-                                 upper_slack_limit=j3,
-                                 name_suffix='/angle/jerk')
+        # self.add_jerk_constraint(lower_jerk_limit=-j3,
+        #                          upper_jerk_limit=j3,
+        #                          weight=0.0,
+        #                          task_expression=yaw,
+        #                          acceleration_limit=j2,
+        #                          lower_slack_limit=-j3,
+        #                          upper_slack_limit=j3,
+        #                          name_suffix='/angle/jerk')
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.joint_name}'
@@ -89,6 +89,7 @@ class Circle(Goal):
     def make_constraints(self):
         map_T_bf = self.get_fk(self.world.root_link_name, self.tip_link_name)
         t = self.traj_time_in_seconds() * self.scale
+        t = w.min(t, 15 * self.scale)
         x = w.cos(t) * self.radius
         y = w.sin(t) * self.radius
         map_P_center = w.Point3(self.center)

@@ -136,7 +136,9 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
+        self.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
+                           goal_pose=goal_pose)
+        # self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
@@ -187,22 +189,22 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.register_group('fl_l',
                             root_link_group_name=self.robot_name,
                             root_link_name='fl_caster_l_wheel_link')
-        self.dye_group('fl_l', rgba=(1,0,0,1))
+        self.dye_group('fl_l', rgba=(1, 0, 0, 1))
 
         self.register_group('fr_l',
                             root_link_group_name=self.robot_name,
                             root_link_name='fr_caster_l_wheel_link')
-        self.dye_group('fr_l', rgba=(1,0,0,1))
+        self.dye_group('fr_l', rgba=(1, 0, 0, 1))
 
         self.register_group('bl_l',
                             root_link_group_name=self.robot_name,
                             root_link_name='bl_caster_l_wheel_link')
-        self.dye_group('bl_l', rgba=(1,0,0,1))
+        self.dye_group('bl_l', rgba=(1, 0, 0, 1))
 
         self.register_group('br_l',
                             root_link_group_name=self.robot_name,
                             root_link_name='br_caster_l_wheel_link')
-        self.dye_group('br_l', rgba=(1,0,0,1))
+        self.dye_group('br_l', rgba=(1, 0, 0, 1))
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
@@ -452,30 +454,6 @@ class TestConstraints:
 
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
         zero_pose.set_json_goal(constraint_type='DebugGoal')
-        zero_pose.plan_and_execute()
-
-    def test_circle(self, zero_pose: PR2TestWrapper):
-        center = PointStamped()
-        center.header.frame_id = zero_pose.default_root
-        zero_pose.set_json_goal(constraint_type='Circle',
-                                center=center,
-                                radius=0.5,
-                                tip_link='base_footprint',
-                                scale=0.1)
-        # zero_pose.set_json_goal('PR2CasterConstraints')
-        zero_pose.set_max_traj_length(new_length=60)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-
-    def test_caster_with_joint_goal(self, zero_pose: PR2TestWrapper):
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = zero_pose.default_root
-        base_goal.pose.position.y = 0.05
-        base_goal.pose.orientation.w = 1
-        # zero_pose.set_json_goal('PR2CasterConstraints')
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map')
-        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
@@ -1418,6 +1396,190 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()
 
 
+class TestMoveBaseGoals:
+    def test_left_1m(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.y = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(goal_pose=base_goal,
+                                tip_link='base_footprint',
+                                root_link=zero_pose.default_root)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_left_1cm(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.y = 0.01
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(goal_pose=base_goal,
+                                tip_link='base_footprint',
+                                root_link=zero_pose.default_root)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base(self, zero_pose: PR2TestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = -1
+        # base_goal.pose.orientation.w = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        # zero_pose.set_cart_goal(goal_pose=base_goal,
+        #                         tip_link='base_footprint',
+        #                         root_link=zero_pose.default_root)
+        zero_pose.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
+                                goal_pose=base_goal)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_circle(self, zero_pose: PR2TestWrapper):
+        center = PointStamped()
+        center.header.frame_id = zero_pose.default_root
+        zero_pose.set_json_goal(constraint_type='Circle',
+                                center=center,
+                                radius=0.5,
+                                tip_link='base_footprint',
+                                scale=0.1)
+        # zero_pose.set_json_goal('PR2CasterConstraints')
+        zero_pose.set_max_traj_length(new_length=60)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_stay_put(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = zero_pose.default_root
+        # base_goal.pose.position.y = 0.05
+        base_goal.pose.orientation.w = 1
+        # zero_pose.set_json_goal('PR2CasterConstraints')
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base_forward_1m(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_forward_1cm(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.01
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_forward_left_1m_1m(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_forward_left_1cm_1cm(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.01
+        base_goal.pose.position.y = 0.01
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base_forward_right_and_rotate(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base_rotate(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 2, [0, 0, 1]))
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
+        zero_pose.set_limit_cartesian_velocity_goal(root_link='base_footprint',
+                                                    tip_link='fl_caster_rotation_link',
+                                                    max_linear_velocity=0.01)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base1(self, zero_pose: PR2TestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.y = 2
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.teleport_base(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(goal_pose=base_goal,
+                                         tip_link='base_footprint',
+                                         root_link='map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base2(self, zero_pose: PR2TestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = -1
+        base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(goal_pose=base_goal,
+                                         tip_link='base_footprint',
+                                         root_link='map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_move_base3(self, zero_pose: PR2TestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = -1
+        base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_straight_cart_goal(goal_pose=base_goal,
+                                         tip_link='base_footprint',
+                                         root_link='map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+
 class TestCartGoals:
     def test_two_eef_goal(self, zero_pose: PR2TestWrapper):
         r_goal = PoseStamped()
@@ -1433,132 +1595,6 @@ class TestCartGoals:
         zero_pose.set_cart_goal(root_link='map', tip_link='l_gripper_tool_frame', goal_pose=l_goal)
 
         zero_pose.plan_and_execute()
-
-    # def test_move_base_forward(self, zero_pose: PR2TestWrapper):
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.position.x = 1
-    #     base_goal.pose.orientation.w = 1
-    #     zero_pose.set_cart_goal(base_goal, 'base_footprint')
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
-    #
-    def test_move_base_left(self, zero_pose: PR2TestWrapper):
-        # zero_pose.set_prediction_horizon(1)
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = 'map'
-        base_goal.pose.position.y = 1
-        base_goal.pose.orientation.w = 1
-        zero_pose.set_cart_goal(base_goal, 'base_footprint')
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-
-    #
-    # def test_move_base_forward_left(self, zero_pose: PR2TestWrapper):
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.position.x = 1
-    #     base_goal.pose.position.y = 1
-    #     base_goal.pose.orientation.w = 1
-    #     zero_pose.set_cart_goal(base_goal, 'base_footprint')
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
-    #
-    # def test_move_base_forward_right_and_rotate(self, zero_pose: PR2TestWrapper):
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.position.x = 1
-    #     base_goal.pose.position.y = -1
-    #     base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
-    #     zero_pose.set_cart_goal(base_goal, 'base_footprint')
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
-    #
-    # def test_move_base_rotate(self, zero_pose: PR2TestWrapper):
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 2, [0, 0, 1]))
-    #     zero_pose.set_cart_goal(base_goal, 'base_footprint')
-    #     zero_pose.set_limit_cartesian_velocity_goal(root_link='base_footprint',
-    #                                                 tip_link='fl_caster_rotation_link',
-    #                                                 max_linear_velocity=0.01)
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
-
-    def test_move_base(self, zero_pose: PR2TestWrapper):
-        # map_T_odom = PoseStamped()
-        # map_T_odom.header.frame_id = 'map'
-        # map_T_odom.pose.position.x = 1
-        # map_T_odom.pose.position.y = 1
-        # map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        # zero_pose.set_localization(map_T_odom)
-
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = 'map'
-        # base_goal.pose.position.x = 1
-        base_goal.pose.position.y = -1
-        base_goal.pose.orientation.w = 1
-        # base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
-        zero_pose.set_cart_goal(goal_pose=base_goal,
-                                tip_link='base_footprint',
-                                root_link=zero_pose.default_root)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-
-    # def test_move_base1(self, zero_pose: PR2TestWrapper):
-    #     map_T_odom = PoseStamped()
-    #     map_T_odom.header.frame_id = 'map'
-    #     map_T_odom.pose.position.y = 2
-    #     map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-    #     zero_pose.teleport_base(map_T_odom)
-    #
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.position.x = 1
-    #     base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-    #     zero_pose.set_straight_cart_goal(goal_pose=base_goal,
-    #                                      tip_link='base_footprint',
-    #                                      root_link='map')
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
-    #
-    # def test_move_base2(self, zero_pose: PR2TestWrapper):
-    #     map_T_odom = PoseStamped()
-    #     map_T_odom.header.frame_id = 'map'
-    #     map_T_odom.pose.position.x = 1
-    #     map_T_odom.pose.position.y = 1
-    #     map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-    #     zero_pose.set_localization(map_T_odom)
-    #
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.position.x = -1
-    #     base_goal.pose.position.y = -1
-    #     base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-    #     zero_pose.set_straight_cart_goal(goal_pose=base_goal,
-    #                                      tip_link='base_footprint',
-    #                                      root_link='map')
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
-    #
-    # def test_move_base3(self, zero_pose: PR2TestWrapper):
-    #     map_T_odom = PoseStamped()
-    #     map_T_odom.header.frame_id = 'map'
-    #     map_T_odom.pose.position.x = 1
-    #     map_T_odom.pose.position.y = 1
-    #     map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-    #     zero_pose.set_localization(map_T_odom)
-    #
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'map'
-    #     base_goal.pose.position.x = -1
-    #     base_goal.pose.position.y = -1
-    #     base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-    #     zero_pose.set_straight_cart_goal(goal_pose=base_goal,
-    #                                      tip_link='base_footprint',
-    #                                      root_link='map')
-    #     zero_pose.allow_all_collisions()
-    #     zero_pose.plan_and_execute()
 
     def test_rotate_gripper(self, zero_pose: PR2TestWrapper):
         r_goal = PoseStamped()

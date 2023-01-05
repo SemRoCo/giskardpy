@@ -994,12 +994,12 @@ class OmniDrivePR22(Joint):
         caster_upper_limits = {
             Derivatives.velocity: 100,
             Derivatives.acceleration: 1000,
-            Derivatives.jerk: 5000,
+            Derivatives.jerk: 100,
         }
         caster_lower_limits = {
             Derivatives.velocity: -100,
             Derivatives.acceleration: -1000,
-            Derivatives.jerk: -5000,
+            Derivatives.jerk: -100,
         }
 
         self.yaw = self.orientation_variables[-1]
@@ -1025,7 +1025,7 @@ class OmniDrivePR22(Joint):
         return [self.x_name, self.y_name, self.yaw_name]
 
     def set_initial_state(self):
-        self.world.state[self.caster_forward_name].position = 0.05
+        self.world.state[self.caster_forward_name].position = 0.25
 
     @profile
     def _joint_transformation(self):
@@ -1141,17 +1141,16 @@ class OmniDrivePR22(Joint):
             except KeyError:
                 # can't do "if in", because the dict may be a defaultdict
                 pass
-        # self.vel.quadratic_weights[Derivatives.velocity] = 0.01
-        # self.vel.quadratic_weights[Derivatives.acceleration] = 0.0
-        # self.vel.quadratic_weights[Derivatives.jerk] = 0.01
-        #
-        # self.caster_yaw1.quadratic_weights[Derivatives.velocity] = 0
+
+        self.caster_yaw1.quadratic_weights[Derivatives.velocity] = 0
         # self.caster_forward.quadratic_weights[Derivatives.velocity] = 0
         # self.caster_yaw2.quadratic_weights[Derivatives.velocity] = 0
-        # self.caster_yaw1.quadratic_weights[Derivatives.acceleration] = 0
+
+        self.caster_yaw1.quadratic_weights[Derivatives.acceleration] = 0
         # self.caster_forward.quadratic_weights[Derivatives.acceleration] = 0
         # self.caster_yaw2.quadratic_weights[Derivatives.acceleration] = 0
-        # self.caster_yaw1.quadratic_weights[Derivatives.jerk] = 1
+
+        self.caster_yaw1.quadratic_weights[Derivatives.jerk] = 1
         # self.caster_forward.quadratic_weights[Derivatives.jerk] = 1
         # self.caster_yaw2.quadratic_weights[Derivatives.jerk] = 1
 

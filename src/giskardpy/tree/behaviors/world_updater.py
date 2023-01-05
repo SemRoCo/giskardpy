@@ -94,6 +94,8 @@ class WorldUpdater(GiskardBehavior):
         try:
             self.world.dye_group(req.group_name, req.color)
             res.error_codes = DyeGroupResponse.SUCCESS
+            for link_name in self.world.groups[req.group_name].link_names():
+                self.world._links[link_name].reset_cache()
             logging.loginfo(f'dyed group \'{req.group_name}\' to r:{req.color.r} g:{req.color.g} b:{req.color.b} a:{req.color.a}')
         except UnknownGroupException:
             res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
@@ -128,13 +130,13 @@ class WorldUpdater(GiskardBehavior):
             # if node_name in tree.tree_nodes:
             #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = self.world.root_link_name
+            res.root_link_pose.header.frame_id = str(self.world.root_link_name)
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
                 res.joint_state.velocity.append(value.velocity)
         except KeyError as e:
-            logging.logerr('no object with the name {} was found'.format(req.group_name))
+            logging.logerr(f'no object with the name {req.group_name} was found')
             res.error_codes = GetGroupInfoResponse.GROUP_NOT_FOUND_ERROR
 
         return res

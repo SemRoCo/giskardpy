@@ -1083,7 +1083,11 @@ class OmniDrivePR22(Joint):
 
     @property
     def yaw_name(self):
-        return self.orientation_names[2]
+        return self.caster_yaw2_name
+
+    @property
+    def yaw_vel(self):
+        return self.caster_yaw2
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         state = self.world.state

@@ -11,7 +11,7 @@ class PR2_Base(Giskard):
         self.configure_PlotTrajectory(enabled=True, wait=True)
         # self.configure_PlotDebugExpressions(enabled=True, wait=True)
         self.configure_DebugMarkerPublisher(enabled=True)
-        # self.configure_PublishDebugExpressions(enabled=True)
+        self.configure_PublishDebugExpressions(enabled=True, enabled_base=True)
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
@@ -84,7 +84,7 @@ class PR2_Mujoco(PR2_Base):
         self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/r_gripper_l_finger_controller/state')
         self.add_base_cmd_velocity(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
-                                   track_only_velocity=False)
+                                   track_only_velocity=True)
         self.overwrite_external_collision_avoidance('brumbrum',
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,

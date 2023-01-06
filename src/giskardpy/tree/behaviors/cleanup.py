@@ -9,8 +9,9 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 class CleanUp(GiskardBehavior):
     @profile
-    def __init__(self, name):
+    def __init__(self, name, clear_markers=True):
         super().__init__(name)
+        self.clear_markers_ = clear_markers
         self.marker_pub = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
 
     def clear_markers(self):
@@ -22,7 +23,8 @@ class CleanUp(GiskardBehavior):
 
     @profile
     def initialise(self):
-        self.clear_markers()
+        if self.clear_markers_:
+            self.clear_markers()
         self.god_map.clear_cache()
         self.god_map.get_data(identifier.giskard)._reset_config()
         self.god_map.set_data(identifier.goal_msg, None)

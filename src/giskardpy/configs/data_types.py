@@ -192,6 +192,7 @@ class BehaviorTreeConfig:
         },
         'PlotDebugTF': {
             'enabled': False,
+            'enabled_base': False,
         },
     }
 

@@ -448,19 +448,13 @@ class PR2DiffDriveBaseGoal(Goal):
         self.add_debug_expr('root_V_forward', root_V_forward)
         self.add_debug_expr('root_V_goal', root_V_goal)
 
-        weight = w.if_greater(w.norm(root_P_goal - root_P_tip), 0.001, self.weight*100, 0)
+        weight = w.if_greater(w.norm(root_P_goal - root_P_tip), 0.001, self.weight * 100, 0)
 
         self.add_vector_goal_constraints(frame_V_current=root_V_forward,
                                          frame_V_goal=root_V_goal,
                                          reference_velocity=self.max_angular_velocity,
                                          weight=weight,
                                          name='angle')
-
-
-
-
-
-
 
     def __str__(self) -> str:
         return super().__str__()

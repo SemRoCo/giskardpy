@@ -1142,7 +1142,7 @@ class OmniDrivePR22(Joint):
                 # can't do "if in", because the dict may be a defaultdict
                 pass
 
-        self.caster_yaw1.quadratic_weights[Derivatives.velocity] = 0
+        self.caster_yaw1.quadratic_weights[Derivatives.velocity] = 0.0001
         # self.caster_forward.quadratic_weights[Derivatives.velocity] = 0
         # self.caster_yaw2.quadratic_weights[Derivatives.velocity] = 0
 
@@ -1150,7 +1150,7 @@ class OmniDrivePR22(Joint):
         # self.caster_forward.quadratic_weights[Derivatives.acceleration] = 0
         # self.caster_yaw2.quadratic_weights[Derivatives.acceleration] = 0
 
-        self.caster_yaw1.quadratic_weights[Derivatives.jerk] = 1
+        self.caster_yaw1.quadratic_weights[Derivatives.jerk] = 0.1
         # self.caster_forward.quadratic_weights[Derivatives.jerk] = 1
         # self.caster_yaw2.quadratic_weights[Derivatives.jerk] = 1
 

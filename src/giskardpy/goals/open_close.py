@@ -3,7 +3,7 @@ from __future__ import division
 from typing import Optional
 
 from giskardpy.goals.cartesian_goals import CartesianPose
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.goals.joint_goals import JointPosition
 
 
@@ -46,11 +46,11 @@ class Open(Goal):
                                                    tip_link=tip_link,
                                                    tip_group=tip_group,
                                                    goal_pose=self.handle_T_tip,
-                                                   weight=self.weight * 100))
+                                                   weight=self.weight))
         self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name.short_name,
                                                    group_name=self.joint_group.name,
                                                    goal=goal_joint_state,
-                                                   weight=weight))
+                                                   weight=WEIGHT_BELOW_CA))
 
     def make_constraints(self):
         pass

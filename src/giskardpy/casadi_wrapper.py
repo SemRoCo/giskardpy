@@ -1853,12 +1853,6 @@ def total_derivative(expr,
     symbols = Expression(symbols)
     symbols_dot = Expression(symbols_dot)
     return Expression(ca.jtimes(expr.s, symbols.s, symbols_dot.s))
-    # expr_jacobian = jacobian(expr, symbols)
-    # velocity = dot(expr_jacobian, last_velocities)
-    # if velocity.shape[0] * velocity.shape[1] == 1:
-    #     return velocity[0]
-    # else:
-    #     return velocity
 
 
 def total_derivative2(expr, symbols, symbols_dot, symbols_ddot):

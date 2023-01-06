@@ -3557,13 +3557,11 @@ class TestCollisionAvoidanceGoals:
                                             root_link=kitchen_setup.default_root,
                                             goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
         kitchen_setup.plan_and_execute()
 
         # open drawer
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=drawer_handle)
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
 
@@ -3574,7 +3572,6 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.position.x = .1
         base_pose.pose.orientation.w = 1
         kitchen_setup.move_base(base_pose)
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
         kitchen_setup.plan_and_execute()
 
         # grasp bowl
@@ -3588,6 +3585,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
                                     root_link=kitchen_setup.default_root)
+        kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name)
 
         # grasp cup
         r_goal = deepcopy(cup_pose)
@@ -3601,13 +3599,10 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root)
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
         kitchen_setup.plan_and_execute()
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
-        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
-        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
                                     root_link=kitchen_setup.default_root)
@@ -3616,14 +3611,14 @@ class TestCollisionAvoidanceGoals:
                                     root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
+        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
+        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)
         kitchen_setup.update_parent_link_of_group(name=cup_name, parent_link=kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
         kitchen_setup.plan_and_execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
@@ -3646,7 +3641,6 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.detach_group(name=bowl_name)
@@ -3654,7 +3648,6 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.set_json_goal('PR2CasterConstraints')
         kitchen_setup.plan_and_execute()
 
     def test_ease_spoon(self, kitchen_setup: PR2TestWrapper):

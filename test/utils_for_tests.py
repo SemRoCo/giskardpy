@@ -20,7 +20,7 @@ from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
-from tf2_py import LookupException
+from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
 import giskardpy.utils.tfwrapper as tf
@@ -301,8 +301,11 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
-            return tf.transform_msg(target_frame, msg, timeout=timeout)
-        except LookupException as e:
+            if not self.is_standalone():
+                return tf.transform_msg(target_frame, msg, timeout=timeout)
+            else:
+                raise LookupException('just to trigger except block')
+        except (LookupException, ExtrapolationException) as e:
             target_frame = self.world.get_link_name(target_frame)
             try:
                 msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
@@ -420,19 +423,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
-        if root_group is None:
-            try:
-                root_group = self.world._get_group_containing_link_short_name(root_link)
-            except UnknownGroupException:
-                pass
-        root_link = PrefixName(root_link, root_group)
-        if tip_group is None:
-            try:
-                tip_group = self.world._get_group_containing_link_short_name(tip_link)
-            except UnknownGroupException:
-                pass
-        tip_link = PrefixName(tip_link, tip_group)
-        return root_link, tip_link
+        return self.world.get_link_name(root_link, root_group), self.world.get_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################

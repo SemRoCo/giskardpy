@@ -7,7 +7,7 @@ from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
 from geometry_msgs.msg import Vector3Stamped
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import DiffDrive, OmniDrivePR22
 from giskardpy.my_types import Derivatives
 from giskardpy.utils import logging
@@ -427,7 +427,7 @@ class PR2DiffDriveBaseGoal(Goal):
                                                    goal_pose=goal_pose,
                                                    reference_linear_velocity=self.max_linear_velocity,
                                                    reference_angular_velocity=self.max_angular_velocity,
-                                                   weight=self.weight))
+                                                   weight=WEIGHT_BELOW_CA))
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root_link, self.tip_link)
@@ -448,7 +448,7 @@ class PR2DiffDriveBaseGoal(Goal):
         self.add_debug_expr('root_V_forward', root_V_forward)
         self.add_debug_expr('root_V_goal', root_V_goal)
 
-        weight = w.if_greater(w.norm(root_P_goal - root_P_tip), 0.001, self.weight * 100, 0)
+        weight = w.if_greater(w.norm(root_P_goal - root_P_tip), 0.005, WEIGHT_ABOVE_CA, 0)
 
         self.add_vector_goal_constraints(frame_V_current=root_V_forward,
                                          frame_V_goal=root_V_goal,

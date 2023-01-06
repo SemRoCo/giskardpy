@@ -89,7 +89,7 @@ class Circle(Goal):
     def make_constraints(self):
         map_T_bf = self.get_fk(self.world.root_link_name, self.tip_link_name)
         t = self.traj_time_in_seconds() * self.scale
-        t = w.min(t, 15 * self.scale)
+        t = w.min(t, 30 * self.scale)
         x = w.cos(t) * self.radius
         y = w.sin(t) * self.radius
         map_P_center = w.Point3(self.center)

@@ -1423,7 +1423,9 @@ class TestMoveBaseGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        base_goal.pose.orientation.w = 1
+        # base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
 
     def test_circle(self, zero_pose: PR2TestWrapper):

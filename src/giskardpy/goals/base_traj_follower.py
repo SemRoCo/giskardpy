@@ -135,37 +135,30 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
 
     @profile
     def add_trans_constraints(self):
-        errors_x = []
-        errors_y = []
-        map_T_base_footprint = self.get_fk(self.world.root_link_name, self.base_footprint_link)
+        lb_yaw1 = []
+        lb_forward = []
+        self.world.state[self.joint.caster_yaw1_name].position = 0
         for t in range(self.prediction_horizon):
             yaw1 = self.current_traj_point(self.joint.caster_yaw1_name, t * self.sample_period, Derivatives.velocity)
             forward = self.current_traj_point(self.joint.caster_forward_name, t * self.sample_period,
                                               Derivatives.velocity)
-            base_footprint_V_vel = w.Vector3((w.cos(yaw1) * forward, w.sin(yaw1) * forward, 0))
-            map_V_vel = w.dot(map_T_base_footprint, base_footprint_V_vel)
-            if t == 0 and not self.track_only_velocity:
-                actual_error_x, actual_error_y = self.trans_error_at(0)
-                errors_x.append(map_V_vel[0] + actual_error_x)
-                errors_y.append(map_V_vel[1] + actual_error_y)
-            else:
-                errors_x.append(map_V_vel[0])
-                errors_y.append(map_V_vel[1])
+            lb_yaw1.append(yaw1)
+            lb_forward.append(forward)
         weight_vel = WEIGHT_ABOVE_CA
-        lba_x = errors_x
-        uba_x = errors_x
-        lba_y = errors_y
-        uba_y = errors_y
+        lba_x = lb_yaw1
+        uba_x = lb_yaw1
+        lba_y = lb_forward
+        uba_y = lb_forward
 
         self.add_velocity_constraint(lower_velocity_limit=lba_x,
                                      upper_velocity_limit=uba_x,
                                      weight=weight_vel,
-                                     task_expression=map_T_base_footprint.to_position().x,
-                                     velocity_limit=0.5,
-                                     name_suffix='/vel x')
+                                     task_expression=self.joint.caster_yaw1.get_symbol(Derivatives.position),
+                                     velocity_limit=10,
+                                     name_suffix='/yaw1')
         self.add_velocity_constraint(lower_velocity_limit=lba_y,
                                      upper_velocity_limit=uba_y,
                                      weight=weight_vel,
-                                     task_expression=map_T_base_footprint.to_position().y,
+                                     task_expression=self.joint.caster_forward.get_symbol(Derivatives.position),
                                      velocity_limit=0.5,
-                                     name_suffix='/vel y')
+                                     name_suffix='/forward')

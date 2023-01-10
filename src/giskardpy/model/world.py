@@ -16,6 +16,7 @@ import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
+from giskardpy.configs.data_types import RobotInterfaceConfig
 from giskardpy.data_types import JointStates, KeyDefaultDict
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException, GiskardException
@@ -472,7 +473,8 @@ class WorldTree(WorldTreeInterface):
                  group_name: Optional[str] = None,
                  parent_link_name: Optional[PrefixName] = None,
                  pose: Optional[w.TransMatrix] = None,
-                 actuated: bool = False):
+                 actuated: bool = False,
+                 add_drive_joint_to_group: bool = False):
         """
         Add a urdf to the world at parent_link_name and create a SubWorldTree named group_name for it.
         :param urdf: urdf as str, not a file path
@@ -525,7 +527,11 @@ class WorldTree(WorldTreeInterface):
             # -1 because root link already exists
             raise GiskardException(f'Failed to add urdf \'{group_name}\' to world')
 
-        self.register_group(group_name, urdf_root_link_name, actuated=actuated)
+        if add_drive_joint_to_group:
+            root_link = self.get_parent_link_of_link(urdf_root_link_name)
+            self.register_group(group_name, root_link, actuated=actuated)
+        else:
+            self.register_group(group_name, urdf_root_link_name, actuated=actuated)
         if self.god_map is not None:
             self.apply_default_limits_and_weights()
         self._set_free_variables_on_mimic_joints(group_name)
@@ -744,10 +750,12 @@ class WorldTree(WorldTreeInterface):
         joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
         for joint in joints_to_add:
             self._add_joint_and_create_child(joint)
+        robot_config: RobotInterfaceConfig
         for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
             self.add_urdf(robot_config.urdf,
                           group_name=robot_config.name,
-                          actuated=True)
+                          actuated=True,
+                          add_drive_joint_to_group=robot_config.add_drive_joint_to_group)
         self.fast_all_fks = None
         self.notify_model_change()
 

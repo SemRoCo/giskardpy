@@ -126,7 +126,7 @@ class WorldUpdater(GiskardBehavior):
             # if node_name in tree.tree_nodes:
             #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = self.world.root_link_name
+            res.root_link_pose.header.frame_id = str(self.world.root_link_name)
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)

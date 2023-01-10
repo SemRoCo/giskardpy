@@ -1457,7 +1457,8 @@ class WorldTree(WorldTreeInterface):
                 group_clusters[ancestor].add_subgraph(group_clusters[group_name])
 
         for link_name, link in self.links.items():
-            link_node = pydot.Node(str(link_name))
+            node_label = f'{str(link_name)}\nGeometry: {[type(x).__name__ for x in link.collisions]}'
+            link_node = pydot.Node(str(link_name), label=node_label)
             world_graph.add_node(link_node)
             for group_name, group in self.groups.items():
                 if link_name in group.link_names:

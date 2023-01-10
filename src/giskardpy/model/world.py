@@ -18,7 +18,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
-    PrismaticJoint, RevoluteJoint, ContinuousJoint, OmniDrive
+    PrismaticJoint, RevoluteJoint, ContinuousJoint, OmniDrive, DiffDrive
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map
@@ -367,6 +367,7 @@ class WorldTree:
     def root_link(self) -> Link:
         return self._links[self.root_link_name]
 
+    @property
     def link_names(self) -> List[PrefixName]:
         return list(self._links.keys())
 
@@ -1418,6 +1419,62 @@ class WorldTree:
 
     def has_link_visuals(self, link_name: PrefixName) -> bool:
         return self._links[link_name].has_visuals()
+
+    def save_graph_pdf(self):
+        import pydot
+        def joint_type_to_color(joint):
+            color = 'lightgrey'
+            if isinstance(joint, PrismaticJoint):
+                color = 'red'
+            elif isinstance(joint, RevoluteJoint):
+                color = 'yellow'
+            elif isinstance(joint, ContinuousJoint):
+                color = 'yellow'
+            elif isinstance(joint, (OmniDrive, DiffDrive)):
+                color = 'orange'
+            return color
+
+        world_graph = pydot.Dot('world_tree', bgcolor='white', rank='source')
+        group_clusters = {group_name: pydot.Cluster(label=group_name) for group_name in self.group_names}
+        for group_name, group in self.groups.items():
+            group_cluster = group_clusters[group_name]
+            parent_group = self.get_parent_group_name(group_name)
+            if parent_group == group_name or parent_group is None:
+                world_graph.add_subgraph(group_cluster)
+            else:
+                group_clusters[parent_group].add_subgraph(group_cluster)
+
+        for link_name, link in self._links.items():
+            link_node = pydot.Node(str(link_name))
+            world_graph.add_node(link_node)
+            for group_name, group in self.groups.items():
+                if link_name in group.link_names:
+                    group_clusters[group_name].add_node(link_node)
+
+        for joint_name, joint in self._joints.items():
+            joint_node_name = f'{joint_name}\n{type(joint).__name__}'
+            if self.is_joint_controlled(joint_name) or \
+                    self.is_joint_mimic(joint_name) and self.is_joint_controlled(joint.mimed_joint_name):
+                peripheries = 2
+            else:
+                peripheries = 1
+            joint_node = pydot.Node(str(joint_name), label=joint_node_name, shape='box', style='filled',
+                                 fillcolor=joint_type_to_color(joint), peripheries=peripheries)
+            world_graph.add_node(joint_node)
+            for group_name, group in self.groups.items():
+                if joint_name in group.joint_names:
+                    group_clusters[group_name].add_node(joint_node)
+
+            child_edge = pydot.Edge(str(joint_name), str(joint.child_link_name))
+            world_graph.add_edge(child_edge)
+            parent_edge = pydot.Edge(str(joint.parent_link_name), str(joint_name))
+            world_graph.add_edge(parent_edge)
+            if self.is_joint_mimic(joint_name):
+                parent_edge = pydot.Edge(str(joint_name), str(joint.mimed_joint_name), style='dashed',
+                                         arrowhead='onormal', arrowtail='dot', constraint=False)
+                world_graph.add_edge(parent_edge)
+
+        world_graph.write_pdf("world_tree.pdf")
 
 
 class SubWorldTree(WorldTree):

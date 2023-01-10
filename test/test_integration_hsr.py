@@ -65,6 +65,9 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.clear_world()
         # self.close_gripper()
         self.reset_base()
+        self.register_group('gripper',
+                            root_link_group_name=self.robot_name,
+                            root_link_name='hand_palm_link')
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
@@ -206,6 +209,8 @@ class TestJointGoals:
 
 
 class TestCartGoals:
+    def test_save_graph_pdf(self, zero_pose):
+        zero_pose.world.save_graph_pdf()
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()

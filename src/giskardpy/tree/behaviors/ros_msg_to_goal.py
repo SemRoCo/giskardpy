@@ -161,13 +161,13 @@ class RosMsgToGoal(GetGoal):
             try:
                 robot_name = self.world.get_group_of_joint(joint_name).name
             except KeyError:
-                child_link = self.world._joints[joint_name].child_link_name
+                child_link = self.world.joints[joint_name].child_link_name
                 robot_name = self.world._get_group_name_containing_link(child_link)
             child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
             if child_links:
                 number_of_repeller = configs[robot_name].external_collision_avoidance[joint_name].number_of_repeller
                 for i in range(number_of_repeller):
-                    child_link = self.world._joints[joint_name].child_link_name
+                    child_link = self.world.joints[joint_name].child_link_name
                     hard_threshold = configs[robot_name].external_collision_avoidance[joint_name].hard_threshold
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override

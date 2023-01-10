@@ -49,7 +49,7 @@ class SetOdometry(NonMotionGoal):
                 and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = self.world.groups[group_name].root_link.parent_joint_name
-        brumbrum_joint = self.world._joints[brumbrum_joint_name]
+        brumbrum_joint = self.world.joints[brumbrum_joint_name]
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive)):
             raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
         base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
@@ -484,7 +484,7 @@ class AvoidJointLimits(Goal):
                 try:
                     group_name = self.world.get_group_of_joint(joint_name).name
                 except KeyError:
-                    child_link = self.world._joints[joint_name].child_link_name
+                    child_link = self.world.joints[joint_name].child_link_name
                     group_name = self.world._get_group_name_containing_link(child_link)
                 if self.world.is_joint_prismatic(joint_name) or self.world.is_joint_revolute(joint_name):
                     self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,

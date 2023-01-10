@@ -161,7 +161,7 @@ class Collisions:
     def transform_external_collision(self, collision: Collision) -> Collision:
         try:
             link_name = collision.original_link_a
-            joint = self.world._links[link_name].parent_joint_name
+            joint = self.world.links[link_name].parent_joint_name
             if self.world.is_joint_controlled(joint) and joint not in self.fixed_joints:
                 movable_joint = joint
             def stopper(joint_name):
@@ -170,7 +170,7 @@ class Collisions:
             # movable_joint = self.world.get_controlled_parent_joint_of_link(collision.original_link_a)
         except Exception as e:
             pass
-        new_a = self.world._joints[movable_joint].child_link_name
+        new_a = self.world.joints[movable_joint].child_link_name
         collision.link_a = new_a
         if collision.map_P_pa is not None:
             new_a_T_map = self.world.compute_fk_np(new_a, self.world.root_link_name)

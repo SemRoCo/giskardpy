@@ -56,7 +56,7 @@ class TFPublisher(GiskardBehavior):
                         if group_name in self.robot_names:
                             # robot frames will exist for sure
                             continue
-                        if len(group._joints) > 0:
+                        if len(group.joints) > 0:
                             continue
                         get_fk = self.world.compute_fk_pose
                         fk = get_fk(self.world.root_link_name, group.root_link_name)

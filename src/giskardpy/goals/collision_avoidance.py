@@ -94,7 +94,7 @@ class ExternalCollisionAvoidance(Goal):
 
         soft_threshold = 0
         actual_link_b_hash = self.get_link_b_hash()
-        parent_joint = self.world._links[self.link_name].parent_joint_name
+        parent_joint = self.world.links[self.link_name].parent_joint_name
         direct_children = set(self.world.get_directly_controlled_child_links_with_collisions(parent_joint))
         b_result_cases = [(k[1].__hash__(), v) for k, v in self.soft_thresholds.items() if k[0] in direct_children]
         soft_threshold = w.if_eq_cases(a=actual_link_b_hash,
@@ -283,8 +283,8 @@ class CollisionAvoidanceHint(Goal):
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        self.add_collision_check(self.world._links[self.link_name].name,
-                                 self.world._links[self.link_b].name,
+        self.add_collision_check(self.world.links[self.link_name].name,
+                                 self.world.links[self.link_b].name,
                                  spring_threshold)
 
         self.avoidance_hint = self.world.transform_msg(self.root_link, avoidance_hint)

@@ -122,7 +122,7 @@ class Goal(ABC):
         """
         if not self.world.has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        joint = self.world._joints[joint_name]
+        joint = self.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             return joint.position_expression
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
@@ -174,14 +174,14 @@ class Goal(ABC):
     def joint_position_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
         for joint in self.world.controlled_joints:
-            position_symbols.extend(self.world._joints[joint].free_variable_list)
+            position_symbols.extend(self.world.joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
     def joint_velocity_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
         for joint in self.world.controlled_joints:
-            position_symbols.extend(self.world._joints[joint].free_variable_list)
+            position_symbols.extend(self.world.joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.velocity) for x in position_symbols]
 
     def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:

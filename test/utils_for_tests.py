@@ -266,7 +266,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
-        self.original_number_of_links = len(self.world._links)
+        self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
         return self.general_config.control_mode == self.general_config.control_mode.stand_alone
@@ -759,7 +759,7 @@ class GiskardTestWrapper(GiskardWrapper):
         joints = list(self.world.controlled_joints)
         for joint in joints:
             try:
-                lower_limit, upper_limit = self.world._joints[joint].get_limit_expressions(0)
+                lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
                 lower_limit = lower_limit.evaluate()
                 upper_limit = upper_limit.evaluate()
             except:
@@ -772,7 +772,7 @@ class GiskardTestWrapper(GiskardWrapper):
         trajectory_pos = self.get_result_trajectory_position()
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         for joint_name in controlled_joints:
-            if isinstance(self.world._joints[joint_name], OneDofJoint):
+            if isinstance(self.world.joints[joint_name], OneDofJoint):
                 if not self.world.is_joint_continuous(joint_name):
                     joint_limits = self.world.get_joint_position_limits(joint_name)
                     error_msg = f'{joint_name} has violated joint position limit'
@@ -809,7 +809,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 1
         assert len(self.get_group_names()) == 1
-        assert self.original_number_of_links == len(self.world._links)
+        assert self.original_number_of_links == len(self.world.links)
         return respone
 
     def remove_group(self,

@@ -209,8 +209,8 @@ class TestJointGoals:
 
 
 class TestCartGoals:
-    def test_save_graph_pdf(self, zero_pose):
-        zero_pose.world.save_graph_pdf()
+    def test_save_graph_pdf(self, kitchen_setup):
+        kitchen_setup.world.save_graph_pdf()
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()

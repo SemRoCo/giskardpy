@@ -1418,7 +1418,7 @@ class WorldTree(WorldTreeInterface):
             return color
 
         world_graph = pydot.Dot('world_tree', bgcolor='white', rank='source')
-        group_clusters = {group_name: pydot.Cluster(label=group_name) for group_name in self.group_names}
+        group_clusters = {group_name: pydot.Cluster(group_name, label=group_name) for group_name in self.group_names}
         for group_name, group in self.groups.items():
             group_cluster = group_clusters[group_name]
             parent_group = self.get_parent_group_name(group_name)

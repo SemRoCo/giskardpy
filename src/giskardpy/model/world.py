@@ -608,6 +608,28 @@ class WorldTree(WorldTreeInterface):
             parent = self.get_parent_group_name(ancestry[-1])
         return set(ancestry)
 
+    def create_group_ancestry(self) -> Dict[str, str]:
+        ancestry = {}
+        for group_name in self.group_names:
+            possible_parents = []
+            for possible_parent_name, possible_parent_group in self.groups.items():
+                if group_name in possible_parent_group.group_names:
+                    possible_parents.append(possible_parent_name)
+            ancestry[group_name] = possible_parents
+
+        while not np.all([len(direct_children) <= 1 for direct_children in ancestry.values()]):
+            for group_name, parents in list(ancestry.items()):
+                if len(parents) > 1:
+                    for possible_direct_parent in parents:
+                        for grand_parent in ancestry[possible_direct_parent]:
+                            ancestry[group_name].remove(grand_parent)
+        for group_name, ancestors in list(ancestry.items()):
+            if len(ancestors) == 0:
+                ancestry[group_name] = None
+            else:
+                ancestry[group_name] = ancestors[0]
+        return ancestry
+
     def _get_group_name_containing_link(self, link_name: Union[PrefixName, str]) -> str:
         groups = self.get_group_names_containing_link(link_name)
         ret = self._get_group_from_groups(groups)
@@ -1427,13 +1449,12 @@ class WorldTree(WorldTreeInterface):
 
         world_graph = pydot.Dot('world_tree', bgcolor='white', rank='source')
         group_clusters = {group_name: pydot.Cluster(group_name, label=group_name) for group_name in self.group_names}
-        for group_name, group in self.groups.items():
-            group_cluster = group_clusters[group_name]
-            parent_group = self.get_parent_group_name(group_name)
-            if parent_group == group_name or parent_group is None:
-                world_graph.add_subgraph(group_cluster)
+        ancestry = self.create_group_ancestry()
+        for group_name, ancestor in ancestry.items():
+            if ancestor is None:
+                world_graph.add_subgraph(group_clusters[group_name])
             else:
-                group_clusters[parent_group].add_subgraph(group_cluster)
+                group_clusters[ancestor].add_subgraph(group_clusters[group_name])
 
         for link_name, link in self.links.items():
             link_node = pydot.Node(str(link_name))

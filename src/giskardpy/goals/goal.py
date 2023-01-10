@@ -109,7 +109,7 @@ class Goal(ABC):
         """
         try:
             try:
-                msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
+                msg.header.frame_id = self.world.search_for_link_name(msg.header.frame_id)
             except UnknownGroupException:
                 pass
             return self.world.transform_msg(target_frame, msg)

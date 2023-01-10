@@ -128,7 +128,7 @@ def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
 
 class TestJointGoals:
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
-        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
+        arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = PoseStamped()
@@ -159,7 +159,7 @@ class TestJointGoals:
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, zero_pose: HSRTestWrapper):
-        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
+        arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
 
         tip = 'hand_gripper_tool_frame'
@@ -184,7 +184,7 @@ class TestJointGoals:
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, zero_pose: HSRTestWrapper):
-        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
+        arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         tip = 'head_pan_link'
         p = PoseStamped()

@@ -135,52 +135,74 @@ class WorldTree(WorldTreeInterface):
         self._clear()
 
     def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+        logging.logwarn(f'Deprecated warning: use \'search_for_joint_name\' instead of \'get_joint_name\'.')
+        return self.search_for_joint_name(joint_name, group_name)
+
+    def search_for_joint_name(self, joint_name: str, group_name: Optional[str] = None) -> PrefixName:
         """
-        Will seach the worlds joint for one that matches joint_name. group_name is only needed if there are multiple
+        Will search the worlds joint for one that matches joint_name. group_name is only needed if there are multiple
         joints with the same name.
         :param joint_name: a joint name e.g. torso_lift_joint
         :param group_name: only needed if there are name conflicts, e.g., when there are 2 torso_lift_joints
-        :return: how the joint is called inside of the world tree e.g. pr2/torso_lift_joint
+        :return: how the joint is called inside the world tree e.g. pr2/torso_lift_joint
         """
         if group_name == '':
             group_name = None
-        try:
-            return PrefixName.from_string(joint_name)
-        except AttributeError:
-            if not group_name:
-                group_name = self._get_group_containing_joint_short_name(joint_name)
-                if group_name is None:
-                    return PrefixName(joint_name, None)
-            return self.groups[group_name]._get_joint_short_name_match(joint_name)
+        if group_name is not None:
+            return self.groups[group_name].search_for_joint_name(joint_name)
+
+        matches = []
+        for internal_joint_name in self.joint_names:
+            if joint_name == internal_joint_name or joint_name == internal_joint_name.short_name:
+                matches.append(internal_joint_name)
+        if len(matches) > 1:
+            raise ValueError(f'Multiple matches for \'{joint_name}\' found: \'{matches}\'.')
+        if len(matches) == 0:
+            raise ValueError(f'No matches for \'{joint_name}\' found: \'{matches}\'.')
+        return matches[0]
 
     def get_joint(self, joint_name: my_string, group_name: Optional[str] = None) -> Joint:
         """
         Like get_joint_name, but returns the actual joint.
         """
-        return self.joints[self.get_joint_name(joint_name, group_name)]
+        return self.joints[self.search_for_joint_name(joint_name, group_name)]
 
-    def get_link_name(self, link_name: my_string, group_name: Optional[str] = None) -> PrefixName:
+    def get_link_name(self, link_name: str, group_name: Optional[str] = None) -> PrefixName:
+        logging.logwarn(f'Deprecated warning: use \'search_for_link_name\' instead of \'get_link_name\'.')
+        return self.search_for_link_name(link_name, group_name)
+
+    def search_for_link_name(self, link_name: str, group_name: Optional[str] = None) -> PrefixName:
         """
         Like get_joint_name but for links.
         """
         if group_name == '':
             group_name = None
-        if link_name == '' and group_name is None:
-            return self.root_link_name
-        try:
-            return PrefixName.from_string(link_name)
-        except AttributeError:
+        if link_name == '':
+            link_name = None
+        if link_name is None:
             if group_name is None:
-                group_name = self._get_group_containing_link_short_name(link_name)
-                if group_name is None:
-                    return PrefixName(link_name, None)
-            return self.groups[group_name].get_link_short_name_match(link_name)
+                return self.root_link_name
+            else:
+                return self.groups[group_name].root_link_name
+        if group_name is not None:
+            return self.groups[group_name].search_for_link_name(link_name)
+
+        matches = []
+        for internal_link_name in self.link_names:
+            if link_name == internal_link_name or link_name == internal_link_name.short_name:
+                matches.append(internal_link_name)
+        if len(matches) > 1:
+            raise ValueError(f'Multiple matches for \'{link_name}\' found: \'{matches}\'.')
+        if len(matches) == 0:
+            raise ValueError(f'No matches for \'{link_name}\' found: \'{matches}\'.')
+        return matches[0]
+
 
     def get_link(self, link_name: str, group_name: Optional[str] = None) -> Link:
         """
         Like get_joint but for links.
         """
-        return self.links[self.get_link_name(link_name, group_name)]
+        return self.links[self.search_for_link_name(link_name, group_name)]
 
     @property
     def version(self) -> Tuple[int, int]:
@@ -566,61 +588,6 @@ class WorldTree(WorldTreeInterface):
                 except KeyError:
                     continue
                 groups.add(group_name)
-        return groups
-
-    def _get_group_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Optional[str]:
-        groups = self._get_groups_containing_link_short_name(link_name)
-        groups_size = len(groups)
-        if groups_size == 0 and link_name in self.links:
-            return None
-        ret = self._get_group_from_groups(groups)
-        if ret is None and groups_size > 0:
-            raise UnknownGroupException(f'Found multiple seperated groups {groups} for link_name {link_name}. '
-                                        f'Please define a group name for link {link_name}.')
-        elif ret is None:
-            raise UnknownGroupException(f'Did not find any group containing the link {link_name}.')
-        return ret
-
-    def _get_groups_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
-        groups = set()
-        for group_name, subtree in self.groups.items():
-            try:
-                subtree.get_link_short_name_match(link_name)
-            except KeyError:
-                continue
-            groups.add(group_name)
-        return groups
-
-    def _get_group_of_joint_short_names(self, joint_names: [PrefixName, str]) -> Union[PrefixName, str]:
-        if len(joint_names) > 0:
-            groups = [self._get_group_containing_joint_short_name(j_n) for j_n in joint_names]
-            if all(map(lambda e: e == groups[0], groups)):
-                return groups[0]
-            else:
-                raise Exception(f'Containing different group names {groups} '
-                                f'for given list of joint_names {joint_names}.')
-
-    def _get_group_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Optional[str]:
-        groups = self._get_groups_containing_joint_short_name(joint_name)
-        groups_size = len(groups)
-        if groups_size == 0 and joint_name in self.joints:
-            return None
-        ret = self._get_group_from_groups(groups)
-        if ret is None and groups_size > 0:
-            raise UnknownGroupException(f'Found multiple seperated groups {groups} for joint_name {joint_name}.'
-                                        f'Please define a group name for joint {joint_name}.')
-        elif ret is None:
-            raise UnknownGroupException(f'Did not find any group containing the joint {joint_name}.')
-        return ret
-
-    def _get_groups_containing_joint_short_name(self, joint_name: Union[PrefixName, str]) -> Set[str]:
-        groups = set()
-        for group_name, subtree in self.groups.items():
-            try:
-                subtree._get_joint_short_name_match(joint_name)
-            except KeyError:
-                continue
-            groups.add(group_name)
         return groups
 
     def _get_parents_of_group_name(self, group_name: str) -> Set[str]:
@@ -1126,8 +1093,8 @@ class WorldTree(WorldTreeInterface):
 
     @memoize
     def compute_fk_pose(self, root: my_string, tip: my_string) -> PoseStamped:
-        root = self.get_link_name(root)
-        tip = self.get_link_name(tip)
+        root = self.search_for_link_name(root)
+        tip = self.search_for_link_name(tip)
         homo_m = self.compute_fk_np(root, tip)
         p = PoseStamped()
         p.header.frame_id = str(root)
@@ -1510,6 +1477,28 @@ class WorldBranch(WorldTreeInterface):
     def get_joint(self, joint_name: str) -> Joint:
         return self.world.get_joint(joint_name, self.name)
 
+    def search_for_link_name(self, link_name: str) -> PrefixName:
+        matches = []
+        for internal_link_name in self.link_names:
+            if internal_link_name.short_name == link_name or internal_link_name == link_name:
+                matches.append(internal_link_name)
+        if len(matches) > 1:
+            raise ValueError(f'Multiple matches for \'{link_name}\' found: \'{matches}\'.')
+        if len(matches) == 0:
+            raise ValueError(f'No matches for \'{link_name}\' found: \'{matches}\'.')
+        return matches[0]
+
+    def search_for_joint_name(self, joint_name: str) -> PrefixName:
+        matches = []
+        for internal_joint_name in self.joint_names:
+            if joint_name == internal_joint_name or joint_name == internal_joint_name.short_name:
+                matches.append(internal_joint_name)
+        if len(matches) > 1:
+            raise ValueError(f'Multiple matches for \'{joint_name}\' found: \'{matches}\'.')
+        if len(matches) == 0:
+            raise ValueError(f'No matches for \'{joint_name}\' found: \'{matches}\'.')
+        return matches[0]
+
     @property
     def controlled_joints(self) -> List[PrefixName]:
         return [j for j in self.god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
@@ -1557,17 +1546,6 @@ class WorldBranch(WorldTreeInterface):
             raise ValueError(f'Found multiple link matches \'{matches}\'.')
         if len(matches) == 0:
             raise UnknownLinkException(f'Found no link match for \'{link_name}\'.')
-        return matches[0]
-
-    def _get_joint_short_name_match(self, joint_name: my_string) -> PrefixName:
-        matches = []
-        for joint_name2 in self.joint_names:
-            if joint_name == joint_name2 or joint_name == joint_name2.short_name:
-                matches.append(joint_name2)
-        if len(matches) > 1:
-            raise ValueError(f'Found multiple link matches \'{matches}\'.')
-        if len(matches) == 0:
-            raise UnknownLinkException(f'Found no link match for \'{joint_name}\'.')
         return matches[0]
 
     def reset_cache(self):

@@ -99,7 +99,7 @@ class WorldUpdater(GiskardBehavior):
 
     @profile
     def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
-        link_name = self.world.get_link_name(req.root_link_name, req.parent_group_name)
+        link_name = self.world.search_for_link_name(req.root_link_name, req.parent_group_name)
         self.world.register_group(req.group_name, link_name)
         res = RegisterGroupResponse()
         res.error_codes = res.SUCCESS
@@ -199,14 +199,14 @@ class WorldUpdater(GiskardBehavior):
     @profile
     def add_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req.parent_link = self.world.get_link_name(req.parent_link, req.parent_link_group)
+        req.parent_link = self.world.search_for_link_name(req.parent_link, req.parent_link_group)
         world_body = req.body
         if req.pose.header.frame_id == '':
             raise TransformException('Frame_id in pose is not set.')
         try:
             global_pose = transform_pose(target_frame=self.world.root_link_name, pose=req.pose, timeout=0.5)
         except:
-            req.pose.header.frame_id = self.world.get_link_name(req.pose.header.frame_id)
+            req.pose.header.frame_id = self.world.search_for_link_name(req.pose.header.frame_id)
             global_pose = self.world.transform_msg(self.world.root_link_name, req.pose)
 
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
@@ -254,7 +254,7 @@ class WorldUpdater(GiskardBehavior):
     @profile
     def update_parent_link(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req.parent_link = self.world.get_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
+        req.parent_link = self.world.search_for_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]

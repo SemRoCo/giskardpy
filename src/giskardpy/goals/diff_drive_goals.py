@@ -15,7 +15,7 @@ class DiffDriveTangentialToPoint(Goal):
                  group_name: Optional[str] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False):
         super().__init__()
-        self.tip = self.world.get_link_name('base_footprint', group_name)
+        self.tip = self.world.search_for_link_name('base_footprint', group_name)
         self.root = self.world.root_link_name
         self.goal_point = self.transform_msg(self.world.root_link_name, goal_point)
         self.goal_point.point.z = 0
@@ -122,13 +122,13 @@ class KeepHandInWorkspace(Goal):
         super().__init__()
         if base_footprint is None:
             base_footprint = 'base_footprint'
-        base_footprint = self.world.get_link_name(base_footprint, group_name)
+        base_footprint = self.world.search_for_link_name(base_footprint, group_name)
         if map_frame is None:
             map_frame = self.world.root_link_name
         self.weight = weight
         self.max_velocity = max_velocity
         self.map_frame = map_frame
-        self.tip_link = self.world.get_link_name(tip_link, group_name)
+        self.tip_link = self.world.search_for_link_name(tip_link, group_name)
         self.base_footprint = base_footprint
 
         if pointing_axis is not None:

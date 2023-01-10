@@ -487,8 +487,8 @@ class TestConstraints:
         }, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        assert zero_pose.robot.state[joint_name].position <= upper_limit
-        assert zero_pose.robot.state[joint_name].position >= lower_limit
+        assert zero_pose.world.state[joint_name].position <= upper_limit
+        assert zero_pose.world.state[joint_name].position >= lower_limit
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         tip = 'base_footprint'
@@ -591,7 +591,7 @@ class TestConstraints:
                                 goal=joint_goal,
                                 max_velocity=0.5)
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
+        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
 
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
         joint = zero_pose.world.get_joint_name('r_shoulder_lift_joint')
@@ -606,7 +606,7 @@ class TestConstraints:
                                 goal=joint_goal,
                                 max_velocity=0.5)
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
+        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
 
     def test_JointPositionContinuous(self, zero_pose: PR2TestWrapper):
         joint = 'r_wrist_roll_joint'
@@ -618,7 +618,7 @@ class TestConstraints:
                                 max_velocity=1)
         zero_pose.plan_and_execute()
         joint = zero_pose.world.get_joint_name(joint)
-        np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, -2.283, decimal=2)
+        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, -2.283, decimal=2)
 
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'
@@ -815,11 +815,11 @@ class TestConstraints:
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
                                 not zero_pose.world.is_joint_continuous(j)]
 
-        current_joint_state = zero_pose.robot.state.to_position_dict()
+        current_joint_state = zero_pose.world.state.to_position_dict()
         percentage *= 0.9  # it will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.robot.get_joint_position_limits(joint)
+            lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
@@ -3883,7 +3883,7 @@ class TestWorld:
         root_link = world_setup.get_link_name('r_wrist_roll_link')
         tip_link = world_setup.get_link_name('r_gripper_r_finger_tip_link')
         world_setup.register_group('r_hand', root_link)
-        real = world_setup.groups['r_hand'].compute_chain(root_link, tip_link, True, True, True, True)
+        real = world_setup.compute_chain(root_link, tip_link, True, True, True, True)
         assert real == ['pr2/r_wrist_roll_link',
                         'pr2/r_gripper_palm_joint',
                         'pr2/r_gripper_palm_link',
@@ -3897,7 +3897,7 @@ class TestWorld:
         tip_link = world_setup.get_link_name('r_gripper_r_finger_tip_link')
         world_setup.register_group('r_hand', world_setup.get_link_name('r_wrist_roll_link'))
         try:
-            real = world_setup.groups['r_hand'].compute_chain(root_link, tip_link, True, True, True, True)
+            real = world_setup.compute_chain(root_link, tip_link, True, True, True, True)
             assert False
         except ValueError:
             pass
@@ -3919,7 +3919,7 @@ class TestWorld:
         root_link = world_setup.get_link_name('r_gripper_l_finger_tip_link')
         tip_link = world_setup.get_link_name('r_gripper_r_finger_tip_link')
         world_setup.register_group('r_hand', world_setup.get_link_name('r_wrist_roll_link'))
-        chain1, connection, chain2 = world_setup.groups['r_hand'].compute_split_chain(root_link, tip_link,
+        chain1, connection, chain2 = world_setup.compute_split_chain(root_link, tip_link,
                                                                                       True, True, True, True)
         assert chain1 == ['pr2/r_gripper_l_finger_tip_link',
                           'pr2/r_gripper_l_finger_tip_joint',
@@ -4088,19 +4088,11 @@ class TestWorld:
                                                                'pr2/torso_lift_joint': (0.0115, 0.325),
                                                                'pr2/torso_lift_motor_screw_joint': (None, None)}
 
-    def test_get_all_joint_limits_group(self, world_setup: WorldTree):
-        world_setup.register_group('r_hand', world_setup.get_link_name('r_wrist_roll_link'))
-        actual = world_setup.groups['r_hand'].get_all_joint_position_limits()
-        assert actual == {'pr2/r_gripper_joint': (0.0, 0.088),
-                          'pr2/r_gripper_l_finger_joint': (0.0, 0.548),
-                          'pr2/r_gripper_motor_screw_joint': (None, None),
-                          'pr2/r_gripper_motor_slider_joint': (-0.1, 0.1)}
-
     def test_possible_collision_combinations(self, world_setup: WorldTree):
-        result = world_setup.possible_collision_combinations(world_setup.robot_names[0])
+        result = world_setup.groups[world_setup.robot_names[0]].possible_collision_combinations()
         reference = {world_setup.sort_links(link_a, link_b) for link_a, link_b in
                      combinations(world_setup.groups[world_setup.robot_names[0]].link_names_with_collisions, 2) if
-                     not world_setup.groups[world_setup.robot_names[0]].are_linked(link_a, link_b)}
+                     not world_setup.are_linked(link_a, link_b)}
         assert result == reference
 
     def test_compute_chain_reduced_to_controlled_joints2(self, world_setup: WorldTree):

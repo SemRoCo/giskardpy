@@ -463,6 +463,11 @@ def memoize(function):
     return wrapper
 
 
+def clear_memo(f):
+    if hasattr(f, 'memo'):
+        f.memo.clear()
+
+
 def copy_memoize(function):
     memo = function.memo = {}
 

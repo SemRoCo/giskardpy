@@ -18,7 +18,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
-from giskardpy.model.world import SubWorldTree
+from giskardpy.model.world import WorldBranch
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
@@ -117,7 +117,7 @@ class WorldUpdater(GiskardBehavior):
         res = GetGroupInfoResponse()
         res.error_codes = GetGroupInfoResponse.SUCCESS
         try:
-            group = self.world.groups[req.group_name]  # type: SubWorldTree
+            group = self.world.groups[req.group_name]  # type: WorldBranch
             res.controlled_joints = [str(j.short_name) for j in group.controlled_joints]
             res.links = list(sorted(str(x.short_name) for x in group.link_names_as_set))
             res.child_groups = list(sorted(str(x) for x in group.groups.keys()))

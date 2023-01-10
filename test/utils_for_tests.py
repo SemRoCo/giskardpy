@@ -325,7 +325,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_robot(self, group_name):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldBranch
         """
         return self.world.groups[group_name]
 

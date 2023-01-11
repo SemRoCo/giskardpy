@@ -125,6 +125,7 @@ class RosMsgToGoal(GetGoal):
 
     def make_max_distances(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
         default_distance = {}
+        # fixme this default is buggy, but it doesn't get triggered
         for robot_name in self.robot_names:
             collision_avoidance_config = self.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance

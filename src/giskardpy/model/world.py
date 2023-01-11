@@ -52,6 +52,12 @@ class WorldTreeInterface(ABC):
     links: Dict[PrefixName, Link]
     groups: Dict[str, WorldBranch]
 
+    @property
+    def free_variables(self) -> List[FreeVariable]:
+        free_variables = []
+        for joint_name in self.movable_joints:
+            free_variables.extend(self.joints[joint_name].free_variable_list)
+        return free_variables
 
     @property
     def joint_names(self):
@@ -193,9 +199,9 @@ class WorldTree(WorldTreeInterface):
             if link_name == internal_link_name or link_name == internal_link_name.short_name:
                 matches.append(internal_link_name)
         if len(matches) > 1:
-            raise ValueError(f'Multiple matches for \'{link_name}\' found: \'{matches}\'.')
+            raise UnknownLinkException(f'Multiple matches for \'{link_name}\' found: \'{matches}\'.')
         if len(matches) == 0:
-            raise ValueError(f'No matches for \'{link_name}\' found: \'{matches}\'.')
+            raise UnknownLinkException(f'No matches for \'{link_name}\' found: \'{matches}\'.')
         return matches[0]
 
 
@@ -241,50 +247,17 @@ class WorldTree(WorldTreeInterface):
 
     def reset_cache(self):
         super().reset_cache()
-        try:
-            del self.get_directly_controlled_child_links_with_collisions
-        except:
-            pass
-        try:
-            del self.get_directly_controlled_child_links_with_collisions
-        except:
-            pass
-        try:
-            del self.compute_chain_reduced_to_controlled_joints
-        except:
-            pass
-        try:
-            del self.get_movable_parent_joint
-        except:
-            pass
-        try:
-            del self.get_controlled_parent_joint_of_link
-        except:
-            pass
-        try:
-            del self.get_controlled_parent_joint_of_joint
-        except:
-            pass
-        try:
-            del self.compute_split_chain
-        except:
-            pass
-        try:
-            del self.are_linked
-        except:
-            pass
-        try:
-            del self.compose_fk_expression
-        except:
-            pass
-        try:
-            del self.compute_chain
-        except:
-            pass
-        try:
-            del self.is_link_controlled
-        except:
-            pass
+        clear_memo(self.get_directly_controlled_child_links_with_collisions)
+        clear_memo(self.get_directly_controlled_child_links_with_collisions)
+        clear_memo(self.compute_chain_reduced_to_controlled_joints)
+        clear_memo(self.get_movable_parent_joint)
+        clear_memo(self.get_controlled_parent_joint_of_link)
+        clear_memo(self.get_controlled_parent_joint_of_joint)
+        clear_memo(self.compute_split_chain)
+        clear_memo(self.are_linked)
+        clear_memo(self.compose_fk_expression)
+        clear_memo(self.compute_chain)
+        clear_memo(self.is_link_controlled)
 
     @profile
     def notify_model_change(self):
@@ -1362,13 +1335,6 @@ class WorldTree(WorldTreeInterface):
 
     def get_joint_velocity_limits(self, joint_name) -> Tuple[float, float]:
         return self.compute_joint_limits(joint_name, Derivatives.velocity)
-
-    @property
-    def free_variables(self) -> List[FreeVariable]:
-        free_variables = []
-        for joint_name in self.movable_joints:
-            free_variables.extend(self.joints[joint_name].free_variable_list)
-        return free_variables
 
     def dye_group(self, group_name: str, color: ColorRGBA):
         if group_name in self.groups:

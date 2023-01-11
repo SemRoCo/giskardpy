@@ -2447,7 +2447,7 @@ class TestWorldManipulation:
                           size=(0.1, 0.02, 0.02),
                           pose=p,
                           parent_link='muh',
-                          expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+                          expected_error_code=UpdateWorldResponse.UNKNOWN_LINK_ERROR)
 
     def test_reattach_unknown_object(self, zero_pose: PR2TestWrapper):
         zero_pose.update_parent_link_of_group('muh',

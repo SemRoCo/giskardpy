@@ -3749,7 +3749,8 @@ class TestCollisionAvoidanceGoals:
 class TestInfoServices:
     def test_get_object_info(self, zero_pose: PR2TestWrapper):
         result = zero_pose.get_group_info('pr2')
-        expected = {'head_pan_joint',
+        expected = {'brumbrum',
+                    'head_pan_joint',
                     'head_tilt_joint',
                     'l_elbow_flex_joint',
                     'l_forearm_roll_joint',

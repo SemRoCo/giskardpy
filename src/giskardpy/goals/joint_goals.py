@@ -48,7 +48,7 @@ class SetOdometry(NonMotionGoal):
         if self.god_map.get_data(identifier.execute) \
                 and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
-        brumbrum_joint_name = self.world.groups[group_name].root_link.parent_joint_name
+        brumbrum_joint_name = self.world.groups[group_name].root_link.child_joint_names[0]
         brumbrum_joint = self.world.joints[brumbrum_joint_name]
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive)):
             raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')

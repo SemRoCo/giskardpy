@@ -69,7 +69,8 @@ class Giskard:
     def add_robot_urdf(self,
                        urdf: str,
                        group_name: str,
-                       joint_state_topics: List[str] = ('/joint_states',)):
+                       joint_state_topics: List[str] = ('/joint_states',),
+                       add_drive_joint_to_group: bool = True):
         """
         Add a robot urdf to the world.
         :param urdf: robot urdf as string, not the path
@@ -84,7 +85,7 @@ class Giskard:
             group_name = robot_name_from_urdf_string(urdf)
             assert group_name not in self.group_names
             self.group_names.append(group_name)
-        robot = RobotInterfaceConfig(urdf, name=group_name)
+        robot = RobotInterfaceConfig(urdf, name=group_name, add_drive_joint_to_group=add_drive_joint_to_group)
         self.robot_interface_configs.append(robot)
         js_kwargs = [{'group_name': group_name, 'joint_state_topic': topic} for topic in joint_state_topics]
         self.hardware_config.joint_state_topics_kwargs.extend(js_kwargs)
@@ -92,7 +93,8 @@ class Giskard:
     def add_robot_from_parameter_server(self,
                                         parameter_name: str = 'robot_description',
                                         joint_state_topics: List[str] = ('/joint_states',),
-                                        group_name: Optional[str] = None):
+                                        group_name: Optional[str] = None,
+                                        add_drive_joint_to_group: bool = True):
         """
         Add a robot urdf from parameter server to Giskard.
         :param parameter_name:
@@ -101,7 +103,8 @@ class Giskard:
         :param group_name: How to call the robot. If nothing is specified it will get the name it has in the urdf
         """
         urdf = rospy.get_param(parameter_name)
-        self.add_robot_urdf(urdf, group_name=group_name, joint_state_topics=joint_state_topics)
+        self.add_robot_urdf(urdf, group_name=group_name, joint_state_topics=joint_state_topics,
+                            add_drive_joint_to_group=add_drive_joint_to_group)
 
     def configure_MaxTrajectoryLength(self, enabled: bool = True, length: float = 30):
         self.behavior_tree_config.plugin_config['MaxTrajectoryLength']['enabled'] = enabled

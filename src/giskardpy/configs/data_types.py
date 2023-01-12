@@ -208,8 +208,9 @@ class BehaviorTreeConfig:
 
 
 class RobotInterfaceConfig:
-    def __init__(self, urdf: str, name: Optional[str] = None):
+    def __init__(self, urdf: str, name: Optional[str] = None, add_drive_joint_to_group: bool = True):
         if name is None:
             name = robot_name_from_urdf_string(urdf)
         self.urdf = urdf
         self.name = name
+        self.add_drive_joint_to_group = add_drive_joint_to_group

@@ -91,7 +91,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             pbw.clear_pybullet()
             self.world.fast_all_fks = None
             self.fks = self.world.compute_all_fks()
-            for link_name, link in self.world._links.items():
+            for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.add_object(link)
             # logging.logwarn('synced world')
@@ -102,7 +102,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             except:
                 self.world.fast_all_fks = None
                 self.fks = self.world.compute_all_fks()
-            for link_name, link in self.world._links.items():
+            for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.update_pose(link)
 

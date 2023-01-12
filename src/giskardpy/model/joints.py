@@ -331,7 +331,7 @@ class MimicJoint(DependentJoint, OneDofJoint, ABC):
         return self.free_variable.get_symbol(Derivatives.position) * multiplier + offset
 
     def connect_to_existing_free_variables(self):
-        mimed_joint: OneDofJoint = self.god_map.unsafe_get_data(identifier.world)._joints[self.mimed_joint_name]
+        mimed_joint: OneDofJoint = self.god_map.unsafe_get_data(identifier.world).joints[self.mimed_joint_name]
         self.free_variable = mimed_joint.free_variable
         self.clear_cache()
 
@@ -1237,7 +1237,7 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
         return []
 
     def connect_to_existing_free_variables(self):
-        self.brumbrum = self.world._joints[self.mimiced_joint_name]
+        self.brumbrum = self.world.joints[self.mimiced_joint_name]
         if isinstance(self.brumbrum, OmniDrive):
             self.x_vel = self.brumbrum.x_vel.get_symbol(Derivatives.velocity)
             self.y_vel = self.brumbrum.y_vel.get_symbol(Derivatives.velocity)
@@ -1256,7 +1256,6 @@ class PR2CasterJoint(OneDofURDFJoint, MimicJoint):
             self.x_vel = w.cos(yaw1_position-yaw2_position) * forward_velocity
             self.y_vel = w.sin(yaw1_position-yaw2_position) * forward_velocity
             self.yaw_vel = yaw2_velocity
-
 
 
 # class OmniDriveWithCaster(Joint):

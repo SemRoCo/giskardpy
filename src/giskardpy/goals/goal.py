@@ -109,7 +109,7 @@ class Goal(ABC):
         """
         try:
             try:
-                msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
+                msg.header.frame_id = self.world.search_for_link_name(msg.header.frame_id)
             except UnknownGroupException:
                 pass
             return self.world.transform_msg(target_frame, msg)
@@ -122,7 +122,7 @@ class Goal(ABC):
         """
         if not self.world.has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        joint = self.world._joints[joint_name]
+        joint = self.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             return joint.position_expression
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
@@ -174,7 +174,7 @@ class Goal(ABC):
     def joint_position_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
         for joint in self.world.controlled_joints:
-            position_symbols.extend(self.world._joints[joint].free_variable_list)
+            position_symbols.extend(self.world.joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
@@ -188,7 +188,7 @@ class Goal(ABC):
     def joint_acceleration_symbols(self) -> List[Union[w.Symbol, float]]:
         acceleration_symbols = []
         for joint in self.world.controlled_joints:
-            acceleration_symbols.extend(self.world._joints[joint].free_variable_list)
+            acceleration_symbols.extend(self.world.joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
 
     def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:

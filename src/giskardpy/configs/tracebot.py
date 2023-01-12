@@ -6,8 +6,8 @@ from giskardpy.my_types import PrefixName
 class Tracebot(Giskard):
     def __init__(self):
         super().__init__()
-        self.set_root_link_name('tracebot_base_link')
-        self.add_fixed_joint('tracebot_base_link', 'tracebot/tracebot_base_link')
+        self.set_root_link_name('world')
+        self.add_fixed_joint('world', 'tracy/world')
 
 
 class TracebotMujoco(Tracebot):
@@ -16,6 +16,19 @@ class TracebotMujoco(Tracebot):
         super().__init__()
         self.add_follow_joint_trajectory_server(namespace='/tracebot/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/tracebot/whole_body_controller/state')
+
+
+class TracyReal(Tracebot):
+    def __init__(self):
+        self.add_robot_from_parameter_server(joint_state_topics=['joint_states'])
+        super().__init__()
+        self.add_follow_joint_trajectory_server(
+            namespace='/left_arm/scaled_pos_joint_traj_controller_left/follow_joint_trajectory',
+            state_topic='/left_arm/scaled_pos_joint_traj_controller_left/state')
+        self.add_follow_joint_trajectory_server(
+            namespace='/right_arm/scaled_pos_joint_traj_controller_right/follow_joint_trajectory',
+            state_topic='/right_arm/scaled_pos_joint_traj_controller_right/state')
+        self.set_default_joint_limits(velocity_limit=0.2)
 
 
 class Tracebot_StandAlone(Tracebot):

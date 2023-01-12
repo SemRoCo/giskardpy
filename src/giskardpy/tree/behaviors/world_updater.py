@@ -19,7 +19,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
-from giskardpy.model.world import SubWorldTree
+from giskardpy.model.world import WorldBranch
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
@@ -103,7 +103,7 @@ class WorldUpdater(GiskardBehavior):
 
     @profile
     def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
-        link_name = self.world.get_link_name(req.root_link_name, req.parent_group_name)
+        link_name = self.world.search_for_link_name(req.root_link_name, req.parent_group_name)
         self.world.register_group(req.group_name, link_name)
         res = RegisterGroupResponse()
         res.error_codes = res.SUCCESS
@@ -121,7 +121,7 @@ class WorldUpdater(GiskardBehavior):
         res = GetGroupInfoResponse()
         res.error_codes = GetGroupInfoResponse.SUCCESS
         try:
-            group = self.world.groups[req.group_name]  # type: SubWorldTree
+            group = self.world.groups[req.group_name]  # type: WorldBranch
             res.controlled_joints = [str(j.short_name) for j in group.controlled_joints]
             res.links = list(sorted(str(x.short_name) for x in group.link_names_as_set))
             res.child_groups = list(sorted(str(x) for x in group.groups.keys()))
@@ -203,14 +203,14 @@ class WorldUpdater(GiskardBehavior):
     @profile
     def add_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req.parent_link = self.world.get_link_name(req.parent_link, req.parent_link_group)
+        req.parent_link = self.world.search_for_link_name(req.parent_link, req.parent_link_group)
         world_body = req.body
         if req.pose.header.frame_id == '':
             raise TransformException('Frame_id in pose is not set.')
         try:
             global_pose = transform_pose(target_frame=self.world.root_link_name, pose=req.pose, timeout=0.5)
         except:
-            req.pose.header.frame_id = self.world.get_link_name(req.pose.header.frame_id)
+            req.pose.header.frame_id = self.world.search_for_link_name(req.pose.header.frame_id)
             global_pose = self.world.transform_msg(self.world.root_link_name, req.pose)
 
         global_pose = self.world.transform_pose(req.parent_link, global_pose).pose
@@ -247,7 +247,7 @@ class WorldUpdater(GiskardBehavior):
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
-        pose = self.world.transform_pose(self.world._joints[joint_name].parent_link_name, req.pose).pose
+        pose = self.world.transform_pose(self.world.joints[joint_name].parent_link_name, req.pose).pose
         pose = w.TransMatrix(pose)
         self.world.update_joint_parent_T_child(joint_name, pose)
         # self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
@@ -258,7 +258,7 @@ class WorldUpdater(GiskardBehavior):
     @profile
     def update_parent_link(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req.parent_link = self.world.get_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
+        req.parent_link = self.world.search_for_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
         if req.group_name not in self.world.groups:
             raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
         group = self.world.groups[req.group_name]

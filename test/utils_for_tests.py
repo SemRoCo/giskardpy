@@ -266,7 +266,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
-        self.original_number_of_links = len(self.world._links)
+        self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
         return self.general_config.control_mode == self.general_config.control_mode.stand_alone
@@ -306,9 +306,9 @@ class GiskardTestWrapper(GiskardWrapper):
             else:
                 raise LookupException('just to trigger except block')
         except (LookupException, ExtrapolationException) as e:
-            target_frame = self.world.get_link_name(target_frame)
+            target_frame = self.world.search_for_link_name(target_frame)
             try:
-                msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
+                msg.header.frame_id = self.world.search_for_link_name(msg.header.frame_id)
             except UnknownGroupException:
                 pass
             return self.world.transform_msg(target_frame, msg)
@@ -328,7 +328,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_robot(self, group_name):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldBranch
         """
         return self.world.groups[group_name]
 
@@ -396,7 +396,7 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
-            joint_name = self.world.get_joint_name(joint_name)
+            joint_name = self.world.search_for_joint_name(joint_name)
             if self.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
@@ -423,7 +423,8 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
-        return self.world.get_link_name(root_link, root_group), self.world.get_link_name(tip_link, tip_group)
+        return self.world.search_for_link_name(root_link, root_group), \
+               self.world.search_for_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################
@@ -750,7 +751,7 @@ class GiskardTestWrapper(GiskardWrapper):
         joints = list(self.world.controlled_joints)
         for joint in joints:
             try:
-                lower_limit, upper_limit = self.world._joints[joint].get_limit_expressions(0)
+                lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
                 lower_limit = lower_limit.evaluate()
                 upper_limit = upper_limit.evaluate()
             except:
@@ -763,7 +764,7 @@ class GiskardTestWrapper(GiskardWrapper):
         trajectory_pos = self.get_result_trajectory_position()
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         for joint_name in controlled_joints:
-            if isinstance(self.world._joints[joint_name], OneDofJoint):
+            if isinstance(self.world.joints[joint_name], OneDofJoint):
                 if not self.world.is_joint_continuous(joint_name):
                     joint_limits = self.world.get_joint_position_limits(joint_name)
                     error_msg = f'{joint_name} has violated joint position limit'
@@ -800,7 +801,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 1
         assert len(self.get_group_names()) == 1
-        assert self.original_number_of_links == len(self.world._links)
+        assert self.original_number_of_links == len(self.world.links)
         return respone
 
     def remove_group(self,
@@ -864,8 +865,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 if parent_link == '':
                     parent_link = self.world.root_link_name
                 else:
-                    parent_link_group = self.world._get_group_containing_link_short_name(parent_link)
-                    parent_link = PrefixName(parent_link, parent_link_group)
+                    parent_link = self.world.search_for_link_name(parent_link)
                 assert parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
@@ -1071,7 +1071,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def check_cpi_geq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
-        links = [self.world.get_link_name(link_name) for link_name in links]
+        links = [self.world.search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1085,7 +1085,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_cpi_leq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
         min_contact: Collision = None
-        links = [self.world.get_link_name(link_name) for link_name in links]
+        links = [self.world.search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1583,8 +1583,7 @@ class JointGoalChecker(GoalChecker):
         :type decimal: int
         """
         for joint_name in goal_js:
-            group_name = self.world._get_group_containing_joint_short_name(joint_name)
-            full_joint_name = PrefixName(joint_name, group_name)
+            full_joint_name = self.world.search_for_joint_name(joint_name)
             goal = goal_js[joint_name]
             current = current_js[full_joint_name].position
             if self.world.is_joint_continuous(full_joint_name):

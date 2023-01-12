@@ -425,9 +425,9 @@ class TestJointGoals:
 
     def test_hard_joint_limits(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
-        r_elbow_flex_joint = zero_pose.world.get_joint_name('r_elbow_flex_joint')
-        torso_lift_joint = zero_pose.world.get_joint_name('torso_lift_joint')
-        head_pan_joint = zero_pose.world.get_joint_name('head_pan_joint')
+        r_elbow_flex_joint = zero_pose.world.search_for_joint_name('r_elbow_flex_joint')
+        torso_lift_joint = zero_pose.world.search_for_joint_name('torso_lift_joint')
+        head_pan_joint = zero_pose.world.search_for_joint_name('head_pan_joint')
         r_elbow_flex_joint_limits = zero_pose.world.get_joint_position_limits(r_elbow_flex_joint)
         torso_lift_joint_limits = zero_pose.world.get_joint_position_limits(torso_lift_joint)
         head_pan_joint_limits = zero_pose.world.get_joint_position_limits(head_pan_joint)
@@ -482,7 +482,7 @@ class TestConstraints:
 
     def test_JointPositionRange(self, zero_pose: PR2TestWrapper):
         # FIXME needs to be implemented like other position limits, or override limits
-        joint_name = zero_pose.world.get_joint_name('head_pan_joint')
+        joint_name = zero_pose.world.search_for_joint_name('head_pan_joint')
         lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint_name)
         lower_limit *= 0.5
         upper_limit *= 0.5
@@ -509,8 +509,8 @@ class TestConstraints:
         }, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        assert zero_pose.robot.state[joint_name].position <= upper_limit
-        assert zero_pose.robot.state[joint_name].position >= lower_limit
+        assert zero_pose.world.state[joint_name].position <= upper_limit
+        assert zero_pose.world.state[joint_name].position >= lower_limit
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         tip = 'base_footprint'
@@ -605,7 +605,7 @@ class TestConstraints:
         compare_points(expected.pose.position, new_pose.pose.position)
 
     def test_JointPositionRevolute(self, zero_pose: PR2TestWrapper):
-        joint = zero_pose.world.get_joint_name('r_shoulder_lift_joint')
+        joint = zero_pose.world.search_for_joint_name('r_shoulder_lift_joint')
         joint_goal = 1
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('JointPositionRevolute',
@@ -613,10 +613,10 @@ class TestConstraints:
                                 goal=joint_goal,
                                 max_velocity=0.5)
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
+        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
 
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
-        joint = zero_pose.world.get_joint_name('r_shoulder_lift_joint')
+        joint = zero_pose.world.search_for_joint_name('r_shoulder_lift_joint')
         joint_goal = 1
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('JointVelocityRevolute',
@@ -628,7 +628,7 @@ class TestConstraints:
                                 goal=joint_goal,
                                 max_velocity=0.5)
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, joint_goal, decimal=3)
+        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
 
     def test_JointPositionContinuous(self, zero_pose: PR2TestWrapper):
         joint = 'r_wrist_roll_joint'
@@ -639,8 +639,8 @@ class TestConstraints:
                                 goal=joint_goal,
                                 max_velocity=1)
         zero_pose.plan_and_execute()
-        joint = zero_pose.world.get_joint_name(joint)
-        np.testing.assert_almost_equal(zero_pose.robot.state[joint].position, -2.283, decimal=2)
+        joint = zero_pose.world.search_for_joint_name(joint)
+        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, -2.283, decimal=2)
 
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'
@@ -805,7 +805,8 @@ class TestConstraints:
         zero_pose.plan_and_execute()
 
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
-                                not zero_pose.world.is_joint_continuous(j)]
+                                not zero_pose.world.is_joint_continuous(j) and
+                                (zero_pose.world.is_joint_prismatic(j) or zero_pose.world.is_joint_revolute(j))]
 
         current_joint_state = zero_pose.world.state.to_position_dict()
         percentage *= 0.95  # it will not reach the exact percentage, because the weight is so low
@@ -820,9 +821,10 @@ class TestConstraints:
 
     def test_AvoidJointLimits2(self, zero_pose: PR2TestWrapper):
         percentage = 10
-        joints = [j for j in zero_pose.robot.controlled_joints if
-                  not zero_pose.world.is_joint_continuous(j)]
-        goal_state = {j: zero_pose.world.get_joint_position_limits(j)[1] for j in joints}
+        joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
+                                not zero_pose.world.is_joint_continuous(j) and
+                                (zero_pose.world.is_joint_prismatic(j) or zero_pose.world.is_joint_revolute(j))]
+        goal_state = {j: zero_pose.world.get_joint_position_limits(j)[1] for j in joint_non_continuous}
         zero_pose.set_json_goal('AvoidJointLimits',
                                 percentage=percentage)
         zero_pose.set_joint_goal(goal_state, check=False)
@@ -834,14 +836,11 @@ class TestConstraints:
         zero_pose.allow_self_collision()
         zero_pose.plan_and_execute()
 
-        joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
-                                not zero_pose.world.is_joint_continuous(j)]
-
-        current_joint_state = zero_pose.robot.state.to_position_dict()
+        current_joint_state = zero_pose.world.state.to_position_dict()
         percentage *= 0.9  # it will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.robot.get_joint_position_limits(joint)
+            lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
@@ -1196,7 +1195,7 @@ class TestConstraints:
         goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.set_json_goal('JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.UNKNOWN_GROUP])
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': 'muh'}
@@ -2178,6 +2177,9 @@ class TestWayPoints:
 
 class TestWorldManipulation:
 
+    def test_save_graph_pdf(self, kitchen_setup):
+        kitchen_setup.world.save_graph_pdf()
+
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
         old_color = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
         kitchen_setup.dye_group(kitchen_setup.robot_name, (1, 0, 0, 1))
@@ -2456,7 +2458,7 @@ class TestWorldManipulation:
                           size=(0.1, 0.02, 0.02),
                           pose=p,
                           parent_link='muh',
-                          expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+                          expected_error_code=UpdateWorldResponse.UNKNOWN_LINK_ERROR)
 
     def test_reattach_unknown_object(self, zero_pose: PR2TestWrapper):
         zero_pose.update_parent_link_of_group('muh',
@@ -3760,7 +3762,8 @@ class TestCollisionAvoidanceGoals:
 class TestInfoServices:
     def test_get_object_info(self, zero_pose: PR2TestWrapper):
         result = zero_pose.get_group_info('pr2')
-        expected = {'head_pan_joint',
+        expected = {'brumbrum',
+                    'head_pan_joint',
                     'head_tilt_joint',
                     'l_elbow_flex_joint',
                     'l_forearm_roll_joint',
@@ -3782,23 +3785,32 @@ class TestInfoServices:
 
 class TestWorld:
     def test_compute_chain_reduced_to_controlled_joints(self, world_setup: WorldTree):
-        r_gripper_tool_frame = world_setup.get_link_name('r_gripper_tool_frame')
-        l_gripper_tool_frame = world_setup.get_link_name('l_gripper_tool_frame')
+        r_gripper_tool_frame = world_setup.search_for_link_name('r_gripper_tool_frame')
+        l_gripper_tool_frame = world_setup.search_for_link_name('l_gripper_tool_frame')
         link_a, link_b = world_setup.compute_chain_reduced_to_controlled_joints(r_gripper_tool_frame,
                                                                                 l_gripper_tool_frame)
-        assert link_a == world_setup.get_link_name('r_wrist_roll_link')
-        assert link_b == world_setup.get_link_name('l_wrist_roll_link')
+        assert link_a == world_setup.search_for_link_name('r_wrist_roll_link')
+        assert link_b == world_setup.search_for_link_name('l_wrist_roll_link')
 
     def test_add_box(self, world_setup: WorldTree):
-        box_name = 'boxy'
+        box1_name = 'box1'
+        box2_name = 'box2'
         box = make_world_body_box()
         pose = Pose()
         pose.orientation.w = 1
-        world_setup.add_world_body(group_name=box_name,
+        world_setup.add_world_body(group_name=box1_name,
                                    msg=box,
                                    pose=pose,
                                    parent_link_name=world_setup.root_link_name)
-        assert box_name in world_setup.groups
+        world_setup.add_world_body(group_name=box2_name,
+                                   msg=box,
+                                   pose=pose,
+                                   parent_link_name=PrefixName('r_gripper_tool_frame', 'pr2'))
+        assert box1_name in world_setup.groups
+        assert world_setup.groups['pr2'].search_for_link_name(box2_name) == 'box2/box2'
+        assert world_setup.groups['pr2'].search_for_link_name('box2/box2') == 'box2/box2'
+        assert world_setup.search_for_link_name(box2_name) == 'box2/box2'
+        assert world_setup.search_for_link_name(box1_name) == 'box1/box1'
 
     def test_attach_box(self, world_setup: WorldTree):
         box_name = 'boxy'
@@ -3809,14 +3821,15 @@ class TestWorld:
                                    msg=box,
                                    pose=pose,
                                    parent_link_name=world_setup.root_link_name)
-        new_parent_link_name = world_setup.get_link_name('r_gripper_tool_frame')
+        new_parent_link_name = world_setup.search_for_link_name('r_gripper_tool_frame')
         old_fk = world_setup.compute_fk_pose(world_setup.root_link_name, box_name)
 
         world_setup.move_group(box_name, new_parent_link_name)
 
         new_fk = world_setup.compute_fk_pose(world_setup.root_link_name, box_name)
-        assert world_setup.get_link_name(box_name) in world_setup.groups[world_setup.robot_names[0]].link_names_as_set
-        assert world_setup.get_parent_link_of_link(world_setup.get_link_name(box_name)) == new_parent_link_name
+        assert world_setup.search_for_link_name(box_name) in world_setup.groups[
+            world_setup.robot_names[0]].link_names_as_set
+        assert world_setup.get_parent_link_of_link(world_setup.search_for_link_name(box_name)) == new_parent_link_name
         compare_poses(old_fk.pose, new_fk.pose)
 
         assert box_name in world_setup.groups[world_setup.robot_names[0]].groups
@@ -3824,44 +3837,46 @@ class TestWorld:
         assert box_name not in world_setup.minimal_group_names
 
     def test_group_pr2_hand(self, world_setup: WorldTree):
-        world_setup.register_group('r_hand', world_setup.get_link_name('r_wrist_roll_link'))
-        assert set(world_setup.groups['r_hand'].joint_names) == {world_setup.get_joint_name('r_gripper_palm_joint'),
-                                                                 world_setup.get_joint_name('r_gripper_led_joint'),
-                                                                 world_setup.get_joint_name(
-                                                                     'r_gripper_motor_accelerometer_joint'),
-                                                                 world_setup.get_joint_name('r_gripper_tool_joint'),
-                                                                 world_setup.get_joint_name(
-                                                                     'r_gripper_motor_slider_joint'),
-                                                                 world_setup.get_joint_name('r_gripper_l_finger_joint'),
-                                                                 world_setup.get_joint_name('r_gripper_r_finger_joint'),
-                                                                 world_setup.get_joint_name(
-                                                                     'r_gripper_motor_screw_joint'),
-                                                                 world_setup.get_joint_name(
-                                                                     'r_gripper_l_finger_tip_joint'),
-                                                                 world_setup.get_joint_name(
-                                                                     'r_gripper_r_finger_tip_joint'),
-                                                                 world_setup.get_joint_name('r_gripper_joint')}
-        assert set(world_setup.groups['r_hand'].link_names_as_set) == {world_setup.get_link_name('r_wrist_roll_link'),
-                                                                       world_setup.get_link_name('r_gripper_palm_link'),
-                                                                       world_setup.get_link_name('r_gripper_led_frame'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_motor_accelerometer_link'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_tool_frame'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_motor_slider_link'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_motor_screw_link'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_l_finger_link'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_l_finger_tip_link'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_r_finger_link'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_r_finger_tip_link'),
-                                                                       world_setup.get_link_name(
-                                                                           'r_gripper_l_finger_tip_frame')}
+        world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))
+        assert set(world_setup.groups['r_hand'].joint_names) == {
+            world_setup.search_for_joint_name('r_gripper_palm_joint'),
+            world_setup.search_for_joint_name('r_gripper_led_joint'),
+            world_setup.search_for_joint_name(
+                'r_gripper_motor_accelerometer_joint'),
+            world_setup.search_for_joint_name('r_gripper_tool_joint'),
+            world_setup.search_for_joint_name(
+                'r_gripper_motor_slider_joint'),
+            world_setup.search_for_joint_name('r_gripper_l_finger_joint'),
+            world_setup.search_for_joint_name('r_gripper_r_finger_joint'),
+            world_setup.search_for_joint_name(
+                'r_gripper_motor_screw_joint'),
+            world_setup.search_for_joint_name(
+                'r_gripper_l_finger_tip_joint'),
+            world_setup.search_for_joint_name(
+                'r_gripper_r_finger_tip_joint'),
+            world_setup.search_for_joint_name('r_gripper_joint')}
+        assert set(world_setup.groups['r_hand'].link_names_as_set) == {
+            world_setup.search_for_link_name('r_wrist_roll_link'),
+            world_setup.search_for_link_name('r_gripper_palm_link'),
+            world_setup.search_for_link_name('r_gripper_led_frame'),
+            world_setup.search_for_link_name(
+                'r_gripper_motor_accelerometer_link'),
+            world_setup.search_for_link_name(
+                'r_gripper_tool_frame'),
+            world_setup.search_for_link_name(
+                'r_gripper_motor_slider_link'),
+            world_setup.search_for_link_name(
+                'r_gripper_motor_screw_link'),
+            world_setup.search_for_link_name(
+                'r_gripper_l_finger_link'),
+            world_setup.search_for_link_name(
+                'r_gripper_l_finger_tip_link'),
+            world_setup.search_for_link_name(
+                'r_gripper_r_finger_link'),
+            world_setup.search_for_link_name(
+                'r_gripper_r_finger_tip_link'),
+            world_setup.search_for_link_name(
+                'r_gripper_l_finger_tip_frame')}
 
     def test_get_chain(self, world_setup: WorldTree):
         with suppress_stderr():
@@ -3870,8 +3885,8 @@ class TestWorld:
 
         root_link = 'base_footprint'
         tip_link = 'r_gripper_tool_frame'
-        real = world_setup.compute_chain(root_link_name=world_setup.get_link_name(root_link),
-                                         tip_link_name=world_setup.get_link_name(tip_link),
+        real = world_setup.compute_chain(root_link_name=world_setup.search_for_link_name(root_link),
+                                         tip_link_name=world_setup.search_for_link_name(tip_link),
                                          add_joints=True,
                                          add_links=True,
                                          add_fixed_joints=True,
@@ -3880,8 +3895,8 @@ class TestWorld:
         assert {x.short_name for x in real} == set(expected)
 
     def test_get_chain2(self, world_setup: WorldTree):
-        root_link = world_setup.get_link_name('l_gripper_tool_frame')
-        tip_link = world_setup.get_link_name('r_gripper_tool_frame')
+        root_link = world_setup.search_for_link_name('l_gripper_tool_frame')
+        tip_link = world_setup.search_for_link_name('r_gripper_tool_frame')
         try:
             world_setup.compute_chain(root_link, tip_link, True, True, True, True)
             assert False
@@ -3889,10 +3904,10 @@ class TestWorld:
             pass
 
     def test_get_chain_group(self, world_setup: WorldTree):
-        root_link = world_setup.get_link_name('r_wrist_roll_link')
-        tip_link = world_setup.get_link_name('r_gripper_r_finger_tip_link')
+        root_link = world_setup.search_for_link_name('r_wrist_roll_link')
+        tip_link = world_setup.search_for_link_name('r_gripper_r_finger_tip_link')
         world_setup.register_group('r_hand', root_link)
-        real = world_setup.groups['r_hand'].compute_chain(root_link, tip_link, True, True, True, True)
+        real = world_setup.compute_chain(root_link, tip_link, True, True, True, True)
         assert real == ['pr2/r_wrist_roll_link',
                         'pr2/r_gripper_palm_joint',
                         'pr2/r_gripper_palm_link',
@@ -3902,18 +3917,18 @@ class TestWorld:
                         'pr2/r_gripper_r_finger_tip_link']
 
     def test_get_chain_group2(self, world_setup: WorldTree):
-        root_link = world_setup.get_link_name('r_gripper_l_finger_tip_link')
-        tip_link = world_setup.get_link_name('r_gripper_r_finger_tip_link')
-        world_setup.register_group('r_hand', world_setup.get_link_name('r_wrist_roll_link'))
+        root_link = world_setup.search_for_link_name('r_gripper_l_finger_tip_link')
+        tip_link = world_setup.search_for_link_name('r_gripper_r_finger_tip_link')
+        world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))
         try:
-            real = world_setup.groups['r_hand'].compute_chain(root_link, tip_link, True, True, True, True)
+            real = world_setup.compute_chain(root_link, tip_link, True, True, True, True)
             assert False
         except ValueError:
             pass
 
     def test_get_split_chain(self, world_setup: WorldTree):
-        root_link = world_setup.get_link_name('l_gripper_r_finger_tip_link')
-        tip_link = world_setup.get_link_name('l_gripper_l_finger_tip_link')
+        root_link = world_setup.search_for_link_name('l_gripper_r_finger_tip_link')
+        tip_link = world_setup.search_for_link_name('l_gripper_l_finger_tip_link')
         chain1, connection, chain2 = world_setup.compute_split_chain(root_link, tip_link, True, True, True, True)
         chain1 = [n.short_name for n in chain1]
         connection = [n.short_name for n in connection]
@@ -3925,11 +3940,11 @@ class TestWorld:
                           'l_gripper_l_finger_tip_link']
 
     def test_get_split_chain_group(self, world_setup: WorldTree):
-        root_link = world_setup.get_link_name('r_gripper_l_finger_tip_link')
-        tip_link = world_setup.get_link_name('r_gripper_r_finger_tip_link')
-        world_setup.register_group('r_hand', world_setup.get_link_name('r_wrist_roll_link'))
-        chain1, connection, chain2 = world_setup.groups['r_hand'].compute_split_chain(root_link, tip_link,
-                                                                                      True, True, True, True)
+        root_link = world_setup.search_for_link_name('r_gripper_l_finger_tip_link')
+        tip_link = world_setup.search_for_link_name('r_gripper_r_finger_tip_link')
+        world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))
+        chain1, connection, chain2 = world_setup.compute_split_chain(root_link, tip_link,
+                                                                     True, True, True, True)
         assert chain1 == ['pr2/r_gripper_l_finger_tip_link',
                           'pr2/r_gripper_l_finger_tip_joint',
                           'pr2/r_gripper_l_finger_link',
@@ -3942,21 +3957,21 @@ class TestWorld:
 
     def test_get_joint_limits2(self, world_setup: WorldTree):
         lower_limit, upper_limit = world_setup.get_joint_position_limits(
-            world_setup.get_joint_name('l_shoulder_pan_joint'))
+            world_setup.search_for_joint_name('l_shoulder_pan_joint'))
         assert lower_limit == -0.564601836603
         assert upper_limit == 2.1353981634
 
     def test_search_branch(self, world_setup: WorldTree):
-        result = world_setup.search_branch(world_setup.get_link_name('odom_combined'),
+        result = world_setup.search_branch(world_setup.search_for_link_name('odom_combined'),
                                            stop_at_joint_when=lambda _: False,
                                            stop_at_link_when=lambda _: False)
         assert result == ([], [])
-        result = world_setup.search_branch(world_setup.get_link_name('odom_combined'),
+        result = world_setup.search_branch(world_setup.search_for_link_name('odom_combined'),
                                            stop_at_joint_when=world_setup.is_joint_controlled,
                                            stop_at_link_when=lambda _: False,
                                            collect_link_when=world_setup.has_link_collisions)
         assert result == ([], [])
-        result = world_setup.search_branch(world_setup.get_link_name('base_footprint'),
+        result = world_setup.search_branch(world_setup.search_for_link_name('base_footprint'),
                                            stop_at_joint_when=world_setup.is_joint_controlled,
                                            collect_link_when=world_setup.has_link_collisions)
         assert set(result[0]) == {'pr2/base_bellow_link',
@@ -3973,7 +3988,7 @@ class TestWorld:
                                   'pr2/br_caster_r_wheel_link',
                                   'pr2/br_caster_rotation_link',
                                   'pr2/base_link'}
-        result = world_setup.search_branch(world_setup.get_link_name('l_elbow_flex_link'),
+        result = world_setup.search_branch(world_setup.search_for_link_name('l_elbow_flex_link'),
                                            collect_joint_when=world_setup.is_joint_fixed)
         assert set(result[0]) == set()
         assert set(result[1]) == {'pr2/l_force_torque_adapter_joint',
@@ -3985,7 +4000,7 @@ class TestWorld:
                                   'pr2/l_gripper_motor_accelerometer_joint',
                                   'pr2/l_gripper_palm_joint',
                                   'pr2/l_gripper_tool_joint'}
-        links, joints = world_setup.search_branch(world_setup.get_link_name('r_wrist_roll_link'),
+        links, joints = world_setup.search_branch(world_setup.search_for_link_name('r_wrist_roll_link'),
                                                   stop_at_joint_when=world_setup.is_joint_controlled,
                                                   collect_link_when=world_setup.has_link_collisions,
                                                   collect_joint_when=lambda _: True)
@@ -4006,7 +4021,7 @@ class TestWorld:
                                'pr2/r_gripper_r_finger_joint',
                                'pr2/r_gripper_r_finger_tip_joint',
                                'pr2/r_gripper_joint'}
-        links, joints = world_setup.search_branch(world_setup.get_link_name('br_caster_l_wheel_link'),
+        links, joints = world_setup.search_branch(world_setup.search_for_link_name('br_caster_l_wheel_link'),
                                                   collect_link_when=lambda _: True,
                                                   collect_joint_when=lambda _: True)
         assert links == ['pr2/br_caster_l_wheel_link']
@@ -4014,13 +4029,13 @@ class TestWorld:
 
     # def test_get_siblings_with_collisions(self, world_setup: WorldTree):
     #     # FIXME
-    #     result = world_setup.get_siblings_with_collisions(world_setup.get_joint_name('brumbrum'))
+    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('brumbrum'))
     #     assert result == []
-    #     result = world_setup.get_siblings_with_collisions(world_setup.get_joint_name('l_elbow_flex_joint'))
+    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('l_elbow_flex_joint'))
     #     assert set(result) == {'pr2/l_upper_arm_roll_link', 'pr2/l_upper_arm_link'}
-    #     result = world_setup.get_siblings_with_collisions(world_setup.get_joint_name('r_wrist_roll_joint'))
+    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('r_wrist_roll_joint'))
     #     assert result == ['pr2/r_wrist_flex_link']
-    #     result = world_setup.get_siblings_with_collisions(world_setup.get_joint_name('br_caster_l_wheel_joint'))
+    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('br_caster_l_wheel_joint'))
     #     assert set(result) == {'pr2/base_bellow_link',
     #                            'pr2/fl_caster_l_wheel_link',
     #                            'pr2/fl_caster_r_wheel_link',
@@ -4037,21 +4052,21 @@ class TestWorld:
 
     def test_get_controlled_parent_joint_of_link(self, world_setup: WorldTree):
         with pytest.raises(KeyError) as e_info:
-            world_setup.get_controlled_parent_joint_of_link(world_setup.get_link_name('odom_combined'))
+            world_setup.get_controlled_parent_joint_of_link(world_setup.search_for_link_name('odom_combined'))
         assert world_setup.get_controlled_parent_joint_of_link(
-            world_setup.get_link_name('base_footprint')) == 'pr2/brumbrum'
+            world_setup.search_for_link_name('base_footprint')) == 'pr2/brumbrum'
 
     def test_get_parent_joint_of_joint(self, world_setup: WorldTree):
         # TODO shouldn't this return a not found error?
         with pytest.raises(KeyError) as e_info:
             world_setup.get_controlled_parent_joint_of_joint('pr2/brumbrum')
         with pytest.raises(KeyError) as e_info:
-            world_setup.search_for_parent_joint(world_setup.get_joint_name('r_wrist_roll_joint'),
+            world_setup.search_for_parent_joint(world_setup.search_for_joint_name('r_wrist_roll_joint'),
                                                 stop_when=lambda x: False)
         assert world_setup.get_controlled_parent_joint_of_joint(
-            world_setup.get_joint_name('r_torso_lift_side_plate_joint')) == 'pr2/torso_lift_joint'
+            world_setup.search_for_joint_name('r_torso_lift_side_plate_joint')) == 'pr2/torso_lift_joint'
         assert world_setup.get_controlled_parent_joint_of_joint(
-            world_setup.get_joint_name('torso_lift_joint')) == 'pr2/brumbrum'
+            world_setup.search_for_joint_name('torso_lift_joint')) == 'pr2/brumbrum'
 
     def test_get_all_joint_limits(self, world_setup: WorldTree):
         assert world_setup.get_all_joint_position_limits() == {'pr2/bl_caster_l_wheel_joint': (None, None),
@@ -4097,32 +4112,25 @@ class TestWorld:
                                                                'pr2/torso_lift_joint': (0.0115, 0.325),
                                                                'pr2/torso_lift_motor_screw_joint': (None, None)}
 
-    def test_get_all_joint_limits_group(self, world_setup: WorldTree):
-        world_setup.register_group('r_hand', world_setup.get_link_name('r_wrist_roll_link'))
-        actual = world_setup.groups['r_hand'].get_all_joint_position_limits()
-        assert actual == {'pr2/r_gripper_joint': (0.0, 0.088),
-                          'pr2/r_gripper_l_finger_joint': (0.0, 0.548),
-                          'pr2/r_gripper_motor_screw_joint': (None, None),
-                          'pr2/r_gripper_motor_slider_joint': (-0.1, 0.1)}
-
     def test_possible_collision_combinations(self, world_setup: WorldTree):
-        result = world_setup.possible_collision_combinations(world_setup.robot_names[0])
+        result = world_setup.groups[world_setup.robot_names[0]].possible_collision_combinations()
         reference = {world_setup.sort_links(link_a, link_b) for link_a, link_b in
                      combinations(world_setup.groups[world_setup.robot_names[0]].link_names_with_collisions, 2) if
-                     not world_setup.groups[world_setup.robot_names[0]].are_linked(link_a, link_b)}
+                     not world_setup.are_linked(link_a, link_b)}
         assert result == reference
 
     def test_compute_chain_reduced_to_controlled_joints2(self, world_setup: WorldTree):
         link_a, link_b = world_setup.compute_chain_reduced_to_controlled_joints(
-            world_setup.get_link_name('l_upper_arm_link'),
-            world_setup.get_link_name('r_upper_arm_link'))
+            world_setup.search_for_link_name('l_upper_arm_link'),
+            world_setup.search_for_link_name('r_upper_arm_link'))
         assert link_a == 'pr2/l_upper_arm_roll_link'
         assert link_b == 'pr2/r_upper_arm_roll_link'
 
     def test_compute_chain_reduced_to_controlled_joints3(self, world_setup: WorldTree):
         with pytest.raises(KeyError):
-            world_setup.compute_chain_reduced_to_controlled_joints(world_setup.get_link_name('l_wrist_roll_link'),
-                                                                   world_setup.get_link_name('l_gripper_r_finger_link'))
+            world_setup.compute_chain_reduced_to_controlled_joints(
+                world_setup.search_for_link_name('l_wrist_roll_link'),
+                world_setup.search_for_link_name('l_gripper_r_finger_link'))
 
 # time: [1-9][1-9]*.[1-9]* s
 # import pytest

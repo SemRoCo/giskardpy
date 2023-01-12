@@ -178,7 +178,7 @@ class PR22TestWrapper(GiskardTestWrapper):
         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 2
         assert len(self.world.robot_names) == 2
-        assert self.original_number_of_links == len(self.world._links)
+        assert self.original_number_of_links == len(self.world.links)
 
     def teleport_base(self, goal_pose, robot_name):
         goal_pose = tf.transform_pose(str(self.default_roots[robot_name]), goal_pose)

@@ -61,7 +61,7 @@ class GiskardBehavior(Behaviour):
 
     def robot(self, robot_name=''):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldBranch
         """
         return self.collision_scene.robot(robot_name=robot_name)
 

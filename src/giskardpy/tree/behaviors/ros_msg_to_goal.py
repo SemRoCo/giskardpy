@@ -4,7 +4,7 @@ import json
 import traceback
 from collections import defaultdict
 from copy import deepcopy
-from typing import List
+from typing import List, Dict, Tuple
 
 from py_trees import Status
 
@@ -15,6 +15,7 @@ from giskardpy.exceptions import UnknownConstraintException, InvalidGoalExceptio
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.goals.goal import Goal
+from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard, \
@@ -122,8 +123,9 @@ class RosMsgToGoal(GetGoal):
                                                                                     max_distances)
         return collision_matrix
 
-    def make_max_distances(self):
+    def make_max_distances(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
         default_distance = {}
+        # fixme this default is buggy, but it doesn't get triggered
         for robot_name in self.robot_names:
             collision_avoidance_config = self.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance

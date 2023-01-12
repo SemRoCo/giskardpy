@@ -56,7 +56,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
                 #TODO
                 pass
         else:
-            joint_name = self.world.get_joint_name(joint_name)
+            joint_name = self.world.search_for_joint_name(joint_name)
             self.joint = self.world.joints[joint_name]
         self.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')

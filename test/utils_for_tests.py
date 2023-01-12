@@ -303,9 +303,9 @@ class GiskardTestWrapper(GiskardWrapper):
         try:
             return tf.transform_msg(target_frame, msg, timeout=timeout)
         except LookupException as e:
-            target_frame = self.world.get_link_name(target_frame)
+            target_frame = self.world.search_for_link_name(target_frame)
             try:
-                msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
+                msg.header.frame_id = self.world.search_for_link_name(msg.header.frame_id)
             except UnknownGroupException:
                 pass
             return self.world.transform_msg(target_frame, msg)
@@ -325,7 +325,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_robot(self, group_name):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldBranch
         """
         return self.world.groups[group_name]
 
@@ -393,7 +393,7 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
-            joint_name = self.world.get_joint_name(joint_name)
+            joint_name = self.world.search_for_joint_name(joint_name)
             if self.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
@@ -420,19 +420,8 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
-        if root_group is None:
-            try:
-                root_group = self.world._get_group_containing_link_short_name(root_link)
-            except UnknownGroupException:
-                pass
-        root_link = PrefixName(root_link, root_group)
-        if tip_group is None:
-            try:
-                tip_group = self.world._get_group_containing_link_short_name(tip_link)
-            except UnknownGroupException:
-                pass
-        tip_link = PrefixName(tip_link, tip_group)
-        return root_link, tip_link
+        return self.world.search_for_link_name(root_link, root_group), \
+               self.world.search_for_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################
@@ -873,8 +862,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 if parent_link == '':
                     parent_link = self.world.root_link_name
                 else:
-                    parent_link_group = self.world._get_group_containing_link_short_name(parent_link)
-                    parent_link = PrefixName(parent_link, parent_link_group)
+                    parent_link = self.world.search_for_link_name(parent_link)
                 assert parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
@@ -1080,7 +1068,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def check_cpi_geq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
-        links = [self.world.get_link_name(link_name) for link_name in links]
+        links = [self.world.search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1094,7 +1082,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_cpi_leq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
         min_contact: Collision = None
-        links = [self.world.get_link_name(link_name) for link_name in links]
+        links = [self.world.search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1592,8 +1580,7 @@ class JointGoalChecker(GoalChecker):
         :type decimal: int
         """
         for joint_name in goal_js:
-            group_name = self.world._get_group_containing_joint_short_name(joint_name)
-            full_joint_name = PrefixName(joint_name, group_name)
+            full_joint_name = self.world.search_for_joint_name(joint_name)
             goal = goal_js[joint_name]
             current = current_js[full_joint_name].position
             if self.world.is_joint_continuous(full_joint_name):

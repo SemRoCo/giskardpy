@@ -34,10 +34,10 @@ class CartesianPosition(Goal):
             p.header = goal_point.header
             p.point = goal_point.pose.position
             goal_point = p
-        self.root_link = self.world.get_link_name(root_link, root_group)
-        self.tip_link = self.world.get_link_name(tip_link, tip_group)
+        self.root_link = self.world.search_for_link_name(root_link, root_group)
+        self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
         if root_link2 is not None:
-            self.root_link2 = self.world.get_link_name(root_link2, root_group)
+            self.root_link2 = self.world.search_for_link_name(root_link2, root_group)
             self.goal_point = self.transform_msg(self.root_link2, goal_point)
         else:
             self.root_link2 = None
@@ -98,10 +98,10 @@ class CartesianOrientation(Goal):
             q.header = goal_orientation.header
             q.quaternion = goal_orientation.pose.orientation
             goal_orientation = q
-        self.root_link = self.world.get_link_name(root_link, root_group)
-        self.tip_link = self.world.get_link_name(tip_link, tip_group)
+        self.root_link = self.world.search_for_link_name(root_link, root_group)
+        self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
         if root_link2 is not None:
-            self.root_link2 = self.world.get_link_name(root_link2, root_group)
+            self.root_link2 = self.world.search_for_link_name(root_link2, root_group)
             self.goal_orientation = self.transform_msg(self.root_link2, goal_orientation)
         else:
             self.root_link2 = None
@@ -161,8 +161,8 @@ class CartesianPositionStraight(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        self.root_link = self.world.get_link_name(root_link, root_group)
-        self.tip_link = self.world.get_link_name(tip_link, tip_group)
+        self.root_link = self.world.search_for_link_name(root_link, root_group)
+        self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
         self.goal_point = self.transform_msg(self.root_link, goal_point)
 
     def make_constraints(self):
@@ -308,8 +308,8 @@ class DiffDriveBaseGoal(Goal):
             pointing_axis.header.frame_id = tip_link
             pointing_axis.vector.x = 1
         self.weight = weight
-        self.map = self.world.get_link_name(root_link, root_group)
-        self.base_footprint = self.world.get_link_name(tip_link, tip_group)
+        self.map = self.world.search_for_link_name(root_link, root_group)
+        self.base_footprint = self.world.search_for_link_name(tip_link, tip_group)
         self.goal_pose = self.transform_msg(self.map, goal_pose)
         self.goal_pose.pose.position.z = 0
         diff_drive_joints = [v for k, v in self.world.joints.items() if isinstance(v, DiffDrive)]
@@ -459,8 +459,8 @@ class TranslationVelocityLimit(Goal):
         See CartesianVelocityLimit
         """
         super().__init__()
-        self.root_link = self.world.get_link_name(root_link, root_group)
-        self.tip_link = self.world.get_link_name(tip_link, tip_group)
+        self.root_link = self.world.search_for_link_name(root_link, root_group)
+        self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
@@ -491,8 +491,8 @@ class RotationVelocityLimit(Goal):
         """
 
         super().__init__()
-        self.root_link = self.world.get_link_name(root_link, root_group)
-        self.tip_link = self.world.get_link_name(tip_link, tip_group)
+        self.root_link = self.world.search_for_link_name(root_link, root_group)
+        self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
         self.hard = hard
 
         self.weight = weight

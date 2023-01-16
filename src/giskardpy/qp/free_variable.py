@@ -4,14 +4,14 @@ import numpy as np
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
-from giskardpy.my_types import Derivatives
+from giskardpy.my_types import Derivatives, PrefixName
 
 
 class FreeVariable:
     state_identifier: List[str] = identifier.joint_states
 
     def __init__(self,
-                 name: str,
+                 name: PrefixName,
                  god_map: GodMap,
                  lower_limits: Dict[Derivatives, float],
                  upper_limits: Dict[Derivatives, float],

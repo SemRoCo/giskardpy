@@ -9,7 +9,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
-from giskardpy.model.joints import OneDofJoint, MimicJoint, OmniDrive
+from giskardpy.model.joints import OneDofJoint, OmniDrive, DependentJoint
 from giskardpy.my_types import PrefixName
 
 try:
@@ -102,10 +102,10 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             raise ValueError(f'\'{state_topic}\' has no joints')
 
         for joint in self.world.joints.values():
-            if isinstance(joint, OneDofJoint) and not isinstance(joint, MimicJoint):
-                if joint.free_variable.name in controlled_joint_names:
+            if isinstance(joint, OneDofJoint) and not isinstance(joint, DependentJoint):
+                if joint.free_variables[0].name in controlled_joint_names:
                     self.controlled_joints.append(joint)
-                    controlled_joint_names.remove(joint.free_variable.name)
+                    controlled_joint_names.remove(joint.free_variables[0].name)
             elif isinstance(joint, OmniDrive):
                 if set(controlled_joint_names) == set(joint.position_variable_names):
                     self.controlled_joints.append(joint)

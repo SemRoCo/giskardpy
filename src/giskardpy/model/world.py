@@ -21,8 +21,7 @@ from giskardpy.data_types import JointStates, KeyDefaultDict
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint, URDFJoint, MimicJoint, \
-    PrismaticJoint, RevoluteJoint, ContinuousJoint, OmniDrive, DiffDrive
+from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map

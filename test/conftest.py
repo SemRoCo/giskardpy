@@ -99,7 +99,7 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              pose=kitchen_pose,
                              js_topic='/kitchen/joint_states',
                              set_js_topic='/kitchen/cram_joint_states')
-    js = {str(k.short_name): 0.0 for k in better_pose.world.groups[better_pose.kitchen_name].movable_joints}
+    js = {str(k.short_name): 0.0 for k in better_pose.world.groups[better_pose.kitchen_name].movable_joint_names}
     better_pose.set_kitchen_js(js)
     return better_pose
 
@@ -120,7 +120,7 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
                              js_topic='/apartment_joint_states',
                              set_js_topic='/iai_kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in better_pose.world.groups[better_pose.environment_name].movable_joints}
+    js = {str(k): 0.0 for k in better_pose.world.groups[better_pose.environment_name].movable_joint_names}
     better_pose.set_apartment_js(js)
     base_pose = PoseStamped()
     base_pose.header.frame_id = 'iai_apartment/side_B'

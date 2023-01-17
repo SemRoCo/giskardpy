@@ -21,7 +21,8 @@ from giskardpy.data_types import JointStates, KeyDefaultDict
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive
+from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
+    urdf_to_joint, DependentJoint, ActuatedJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map
@@ -54,8 +55,8 @@ class WorldTreeInterface(ABC):
     @property
     def free_variables(self) -> List[FreeVariable]:
         free_variables = []
-        for joint_name in self.movable_joints:
-            free_variables.extend(self.joints[joint_name].free_variable_list)
+        for joint_name in self.movable_joint_names:
+            free_variables.extend(self.joints[joint_name].free_variables)
         return free_variables
 
     @property
@@ -72,7 +73,7 @@ class WorldTreeInterface(ABC):
 
     @cached_property
     def movable_joints_as_set(self) -> Set[PrefixName]:
-        return set(self.movable_joints)
+        return set(self.movable_joint_names)
 
     @property
     def link_names_with_visuals(self) -> Set[PrefixName]:
@@ -87,9 +88,9 @@ class WorldTreeInterface(ABC):
         return self.link_names_as_set.difference(self.link_names_with_collisions)
 
     @cached_property
-    def movable_joints(self) -> List[PrefixName]:
+    def movable_joint_names(self) -> List[PrefixName]:
         return [j.name for j in self.joints.values() if
-                not isinstance(j, FixedJoint) and not isinstance(j, MimicJoint)]
+                not isinstance(j, FixedJoint) and not isinstance(j, DependentJoint)]
 
     @cached_property
     def link_names_as_set(self) -> Set[PrefixName]:
@@ -486,7 +487,7 @@ class WorldTree(WorldTreeInterface):
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
 
-                joint = URDFJoint.from_urdf(urdf_joint, group_name)
+                joint = urdf_to_joint(urdf_joint, group_name)
 
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
@@ -504,8 +505,9 @@ class WorldTree(WorldTreeInterface):
             self.register_group(group_name, root_link, actuated=actuated)
         else:
             self.register_group(group_name, urdf_root_link_name, actuated=actuated)
-        if self.god_map is not None:
-            self.apply_default_limits_and_weights()
+        # if self.god_map is not None:
+        #     self.apply_default_limits_and_weights()
+        self.notify_model_change()
         self._set_free_variables_on_mimic_joints(group_name)
 
     def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
@@ -762,35 +764,6 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def apply_default_limits_and_weights(self):
-        new_lin_limits = {}
-        new_ang_limits = {}
-        for i in range(self.god_map.unsafe_get_data(identifier.max_derivative)):
-            derivative = Derivatives(i + 1)  # to start with velocity and include max_derivative
-
-            class Linear:
-                def __init__(self, god_map, diff):
-                    self.god_map = god_map
-                    self.diff = diff
-
-                def __call__(self, key):
-                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + [key])
-
-            class Angular:
-                def __init__(self, god_map, diff):
-                    self.god_map = god_map
-                    self.diff = diff
-
-                def __call__(self, key):
-                    return self.god_map.to_symbol(identifier.joint_limits + [self.diff] + [key])
-
-            d_linear = KeyDefaultDict(Linear(self.god_map, derivative))
-            d_angular = KeyDefaultDict(Angular(self.god_map, derivative))
-            new_lin_limits[derivative] = d_linear
-            new_ang_limits[derivative] = d_angular
-        for joint_name in self.movable_joints:
-            joint = self.joints[joint_name]
-            joint.update_limits(new_lin_limits, new_ang_limits)
-
         new_weights = {}
         for i in range(self.god_map.unsafe_get_data(identifier.max_derivative)):
             derivative = Derivatives(i + 1)  # to start with velocity and include max_derivative
@@ -810,7 +783,7 @@ class WorldTree(WorldTreeInterface):
         self.notify_model_change()
 
     def overwrite_joint_weights(self, new_weights: derivative_joint_map):
-        for joint_name in self.movable_joints:
+        for joint_name in self.movable_joint_names:
             joint = self.joints[joint_name]
             if not self.is_joint_mimic(joint_name):
                 joint.update_weights(new_weights)
@@ -818,9 +791,9 @@ class WorldTree(WorldTreeInterface):
     @property
     def joint_constraints(self) -> List[FreeVariable]:
         joint_constraints = []
-        for joint_name, joint in self.joints.items():
-            if joint.has_free_variables():
-                joint_constraints.extend(joint.free_variable_list)
+        for joint_name in self.movable_joint_names:
+            joint = self.joints[joint_name]
+            joint_constraints.extend(joint.free_variables)
         return joint_constraints
 
     def _link_joint_to_links(self, joint: Joint):
@@ -1355,7 +1328,7 @@ class WorldTree(WorldTreeInterface):
         return limits
 
     def get_all_joint_position_limits(self) -> Dict[PrefixName, Tuple[Optional[float], Optional[float]]]:
-        return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
+        return {j: self.get_joint_position_limits(j) for j in self.movable_joint_names}
 
     def is_joint_prismatic(self, joint_name: PrefixName) -> bool:
         return isinstance(self.joints[joint_name], PrismaticJoint)
@@ -1381,10 +1354,11 @@ class WorldTree(WorldTreeInterface):
         return isinstance(self.joints[joint_name], RevoluteJoint) and not self.is_joint_continuous(joint_name)
 
     def is_joint_continuous(self, joint_name: PrefixName) -> bool:
-        return isinstance(self.joints[joint_name], ContinuousJoint)
+        joint = self.joints[joint_name]
+        return isinstance(joint, RevoluteJoint) and not joint.free_variable.has_position_limits()
 
     def is_joint_mimic(self, joint_name: PrefixName) -> bool:
-        return isinstance(self.joints[joint_name], MimicJoint)
+        return isinstance(self.joints[joint_name], DependentJoint)
 
     def is_joint_rotational(self, joint_name: PrefixName) -> bool:
         return self.is_joint_revolute(joint_name) or self.is_joint_continuous(joint_name)

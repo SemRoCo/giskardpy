@@ -468,7 +468,7 @@ class CollisionWorldSynchronizer:
         :return:
         """
         js = JointStates()
-        for joint_name in sorted(group.movable_joints):
+        for joint_name in sorted(group.movable_joint_names):
             if group.search_downwards_for_links(joint_name):
                 js[joint_name].position = f(joint_name)
             else:

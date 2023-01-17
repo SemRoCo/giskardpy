@@ -29,6 +29,10 @@ class FreeVariable:
         self.upper_limits = {}
         if quadratic_weights is None:
             self.quadratic_weights = {}
+            for i in range(self.god_map.get_data(identifier.max_derivative)):
+                derivative = Derivatives(i + 1)
+                quadratic_weight_symbol = self.god_map.to_symbol(identifier.joint_weights + [derivative, self.name])
+                self.quadratic_weights[derivative] = quadratic_weight_symbol
         else:
             self.quadratic_weights = quadratic_weights
         assert max(self._symbols.keys()) == len(self._symbols) - 1
@@ -48,7 +52,8 @@ class FreeVariable:
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {derivative}')
 
-    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[w.Expression, float]:
+    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[
+        w.Expression, float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
             expr = w.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
         elif derivative in self.default_lower_limits:
@@ -67,7 +72,8 @@ class FreeVariable:
     def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[w.Symbol, float], float]):
         self.upper_limits[derivative] = limit
 
-    def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
+    def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[
+        Union[w.Symbol, float], float]:
         if not default and derivative in self.default_upper_limits and derivative in self.upper_limits:
             expr = w.min(self.default_upper_limits[derivative], self.upper_limits[derivative])
         elif derivative in self.default_upper_limits:

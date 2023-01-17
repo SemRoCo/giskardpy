@@ -246,7 +246,7 @@ def kitchen_setup(resetted_giskard) -> PR22TestWrapper:
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
                               tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
                               set_js_topic=u'/kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
+    js = {str(k): 0.0 for k in resetted_giskard.world.groups[object_name].movable_joint_names}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
 

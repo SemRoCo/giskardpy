@@ -422,7 +422,7 @@ class Giskard:
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)
-        non_controlled_joints = set(world.movable_joints).difference(set(world.controlled_joints))
+        non_controlled_joints = set(world.movable_joint_names).difference(set(world.controlled_joints))
         if len(world.controlled_joints) == 0:
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '

@@ -67,7 +67,7 @@ class Trajectory:
                 if isinstance(joint, OmniDrive):
                     free_variables = joint.position_variable_names
                 else:
-                    free_variables = [v.name for v in joint.free_variable_list]
+                    free_variables = [v.name for v in joint.free_variables]
                 for free_variable in free_variables:
                     if free_variable in traj_point:
                         if i == 0:

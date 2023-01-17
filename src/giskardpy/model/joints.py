@@ -97,16 +97,29 @@ def urdf_to_joint(urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, Revolu
                            parent_link_name=parent_link_name,
                            child_link_name=child_link_name,
                            parent_T_child=parent_T_child)
-    elif not issubclass(joint_class, DependentJoint):
-        lower_limits, upper_limits = urdf_joint_to_limits(urdf_joint)
+
+    lower_limits, upper_limits = urdf_joint_to_limits(urdf_joint)
+    for i in range(blackboard_god_map().unsafe_get_data(identifier.max_derivative)):
+        derivative = Derivatives(i + 1)  # to start with velocity and include max_derivative
+        limit_symbol = blackboard_god_map().to_symbol(identifier.joint_limits + [derivative, joint_name])
+        if derivative in lower_limits:
+            lower_limits[derivative] = w.max(-limit_symbol, lower_limits[derivative])
+        else:
+            lower_limits[derivative] = -limit_symbol
+        if derivative in upper_limits:
+            upper_limits[derivative] = w.min(limit_symbol, upper_limits[derivative])
+        else:
+            upper_limits[derivative] = limit_symbol
+
+    if not issubclass(joint_class, DependentJoint):
         return joint_class(name=joint_name,
                            parent_link_name=parent_link_name,
                            child_link_name=child_link_name,
                            parent_T_child=parent_T_child,
+                           axis=urdf_joint.axis,
                            lower_limits=lower_limits,
                            upper_limits=upper_limits)
     else:
-        lower_limits, upper_limits = urdf_joint_to_limits(urdf_joint)
         multiplier = urdf_joint.mimic.multiplier
         offset = urdf_joint.mimic.offset
         return joint_class(name=joint_name,
@@ -154,7 +167,7 @@ class ActuatedJoint(Joint, ABC):
 
     @property
     def world_state(self):
-        return self.world.world_state
+        return self.world.state
 
     @abc.abstractmethod
     def set_initial_state(self):
@@ -181,6 +194,26 @@ class ActuatedJoint(Joint, ABC):
 
 class OneDofJoint(ActuatedJoint):
     _parent_T_child: w.TransMatrix
+    axis: Tuple[float, float, float]
+
+    def __init__(self,
+                 name: PrefixName,
+                 parent_link_name: PrefixName,
+                 child_link_name: PrefixName,
+                 axis: Tuple[float, float, float],
+                 parent_T_child: w.TransMatrix,
+                 lower_limits: derivative_map,
+                 upper_limits: derivative_map):
+        self.name = name
+        self.parent_link_name = parent_link_name
+        self.child_link_name = child_link_name
+        self._parent_T_child = parent_T_child
+        self.axis = axis
+        self.free_variable = FreeVariable(name=self.name,
+                                          god_map=self.god_map,
+                                          lower_limits=lower_limits,
+                                          upper_limits=upper_limits)
+        self.free_variables = [self.free_variable]
 
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
         for free_variable in self.free_variables:
@@ -200,11 +233,18 @@ class OneDofJoint(ActuatedJoint):
         self._parent_T_child = new_parent_T_child
 
     def update_derivative_limits(self, derivative: Derivatives, new_limit: w.symbol_expr_float):
-        self.free_variables[0].set_lower_limit(derivative=derivative, limit=-new_limit)
-        self.free_variables[0].set_upper_limit(derivative=derivative, limit=new_limit)
+        self.free_variable.set_lower_limit(derivative=derivative, limit=-new_limit)
+        self.free_variable.set_upper_limit(derivative=derivative, limit=new_limit)
+
+    def set_god_map_limits(self):
+        for derivative in range(Derivatives.jerk):
+            self.god_map.to_symbol(identifier.joint_limits + [derivative] + [self.name])
 
     def update_derivative_weight(self, derivative: Derivatives, new_weight: w.symbol_expr_float):
-        self.free_variables[0].quadratic_weights[derivative] = new_weight
+        self.free_variable.quadratic_weights[derivative] = new_weight
+
+    def get_limit_expressions(self, order: Derivatives) -> Optional[Tuple[w.Expression, w.Expression]]:
+        return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
 
 
 class FixedJoint(Joint):
@@ -213,7 +253,7 @@ class FixedJoint(Joint):
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
-        self._parent_T_child = parent_T_child
+        self._parent_T_child = w.TransMatrix(parent_T_child)
 
     def update_parent_T_child(self, new_parent_T_child: w.TransMatrix):
         self._parent_T_child = new_parent_T_child
@@ -226,77 +266,39 @@ class FixedJoint(Joint):
 class RevoluteJoint(OneDofJoint):
     axis: Tuple[float, float, float]
 
-    def __init__(self,
-                 name: PrefixName,
-                 parent_link_name: PrefixName,
-                 child_link_name: PrefixName,
-                 axis: Tuple[float, float, float],
-                 parent_T_child: w.TransMatrix,
-                 lower_limits: derivative_map,
-                 upper_limits: derivative_map):
-        self.name = name
-        self.parent_link_name = parent_link_name
-        self.child_link_name = child_link_name
-        self._parent_T_child = parent_T_child
-        self.axis = axis
-        self.rotation = FreeVariable(name=self.name,
-                                     god_map=self.god_map,
-                                     lower_limits=lower_limits,
-                                     upper_limits=upper_limits)
-        self.free_variables.append(self.rotation)
-
     @cached_property
     def parent_T_child(self):
         rotation_axis = w.Vector3(self.axis)
-        parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis, self.rotation.get_symbol(Derivatives.position))
+        parent_R_child = w.RotationMatrix.from_axis_angle(rotation_axis,
+                                                          self.free_variable.get_symbol(Derivatives.position))
         return self._parent_T_child.dot(w.TransMatrix(parent_R_child))
 
     def set_initial_state(self):
-        lower_limit = self.rotation.get_lower_limit(derivative=Derivatives.position,
-                                                    evaluated=True)
-        upper_limit = self.rotation.get_upper_limit(derivative=Derivatives.position,
-                                                    evaluated=True)
+        lower_limit = self.free_variable.get_lower_limit(derivative=Derivatives.position,
+                                                         evaluated=True)
+        upper_limit = self.free_variable.get_upper_limit(derivative=Derivatives.position,
+                                                         evaluated=True)
         center = (upper_limit + lower_limit) / 2
-        self.world.world_state[self.rotation.name].position = center
+        self.world.world_state[self.free_variable.name].position = center
 
 
 class PrismaticJoint(OneDofJoint):
-    axis: Tuple[float, float, float]
-
-    def __init__(self,
-                 name: PrefixName,
-                 parent_link_name: PrefixName,
-                 child_link_name: PrefixName,
-                 axis: Tuple[float, float, float],
-                 parent_T_child: w.TransMatrix,
-                 lower_limits: derivative_map,
-                 upper_limits: derivative_map):
-        self.name = name
-        self.parent_link_name = parent_link_name
-        self.child_link_name = child_link_name
-        self._parent_T_child = parent_T_child
-        self.axis = axis
-        self.translation = FreeVariable(name=self.name,
-                                        god_map=self.god_map,
-                                        lower_limits=lower_limits,
-                                        upper_limits=upper_limits)
-        self.free_variables.append(self.translation)
 
     @property
     def parent_T_child(self) -> w.TransMatrix:
-        translation_axis = w.Point3(self.axis) * self.translation.get_symbol(Derivatives.position)
+        translation_axis = w.Point3(self.axis) * self.free_variable.get_symbol(Derivatives.position)
         parent_T_child = w.TransMatrix.from_xyz_rpy(x=translation_axis[0],
                                                     y=translation_axis[1],
                                                     z=translation_axis[2])
         return self._parent_T_child.dot(parent_T_child)
 
     def set_initial_state(self):
-        lower_limit = self.translation.get_lower_limit(derivative=Derivatives.position,
-                                                       evaluated=True)
-        upper_limit = self.translation.get_upper_limit(derivative=Derivatives.position,
-                                                       evaluated=True)
+        lower_limit = self.free_variable.get_lower_limit(derivative=Derivatives.position,
+                                                         evaluated=True)
+        upper_limit = self.free_variable.get_upper_limit(derivative=Derivatives.position,
+                                                         evaluated=True)
         center = (upper_limit + lower_limit) / 2
-        self.world.world_state[self.translation.name].position = center
+        self.world.world_state[self.free_variable.name].position = center
 
 
 # class ContinuousJoint(OneDofJoint):
@@ -450,6 +452,25 @@ class OmniDrive(ActuatedJoint):
         self.translation_variables: List[FreeVariable] = []
         self.orientation_variables: List[FreeVariable] = []
 
+    @property
+    def parent_T_child(self) -> w.TransMatrix:
+        odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
+                                               y=self.y.get_symbol(Derivatives.position),
+                                               yaw=self.yaw.get_symbol(Derivatives.position))
+        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
+                                                 y=self.y_vel.get_symbol(Derivatives.position),
+                                                 yaw=self.yaw_vel.get_symbol(Derivatives.position))
+        bf_vel_T_bf = w.TransMatrix.from_xyz_rpy(x=0,
+                                                 y=0,
+                                                 z=self.translation_variables[2].get_symbol(Derivatives.position),
+                                                 roll=self.orientation_variables[0].get_symbol(Derivatives.position),
+                                                 pitch=self.orientation_variables[1].get_symbol(Derivatives.position),
+                                                 yaw=0)
+        return odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
+
+    def update_parent_T_child(self, new_parent_T_child: w.TransMatrix):
+        pass
+
     def create_free_variables(self):
         translation_upper_limits = {}
         if self.translation_velocity_limit is not None:
@@ -498,22 +519,6 @@ class OmniDrive(ActuatedJoint):
     def position_variable_names(self):
         return [self.x_name, self.y_name, self.yaw_name]
 
-    @profile
-    def _joint_transformation(self):
-        odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
-                                               y=self.y.get_symbol(Derivatives.position),
-                                               yaw=self.yaw.get_symbol(Derivatives.position))
-        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
-                                                 y=self.y_vel.get_symbol(Derivatives.position),
-                                                 yaw=self.yaw_vel.get_symbol(Derivatives.position))
-        bf_vel_T_bf = w.TransMatrix.from_xyz_rpy(x=0,
-                                                 y=0,
-                                                 z=self.translation_variables[2].get_symbol(Derivatives.position),
-                                                 roll=self.orientation_variables[0].get_symbol(Derivatives.position),
-                                                 pitch=self.orientation_variables[1].get_symbol(Derivatives.position),
-                                                 yaw=0)
-        return odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
-
     @property
     def x(self):
         return self.translation_variables[0]
@@ -552,7 +557,7 @@ class OmniDrive(ActuatedJoint):
 
     def update_state(self, new_cmds: derivative_joint_map, dt: float):
         state = self.world.state
-        for free_variable in self.free_variable_list:
+        for free_variable in self.free_variables:
             try:
                 vel = new_cmds[Derivatives.velocity][free_variable.position_name]
             except KeyError as e:
@@ -611,19 +616,15 @@ class OmniDrive(ActuatedJoint):
                 # can't do "if in", because the dict may be a defaultdict
                 pass
 
-    def get_limit_expressions(self, order: int) -> Tuple[
-        Optional[Union[w.Symbol, float]], Optional[Union[w.Symbol, float]]]:
-        return None, None
-
     def has_free_variables(self) -> bool:
         return True
 
     @property
-    def free_variable_list(self) -> List[FreeVariable]:
+    def free_variables(self) -> List[FreeVariable]:
         return [self.x_vel, self.y_vel, self.yaw_vel]
 
     def _all_symbols(self) -> List[FreeVariable]:
-        return self.free_variable_list + self.translation_variables + self.orientation_variables
+        return self.free_variables + self.translation_variables + self.orientation_variables
 
 
 class DiffDrive(ActuatedJoint):

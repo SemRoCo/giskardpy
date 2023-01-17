@@ -18,7 +18,7 @@ class KinSimPlugin(GiskardBehavior):
     def update(self):
         next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
         joints = self.world.joints
-        for joint_name in self.world.movable_joints:
+        for joint_name in self.world.movable_joint_names:
             joints[joint_name].update_state(next_cmds, self.sample_period)
         self.world.notify_state_change()
         return Status.RUNNING

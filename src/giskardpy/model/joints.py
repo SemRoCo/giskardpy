@@ -176,6 +176,9 @@ class OneDofJoint(Joint):
         else:
             self.free_variable = self.world.add_free_variable(free_variable_name, lower_limits, upper_limits)
 
+    def get_symbol(self, derivative: Derivatives):
+        return self.free_variable.get_symbol(derivative) * self.multiplier + self.offset
+
     def get_limit_expressions(self, order: Derivatives) -> Optional[Tuple[w.Expression, w.Expression]]:
         return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
 

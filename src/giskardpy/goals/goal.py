@@ -124,7 +124,7 @@ class Goal(ABC):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
         joint = self.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            return joint.free_variable.get_symbol(Derivatives.position)
+            return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
     @property

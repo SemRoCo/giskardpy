@@ -444,8 +444,8 @@ class WorldTree(WorldTreeInterface):
                                                         evaluated=True)
             upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position,
                                                         evaluated=True)
-            center = (upper_limit + lower_limit) / 2
-            self.state[name].position = center
+            initial_value = min(max(0, lower_limit), upper_limit)
+            self.state[name].position = initial_value
         self.free_variables[name] = free_variable
         return free_variable
 

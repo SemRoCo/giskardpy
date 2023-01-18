@@ -7,6 +7,7 @@ from giskardpy.configs.default_giskard import Giskard
 class HSR_Base(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
+        self.configure_PlotTrajectory(enabled=True)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/hsrb.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                       hard_threshold=0.0)

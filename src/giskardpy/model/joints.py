@@ -90,13 +90,13 @@ def urdf_to_joint(urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, Revolu
         else:
             upper_limits[derivative] = limit_symbol
 
+    multiplier = None
+    offset = None
     if urdf_joint.mimic is not None:
         multiplier = urdf_joint.mimic.multiplier
         offset = urdf_joint.mimic.offset
         free_variable_name = PrefixName(urdf_joint.mimic.joint, prefix)
     else:
-        multiplier = 1
-        offset = 0
         free_variable_name = joint_name
     return joint_class(name=joint_name,
                        free_variable_name=free_variable_name,
@@ -145,6 +145,7 @@ class OneDofJoint(Joint):
     axis: Tuple[float, float, float]
     multiplier: float
     offset: float
+    free_variable: FreeVariable
 
     def __init__(self,
                  name: PrefixName,
@@ -155,14 +156,20 @@ class OneDofJoint(Joint):
                  parent_T_child: w.TransMatrix,
                  lower_limits: derivative_map,
                  upper_limits: derivative_map,
-                 multiplier: float = 1,
-                 offset: float = 0):
+                 multiplier: Optional[float] = None,
+                 offset: Optional[float] = None):
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
         self.parent_T_child = parent_T_child
-        self.multiplier = multiplier
-        self.offset = offset
+        if multiplier is None:
+            self.multiplier = 1
+        else:
+            self.multiplier = multiplier
+        if offset is None:
+            self.offset = 0
+        else:
+            self.offset = offset
         self.axis = axis
         if free_variable_name in self.world.free_variables:
             self.free_variable = self.world.free_variables[free_variable_name]

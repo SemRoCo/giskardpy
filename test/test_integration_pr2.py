@@ -4055,50 +4055,6 @@ class TestWorld:
         assert world_setup.get_controlled_parent_joint_of_joint(
             world_setup.search_for_joint_name('torso_lift_joint')) == 'pr2/brumbrum'
 
-    def test_get_all_joint_limits(self, world_setup: WorldTree):
-        assert world_setup.get_all_joint_position_limits() == {'pr2/bl_caster_l_wheel_joint': (None, None),
-                                                               'pr2/bl_caster_r_wheel_joint': (None, None),
-                                                               'pr2/bl_caster_rotation_joint': (None, None),
-                                                               'pr2/br_caster_l_wheel_joint': (None, None),
-                                                               'pr2/br_caster_r_wheel_joint': (None, None),
-                                                               'pr2/br_caster_rotation_joint': (None, None),
-                                                               'pr2/fl_caster_l_wheel_joint': (None, None),
-                                                               'pr2/fl_caster_r_wheel_joint': (None, None),
-                                                               'pr2/fl_caster_rotation_joint': (None, None),
-                                                               'pr2/fr_caster_l_wheel_joint': (None, None),
-                                                               'pr2/fr_caster_r_wheel_joint': (None, None),
-                                                               'pr2/fr_caster_rotation_joint': (None, None),
-                                                               'pr2/brumbrum': (None, None),
-                                                               'pr2/head_pan_joint': (-2.857, 2.857),
-                                                               'pr2/head_tilt_joint': (-0.3712, 1.29626),
-                                                               'pr2/l_elbow_flex_joint': (-2.1213, -0.15),
-                                                               'pr2/l_forearm_roll_joint': (None, None),
-                                                               'pr2/l_gripper_joint': (0.0, 0.088),
-                                                               'pr2/l_gripper_l_finger_joint': (0.0, 0.548),
-                                                               'pr2/l_gripper_motor_screw_joint': (None, None),
-                                                               'pr2/l_gripper_motor_slider_joint': (-0.1, 0.1),
-                                                               'pr2/l_shoulder_lift_joint': (-0.3536, 1.2963),
-                                                               'pr2/l_shoulder_pan_joint': (
-                                                                   -0.564601836603, 2.1353981634),
-                                                               'pr2/l_upper_arm_roll_joint': (-0.65, 3.75),
-                                                               'pr2/l_wrist_flex_joint': (-2.0, -0.1),
-                                                               'pr2/l_wrist_roll_joint': (None, None),
-                                                               'pr2/laser_tilt_mount_joint': (-0.7354, 1.43353),
-                                                               'pr2/r_elbow_flex_joint': (-2.1213, -0.15),
-                                                               'pr2/r_forearm_roll_joint': (None, None),
-                                                               'pr2/r_gripper_joint': (0.0, 0.088),
-                                                               'pr2/r_gripper_l_finger_joint': (0.0, 0.548),
-                                                               'pr2/r_gripper_motor_screw_joint': (None, None),
-                                                               'pr2/r_gripper_motor_slider_joint': (-0.1, 0.1),
-                                                               'pr2/r_shoulder_lift_joint': (-0.3536, 1.2963),
-                                                               'pr2/r_shoulder_pan_joint': (
-                                                                   -2.1353981634, 0.564601836603),
-                                                               'pr2/r_upper_arm_roll_joint': (-3.75, 0.65),
-                                                               'pr2/r_wrist_flex_joint': (-2.0, -0.1),
-                                                               'pr2/r_wrist_roll_joint': (None, None),
-                                                               'pr2/torso_lift_joint': (0.0115, 0.325),
-                                                               'pr2/torso_lift_motor_screw_joint': (None, None)}
-
     def test_possible_collision_combinations(self, world_setup: WorldTree):
         result = world_setup.groups[world_setup.robot_names[0]].possible_collision_combinations()
         reference = {world_setup.sort_links(link_a, link_b) for link_a, link_b in

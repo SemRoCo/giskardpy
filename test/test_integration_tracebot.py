@@ -74,11 +74,11 @@ class TracebotTestWrapperMujoco(GiskardTestWrapper):
 
 
 class TestCartGoals:
-    def test_drive(self, zero_pose: TracebotTestWrapper):
+    def test_move_left_hand(self, zero_pose: TracebotTestWrapper):
         tip = 'left_tool0'
         goal = PoseStamped()
         goal.header.frame_id = tip
-        goal.pose.position.x = 0.05
+        goal.pose.position.x = 0.1
         # goal.pose.position.y = 1
         goal.pose.orientation.w = 1
         # goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))

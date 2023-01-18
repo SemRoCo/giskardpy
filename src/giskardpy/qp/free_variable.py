@@ -5,6 +5,7 @@ import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import Derivatives, PrefixName
+from giskardpy.utils.utils import blackboard_god_map
 
 
 class FreeVariable:
@@ -12,12 +13,11 @@ class FreeVariable:
 
     def __init__(self,
                  name: PrefixName,
-                 god_map: GodMap,
                  lower_limits: Dict[Derivatives, float],
                  upper_limits: Dict[Derivatives, float],
                  quadratic_weights: Optional[Dict[Derivatives, float]] = None,
                  horizon_functions: Optional[Dict[Derivatives, float]] = None):
-        self.god_map = god_map
+        self.god_map = blackboard_god_map()
         self._symbols = {}
         self.name = name
         for derivative in Derivatives:

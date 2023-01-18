@@ -22,7 +22,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
-    urdf_to_joint
+    urdf_to_joint, VirtualFreeVariables
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
@@ -30,7 +30,7 @@ from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo
+from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo, blackboard_god_map
 
 
 class TravelCompanion:
@@ -119,10 +119,11 @@ class WorldTree(WorldTreeInterface):
     links: Dict[PrefixName, Link]
     state: JointStates
     free_variables: Dict[PrefixName, FreeVariable]
+    virtual_free_variables: Dict[PrefixName, FreeVariable]
 
-    def __init__(self, root_link_name: PrefixName, god_map: GodMap):
+    def __init__(self, root_link_name: PrefixName):
         self.root_link_name = root_link_name
-        self.god_map = god_map
+        self.god_map = blackboard_god_map()
         self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
@@ -438,13 +439,24 @@ class WorldTree(WorldTreeInterface):
         free_variable = FreeVariable(name=name,
                                      lower_limits=lower_limits,
                                      upper_limits=upper_limits)
-        lower_limit = free_variable.get_lower_limit(derivative=Derivatives.position,
-                                                    evaluated=True)
-        upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position,
-                                                    evaluated=True)
-        center = (upper_limit + lower_limit) / 2
-        self.state[name].position = center
+        if free_variable.has_position_limits():
+            lower_limit = free_variable.get_lower_limit(derivative=Derivatives.position,
+                                                        evaluated=True)
+            upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position,
+                                                        evaluated=True)
+            center = (upper_limit + lower_limit) / 2
+            self.state[name].position = center
         self.free_variables[name] = free_variable
+        return free_variable
+
+    def add_virtual_free_variable(self,
+                                  name: PrefixName,
+                                  lower_limits: derivative_map,
+                                  upper_limits: derivative_map) -> FreeVariable:
+        free_variable = FreeVariable(name=name,
+                                     lower_limits=lower_limits,
+                                     upper_limits=upper_limits)
+        self.virtual_free_variables[name] = free_variable
         return free_variable
 
     def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
@@ -459,6 +471,9 @@ class WorldTree(WorldTreeInterface):
             for derivative, cmd in new_cmds.items():
                 cmd_ = cmd[free_variable.position_name]
                 self.state[free_variable_name][derivative] = cmd_
+        for joint in self.joints.values():
+            if isinstance(joint, VirtualFreeVariables):
+                joint.update_state(dt)
         self.notify_state_change()
 
     def add_urdf(self,
@@ -748,6 +763,7 @@ class WorldTree(WorldTreeInterface):
         self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
         self.free_variables = {}
+        self.virtual_free_variables = {}
         self.groups: Dict[my_string, WorldBranch] = {}
         self.reset_cache()
 
@@ -757,7 +773,8 @@ class WorldTree(WorldTreeInterface):
         """
         self._clear()
         joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
-        for joint in joints_to_add:
+        for joint_class, kwargs in joints_to_add:
+            joint = joint_class(**kwargs)
             self._add_joint_and_create_child(joint)
         robot_config: RobotInterfaceConfig
         for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):

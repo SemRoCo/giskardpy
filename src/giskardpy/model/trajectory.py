@@ -65,7 +65,7 @@ class Trajectory:
             p.time_from_start = rospy.Duration(time * sample_period)
             for joint in joints:
                 if isinstance(joint, OmniDrive):
-                    free_variables = joint.position_variable_names
+                    free_variables = [joint.x.name, joint.y.name, joint.yaw.name]
                 else:
                     free_variables = [joint.free_variable.name]
                 for free_variable in free_variables:

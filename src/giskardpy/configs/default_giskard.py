@@ -1,6 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple, Type, Any
 
 import numpy as np
 import rospy
@@ -20,7 +20,7 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string, PrefixName, Derivatives
+from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
@@ -28,7 +28,8 @@ from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 
 class Giskard:
-    def __init__(self):
+    def __init__(self, root_link_name: Optional[str] = None):
+        self._root_link_name = PrefixName.from_string(root_link_name, set_none_if_no_slash=True)
         self._collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
         self._general_config: GeneralConfig = GeneralConfig()
         self._qp_solver_config: QPSolverConfig = QPSolverConfig()
@@ -38,10 +39,10 @@ class Giskard:
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
         self._god_map.set_data(identifier.joints_to_add, [])
-        self._controlled_joints = []
-        self._root_link_name = None
         blackboard = Blackboard
         blackboard.god_map = self._god_map
+        self.world = WorldTree(self._root_link_name)
+        self._controlled_joints = []
         self._backup = {}
         self.goal_package_paths = ['giskardpy.goals']
 
@@ -51,12 +52,6 @@ class Giskard:
             raise GiskardException(f'No classes of type \'Goal\' found in {package_name}')
         logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
         self.goal_package_paths.append(package_name)
-
-    def set_root_link_name(self, link_name: str):
-        """
-        Set the name of the root link of the world. Only required in standalone mode.
-        """
-        self._root_link_name = PrefixName.from_string(link_name, set_none_if_no_slash=True)
 
     def _get_collision_avoidance_config(self, group_name: Optional[str] = None):
         if group_name is None:
@@ -168,7 +163,7 @@ class Giskard:
     def publish_all_tf(self):
         self.behavior_tree_config.plugin_config['TFPublisher']['mode'] = TfPublishingModes.all
 
-    def _add_joint(self, joint: Joint):
+    def _add_joint(self, joint: Tuple[Type, Dict[str, Any]]):
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
         joints.append(joint)
 
@@ -186,10 +181,10 @@ class Giskard:
         parent_link = PrefixName.from_string(parent_link, set_none_if_no_slash=True)
         child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
         joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
-        joint = FixedJoint(name=joint_name,
-                           parent_link_name=parent_link,
-                           child_link_name=child_link,
-                           parent_T_child=homogenous_transform)
+        joint = (FixedJoint, {'name': joint_name,
+                              'parent_link_name': parent_link,
+                              'child_link_name': child_link,
+                              'parent_T_child': homogenous_transform})
         self._add_joint(joint)
 
     def add_sync_tf_frame(self, parent_link: str, child_link: str):
@@ -228,20 +223,13 @@ class Giskard:
                                                                                'fill_velocity_values': fill_velocity_values})
 
     def add_omni_drive_joint(self,
+                             name: str,
                              parent_link_name: str,
                              child_link_name: str,
                              robot_group_name: Optional[str] = None,
-                             name: Optional[str] = 'brumbrum',
                              odometry_topic: Optional[str] = None,
-                             translation_velocity_limit: Optional[float] = 0.2,
-                             rotation_velocity_limit: Optional[float] = 0.2,
-                             translation_acceleration_limit: Optional[float] = None,
-                             rotation_acceleration_limit: Optional[float] = None,
-                             translation_jerk_limit: Optional[float] = 5,
-                             rotation_jerk_limit: Optional[float] = 10,
-                             odom_x_name: Optional[str] = 'odom_x',
-                             odom_y_name: Optional[str] = 'odom_y',
-                             odom_yaw_name: Optional[str] = 'odom_yaw'):
+                             translation_limits: Optional[derivative_map] = None,
+                             rotation_limits: Optional[derivative_map] = None):
         """
         Use this to connect a robot urdf of a mobile robot to the world if it has an omni-directional drive.
         :param parent_link_name:
@@ -249,35 +237,23 @@ class Giskard:
         :param robot_group_name: set if there are multiple robots
         :param name: Name of the new link. Has to be unique and may be required in other functions.
         :param odometry_topic: where the odometry gets published
-        :param translation_velocity_limit: in m/s
-        :param rotation_velocity_limit: in rad/s
-        :param translation_acceleration_limit: in m/s**2
-        :param rotation_acceleration_limit: in rad/s**2
-        :param translation_jerk_limit: in m/s**3
-        :param rotation_jerk_limit: in rad/s**3
-        :param odom_x_name: how the degree of freedom along the x-axis is called
-        :param odom_y_name: how the degree of freedom along the y-axis is called
-        :param odom_yaw_name: how the degree of freedom about the z-axis is called
+        :param translation_limit: in m/s**3
+        :param rotation_limit: in rad/s**3
         """
         if robot_group_name is None:
             robot_group_name = self.get_default_group_name()
-        brumbrum_joint = OmniDrive(parent_link_name=parent_link_name,
-                                   child_link_name=PrefixName(child_link_name, robot_group_name),
-                                   name=name,
-                                   group_name=robot_group_name,
-                                   odom_x_name=odom_x_name,
-                                   odom_y_name=odom_y_name,
-                                   odom_yaw_name=odom_yaw_name,
-                                   translation_velocity_limit=translation_velocity_limit,
-                                   rotation_velocity_limit=rotation_velocity_limit,
-                                   translation_acceleration_limit=translation_acceleration_limit,
-                                   rotation_acceleration_limit=rotation_acceleration_limit,
-                                   translation_jerk_limit=translation_jerk_limit,
-                                   rotation_jerk_limit=rotation_jerk_limit)
+        joint_name = PrefixName(name, robot_group_name)
+        parent_link_name = PrefixName(parent_link_name, None)
+        child_link_name = PrefixName(child_link_name, robot_group_name)
+        brumbrum_joint = (OmniDrive, {'parent_link_name': parent_link_name,
+                                      'child_link_name': child_link_name,
+                                      'name': joint_name,
+                                      'translation_limits': translation_limits,
+                                      'rotation_limits': rotation_limits})
         self._add_joint(brumbrum_joint)
         if odometry_topic is not None:
             self._add_odometry_topic(odometry_topic=odometry_topic,
-                                     joint_name=brumbrum_joint.name)
+                                     joint_name=joint_name)
 
     def get_default_group_name(self):
         """
@@ -389,11 +365,10 @@ class Giskard:
         self._create_parameter_backup()
         if self._root_link_name is None:
             self._root_link_name = tf.get_tf_root()
-        world = WorldTree(self._root_link_name, self._god_map)
-        world.delete_all_but_robots()
-        world.register_controlled_joints(self._controlled_joints)
+        self.world.delete_all_but_robots()
+        self.world.register_controlled_joints(self._controlled_joints)
 
-        collision_scene = self._create_collision_checker(world)
+        collision_scene = self._create_collision_checker(self.world)
         self._god_map.set_data(identifier.collision_checker, self._collision_checker)
         self._god_map.set_data(identifier.collision_scene, collision_scene)
         if self._general_config.control_mode == ControlModes.open_loop:
@@ -429,10 +404,6 @@ class Giskard:
                         f'but not flagged as controlled: {non_controlled_joints}.')
         if len(self.hardware_config.send_trajectory_to_cmd_vel_kwargs) == 0:
             logging.loginfo('No cmd_vel topic has been registered.')
-
-    @property
-    def world(self) -> WorldTree:
-        return self._god_map.get_data(identifier.world)
 
     def live(self):
         """

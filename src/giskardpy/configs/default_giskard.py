@@ -436,7 +436,7 @@ class Giskard:
         :param b: 0-1
         :param a: 0-1
         """
-        self._general_config.default_link_color = ColorRGBA(r, g, b, a)
+        self.world.default_link_color = ColorRGBA(r, g, b, a)
 
     def set_control_mode(self, mode: ControlModes):
         self._general_config.control_mode = mode

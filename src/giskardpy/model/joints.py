@@ -13,6 +13,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.utils.math import rpy_from_quaternion
 from giskardpy.utils.utils import blackboard_god_map
 
 
@@ -324,6 +325,19 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         self.yaw_vel = self.world.add_free_variable(name=PrefixName('yaw_vel', self.name),
                                                     lower_limits=rotation_lower_limits,
                                                     upper_limits=self.rotation_limits)
+
+    def update_transform(self, new_parent_T_child: Pose):
+        roll, pitch, yaw = rpy_from_quaternion(new_parent_T_child.orientation.x,
+                                               new_parent_T_child.orientation.y,
+                                               new_parent_T_child.orientation.z,
+                                               new_parent_T_child.orientation.w)
+        self.last_msg = JointStates()
+        self.world.state[self.x.name].position = new_parent_T_child.position.x
+        self.world.state[self.y.name].position = new_parent_T_child.position.y
+        self.world.state[self.z.name].position = new_parent_T_child.position.z
+        self.world.state[self.roll.name].position = roll
+        self.world.state[self.pitch.name].position = pitch
+        self.world.state[self.yaw.name].position = yaw
 
     def update_state(self, dt: float):
         state = self.world.state

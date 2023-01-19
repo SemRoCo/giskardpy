@@ -69,15 +69,15 @@ class SyncOdometry(GiskardBehavior):
                                                    pose.orientation.z,
                                                    pose.orientation.w)
             self.last_msg = JointStates()
-            self.world.state[self.joint.x_name].position = pose.position.x
-            self.world.state[self.joint.y_name].position = pose.position.y
+            self.world.state[self.joint.x.name].position = pose.position.x
+            self.world.state[self.joint.y.name].position = pose.position.y
             try:
-                self.world.state[self.joint.z_name].position = pose.position.z
-                self.world.state[self.joint.roll_name].position = roll
-                self.world.state[self.joint.pitch_name].position = pitch
+                self.world.state[self.joint.z.name].position = pose.position.z
+                self.world.state[self.joint.roll.name].position = roll
+                self.world.state[self.joint.pitch.name].position = pitch
             except:
                 pass
-            self.world.state[self.joint.yaw_name].position = yaw
+            self.world.state[self.joint.yaw.name].position = yaw
             # q = quaternion_from_rpy(roll, pitch, 0)
             # self.world.state[joint.qx_name].position = q[0]
             # self.world.state[joint.qy_name].position = q[1]

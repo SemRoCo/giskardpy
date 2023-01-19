@@ -103,13 +103,14 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         for joint in self.world.joints.values():
             if isinstance(joint, OneDofJoint):
-                if joint.free_variables[0].name in controlled_joint_names:
+                if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)
-                    controlled_joint_names.remove(joint.free_variables[0].name)
+                    controlled_joint_names.remove(joint.free_variable.name)
             elif isinstance(joint, OmniDrive):
-                if set(controlled_joint_names) == set(joint.position_variable_names):
+                degrees_of_freedom = {joint.x.name, joint.y.name, joint.yaw.name}
+                if set(controlled_joint_names) == degrees_of_freedom:
                     self.controlled_joints.append(joint)
-                    for position_variable in joint.position_variable_names:
+                    for position_variable in degrees_of_freedom:
                         controlled_joint_names.remove(position_variable)
         if len(controlled_joint_names) > 0:
             raise ValueError(f'{state_topic} provides the following joints '

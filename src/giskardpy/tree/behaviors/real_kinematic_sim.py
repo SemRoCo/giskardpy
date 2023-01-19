@@ -23,8 +23,7 @@ class RealKinSimPlugin(GiskardBehavior):
         # next_time = rospy.get_rostime()
         dt = next_time - self.last_time
         # print(f'dt: {dt}')
-        for joint_name in self.world.controlled_joints:
-            joints[joint_name].update_state(next_cmds, dt)
+        self.world.update_state(next_cmds, dt)
         self.last_time = next_time
         self.world.notify_state_change()
         return Status.RUNNING

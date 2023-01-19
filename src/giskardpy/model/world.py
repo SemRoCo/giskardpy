@@ -22,7 +22,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
-    urdf_to_joint, VirtualFreeVariables
+    urdf_to_joint, VirtualFreeVariables, MovableJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
@@ -79,7 +79,7 @@ class WorldTreeInterface(ABC):
 
     @cached_property
     def movable_joint_names(self) -> List[PrefixName]:
-        return [j.name for j in self.joints.values() if not isinstance(j, FixedJoint)]
+        return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
 
     @cached_property
     def link_names_as_set(self) -> Set[PrefixName]:
@@ -449,13 +449,10 @@ class WorldTree(WorldTreeInterface):
         self.free_variables[name] = free_variable
         return free_variable
 
-    def add_virtual_free_variable(self,
-                                  name: PrefixName,
-                                  lower_limits: derivative_map,
-                                  upper_limits: derivative_map) -> FreeVariable:
+    def add_virtual_free_variable(self, name: PrefixName) -> FreeVariable:
         free_variable = FreeVariable(name=name,
-                                     lower_limits=lower_limits,
-                                     upper_limits=upper_limits)
+                                     lower_limits={},
+                                     upper_limits={})
         self.virtual_free_variables[name] = free_variable
         return free_variable
 

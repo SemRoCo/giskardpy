@@ -17,7 +17,7 @@ from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive
+from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, TFJoint
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
@@ -29,7 +29,10 @@ from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 class Giskard:
     def __init__(self, root_link_name: Optional[str] = None):
-        self._root_link_name = PrefixName.from_string(root_link_name, set_none_if_no_slash=True)
+        if root_link_name is not None:
+            self._root_link_name = PrefixName.from_string(root_link_name, set_none_if_no_slash=True)
+        else:
+            self._root_link_name = PrefixName(tf.get_tf_root(), None)
         self._collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb
         self._general_config: GeneralConfig = GeneralConfig()
         self._qp_solver_config: QPSolverConfig = QPSolverConfig()
@@ -187,6 +190,22 @@ class Giskard:
                               'parent_T_child': homogenous_transform})
         self._add_joint(joint)
 
+    def _add_tf_joint(self, parent_link: my_string, child_link: my_string):
+        """
+        Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
+        :param parent_link:
+        :param child_link:
+        :param homogenous_transform: a 4x4 transformation matrix.
+        """
+        parent_link = PrefixName.from_string(parent_link, set_none_if_no_slash=True)
+        child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
+        joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
+        joint = (TFJoint, {'name': joint_name,
+                           'parent_link_name': parent_link,
+                           'child_link_name': child_link})
+        self._add_joint(joint)
+        return joint_name
+
     def add_sync_tf_frame(self, parent_link: str, child_link: str):
         """
         Tell Giskard to keep track of tf frames, e.g., for robot localization.
@@ -195,8 +214,8 @@ class Giskard:
         """
         if not tf.wait_for_transform(parent_link, child_link, rospy.Time(), rospy.Duration(1)):
             raise LookupException(f'Cannot get transform of {parent_link}<-{child_link}')
-        self.add_fixed_joint(parent_link=parent_link, child_link=child_link)
-        self.behavior_tree_config.add_sync_tf_frame(parent_link, child_link)
+        joint_name = self._add_tf_joint(parent_link=parent_link, child_link=child_link)
+        self.behavior_tree_config.add_sync_tf_frame(joint_name)
 
     def _add_odometry_topic(self, odometry_topic: str, joint_name: str):
         self.hardware_config.odometry_node_kwargs.append({'odometry_topic': odometry_topic,
@@ -363,8 +382,6 @@ class Giskard:
         if len(self.robot_interface_configs) == 0:
             self.add_robot_from_parameter_server()
         self._create_parameter_backup()
-        if self._root_link_name is None:
-            self._root_link_name = tf.get_tf_root()
         self.world.delete_all_but_robots()
         self.world.register_controlled_joints(self._controlled_joints)
 

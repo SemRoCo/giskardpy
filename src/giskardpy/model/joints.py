@@ -5,6 +5,7 @@ from typing import Dict, Tuple, Optional, List, Union, Type
 from functools import cached_property
 import numpy as np
 import urdf_parser_py.urdf as up
+from geometry_msgs.msg import PoseStamped, Pose
 
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
@@ -132,6 +133,9 @@ class VirtualFreeVariables(ABC):
     def update_state(self, dt: float): ...
 
 
+class MovableJoint(Joint): ...
+
+
 class FixedJoint(Joint):
     def __init__(self, name: PrefixName, parent_link_name: PrefixName, child_link_name: PrefixName,
                  parent_T_child: w.TransMatrix):
@@ -141,7 +145,39 @@ class FixedJoint(Joint):
         self.parent_T_child = w.TransMatrix(parent_T_child)
 
 
-class OneDofJoint(Joint):
+class TFJoint(Joint):
+    def __init__(self, name: PrefixName, parent_link_name: PrefixName, child_link_name: PrefixName):
+        self.name = name
+        self.parent_link_name = parent_link_name
+        self.child_link_name = child_link_name
+        self.x = self.world.add_virtual_free_variable(name=PrefixName('x', self.name))
+        self.y = self.world.add_virtual_free_variable(name=PrefixName('y', self.name))
+        self.z = self.world.add_virtual_free_variable(name=PrefixName('z', self.name))
+        self.qx = self.world.add_virtual_free_variable(name=PrefixName('qx', self.name))
+        self.qy = self.world.add_virtual_free_variable(name=PrefixName('qy', self.name))
+        self.qz = self.world.add_virtual_free_variable(name=PrefixName('qz', self.name))
+        self.qw = self.world.add_virtual_free_variable(name=PrefixName('qw', self.name))
+        self.world.state[self.qw.name].position = 1
+        parent_P_child = w.Point3((self.x.get_symbol(Derivatives.position),
+                                   self.y.get_symbol(Derivatives.position),
+                                   self.z.get_symbol(Derivatives.position)))
+        parent_R_child = w.Quaternion((self.qx.get_symbol(Derivatives.position),
+                                       self.qy.get_symbol(Derivatives.position),
+                                       self.qz.get_symbol(Derivatives.position),
+                                       self.qw.get_symbol(Derivatives.position))).to_rotation_matrix()
+        self.parent_T_child = w.TransMatrix.from_point_rotation_matrix(parent_P_child, parent_R_child)
+
+    def update_transform(self, new_child_T_parent: Pose):
+        self.world.state[self.x.name].position = new_child_T_parent.position.x
+        self.world.state[self.y.name].position = new_child_T_parent.position.y
+        self.world.state[self.z.name].position = new_child_T_parent.position.z
+        self.world.state[self.qx.name].position = new_child_T_parent.orientation.x
+        self.world.state[self.qy.name].position = new_child_T_parent.orientation.y
+        self.world.state[self.qz.name].position = new_child_T_parent.orientation.z
+        self.world.state[self.qw.name].position = new_child_T_parent.orientation.w
+
+
+class OneDofJoint(MovableJoint):
     axis: Tuple[float, float, float]
     multiplier: float
     offset: float
@@ -211,7 +247,7 @@ class PrismaticJoint(OneDofJoint):
         self.parent_T_child = self.parent_T_child.dot(parent_T_child)
 
 
-class OmniDrive(Joint, VirtualFreeVariables):
+class OmniDrive(MovableJoint, VirtualFreeVariables):
     x: FreeVariable
     y: FreeVariable
     z: FreeVariable
@@ -271,25 +307,13 @@ class OmniDrive(Joint, VirtualFreeVariables):
         translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
         rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
 
-        self.x = self.world.add_virtual_free_variable(name=PrefixName('x', self.name),
-                                                      lower_limits=translation_lower_limits,
-                                                      upper_limits=self.translation_limits)
-        self.y = self.world.add_virtual_free_variable(name=PrefixName('y', self.name),
-                                                      lower_limits=translation_lower_limits,
-                                                      upper_limits=self.translation_limits)
-        self.z = self.world.add_virtual_free_variable(name=PrefixName('z', self.name),
-                                                      lower_limits=translation_lower_limits,
-                                                      upper_limits=self.translation_limits)
+        self.x = self.world.add_virtual_free_variable(name=PrefixName('x', self.name))
+        self.y = self.world.add_virtual_free_variable(name=PrefixName('y', self.name))
+        self.z = self.world.add_virtual_free_variable(name=PrefixName('z', self.name))
 
-        self.roll = self.world.add_virtual_free_variable(name=PrefixName('roll', self.name),
-                                                         lower_limits=rotation_lower_limits,
-                                                         upper_limits=self.rotation_limits)
-        self.pitch = self.world.add_virtual_free_variable(name=PrefixName('pitch', self.name),
-                                                          lower_limits=rotation_lower_limits,
-                                                          upper_limits=self.rotation_limits)
-        self.yaw = self.world.add_virtual_free_variable(name=PrefixName('yaw', self.name),
-                                                        lower_limits=rotation_lower_limits,
-                                                        upper_limits=self.rotation_limits)
+        self.roll = self.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
+        self.pitch = self.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
+        self.yaw = self.world.add_virtual_free_variable(name=PrefixName('yaw', self.name))
 
         self.x_vel = self.world.add_free_variable(name=PrefixName('x_vel', self.name),
                                                   lower_limits=translation_lower_limits,
@@ -319,5 +343,5 @@ class OmniDrive(Joint, VirtualFreeVariables):
         state[self.yaw.name].position += rot_vel * dt
 
 
-class DiffDrive(Joint):
+class DiffDrive(MovableJoint):
     pass

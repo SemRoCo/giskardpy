@@ -388,7 +388,7 @@ class Giskard:
             self.add_robot_from_parameter_server()
         self._create_parameter_backup()
         if self._root_link_name is None:
-            self._root_link_name = tf.get_tf_root()
+            self._root_link_name = PrefixName(tf.get_tf_root(), None)
         world = WorldTree(self._root_link_name, self._god_map)
         world.delete_all_but_robots()
         world.register_controlled_joints(self._controlled_joints)

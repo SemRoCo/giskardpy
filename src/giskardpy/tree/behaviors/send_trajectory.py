@@ -94,7 +94,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 elif isinstance(msg, control_msgs.msg.JointTrajectoryControllerState) \
                         or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
                     controlled_joint_names = msg.joint_names
-            except ROSException as e:
+            except (ROSException, ROSTopicException) as e:
                 logging.logwarn(f'Couldn\'t connect to {state_topic}. Is it running?')
                 rospy.sleep(1)
         controlled_joint_names = [PrefixName(j, self.group_name) for j in controlled_joint_names]

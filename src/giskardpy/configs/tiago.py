@@ -1,10 +1,13 @@
+from typing import Optional
+
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard, ControlModes
+from giskardpy.my_types import Derivatives
 
 
 class TiagoBase(Giskard):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, root_link_name: Optional[str] = None):
+        super().__init__(root_link_name=root_link_name)
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/tiago.srdf')
         self.overwrite_external_collision_avoidance('brumbrum',
@@ -105,19 +108,26 @@ class IAI_Tiago(TiagoBase):
 class Tiago_Standalone(TiagoBase):
     def __init__(self):
         self.add_robot_from_parameter_server()
-        super().__init__()
+        super().__init__('map')
         self.set_default_visualization_marker_color(1, 1, 1, 1)
         self.set_control_mode(ControlModes.stand_alone)
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_diff_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
                                   name='brumbrum',
-                                  translation_velocity_limit=0.19,
-                                  rotation_velocity_limit=0.19)
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  },)
         self.register_controlled_joints(['torso_lift_joint', 'head_1_joint', 'head_2_joint', 'brumbrum'])
         self.register_controlled_joints(['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
                                          'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint'])

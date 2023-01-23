@@ -6,7 +6,7 @@ import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.data_types import JointStates
-from giskardpy.model.joints import Joint, OmniDrive
+from giskardpy.model.joints import Joint, OmniDrive, MovableJoint
 from giskardpy.my_types import PrefixName
 
 
@@ -53,7 +53,7 @@ class Trajectory:
     def values(self):
         return self._points.values()
 
-    def to_msg(self, sample_period: float, start_time: Union[rospy.Duration, float], joints: List[Joint],
+    def to_msg(self, sample_period: float, start_time: Union[rospy.Duration, float], joints: List[MovableJoint],
                fill_velocity_values: bool = True) -> JointTrajectory:
         if isinstance(start_time, (int, float)):
             start_time = rospy.Duration(start_time)
@@ -64,10 +64,7 @@ class Trajectory:
             p = JointTrajectoryPoint()
             p.time_from_start = rospy.Duration(time * sample_period)
             for joint in joints:
-                if isinstance(joint, OmniDrive):
-                    free_variables = [joint.x.name, joint.y.name, joint.yaw.name]
-                else:
-                    free_variables = [joint.free_variable.name]
+                free_variables = joint.get_position_variables()
                 for free_variable in free_variables:
                     if free_variable in traj_point:
                         if i == 0:

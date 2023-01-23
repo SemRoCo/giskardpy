@@ -283,42 +283,30 @@ class Giskard:
         return self.group_names[0]
 
     def add_diff_drive_joint(self,
+                             name: str,
                              parent_link_name: str,
                              child_link_name: str,
                              robot_group_name: Optional[str] = None,
-                             name: Optional[str] = 'brumbrum',
                              odometry_topic: Optional[str] = None,
-                             translation_velocity_limit: Optional[float] = 0.2,
-                             rotation_velocity_limit: Optional[float] = 0.2,
-                             translation_acceleration_limit: Optional[float] = None,
-                             rotation_acceleration_limit: Optional[float] = None,
-                             translation_jerk_limit: Optional[float] = 5,
-                             rotation_jerk_limit: Optional[float] = 10,
-                             odom_x_name: Optional[str] = 'odom_x',
-                             odom_y_name: Optional[str] = 'odom_y',
-                             odom_yaw_name: Optional[str] = 'odom_yaw'):
+                             translation_limits: Optional[derivative_map] = None,
+                             rotation_limits: Optional[derivative_map] = None):
         """
         Same as add_omni_drive_joint, but for a differential drive.
         """
         if robot_group_name is None:
             robot_group_name = self.get_default_group_name()
-        brumbrum_joint = DiffDrive(parent_link_name=parent_link_name,
-                                   child_link_name=PrefixName(child_link_name, robot_group_name),
-                                   name=name,
-                                   group_name=robot_group_name,
-                                   odom_x_name=odom_x_name,
-                                   odom_y_name=odom_y_name,
-                                   odom_yaw_name=odom_yaw_name,
-                                   translation_velocity_limit=translation_velocity_limit,
-                                   rotation_velocity_limit=rotation_velocity_limit,
-                                   translation_acceleration_limit=translation_acceleration_limit,
-                                   rotation_acceleration_limit=rotation_acceleration_limit,
-                                   translation_jerk_limit=translation_jerk_limit,
-                                   rotation_jerk_limit=rotation_jerk_limit)
+        joint_name = PrefixName(name, robot_group_name)
+        parent_link_name = PrefixName(parent_link_name, None)
+        child_link_name = PrefixName(child_link_name, robot_group_name)
+        brumbrum_joint = (DiffDrive, {'parent_link_name': parent_link_name,
+                                      'child_link_name': child_link_name,
+                                      'name': joint_name,
+                                      'translation_limits': translation_limits,
+                                      'rotation_limits': rotation_limits})
         self._add_joint(brumbrum_joint)
         if odometry_topic is not None:
             self._add_odometry_topic(odometry_topic=odometry_topic,
-                                     joint_name=brumbrum_joint.name)
+                                     joint_name=joint_name)
 
     def set_maximum_derivative(self, new_value: Derivatives = Derivatives.jerk):
         """

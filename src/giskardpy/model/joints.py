@@ -134,7 +134,9 @@ class VirtualFreeVariables(ABC):
     def update_state(self, dt: float): ...
 
 
-class MovableJoint(Joint): ...
+class MovableJoint(Joint):
+    @abc.abstractmethod
+    def get_position_variables(self) -> List[PrefixName]: ...
 
 
 class FixedJoint(Joint):
@@ -212,6 +214,9 @@ class OneDofJoint(MovableJoint):
             self.free_variable = self.world.free_variables[free_variable_name]
         else:
             self.free_variable = self.world.add_free_variable(free_variable_name, lower_limits, upper_limits)
+
+    def get_position_variables(self):
+        return [self.free_variable.name]
 
     def get_symbol(self, derivative: Derivatives):
         return self.free_variable.get_symbol(derivative) * self.multiplier + self.offset
@@ -356,6 +361,104 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         state[self.yaw.name].velocity = rot_vel
         state[self.yaw.name].position += rot_vel * dt
 
+    def get_position_variables(self) -> List[PrefixName]:
+        return [self.x.name, self.y.name, self.yaw.name]
 
-class DiffDrive(MovableJoint):
-    pass
+
+class DiffDrive(MovableJoint, VirtualFreeVariables):
+    x: FreeVariable
+    y: FreeVariable
+    z: FreeVariable
+    roll: FreeVariable
+    pitch: FreeVariable
+    yaw: FreeVariable
+    x_vel: FreeVariable
+    z_vel: FreeVariable
+
+    def __init__(self,
+                 name: PrefixName,
+                 parent_link_name: PrefixName,
+                 child_link_name: PrefixName,
+                 translation_limits: Optional[derivative_map] = None,
+                 rotation_limits: Optional[derivative_map] = None):
+        self.name = name
+        self.parent_link_name = parent_link_name
+        self.child_link_name = child_link_name
+        if translation_limits is None:
+            self.translation_limits = {
+                Derivatives.velocity: 0.5,
+                Derivatives.acceleration: 1000,
+                Derivatives.jerk: 5
+            }
+        else:
+            self.translation_limits = translation_limits
+
+        if rotation_limits is None:
+            self.rotation_limits = {
+                Derivatives.velocity: 0.6,
+                Derivatives.acceleration: 1000,
+                Derivatives.jerk: 10
+            }
+        else:
+            self.rotation_limits = rotation_limits
+
+        self.create_free_variables()
+        self.create_parent_T_child()
+
+    def create_parent_T_child(self):
+        odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
+                                               y=self.y.get_symbol(Derivatives.position),
+                                               yaw=self.yaw.get_symbol(Derivatives.position))
+        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
+                                                 yaw=self.yaw_vel.get_symbol(Derivatives.position))
+        self.parent_T_child = w.dot(odom_T_bf, bf_T_bf_vel)
+
+    def create_free_variables(self):
+        translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
+        rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
+
+        self.x = self.world.add_virtual_free_variable(name=PrefixName('x', self.name))
+        self.y = self.world.add_virtual_free_variable(name=PrefixName('y', self.name))
+        self.z = self.world.add_virtual_free_variable(name=PrefixName('z', self.name))
+
+        self.roll = self.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
+        self.pitch = self.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
+        self.yaw = self.world.add_virtual_free_variable(name=PrefixName('yaw', self.name))
+
+        self.x_vel = self.world.add_free_variable(name=PrefixName('x_vel', self.name),
+                                                  lower_limits=translation_lower_limits,
+                                                  upper_limits=self.translation_limits)
+        self.yaw_vel = self.world.add_free_variable(name=PrefixName('yaw_vel', self.name),
+                                                    lower_limits=rotation_lower_limits,
+                                                    upper_limits=self.rotation_limits)
+
+    def update_transform(self, new_parent_T_child: Pose):
+        roll, pitch, yaw = rpy_from_quaternion(new_parent_T_child.orientation.x,
+                                               new_parent_T_child.orientation.y,
+                                               new_parent_T_child.orientation.z,
+                                               new_parent_T_child.orientation.w)
+        self.last_msg = JointStates()
+        self.world.state[self.x.name].position = new_parent_T_child.position.x
+        self.world.state[self.y.name].position = new_parent_T_child.position.y
+        self.world.state[self.z.name].position = new_parent_T_child.position.z
+        self.world.state[self.roll.name].position = roll
+        self.world.state[self.pitch.name].position = pitch
+        self.world.state[self.yaw.name].position = yaw
+
+    def update_state(self, dt: float):
+        state = self.world.state
+        state[self.x_vel.name].position = 0
+        state[self.yaw_vel.name].position = 0
+
+        x_vel = state[self.x_vel.name].velocity
+        rot_vel = state[self.yaw_vel.name].velocity
+        yaw = state[self.yaw.name].position
+        state[self.x.name].velocity = np.cos(yaw) * x_vel
+        state[self.x.name].position += state[self.x.name].velocity * dt
+        state[self.y.name].velocity = np.sin(yaw) * x_vel
+        state[self.y.name].position += state[self.y.name].velocity * dt
+        state[self.yaw.name].velocity = rot_vel
+        state[self.yaw.name].position += rot_vel * dt
+
+    def get_position_variables(self) -> List[PrefixName]:
+        return [self.x.name, self.y.name, self.yaw.name]

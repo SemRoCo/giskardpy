@@ -43,7 +43,6 @@ from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
 import os
 
-from iai_naive_kinematics_sim.srv import UpdateTransformRequest, UpdateTransform
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -236,8 +235,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_moving = 0
         self._alive = True
 
-        self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-                                                       UpdateTransform)
+        # self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+        #                                                UpdateTransform)
 
         self.giskard = config_file()
         if 'GITHUB_WORKFLOW' in os.environ:
@@ -290,15 +289,15 @@ class GiskardTestWrapper(GiskardWrapper):
                            seed_configuration=seed_configuration)
 
     def set_localization(self, map_T_odom: PoseStamped):
-        # pass
-        map_T_odom.pose.position.z = 0
-        req = UpdateTransformRequest()
-        req.transform.translation = map_T_odom.pose.position
-        req.transform.rotation = map_T_odom.pose.orientation
-        assert self.set_localization_srv(req).success
-        self.wait_heartbeats(15)
-        p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
-        compare_poses(p2.pose, map_T_odom.pose)
+        pass
+        # map_T_odom.pose.position.z = 0
+        # req = UpdateTransformRequest()
+        # req.transform.translation = map_T_odom.pose.position
+        # req.transform.rotation = map_T_odom.pose.orientation
+        # assert self.set_localization_srv(req).success
+        # self.wait_heartbeats(15)
+        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+        # compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:

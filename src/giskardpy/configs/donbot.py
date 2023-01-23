@@ -1,3 +1,5 @@
+from typing import Optional
+
 from std_msgs.msg import ColorRGBA
 
 from giskardpy.configs.data_types import ControlModes
@@ -5,8 +7,8 @@ from giskardpy.configs.default_giskard import Giskard
 
 
 class Donbot_Base(Giskard):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, root_link_name: Optional[str] = None):
+        super().__init__(root_link_name=root_link_name)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
         self.ignore_self_collisions_of_pair('ur5_forearm_link', 'ur5_wrist_3_link')
         self.ignore_self_collisions_of_pair('ur5_base_link', 'ur5_upper_arm_link')
@@ -61,13 +63,12 @@ class Donbot_Standalone(Donbot_Base):
 
     def __init__(self):
         self.add_robot_from_parameter_server()
-        super().__init__()
+        super().__init__('map')
         self.set_default_visualization_marker_color(r=1, g=1, b=1, a=1)
         self.set_control_mode(ControlModes.stand_alone)
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='iai_donbot/odom')
         self.register_controlled_joints([
             'ur5_elbow_joint',

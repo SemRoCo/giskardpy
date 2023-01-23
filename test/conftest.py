@@ -104,7 +104,7 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     for joint_name in better_pose.world.groups[better_pose.kitchen_name].movable_joint_names:
         joint = better_pose.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            js[joint.free_variable.name] = 0.0
+            js[str(joint.free_variable.name)] = 0.0
     better_pose.set_kitchen_js(js)
     return better_pose
 
@@ -129,7 +129,7 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     for joint_name in better_pose.world.groups[better_pose.environment_name].movable_joint_names:
         joint = better_pose.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            js[joint.free_variable.name] = 0.0
+            js[str(joint.free_variable.name)] = 0.0
     better_pose.set_apartment_js(js)
     base_pose = PoseStamped()
     base_pose.header.frame_id = 'iai_apartment/side_B'

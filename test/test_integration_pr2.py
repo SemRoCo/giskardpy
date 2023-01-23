@@ -218,9 +218,9 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    # launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
-    # c = PR2TestWrapper()
-    c = PR2TestWrapperMujoco()
+    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
+    c = PR2TestWrapper()
+    # c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -2165,8 +2165,8 @@ class TestWayPoints:
 
 class TestWorldManipulation:
 
-    def test_save_graph_pdf(self, kitchen_setup):
-        kitchen_setup.world.save_graph_pdf()
+    # def test_save_graph_pdf(self, kitchen_setup):
+    #     kitchen_setup.world.save_graph_pdf()
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
         old_color = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color

@@ -135,6 +135,8 @@ class VirtualFreeVariables(ABC):
 
 
 class MovableJoint(Joint):
+    free_variables: List[FreeVariable]
+
     @abc.abstractmethod
     def get_position_variables(self) -> List[PrefixName]: ...
 
@@ -214,6 +216,7 @@ class OneDofJoint(MovableJoint):
             self.free_variable = self.world.free_variables[free_variable_name]
         else:
             self.free_variable = self.world.add_free_variable(free_variable_name, lower_limits, upper_limits)
+        self.free_variables = [self.free_variable]
 
     def get_position_variables(self):
         return [self.free_variable.name]
@@ -330,6 +333,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         self.yaw_vel = self.world.add_free_variable(name=PrefixName('yaw_vel', self.name),
                                                     lower_limits=rotation_lower_limits,
                                                     upper_limits=self.rotation_limits)
+        self.free_variables = [self.x_vel, self.y_vel, self.yaw_vel]
 
     def update_transform(self, new_parent_T_child: Pose):
         roll, pitch, yaw = rpy_from_quaternion(new_parent_T_child.orientation.x,
@@ -431,6 +435,7 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
         self.yaw_vel = self.world.add_free_variable(name=PrefixName('yaw_vel', self.name),
                                                     lower_limits=rotation_lower_limits,
                                                     upper_limits=self.rotation_limits)
+        self.free_variables = [self.x_vel, self.yaw_vel]
 
     def update_transform(self, new_parent_T_child: Pose):
         roll, pitch, yaw = rpy_from_quaternion(new_parent_T_child.orientation.x,

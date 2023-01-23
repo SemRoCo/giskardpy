@@ -831,7 +831,7 @@ class WorldTree(WorldTreeInterface):
         new_parent_link = self.links[new_parent_link_name]
 
         joint.parent_link_name = new_parent_link_name
-        joint.update_parent_T_child(fk)
+        joint.parent_T_child = fk
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()
@@ -842,9 +842,20 @@ class WorldTree(WorldTreeInterface):
                                     new_parent_T_child: w.TransMatrix,
                                     notify: bool = True):
         joint = self.joints[joint_name]
-        joint.update_parent_T_child(new_parent_T_child)
+        if not isinstance(joint, FixedJoint):
+            raise NotImplementedError('Can only change fixed joints')
+        joint.parent_T_child = new_parent_T_child
         if notify:
             self.notify_model_change()
+
+    def cleanup_unused_free_variable(self):
+        used_variables = []
+        for joint_name in self.movable_joint_names:
+            joint = self.joints[joint_name]
+            used_variables.extend(free_variable.name for free_variable in joint.free_variables)
+        for free_variable_name in self.free_variables:
+            if free_variable_name not in used_variables:
+                del self.state[free_variable_name]
 
     def move_group(self, group_name: str, new_parent_link_name: PrefixName):
         """

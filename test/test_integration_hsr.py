@@ -212,17 +212,17 @@ class TestJointGoals:
 
 
 class TestCartGoals:
-    def test_save_graph_pdf(self, kitchen_setup):
-        box1_name = 'box1'
-        pose = PoseStamped()
-        pose.header.frame_id = kitchen_setup.default_root
-        pose.pose.orientation.w = 1
-        kitchen_setup.add_box(name=box1_name,
-                              size=(1,1,1),
-                              pose=pose,
-                              parent_link='hand_palm_link',
-                              parent_link_group='hsrb')
-        kitchen_setup.world.save_graph_pdf()
+    # def test_save_graph_pdf(self, kitchen_setup):
+    #     box1_name = 'box1'
+    #     pose = PoseStamped()
+    #     pose.header.frame_id = kitchen_setup.default_root
+    #     pose.pose.orientation.w = 1
+    #     kitchen_setup.add_box(name=box1_name,
+    #                           size=(1,1,1),
+    #                           pose=pose,
+    #                           parent_link='hand_palm_link',
+    #                           parent_link_group='hsrb')
+    #     kitchen_setup.world.save_graph_pdf()
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()

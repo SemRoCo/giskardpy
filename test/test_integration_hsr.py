@@ -210,6 +210,13 @@ class TestJointGoals:
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
+    def test_mimic_joints4(self, zero_pose: HSRTestWrapper):
+        joint_goal = {'torso_lift_joint': 0.25}
+        zero_pose.set_joint_goal(joint_goal, check=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        np.testing.assert_almost_equal(zero_pose.world.state['hsrb/arm_lift_joint'].position, 0.5, decimal=2)
+
 
 class TestCartGoals:
     # def test_save_graph_pdf(self, kitchen_setup):

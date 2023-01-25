@@ -95,8 +95,21 @@ def urdf_to_joint(urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, Revolu
     multiplier = None
     offset = None
     if urdf_joint.mimic is not None:
-        multiplier = urdf_joint.mimic.multiplier
-        offset = urdf_joint.mimic.offset
+        if urdf_joint.mimic.multiplier is not None:
+            multiplier = urdf_joint.mimic.multiplier
+        else:
+            multiplier = 1
+        if urdf_joint.mimic.offset is not None:
+            offset = urdf_joint.mimic.offset
+        else:
+            offset = 0
+        upper_limits[Derivatives.position] -= offset
+        lower_limits[Derivatives.position] -= offset
+        if multiplier < 0:
+            upper_limits[Derivatives.position], \
+            lower_limits[Derivatives.position] = lower_limits[Derivatives.position], upper_limits[Derivatives.position]
+        upper_limits[Derivatives.position] /= multiplier
+        lower_limits[Derivatives.position] /= multiplier
         free_variable_name = PrefixName(urdf_joint.mimic.joint, prefix)
     else:
         free_variable_name = joint_name

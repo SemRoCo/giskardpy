@@ -56,3 +56,6 @@ and/or make sure that your ```$PYTHONPATH``` includes something like ```/path/of
 ### Tutorials
 https://github.com/SemRoCo/giskardpy/wiki
 
+### How to cite
+Stelter, Simon, Georg Bartels, and Michael Beetz. "An open-source motion planning framework for mobile manipulators using constraint-based task space control with linear MPC." 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2022.
+

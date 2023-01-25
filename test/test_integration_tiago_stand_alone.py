@@ -13,7 +13,8 @@ from giskard_msgs.msg import MoveResult
 from giskardpy import identifier
 from giskardpy.configs.tiago import TiagoMujoco, Tiago_Standalone
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.my_types import PrefixName
+from giskardpy.model.joints import OneDofJoint
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.utils import publish_pose, launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
@@ -418,7 +419,6 @@ class TestCollisionAvoidance:
                         'arm_left_7_joint'])
         apartment_setup.plan_and_execute()
 
-
     def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
         js = {
             'arm_left_1_joint': -1.1069832458862692,
@@ -646,9 +646,11 @@ class TestJointGoals:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         joint_name = PrefixName('arm_right_5_joint', zero_pose.robot_name)
-        lower_limit, upper_limit = zero_pose.world.joints[joint_name].get_limit_expressions(0)
-        lower_limit = lower_limit.evaluate()
-        upper_limit = upper_limit.evaluate()
+        arm_right_5_joint: OneDofJoint = zero_pose.world.joints[joint_name]
+        lower_limit = arm_right_5_joint.free_variable.get_lower_limit(Derivatives.position,
+                                                                      evaluated=True)
+        upper_limit = arm_right_5_joint.free_variable.get_upper_limit(Derivatives.position,
+                                                                      evaluated=True)
         assert lower_limit <= zero_pose.world.state[
             PrefixName('arm_right_5_joint', zero_pose.robot_name)].position <= upper_limit
 
@@ -760,7 +762,6 @@ class TestJointGoals:
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-
 
     def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {

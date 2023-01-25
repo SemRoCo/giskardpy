@@ -3503,6 +3503,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
                                     root_link=kitchen_setup.default_root)
+        kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name)
 
         # grasp cup
         r_goal = deepcopy(cup_pose)
@@ -3520,8 +3521,6 @@ class TestCollisionAvoidanceGoals:
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
-        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
-        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
                                     root_link=kitchen_setup.default_root)
@@ -3530,6 +3529,8 @@ class TestCollisionAvoidanceGoals:
                                     root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
+        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
+        kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)

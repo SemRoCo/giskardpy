@@ -121,5 +121,5 @@ jobs:
         python3 -m pytest -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals
     - name: Setup upterm session
 #      if: always()
-      if: failure()
-      uses: lhotari/action-upterm@v1
+#      if: failure()
+#      uses: lhotari/action-upterm@v1

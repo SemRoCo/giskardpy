@@ -119,7 +119,7 @@ jobs:
       run: |
         roscd giskardpy
         python3 -m pytest -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals
-    - name: Setup upterm session
+#    - name: Setup upterm session
 #      if: always()
 #      if: failure()
 #      uses: lhotari/action-upterm@v1

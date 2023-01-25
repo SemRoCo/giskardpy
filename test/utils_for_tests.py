@@ -20,7 +20,7 @@ from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
-from tf2_py import LookupException
+from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
 import giskardpy.utils.tfwrapper as tf
@@ -301,8 +301,11 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
-            return tf.transform_msg(target_frame, msg, timeout=timeout)
-        except LookupException as e:
+            if not self.is_standalone():
+                return tf.transform_msg(target_frame, msg, timeout=timeout)
+            else:
+                raise LookupException('just to trigger except block')
+        except (LookupException, ExtrapolationException) as e:
             target_frame = self.world.search_for_link_name(target_frame)
             try:
                 msg.header.frame_id = self.world.search_for_link_name(msg.header.frame_id)
@@ -429,9 +432,6 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_joint_goal(self, goal, weight=None, hard=False, decimal=2, expected_error_codes=(MoveResult.SUCCESS,),
                        check=True, group_name=None):
-        """
-        :type goal: dict
-        """
         super().set_joint_goal(goal, group_name, weight=weight, hard=hard)
         if check:
             self.add_goal_check(JointGoalChecker(giskard=self,
@@ -494,7 +494,10 @@ class GiskardTestWrapper(GiskardWrapper):
         if check:
             full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(TranslationGoalChecker(self, full_tip_link, full_root_link, goal_point))
+            self.add_goal_check(TranslationGoalChecker(giskard=self,
+                                                       tip_link=full_tip_link,
+                                                       root_link=full_root_link,
+                                                       expected=goal_point))
 
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                       weight=None, max_velocity=None,

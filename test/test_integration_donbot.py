@@ -296,7 +296,7 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 0})
 
-        kitchen_setup.plan_and_execute()
+        # kitchen_setup.plan_and_execute()
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()

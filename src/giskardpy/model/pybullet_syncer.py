@@ -56,7 +56,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        collisions = Collisions(self.god_map, collision_list_size)
+        collisions = Collisions(collision_list_size)
         for (link_a, link_b), distance in cut_off_distances.items():
             link_b_id = self.object_name_to_bullet_id[link_b]
             robot_link_id = self.object_name_to_bullet_id[link_a]

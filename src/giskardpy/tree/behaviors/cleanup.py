@@ -28,7 +28,7 @@ class CleanUp(GiskardBehavior):
         self.god_map.set_data(identifier.goal_msg, None)
         self.world.fast_all_fks = None
         self.collision_scene.reset_cache()
-        self.god_map.set_data(identifier.closest_point, Collisions(self.god_map, 1))
+        self.god_map.set_data(identifier.closest_point, Collisions(1))
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.god_map.set_data(identifier.time, 1)
 

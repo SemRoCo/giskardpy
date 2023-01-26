@@ -111,7 +111,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def bpb_result_to_collisions(self, result, collision_list_size):
-        collisions = Collisions(self.god_map, collision_list_size)
+        collisions = Collisions(collision_list_size)
         for c in self.bpb_result_to_list(result):
             collisions.add(c)
         return collisions

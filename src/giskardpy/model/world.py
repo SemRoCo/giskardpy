@@ -1152,7 +1152,7 @@ class WorldTree(WorldTreeInterface):
 
             def __init__(self, world: WorldTree):
                 self.world = world
-                self.god_map = self.world.god_map
+                self.god_map = GodMap()
                 self.fks = {self.world.root_link_name: w.TransMatrix()}
 
             @profile

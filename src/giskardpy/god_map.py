@@ -14,7 +14,8 @@ from giskardpy.data_types import KeyDefaultDict
 from giskardpy.utils.singleton import SingletonMeta
 
 
-def set_default_in_override_block(block_identifier, god_map):
+def set_default_in_override_block(block_identifier):
+    god_map = GodMap()
     default_value = god_map.get_data(block_identifier[:-1] + ['default'])
     override = god_map.get_data(block_identifier)
     d = defaultdict(lambda: default_value)
@@ -194,13 +195,6 @@ class GodMap(metaclass=SingletonMeta):
         self.last_expr_values = {}
         self.shortcuts = {}
         self.lock = RLock()
-
-    def __copy__(self):
-        god_map_copy = GodMap()
-        god_map_copy._data = copy(self._data)
-        god_map_copy.key_to_expr = copy(self.key_to_expr)
-        god_map_copy.expr_to_key = copy(self.expr_to_key)
-        return god_map_copy
 
     def __enter__(self):
         self.lock.acquire()

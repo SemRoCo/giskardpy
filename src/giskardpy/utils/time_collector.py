@@ -11,8 +11,8 @@ class TimeCollector:
     compilations = []
     collision_avoidance = []
 
-    def __init__(self, god_map: GodMap):
-        self.god_map = god_map
+    def __init__(self):
+        self.god_map = GodMap()
 
     def next_goal(self):
         pass

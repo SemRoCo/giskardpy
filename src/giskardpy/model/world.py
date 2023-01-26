@@ -30,7 +30,7 @@ from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo, blackboard_god_map
+from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo
 
 
 class TravelCompanion:
@@ -123,7 +123,7 @@ class WorldTree(WorldTreeInterface):
 
     def __init__(self, root_link_name: PrefixName):
         self.root_link_name = root_link_name
-        self.god_map = blackboard_god_map()
+        self.god_map = GodMap()
         self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
@@ -1152,7 +1152,7 @@ class WorldTree(WorldTreeInterface):
 
             def __init__(self, world: WorldTree):
                 self.world = world
-                self.god_map = self.world.god_map
+                self.god_map = GodMap()
                 self.fks = {self.world.root_link_name: w.TransMatrix()}
 
             @profile

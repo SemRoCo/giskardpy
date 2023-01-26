@@ -71,8 +71,8 @@ class Collision:
 
 class Collisions:
     @profile
-    def __init__(self, god_map: GodMap, collision_list_size):
-        self.god_map = god_map
+    def __init__(self, collision_list_size):
+        self.god_map = GodMap()
         self.collision_scene: CollisionWorldSynchronizer = self.god_map.get_data(identifier.collision_scene)
         self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(
             identifier.collision_avoidance_configs)

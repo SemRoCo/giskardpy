@@ -40,7 +40,7 @@ class Giskard:
         self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
         self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
-        self._god_map.set_data(identifier.timer_collector, TimeCollector(self._god_map))
+        self._god_map.set_data(identifier.timer_collector, TimeCollector())
         self._god_map.set_data(identifier.joints_to_add, [])
         blackboard = Blackboard
         blackboard.god_map = self._god_map
@@ -377,11 +377,11 @@ class Giskard:
         self._god_map.set_data(identifier.collision_checker, self._collision_checker)
         self._god_map.set_data(identifier.collision_scene, collision_scene)
         if self._general_config.control_mode == ControlModes.open_loop:
-            self._tree = OpenLoop(self._god_map)
+            self._tree = OpenLoop()
         elif self._general_config.control_mode == ControlModes.close_loop:
-            self._tree = ClosedLoop(self._god_map)
+            self._tree = ClosedLoop()
         elif self._general_config.control_mode == ControlModes.stand_alone:
-            self._tree = StandAlone(self._god_map)
+            self._tree = StandAlone()
         else:
             raise KeyError(f'Robot interface mode \'{self._general_config.control_mode}\' is not supported.')
 

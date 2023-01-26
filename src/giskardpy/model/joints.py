@@ -10,11 +10,11 @@ from geometry_msgs.msg import PoseStamped, Pose
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
+from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils.math import rpy_from_quaternion
-from giskardpy.utils.utils import blackboard_god_map
 
 
 def urdf_joint_to_class(urdf_joint: up.Joint) -> Union[Type[FixedJoint], Type[RevoluteJoint], Type[PrismaticJoint]]:
@@ -80,9 +80,9 @@ def urdf_to_joint(urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, Revolu
                            child_link_name=child_link_name,
                            parent_T_child=parent_T_child)
     lower_limits, upper_limits = urdf_joint_to_limits(urdf_joint)
-    for i in range(blackboard_god_map().unsafe_get_data(identifier.max_derivative)):
+    for i in range(GodMap().unsafe_get_data(identifier.max_derivative)):
         derivative = Derivatives(i + 1)  # to start with velocity and include max_derivative
-        limit_symbol = blackboard_god_map().to_symbol(identifier.joint_limits + [derivative, joint_name])
+        limit_symbol = GodMap().to_symbol(identifier.joint_limits + [derivative, joint_name])
         if derivative in lower_limits:
             lower_limits[derivative] = w.max(-limit_symbol, lower_limits[derivative])
         else:
@@ -139,7 +139,7 @@ class Joint(ABC):
 
     @property
     def world(self):
-        return blackboard_god_map().get_data(identifier.world)
+        return GodMap().get_data(identifier.world)
 
 
 class VirtualFreeVariables(ABC):

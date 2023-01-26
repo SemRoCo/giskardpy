@@ -34,6 +34,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
 from giskardpy.exceptions import DontPrintStackTrace
+from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
@@ -393,7 +394,7 @@ def write_to_tmp(file_name: str, file_str: str) -> str:
 
 
 def to_tmp_path(file_name: str) -> str:
-    path = blackboard_god_map().get_data(identifier.tmp_folder)
+    path = GodMap().get_data(identifier.tmp_folder)
     return resolve_ros_iris(f'{path}{file_name}')
 
 
@@ -424,12 +425,8 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
-def blackboard_god_map():
-    return Blackboard().god_map
-
-
 def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
-    first_group_name = list(blackboard_god_map().get_data(identifier.world).groups.keys())[0]
+    first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
     decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
@@ -565,6 +562,7 @@ def replace_prefix_name_with_str(d: dict) -> dict:
             new_d[k] = replace_prefix_name_with_str(v)
     return new_d
 
+
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?
     return original_convert_dictionary_to_ros_message(json['message_type'], json['message'])
@@ -588,7 +586,10 @@ def trajectory_to_np(tj, joint_names):
     times = np.array(times)
     return names, position, velocity, times
 
+
 _pose_publisher = None
+
+
 def publish_pose(pose: PoseStamped):
     global _pose_publisher
     if _pose_publisher is None:

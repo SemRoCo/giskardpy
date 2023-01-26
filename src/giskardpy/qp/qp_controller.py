@@ -21,7 +21,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout, blackboard_god_map
+from giskardpy.utils.utils import memoize, create_path, suppress_stdout
 
 
 def save_pandas(dfs, names, path):
@@ -794,7 +794,7 @@ class QPController:
 
     @property
     def god_map(self) -> GodMap:
-        return blackboard_god_map()
+        return GodMap()
 
     @property
     def world(self) -> WorldTree:

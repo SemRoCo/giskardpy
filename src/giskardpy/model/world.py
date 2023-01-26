@@ -1401,8 +1401,7 @@ class WorldTree(WorldTreeInterface):
 
         for joint_name, joint in self.joints.items():
             joint_node_name = f'{joint_name}\n{type(joint).__name__}'
-            if self.is_joint_controlled(joint_name) or \
-                    self.is_joint_mimic(joint_name) and self.is_joint_controlled(joint.mimed_joint_name):
+            if self.is_joint_controlled(joint_name):
                 peripheries = 2
             else:
                 peripheries = 1
@@ -1417,12 +1416,8 @@ class WorldTree(WorldTreeInterface):
             world_graph.add_edge(child_edge)
             parent_edge = pydot.Edge(str(joint.parent_link_name), str(joint_name))
             world_graph.add_edge(parent_edge)
-            if self.is_joint_mimic(joint_name):
-                parent_edge = pydot.Edge(str(joint_name), str(joint.mimed_joint_name), style='dashed',
-                                         arrowhead='onormal', arrowtail='dot', constraint=False)
-                world_graph.add_edge(parent_edge)
-
-        world_graph.write_pdf("world_tree.pdf")
+        file_name = f'{self.god_map.get_data(identifier.tmp_folder)}/world_tree.pdf'
+        world_graph.write_pdf(file_name)
 
 
 class WorldBranch(WorldTreeInterface):

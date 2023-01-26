@@ -2170,8 +2170,8 @@ class TestWayPoints:
 
 class TestWorldManipulation:
 
-    # def test_save_graph_pdf(self, kitchen_setup):
-    #     kitchen_setup.world.save_graph_pdf()
+    def test_save_graph_pdf(self, kitchen_setup):
+        kitchen_setup.world.save_graph_pdf()
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
         old_color = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color

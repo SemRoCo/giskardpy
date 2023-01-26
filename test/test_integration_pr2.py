@@ -446,7 +446,11 @@ class TestConstraints:
         base_pose.pose.position.y = -2
         base_pose.pose.orientation.w = 1
         # apartment_setup.allow_all_collisions()
-        apartment_setup.move_base(base_pose)
+        apartment_setup.set_cart_goal(goal_pose=base_pose,
+                                      tip_link='base_footprint',
+                                      root_link=apartment_setup.default_root,
+                                      check=False)
+        apartment_setup.plan_and_execute()
 
     def test_SetPredictionHorizon(self, zero_pose: PR2TestWrapper):
         default_prediction_horizon = zero_pose.god_map.get_data(identifier.prediction_horizon)
@@ -944,7 +948,8 @@ class TestConstraints:
         kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
                                     root_link='base_footprint',
-                                    weight=WEIGHT_BELOW_CA)
+                                    weight=WEIGHT_BELOW_CA,
+                                    check=False)
         kitchen_setup.plan_and_execute()
 
     # def test_open_fridge(self, kitchen_setup: PR2TestWrapper):

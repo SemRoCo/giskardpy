@@ -1,4 +1,4 @@
-name: CI PR2 standalone
+name: CI donbot standalone
 defaults:
   run:
     shell: bash -ieo pipefail {0}
@@ -45,12 +45,12 @@ jobs:
         path: 'ros_ws/src/qpOASES'
         repository: SemRoCo/qpOASES
         ref: noetic
-    - name: Checkout iai_pr2
+    - name: Checkout iai_robots
       uses: actions/checkout@v3
       with:
-        path: 'ros_ws/src/iai_pr2'
-        repository: code-iai/iai_pr2
-        ref: mujoco_sim_setup
+        path: 'ros_ws/src/iai_robots'
+        repository: code-iai/iai_robots
+        ref: noetic
     - name: Checkout iai_maps
       uses: actions/checkout@v3
       with:
@@ -73,8 +73,6 @@ jobs:
     - name: build Giskard
       run: |
         cd ros_ws
-        touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
-        touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
         catkin build
         echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
         echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
@@ -87,39 +85,19 @@ jobs:
     - name: start roscore
       run: |
         roscore &
-    - name: PR2 TestWorldManipulation
+    - name: donbot TestCartGoals
       run: |
         roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestWorldManipulation
-    - name: PR2 TestJointGoals
+        python3 -m pytest -s test/test_integration_donbot.py::TestCartGoals
+    - name: donbot TestConstraints
       run: |
         roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestJointGoals
-    - name: PR2 TestCartGoals
+        python3 -m pytest -s test/test_integration_donbot.py::TestConstraints
+    - name: donbot TestJointGoals
       run: |
         roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestCartGoals
-    - name: PR2 TestConstraints
-      run: |
-        roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestConstraints
-    - name: PR2 TestWayPoints
-      run: |
-        roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestWayPoints
-    - name: PR2 TestInfoServices
-      run: |
-        roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestInfoServices
-    - name: PR2 TestSelfCollisionAvoidance
-      run: |
-        roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestSelfCollisionAvoidance
-    - name: PR2 TestCollisionAvoidanceGoals
-      run: |
-        roscd giskardpy
-        python3 -m pytest -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals
+        python3 -m pytest -s test/test_integration_donbot.py::TestJointGoals
 #    - name: Setup upterm session
-#      if: always()
+##      if: always()
 #      if: failure()
 #      uses: lhotari/action-upterm@v1

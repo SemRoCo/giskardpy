@@ -21,7 +21,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout, blackboard_god_map
+from giskardpy.utils.utils import memoize, create_path, suppress_stdout
 
 
 def save_pandas(dfs, names, path):
@@ -63,7 +63,7 @@ class Parent:
     def replace_hack(self, expression: Union[float, w.Expression], new_value):
         if not isinstance(expression, w.Expression):
             return expression
-        hack = blackboard_god_map().to_symbol(identifier.hack)
+        hack = GodMap().to_symbol(identifier.hack)
         expression.s = w.ca.substitute(expression.s, hack.s, new_value)
         return expression
 
@@ -941,7 +941,7 @@ class QPController:
 
     @property
     def god_map(self) -> GodMap:
-        return blackboard_god_map()
+        return GodMap()
 
     @property
     def world(self) -> WorldTree:

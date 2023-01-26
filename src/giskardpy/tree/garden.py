@@ -242,11 +242,10 @@ def extract_data_from_profile(path):
 
 
 class TreeManager:
-    god_map: GodMap
+    god_map = GodMap()
 
     @profile
-    def __init__(self, god_map, tree=None):
-        self.god_map = god_map
+    def __init__(self, tree=None):
         self.action_server_name = self.god_map.get_data(identifier.action_server_name)
         self.config = self.god_map.get_data(identifier.giskard)
 

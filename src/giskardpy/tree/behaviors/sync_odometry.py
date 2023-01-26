@@ -9,6 +9,7 @@ from rospy import ROSException
 
 from giskardpy.data_types import JointStates
 from giskardpy.model.joints import OmniDrive
+from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.math import rpy_from_quaternion
@@ -18,7 +19,7 @@ from giskardpy.utils.utils import catch_and_raise_to_blackboard
 class SyncOdometry(GiskardBehavior):
 
     @profile
-    def __init__(self, odometry_topic: str, joint_name: str):
+    def __init__(self, odometry_topic: str, joint_name: PrefixName):
         self.odometry_topic = odometry_topic
         super().__init__(str(self))
         self.joint_name = joint_name
@@ -63,26 +64,7 @@ class SyncOdometry(GiskardBehavior):
     def update(self):
         try:
             odometry: Odometry = self.lock.get()
-            pose = odometry.pose.pose
-            roll, pitch, yaw = rpy_from_quaternion(pose.orientation.x,
-                                                   pose.orientation.y,
-                                                   pose.orientation.z,
-                                                   pose.orientation.w)
-            self.last_msg = JointStates()
-            self.world.state[self.joint.x_name].position = pose.position.x
-            self.world.state[self.joint.y_name].position = pose.position.y
-            try:
-                self.world.state[self.joint.z_name].position = pose.position.z
-                self.world.state[self.joint.roll_name].position = roll
-                self.world.state[self.joint.pitch_name].position = pitch
-            except:
-                pass
-            self.world.state[self.joint.yaw_name].position = yaw
-            # q = quaternion_from_rpy(roll, pitch, 0)
-            # self.world.state[joint.qx_name].position = q[0]
-            # self.world.state[joint.qy_name].position = q[1]
-            # self.world.state[joint.qz_name].position = q[2]
-            # self.world.state[joint.qw_name].position = q[3]
+            self.joint.update_transform(odometry.pose.pose)
 
         except Empty:
             pass

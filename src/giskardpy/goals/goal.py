@@ -16,7 +16,6 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
 from giskardpy.qp.constraint import DerivativeConstraint, Constraint
-from giskardpy.utils.utils import blackboard_god_map
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
@@ -32,7 +31,7 @@ class Goal(ABC):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
-        self.god_map: GodMap = blackboard_god_map()
+        self.god_map = GodMap()
         self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
         self._test_mode = self.god_map.get_data(identifier.test_mode)
         # last 2 velocities are 0 anyway
@@ -124,7 +123,7 @@ class Goal(ABC):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
         joint = self.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            return joint.position_expression
+            return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
     @property
@@ -174,7 +173,7 @@ class Goal(ABC):
     def joint_position_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
         for joint in self.world.controlled_joints:
-            position_symbols.extend(self.world.joints[joint].free_variable_list)
+            position_symbols.extend(self.world.joints[joint].free_variables)
         return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
@@ -188,7 +187,7 @@ class Goal(ABC):
     def joint_acceleration_symbols(self) -> List[Union[w.Symbol, float]]:
         acceleration_symbols = []
         for joint in self.world.controlled_joints:
-            acceleration_symbols.extend(self.world.joints[joint].free_variable_list)
+            acceleration_symbols.extend(self.world.joints[joint].free_variables)
         return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
 
     def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:

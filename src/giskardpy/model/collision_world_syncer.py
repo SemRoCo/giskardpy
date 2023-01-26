@@ -71,8 +71,8 @@ class Collision:
 
 class Collisions:
     @profile
-    def __init__(self, god_map: GodMap, collision_list_size):
-        self.god_map = god_map
+    def __init__(self, collision_list_size):
+        self.god_map = GodMap()
         self.collision_scene: CollisionWorldSynchronizer = self.god_map.get_data(identifier.collision_scene)
         self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(
             identifier.collision_avoidance_configs)
@@ -468,7 +468,7 @@ class CollisionWorldSynchronizer:
         :return:
         """
         js = JointStates()
-        for joint_name in sorted(group.movable_joints):
+        for joint_name in sorted(group.movable_joint_names):
             if group.search_downwards_for_links(joint_name):
                 js[joint_name].position = f(joint_name)
             else:

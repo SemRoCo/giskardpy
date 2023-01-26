@@ -415,7 +415,7 @@ class PR2DiffDriveBaseGoal(Goal):
         super().__init__()
         self.max_angular_velocity = max_angular_velocity
         self.max_linear_velocity = max_linear_velocity
-        diff_drive_joints = [v for k, v in self.world._joints.items() if isinstance(v, OmniDrivePR22)]
+        diff_drive_joints = [v for k, v in self.world.joints.items() if isinstance(v, OmniDrivePR22)]
         assert len(diff_drive_joints) == 1
         self.joint: OmniDrivePR22 = diff_drive_joints[0]
         self.weight = weight

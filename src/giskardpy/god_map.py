@@ -11,6 +11,7 @@ from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, V
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import KeyDefaultDict
+from giskardpy.utils.singleton import SingletonMeta
 
 
 def set_default_in_override_block(block_identifier, god_map):
@@ -180,7 +181,7 @@ def get_data(identifier: Sequence[Union[str, int, Sequence[Union[str, int]]]], d
     return result, shortcut
 
 
-class GodMap(object):
+class GodMap(metaclass=SingletonMeta):
     """
     Data structure used by tree to exchange information.
     """

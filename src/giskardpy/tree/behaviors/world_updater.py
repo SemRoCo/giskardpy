@@ -275,10 +275,11 @@ class WorldUpdater(GiskardBehavior):
         if name not in self.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
         self.collision_scene.remove_black_list_entries(set(self.world.groups[name].link_names_with_collisions))
-        old_free_variables = [x.name for x in self.world.groups[name].free_variables]
         self.world.delete_group(name)
-        for free_variable in old_free_variables:
-            del self.world.state[free_variable]
+        self.world.cleanup_unused_free_variable()
+        # old_free_variables = [x.name for x in self.world.groups[name].free_variables]
+        # for free_variable in old_free_variables:
+        #     del self.world.state[free_variable]
         self._remove_plugins_of_group(name)
         logging.loginfo(f'Deleted \'{name}\'.')
 
@@ -297,7 +298,7 @@ class WorldUpdater(GiskardBehavior):
             self._remove_plugins_of_group(group_name)
         self.added_plugin_names = defaultdict(list)
         # copy only state of joints that didn't get deleted
-        remaining_free_variables = [x.name for x in self.world.free_variables]
+        remaining_free_variables = list(self.world.free_variables.keys())
         self.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
         self.world.notify_state_change()
         self.clear_markers()

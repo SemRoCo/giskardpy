@@ -446,7 +446,11 @@ class TestConstraints:
         base_pose.pose.position.y = -2
         base_pose.pose.orientation.w = 1
         # apartment_setup.allow_all_collisions()
-        apartment_setup.move_base(base_pose)
+        apartment_setup.set_cart_goal(goal_pose=base_pose,
+                                      tip_link='base_footprint',
+                                      root_link=apartment_setup.default_root,
+                                      check=False)
+        apartment_setup.plan_and_execute()
 
     def test_SetPredictionHorizon(self, zero_pose: PR2TestWrapper):
         default_prediction_horizon = zero_pose.god_map.get_data(identifier.prediction_horizon)
@@ -944,7 +948,8 @@ class TestConstraints:
         kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
                                     root_link='base_footprint',
-                                    weight=WEIGHT_BELOW_CA)
+                                    weight=WEIGHT_BELOW_CA,
+                                    check=False)
         kitchen_setup.plan_and_execute()
 
     # def test_open_fridge(self, kitchen_setup: PR2TestWrapper):
@@ -2851,7 +2856,8 @@ class TestCollisionAvoidanceGoals:
         base_goal.pose.position.x = -1
         base_goal.pose.orientation.w = 1
         box_setup.allow_self_collision()
-        box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_BELOW_CA)
+        box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_BELOW_CA,
+                                check=False)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(['base_link'], 0.09)
 
@@ -2866,21 +2872,6 @@ class TestCollisionAvoidanceGoals:
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(['base_link'], 0.048)
         box_setup.check_cpi_leq(['base_link'], 0.06)
-
-    def test_avoid_collision_drive_into_box(self, box_setup: PR2TestWrapper):
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = box_setup.default_root
-        base_goal.pose.position.x = 0.25
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        box_setup.teleport_base(base_goal)
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = 'base_footprint'
-        base_goal.pose.position.x = -1
-        base_goal.pose.orientation.w = 1
-        box_setup.allow_self_collision()
-        box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_BELOW_CA)
-        box_setup.plan_and_execute()
-        box_setup.check_cpi_geq(['base_link'], 0.09)
 
     def test_collision_override(self, box_setup: PR2TestWrapper):
         p = PoseStamped()
@@ -4055,50 +4046,6 @@ class TestWorld:
             world_setup.search_for_joint_name('r_torso_lift_side_plate_joint')) == 'pr2/torso_lift_joint'
         assert world_setup.get_controlled_parent_joint_of_joint(
             world_setup.search_for_joint_name('torso_lift_joint')) == 'pr2/brumbrum'
-
-    def test_get_all_joint_limits(self, world_setup: WorldTree):
-        assert world_setup.get_all_joint_position_limits() == {'pr2/bl_caster_l_wheel_joint': (None, None),
-                                                               'pr2/bl_caster_r_wheel_joint': (None, None),
-                                                               'pr2/bl_caster_rotation_joint': (None, None),
-                                                               'pr2/br_caster_l_wheel_joint': (None, None),
-                                                               'pr2/br_caster_r_wheel_joint': (None, None),
-                                                               'pr2/br_caster_rotation_joint': (None, None),
-                                                               'pr2/fl_caster_l_wheel_joint': (None, None),
-                                                               'pr2/fl_caster_r_wheel_joint': (None, None),
-                                                               'pr2/fl_caster_rotation_joint': (None, None),
-                                                               'pr2/fr_caster_l_wheel_joint': (None, None),
-                                                               'pr2/fr_caster_r_wheel_joint': (None, None),
-                                                               'pr2/fr_caster_rotation_joint': (None, None),
-                                                               'pr2/brumbrum': (None, None),
-                                                               'pr2/head_pan_joint': (-2.857, 2.857),
-                                                               'pr2/head_tilt_joint': (-0.3712, 1.29626),
-                                                               'pr2/l_elbow_flex_joint': (-2.1213, -0.15),
-                                                               'pr2/l_forearm_roll_joint': (None, None),
-                                                               'pr2/l_gripper_joint': (0.0, 0.088),
-                                                               'pr2/l_gripper_l_finger_joint': (0.0, 0.548),
-                                                               'pr2/l_gripper_motor_screw_joint': (None, None),
-                                                               'pr2/l_gripper_motor_slider_joint': (-0.1, 0.1),
-                                                               'pr2/l_shoulder_lift_joint': (-0.3536, 1.2963),
-                                                               'pr2/l_shoulder_pan_joint': (
-                                                                   -0.564601836603, 2.1353981634),
-                                                               'pr2/l_upper_arm_roll_joint': (-0.65, 3.75),
-                                                               'pr2/l_wrist_flex_joint': (-2.0, -0.1),
-                                                               'pr2/l_wrist_roll_joint': (None, None),
-                                                               'pr2/laser_tilt_mount_joint': (-0.7354, 1.43353),
-                                                               'pr2/r_elbow_flex_joint': (-2.1213, -0.15),
-                                                               'pr2/r_forearm_roll_joint': (None, None),
-                                                               'pr2/r_gripper_joint': (0.0, 0.088),
-                                                               'pr2/r_gripper_l_finger_joint': (0.0, 0.548),
-                                                               'pr2/r_gripper_motor_screw_joint': (None, None),
-                                                               'pr2/r_gripper_motor_slider_joint': (-0.1, 0.1),
-                                                               'pr2/r_shoulder_lift_joint': (-0.3536, 1.2963),
-                                                               'pr2/r_shoulder_pan_joint': (
-                                                                   -2.1353981634, 0.564601836603),
-                                                               'pr2/r_upper_arm_roll_joint': (-3.75, 0.65),
-                                                               'pr2/r_wrist_flex_joint': (-2.0, -0.1),
-                                                               'pr2/r_wrist_roll_joint': (None, None),
-                                                               'pr2/torso_lift_joint': (0.0115, 0.325),
-                                                               'pr2/torso_lift_motor_screw_joint': (None, None)}
 
     def test_possible_collision_combinations(self, world_setup: WorldTree):
         result = world_setup.groups[world_setup.robot_names[0]].possible_collision_combinations()

@@ -53,15 +53,15 @@ class SetOdometry(NonMotionGoal):
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive)):
             raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
         base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
-        self.world.state[brumbrum_joint.x_name].position = base_pose.position.x
-        self.world.state[brumbrum_joint.y_name].position = base_pose.position.y
+        self.world.state[brumbrum_joint.x.name].position = base_pose.position.x
+        self.world.state[brumbrum_joint.y.name].position = base_pose.position.y
         axis, angle = axis_angle_from_quaternion(base_pose.orientation.x,
                                                  base_pose.orientation.y,
                                                  base_pose.orientation.z,
                                                  base_pose.orientation.w)
         if axis[-1] < 0:
             angle = -angle
-        self.world.state[brumbrum_joint.yaw_name].position = angle
+        self.world.state[brumbrum_joint.yaw.name].position = angle
         self.world.notify_state_change()
 
     def __str__(self) -> str:

@@ -245,7 +245,7 @@ class GodMap(object):
     def clear_cache(self):
         self.shortcuts = {}
 
-    def to_symbol(self, identifier):
+    def to_symbol(self, identifier) -> w.Symbol:
         """
         All registered identifiers will be included in self.get_symbol_map().
         :type identifier: list

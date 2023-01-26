@@ -4,8 +4,7 @@ from giskardpy.utils import logging
 
 
 class SetPredictionHorizon(Goal):
-    def __init__(self,
-                 prediction_horizon: int):
+    def __init__(self, prediction_horizon: int):
         """
         Will overwrite the prediction horizon for a single goal.
         Setting it to 1 will turn of acceleration and jerk limits.
@@ -18,23 +17,7 @@ class SetPredictionHorizon(Goal):
         self.prediction_horizon = self.new_prediction_horizon
         if 5 > self.prediction_horizon > 1:
             logging.logwarn('Prediction horizon should be 1 or greater equal 5.')
-        if self.prediction_horizon == 1:
-            if 'acceleration' in self.god_map.get_data(identifier.joint_weights):
-                del self.god_map.get_data(identifier.joint_weights)['acceleration']
-            if 'acceleration' in self.god_map.get_data(identifier.joint_limits):
-                del self.god_map.get_data(identifier.joint_limits)['acceleration']
-        if self.prediction_horizon <= 2:
-            if 'jerk' in self.god_map.get_data(identifier.joint_weights):
-                del self.god_map.get_data(identifier.joint_weights)['jerk']
-            if 'jerk' in self.god_map.get_data(identifier.joint_limits):
-                del self.god_map.get_data(identifier.joint_limits)['jerk']
-        if self.prediction_horizon <= 3:
-            if 'jerk' in self.god_map.get_data(identifier.joint_weights):
-                del self.god_map.get_data(identifier.joint_weights)['snap']
-            if 'jerk' in self.god_map.get_data(identifier.joint_limits):
-                del self.god_map.get_data(identifier.joint_limits)['snap']
         self.god_map.set_data(identifier.prediction_horizon, self.prediction_horizon)
-        self.world.apply_default_limits_and_weights()
 
     def __str__(self) -> str:
         return str(self.__class__.__name__)

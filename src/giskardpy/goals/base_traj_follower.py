@@ -3,7 +3,7 @@ from __future__ import division
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive
-from giskardpy.my_types import my_string, Derivatives
+from giskardpy.my_types import my_string, Derivatives, PrefixName
 
 
 class BaseTrajFollower(Goal):
@@ -18,12 +18,12 @@ class BaseTrajFollower(Goal):
         # self.control_horizon = 1
 
     @profile
-    def x_symbol(self, t: int, free_variable_name: str, derivative: Derivatives = Derivatives.position) \
+    def x_symbol(self, t: int, free_variable_name: PrefixName, derivative: Derivatives = Derivatives.position) \
             -> w.Symbol:
         return self.god_map.to_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, derivative])
 
     @profile
-    def current_traj_point(self, free_variable_name: str, start_t: float,
+    def current_traj_point(self, free_variable_name: PrefixName, start_t: float,
                            derivative: Derivatives = Derivatives.position) \
             -> w.Expression:
         time = self.god_map.to_expr(identifier.time)
@@ -39,12 +39,12 @@ class BaseTrajFollower(Goal):
 
     @profile
     def make_odom_T_base_footprint_goal(self, t: float, derivative: Derivatives = Derivatives.position):
-        x = self.current_traj_point(self.joint.x_name, t, derivative)
+        x = self.current_traj_point(self.joint.x.name, t, derivative)
         if isinstance(self.joint, OmniDrive) or derivative == 0:
-            y = self.current_traj_point(self.joint.y_name, t, derivative)
+            y = self.current_traj_point(self.joint.y.name, t, derivative)
         else:
             y = 0
-        rot = self.current_traj_point(self.joint.yaw_name, t, derivative)
+        rot = self.current_traj_point(self.joint.yaw.name, t, derivative)
         odom_T_base_footprint_goal = w.TransMatrix.from_xyz_rpy(x=x, y=y, yaw=rot)
         # self.add_debug_expr('x goal in odom', x)
         return odom_T_base_footprint_goal
@@ -95,9 +95,9 @@ class BaseTrajFollower(Goal):
             base_footprint_T_base_footprint_goal = w.dot(base_footprint_T_odom, odom_T_base_footprint_goal)
             # errors_x.append(w.position_of(base_footprint_T_base_footprint_goal)[0])
             # errors_y.append(w.position_of(base_footprint_T_base_footprint_goal)[1])
-            x = self.current_traj_point(self.joint.x_vel_name, t * self.sample_period, Derivatives.velocity)
+            x = self.current_traj_point(self.joint.x_vel.name, t * self.sample_period, Derivatives.velocity)
             if isinstance(self.joint, OmniDrive):
-                y = self.current_traj_point(self.joint.y_vel_name, t * self.sample_period, Derivatives.velocity)
+                y = self.current_traj_point(self.joint.y_vel.name, t * self.sample_period, Derivatives.velocity)
             else:
                 y = 0
             base_footprint_P_vel = w.Vector3((x, y, 0))
@@ -185,7 +185,7 @@ class BaseTrajFollower(Goal):
         # _, rotation_goal = w.axis_angle_from_matrix(map_T_base_footprint_goal)
         # axis_current, rotation_current = w.axis_angle_from_matrix(map_T_base_footprint_current)
 
-        rotation_goal = self.current_traj_point(self.joint.yaw_name, t)
+        rotation_goal = self.current_traj_point(self.joint.yaw.name, t)
         rotation_current = self.joint.yaw.get_symbol(0)
         error = w.shortest_angular_distance(rotation_current, rotation_goal) / self.sample_period
         # self.add_debug_expr('rot goal', rotation_goal)
@@ -196,7 +196,7 @@ class BaseTrajFollower(Goal):
     def add_rot_constraints(self):
         errors = []
         for t in range(self.prediction_horizon):
-            errors.append(self.current_traj_point(self.joint.yaw_name, t * self.sample_period, Derivatives.velocity))
+            errors.append(self.current_traj_point(self.joint.yaw.name, t * self.sample_period, Derivatives.velocity))
             if t == 0 and not self.track_only_velocity:
                 errors[-1] += self.rot_error_at(t)
         self.add_velocity_constraint(lower_velocity_limit=errors,

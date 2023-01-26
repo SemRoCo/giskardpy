@@ -300,18 +300,19 @@ class GiskardTestWrapper(GiskardWrapper):
         # compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
+        result_msg = deepcopy(msg)
         try:
             if not self.is_standalone():
-                return tf.transform_msg(target_frame, msg, timeout=timeout)
+                return tf.transform_msg(target_frame, result_msg, timeout=timeout)
             else:
                 raise LookupException('just to trigger except block')
         except (LookupException, ExtrapolationException) as e:
             target_frame = self.world.search_for_link_name(target_frame)
             try:
-                msg.header.frame_id = self.world.search_for_link_name(msg.header.frame_id)
+                result_msg.header.frame_id = self.world.search_for_link_name(result_msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            return self.world.transform_msg(target_frame, msg)
+            return self.world.transform_msg(target_frame, result_msg)
 
     def wait_heartbeats(self, number=2):
         behavior_tree = self.tree.tree

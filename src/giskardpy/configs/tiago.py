@@ -1,10 +1,13 @@
+from typing import Optional
+
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard, ControlModes
+from giskardpy.my_types import Derivatives
 
 
 class TiagoBase(Giskard):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, root_link_name: Optional[str] = None):
+        super().__init__(root_link_name=root_link_name)
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/tiago.srdf')
         self.overwrite_external_collision_avoidance('brumbrum',
@@ -45,36 +48,44 @@ class TiagoBase(Giskard):
 
 class TiagoMujoco(TiagoBase):
     def __init__(self):
+        self.add_robot_from_parameter_server(joint_state_topics=['/tiago/joint_states'])
         super().__init__()
-        self.add_robot_from_parameter_server()
+        self.set_qp_solver(SupportedQPSolver.qp_oases)
         self.add_sync_tf_frame('map', 'odom')
         self.add_diff_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
-                                  translation_acceleration_limit=1,
-                                  rotation_acceleration_limit=1,
-                                  odometry_topic='/tiago/base_footprint')
-        self.add_follow_joint_trajectory_server(namespace='/arm_left_controller/follow_joint_trajectory',
-                                                state_topic='/arm_left_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/arm_right_controller/follow_joint_trajectory',
-                                                state_topic='/arm_right_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/head_controller/follow_joint_trajectory',
-                                                state_topic='/head_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/left_gripper_controller/follow_joint_trajectory',
-                                                state_topic='/left_gripper_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/right_gripper_controller/follow_joint_trajectory',
-                                                state_topic='/right_gripper_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
-                                                state_topic='/torso_controller/state')
+                                  odometry_topic='/tiago/base_footprint',
+                                  name='brumbrum',
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  })
+        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_left_controller/follow_joint_trajectory',
+                                                state_topic='/tiago/arm_left_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_right_controller/follow_joint_trajectory',
+                                                state_topic='/tiago/arm_right_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/head_controller/follow_joint_trajectory',
+                                                state_topic='/tiago/head_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/left_gripper_controller/follow_joint_trajectory',
+                                                state_topic='/tiago/left_gripper_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/right_gripper_controller/follow_joint_trajectory',
+                                                state_topic='/tiago/right_gripper_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/torso_controller/follow_joint_trajectory',
+                                                state_topic='/tiago/torso_controller/state')
         self.add_base_cmd_velocity(cmd_vel_topic='/tiago/cmd_vel')
-        self._qp_solver_config.joint_weights['velocity']['brumbrum'] = 0.1
 
 
 class IAI_Tiago(TiagoBase):
     def __init__(self):
+        self.add_robot_from_parameter_server()
         super().__init__()
         self.add_sync_tf_frame('map', 'odom')
-        self._add_odometry_topic('/mobile_base_controller/odom')
-        self.add_robot_from_parameter_server()
         self.add_follow_joint_trajectory_server(
             namespace='/arm_left_impedance_controller/follow_joint_trajectory',
             state_topic='/arm_left_impedance_controller/state'
@@ -95,29 +106,46 @@ class IAI_Tiago(TiagoBase):
                                                 state_topic='/head_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
                                                 state_topic='/torso_controller/state')
-        self.add_diff_drive_interface(cmd_vel_topic='/mobile_base_controller/cmd_vel',
-                                      parent_link_name='odom',
-                                      child_link_name='base_footprint',
-                                      translation_acceleration_limit=0.5,
-                                      rotation_acceleration_limit=None)
+        self.add_diff_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  odometry_topic='/mobile_base_controller/odom',
+                                  name='brumbrum',
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  })
+        self.add_base_cmd_velocity(cmd_vel_topic='/mobile_base_controller/cmd_vel')
 
 
 class Tiago_Standalone(TiagoBase):
     def __init__(self):
         self.add_robot_from_parameter_server()
-        super().__init__()
+        super().__init__('map')
         self.set_default_visualization_marker_color(1, 1, 1, 1)
         self.set_control_mode(ControlModes.stand_alone)
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_diff_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
                                   name='brumbrum',
-                                  translation_velocity_limit=0.19,
-                                  rotation_velocity_limit=0.19)
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  })
         self.register_controlled_joints(['torso_lift_joint', 'head_1_joint', 'head_2_joint', 'brumbrum'])
         self.register_controlled_joints(['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
                                          'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint'])

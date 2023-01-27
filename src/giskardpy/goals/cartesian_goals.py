@@ -436,7 +436,7 @@ class PR2DiffDriveBaseGoal(Goal):
         root_T_goal = w.TransMatrix(self.root_T_goal)
         root_P_goal = root_T_goal.to_position()
 
-        root_yaw1 = self.joint.caster_yaw1.get_symbol(Derivatives.position)
+        root_yaw1 = self.joint.yaw1_vel.get_symbol(Derivatives.position)
         root_V_forward = w.Vector3((w.cos(root_yaw1), w.sin(root_yaw1), 0))
         root_V_forward.vis_frame = self.tip_link
 

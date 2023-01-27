@@ -43,7 +43,6 @@ from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
 import os
 
-
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
 
@@ -541,6 +540,24 @@ class GiskardTestWrapper(GiskardWrapper):
                                max_velocity=angular_velocity,
                                check=check,
                                **kwargs)
+
+    def set_move_base_goal(self, goal_pose, check=True):
+        self.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
+                           goal_pose=goal_pose)
+        if check:
+            full_root_link = self.default_root
+            full_tip_link = self.world.get_link_name('base_footprint')
+            goal_point = PointStamped()
+            goal_point.header = goal_pose.header
+            goal_point.point = goal_pose.pose.position
+            self.add_goal_check(TranslationGoalChecker(giskard=self,
+                                                       tip_link=full_tip_link,
+                                                       root_link=full_root_link,
+                                                       expected=goal_point))
+            goal_orientation = QuaternionStamped()
+            goal_orientation.header = goal_pose.header
+            goal_orientation.quaternion = goal_pose.pose.orientation
+            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
     def set_diff_drive_base_goal(self, goal_pose, tip_link=None, root_link=None, weight=None, linear_velocity=None,
                                  angular_velocity=None, check=True, **kwargs):

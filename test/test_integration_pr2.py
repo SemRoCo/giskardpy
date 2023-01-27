@@ -136,9 +136,8 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def move_base(self, goal_pose):
-        # self.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
-        #                    goal_pose=goal_pose)
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
+        self.set_move_base_goal(goal_pose=goal_pose)
+        # self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
@@ -1427,8 +1426,8 @@ class TestMoveBaseGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
-        base_goal.pose.orientation.w = 1
-        # base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        # base_goal.pose.orientation.w = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
         zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
 

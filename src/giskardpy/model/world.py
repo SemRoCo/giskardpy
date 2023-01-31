@@ -1092,7 +1092,7 @@ class WorldTree(WorldTreeInterface):
                                               collision_id: int) -> PoseStamped:
         root_T_tip = self.compute_fk_np(root, tip)
         tip_link = self.links[tip]
-        root_T_tip = root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
+        root_T_tip = root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry.evaluate())
         p = PoseStamped()
         p.header.frame_id = str(root)
         p.pose = homo_matrix_to_pose(root_T_tip)

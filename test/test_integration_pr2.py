@@ -3492,7 +3492,6 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.position.x = .1
         base_pose.pose.orientation.w = 1
         kitchen_setup.move_base(base_pose)
-        kitchen_setup.plan_and_execute()
 
         # grasp bowl
         l_goal = deepcopy(bowl_pose)

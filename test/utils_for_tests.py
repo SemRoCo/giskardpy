@@ -234,8 +234,12 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_moving = 0
         self._alive = True
 
-        # self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-        #                                                UpdateTransform)
+        try:
+            from iai_naive_kinematics_sim.srv import UpdateTransform
+            self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+                                                           UpdateTransform)
+        except Exception as e:
+            self.set_localization_srv = None
 
         self.giskard = config_file()
         if 'GITHUB_WORKFLOW' in os.environ:
@@ -288,15 +292,16 @@ class GiskardTestWrapper(GiskardWrapper):
                            seed_configuration=seed_configuration)
 
     def set_localization(self, map_T_odom: PoseStamped):
-        pass
-        # map_T_odom.pose.position.z = 0
-        # req = UpdateTransformRequest()
-        # req.transform.translation = map_T_odom.pose.position
-        # req.transform.rotation = map_T_odom.pose.orientation
-        # assert self.set_localization_srv(req).success
-        # self.wait_heartbeats(15)
-        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
-        # compare_poses(p2.pose, map_T_odom.pose)
+        if self.set_localization_srv is not None:
+            from iai_naive_kinematics_sim.srv import UpdateTransformRequest
+            map_T_odom.pose.position.z = 0
+            req = UpdateTransformRequest()
+            req.transform.translation = map_T_odom.pose.position
+            req.transform.rotation = map_T_odom.pose.orientation
+            assert self.set_localization_srv(req).success
+            self.wait_heartbeats(15)
+            p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+            compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         result_msg = deepcopy(msg)

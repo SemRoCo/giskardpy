@@ -104,7 +104,10 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     for joint_name in better_pose.world.groups[better_pose.kitchen_name].movable_joint_names:
         joint = better_pose.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            js[str(joint.free_variable.name)] = 0.0
+            if better_pose.is_standalone():
+                js[str(joint.free_variable.name)] = 0.0
+            else:
+                js[str(joint.free_variable.name.short_name)] = 0.0
     better_pose.set_kitchen_js(js)
     return better_pose
 

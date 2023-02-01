@@ -79,7 +79,7 @@ class Giskard:
         if group_name is None:
             group_name = robot_name_from_urdf_string(urdf)
             assert group_name not in self.group_names
-            self.group_names.append(group_name)
+        self.group_names.append(group_name)
         robot = RobotInterfaceConfig(urdf, name=group_name)
         self.robot_interface_configs.append(robot)
         js_kwargs = [{'group_name': group_name, 'joint_state_topic': topic} for topic in joint_state_topics]

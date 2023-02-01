@@ -152,8 +152,9 @@ class Giskard:
     def disable_tf_publishing(self):
         self.behavior_tree_config.plugin_config['TFPublisher']['enabled'] = False
 
-    def publish_all_tf(self):
+    def publish_all_tf(self, include_prefix: bool = True):
         self.behavior_tree_config.plugin_config['TFPublisher']['mode'] = TfPublishingModes.all
+        self.behavior_tree_config.plugin_config['TFPublisher']['include_prefix'] = include_prefix
 
     def _add_joint(self, joint: Joint):
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
@@ -248,7 +249,7 @@ class Giskard:
         """
         if robot_group_name is None:
             robot_group_name = self.get_default_group_name()
-        brumbrum_joint = OmniDrive(parent_link_name=parent_link_name,
+        brumbrum_joint = OmniDrive(parent_link_name=PrefixName(parent_link_name, None),
                                    child_link_name=PrefixName(child_link_name, robot_group_name),
                                    name=name,
                                    group_name=robot_group_name,

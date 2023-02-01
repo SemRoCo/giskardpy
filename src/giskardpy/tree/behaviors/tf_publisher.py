@@ -14,12 +14,13 @@ class TFPublisher(GiskardBehavior):
     """
 
     @profile
-    def __init__(self, name: str, mode: TfPublishingModes, tf_topic: str, enabled: bool):
+    def __init__(self, name: str, mode: TfPublishingModes, tf_topic: str, enabled: bool, include_prefix=True):
         super().__init__(name)
         self.original_links = set(self.world.link_names_as_set)
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.mode = mode
         self.robot_names = self.collision_scene.robot_names
+        self.include_prefix = include_prefix
 
     def make_transform(self, parent_frame, child_frame, pose):
         tf = TransformStamped()
@@ -37,7 +38,7 @@ class TFPublisher(GiskardBehavior):
         try:
             with self.get_god_map() as god_map:
                 if self.mode == TfPublishingModes.all:
-                    self.tf_pub.publish(self.world.as_tf_msg())
+                    self.tf_pub.publish(self.world.as_tf_msg(self.include_prefix))
                 else:
                     tf_msg = TFMessage()
                     if self.mode in [TfPublishingModes.attached_objects, TfPublishingModes.attached_and_world_objects]:
@@ -49,7 +50,10 @@ class TFPublisher(GiskardBehavior):
                             for link_name in attached_links:
                                 parent_link_name = self.world.groups[robot_name].get_parent_link_of_link(link_name)
                                 fk = get_fk(parent_link_name, link_name)
-                                tf = self.make_transform(fk.header.frame_id, str(link_name), fk.pose)
+                                if self.include_prefix:
+                                    tf = self.make_transform(fk.header.frame_id, str(link_name), fk.pose)
+                                else:
+                                    tf = self.make_transform(fk.header.frame_id, str(link_name.short_name), fk.pose)
                                 tf_msg.transforms.append(tf)
                 if self.mode in [TfPublishingModes.world_objects, TfPublishingModes.attached_and_world_objects]:
                     for group_name, group in self.world.groups.items():

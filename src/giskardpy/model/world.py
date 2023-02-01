@@ -1125,15 +1125,21 @@ class WorldTree(WorldTreeInterface):
         return result
 
     @profile
-    def as_tf_msg(self):
+    def as_tf_msg(self, include_prefix: bool) -> TFMessage:
         """
         Create a tfmessage for the whole world tree.
         """
         tf_msg = TFMessage()
         for joint_name, joint in self.joints.items():
             p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
-            p_T_c = make_transform(parent_frame=joint.parent_link_name,
-                                   child_frame=joint.child_link_name,
+            if include_prefix:
+                parent_link_name = joint.parent_link_name
+                child_link_name = joint.child_link_name
+            else:
+                parent_link_name = joint.parent_link_name.short_name
+                child_link_name = joint.child_link_name.short_name
+            p_T_c = make_transform(parent_frame=parent_link_name,
+                                   child_frame=child_link_name,
                                    pose=p_T_c.pose,
                                    normalize_quaternion=False)
             tf_msg.transforms.append(p_T_c)

@@ -82,7 +82,7 @@ class Giskard:
         if group_name is None:
             group_name = robot_name_from_urdf_string(urdf)
             assert group_name not in self.group_names
-            self.group_names.append(group_name)
+        self.group_names.append(group_name)
         robot = RobotInterfaceConfig(urdf, name=group_name, add_drive_joint_to_group=add_drive_joint_to_group)
         self.robot_interface_configs.append(robot)
         js_kwargs = [{'group_name': group_name, 'joint_state_topic': topic} for topic in joint_state_topics]
@@ -169,8 +169,9 @@ class Giskard:
     def disable_tf_publishing(self):
         self.behavior_tree_config.plugin_config['TFPublisher']['enabled'] = False
 
-    def publish_all_tf(self):
+    def publish_all_tf(self, include_prefix: bool = True):
         self.behavior_tree_config.plugin_config['TFPublisher']['mode'] = TfPublishingModes.all
+        self.behavior_tree_config.plugin_config['TFPublisher']['include_prefix'] = include_prefix
 
     def _add_joint(self, joint: Tuple[Type, Dict[str, Any]]):
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])

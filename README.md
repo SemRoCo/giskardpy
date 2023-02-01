@@ -54,5 +54,8 @@ If it doesn't work, source your ```.bashrc``` again
 and/or make sure that your ```$PYTHONPATH``` includes something like ```/path/of/your/choosing/bullet3/build_cmake/better_python:/path/of/your/choosing/bullet3/examples/pybullet```. 
 
 ### Tutorials
-http://giskard.de/wiki:tutorials
+https://github.com/SemRoCo/giskardpy/wiki
+
+### How to cite
+Stelter, Simon, Georg Bartels, and Michael Beetz. "An open-source motion planning framework for mobile manipulators using constraint-based task space control with linear MPC." 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2022.
 

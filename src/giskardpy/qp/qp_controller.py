@@ -711,7 +711,7 @@ class A(Parent):
                 horizontal_offset * (order):horizontal_offset * (order + 1)] = J_hstack
 
             # extra slack variable for total error
-            I = w.eye(number_of_task_constr_rows) * self.dt * self.prediction_horizon
+            I = w.diag(w.Expression([self.dt * c.control_horizon for c in self.constraints]))
             A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
 
         A_soft.remove(rows_to_delete, [])

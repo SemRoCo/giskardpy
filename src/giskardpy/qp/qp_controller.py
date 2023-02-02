@@ -16,7 +16,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import derivative_joint_map, Derivatives
-from giskardpy.qp.constraint import DerivativeConstraint, Constraint
+from giskardpy.qp.constraint import DerivativeConstraint, IntegralConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
@@ -43,17 +43,17 @@ def save_pandas(dfs, names, path):
 class Parent:
     time_collector: TimeCollector
     free_variables: List[FreeVariable]
-    constraints: List[Constraint]
+    constraints: List[IntegralConstraint]
     velocity_constraints: List[DerivativeConstraint]
 
     def __init__(self,
                  free_variables: List[FreeVariable],
-                 constraints: List[Constraint],
+                 constraints: List[IntegralConstraint],
                  derivative_constraints: List[DerivativeConstraint],
                  sample_period: float, prediction_horizon: int, order: Derivatives,
                  time_collector: Optional[TimeCollector] = None):
         self.free_variables = free_variables  # type: list[FreeVariable]
-        self.constraints = constraints  # type: list[Constraint]
+        self.constraints = constraints  # type: list[IntegralConstraint]
         self.derivative_constraints = derivative_constraints  # type: list[DerivativeConstraint]
         self.time_collector = time_collector
         self.prediction_horizon = prediction_horizon
@@ -105,7 +105,7 @@ class Parent:
 class H(Parent):
     def __init__(self,
                  free_variables: List[FreeVariable],
-                 constraints: List[Constraint],
+                 constraints: List[IntegralConstraint],
                  derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
@@ -179,7 +179,7 @@ class B(Parent):
 
     def __init__(self,
                  free_variables: List[FreeVariable],
-                 constraints: List[Constraint],
+                 constraints: List[IntegralConstraint],
                  derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
@@ -250,7 +250,7 @@ class BA(Parent):
 
     def __init__(self,
                  free_variables: List[FreeVariable],
-                 constraints: List[Constraint],
+                 constraints: List[IntegralConstraint],
                  derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
@@ -389,7 +389,7 @@ class BA(Parent):
 class A(Parent):
     def __init__(self,
                  free_variables: List[FreeVariable],
-                 constraints: List[Constraint],
+                 constraints: List[IntegralConstraint],
                  derivative_constraints: List[DerivativeConstraint],
                  sample_period: float,
                  prediction_horizon: int,
@@ -739,7 +739,7 @@ class QPController:
                  prediction_horizon: int,
                  solver_name: str,
                  free_variables: List[FreeVariable] = None,
-                 constraints: List[Constraint] = None,
+                 constraints: List[IntegralConstraint] = None,
                  velocity_constraints: List[DerivativeConstraint] = None,
                  debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,

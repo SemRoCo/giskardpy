@@ -2,12 +2,14 @@ from collections import namedtuple
 from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as w
+from giskardpy import identifier
+from giskardpy.god_map import GodMap
 from giskardpy.my_types import Derivatives
 
 DebugConstraint = namedtuple('debug', ['expr'])
 
 
-class Constraint:
+class IntegralConstraint:
     lower_error = -1e4
     upper_error = 1e4
     lower_slack_limit = -1e4
@@ -19,14 +21,15 @@ class Constraint:
                  expression: w.Expression,
                  lower_error: w.symbol_expr_float, upper_error: w.symbol_expr_float,
                  velocity_limit: w.symbol_expr_float,
-                 quadratic_weight: w.symbol_expr_float, control_horizon: int,
+                 quadratic_weight: w.symbol_expr_float,
+                 control_horizon: Optional[int] = None,
                  linear_weight: Optional[w.symbol_expr_float] = None,
                  lower_slack_limit: Optional[w.symbol_expr_float] = None,
                  upper_slack_limit: Optional[w.symbol_expr_float] = None):
         self.name = name
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon
+        self.control_horizon = control_horizon if control_horizon is not None else max(self.prediction_horizon - 2, 1)
         self.velocity_limit = velocity_limit
         self.lower_error = lower_error
         self.upper_error = upper_error
@@ -36,6 +39,14 @@ class Constraint:
             self.upper_slack_limit = upper_slack_limit
         if linear_weight is not None:
             self.linear_weight = linear_weight
+
+    @property
+    def god_map(self) -> GodMap:
+        return GodMap()
+
+    @property
+    def prediction_horizon(self) -> int:
+        return self.god_map.get_data(identifier.prediction_horizon)
 
     def __str__(self):
         return self.name

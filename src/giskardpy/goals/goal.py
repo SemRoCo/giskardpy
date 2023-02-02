@@ -15,7 +15,7 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
-from giskardpy.qp.constraint import DerivativeConstraint, Constraint
+from giskardpy.qp.constraint import DerivativeConstraint, IntegralConstraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
@@ -34,8 +34,6 @@ class Goal(ABC):
         self.god_map = GodMap()
         self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
         self._test_mode = self.god_map.get_data(identifier.test_mode)
-        # last 2 velocities are 0 anyway
-        self.control_horizon = max(self.prediction_horizon - 2, 1)
         self._sub_goals: List[Goal] = []
         self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
 
@@ -205,7 +203,7 @@ class Goal(ABC):
         return self.get_expr_velocity(fk)
 
     @profile
-    def get_constraints(self) -> Tuple[Dict[str, Constraint],
+    def get_constraints(self) -> Tuple[Dict[str, IntegralConstraint],
                                        Dict[str, DerivativeConstraint],
                                        Dict[str, Union[w.Symbol, float]]]:
         self._constraints = OrderedDict()
@@ -340,7 +338,8 @@ class Goal(ABC):
                        task_expression: w.symbol_expr,
                        name: Optional[str] = None,
                        lower_slack_limit: Optional[w.symbol_expr_float] = None,
-                       upper_slack_limit: Optional[w.symbol_expr_float] = None):
+                       upper_slack_limit: Optional[w.symbol_expr_float] = None,
+                       control_horizon: Optional[int] = None):
         """
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final
@@ -364,15 +363,15 @@ class Goal(ABC):
                            f'You need to set a name, if you add multiple constraints.')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
-        self._constraints[name] = Constraint(name=name,
-                                             expression=task_expression,
-                                             lower_error=lower_error,
-                                             upper_error=upper_error,
-                                             velocity_limit=reference_velocity,
-                                             quadratic_weight=weight,
-                                             lower_slack_limit=lower_slack_limit,
-                                             upper_slack_limit=upper_slack_limit,
-                                             control_horizon=self.control_horizon)
+        self._constraints[name] = IntegralConstraint(name=name,
+                                                     expression=task_expression,
+                                                     lower_error=lower_error,
+                                                     upper_error=upper_error,
+                                                     velocity_limit=reference_velocity,
+                                                     quadratic_weight=weight,
+                                                     lower_slack_limit=lower_slack_limit,
+                                                     upper_slack_limit=upper_slack_limit,
+                                                     control_horizon=control_horizon)
 
     def add_constraint_vector(self,
                               reference_velocities: Union[w.Expression, w.Vector3, w.Point3, List[w.symbol_expr_float]],

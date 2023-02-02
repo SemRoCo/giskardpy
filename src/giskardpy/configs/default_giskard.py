@@ -271,7 +271,7 @@ class Giskard:
         joint_name = PrefixName(name, robot_group_name)
         parent_link_name = PrefixName(parent_link_name, None)
         child_link_name = PrefixName(child_link_name, robot_group_name)
-        brumbrum_joint = (OmniDrive, {'parent_link_name': parent_link_name,
+        brumbrum_joint = (OmniDrivePR22, {'parent_link_name': parent_link_name,
                                       'child_link_name': child_link_name,
                                       'name': joint_name,
                                       'translation_limits': translation_limits,

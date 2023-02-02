@@ -627,7 +627,7 @@ class StandAlone(TreeManager):
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
             planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-            planning_4.add_child(DebugMarkerPublisher('debug tf publisher'))
+            planning_4.add_child(DebugMarkerPublisher('debug marker publisher'))
         if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
             planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                          **self.god_map.unsafe_get_data(
@@ -741,6 +741,8 @@ class OpenLoop(StandAlone):
                 real_time_tracking.add_child(RosTime('time'))
                 real_time_tracking.add_child(ControllerPluginBase('base controller'))
                 real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
+                if self.god_map.get_data(identifier.PlotDebugTF_enabled):
+                    real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
                 if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                                          **self.god_map.unsafe_get_data(

@@ -55,7 +55,7 @@ class BaseTrajFollower(Goal):
 
         frame_P_goal = map_T_base_footprint_goal.to_position()
         frame_P_current = map_T_base_footprint_current.to_position()
-        error = (frame_P_goal[:3] - frame_P_current[:3]) / self.sample_period
+        error = (frame_P_goal - frame_P_current) / self.sample_period
         return error[0], error[1]
 
     @profile
@@ -101,7 +101,7 @@ class BaseTrajFollower(Goal):
     @profile
     def rot_error_at(self, t: int):
         rotation_goal = self.current_traj_point(self.joint.yaw.name, t)
-        rotation_current = self.joint.yaw.get_symbol(0)
+        rotation_current = self.joint.yaw.get_symbol(Derivatives.position)
         error = w.shortest_angular_distance(rotation_current, rotation_goal) / self.sample_period
         return error
 
@@ -115,7 +115,7 @@ class BaseTrajFollower(Goal):
         self.add_velocity_constraint(lower_velocity_limit=errors,
                                      upper_velocity_limit=errors,
                                      weight=WEIGHT_BELOW_CA,
-                                     task_expression=self.joint.yaw_vel.get_symbol(0),
+                                     task_expression=self.joint.yaw.get_symbol(Derivatives.position),
                                      velocity_limit=0.5,
                                      name_suffix='/rot')
 
@@ -133,32 +133,52 @@ class BaseTrajFollower(Goal):
 class BaseTrajFollowerPR2(BaseTrajFollower):
     joint: OmniDrivePR22
 
+    def make_constraints(self):
+        constraints = super().make_constraints()
+        return constraints
+
     @profile
     def add_trans_constraints(self):
         lb_yaw1 = []
         lb_forward = []
-        self.world.state[self.joint.caster_yaw1_name].position = 0
+        self.world.state[self.joint.yaw1_vel.name].position = 0
         for t in range(self.prediction_horizon):
-            yaw1 = self.current_traj_point(self.joint.caster_yaw1_name, t * self.sample_period, Derivatives.velocity)
-            forward = self.current_traj_point(self.joint.caster_forward_name, t * self.sample_period,
-                                              Derivatives.velocity)
+            trajectory_time_in_s = t * self.sample_period
+
+            yaw1 = self.current_traj_point(self.joint.yaw1_vel.name, trajectory_time_in_s, Derivatives.velocity)
             lb_yaw1.append(yaw1)
+            if t == 0 and not self.track_only_velocity:
+                lb_yaw1[-1] += self.rot_error_at(t)
+                yaw1_goal_position = self.current_traj_point(self.joint.yaw1_vel.name, trajectory_time_in_s,
+                                                             Derivatives.position)
+            forward = self.current_traj_point(self.joint.forward_vel.name, t * self.sample_period,
+                                              Derivatives.velocity)
             lb_forward.append(forward)
         weight_vel = WEIGHT_ABOVE_CA
-        lba_x = lb_yaw1
-        uba_x = lb_yaw1
-        lba_y = lb_forward
-        uba_y = lb_forward
+        lba_yaw = lb_yaw1
+        uba_yaw = lb_yaw1
+        lba_forward = lb_forward
+        uba_forward = lb_forward
 
-        self.add_velocity_constraint(lower_velocity_limit=lba_x,
-                                     upper_velocity_limit=uba_x,
+        yaw1 = self.joint.yaw1_vel.get_symbol(Derivatives.position)
+        yaw2 = self.joint.yaw.get_symbol(Derivatives.position)
+        bf_yaw = yaw1 - yaw2
+        x = w.cos(bf_yaw)
+        y = w.sin(bf_yaw)
+        v = w.Vector3([x, y, 0])
+        v.vis_frame = 'pr2/base_footprint'
+        v.reference_frame = 'pr2/base_footprint'
+        self.add_debug_expr('v', v)
+
+        self.add_velocity_constraint(lower_velocity_limit=lba_yaw,
+                                     upper_velocity_limit=uba_yaw,
                                      weight=weight_vel,
-                                     task_expression=self.joint.caster_yaw1.get_symbol(Derivatives.position),
-                                     velocity_limit=10,
+                                     task_expression=self.joint.yaw1_vel.get_symbol(Derivatives.position),
+                                     velocity_limit=100,
                                      name_suffix='/yaw1')
-        self.add_velocity_constraint(lower_velocity_limit=lba_y,
-                                     upper_velocity_limit=uba_y,
+        self.add_velocity_constraint(lower_velocity_limit=lba_forward,
+                                     upper_velocity_limit=uba_forward,
                                      weight=weight_vel,
-                                     task_expression=self.joint.caster_forward.get_symbol(Derivatives.position),
+                                     task_expression=self.joint.forward_vel.get_symbol(Derivatives.position),
                                      velocity_limit=0.5,
                                      name_suffix='/forward')

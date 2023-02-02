@@ -282,7 +282,6 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
     yaw: FreeVariable
     x_vel: FreeVariable
     y_vel: FreeVariable
-    yaw_vel: FreeVariable
 
     def __init__(self,
                  name: PrefixName,
@@ -319,8 +318,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
                                                y=self.y.get_symbol(Derivatives.position),
                                                yaw=self.yaw.get_symbol(Derivatives.position))
         bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
-                                                 y=self.y_vel.get_symbol(Derivatives.position),
-                                                 yaw=self.yaw_vel.get_symbol(Derivatives.position))
+                                                 y=self.y_vel.get_symbol(Derivatives.position))
         bf_vel_T_bf = w.TransMatrix.from_xyz_rpy(x=0,
                                                  y=0,
                                                  z=self.z.get_symbol(Derivatives.position),
@@ -339,7 +337,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
 
         self.roll = self.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
         self.pitch = self.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
-        self.yaw = self.world.add_virtual_free_variable(name=PrefixName('yaw', self.name))
+        self.yaw = self.world.add_free_variable(name=PrefixName('yaw', self.name))
 
         self.x_vel = self.world.add_free_variable(name=PrefixName('x_vel', self.name),
                                                   lower_limits=translation_lower_limits,
@@ -347,10 +345,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         self.y_vel = self.world.add_free_variable(name=PrefixName('y_vel', self.name),
                                                   lower_limits=translation_lower_limits,
                                                   upper_limits=self.translation_limits)
-        self.yaw_vel = self.world.add_free_variable(name=PrefixName('yaw_vel', self.name),
-                                                    lower_limits=rotation_lower_limits,
-                                                    upper_limits=self.rotation_limits)
-        self.free_variables = [self.x_vel, self.y_vel, self.yaw_vel]
+        self.free_variables = [self.x_vel, self.y_vel, self.yaw]
 
     def update_transform(self, new_parent_T_child: Pose):
         roll, pitch, yaw = rpy_from_quaternion(new_parent_T_child.orientation.x,
@@ -369,11 +364,10 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         state = self.world.state
         state[self.x_vel.name].position = 0
         state[self.y_vel.name].position = 0
-        state[self.yaw_vel.name].position = 0
 
         x_vel = state[self.x_vel.name].velocity
         y_vel = state[self.y_vel.name].velocity
-        rot_vel = state[self.yaw_vel.name].velocity
+        rot_vel = state[self.yaw.name].velocity
         delta = state[self.yaw.name].position
         state[self.x.name].velocity = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
         state[self.x.name].position += state[self.x.name].velocity * dt
@@ -492,10 +486,9 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
     z: FreeVariable
     roll: FreeVariable
     pitch: FreeVariable
-    yaw: FreeVariable
     forward_vel: FreeVariable
     yaw1_vel: FreeVariable
-    yaw2_vel: FreeVariable
+    yaw: FreeVariable
 
     def __init__(self,
                  name: PrefixName,
@@ -558,10 +551,10 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         self.yaw1_vel = self.world.add_free_variable(name=PrefixName('yaw1_vel', self.name),
                                                      lower_limits=caster_lower_limits,
                                                      upper_limits=caster_upper_limits)
-        self.yaw2_vel = self.world.add_free_variable(name=PrefixName('yaw2_vel', self.name),
-                                                     lower_limits=rotation_lower_limits,
-                                                     upper_limits=self.rotation_limits)
-        self.free_variables = [self.forward_vel, self.yaw1_vel, self.yaw2_vel]
+        self.yaw = self.world.add_free_variable(name=PrefixName('yaw2_vel', self.name),
+                                                lower_limits=rotation_lower_limits,
+                                                upper_limits=self.rotation_limits)
+        self.free_variables = [self.forward_vel, self.yaw1_vel, self.yaw]
         self.world.state[self.forward_vel.name].position = 0.25
 
         self.yaw1_vel.quadratic_weights[Derivatives.velocity] = 0.0001
@@ -569,7 +562,7 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         self.yaw1_vel.quadratic_weights[Derivatives.jerk] = 0.1
 
     def get_position_variables(self) -> List[PrefixName]:
-        return [self.forward_vel.name, self.yaw1_vel.name, self.yaw2_vel.name]
+        return [self.forward_vel.name, self.yaw1_vel.name, self.yaw.name]
 
     @profile
     def create_parent_T_child(self):
@@ -580,7 +573,7 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
                                                )
         yaw1 = self.yaw1_vel.get_symbol(Derivatives.position)
         forward = self.forward_vel.get_symbol(Derivatives.position)
-        yaw2 = self.yaw2_vel.get_symbol(Derivatives.position)
+        yaw2 = self.yaw.get_symbol(Derivatives.position)
         a = w.TransMatrix.from_xyz_rpy(yaw=yaw1)
         b = w.TransMatrix.from_xyz_rpy(x=forward * hack)
         # c = w.TransMatrix.from_xyz_rpy(x=-forward)
@@ -616,6 +609,18 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         # state[self.yaw_name].velocity = total_yaw_velocity
         # state[self.yaw_name].position += total_yaw_velocity * dt
 
+    def update_transform(self, new_parent_T_child: Pose):
+        roll, pitch, yaw = rpy_from_quaternion(new_parent_T_child.orientation.x,
+                                               new_parent_T_child.orientation.y,
+                                               new_parent_T_child.orientation.z,
+                                               new_parent_T_child.orientation.w)
+        self.last_msg = JointStates()
+        self.world.state[self.x.name].position = new_parent_T_child.position.x
+        self.world.state[self.y.name].position = new_parent_T_child.position.y
+        self.world.state[self.z.name].position = new_parent_T_child.position.z
+        self.world.state[self.roll.name].position = roll
+        self.world.state[self.pitch.name].position = pitch
+        self.world.state[self.yaw.name].position = yaw
 
 class PR2CasterJoint(MovableJoint):
     def __init__(self,
@@ -644,8 +649,8 @@ class PR2CasterJoint(MovableJoint):
         elif isinstance(self.odom_joint, OmniDrivePR22):
             forward_velocity = self.odom_joint.forward_vel.get_symbol(Derivatives.velocity)
             yaw1_position = self.odom_joint.yaw1_vel.get_symbol(Derivatives.position)
-            yaw2_position = self.odom_joint.yaw2_vel.get_symbol(Derivatives.position)
-            yaw2_velocity = self.odom_joint.yaw2_vel.get_symbol(Derivatives.velocity)
+            yaw2_position = self.odom_joint.yaw.get_symbol(Derivatives.position)
+            yaw2_velocity = self.odom_joint.yaw.get_symbol(Derivatives.velocity)
             x_vel = w.cos(yaw1_position-yaw2_position) * forward_velocity
             y_vel = w.sin(yaw1_position-yaw2_position) * forward_velocity
             yaw_vel = yaw2_velocity

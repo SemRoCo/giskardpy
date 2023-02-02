@@ -96,9 +96,9 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         twist = Twist()
         if isinstance(self.joint, OmniDrivePR22):
             try:
-                forward_velocity = cmd[Derivatives.velocity][self.joint.caster_forward.position_name]
-                yaw1_position = self.world.state[self.joint.caster_yaw1_name].position
-                yaw2_position = self.world.state[self.joint.caster_yaw2_name].position
+                forward_velocity = cmd[Derivatives.velocity][self.joint.forward_vel.position_name]
+                yaw1_position = self.world.state[self.joint.yaw1_vel.name].position
+                yaw2_position = self.world.state[self.joint.yaw.name].position
                 bf_yaw1 = yaw1_position - yaw2_position
                 twist.linear.x = np.cos(bf_yaw1) * forward_velocity
                 twist.linear.y = np.sin(bf_yaw1) * forward_velocity
@@ -106,7 +106,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
                     twist.linear.x = 0
                 if abs(twist.linear.y) < self.threshold[1]:
                     twist.linear.y = 0
-            except:
+            except Exception as e:
                 twist.linear.x = 0
                 twist.linear.y = 0
         else:
@@ -123,7 +123,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             except:
                 twist.linear.y = 0
         try:
-            twist.angular.z = cmd[Derivatives.velocity][self.joint.yaw_vel.position_name]
+            twist.angular.z = cmd[Derivatives.velocity][self.joint.yaw.position_name]
             if abs(twist.angular.z) < self.threshold[2]:
                 twist.angular.z = 0
         except:

@@ -64,7 +64,7 @@ class SetOdometry(NonMotionGoal):
         if isinstance(brumbrum_joint, OmniDrivePR22):
             self.world.state[brumbrum_joint.yaw1_vel.name].position = 0
             # self.world.state[brumbrum_joint.yaw2_name].position = angle
-            self.world.state[brumbrum_joint.yaw2_vel.name].position = angle
+            self.world.state[brumbrum_joint.yaw.name].position = angle
         else:
             self.world.state[brumbrum_joint.yaw.name].position = angle
         self.world.notify_state_change()

@@ -95,7 +95,7 @@ class Trajectory:
         data = defaultdict(lambda: defaultdict(list))
         for time, joint_states in self.items():
             for free_variable, joint_state in joint_states.items():
-                for derivative, state in joint_state.state.items():
+                for derivative, state in enumerate(joint_state.state):
                     data[derivative][free_variable].append(state)
         for derivative, d_data in data.items():
             for free_variable, trajectory in d_data.items():

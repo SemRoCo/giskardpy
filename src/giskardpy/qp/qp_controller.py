@@ -11,6 +11,7 @@ import pandas as pd
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.data_types import JointStates, _JointState
 from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import GodMap
@@ -18,6 +19,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.my_types import derivative_joint_map, Derivatives
 from giskardpy.qp.constraint import DerivativeConstraint, IntegralConstraint
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
@@ -1077,7 +1079,7 @@ class QPController:
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: list) -> Tuple[derivative_joint_map, dict]:
+    def get_cmd(self, substitutions: list) -> Tuple[NextCommands, dict]:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:
@@ -1089,7 +1091,7 @@ class QPController:
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
             self._create_debug_pandas()
-            return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+            return NextCommands(self.free_variables, self.xdot_full), self._eval_debug_exprs()
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
@@ -1100,7 +1102,7 @@ class QPController:
                 self.__swap_compiled_matrices()
                 try:
                     self.xdot_full = self.qp_solver.solve(*self.evaluate_and_split(substitutions))
-                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+                    return NextCommands(self.free_variables, self.xdot_full), self._eval_debug_exprs()
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())
@@ -1149,16 +1151,17 @@ class QPController:
                         list(lower_violations.index))
                 raise HardConstraintsViolatedException(error_message)
         logging.loginfo('No slack limit violation detected.')
-        return False
-
     def split_xdot(self, xdot) -> derivative_joint_map:
         split = {}
         offset = len(self.free_variables)
         for derivative in range(Derivatives.velocity, self.order + 1):
-            split[Derivatives(derivative)] = OrderedDict((x.position_name,
-                                                          xdot[i + offset * self.prediction_horizon * (derivative - 1)])
-                                                         for i, x in enumerate(self.free_variables))
+            split.update({x.get_symbol(derivative): xdot[i + offset * self.prediction_horizon * (derivative - 1)] for i, x in enumerate(self.free_variables)})
+            # split[Derivatives(derivative)] = OrderedDict((x.position_name,
+            #                                               xdot[i + offset * self.prediction_horizon * (derivative - 1)])
+            #                                              for i, x in enumerate(self.free_variables))
         return split
+        return False
+
 
     def b_names(self):
         return self.b.names

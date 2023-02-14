@@ -42,7 +42,8 @@ class DebugMarkerPublisher(GiskardBehavior):
 
     def to_vectors_markers(self, width: float = 0.05) -> List[Marker]:
         ms = []
-        for i, (name, value) in enumerate(self.debugs_evaluated.items()):
+        color_counter = 0
+        for name, value in self.debugs_evaluated.items():
             expr = self.debugs[name]
             if not hasattr(expr, 'reference_frame'):
                 continue
@@ -132,10 +133,11 @@ class DebugMarkerPublisher(GiskardBehavior):
                     m.points.append(Point(map_P_p1[0][0], map_P_p1[1][0], map_P_p1[2][0]))
                     m.points.append(Point(map_P_p2[0][0], map_P_p2[1][0], map_P_p2[2][0]))
                     m.type = m.ARROW
-                    m.color = self.colors[i]
+                    m.color = self.colors[color_counter]
                     m.scale.x = width / 2
                     m.scale.y = width
                     m.scale.z = 0
+                    color_counter += 1
                 elif isinstance(expr, w.Point3):
                     ref_P_d = value
                     map_P_d = np.dot(map_T_ref, ref_P_d)
@@ -144,10 +146,11 @@ class DebugMarkerPublisher(GiskardBehavior):
                     m.pose.position.z = map_P_d[2][0]
                     m.pose.orientation.w = 1
                     m.type = m.SPHERE
-                    m.color = self.colors[i]
+                    m.color = self.colors[color_counter]
                     m.scale.x = width
                     m.scale.y = width
                     m.scale.z = width
+                    color_counter += 1
                 ms.append(m)
         return ms
 

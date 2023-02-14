@@ -120,6 +120,8 @@ class Giskard:
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
                                     the system.
         """
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled'] = enabled
         # self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
 
@@ -137,9 +139,13 @@ class Giskard:
         self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
 
     def configure_PlotDebugExpressions(self, enabled: bool = False):
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
 
     def configure_DebugMarkerPublisher(self, enabled: bool = False):
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PlotDebugTF']['enabled'] = enabled
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):

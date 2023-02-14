@@ -20,19 +20,17 @@ class PublishDebugExpressions(GiskardBehavior):
 
     @profile
     def update(self):
-        # print('hi')
-        debug_pandas = self.god_map.get_data(identifier.debug_expressions_evaluated)
         qp_controller: QPController = self.god_map.get_data(identifier.qp_controller)
-        qp_controller._create_debug_pandas()
+        p_lbA, p_ubA, p_lb, p_ub, p_weights, p_xdot, p_Ax_without_slack, p_debug = qp_controller.create_debug_pandas2()
         msg = JointState()
         msg.header.stamp = rospy.get_rostime()
-        msg.name = [f'debug_expressions/{x}' for x in debug_pandas.keys()]
-        msg.position = list(debug_pandas.values())
-        for name, thing in zip(['lbA', 'ubA', 'lb', 'ub', 'weights', 'xdot', 'Ax no slack'],
-                         [qp_controller.p_lbA, qp_controller.p_ubA, qp_controller.p_lb, qp_controller.p_ub,
-                          qp_controller.p_weights, qp_controller.p_xdot, qp_controller.p_Ax_without_slack]):
+        for name, thing in zip(['lbA', 'ubA', 'lb', 'ub', 'weights', 'xdot', 'Ax no slack', 'debug_expressions'],
+                         [p_lbA, p_ubA, p_lb, p_ub, p_weights, p_xdot, p_Ax_without_slack, p_debug]):
             msg.name.extend([f'{name}/{x}' for x in thing.index])
-            msg.position.extend(list(thing.values.T[0]))
+            try:
+                msg.position.extend(list(thing.values.T[0]))
+            except IndexError as e:
+                msg.position = []
 
         self.publisher.publish(msg)
         return Status.RUNNING

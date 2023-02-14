@@ -881,7 +881,7 @@ class QPController:
         # self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
     @profile
-    def _eval_debug_exprs(self):
+    def eval_debug_exprs(self):
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
             params = self.god_map.get_values(f.str_params)
@@ -930,7 +930,7 @@ class QPController:
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: list) -> Tuple[derivative_joint_map, dict]:
+    def get_cmd(self, substitutions: list) -> derivative_joint_map:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:
@@ -942,7 +942,7 @@ class QPController:
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
             # self._create_debug_pandas()
-            return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+            return self.split_xdot(self.xdot_full)
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
@@ -953,7 +953,7 @@ class QPController:
                 self.__swap_compiled_matrices()
                 try:
                     self.xdot_full = self.qp_solver.solve(*self.evaluate_and_split(substitutions))
-                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+                    return self.split_xdot(self.xdot_full)
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())
@@ -965,6 +965,7 @@ class QPController:
             self._is_inf_in_data()
             raise
 
+    @profile
     def evaluate_and_split(self, substitutions):
         self.substitutions = substitutions
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
@@ -1065,9 +1066,55 @@ class QPController:
         plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
+    def create_debug_pandas2(self):
+        sample_period = self.sample_period
+        b_names = self.b_names()
+        bA_names = self.bA_names()
+        b_filter, bA_filter = self.make_filters()
+        filtered_b_names = np.array(b_names)[b_filter]
+        filtered_bA_names = np.array(bA_names)[bA_filter]
+        H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
+        num_vel_constr = len(self.velocity_constraints) * (self.prediction_horizon - 2)
+        num_task_constr = len(self.constraints)
+        num_constr = num_vel_constr + num_task_constr
+
+        p_debug = {}
+        for name, value in self.evaluated_debug_expressions.items():
+            if isinstance(value, np.ndarray) and len(value) > 1:
+                for x in range(value.shape[0]):
+                    for y in range(value.shape[1]):
+                        tmp_name = f'{name}|{x}_{y}'
+                        p_debug[tmp_name] = value[x, y]
+            else:
+                p_debug[name] = np.array(value)
+        p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
+
+        p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
+        p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)
+        # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
+        p_lbA_raw = pd.DataFrame(lbA, filtered_bA_names, ['data'], dtype=float)
+        p_lbA = deepcopy(p_lbA_raw)
+        p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, ['data'], dtype=float)
+        p_ubA = deepcopy(p_ubA_raw)
+        # remove sample period factor
+        p_lbA[-num_constr:] /= sample_period
+        p_ubA[-num_constr:] /= sample_period
+        p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
+        p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
+        p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
+
+        p_pure_xdot = deepcopy(p_xdot)
+        p_pure_xdot[-num_constr:] = 0
+        # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
+        p_Ax_without_slack_raw = pd.DataFrame(p_A.dot(p_pure_xdot), filtered_bA_names, ['data'],
+                                                   dtype=float)
+        p_Ax_without_slack = deepcopy(p_Ax_without_slack_raw)
+        p_Ax_without_slack[-num_constr:] /= sample_period
+        return p_lbA, p_ubA, p_lb, p_ub, p_weights, p_xdot, p_Ax_without_slack, p_debug
+
+    @profile
     def _create_debug_pandas(self):
         substitutions = self.substitutions
-        self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
         b_names = self.b_names()
@@ -1103,8 +1150,7 @@ class QPController:
         # remove sample period factor
         self.p_lbA[-num_constr:] /= sample_period
         self.p_ubA[-num_constr:] /= sample_period
-        self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, ['data'],
-                                      dtype=float)
+        self.p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
         self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)

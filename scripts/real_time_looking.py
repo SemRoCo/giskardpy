@@ -34,7 +34,7 @@ class IMServer(object):
         self.root = 'map'
         self.tip = 'head_mount_kinect_rgb_optical_frame'
         self.point = PointStamped()
-        self.point.header.frame_id = 'map'
+        self.point.header.frame_id = 'base_footprint'
         self.point.point.x = 1
         self.point.point.z = 1
         self.point = tf.transform_msg(self.root, self.point)

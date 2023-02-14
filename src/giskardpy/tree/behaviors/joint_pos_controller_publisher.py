@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 import rospy
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, Float64
 
 import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict
@@ -9,14 +9,19 @@ from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 
 
-class JointGroupPosController(CommandPublisher):
+class JointPosController(CommandPublisher):
     @profile
-    def __init__(self, namespace='/joint_group_pos_controller', group_name: str = None, hz=100):
-        super().__init__(namespace, hz)
-        self.namespace = namespace
-        self.cmd_topic = f'{self.namespace}/command'
-        self.cmd_pub = rospy.Publisher(self.cmd_topic, Float64MultiArray, queue_size=10)
-        self.joint_names = rospy.get_param(f'{self.namespace}/joints')
+    def __init__(self, namespaces=None, group_name: str = None, hz=100):
+        super().__init__('joint position publisher', hz)
+        self.namespaces = namespaces
+        self.publishers = []
+        self.cmd_topics = []
+        self.joint_names = []
+        for namespace in self.namespaces:
+            cmd_topic = f'{namespace}/command'
+            self.cmd_topics.append(cmd_topic)
+            self.publishers.append(rospy.Publisher(cmd_topic, Float64, queue_size=10))
+            self.joint_names.append(rospy.get_param(f'{namespace}/joint'))
         for i in range(len(self.joint_names)):
             self.joint_names[i] = self.world.search_for_joint_name(self.joint_names[i])
         self.world.register_controlled_joints(self.joint_names)
@@ -30,13 +35,13 @@ class JointGroupPosController(CommandPublisher):
         super().initialise()
 
     def publish_joint_state(self, time):
-        msg = Float64MultiArray()
+        msg = Float64()
         js = deepcopy(self.world.state)
         try:
             qp_data = self.god_map.get_data(identifier.qp_solver_solution)
         except Exception:
             return
-        for joint_name in self.joint_names:
+        for i, joint_name in enumerate(self.joint_names):
             try:
                 key = self.world.joints[joint_name].free_variables[0].position_name
                 velocity = qp_data[Derivatives.velocity][key]
@@ -45,5 +50,5 @@ class JointGroupPosController(CommandPublisher):
                 position = js[joint_name].position + velocity * 0.001
             except KeyError:
                 position = js[joint_name].position
-            msg.data.append(position)
-        self.cmd_pub.publish(msg)
+            msg.data = position
+            self.publishers[i].publish(msg)

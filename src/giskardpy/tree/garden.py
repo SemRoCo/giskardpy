@@ -31,6 +31,7 @@ from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
 from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
+from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
@@ -776,9 +777,13 @@ class ClosedLoop(OpenLoop):
                     and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
                 planning_4.add_child(CollisionMarker('cpi marker'))
         planning_4.add_child(ControllerPlugin('controller'))
+        if self.god_map.get_data(identifier.debug_expr_needed):
+            planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
         planning_4.add_child(KinSimPlugin('kin sim'))
         for joint_group_position_controller_config in hardware_config.joint_group_position_controllers_kwargs:
             planning_4.add_child(JointGroupPosController(**joint_group_position_controller_config))
+        for joint_position_controller_config in hardware_config.joint_position_controllers_kwargs:
+            planning_4.add_child(JointPosController(**joint_position_controller_config))
         planning_4.add_child(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
             planning_4.add_child(LogDebugExpressionsPlugin('log lba'))

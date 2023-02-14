@@ -83,6 +83,7 @@ class HardwareConfig:
         self.send_trajectory_to_cmd_vel_kwargs: List[dict] = []
         self.follow_joint_trajectory_interfaces_kwargs: List[dict] = []
         self.joint_group_position_controllers_kwargs: List[dict] = []
+        self.joint_position_controllers_kwargs: List[dict] = []
         self.joint_state_topics_kwargs: List[dict] = []
         self.odometry_node_kwargs: List[dict] = []
 

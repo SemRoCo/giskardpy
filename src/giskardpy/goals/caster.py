@@ -122,3 +122,50 @@ class Circle(Goal):
 
     def __str__(self) -> str:
         return super().__str__()
+
+
+class Wave(Goal):
+
+    def __init__(self, center: PointStamped, radius: float, tip_link: str, scale: float):
+        super().__init__()
+        self.center = self.transform_msg(self.world.root_link_name, center)
+        self.radius = radius
+        self.scale = scale
+        self.tip_link_name = self.world.get_link_name(tip_link)
+
+    def make_constraints(self):
+        map_T_bf = self.get_fk(self.world.root_link_name, self.tip_link_name)
+        t = self.traj_time_in_seconds() * self.scale
+        t = w.min(t, 30 * self.scale)
+        x = w.sin(t) * self.radius
+        # y = w.sin(t) * self.radius
+        map_P_center = w.Point3(self.center)
+        map_T_center = w.TransMatrix.from_point_rotation_matrix(map_P_center)
+        # center_V_center_to_bf_goal = w.Vector3((-x, 0, 0))
+        # map_V_bf_to_center = map_T_center.dot(center_V_center_to_bf_goal)
+        # bf_V_y = w.Vector3((0, 1, 0))
+        # map_V_y = map_T_bf.dot(bf_V_y)
+        # map_V_y.vis_frame = self.tip_link_name
+        # map_V_bf_to_center.vis_frame = self.tip_link_name
+        # map_V_y.scale(1)
+        # map_V_bf_to_center.scale(1)
+        # self.add_debug_expr('map_V_y', map_V_y)
+        # self.add_debug_expr('map_V_bf_to_center', map_V_bf_to_center)
+        # self.add_vector_goal_constraints(frame_V_current=map_V_y,
+        #                                  frame_V_goal=map_V_bf_to_center,
+        #                                  reference_velocity=0.1,
+        #                                  weight=WEIGHT_ABOVE_CA,
+        #                                  name='orientation')
+
+        center_P_bf_goal = w.Point3((x, 0, 0))
+        map_P_bf_goal = map_T_center.dot(center_P_bf_goal)
+        map_P_bf = map_T_bf.to_position()
+        # self.add_debug_expr('map_P_bf_goal', map_P_bf_goal)
+        self.add_point_goal_constraints(frame_P_current=map_P_bf,
+                                        frame_P_goal=map_P_bf_goal,
+                                        reference_velocity=0.1,
+                                        weight=WEIGHT_BELOW_CA,
+                                        name='position')
+
+    def __str__(self) -> str:
+        return super().__str__()

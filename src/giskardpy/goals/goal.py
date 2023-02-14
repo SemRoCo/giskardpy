@@ -32,10 +32,13 @@ class Goal(ABC):
         This is where you specify goal parameters and save them as self attributes.
         """
         self.god_map = GodMap()
-        self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
         self._test_mode = self.god_map.get_data(identifier.test_mode)
         self._sub_goals: List[Goal] = []
         self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
+
+    @property
+    def prediction_horizon(self) -> int:
+        return self.god_map.get_data(identifier.prediction_horizon)
 
     @abc.abstractmethod
     def make_constraints(self):
@@ -229,6 +232,7 @@ class Goal(ABC):
                                 task_expression: w.symbol_expr,
                                 velocity_limit: w.symbol_expr_float,
                                 name_suffix: Optional[str] = None,
+                                control_horizon: Optional[w.symbol_expr_float] = None,
                                 lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = -1e4,
                                 upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]] = 1e4,
                                 horizon_function: Optional[Callable[[float, int], float]] = None):
@@ -260,7 +264,7 @@ class Goal(ABC):
                                                                   normalization_factor=velocity_limit,
                                                                   lower_slack_limit=lower_slack_limit,
                                                                   upper_slack_limit=upper_slack_limit,
-                                                                  control_horizon=self.control_horizon,
+                                                                  control_horizon=control_horizon,
                                                                   horizon_function=horizon_function)
 
     def add_acceleration_constraint(self,

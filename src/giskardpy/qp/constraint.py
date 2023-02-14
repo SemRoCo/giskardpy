@@ -66,16 +66,16 @@ class DerivativeConstraint:
                  upper_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                  quadratic_weight: w.symbol_expr_float,
                  normalization_factor: Optional[w.symbol_expr_float],
-                 control_horizon: w.symbol_expr_float,
                  lower_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
                  upper_slack_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
+                 control_horizon: Optional[w.symbol_expr_float] = None,
                  linear_weight: w.symbol_expr_float = None,
                  horizon_function: Optional[Callable[[float, int], float]] = None):
         self.name = name
         self.derivative = derivative
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon
+        self.control_horizon = control_horizon if control_horizon is not None else max(self.prediction_horizon - 2, 1)
         self.normalization_factor = normalization_factor
         if self.is_iterable(lower_limit):
             self.lower_limit = lower_limit
@@ -106,6 +106,14 @@ class DerivativeConstraint:
         self.horizon_function = default_horizon_function
         if horizon_function is not None:
             self.horizon_function = horizon_function
+
+    @property
+    def god_map(self) -> GodMap:
+        return GodMap()
+
+    @property
+    def prediction_horizon(self) -> int:
+        return self.god_map.get_data(identifier.prediction_horizon)
 
     def is_iterable(self, thing):
         if isinstance(thing, w.ca.SX) and sum(thing.shape) == 2:

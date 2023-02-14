@@ -1082,54 +1082,6 @@ class QPController:
         plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def create_debug_pandas2(self):
-        # sample_period = self.sample_period
-        b_names = self.b_names()
-        bA_names = self.bA_names()
-        filtered_b_names = np.array(b_names)[self.b_filter]
-        filtered_bA_names = np.array(bA_names)[self.bA_filter]
-        num_vel_constr = len(self.velocity_constraints) * (self.prediction_horizon - 2)
-        num_task_constr = len(self.constraints)
-        num_constr = num_vel_constr + num_task_constr
-
-        p_debug = {}
-        for name, value in self.evaluated_debug_expressions.items():
-            if isinstance(value, np.ndarray):
-                if len(value) > 1:
-                    for x in range(value.shape[0]):
-                        for y in range(value.shape[1]):
-                            tmp_name = f'{name}|{x}_{y}'
-                            p_debug[tmp_name] = value[x, y]
-                else:
-                    p_debug[name] = value.flatten()
-            else:
-                p_debug[name] = np.array(value)
-        p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
-
-        p_lb = pd.DataFrame(self.np_lb_filtered, filtered_b_names, ['data'], dtype=float)
-        p_ub = pd.DataFrame(self.np_ub_filtered, filtered_b_names, ['data'], dtype=float)
-        # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
-        p_lbA_raw = pd.DataFrame(self.np_lbA_filtered, filtered_bA_names, ['data'], dtype=float)
-        # p_lbA = deepcopy(p_lbA_raw)
-        p_ubA_raw = pd.DataFrame(self.np_ubA_filtered, filtered_bA_names, ['data'], dtype=float)
-        # p_ubA = deepcopy(p_ubA_raw)
-        # remove sample period factor
-        # p_lbA[-num_constr:] /= sample_period
-        # p_ubA[-num_constr:] /= sample_period
-        p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
-        # p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
-        p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
-
-        p_pure_xdot = deepcopy(self.xdot_full)
-        p_pure_xdot[-num_constr:] = 0
-        # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
-        p_Ax_without_slack_raw = pd.DataFrame(self.np_A_filtered.dot(p_pure_xdot), filtered_bA_names, ['data'],
-                                              dtype=float)
-        p_Ax_without_slack = deepcopy(p_Ax_without_slack_raw)
-        # p_Ax_without_slack[-num_constr:] /= sample_period
-        return p_lbA_raw, p_ubA_raw, p_lb, p_ub, p_weights, p_xdot, p_Ax_without_slack, p_debug
-
-    @profile
     def _create_debug_pandas(self):
         substitutions = self.substitutions
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}

@@ -28,13 +28,13 @@ class CleanUp(GiskardBehavior):
         self.god_map.set_data(identifier.goal_msg, None)
         self.world.fast_all_fks = None
         self.collision_scene.reset_cache()
-        self.god_map.set_data(identifier.closest_point, Collisions(self.god_map, 1))
+        self.god_map.set_data(identifier.closest_point, Collisions(1))
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.god_map.set_data(identifier.time, 1)
 
         # to reverse update godmap changes
         # self.get_god_map().set_data(identifier.giskard, deepcopy(self.rosparams))
-        self.world.apply_default_limits_and_weights()
+        # self.world.apply_default_limits_and_weights()
         self.god_map.set_data(identifier.next_move_goal, None)
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime

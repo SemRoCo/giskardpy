@@ -4,13 +4,14 @@ from typing import Optional
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped, Pose
 from numpy import pi
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco
+from giskardpy.model.utils import make_world_body_box
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
@@ -65,6 +66,9 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.clear_world()
         # self.close_gripper()
         self.reset_base()
+        self.register_group('gripper',
+                            root_link_group_name=self.robot_name,
+                            root_link_name='hand_palm_link')
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
@@ -125,7 +129,7 @@ def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
 
 class TestJointGoals:
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
-        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
+        arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = PoseStamped()
@@ -141,6 +145,7 @@ class TestJointGoals:
 
         js = {'torso_lift_joint': 0.1}
         zero_pose.set_joint_goal(js, check=False)
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.2, decimal=2)
         base_T_torso = PoseStamped()
@@ -156,7 +161,7 @@ class TestJointGoals:
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, zero_pose: HSRTestWrapper):
-        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
+        arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
 
         tip = 'hand_gripper_tool_frame'
@@ -166,6 +171,7 @@ class TestJointGoals:
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.2, decimal=2)
         base_T_torso = PoseStamped()
@@ -181,7 +187,7 @@ class TestJointGoals:
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, zero_pose: HSRTestWrapper):
-        arm_lift_joint = zero_pose.world.get_joint_name('arm_lift_joint')
+        arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
         tip = 'head_pan_link'
         p = PoseStamped()
@@ -204,8 +210,26 @@ class TestJointGoals:
         base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
+    def test_mimic_joints4(self, zero_pose: HSRTestWrapper):
+        joint_goal = {'torso_lift_joint': 0.25}
+        zero_pose.set_joint_goal(joint_goal, check=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+        np.testing.assert_almost_equal(zero_pose.world.state['hsrb/arm_lift_joint'].position, 0.5, decimal=2)
+
 
 class TestCartGoals:
+    def test_save_graph_pdf(self, kitchen_setup):
+        box1_name = 'box1'
+        pose = PoseStamped()
+        pose.header.frame_id = kitchen_setup.default_root
+        pose.pose.orientation.w = 1
+        kitchen_setup.add_box(name=box1_name,
+                              size=(1,1,1),
+                              pose=pose,
+                              parent_link='hand_palm_link',
+                              parent_link_group='hsrb')
+        kitchen_setup.world.save_graph_pdf()
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()

@@ -21,7 +21,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout, blackboard_god_map
+from giskardpy.utils.utils import memoize, create_path, suppress_stdout
 
 
 def save_pandas(dfs, names, path):
@@ -794,7 +794,7 @@ class QPController:
 
     @property
     def god_map(self) -> GodMap:
-        return blackboard_god_map()
+        return GodMap()
 
     @property
     def world(self) -> WorldTree:
@@ -941,7 +941,7 @@ class QPController:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
             # self.__swap_compiled_matrices()
-            self._create_debug_pandas()
+            # self._create_debug_pandas()
             return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
@@ -1084,7 +1084,7 @@ class QPController:
         num_constr = num_vel_constr + num_task_constr
         # num_non_slack = l
 
-        self._eval_debug_exprs()
+        # self._eval_debug_exprs()
         p_debug = {}
         for name, value in self.evaluated_debug_expressions.items():
             if isinstance(value, np.ndarray):
@@ -1109,8 +1109,8 @@ class QPController:
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
-            xH = np.dot((self.xdot_full ** 2).T, H)
-            self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
+            # xH = np.dot((self.xdot_full ** 2).T, H)
+            # self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 

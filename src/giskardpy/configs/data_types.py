@@ -196,7 +196,7 @@ class BehaviorTreeConfig:
             'precision': 4
         },
         'SyncTfFrames': {
-            'frames': [],
+            'joint_names': [],
         },
         'PlotDebugTF': {
             'enabled': False,
@@ -209,14 +209,15 @@ class BehaviorTreeConfig:
             'window_size': window_size
         }
 
-    def add_sync_tf_frame(self, parent_link, child_link, add_after_robot=False):
+    def add_sync_tf_frame(self, joint_name):
         # TODO make data structure
-        self.plugin_config['SyncTfFrames']['frames'].append([parent_link, child_link])
+        self.plugin_config['SyncTfFrames']['joint_names'].append(joint_name)
 
 
 class RobotInterfaceConfig:
-    def __init__(self, urdf: str, name: Optional[str] = None):
+    def __init__(self, urdf: str, name: Optional[str] = None, add_drive_joint_to_group: bool = True):
         if name is None:
             name = robot_name_from_urdf_string(urdf)
         self.urdf = urdf
         self.name = name
+        self.add_drive_joint_to_group = add_drive_joint_to_group

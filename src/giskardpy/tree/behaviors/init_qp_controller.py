@@ -62,7 +62,7 @@ class InitQPController(GiskardBehavior):
         symbols = set()
         for c in chain(constraints.values(), vel_constraints.values()):
             symbols.update(str(s) for s in w.free_symbols(c.expression))
-        free_variables = list(sorted([v for v in self.world.joint_constraints if v.position_name in symbols],
+        free_variables = list(sorted([v for v in self.world.free_variables.values() if v.position_name in symbols],
                                      key=lambda x: x.position_name))
         if len(free_variables) == 0:
             raise EmptyProblemException('Goal parsing resulted in no free variables.')

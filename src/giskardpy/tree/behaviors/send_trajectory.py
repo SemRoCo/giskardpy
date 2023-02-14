@@ -9,7 +9,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
-from giskardpy.model.joints import OneDofJoint, MimicJoint, OmniDrive
+from giskardpy.model.joints import OneDofJoint, OmniDrive
 from giskardpy.my_types import PrefixName
 
 try:
@@ -94,22 +94,23 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 elif isinstance(msg, control_msgs.msg.JointTrajectoryControllerState) \
                         or isinstance(msg, pr2_controllers_msgs.msg.JointTrajectoryControllerState):
                     controlled_joint_names = msg.joint_names
-            except ROSException as e:
+            except (ROSException, ROSTopicException) as e:
                 logging.logwarn(f'Couldn\'t connect to {state_topic}. Is it running?')
                 rospy.sleep(1)
         controlled_joint_names = [PrefixName(j, self.group_name) for j in controlled_joint_names]
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{state_topic}\' has no joints')
 
-        for joint in self.world._joints.values():
-            if isinstance(joint, OneDofJoint) and not isinstance(joint, MimicJoint):
+        for joint in self.world.joints.values():
+            if isinstance(joint, OneDofJoint):
                 if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)
                     controlled_joint_names.remove(joint.free_variable.name)
             elif isinstance(joint, OmniDrive):
-                if set(controlled_joint_names) == set(joint.position_variable_names):
+                degrees_of_freedom = {joint.x.name, joint.y.name, joint.yaw.name}
+                if set(controlled_joint_names) == degrees_of_freedom:
                     self.controlled_joints.append(joint)
-                    for position_variable in joint.position_variable_names:
+                    for position_variable in degrees_of_freedom:
                         controlled_joint_names.remove(position_variable)
         if len(controlled_joint_names) > 0:
             raise ValueError(f'{state_topic} provides the following joints '

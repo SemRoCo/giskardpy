@@ -6,7 +6,7 @@ from sensor_msgs.msg import JointState
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.data_types import JointStates
-from giskardpy.model.world import SubWorldTree
+from giskardpy.model.world import WorldBranch
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
@@ -26,7 +26,7 @@ class SyncConfiguration2(GiskardBehavior):
         self.map_frame = tf.get_tf_root()
         self.joint_state_topic = joint_state_topic
         self.group_name = group_name
-        self.group = self.world.groups[self.group_name]  # type: SubWorldTree
+        self.group = self.world.groups[self.group_name]  # type: WorldBranch
         if tf_root_link_name is None:
             self.tf_root_link_name = self.group.root_link_name
         else:

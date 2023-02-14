@@ -4,6 +4,7 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 from tf.transformations import quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils import logging
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
@@ -99,7 +100,11 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              pose=kitchen_pose,
                              js_topic='/kitchen/joint_states',
                              set_js_topic='/kitchen/cram_joint_states')
-    js = {str(k.short_name): 0.0 for k in better_pose.world.groups[better_pose.kitchen_name].movable_joints}
+    js = {}
+    for joint_name in better_pose.world.groups[better_pose.kitchen_name].movable_joint_names:
+        joint = better_pose.world.joints[joint_name]
+        if isinstance(joint, OneDofJoint):
+            js[str(joint.free_variable.name)] = 0.0
     better_pose.set_kitchen_js(js)
     return better_pose
 
@@ -120,7 +125,11 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
                              js_topic='/apartment_joint_states',
                              set_js_topic='/iai_kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in better_pose.world.groups[better_pose.environment_name].movable_joints}
+    js = {}
+    for joint_name in better_pose.world.groups[better_pose.environment_name].movable_joint_names:
+        joint = better_pose.world.joints[joint_name]
+        if isinstance(joint, OneDofJoint):
+            js[str(joint.free_variable.name)] = 0.0
     better_pose.set_apartment_js(js)
     base_pose = PoseStamped()
     base_pose.header.frame_id = 'iai_apartment/side_B'

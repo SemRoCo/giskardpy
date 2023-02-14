@@ -56,7 +56,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        collisions = Collisions(self.god_map, collision_list_size)
+        collisions = Collisions(collision_list_size)
         for (link_a, link_b), distance in cut_off_distances.items():
             link_b_id = self.object_name_to_bullet_id[link_b]
             robot_link_id = self.object_name_to_bullet_id[link_a]
@@ -91,7 +91,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             pbw.clear_pybullet()
             self.world.fast_all_fks = None
             self.fks = self.world.compute_all_fks()
-            for link_name, link in self.world._links.items():
+            for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.add_object(link)
             # logging.logwarn('synced world')
@@ -102,7 +102,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             except:
                 self.world.fast_all_fks = None
                 self.fks = self.world.compute_all_fks()
-            for link_name, link in self.world._links.items():
+            for link_name, link in self.world.links.items():
                 if link.has_collisions():
                     self.update_pose(link)
 

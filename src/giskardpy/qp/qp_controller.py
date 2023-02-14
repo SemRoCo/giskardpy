@@ -150,7 +150,7 @@ class H(Parent):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(Derivatives.velocity, min(v.order, self.order) + 1):
+                for o in Derivatives.range(Derivatives.velocity, min(v.order, self.order)):
                     o = Derivatives(o)
                     weights[o][f't{t:03}/{v.position_name}/{o}'] = v.normalized_weight(t, o,
                                                                                        self.prediction_horizon,
@@ -158,7 +158,7 @@ class H(Parent):
         for _, weight in sorted(weights.items()):
             params.append(weight)
 
-        for d in range(Derivatives.velocity, self.order + 1):
+        for d in Derivatives.range(Derivatives.velocity, self.order):
             derivative_constr_weights = {}
             for t in range(self.prediction_horizon):
                 d = Derivatives(d)
@@ -214,21 +214,20 @@ class B(Parent):
         ub = defaultdict(dict)
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                for o in range(Derivatives.velocity, min(v.order, self.order) + 1):  # start with velocity
-                    o = Derivatives(o)
+                for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.order)):
                     if t == self.prediction_horizon - 1 \
-                            and o < min(v.order, self.order) \
+                            and derivative < min(v.order, self.order) \
                             and self.prediction_horizon > 2:  # and False:
-                        lb[o][f't{t:03}/{v.position_name}/{o}'] = 0
-                        ub[o][f't{t:03}/{v.position_name}/{o}'] = 0
+                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
+                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
                     else:
-                        lb[o][f't{t:03}/{v.position_name}/{o}'] = v.get_lower_limit(o, evaluated=self.evaluated)
-                        ub[o][f't{t:03}/{v.position_name}/{o}'] = v.get_upper_limit(o, evaluated=self.evaluated)
+                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = v.get_lower_limit(derivative, evaluated=self.evaluated)
+                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = v.get_upper_limit(derivative, evaluated=self.evaluated)
         lb_params = []
         ub_params = []
-        for o, x in sorted(lb.items()):
+        for derivative, x in sorted(lb.items()):
             lb_params.append(x)
-        for o, x in sorted(ub.items()):
+        for derivative, x in sorted(ub.items()):
             ub_params.append(x)
 
         for d in range(Derivatives.velocity, self.order + 1):
@@ -338,29 +337,28 @@ class BA(Parent):
                         lower_bound = w.if_greater(normal_lower_bound, 0,
                                                    if_result=lower_vel,
                                                    else_result=normal_lower_bound)
-                        lb[f't{t:03d}/{v.position_name}/p_limit'] = lower_bound
+                        lb[f't{t:03d}/{v.name}/p_limit'] = lower_bound
 
                         upper_bound = w.if_less(normal_upper_bound, 0,
                                                 if_result=upper_vel,
                                                 else_result=normal_upper_bound)
-                        ub[f't{t:03d}/{v.position_name}/p_limit'] = upper_bound
+                        ub[f't{t:03d}/{v.name}/p_limit'] = upper_bound
                     else:
-                        lb[f't{t:03d}/{v.position_name}/p_limit'] = normal_lower_bound
-                        ub[f't{t:03d}/{v.position_name}/p_limit'] = normal_upper_bound
+                        lb[f't{t:03d}/{v.name}/p_limit'] = normal_lower_bound
+                        ub[f't{t:03d}/{v.name}/p_limit'] = normal_upper_bound
 
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
-            for o in range(Derivatives.velocity, min(v.order, self.order) + 1):
-                o = Derivatives(o)
-                l_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
-                u_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
+            for o in Derivatives.range(Derivatives.velocity, min(v.order, self.order)):
+                l_last_stuff[o][f'{v.name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
+                u_last_stuff[o][f'{v.name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
                 for o in range(1, min(v.order, self.order)):
-                    derivative_link[o][f't{t:03}/{o}/{v.position_name}/link'] = 0
+                    derivative_link[o][f't{t:03}/{o}/{v.name}/link'] = 0
 
         lb_params = [lb]
         ub_params = [ub]

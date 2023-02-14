@@ -21,9 +21,12 @@ class RealTimePointing(Pointing):
                  pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA):
-
+        initial_goal = PointStamped()
+        initial_goal.header.frame_id = 'base_footprint'
+        initial_goal.point.x = 1
+        initial_goal.point.z = 1
         super().__init__(tip_link=tip_link,
-                         goal_point=PointStamped(),
+                         goal_point=initial_goal,
                          root_link=root_link,
                          pointing_axis=pointing_axis)
         self.sub = rospy.Subscriber('muh', PointStamped, self.cb)

@@ -29,16 +29,10 @@ class PlotDebugExpressions(PlotTrajectory):
         for time, js in traj.items():
             new_js = JointStates()
             for name, js_ in js.items():
-                # name = name.replace('/', '|')
-                # traj_name = ''.join(name.split('/')[:-1])
-                # name = name.split('/')[-1]
                 if isinstance(js_.position, np.ndarray):
                     for x in range(js_.position.shape[0]):
                         for y in range(js_.position.shape[1]):
                             tmp_name = f'{name}|{x}_{y}'
-                            # tmp_name = re.escape(tmp_name)
-                            # tmp_name = tmp_name.replace('/', '|')
-                            # tmp_name = tmp_name.replace('/', '\/')
                             new_js[tmp_name].position = js_.position[x, y]
                             new_js[tmp_name].velocity = js_.velocity[x, y]
                 else:

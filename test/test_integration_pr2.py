@@ -1458,7 +1458,20 @@ class TestMoveBaseGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.orientation.w = 1
+        zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
+
+    def test_wave(self, zero_pose: PR2TestWrapper):
+        center = PointStamped()
+        center.header.frame_id = zero_pose.default_root
+        zero_pose.allow_all_collisions()
+        zero_pose.set_json_goal(constraint_type='Wave',
+                                center=center,
+                                radius=0.05,
+                                tip_link='base_footprint',
+                                scale=2)
+        zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
+        zero_pose.plan_and_execute()
 
     def test_forward_1cm(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()

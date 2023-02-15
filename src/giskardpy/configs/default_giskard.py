@@ -42,6 +42,7 @@ class Giskard:
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector())
         self._god_map.set_data(identifier.joints_to_add, [])
+        self._god_map.set_data(identifier.debug_expr_needed, False)
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self.world = WorldTree(self._root_link_name)

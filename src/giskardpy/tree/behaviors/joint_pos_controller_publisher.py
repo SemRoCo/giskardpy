@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import rospy
+from rospy.timer import TimerEvent
 from std_msgs.msg import Float64MultiArray, Float64
 
 import giskardpy.identifier as identifier
@@ -34,20 +35,26 @@ class JointPosController(CommandPublisher):
         self.symbol_to_joint_map = KeyDefaultDict(f)
         super().initialise()
 
-    def publish_joint_state(self, time):
+    def publish_joint_state(self, time: TimerEvent):
+        next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
+        self.world.update_state(next_cmds, self.sample_period)
         msg = Float64()
         js = deepcopy(self.world.state)
         try:
             qp_data = self.god_map.get_data(identifier.qp_solver_solution)
         except Exception:
             return
+        try:
+            dt = (time.current_real - time.last_real).to_sec()
+        except:
+            dt = 0
         for i, joint_name in enumerate(self.joint_names):
             try:
                 key = self.world.joints[joint_name].free_variables[0].position_name
                 velocity = qp_data[Derivatives.velocity][key]
-                dt = (time.current_real - self.stamp).to_sec()
-                dt -= 1/self.hz
-                position = js[joint_name].position + velocity * 0.001
+                # dt = (time.current_real - self.stamp).to_sec()
+                # dt -= 1/self.hz
+                position = js[joint_name].position + velocity * dt
             except KeyError:
                 position = js[joint_name].position
             msg.data = position

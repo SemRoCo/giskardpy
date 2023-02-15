@@ -1100,7 +1100,7 @@ class QPController:
         num_constr = num_vel_constr + num_task_constr
         # num_non_slack = l
 
-        # self._eval_debug_exprs()
+        self.eval_debug_exprs()
         p_debug = {}
         for name, value in self.evaluated_debug_expressions.items():
             if isinstance(value, np.ndarray):

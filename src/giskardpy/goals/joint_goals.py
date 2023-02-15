@@ -273,6 +273,8 @@ class JointPositionRevolute(Goal):
                              self.world.get_joint_velocity_limits(self.joint_name)[1])
 
         error = joint_goal - current_joint
+        self.add_debug_expr('goal', joint_goal)
+        self.add_debug_expr('current', current_joint)
         if self.hard:
             self.add_constraint(reference_velocity=max_velocity,
                                 lower_error=error,

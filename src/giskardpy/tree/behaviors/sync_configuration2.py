@@ -1,4 +1,5 @@
 from queue import Queue, Empty
+from typing import Optional
 
 import rospy
 from py_trees import Status
@@ -17,20 +18,17 @@ class SyncConfiguration2(GiskardBehavior):
     """
 
     @profile
-    def __init__(self, name, group_name, joint_state_topic='joint_states', tf_root_link_name=None):
+    def __init__(self, group_name: str, joint_state_topic='joint_states'):
         """
         :type js_identifier: str
         """
-        super().__init__(name)
-        self.mjs = None
-        self.map_frame = tf.get_tf_root()
+        super().__init__(str(self))
         self.joint_state_topic = joint_state_topic
+        if not self.joint_state_topic.startswith('/'):
+            self.joint_state_topic = '/' + self.joint_state_topic
+        super().__init__(str(self))
+        self.mjs: Optional[JointStates] = None
         self.group_name = group_name
-        self.group = self.world.groups[self.group_name]  # type: WorldBranch
-        if tf_root_link_name is None:
-            self.tf_root_link_name = self.group.root_link_name
-        else:
-            self.tf_root_link_name = tf_root_link_name
         self.lock = Queue(maxsize=1)
 
     @profile
@@ -58,7 +56,7 @@ class SyncConfiguration2(GiskardBehavior):
             else:
                 js = self.lock.get_nowait()
             dt = (js.header.stamp - self.last_time).to_sec()
-            self.mjs = JointStates.from_msg(js, None)
+            self.mjs = JointStates.from_msg(js, self.group_name)
             self.last_time = js.header.stamp
             # self.world.state.update(self.mjs)
             for joint_name, next_state in self.mjs.items():

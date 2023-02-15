@@ -4066,6 +4066,8 @@ class TestWorld:
                 world_setup.search_for_link_name('l_wrist_roll_link'),
                 world_setup.search_for_link_name('l_gripper_r_finger_link'))
 
+
+# kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal2'])

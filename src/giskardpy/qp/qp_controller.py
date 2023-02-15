@@ -1089,10 +1089,9 @@ class QPController:
         sample_period = self.sample_period
         b_names = self.b_names()
         bA_names = self.bA_names()
-        b_filter, bA_filter = self.update_filters()
-        filtered_b_names = np.array(b_names)[b_filter]
-        filtered_bA_names = np.array(bA_names)[bA_filter]
-        H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
+        filtered_b_names = np.array(b_names)[self.b_filter]
+        filtered_bA_names = np.array(bA_names)[self.bA_filter]
+        # H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
         # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
         # num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
         # num_of_slack = len(lb) - num_non_slack
@@ -1110,18 +1109,18 @@ class QPController:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
-        self.p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(self.np_lb_filtered, filtered_b_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(self.np_ub_filtered, filtered_b_names, ['data'], dtype=float)
         # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
-        self.p_lbA_raw = pd.DataFrame(lbA, filtered_bA_names, ['data'], dtype=float)
+        self.p_lbA_raw = pd.DataFrame(self.np_lbA_filtered, filtered_bA_names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
-        self.p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, ['data'], dtype=float)
+        self.p_ubA_raw = pd.DataFrame(self.np_ubA_filtered, filtered_bA_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
         # remove sample period factor
         self.p_lbA[-num_constr:] /= sample_period
         self.p_ubA[-num_constr:] /= sample_period
         self.p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
-        self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
+        self.p_A = pd.DataFrame(self.np_A_filtered, filtered_bA_names, filtered_b_names, dtype=float)
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)

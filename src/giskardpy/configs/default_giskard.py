@@ -42,6 +42,7 @@ class Giskard:
         self._god_map.set_data(identifier.giskard, self)
         self._god_map.set_data(identifier.timer_collector, TimeCollector())
         self._god_map.set_data(identifier.joints_to_add, [])
+        self._god_map.set_data(identifier.debug_expr_needed, False)
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self.world = WorldTree(self._root_link_name)
@@ -114,14 +115,30 @@ class Giskard:
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
 
-    def configure_PublishDebugExpressions(self, enabled: bool = True):
+    def configure_PublishDebugExpressions(self, enabled: bool = True, publish_lb: bool = False,
+                                          publish_ub: bool = False, publish_lbA: bool = False,
+                                          publish_ubA: bool = False, publish_Ax: bool = False,
+                                          publish_xdot: bool = False, publish_weights: bool = False,
+                                          publish_debug: bool = False):
         """
         :param enabled: whether Giskard should publish markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
                                     the system.
         """
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled'] = enabled
-        # self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
+        publish_flags = {
+            'publish_lb': publish_lb,
+            'publish_ub': publish_ub,
+            'publish_lbA': publish_lbA,
+            'publish_ubA': publish_ubA,
+            'publish_weights': publish_weights,
+            'publish_Ax': publish_Ax,
+            'publish_xdot': publish_xdot,
+            'publish_debug': publish_debug,
+        }
+        self.behavior_tree_config.plugin_config['PublishDebugExpressions'].update(publish_flags)
 
     def configure_CollisionMarker(self, enabled: bool = True, in_planning_loop: bool = False):
         """
@@ -137,9 +154,13 @@ class Giskard:
         self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
 
     def configure_PlotDebugExpressions(self, enabled: bool = False):
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
 
     def configure_DebugMarkerPublisher(self, enabled: bool = False):
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PlotDebugTF']['enabled'] = enabled
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):

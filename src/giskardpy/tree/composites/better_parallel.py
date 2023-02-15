@@ -74,7 +74,7 @@ class Parallel(py_trees.composites.Parallel):
         if self.status != Status.RUNNING:
             # subclass (user) handling
             self.initialise()
-        self.logger.debug("%s.tick()" % self.__class__.__name__)
+        # self.logger.debug("%s.tick()" % self.__class__.__name__)
         # process them all first
         for child in self.children:
             if self.policy.synchronise and child.status == common.Status.SUCCESS:

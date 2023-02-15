@@ -155,7 +155,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         overriding this shit because of the fucking prints
         """
         current_time = rospy.get_rostime()
-        self.logger.debug("{0}.update()".format(self.__class__.__name__))
+        # self.logger.debug("{0}.update()".format(self.__class__.__name__))
         if not self.action_client:
             self.feedback_message = "no action client, did you call setup() on your tree?"
             return py_trees.Status.INVALID
@@ -229,8 +229,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         Args:
             new_status (:class:`~py_trees.common.Status`): the behaviour is transitioning to this new status
         """
-        self.logger.debug("%s.terminate(%s)" % (self.__class__.__name__, "%s->%s" % (
-        self.status, new_status) if self.status != new_status else "%s" % new_status))
+        # self.logger.debug("%s.terminate(%s)" % (self.__class__.__name__, "%s->%s" % (
+        # self.status, new_status) if self.status != new_status else "%s" % new_status))
         if self.action_client is not None and self.sent_goal:
             motion_state = self.action_client.get_state()
             if ((motion_state == GoalStatus.PENDING) or (motion_state == GoalStatus.ACTIVE) or

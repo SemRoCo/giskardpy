@@ -732,7 +732,6 @@ class QPController:
         compilation_time = time() - t
         logging.loginfo(f'Compiled debug expressions in {compilation_time:.5f}s')
 
-
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]
         num_joint_with_position_limits = len(joint_with_position_limits)
@@ -877,12 +876,12 @@ class QPController:
         lb, ub = self.b()
         self._set_lb(w.Expression(lb))
         self._set_ub(w.Expression(ub))
-        self.np_g = np.zeros(self.H.width)
+        self.np_g_filtered = np.zeros(self.H.width)
         # self.debug_names = list(sorted(self.debug_expressions.keys()))
         # self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
     @profile
-    def _eval_debug_exprs(self):
+    def eval_debug_exprs(self):
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
             params = self.god_map.get_values(f.str_params)
@@ -890,7 +889,7 @@ class QPController:
         return self.evaluated_debug_expressions
 
     @profile
-    def make_filters(self):
+    def update_filters(self):
         b_filter = self.np_weights != 0
         b_filter[:self.H.number_of_free_variables_with_horizon()] = True
         # offset = self.H.number_of_free_variables_with_horizon() + self.H.number_of_constraint_vel_variables()
@@ -903,17 +902,8 @@ class QPController:
         bA_filter = np.ones(self.A.height, dtype=bool)
         ll = self.H.number_of_constraint_vel_variables() + self.H.number_of_contraint_error_variables()
         bA_filter[-ll:] = b_filter[-ll:]
-        return np.array(b_filter), np.array(bA_filter)
-
-    @profile
-    def filter_zero_weight_stuff(self, b_filter, bA_filter):
-        return self.np_weights[b_filter], \
-               np.zeros(b_filter.shape[0]), \
-               self.np_A[bA_filter, :][:, b_filter], \
-               self.np_lb[b_filter], \
-               self.np_ub[b_filter], \
-               self.np_lbA[bA_filter], \
-               self.np_ubA[bA_filter]
+        self.b_filter = np.array(b_filter)
+        self.bA_filter = np.array(bA_filter)
 
     def __swap_compiled_matrices(self):
         if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
@@ -931,19 +921,25 @@ class QPController:
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: list) -> Tuple[derivative_joint_map, dict]:
+    def get_cmd(self, substitutions: list) -> derivative_joint_map:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:
         :return: joint name -> joint command
         """
-        filtered_stuff = self.evaluate_and_split(substitutions)
+        self.evaluate_and_create_np_data(substitutions)
         try:
             # self.__swap_compiled_matrices()
-            self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
+            self.xdot_full = self.qp_solver.solve_and_retry(weights=self.np_weights_filtered,
+                                                            g=self.np_g_filtered,
+                                                            A=self.np_A_filtered,
+                                                            lb=self.np_lb_filtered,
+                                                            ub=self.np_ub_filtered,
+                                                            lbA=self.np_lbA_filtered,
+                                                            ubA=self.np_ubA_filtered)
             # self.__swap_compiled_matrices()
             # self._create_debug_pandas()
-            return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+            return self.split_xdot(self.xdot_full)
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
@@ -953,8 +949,15 @@ class QPController:
             if joint_limits_violated_msg is not None:
                 self.__swap_compiled_matrices()
                 try:
-                    self.xdot_full = self.qp_solver.solve(*self.evaluate_and_split(substitutions))
-                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+                    self.evaluate_and_create_np_data(substitutions)
+                    self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
+                                                          g=self.np_g_filtered,
+                                                          A=self.np_A_filtered,
+                                                          lb=self.np_lb_filtered,
+                                                          ub=self.np_ub_filtered,
+                                                          lbA=self.np_lbA_filtered,
+                                                          ubA=self.np_ubA_filtered)
+                    return self.split_xdot(self.xdot_full)
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())
@@ -962,11 +965,12 @@ class QPController:
                 finally:
                     self.__swap_compiled_matrices()
             #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
-            self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
+            self._are_hard_limits_violated(str(e_original))
             self._is_inf_in_data()
             raise
 
-    def evaluate_and_split(self, substitutions):
+    @profile
+    def evaluate_and_create_np_data(self, substitutions):
         self.substitutions = substitutions
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
         self.np_weights = np_big_ass_M[self.A.height, :-2]
@@ -976,17 +980,30 @@ class QPController:
         self.np_lbA = np_big_ass_M[:self.A.height, -2]
         self.np_ubA = np_big_ass_M[:self.A.height, -1]
 
-        filters = self.make_filters()
-        filtered_stuff = self.filter_zero_weight_stuff(*filters)
-        return filtered_stuff
+        self.update_filters()
+        self.np_weights_filtered = self.np_weights[self.b_filter]
+        self.np_g_filtered = np.zeros(self.b_filter.shape[0])
+        self.np_A_filtered = self.np_A[self.bA_filter, :][:, self.b_filter]
+        self.np_lb_filtered = self.np_lb[self.b_filter]
+        self.np_ub_filtered = self.np_ub[self.b_filter]
+        self.np_lbA_filtered = self.np_lbA[self.bA_filter]
+        self.np_ubA_filtered = self.np_ubA[self.bA_filter]
 
-    def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
+    def _are_hard_limits_violated(self, error_message):
         num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
-        num_of_slack = len(lb) - num_non_slack
+        num_of_slack = len(self.np_lb_filtered) - num_non_slack
+        lb = self.np_lb_filtered.copy()
         lb[-num_of_slack:] = -100
+        ub = self.np_ub_filtered.copy()
         ub[-num_of_slack:] = 100
         try:
-            self.xdot_full = self.qp_solver.solve(weights, g, A, lb, ub, lbA, ubA)
+            self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
+                                                  g=self.np_g_filtered,
+                                                  A=self.np_A_filtered,
+                                                  lb=self.np_lb_filtered,
+                                                  ub=self.np_ub_filtered,
+                                                  lbA=self.np_lbA_filtered,
+                                                  ubA=self.np_ubA_filtered)
         except:
             pass
         else:
@@ -1068,15 +1085,13 @@ class QPController:
     @profile
     def _create_debug_pandas(self):
         substitutions = self.substitutions
-        self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
         b_names = self.b_names()
         bA_names = self.bA_names()
-        b_filter, bA_filter = self.make_filters()
-        filtered_b_names = np.array(b_names)[b_filter]
-        filtered_bA_names = np.array(bA_names)[bA_filter]
-        H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
+        filtered_b_names = np.array(b_names)[self.b_filter]
+        filtered_bA_names = np.array(bA_names)[self.bA_filter]
+        # H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
         # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
         # num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
         # num_of_slack = len(lb) - num_non_slack
@@ -1094,19 +1109,18 @@ class QPController:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
-        self.p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(self.np_lb_filtered, filtered_b_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(self.np_ub_filtered, filtered_b_names, ['data'], dtype=float)
         # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
-        self.p_lbA_raw = pd.DataFrame(lbA, filtered_bA_names, ['data'], dtype=float)
+        self.p_lbA_raw = pd.DataFrame(self.np_lbA_filtered, filtered_bA_names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
-        self.p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, ['data'], dtype=float)
+        self.p_ubA_raw = pd.DataFrame(self.np_ubA_filtered, filtered_bA_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
         # remove sample period factor
         self.p_lbA[-num_constr:] /= sample_period
         self.p_ubA[-num_constr:] /= sample_period
-        self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, ['data'],
-                                      dtype=float)
-        self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
+        self.p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
+        self.p_A = pd.DataFrame(self.np_A_filtered, filtered_bA_names, filtered_b_names, dtype=float)
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)

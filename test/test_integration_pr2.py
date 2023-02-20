@@ -220,7 +220,6 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 def giskard(request, ros):
     # launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
     # c = PR2TestWrapper()
-    # c = PR2TestWrapperMujoco()
     c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c

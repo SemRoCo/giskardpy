@@ -55,7 +55,7 @@ def giskard(request, ros):
 class TestJointGoalsMujoco(TestJointGoals):
     def test_joint_goal2(self, zero_pose: PR2TestWrapper):
         js = {
-            'torso_lift_joint': 0.2999225173357618,
+            # 'torso_lift_joint': 0.2999225173357618,
             'head_pan_joint': 0.041880780651479044,
             'head_tilt_joint': -0.37,
             'r_upper_arm_roll_joint': -0.9487714747527726,

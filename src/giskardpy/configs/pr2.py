@@ -12,8 +12,8 @@ class PR2_Base(Giskard):
         # self.set_qp_solver(SupportedQPSolver.qp_oases)
         # self.configure_PlotTrajectory(enabled=True)
         # self.configure_PlotDebugExpressions(enabled=True)
-        self.configure_PublishDebugExpressions(enabled=True, publish_debug=True, publish_xdot=True, publish_lbA=True)
-        self.configure_DebugMarkerPublisher(enabled=True)
+        self.configure_PublishDebugExpressions(enabled=True, publish_debug=True, publish_xdot=True)
+        # self.configure_DebugMarkerPublisher(enabled=True)
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
@@ -127,10 +127,11 @@ class PR2_MujocoRealTimeGroup(PR2_Base):
 
 class PR2_MujocoRealTime(PR2_Base):
     def __init__(self):
-        self.add_robot_from_parameter_server()
+        self.add_robot_from_parameter_server(joint_state_topics=['pr2/joint_states'])
         super().__init__()
         self.set_control_mode(ControlModes.close_loop)
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
+        self.configure_VisualizationBehavior(enabled=False)
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_fixed_joint('odom_combined', 'pr2/base_footprint')
         # self.add_omni_drive_joint(parent_link_name='odom_combined',

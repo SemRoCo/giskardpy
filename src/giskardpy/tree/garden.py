@@ -757,6 +757,14 @@ class OpenLoop(StandAlone):
 
 
 class ClosedLoop(OpenLoop):
+    def grow_planning3(self):
+        planning_3 = Sequence('planning III')
+        # planning_3.add_child(PrintText('asdf'))
+        planning_3.add_child(SetTrackingStartTime('start time', offset=0.0))
+        planning_3.add_child(self.grow_closed_loop_control())
+        # planning_3.add_child(self.grow_plan_postprocessing())
+        return planning_3
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
@@ -771,7 +779,6 @@ class ClosedLoop(OpenLoop):
         planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
         for kwargs in hardware_config.joint_state_topics_kwargs:
             planning_4.add_child(SyncConfiguration2(**kwargs))
-        # planning_4.add_child(SyncConfiguration2('sync with robot'))
         if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
                 and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_4.add_child(VisualizationBehavior('visualization'))
@@ -780,17 +787,23 @@ class ClosedLoop(OpenLoop):
             if self.god_map.get_data(identifier.enable_CPIMarker) \
                     and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
                 planning_4.add_child(CollisionMarker('cpi marker'))
+
+
         planning_4.add_child(ControllerPlugin('controller'))
         if self.god_map.get_data(identifier.debug_expr_needed):
             planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
-        # planning_4.add_child(KinSimPlugin('kin sim'))
+        planning_4.add_child(RosTime('time'))
+
+        planning_4.add_child(RealKinSimPlugin('kin sim'))
         for joint_group_position_controller_config in hardware_config.joint_group_position_controllers_kwargs:
             planning_4.add_child(JointGroupPosController(**joint_group_position_controller_config))
         for joint_position_controller_config in hardware_config.joint_position_controllers_kwargs:
             planning_4.add_child(JointPosController(**joint_position_controller_config))
-        planning_4.add_child(LogTrajPlugin('log'))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
+
+        # planning_4.add_child(KinSimPlugin('kin sim'))
+        # planning_4.add_child(LogTrajPlugin('log'))
+        # if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+        #     planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
             planning_4.add_child(DebugMarkerPublisher('debug tf publisher'))
         if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
@@ -799,8 +812,8 @@ class ClosedLoop(OpenLoop):
                                                              identifier.PublishDebugExpressions)))
         # planning_4.add_child(WiggleCancel('wiggle'))
         # planning_4.add_child(LoopDetector('loop detector'))
-        planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin())
+        planning_4.add_child(GoalReached('goal reached', real_time=True))
+        # planning_4.add_child(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))

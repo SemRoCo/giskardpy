@@ -34,6 +34,7 @@ post_processing = ['post_processing']
 soft_constraints = post_processing + ['soft_constraints']
 result_message = ['result_message']
 tracking_start_time = ['tracking_start_time']
+dt = ['dt']
 
 # stuff from rosparam
 robot_descriptions = ['robot_descriptions']

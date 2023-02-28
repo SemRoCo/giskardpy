@@ -632,6 +632,9 @@ class QPController:
         elif solver_name == SupportedQPSolver.quadprog:
             from giskardpy.qp.qp_solver_quadprog import QPSolverQuadprog
             qp_solver_class = QPSolverQuadprog
+        elif solver_name == SupportedQPSolver.osqp:
+            from giskardpy.qp.qp_solver_osqp import QPSolverOSQP
+            qp_solver_class = QPSolverOSQP
         else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
             qp_solver_class = QPSolverQPOases

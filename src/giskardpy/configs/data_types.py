@@ -30,6 +30,7 @@ class SupportedQPSolver(Enum):
     qp_oases = 2
     cplex = 3
     qp_swift = 4
+    quadprog = 5
 
 
 class ControlModes(Enum):

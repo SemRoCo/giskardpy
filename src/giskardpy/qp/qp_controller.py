@@ -626,6 +626,9 @@ class QPController:
         elif solver_name == SupportedQPSolver.cplex:
             from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             qp_solver_class = QPSolverCplex
+        elif solver_name == SupportedQPSolver.qp_swift:
+            from giskardpy.qp.qp_solver_qpswift import QPSolverQPSwift
+            qp_solver_class = QPSolverQPSwift
         else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
             qp_solver_class = QPSolverQPOases
@@ -876,7 +879,7 @@ class QPController:
         lb, ub = self.b()
         self._set_lb(w.Expression(lb))
         self._set_ub(w.Expression(ub))
-        self.np_g_filtered = np.zeros(self.H.width)
+        self.np_g = np.zeros(self.H.width)
         # self.debug_names = list(sorted(self.debug_expressions.keys()))
         # self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
@@ -982,7 +985,7 @@ class QPController:
 
         self.update_filters()
         self.np_weights_filtered = self.np_weights[self.b_filter]
-        self.np_g_filtered = np.zeros(self.b_filter.shape[0])
+        self.np_g_filtered = np.zeros(self.np_weights_filtered.shape[0])
         self.np_A_filtered = self.np_A[self.bA_filter, :][:, self.b_filter]
         self.np_lb_filtered = self.np_lb[self.b_filter]
         self.np_ub_filtered = self.np_ub[self.b_filter]

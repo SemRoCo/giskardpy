@@ -29,6 +29,7 @@ class SupportedQPSolver(Enum):
     gurobi = 1
     qp_oases = 2
     cplex = 3
+    qp_swift = 4
 
 
 class ControlModes(Enum):

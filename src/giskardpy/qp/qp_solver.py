@@ -26,8 +26,8 @@ class QPSolver(ABC):
               ubA: np.ndarray) -> np.ndarray:
         """
         x^T*H*x + x^T*g
-        s.t.: lbA < A*x < ubA
-        and    lb <  x  < ub
+        s.t.: lbA <= A*x <= ubA
+        and    lb <=  x  <= ub
         :param weights: 1d vector, len = (jc (joint constraints) + sc (soft constraints))
         :param g: 1d zero vector of len joint constraints + soft constraints
         :param A: 2d jacobi matrix of hc (hard constraints) and sc, shape = (hc + sc) * (number of joints)

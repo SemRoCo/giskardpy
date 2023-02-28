@@ -635,6 +635,9 @@ class QPController:
         elif solver_name == SupportedQPSolver.osqp:
             from giskardpy.qp.qp_solver_osqp import QPSolverOSQP
             qp_solver_class = QPSolverOSQP
+        elif solver_name == SupportedQPSolver.cvxopt:
+            from giskardpy.qp.qp_solver_cvxopt import QPSolverCVXOPT
+            qp_solver_class = QPSolverCVXOPT
         else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
             qp_solver_class = QPSolverQPOases

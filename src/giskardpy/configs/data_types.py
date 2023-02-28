@@ -32,6 +32,7 @@ class SupportedQPSolver(Enum):
     qp_swift = 4
     quadprog = 5
     osqp = 6
+    cvxopt = 6
 
 
 class ControlModes(Enum):

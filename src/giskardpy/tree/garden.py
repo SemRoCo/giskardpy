@@ -32,6 +32,7 @@ from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
 from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
 from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
+from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
@@ -799,6 +800,8 @@ class ClosedLoop(OpenLoop):
             planning_4.add_child(JointGroupPosController(**joint_group_position_controller_config))
         for joint_position_controller_config in hardware_config.joint_position_controllers_kwargs:
             planning_4.add_child(JointPosController(**joint_position_controller_config))
+        for kwargs in hardware_config.joint_velocity_controllers_kwargs:
+            planning_4.add_child(JointVelController(**kwargs))
 
         # planning_4.add_child(KinSimPlugin('kin sim'))
         # planning_4.add_child(LogTrajPlugin('log'))

@@ -281,7 +281,7 @@ class Giskard:
     def add_joint_velocity_controller(self, namespaces: List[str], group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.get_default_group_name()
-        self.hardware_config.joint_position_controllers_kwargs.append({'namespaces': namespaces,
+        self.hardware_config.joint_velocity_controllers_kwargs.append({'namespaces': namespaces,
                                                                        'group_name': group_name})
 
     def add_omni_drive_joint(self,

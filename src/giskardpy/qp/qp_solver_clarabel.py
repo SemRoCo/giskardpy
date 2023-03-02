@@ -24,9 +24,10 @@ class QPSolverClarabel(QPSolver):
     @profile
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
-        G = sparse.csc_matrix(np.vstack([-A, A]))
+        A_b = np.eye(lb.shape[0])
+        G = sparse.csc_matrix(np.vstack([-A_b, A_b, -A, A]))
+        h = np.concatenate([-lb, ub, -lbA, ubA])
         P = sparse.csc_matrix(np.diag(weights))
-        h = np.concatenate([-lbA, ubA])
         q = g
 
         cones = [clarabel.NonnegativeConeT(h.shape[0])]

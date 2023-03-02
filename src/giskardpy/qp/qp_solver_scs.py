@@ -24,20 +24,21 @@ class QPSolverSCS(QPSolver):
     @profile
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
-        A = sparse.csc_matrix(np.vstack([-A, A]))
+        A_b = np.eye(lb.shape[0])
+        G = sparse.csc_matrix(np.vstack([-A_b, A_b, -A, A]))
+        h = np.concatenate([-lb, ub, -lbA, ubA])
         P = sparse.csc_matrix(np.diag(weights))
-        b = np.concatenate([-lbA, ubA])
-        c = g
+        q = g
 
         data = {
             'P': P,
-            'A': A,
-            'b': b,
-            'c': c
+            'A': G,
+            'b': h,
+            'c': q
         }
 
         cone = {
-            'l': b.shape[0],
+            'l': h.shape[0],
         }
 
         solver = scs.SCS(data, cone, verbose=False)

@@ -647,6 +647,9 @@ class QPController:
         elif solver_name == SupportedQPSolver.clarabel:
             from giskardpy.qp.qp_solver_clarabel import QPSolverClarabel
             qp_solver_class = QPSolverClarabel
+        elif solver_name == SupportedQPSolver.scs:
+            from giskardpy.qp.qp_solver_scs import QPSolverSCS
+            qp_solver_class = QPSolverSCS
         else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
             qp_solver_class = QPSolverQPOases

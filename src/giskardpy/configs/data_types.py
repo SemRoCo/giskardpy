@@ -35,6 +35,7 @@ class SupportedQPSolver(Enum):
     cvxopt = 7
     qp_solvers = 8
     mosek = 9
+    clarabel = 10
 
 
 class ControlModes(Enum):

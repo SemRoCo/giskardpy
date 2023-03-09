@@ -38,6 +38,7 @@ class SupportedQPSolver(Enum):
     clarabel = 10
     scs = 11
     casadi = 12
+    qpalm = 13
 
 
 class ControlModes(Enum):

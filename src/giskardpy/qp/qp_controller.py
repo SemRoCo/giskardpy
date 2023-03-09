@@ -653,6 +653,12 @@ class QPController:
         elif solver_name == SupportedQPSolver.casadi:
             from giskardpy.qp.qp_solver_casadi import QPSolverCasadi
             qp_solver_class = QPSolverCasadi
+        elif solver_name == SupportedQPSolver.casadi:
+            from giskardpy.qp.qp_solver_casadi import QPSolverCasadi
+            qp_solver_class = QPSolverCasadi
+        elif solver_name == SupportedQPSolver.qpalm:
+            from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
+            qp_solver_class = QPSolverQPalm
         else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
             qp_solver_class = QPSolverQPOases

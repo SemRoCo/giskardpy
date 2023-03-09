@@ -37,6 +37,7 @@ class SupportedQPSolver(Enum):
     mosek = 9
     clarabel = 10
     scs = 11
+    casadi = 12
 
 
 class ControlModes(Enum):

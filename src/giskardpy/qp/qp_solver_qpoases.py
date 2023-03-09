@@ -45,6 +45,7 @@ class QPSolverQPOases(QPSolver):
     def did_problem_change(self, A):
         return A.shape != self.shape
 
+    #profile
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         H = np.diag(weights).copy()
@@ -78,7 +79,7 @@ class QPSolverQPOases(QPSolver):
             raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
         raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
 
-    # @profile
+    @profile
     def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
         relaxed = False
         for number_of_retries in range(2 + len(QPoasesModes)):

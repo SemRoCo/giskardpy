@@ -39,6 +39,8 @@ class SupportedQPSolver(Enum):
     scs = 11
     casadi = 12
     qpalm = 13
+    super_csc = 14
+    cvxpy = 15
 
 
 class ControlModes(Enum):

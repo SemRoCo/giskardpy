@@ -13,6 +13,7 @@ from copy import deepcopy
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
+from time import time
 from typing import Type, Optional, Dict
 
 import matplotlib.colors as mcolors
@@ -37,6 +38,7 @@ from giskardpy.exceptions import DontPrintStackTrace
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
+from giskardpy.utils.time_collector import TimeCollector
 
 
 @contextmanager
@@ -458,6 +460,22 @@ def memoize(function):
             return rv
 
     return wrapper
+
+
+def record_time(function):
+    god_map = GodMap()
+    time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
+    if function.__name__ == 'solve':
+        @wraps(function)
+        def wrapper(self, weights, g, A, lb, ub, lbA, ubA):
+            qp_solver = god_map.get_data(identifier.qp_solver_name)
+            start_time = time()
+            result = function(self, weights, g, A, lb, ub, lbA, ubA)
+            time_delta = time() - start_time
+            time_collector.add_qp_solve_time(str(qp_solver), A.shape[1], A.shape[0], time_delta)
+            return result
+        return wrapper
+
 
 
 def clear_memo(f):

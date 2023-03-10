@@ -349,7 +349,10 @@ class GiskardTestWrapper(GiskardWrapper):
         self._alive = True
 
     def tear_down(self):
-        self.god_map.unsafe_get_data(identifier.timer_collector).print()
+        try:
+            self.god_map.unsafe_get_data(identifier.timer_collector).pretty_print()
+        except Exception as e:
+            pass
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:

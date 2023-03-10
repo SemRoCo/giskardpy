@@ -6,6 +6,7 @@ from scipy import sparse
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
+from giskardpy.utils.utils import record_time
 
 gurobipy.setParam('LogToConsole', False)
 
@@ -84,6 +85,7 @@ class QPSolverGurobi(QPSolver):
         return np.round(data, decimal_places)
 
     @profile
+    @record_time
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         H = np.diag(weights)

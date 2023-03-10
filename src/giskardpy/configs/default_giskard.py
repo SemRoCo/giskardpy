@@ -40,7 +40,6 @@ class Giskard:
         self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
         self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
-        self._god_map.set_data(identifier.timer_collector, TimeCollector())
         self._god_map.set_data(identifier.joints_to_add, [])
         self._god_map.set_data(identifier.debug_expr_needed, False)
         blackboard = Blackboard

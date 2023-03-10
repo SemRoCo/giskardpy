@@ -20,7 +20,6 @@ from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import memoize, create_path, suppress_stdout
 
 
@@ -41,10 +40,8 @@ def save_pandas(dfs, names, path):
 
 
 class Parent(object):
-    time_collector: TimeCollector
 
-    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
-        self.time_collector = time_collector
+    def __init__(self, sample_period, prediction_horizon, order):
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.order = order
@@ -338,8 +335,8 @@ class BA(Parent):
 
 class A(Parent):
     def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 time_collector, default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order, time_collector)
+                 default_limits=False):
+        super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
@@ -470,7 +467,6 @@ class A(Parent):
         logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
-        self.time_collector.jacobians.append(jac_time)
 
         # position limits
         vertical_offset = number_of_joints * self.prediction_horizon
@@ -581,7 +577,6 @@ class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
-    time_collector: TimeCollector
     debug_expressions: Dict[str, w.all_expressions]
     compiled_debug_expressions: Dict[str, w.CompiledFunction]
     evaluated_debug_expressions: Dict[str, np.ndarray]
@@ -596,9 +591,7 @@ class QPController:
                  debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
-                 retry_weight_factor: float = 100,
-                 time_collector: TimeCollector = None):
-        self.time_collector = time_collector
+                 retry_weight_factor: float = 100):
         self.free_variables = []
         self.constraints = []
         self.velocity_constraints = []
@@ -757,7 +750,6 @@ class QPController:
         self.compiled_big_ass_M = self.big_ass_M.compile(free_symbols)
         compilation_time = time() - t
         logging.loginfo(f'Compiled symbolic controller in {compilation_time:.5f}s')
-        self.time_collector.compilations.append(compilation_time)
 
     def _compile_debug_expressions(self):
         t = time()
@@ -897,14 +889,10 @@ class QPController:
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
                    order=self.order,
-                   time_collector=self.time_collector,
                    default_limits=default_limits)
 
         logging.loginfo(f'Constructing new controller with {self.A.height} constraints '
                         f'and {self.A.width} free variables...')
-        self.time_collector.constraints.append(self.A.height)
-        self.time_collector.variables.append(self.A.width)
-
         self._init_big_ass_M()
 
         self._set_weights(w.Expression(self.H.weights()))

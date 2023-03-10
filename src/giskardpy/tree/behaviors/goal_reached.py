@@ -34,8 +34,6 @@ class GoalReached(GiskardBehavior):
                 logging.loginfo('Velocities went below threshold.')
                 logging.loginfo(f'Found goal trajectory with length '
                                 f'{planning_time * self.sample_period:.3f}s in {run_time:.3f}s')
-                self.time_collector.lengths.append(planning_time * self.sample_period)
-                self.time_collector.times.append(run_time)
                 return Status.SUCCESS
         return Status.RUNNING
 

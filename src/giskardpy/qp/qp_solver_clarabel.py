@@ -9,6 +9,7 @@ from scipy import sparse
 
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
+from giskardpy.utils.utils import record_time
 
 
 class QPSolverClarabel(QPSolver):
@@ -22,6 +23,7 @@ class QPSolverClarabel(QPSolver):
 
 
     @profile
+    @record_time
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         A_b = np.eye(lb.shape[0])

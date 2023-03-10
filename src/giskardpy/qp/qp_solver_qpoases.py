@@ -7,6 +7,7 @@ from qpoases import PyReturnValue
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
+from giskardpy.utils.utils import record_time
 
 
 class QPoasesModes(IntEnum):
@@ -45,7 +46,8 @@ class QPSolverQPOases(QPSolver):
     def did_problem_change(self, A):
         return A.shape != self.shape
 
-    #profile
+    @profile
+    @record_time
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         H = np.diag(weights).copy()

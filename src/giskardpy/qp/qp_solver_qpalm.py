@@ -11,6 +11,7 @@ from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 import qpSWIFT
 
+from giskardpy.utils.utils import record_time
 
 
 class QPSolverQPalm(QPSolver):
@@ -26,6 +27,7 @@ class QPSolverQPalm(QPSolver):
     settings.eps_abs = 1e-8
 
     @profile
+    @record_time
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         A_b = np.eye(lb.shape[0])

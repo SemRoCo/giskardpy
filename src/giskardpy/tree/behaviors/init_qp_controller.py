@@ -31,7 +31,6 @@ class InitQPController(GiskardBehavior):
                 identifier.retries_with_relaxed_constraints),
             retry_added_slack=self.get_god_map().unsafe_get_data(identifier.retry_added_slack),
             retry_weight_factor=self.get_god_map().unsafe_get_data(identifier.retry_weight_factor),
-            time_collector=self.time_collector
         )
         qp_controller.compile()
         self.god_map.set_data(identifier.qp_controller, qp_controller)

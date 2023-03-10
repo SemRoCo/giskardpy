@@ -626,6 +626,9 @@ class QPController:
         elif solver_name == SupportedQPSolver.cplex:
             from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             qp_solver_class = QPSolverCplex
+        elif solver_name == SupportedQPSolver.qp_swift:
+            from giskardpy.qp.qp_solver_qpswift import QPSolverQPSwift
+            qp_solver_class = QPSolverQPSwift
         else:
             from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
             qp_solver_class = QPSolverQPOases
@@ -904,6 +907,17 @@ class QPController:
         bA_filter[-ll:] = b_filter[-ll:]
         self.b_filter = np.array(b_filter)
         self.bA_filter = np.array(bA_filter)
+        return np.array(b_filter), np.array(bA_filter)
+
+    @profile
+    def filter_zero_weight_stuff(self, b_filter, bA_filter):
+        return self.np_weights[b_filter], \
+               np.zeros(self.np_weights[b_filter].shape[0]), \
+               self.np_A[bA_filter, :][:, b_filter], \
+               self.np_lb[b_filter], \
+               self.np_ub[b_filter], \
+               self.np_lbA[bA_filter], \
+               self.np_ubA[bA_filter]
 
     def __swap_compiled_matrices(self):
         if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):

@@ -909,16 +909,6 @@ class QPController:
         self.bA_filter = np.array(bA_filter)
         return np.array(b_filter), np.array(bA_filter)
 
-    @profile
-    def filter_zero_weight_stuff(self, b_filter, bA_filter):
-        return self.np_weights[b_filter], \
-               np.zeros(self.np_weights[b_filter].shape[0]), \
-               self.np_A[bA_filter, :][:, b_filter], \
-               self.np_lb[b_filter], \
-               self.np_ub[b_filter], \
-               self.np_lbA[bA_filter], \
-               self.np_ubA[bA_filter]
-
     def __swap_compiled_matrices(self):
         if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
             with suppress_stdout():
@@ -996,7 +986,7 @@ class QPController:
 
         self.update_filters()
         self.np_weights_filtered = self.np_weights[self.b_filter]
-        self.np_g_filtered = np.zeros(self.b_filter.shape[0])
+        self.np_g_filtered = np.zeros(self.np_weights_filtered.shape[0])
         self.np_A_filtered = self.np_A[self.bA_filter, :][:, self.b_filter]
         self.np_lb_filtered = self.np_lb[self.b_filter]
         self.np_ub_filtered = self.np_ub[self.b_filter]

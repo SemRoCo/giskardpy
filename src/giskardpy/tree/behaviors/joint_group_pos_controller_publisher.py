@@ -40,10 +40,15 @@ class JointGroupPosController(CommandPublisher):
             try:
                 key = self.world.joints[joint_name].free_variables[0].position_name
                 velocity = qp_data[Derivatives.velocity][key]
-                dt = (time.current_real - self.stamp).to_sec()
-                dt -= 1/self.hz
-                position = js[joint_name].position + velocity * 0.001
+                # try:
+                #     dt = (time.current_real - time.last_real).to_sec()
+                # except:
+                #     dt = 0.0
+                # dt -= 1/self.hz
+                position = js[joint_name].position + velocity * (
+                            (time.current_real - self.stamp).to_sec() - 1 / self.hz)
             except KeyError:
                 position = js[joint_name].position
             msg.data.append(position)
+
         self.cmd_pub.publish(msg)

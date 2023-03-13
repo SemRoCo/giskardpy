@@ -24,7 +24,7 @@ class CommandPublisher(GiskardBehavior):
         super().initialise()
 
     def update(self):
-        # self.stamp = rospy.get_rostime()
+        self.stamp = rospy.get_rostime()
         return Status.RUNNING
 
     def terminate(self, new_status):

@@ -7,4 +7,10 @@ hsrb:
     - arm_roll_joint
     - wrist_flex_joint
     - wrist_roll_joint
+  realtime_base_controller:
+    type: velocity_controllers/JointGroupVelocityController
+    joints:
+      - base_l_drive_wheel_joint
+      - base_r_drive_wheel_joint
+
 

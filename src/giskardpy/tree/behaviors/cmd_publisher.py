@@ -19,16 +19,20 @@ class CommandPublisher(GiskardBehavior):
     @profile
     def initialise(self):
         self.sample_period = self.god_map.get_data(identifier.sample_period)
-        self.stamp = rospy.get_rostime()
+        # self.stamp = rospy.get_rostime()
         self.timer = rospy.Timer(period=rospy.Duration(1/self.hz), callback=self.publish_joint_state)
         super().initialise()
 
     def update(self):
-        self.stamp = rospy.get_rostime()
+        # self.stamp = rospy.get_rostime()
         return Status.RUNNING
 
     def terminate(self, new_status):
-        self.timer.shutdown()
+        try:
+            self.timer.shutdown()
+        except AttributeError as e:
+            # terminate might be called before initialise
+            pass
 
     def publish_joint_state(self, time):
         raise NotImplementedError()

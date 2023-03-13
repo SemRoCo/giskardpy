@@ -32,6 +32,7 @@ from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
 from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
 from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
+from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
@@ -54,6 +55,7 @@ from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
+from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
@@ -756,6 +758,14 @@ class OpenLoop(StandAlone):
 
 
 class ClosedLoop(OpenLoop):
+    def grow_planning3(self):
+        planning_3 = Sequence('planning III')
+        # planning_3.add_child(PrintText('asdf'))
+        planning_3.add_child(SetTrackingStartTime('start time', offset=0.0))
+        planning_3.add_child(self.grow_closed_loop_control())
+        # planning_3.add_child(self.grow_plan_postprocessing())
+        return planning_3
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
@@ -768,6 +778,8 @@ class ClosedLoop(OpenLoop):
     def grow_closed_loop_control(self):
         hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
         planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
+        for kwargs in hardware_config.joint_state_topics_kwargs:
+            planning_4.add_child(SyncConfiguration2(**kwargs))
         if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
                 and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_4.add_child(VisualizationBehavior('visualization'))
@@ -776,17 +788,25 @@ class ClosedLoop(OpenLoop):
             if self.god_map.get_data(identifier.enable_CPIMarker) \
                     and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
                 planning_4.add_child(CollisionMarker('cpi marker'))
+
+
         planning_4.add_child(ControllerPlugin('controller'))
         if self.god_map.get_data(identifier.debug_expr_needed):
             planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
-        planning_4.add_child(KinSimPlugin('kin sim'))
+        planning_4.add_child(RosTime('time'))
+
+        planning_4.add_child(RealKinSimPlugin('kin sim'))
         for joint_group_position_controller_config in hardware_config.joint_group_position_controllers_kwargs:
             planning_4.add_child(JointGroupPosController(**joint_group_position_controller_config))
         for joint_position_controller_config in hardware_config.joint_position_controllers_kwargs:
             planning_4.add_child(JointPosController(**joint_position_controller_config))
-        planning_4.add_child(LogTrajPlugin('log'))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
+        for kwargs in hardware_config.joint_velocity_controllers_kwargs:
+            planning_4.add_child(JointVelController(**kwargs))
+
+        # planning_4.add_child(KinSimPlugin('kin sim'))
+        # planning_4.add_child(LogTrajPlugin('log'))
+        # if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+        #     planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
             planning_4.add_child(DebugMarkerPublisher('debug tf publisher'))
         if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
@@ -795,8 +815,8 @@ class ClosedLoop(OpenLoop):
                                                              identifier.PublishDebugExpressions)))
         # planning_4.add_child(WiggleCancel('wiggle'))
         # planning_4.add_child(LoopDetector('loop detector'))
-        # planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin())
+        planning_4.add_child(GoalReached('goal reached', real_time=True))
+        # planning_4.add_child(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))

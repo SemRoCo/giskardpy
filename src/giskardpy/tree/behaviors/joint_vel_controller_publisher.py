@@ -13,12 +13,12 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
-class JointPosController(GiskardBehavior):
+class JointVelController(GiskardBehavior):
     last_time: float
 
     @profile
     def __init__(self, namespaces=None, group_name: str = None):
-        super().__init__('joint position publisher')
+        super().__init__('joint velocity publisher')
         self.namespaces = namespaces
         self.publishers = []
         self.cmd_topics = []
@@ -71,14 +71,6 @@ class JointPosController(GiskardBehavior):
         # except:
         #     dt = 0
         for i, joint_name in enumerate(self.joint_names):
-            try:
-                # key = self.world.joints[joint_name].free_variables[0].position_name
-                # velocity = self.world.st
-                # dt = (time.current_real - self.stamp).to_sec()
-                # dt -= 1/self.hz
-                position = js[joint_name].position #+ velocity * dt
-            except KeyError:
-                position = js[joint_name].position
-            msg.data = position
+            msg.data = js[joint_name].velocity
             self.publishers[i].publish(msg)
         return Status.RUNNING

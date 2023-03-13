@@ -1,4 +1,6 @@
-from queue import Queue, Empty
+from queue import Queue, Empty, LifoQueue
+from threading import Lock, Semaphore
+from typing import Optional
 
 import rospy
 from py_trees import Status
@@ -17,21 +19,20 @@ class SyncConfiguration2(GiskardBehavior):
     """
 
     @profile
-    def __init__(self, name, group_name, joint_state_topic='joint_states', tf_root_link_name=None):
+    def __init__(self, group_name: str, joint_state_topic='joint_states'):
         """
         :type js_identifier: str
         """
-        super().__init__(name)
-        self.mjs = None
-        self.map_frame = tf.get_tf_root()
+        super().__init__(str(self))
+        self.pub = rospy.Publisher('asdfasfd', JointState, queue_size=10)
         self.joint_state_topic = joint_state_topic
+        if not self.joint_state_topic.startswith('/'):
+            self.joint_state_topic = '/' + self.joint_state_topic
+        super().__init__(str(self))
+        self.mjs: Optional[JointStates] = None
         self.group_name = group_name
-        self.group = self.world.groups[self.group_name]  # type: WorldBranch
-        if tf_root_link_name is None:
-            self.tf_root_link_name = self.group.root_link_name
-        else:
-            self.tf_root_link_name = tf_root_link_name
-        self.lock = Queue(maxsize=1)
+        self.lock = Lock()
+        # self.lock = LifoQueue(maxsize=0)
 
     @profile
     def setup(self, timeout=0.0):
@@ -39,11 +40,17 @@ class SyncConfiguration2(GiskardBehavior):
         return super().setup(timeout)
 
     def cb(self, data):
+        # self.pub.publish(data)
+        # try:
+        #     self.lock.get_nowait()
+        # except Empty:
+        #     pass
+        self.msg = data
         try:
-            self.lock.get_nowait()
-        except Empty:
+            self.lock.release()
+        except Exception:
             pass
-        self.lock.put(data)
+        # self.lock.put(data)
 
     @profile
     def initialise(self):
@@ -52,21 +59,22 @@ class SyncConfiguration2(GiskardBehavior):
 
     @profile
     def update(self):
-        try:
-            if self.mjs is None:
-                js = self.lock.get()
-            else:
-                js = self.lock.get_nowait()
-            dt = (js.header.stamp - self.last_time).to_sec()
-            self.mjs = JointStates.from_msg(js, None)
-            self.last_time = js.header.stamp
-            # self.world.state.update(self.mjs)
-            for joint_name, next_state in self.mjs.items():
-                # self.world.state[joint_name].acceleration = (next_state.velocity - self.world.state[joint_name].velocity)/dt
-                # self.world.state[joint_name].velocity = next_state.velocity
-                self.world.state[joint_name].position = next_state.position
-            self.world.notify_state_change()
-        except Empty:
-            pass
+        self.lock.acquire()
+        # try:
+        # if self.mjs is None:
+        # js = self.lock.get()
+        # else:
+        #     js = self.lock.get_nowait()
+        # dt = (js.header.stamp - self.last_time).to_sec()
+        self.mjs = JointStates.from_msg(self.msg, self.group_name)
+        # self.last_time = js.header.stamp
+        # self.world.state.update(self.mjs)
+        for joint_name, next_state in self.mjs.items():
+            # self.world.state[joint_name].acceleration = (next_state.velocity - self.world.state[joint_name].velocity)/dt
+            # self.world.state[joint_name].velocity = next_state.velocity
+            self.world.state[joint_name].position = next_state.position
+        self.world.notify_state_change()
+        # except Empty:
+        #     pass
 
         return Status.RUNNING

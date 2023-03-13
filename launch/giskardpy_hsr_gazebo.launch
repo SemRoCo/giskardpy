@@ -1,0 +1,17 @@
+<launch>
+
+  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
+    <param name="config" value="HSR_GazeboRealtime"/>
+    <remap from="/kitchen/joint_states" to="/iai_kitchen/joint_states" />
+  </node>
+
+  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <rosparam param="enable_self_collision">False</rosparam>
+    <rosparam param="interactive_marker_chains">
+      - [odom, base_footprint]
+      - [odom, head_rgbd_sensor_link]
+      - [odom, hand_palm_link]
+    </rosparam>
+  </node>
+
+</launch>

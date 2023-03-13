@@ -1,0 +1,10 @@
+hsrb:
+  realtime_arm_controller:
+    type: position_controllers/JointGroupPositionController
+    joints:
+    - arm_flex_joint
+    - arm_lift_joint
+    - arm_roll_joint
+    - wrist_flex_joint
+    - wrist_roll_joint
+

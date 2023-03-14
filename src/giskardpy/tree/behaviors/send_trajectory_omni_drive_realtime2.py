@@ -20,8 +20,9 @@ from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
+
 # can be used during closed-loop control, instead of for tracking a trajectory
-class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
+class SendTrajectoryToCmdVelClosedLoop(GiskardBehavior, ABC):
     supported_state_types = [Twist]
 
     @profile

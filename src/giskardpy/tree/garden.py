@@ -50,6 +50,7 @@ from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
+from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendTrajectoryToCmdVelClosedLoop
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
@@ -809,7 +810,7 @@ class ClosedLoop(OpenLoop):
             planning_4.add_child(JointVelController(**kwargs))
 
         for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
-            planning_4.add_child(SendTrajectoryToCmdVel(**drive_interface))
+            planning_4.add_child(SendTrajectoryToCmdVelClosedLoop(**drive_interface))
         # planning_4.add_child(KinSimPlugin('kin sim'))
         # planning_4.add_child(LogTrajPlugin('log'))
         # if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):

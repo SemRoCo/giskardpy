@@ -1,11 +1,12 @@
 import numpy as np
 import quadprog
 
-from giskardpy.exceptions import InfeasibleException
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.qp.qp_solver import QPSolver
 
 
 class QPSolverQuadprog(QPSolver):
+    solver_id = SupportedQPSolver.quadprog
     """
     min_x 0.5 x^T G x + a^T x
     s.t.  Cx <= h

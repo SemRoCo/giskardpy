@@ -1,20 +1,15 @@
-from enum import IntEnum
-
 import numpy as np
 import qpalm
-import qpoases
-from qpoases import PyReturnValue
 from scipy import sparse
 
-from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.utils import logging
-import qpSWIFT
 
 from giskardpy.utils.utils import record_time
 
 
 class QPSolverQPalm(QPSolver):
+    solver_id = SupportedQPSolver.qpalm
     """
     min_x 0.5 x^T Q x + q^T x
     s.t.  lb <= Ax <= ub
@@ -48,7 +43,6 @@ class QPSolverQPalm(QPSolver):
         solver = qpalm.Solver(data, self.settings)
         solver.solve()
         return solver.solution.x
-
 
     # @profile
     def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):

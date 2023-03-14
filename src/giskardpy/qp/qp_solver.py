@@ -4,10 +4,12 @@ from typing import Tuple
 
 import numpy as np
 
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 
 
 class QPSolver(ABC):
+    solver_id: SupportedQPSolver
 
     def __init__(self,
                  num_non_slack: int,

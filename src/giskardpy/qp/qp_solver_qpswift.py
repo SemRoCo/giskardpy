@@ -1,15 +1,14 @@
-from enum import IntEnum
-
 import numpy as np
-from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
+
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.utils import logging
 import qpSWIFT
 
 from giskardpy.utils.utils import record_time
 
 
 class QPSolverQPSwift(QPSolver):
+    solver_id = SupportedQPSolver.qp_swift
     """
     min_x 0.5 x^T P x + c^T x
     s.t.  Ax = b
@@ -17,6 +16,7 @@ class QPSolverQPSwift(QPSolver):
     """
 
     opts = {}
+
 
     @profile
     @record_time

@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple, Type, Union
+from typing import List, Dict, Tuple, Type, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +20,7 @@ from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout
+from giskardpy.utils.utils import memoize, create_path, suppress_stdout, get_all_classes_in_package
 
 
 def save_pandas(dfs, names, path):
@@ -573,6 +573,25 @@ class A(Parent):
         return self.construct_A()
 
 
+available_solvers: Dict[SupportedQPSolver, Type[QPSolver]] = {}
+
+
+def detect_solvers():
+    global available_solvers
+    solver_name: str
+    qp_solver_class: Type[QPSolver]
+    for solver_name, qp_solver_class in get_all_classes_in_package('giskardpy.qp', QPSolver, silent=True).items():
+        try:
+            available_solvers[qp_solver_class.solver_id] = qp_solver_class
+        except Exception:
+            pass
+    solver_names = [str(solver_name).split('.')[1] for solver_name in available_solvers.keys()]
+    logging.loginfo(f'Found these qp solvers: {solver_names}')
+
+
+detect_solvers()
+
+
 class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
@@ -584,7 +603,7 @@ class QPController:
     def __init__(self,
                  sample_period: float,
                  prediction_horizon: int,
-                 solver_name: str,
+                 solver_id: Optional[SupportedQPSolver] = None,
                  free_variables: List[FreeVariable] = None,
                  constraints: List[Constraint] = None,
                  velocity_constraints: List[VelocityConstraint] = None,
@@ -612,61 +631,21 @@ class QPController:
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        qp_solver_class: Type[QPSolver]
-        if solver_name == SupportedQPSolver.gurobi:
-            from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            qp_solver_class = QPSolverGurobi
-        elif solver_name == SupportedQPSolver.cplex:
-            from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            qp_solver_class = QPSolverCplex
-        elif solver_name == SupportedQPSolver.qp_swift:
-            from giskardpy.qp.qp_solver_qpswift import QPSolverQPSwift
-            qp_solver_class = QPSolverQPSwift
-        elif solver_name == SupportedQPSolver.quadprog:
-            from giskardpy.qp.qp_solver_quadprog import QPSolverQuadprog
-            qp_solver_class = QPSolverQuadprog
-        elif solver_name == SupportedQPSolver.osqp:
-            from giskardpy.qp.qp_solver_osqp import QPSolverOSQP
-            qp_solver_class = QPSolverOSQP
-        elif solver_name == SupportedQPSolver.cvxopt:
-            from giskardpy.qp.qp_solver_cvxopt import QPSolverCVXOPT
-            qp_solver_class = QPSolverCVXOPT
-        elif solver_name == SupportedQPSolver.qp_solvers:
-            from giskardpy.qp.qp_solver_qp_solvers import QPSolverQPSolvers
-            qp_solver_class = QPSolverQPSolvers
-        elif solver_name == SupportedQPSolver.mosek:
-            from giskardpy.qp.qp_solver_mosek import QPSolverMosek
-            qp_solver_class = QPSolverMosek
-        elif solver_name == SupportedQPSolver.clarabel:
-            from giskardpy.qp.qp_solver_clarabel import QPSolverClarabel
-            qp_solver_class = QPSolverClarabel
-        elif solver_name == SupportedQPSolver.scs:
-            from giskardpy.qp.qp_solver_scs import QPSolverSCS
-            qp_solver_class = QPSolverSCS
-        elif solver_name == SupportedQPSolver.casadi:
-            from giskardpy.qp.qp_solver_casadi import QPSolverCasadi
-            qp_solver_class = QPSolverCasadi
-        elif solver_name == SupportedQPSolver.casadi:
-            from giskardpy.qp.qp_solver_casadi import QPSolverCasadi
-            qp_solver_class = QPSolverCasadi
-        elif solver_name == SupportedQPSolver.qpalm:
-            from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
-            qp_solver_class = QPSolverQPalm
-        elif solver_name == SupportedQPSolver.super_csc:
-            from giskardpy.qp.qp_solver_super_scs import QPSolverSuperSCS
-            qp_solver_class = QPSolverSuperSCS
-        elif solver_name == SupportedQPSolver.cvxpy:
-            from giskardpy.qp.qp_solver_cvxpy import QPSolverCVXPY
-            qp_solver_class = QPSolverCVXPY
+        if solver_id is not None:
+            qp_solver_class = available_solvers[solver_id]
         else:
-            from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
-            qp_solver_class = QPSolverQPOases
+            for solver_id in SupportedQPSolver:
+                if solver_id in available_solvers:
+                    qp_solver_class = available_solvers[solver_id]
+                    break
+            else:
+                raise QPSolverException(f'No qp solver found')
         num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
         self.qp_solver = qp_solver_class(num_non_slack=num_non_slack,
                                          retry_added_slack=self.retry_added_slack,
                                          retry_weight_factor=self.retry_weight_factor,
                                          retries_with_relaxed_constraints=self.retries_with_relaxed_constraints)
-        logging.loginfo(f'Using QP Solver \'{solver_name}\'')
+        logging.loginfo(f'Using QP Solver \'{solver_id}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
 
     def add_free_variables(self, free_variables):

@@ -3,6 +3,7 @@ import numpy as np
 from gurobipy import GRB
 from scipy import sparse
 
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
@@ -44,6 +45,7 @@ error_info = {
 
 
 class QPSolverGurobi(QPSolver):
+    solver_id = SupportedQPSolver.gurobi
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if
                          '__' not in name}
 

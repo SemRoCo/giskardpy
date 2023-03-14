@@ -387,7 +387,6 @@ class Giskard:
         """
         Initialize the behavior tree and world. You usually don't need to call this.
         """
-        self._qp_solver_check()
         if len(self.robot_interface_configs) == 0:
             self.add_robot_from_parameter_server()
         self._create_parameter_backup()
@@ -407,19 +406,6 @@ class Giskard:
             raise KeyError(f'Robot interface mode \'{self._general_config.control_mode}\' is not supported.')
 
         self._controlled_joints_sanity_check()
-
-    def _qp_solver_check(self):
-        try:
-            if self._qp_solver_config.qp_solver == SupportedQPSolver.gurobi:
-                from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            elif self._qp_solver_config.qp_solver == SupportedQPSolver.cplex:
-                from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            elif self._qp_solver_config.qp_solver not in SupportedQPSolver:
-                raise KeyError(f'Solver \'{self._qp_solver_config.qp_solver}\' not supported.')
-        except Exception as e:
-            logging.logwarn(e)
-            logging.logwarn('Defaulting back to qpoases.')
-            self._qp_solver_config.qp_solver = SupportedQPSolver.qp_oases
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)

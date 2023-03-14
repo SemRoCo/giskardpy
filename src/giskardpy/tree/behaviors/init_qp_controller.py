@@ -26,7 +26,7 @@ class InitQPController(GiskardBehavior):
             sample_period=self.get_god_map().unsafe_get_data(identifier.sample_period),
             prediction_horizon=self.get_god_map().unsafe_get_data(identifier.prediction_horizon),
             debug_expressions=debug_expressions,
-            solver_name=self.get_god_map().unsafe_get_data(identifier.qp_solver_name),
+            solver_id=self.get_god_map().unsafe_get_data(identifier.qp_solver_name),
             retries_with_relaxed_constraints=self.get_god_map().unsafe_get_data(
                 identifier.retries_with_relaxed_constraints),
             retry_added_slack=self.get_god_map().unsafe_get_data(identifier.retry_added_slack),

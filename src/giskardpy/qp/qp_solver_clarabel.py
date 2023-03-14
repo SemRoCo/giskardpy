@@ -1,26 +1,20 @@
-import sys
-from copy import deepcopy
-
-import mosek
 import numpy as np
 from clarabel import clarabel
-from qpsolvers import solve_qp
 from scipy import sparse
 
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.utils import logging
 from giskardpy.utils.utils import record_time
 
 
 class QPSolverClarabel(QPSolver):
+    solver_id = SupportedQPSolver.clarabel
     """
     min_x 0.5 x^T P x + q^T x
     s.t.  Ax = b
           Gx <= h
           lb <= x <= ub
     """
-
-
 
     @profile
     @record_time

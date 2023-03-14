@@ -9,6 +9,7 @@ from giskardpy.god_map import GodMap
 
 class TimeCollector:
     qp_solver_times: Dict[Tuple[str, int, int], List[float]] = defaultdict(list)
+    separator = ';'
 
     def __init__(self):
         self.god_map = GodMap()
@@ -17,8 +18,14 @@ class TimeCollector:
         self.qp_solver_times[class_name, number_variables, number_constraints].append(time)
 
     def print_qp_solver_times(self):
+        print('solver, variables, constraints, avg, std, samples')
         for dims, times in sorted(self.qp_solver_times.items()):
-            print(f'{dims}: {np.average(times)}')
+            print(self.separator.join([str(dims[0].split(".")[1]),
+                                       str(dims[1]),
+                                       str(dims[2]),
+                                       str(np.average(times)),
+                                       str(np.std(times)),
+                                       str(times)]))
 
     def pretty_print(self, filter=None):
         print('-------------------------------------------------')

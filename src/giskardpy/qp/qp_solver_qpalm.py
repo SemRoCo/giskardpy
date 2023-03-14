@@ -33,8 +33,8 @@ class QPSolverQPalm(QPSolver):
 
     settings = qpalm.Settings()
     settings.verbose = False
-    settings.eps_abs = 1e-10
-    settings.eps_rel = 1e-10
+    # settings.eps_abs = 1e-8
+    settings.eps_rel = 1e-8
     settings.nonconvex = False
     # settings.max_iter = 100
 
@@ -59,6 +59,7 @@ class QPSolverQPalm(QPSolver):
 
         solver = qpalm.Solver(data, self.settings)
         solver.solve()
+        # print(f'{solver.info.iter} {solver.info.iter_out}')
         if solver.info.status_val != QPALMInfo.SOLVED:
             raise InfeasibleException(f'Failed to solve qp: {str(QPALMInfo(solver.info.status_val))}')
         return solver.solution.x

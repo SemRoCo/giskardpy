@@ -675,14 +675,21 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def plan_and_execute(self, expected_error_codes=None, stop_after=None, wait=True):
+    def plan_and_execute(self, expected_error_codes: List[int] = None, stop_after: float = None,
+                         wait: bool = True) -> MoveResult:
         return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
 
-    def plan(self, expected_error_codes=None, wait: bool = True) -> MoveResult:
-        return self.send_goal(expected_error_codes, MoveGoal.PLAN_ONLY, wait)
+    def plan(self, expected_error_codes: List[int] = None, wait: bool = True) -> MoveResult:
+        return self.send_goal(expected_error_codes=expected_error_codes,
+                              goal_type=MoveGoal.PLAN_ONLY,
+                              wait=wait)
 
-    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None,
-                  wait=True):
+    def send_goal(self,
+                  expected_error_codes: Optional[List[int]] = None,
+                  goal_type: int = MoveGoal.PLAN_AND_EXECUTE,
+                  goal: Optional[MoveGoal] = None,
+                  stop_after: Optional[float] = None,
+                  wait: bool = True) -> Optional[MoveResult]:
         try:
             time_spend_giskarding = time()
             if stop_after is not None:

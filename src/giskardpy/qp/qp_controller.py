@@ -1010,8 +1010,9 @@ class QPController:
                                                   ub=self.np_ub_filtered,
                                                   lbA=self.np_lbA_filtered,
                                                   ubA=self.np_ubA_filtered)
-        except:
-            pass
+        except Exception as e:
+            logging.loginfo(f'Can\'t determine if hard constraints are violated: {e}.')
+            return False
         else:
             self._create_debug_pandas()
             upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]

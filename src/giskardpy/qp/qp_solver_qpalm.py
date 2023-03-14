@@ -31,10 +31,12 @@ class QPSolverQPalm(QPSolver):
     https://github.com/kul-optec/QPALM
     """
 
-    opts = {}
     settings = qpalm.Settings()
     settings.verbose = False
-    settings.eps_abs = 1e-8
+    settings.eps_abs = 1e-10
+    settings.eps_rel = 1e-10
+    settings.nonconvex = False
+    # settings.max_iter = 100
 
     @profile
     @record_time

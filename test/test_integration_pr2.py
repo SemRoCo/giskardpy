@@ -952,6 +952,47 @@ class TestConstraints:
                                     check=False)
         kitchen_setup.plan_and_execute()
 
+    # def test_pointing_bug(self, zero_pose: PR2TestWrapper):
+    #     initial_joint_state = {
+    #         'torso_lift_joint': 0.31261531343064947,
+    #         'head_pan_joint': -2.8762399155129605,
+    #         'head_tilt_joint': 1.227067553622289,
+    #         'r_upper_arm_roll_joint': -1.4298359538624308,
+    #         'r_shoulder_pan_joint': -0.03837121868433646,
+    #         'r_shoulder_lift_joint': -0.2777931728916727,
+    #         'r_forearm_roll_joint': -35.932852605836715,
+    #         'r_elbow_flex_joint': -2.1155076122857492,
+    #         'r_wrist_flex_joint': -0.10505779734036036,
+    #         'r_wrist_roll_joint': -12.515290560123026,
+    #         'l_upper_arm_roll_joint': 1.3837617139225475,
+    #         'l_shoulder_pan_joint': 1.965374844556896,
+    #         'l_shoulder_lift_joint': -0.2649135724042734,
+    #         'l_forearm_roll_joint': 117.52740957656653,
+    #         'l_elbow_flex_joint': -2.1157971537085163,
+    #         'l_wrist_flex_joint': -0.10313747048706379,
+    #         'l_wrist_roll_joint': 6.28332367137161,
+    #     }
+    #     zero_pose.set_seed_configuration(initial_joint_state)
+    #     initial_base_pose = PoseStamped()
+    #     initial_base_pose.header.frame_id = 'map'
+    #     initial_base_pose.pose.position = Point(1.576, 2.535, -0.000)
+    #     initial_base_pose.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.000)
+    #     zero_pose.set_seed_odometry(initial_base_pose)
+    #     zero_pose.plan_and_execute()
+    #
+    #     pointing_axis = Vector3Stamped()
+    #     pointing_axis.header.frame_id = 'narrow_stereo_optical_frame'
+    #     pointing_axis.vector.z = 1
+    #
+    #     goal_point = PointStamped()
+    #     goal_point.header.frame_id = 'map'
+    #     goal_point.point = Point(2.0, 2.6, 1.0)
+    #     zero_pose.set_pointing_goal(goal_point=goal_point,
+    #                                     pointing_axis=pointing_axis,
+    #                                     tip_link='narrow_stereo_optical_frame',
+    #                                     root_link='base_footprint')
+    #     zero_pose.plan_and_execute()
+
     # def test_open_fridge(self, kitchen_setup: PR2TestWrapper):
     #     handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
     #     handle_name = 'iai_fridge_door_handle'
@@ -3409,7 +3450,6 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.plan_and_execute()
 
     def test_bowl_and_cup(self, kitchen_setup: PR2TestWrapper):
-        # FIXME
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
         bowl_name = 'bowl'
         cup_name = 'cup'
@@ -4066,6 +4106,58 @@ class TestWorld:
                 world_setup.search_for_link_name('l_wrist_roll_link'),
                 world_setup.search_for_link_name('l_gripper_r_finger_link'))
 
+
+class TestBenchmark:
+    def test_joint_goal1(self, zero_pose: PR2TestWrapper):
+        horizons = [1, 9, 21, 31, 51]
+        for h in horizons:
+            js = {'torso_lift_joint': 1}
+            zero_pose.set_joint_goal(js, check=False)
+            zero_pose.allow_all_collisions()
+            zero_pose.set_prediction_horizon(h)
+            zero_pose.plan_and_execute()
+
+    def test_cart_goal_2eef2(self, zero_pose: PR2TestWrapper):
+        horizons = [1, 7, 9, 13, 21]
+        for h in horizons:
+            root = 'odom_combined'
+
+            r_goal = PoseStamped()
+            r_goal.header.frame_id = zero_pose.r_tip
+            r_goal.header.stamp = rospy.get_rostime()
+            r_goal.pose.position = Point(0, -0.1, 0)
+            r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+            zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, root)
+            l_goal = PoseStamped()
+            l_goal.header.frame_id = zero_pose.l_tip
+            l_goal.header.stamp = rospy.get_rostime()
+            l_goal.pose.position = Point(-0.05, 0, 0)
+            l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+            zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
+            zero_pose.set_prediction_horizon(h)
+            zero_pose.plan_and_execute()
+
+    def test_avoid_collision_drive_into_box1(self, box_setup: PR2TestWrapper):
+        horizons = [1, 9, 13, 21, 31]
+        for h in horizons:
+            base_goal = PoseStamped()
+            base_goal.header.frame_id = box_setup.default_root
+            base_goal.pose.position.x = 0.25
+            base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+            box_setup.teleport_base(base_goal)
+            base_goal = PoseStamped()
+            base_goal.header.frame_id = 'base_footprint'
+            base_goal.pose.position.x = -1
+            base_goal.pose.orientation.w = 1
+            box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map',
+                                    weight=WEIGHT_BELOW_CA,
+                                    check=False)
+            box_setup.set_prediction_horizon(h)
+            try:
+                box_setup.plan_and_execute()
+            except:
+                pass
+            box_setup.check_cpi_geq(['base_link'], 0.09)
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

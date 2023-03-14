@@ -5,15 +5,9 @@ Giskard is an open source motion planning framework for ROS, which uses constrai
 
 #### Python dependencies
 ```
-sudo pip3 install pandas numpy==1.23.4 hypothesis qpswift
+sudo pip3 install pandas numpy==1.23.4 hypothesis qpalm
 sudo apt install python3-dev 
 ```
-#### Gurobi
-This step is optional but recommanded because Gurobi is significantly faster than QPOases, but it requires a license.
-If Gurobi is not installed, Giskard will use QPOases automatically as a backup.
-   - ```sudo pip3 install gurobipy```
-   - If you have vpn access or are in the local network of the IAI of the University of Bremen, follow these instructions: https://ai.uni-bremen.de/wiki/intern/adm/gurobi
-   - Otherwise you can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
 
 #### Workspace
 ```
@@ -33,7 +27,8 @@ source ~/giskardpy_ws/devel/setup.bash      # source new overlay
 ```
 
 #### Fast Custom Bullet Bindings
-Giskard uses Adrian Röfer's bullet bindings instead of the official ones, as they are much faster for our use case.
+Giskard uses Adrian Röfer's bullet bindings (https://github.com/ARoefer/bullet3) instead of the official ones, as they are much faster for our use case.
+Use this script to install them:
 ```
 ./scripts/build_better_pybullet.sh /path/of/your/choosing
 source ~/.bashrc
@@ -52,6 +47,20 @@ In [2]:
 ```
 If it doesn't work, source your ```.bashrc``` again 
 and/or make sure that your ```$PYTHONPATH``` includes something like ```/path/of/your/choosing/bullet3/build_cmake/better_python:/path/of/your/choosing/bullet3/examples/pybullet```. 
+
+#### QP solvers
+Giskard supports multiple QP solvers and will automatically use the fasted installed solver.
+The default is `qpalm`, as it is the easiest to install.
+
+You may want to install `qpSWIFT` manually, as it is a little faster than `qpalm`.
+To do so follow the instructions on their github page: https://github.com/qpSWIFT/qpSWIFT.
+
+Giskard also supports three additional solvers, which are slower than `qpalm`, sorted by how fast they are for Giskard's usecase:
+- `Gurobi`: A commercial solver, which is approximately as fast as `qpalm`: 
+  - ```sudo pip3 install gurobipy```
+  - You can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
+- `Clarabel.rs`: `sudo pip3 install clarabel` (https://github.com/oxfordcontrol/Clarabel.rs)
+- `qpOASES`: https://github.com/SemRoCo/qpOASES/tree/noetic
 
 ### Tutorials
 https://github.com/SemRoCo/giskardpy/wiki

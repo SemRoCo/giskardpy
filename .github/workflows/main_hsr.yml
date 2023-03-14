@@ -39,12 +39,6 @@ jobs:
       with:
         path: 'ros_ws/src/giskard_msgs'
         repository: SemRoCo/giskard_msgs
-    - name: Checkout qpoases
-      uses: actions/checkout@v3
-      with:
-        path: 'ros_ws/src/qpOASES'
-        repository: SemRoCo/qpOASES
-        ref: noetic
     - name: Checkout iai_maps
       uses: actions/checkout@v3
       with:

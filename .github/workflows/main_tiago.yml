@@ -68,7 +68,7 @@ jobs:
         submodules: recursive
     - name: install python deps
       run: |
-        sudo pip3 install numpy==1.23.4 pandas hypothesis qpswift
+        sudo pip3 install numpy==1.23.4 pandas hypothesis qpalm
     - name: build Giskard
       run: |
         cd ros_ws

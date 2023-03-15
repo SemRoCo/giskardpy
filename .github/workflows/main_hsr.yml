@@ -127,7 +127,6 @@ jobs:
     - name: install qpSWIFT python wrapper
       run: |
         cd ~/qpSWIFT/python
-#        sudo pip3 install numpy
         sudo python3 setup.py install
     #save cache --------------------------------------------------------------------------------------------------------
     - name: cache pip cache

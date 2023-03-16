@@ -3,14 +3,14 @@ defaults:
   run:
     shell: bash -ieo pipefail {0}
 on:
-  push:
-    branches:
-      - master
+#  push:
+#    branches:
+#      - master
+##      - devel
+#  pull_request:
+#    branches:
+#      - master
 #      - devel
-  pull_request:
-    branches:
-      - master
-      - devel
   workflow_dispatch:
     inputs:
       logLevel:

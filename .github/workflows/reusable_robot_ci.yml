@@ -1,0 +1,171 @@
+name: Reusable Robot CI
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+on:
+  workflow_call:
+    inputs:
+      robot:
+        description: upload specified robot urdf. [pr2, hsr, tiago, donbot]
+        required: true
+        type: string
+      test:
+        description: that that will be run, e.g. python3 -m pytest -s test/test_integration_hsr.py::TestJointGoals
+        required: true
+        type: string
+jobs:
+  test_standalone:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        qp_solver: [qpalm, qpSWIFT]
+    steps:
+      #load cache ------------------------------------------------------------------------------------------------------
+      - name: load pip cache
+        id: pip-load
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+          key: pip
+      - name: load bpb
+        id: load-bpb
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/bpb
+          key: bpb
+      - name: load qpSWIFT
+        id: load-qpSWIFT
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/qpSWIFT
+          key: qpSWIFT
+      #build ===========================================================================================================
+      - uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/giskardpy'
+          repository: SemRoCo/giskardpy
+      - name: Checkout giskard msgs
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/giskard_msgs'
+          repository: SemRoCo/giskard_msgs
+      - name: Checkout iai_maps
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_maps'
+          repository: code-iai/iai_maps
+          ref: master
+      - name: Setup Giskard workspace
+        uses: betwo/github-setup-catkin@master
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+        with:
+          ros-version: noetic
+          build-tool: 'catkin_tools'
+          workspace: $GITHUB_WORKSPACE/ros_ws
+      # install robot --------------------------------------------------------------------------------------------------
+      - if: ${{ inputs.robot == 'hsr' }}
+        name: Checkout hsr_description
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/hsr_description'
+          repository: code-iai/hsr_description
+          ref: master
+      - if: ${{ inputs.robot == 'hsr' }}
+        name: Checkout hsr_meshes
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/hsr_meshes'
+          repository: ToyotaResearchInstitute/hsr_meshes
+          ref: master
+      # pip ------------------------------------------------------------------------------------------------------------
+      - name: install pip dependencies
+        run: |
+          pip3 install numpy pandas hypothesis qpalm
+      - name: build Giskard
+        run: |
+          cd ros_ws
+          . /opt/ros/noetic/setup.bash
+          catkin build
+          echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
+          echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
+      # install better pybullet
+      - if: ${{ steps.load-bpb.outputs.cache-hit != 'true' }}
+        name: install pybullet
+        continue-on-error: true
+        run: |
+          mkdir -p ~/bpb
+          cd ~/bpb
+          git clone https://github.com/SemRoCo/bullet3.git
+          cd bullet3
+          ./build_better_pybullet.sh
+      - if: ${{ steps.load-bpb.outputs.cache-hit == 'true' }}
+        name: add betterpybullet to bashrc
+        continue-on-error: true
+        run: |
+          cd ~/bpb/bullet3
+          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
+      # install qpSWIFT
+      - if: ${{ steps.load-qpSWIFT.outputs.cache-hit != 'true' }}
+        name: compile qpSWIFT
+        run: |
+          cd ~
+          git clone https://github.com/qpSWIFT/qpSWIFT
+          cd qpSWIFT
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+          sudo cmake --build build --target install
+      - name: install qpSWIFT python wrapper
+        run: |
+          cd ~/qpSWIFT/python
+  #        sudo pip3 install numpy
+          sudo python3 setup.py install
+      #save cache --------------------------------------------------------------------------------------------------------
+      - name: cache pip cache
+        id: pip-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ~/.cache/pip
+          key: pip
+      - name: cache bpb
+        id: cache-bpb
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ~/bpb
+          key: bpb
+      - name: cache qpSWIFT
+        id: cache-qpSWIFT
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ~/qpSWIFT
+          key: qpSWIFT
+      #tests =============================================================================================================
+      - name: start roscore
+        run: |
+          roscore &
+      - name: run test
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test }}
+  #    - name: HSR TestCartGoals
+  #      run: |
+  #        roscd giskardpy
+  #        python3 -m pytest -s test/test_integration_hsr.py::TestCartGoals
+  #    - name: HSR TestCollisionAvoidanceGoals
+  #      run: |
+  #        roscd giskardpy
+  #        python3 -m pytest -s test/test_integration_hsr.py::TestCollisionAvoidanceGoals
+  #    - name: HSR TestConstraints
+  #      run: |
+  #        roscd giskardpy
+  #        python3 -m pytest -s test/test_integration_hsr.py::TestConstraints
+  #    - name: Setup upterm session
+  ##      if: always()
+  #      if: failure()
+  #      uses: lhotari/action-upterm@v1

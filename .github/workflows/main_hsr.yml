@@ -28,7 +28,7 @@ on:
         type: boolean
 jobs:
   hsr_joint_goals:
-    uses: SemRoCo/giskardpy/.github/workflows/resuable_robot_ci.yaml@new_solvers
+    uses: SemRoCo/giskardpy/.github/workflows/reusable_robot_ci.yml@new_solvers
     with:
       robot: hsr
       test: test/test_integration_hsr.py::TestJointGoals

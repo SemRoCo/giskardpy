@@ -16,7 +16,6 @@ on:
 jobs:
   test_standalone:
     runs-on: ubuntu-20.04
-    needs: [build_and_cache_bpb, build_and_cache_qpSWIFT]
     strategy:
       matrix:
         qp_solver: [qpalm, qpSWIFT]

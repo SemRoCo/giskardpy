@@ -27,7 +27,10 @@ on:
         required: false
         type: boolean
 jobs:
+  build_dependencies:
+    uses: SemRoCo/giskardpy/.github/workflows/build_dependencies.yml@new_solvers
   hsr_standalone_tests:
+    needs: [build_dependencies]
     strategy:
       matrix:
         test: [TestJointGoals,

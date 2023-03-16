@@ -52,7 +52,7 @@ jobs:
         run: |
           cd ~/bpb/bullet3
           echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
-      #build ===========================================================================================================
+      #pull github deps ================================================================================================
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy'
@@ -70,14 +70,6 @@ jobs:
           path: 'ros_ws/src/iai_maps'
           repository: code-iai/iai_maps
           ref: master
-      - name: Setup Giskard workspace
-        uses: betwo/github-setup-catkin@master
-        env:
-          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-        with:
-          ros-version: noetic
-          build-tool: 'catkin_tools'
-          workspace: $GITHUB_WORKSPACE/ros_ws
       # install robots -------------------------------------------------------------------------------------------------
       - if: ${{ inputs.robot == 'hsr' }}
         name: Checkout hsr_description
@@ -122,6 +114,14 @@ jobs:
           ref: main
           submodules: recursive
       # build workspace ------------------------------------------------------------------------------------------------
+      - name: install ros and rosdeps
+        uses: betwo/github-setup-catkin@master
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+        with:
+          ros-version: noetic
+          build-tool: 'catkin_tools'
+          workspace: $GITHUB_WORKSPACE/ros_ws
       - name: build Giskard
         run: |
           cd ros_ws
@@ -136,7 +136,6 @@ jobs:
         run: |
           roscd giskardpy
           python3 -m pytest -s ${{ inputs.test }}
-  #    - name: Setup upterm session
-  ##      if: always()
-  #      if: failure()
-  #      uses: lhotari/action-upterm@v1
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1

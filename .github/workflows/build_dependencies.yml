@@ -41,6 +41,9 @@ jobs:
         with:
           path: ~/bpb
           key: bpb
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1
   build_and_cache_qpSWIFT:
     runs-on: ubuntu-20.04
     steps:
@@ -67,6 +70,9 @@ jobs:
         with:
           path: ~/qpSWIFT
           key: qpSWIFT
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1
   create_pip_cache:
     runs-on: ubuntu-20.04
     steps:
@@ -89,3 +95,6 @@ jobs:
         with:
           path: ~/.cache/pip
           key: pip
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1

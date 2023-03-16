@@ -1,4 +1,4 @@
-name: CI HSR standalone
+name: CI standalone
 defaults:
   run:
     shell: bash -ieo pipefail {0}
@@ -28,7 +28,7 @@ on:
 jobs:
   build_dependencies:
     uses: ./.github/workflows/build_dependencies.yml
-  hsr_standalone_tests:
+  hsr:
     needs: [ build_dependencies ]
     strategy:
       matrix:
@@ -39,7 +39,7 @@ jobs:
     with:
       robot: hsr
       test: test/test_integration_hsr.py::${{ matrix.test }}
-  donbot_standalone_tests:
+  donbot:
     needs: [ build_dependencies ]
     strategy:
       matrix:
@@ -50,6 +50,34 @@ jobs:
     with:
       robot: donbot
       test: test/test_integration_donbot.py::${{ matrix.test }}
+  pr2:
+    needs: [ build_dependencies ]
+    strategy:
+      matrix:
+        test: [ TestWorldManipulation,
+                TestJointGoals,
+                TestCartGoals,
+                TestConstraints,
+                TestWayPoints,
+                TestInfoServices,
+                TestSelfCollisionAvoidance,
+                TestCollisionAvoidanceGoals ]
+    uses: ./.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: pr2
+      test: test/test_integration_pr2.py::${{ matrix.test }}
+  tiago:
+    needs: [ build_dependencies ]
+    strategy:
+      matrix:
+        test: [ TestConstraints,
+                TestJointGoals,
+                TestCollisionAvoidance,
+                TestCartGoals ]
+    uses: ./.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: tiago
+      test: test/test_integration_tiago_stand_alone.py::${{ matrix.test }}
 #    - name: Setup upterm session
 ##      if: always()
 #      if: failure()

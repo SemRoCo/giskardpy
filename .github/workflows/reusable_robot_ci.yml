@@ -53,15 +53,12 @@ jobs:
           cd ~/bpb/bullet3
           echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
       #build ===========================================================================================================
-      - name: install pip dependencies
-        run: pip3 install numpy pandas hypothesis
-      - if: ${{ matrix.qp_solver == 'qpalm'}}
-        name: install qpalm
-        run: pip3 install qpalm
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy'
           repository: SemRoCo/giskardpy
+      - name: install pip dependencies
+        run: pip3 install -r src/giskardpy/requirements.txt
       - name: Checkout giskard msgs
         uses: actions/checkout@v3
         with:
@@ -102,7 +99,6 @@ jobs:
           cd ros_ws
           . /opt/ros/noetic/setup.bash
           catkin build
-          pip3 install -r src/giskardpy/requirements.txt
           echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
           echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
       #save cache ------------------------------------------------------------------------------------------------------

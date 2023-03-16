@@ -21,7 +21,7 @@ from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import PrefixName
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.configs.pr2 import PR2_Mujoco, PR2_StandAlone
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface import GiskardWrapper
@@ -4108,8 +4108,9 @@ class TestWorld:
 
 
 class TestBenchmark:
-    def test_joint_goal1(self, zero_pose: PR2TestWrapper):
-        horizons = [1, 9, 21, 31, 51]
+    def test_joint_goal_torso_lift_joint(self, zero_pose: PR2TestWrapper):
+        horizons = [1, 7, 9, 21, 31, 41, 51]
+        zero_pose.god_map.set_data(identifier.max_derivative, Derivatives.acceleration)
         for h in horizons:
             js = {'torso_lift_joint': 1}
             zero_pose.set_joint_goal(js, check=False)
@@ -4117,8 +4118,16 @@ class TestBenchmark:
             zero_pose.set_prediction_horizon(h)
             zero_pose.plan_and_execute()
 
+    def test_joint_goal2(self, zero_pose: PR2TestWrapper):
+        horizons = [1, 7, 9, 21, 31, 41]
+        for h in horizons:
+            zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
+            zero_pose.allow_all_collisions()
+            zero_pose.set_prediction_horizon(h)
+            zero_pose.plan_and_execute()
+
     def test_cart_goal_2eef2(self, zero_pose: PR2TestWrapper):
-        horizons = [1, 7, 9, 13, 21]
+        horizons = [1, 7, 9, 11, 13, 21]
         for h in horizons:
             root = 'odom_combined'
 
@@ -4138,7 +4147,7 @@ class TestBenchmark:
             zero_pose.plan_and_execute()
 
     def test_avoid_collision_drive_into_box1(self, box_setup: PR2TestWrapper):
-        horizons = [1, 9, 13, 21, 31]
+        horizons = [1, 7, 9, 13, 21, 31]
         for h in horizons:
             base_goal = PoseStamped()
             base_goal.header.frame_id = box_setup.default_root

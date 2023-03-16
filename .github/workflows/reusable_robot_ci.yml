@@ -14,35 +14,100 @@ on:
         required: true
         type: string
 jobs:
+  build_and_cache_bpb:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: load bpb
+        id: load-bpb
+        uses: actions/cache@v3
+        with:
+          path: ~/bpb
+          key: bpb
+      # install better pybullet
+      - if: ${{ steps.load-bpb.outputs.cache-hit != 'true' }}
+        name: install pybullet
+        run: |
+          sudo pip3 install numpy
+          mkdir -p ~/bpb
+          cd ~/bpb
+          git clone https://github.com/SemRoCo/bullet3.git
+          cd bullet3
+          ./build_better_pybullet.sh
+          sudo cmake --build build --target install
+      - if: ${{ steps.load-bpb.outputs.cache-hit != 'true' }}
+        name: cache bpb
+        id: cache-bpb
+        uses: actions/cache/save@v3
+        with:
+          path: ~/bpb
+          key: bpb
+  build_and_cache_qpSWIFT:
+    runs-on: ubuntu-20.04
+    steps:
+      # load cache
+      - name: load qpSWIFT
+        id: load-qpSWIFT
+        uses: actions/cache@v3
+        with:
+          path: ~/qpSWIFT
+          key: qpSWIFT
+      # install qpSWIFT
+      - if: ${{ steps.load-qpSWIFT.outputs.cache-hit != 'true' }}
+        name: compile qpSWIFT
+        run: |
+          sudo pip3 install numpy
+          cd ~
+          git clone https://github.com/qpSWIFT/qpSWIFT
+          cd qpSWIFT
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+          sudo cmake --build build --target install
+      - name: cache qpSWIFT
+        id: cache-qpSWIFT
+        uses: actions/cache/save@v3
+        with:
+          path: ~/qpSWIFT
+          key: qpSWIFT
+
   test_standalone:
     runs-on: ubuntu-20.04
+    needs: [build_and_cache_bpb, build_and_cache_qpSWIFT]
     strategy:
       matrix:
         qp_solver: [qpalm, qpSWIFT]
+    env:
+      QP_SOLVER: ${{ matrix.qp_solver }}
     steps:
       #load cache ------------------------------------------------------------------------------------------------------
       - name: load pip cache
         id: pip-load
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.cache/pip
+          path: ~/.cache/pip
           key: pip
-      - name: load bpb
-        id: load-bpb
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/bpb
-          key: bpb
-      - name: load qpSWIFT
+      - name: load qpSWIFT #--------------------------------------------------------------------------------------------
         id: load-qpSWIFT
         uses: actions/cache@v3
         with:
-          path: |
-            ~/qpSWIFT
+          path: ~/qpSWIFT
           key: qpSWIFT
+      - name: install qpSWIFT python wrapper
+        run: |
+          cd ~/qpSWIFT/python
+          sudo python3 setup.py install
+      - name: load bpb # -----------------------------------------------------------------------------------------------
+        id: load-bpb
+        uses: actions/cache@v3
+        with:
+          path: ~/bpb
+          key: bpb
+      - name: add bpb to bashrc
+        run: |
+          cd ~/bpb/bullet3
+          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
       #build ===========================================================================================================
+      - name: install pip dependencies
+        run: pip3 install numpy pandas hypothesis qpalm
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy'
@@ -66,7 +131,7 @@ jobs:
           ros-version: noetic
           build-tool: 'catkin_tools'
           workspace: $GITHUB_WORKSPACE/ros_ws
-      # install robot --------------------------------------------------------------------------------------------------
+      # install robots -------------------------------------------------------------------------------------------------
       - if: ${{ inputs.robot == 'hsr' }}
         name: Checkout hsr_description
         uses: actions/checkout@v3
@@ -81,10 +146,7 @@ jobs:
           path: 'ros_ws/src/hsr_meshes'
           repository: ToyotaResearchInstitute/hsr_meshes
           ref: master
-      # pip ------------------------------------------------------------------------------------------------------------
-      - name: install pip dependencies
-        run: |
-          pip3 install numpy pandas hypothesis qpalm
+      # build workspace ------------------------------------------------------------------------------------------------
       - name: build Giskard
         run: |
           cd ros_ws
@@ -92,62 +154,16 @@ jobs:
           catkin build
           echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
           echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
-      # install better pybullet
-      - if: ${{ steps.load-bpb.outputs.cache-hit != 'true' }}
-        name: install pybullet
-        continue-on-error: true
-        run: |
-          mkdir -p ~/bpb
-          cd ~/bpb
-          git clone https://github.com/SemRoCo/bullet3.git
-          cd bullet3
-          ./build_better_pybullet.sh
-      - if: ${{ steps.load-bpb.outputs.cache-hit == 'true' }}
-        name: add betterpybullet to bashrc
-        continue-on-error: true
-        run: |
-          cd ~/bpb/bullet3
-          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
-      # install qpSWIFT
-      - if: ${{ steps.load-qpSWIFT.outputs.cache-hit != 'true' }}
-        name: compile qpSWIFT
-        run: |
-          cd ~
-          git clone https://github.com/qpSWIFT/qpSWIFT
-          cd qpSWIFT
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --config Release
-          sudo cmake --build build --target install
-      - name: install qpSWIFT python wrapper
-        run: |
-          cd ~/qpSWIFT/python
-          sudo python3 setup.py install
-      #save cache --------------------------------------------------------------------------------------------------------
+      #save cache ------------------------------------------------------------------------------------------------------
       - name: cache pip cache
         id: pip-save
         uses: actions/cache/save@v3
         with:
-          path: |
-            ~/.cache/pip
+          path: ~/.cache/pip
           key: pip
-      - name: cache bpb
-        id: cache-bpb
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            ~/bpb
-          key: bpb
-      - name: cache qpSWIFT
-        id: cache-qpSWIFT
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            ~/qpSWIFT
-          key: qpSWIFT
-      #tests =============================================================================================================
+      #tests ===========================================================================================================
       - name: start roscore
-        run: |
-          roscore &
+        run: roscore &
       - name: run test
         run: |
           roscd giskardpy

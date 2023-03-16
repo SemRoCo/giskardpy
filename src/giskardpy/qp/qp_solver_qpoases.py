@@ -19,7 +19,7 @@ class QPoasesModes(IntEnum):
 
 
 class QPSolverQPOases(QPSolver):
-    solver_id = SupportedQPSolver.qp_oases
+    solver_id = SupportedQPSolver.qpOASES
     STATUS_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
 
     def __init__(self, num_non_slack: int, retry_added_slack: float, retry_weight_factor: float,

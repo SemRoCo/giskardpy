@@ -245,6 +245,8 @@ class GiskardTestWrapper(GiskardWrapper):
             self.giskard.configure_CollisionMarker(enabled=False)
             self.giskard.configure_PlotTrajectory(enabled=False)
             self.giskard.configure_PlotDebugExpressions(enabled=False)
+        if 'QP_SOLVER' in os.environ:
+            self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.giskard.grow()
         self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)

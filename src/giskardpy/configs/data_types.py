@@ -26,11 +26,11 @@ class CollisionCheckerLib(Enum):
 
 
 class SupportedQPSolver(Enum):
-    qp_swift = 1
+    qpSWIFT = 1
     qpalm = 2
     gurobi = 3
     clarabel = 4
-    qp_oases = 5
+    qpOASES = 5
     # quadprog = 6
     # cplex = 3
     # osqp = 6

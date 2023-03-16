@@ -93,6 +93,13 @@ jobs:
           path: 'ros_ws/src/hsr_meshes'
           repository: ToyotaResearchInstitute/hsr_meshes
           ref: master
+      - if: ${{ inputs.robot == 'donbot' }}
+        name: Checkout iai_robots
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_robots'
+          repository: code-iai/iai_robots
+          ref: noetic
       # build workspace ------------------------------------------------------------------------------------------------
       - name: build Giskard
         run: |

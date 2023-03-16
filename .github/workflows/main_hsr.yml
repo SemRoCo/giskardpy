@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - master
-#      - devel
   pull_request:
     branches:
       - master
@@ -19,9 +18,9 @@ on:
         default: 'info'
         type: choice
         options:
-        - info
-        - warning
-        - debug
+          - info
+          - warning
+          - debug
       tags:
         description: 'Test scenario tags'
         required: false
@@ -30,16 +29,27 @@ jobs:
   build_dependencies:
     uses: SemRoCo/giskardpy/.github/workflows/build_dependencies.yml@new_solvers
   hsr_standalone_tests:
-    needs: [build_dependencies]
+    needs: [ build_dependencies ]
     strategy:
       matrix:
-        test: [TestJointGoals,
-               TestCollisionAvoidanceGoals,
-               TestConstraints]
+        test: [ TestJointGoals,
+                TestCollisionAvoidanceGoals,
+                TestConstraints ]
     uses: SemRoCo/giskardpy/.github/workflows/reusable_robot_ci.yml@new_solvers
     with:
       robot: hsr
       test: test/test_integration_hsr.py::${{ matrix.test }}
+  donbot_standalone_tests:
+    needs: [ build_dependencies ]
+    strategy:
+      matrix:
+        test: [ TestCartGoals,
+                TestConstraints,
+                TestJointGoals ]
+    uses: SemRoCo/giskardpy/.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: donbot
+      test: test/test_integration_donbot.py::${{ matrix.test }}
 #    - name: Setup upterm session
 ##      if: always()
 #      if: failure()

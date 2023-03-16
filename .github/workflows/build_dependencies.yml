@@ -81,9 +81,7 @@ jobs:
       - if: ${{ steps.pip-load.outputs.cache-hit != 'true' }}
         name: install pip requirements
         run: |
-          pwd
-          ls
-          pip3 install -r giskardpy/requirement.txt
+          pip3 install -r requirements.txt
       - if: ${{ steps.pip-load.outputs.cache-hit != 'true' }}
         name: cache pip
         id: cache-pip

@@ -30,14 +30,14 @@ jobs:
         with:
           path: ~/.cache/pip
           key: pip
-      - if: ${{ matrix.qp_solver == qpSWIFT}}
+      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
         name: load qpSWIFT
         id: load-qpSWIFT
         uses: actions/cache@v3
         with:
           path: ~/qpSWIFT
           key: qpSWIFT
-      - if: ${{ matrix.qp_solver == qpSWIFT}}
+      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
         name: install qpSWIFT python wrapper
         run: |
           sudo pip3 install numpy
@@ -56,7 +56,7 @@ jobs:
       #build ===========================================================================================================
       - name: install pip dependencies
         run: pip3 install numpy pandas hypothesis
-      - if: ${{ matrix.qp_solver == qpalm}}
+      - if: ${{ matrix.qp_solver == 'qpalm'}}
         name: install qpalm
         run: pip3 install qpalm
       - uses: actions/checkout@v3

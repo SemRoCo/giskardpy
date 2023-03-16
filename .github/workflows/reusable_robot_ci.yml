@@ -100,6 +100,27 @@ jobs:
           path: 'ros_ws/src/iai_robots'
           repository: code-iai/iai_robots
           ref: noetic
+      - if: ${{ inputs.robot == 'pr2' }}
+        name: Checkout iai_pr2
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_pr2'
+          repository: code-iai/iai_pr2
+          ref: mujoco_sim_setup
+      - if: ${{ inputs.robot == 'pr2' }}
+        name: ignore some packages in iai_pr2
+        run: |
+          cd ros_ws
+          touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
+          touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
+      - if: ${{ inputs.robot == 'tiago' }}
+        name: Checkout iai_tiago
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_tiago'
+          repository: code-iai/iai_tiago
+          ref: main
+          submodules: recursive
       # build workspace ------------------------------------------------------------------------------------------------
       - name: build Giskard
         run: |

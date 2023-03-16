@@ -62,7 +62,8 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release
           sudo cmake --build build --target install
-      - name: cache qpSWIFT
+      - if: ${{ steps.load-qpSWIFT.outputs.cache-hit != 'true' }}
+        name: cache qpSWIFT
         id: cache-qpSWIFT
         uses: actions/cache/save@v3
         with:
@@ -93,6 +94,7 @@ jobs:
           key: qpSWIFT
       - name: install qpSWIFT python wrapper
         run: |
+          sudo pip3 install numpy
           cd ~/qpSWIFT/python
           sudo python3 setup.py install
       - name: load bpb # -----------------------------------------------------------------------------------------------

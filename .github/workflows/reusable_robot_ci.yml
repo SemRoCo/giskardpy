@@ -102,6 +102,7 @@ jobs:
           cd ros_ws
           . /opt/ros/noetic/setup.bash
           catkin build
+          pip3 install -r src/giskardpy/requirements.txt
           echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
           echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
       #save cache ------------------------------------------------------------------------------------------------------

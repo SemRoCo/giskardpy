@@ -12,7 +12,7 @@ on:
       test:
         description: that that will be run, e.g. test/test_integration_hsr.py::TestJointGoals
         required: true
-        type: string
+        default: []
 jobs:
   test_standalone:
     runs-on: ubuntu-20.04
@@ -105,14 +105,6 @@ jobs:
           cd ros_ws
           touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
           touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
-      - if: ${{ inputs.robot == 'tiago' }}
-        name: Checkout iai_tiago
-        uses: actions/checkout@v3
-        with:
-          path: 'ros_ws/src/iai_tiago'
-          repository: code-iai/iai_tiago
-          ref: main
-          submodules: recursive
       # build workspace ------------------------------------------------------------------------------------------------
       - name: install ros and rosdeps
         uses: betwo/github-setup-catkin@master
@@ -122,6 +114,14 @@ jobs:
           ros-version: noetic
           build-tool: 'catkin_tools'
           workspace: $GITHUB_WORKSPACE/ros_ws
+      - if: ${{ inputs.robot == 'tiago' }} # tiago has to be pulled now because it has fucked up package.xml
+        name: Checkout iai_tiago
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_tiago'
+          repository: code-iai/iai_tiago
+          ref: main
+          submodules: recursive
       - name: build Giskard
         run: |
           cd ros_ws

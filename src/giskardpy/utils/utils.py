@@ -22,6 +22,7 @@ import pylab as plt
 import roslaunch
 import rospkg
 import rospy
+import urdf_parser_py.urdf as up  # I only do this, because otherwise trimesh fails github actions
 import trimesh
 from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
@@ -474,13 +475,13 @@ def memoize(function):
 
 
 def record_time(function):
-    return function
+    # return function
     god_map = GodMap()
     time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
     if function.__name__ == 'solve':
         @wraps(function)
         def wrapper(self, weights, g, A, lb, ub, lbA, ubA):
-            qp_solver = god_map.get_data(identifier.qp_solver_name)
+            qp_solver = self.solver_id
             start_time = time()
             result = function(self, weights, g, A, lb, ub, lbA, ubA)
             time_delta = time() - start_time

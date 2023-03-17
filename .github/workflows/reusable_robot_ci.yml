@@ -12,7 +12,7 @@ on:
       test:
         description: that that will be run, e.g. test/test_integration_hsr.py::TestJointGoals
         required: true
-        default: []
+        type: string
 jobs:
   test_standalone:
     runs-on: ubuntu-20.04

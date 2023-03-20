@@ -1,5 +1,9 @@
 from __future__ import division
 
+# I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
+# fails on github actions
+import urdf_parser_py.urdf as up
+
 import errno
 import inspect
 import json
@@ -13,6 +17,7 @@ from copy import deepcopy
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
+from time import time
 from typing import Type, Optional, Dict
 
 import matplotlib.colors as mcolors
@@ -37,6 +42,7 @@ from giskardpy.exceptions import DontPrintStackTrace
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
+from giskardpy.utils.time_collector import TimeCollector
 
 
 @contextmanager
@@ -73,11 +79,22 @@ class NullContextManager(object):
         pass
 
 
-def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] = None) -> Dict[str, Type]:
+def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] = None, silent: bool = False) \
+        -> Dict[str, Type]:
+    """
+    :param package_name: e.g. giskardpy.goals
+    :param parent_class: e.g. Goal
+    :return:
+    """
     classes = {}
     package = __import__(package_name, fromlist="dummy")
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-        module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
+        try:
+            module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
+        except:
+            if not silent:
+                logging.loginfo(f'Failed to load {modname}')
+            continue
         for name2, value2 in inspect.getmembers(module, inspect.isclass):
             if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
                 classes[name2] = value2
@@ -458,6 +475,23 @@ def memoize(function):
             return rv
 
     return wrapper
+
+
+def record_time(function):
+    return function
+    god_map = GodMap()
+    time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
+    if function.__name__ == 'solve':
+        @wraps(function)
+        def wrapper(self, weights, g, A, lb, ub, lbA, ubA):
+            qp_solver = self.solver_id
+            start_time = time()
+            result = function(self, weights, g, A, lb, ub, lbA, ubA)
+            time_delta = time() - start_time
+            time_collector.add_qp_solve_time(str(qp_solver), A.shape[1], A.shape[0], time_delta)
+            return result
+
+        return wrapper
 
 
 def clear_memo(f):

@@ -65,6 +65,7 @@ def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     if resetted_giskard.is_standalone():
         resetted_giskard.set_seed_configuration(resetted_giskard.default_pose)
+        resetted_giskard.allow_all_collisions()
     else:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
@@ -76,6 +77,7 @@ def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     if resetted_giskard.is_standalone():
         resetted_giskard.set_seed_configuration(resetted_giskard.better_pose)
+        resetted_giskard.allow_all_collisions()
     else:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.set_joint_goal(resetted_giskard.better_pose)

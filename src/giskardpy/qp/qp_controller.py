@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple, Type, Union
+from typing import List, Dict, Tuple, Type, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,8 +20,7 @@ from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout
+from giskardpy.utils.utils import memoize, create_path, suppress_stdout, get_all_classes_in_package
 
 
 def save_pandas(dfs, names, path):
@@ -41,10 +40,8 @@ def save_pandas(dfs, names, path):
 
 
 class Parent(object):
-    time_collector: TimeCollector
 
-    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
-        self.time_collector = time_collector
+    def __init__(self, sample_period, prediction_horizon, order):
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.order = order
@@ -338,8 +335,8 @@ class BA(Parent):
 
 class A(Parent):
     def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 time_collector, default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order, time_collector)
+                 default_limits=False):
+        super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
@@ -470,7 +467,6 @@ class A(Parent):
         logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
-        self.time_collector.jacobians.append(jac_time)
 
         # position limits
         vertical_offset = number_of_joints * self.prediction_horizon
@@ -577,11 +573,29 @@ class A(Parent):
         return self.construct_A()
 
 
+available_solvers: Dict[SupportedQPSolver, Type[QPSolver]] = {}
+
+
+def detect_solvers():
+    global available_solvers
+    solver_name: str
+    qp_solver_class: Type[QPSolver]
+    for solver_name, qp_solver_class in get_all_classes_in_package('giskardpy.qp', QPSolver, silent=True).items():
+        try:
+            available_solvers[qp_solver_class.solver_id] = qp_solver_class
+        except Exception:
+            pass
+    solver_names = [str(solver_name).split('.')[1] for solver_name in available_solvers.keys()]
+    logging.loginfo(f'Found these qp solvers: {solver_names}')
+
+
+detect_solvers()
+
+
 class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
-    time_collector: TimeCollector
     debug_expressions: Dict[str, w.all_expressions]
     compiled_debug_expressions: Dict[str, w.CompiledFunction]
     evaluated_debug_expressions: Dict[str, np.ndarray]
@@ -589,16 +603,14 @@ class QPController:
     def __init__(self,
                  sample_period: float,
                  prediction_horizon: int,
-                 solver_name: str,
+                 solver_id: Optional[SupportedQPSolver] = None,
                  free_variables: List[FreeVariable] = None,
                  constraints: List[Constraint] = None,
                  velocity_constraints: List[VelocityConstraint] = None,
                  debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
-                 retry_weight_factor: float = 100,
-                 time_collector: TimeCollector = None):
-        self.time_collector = time_collector
+                 retry_weight_factor: float = 100):
         self.free_variables = []
         self.constraints = []
         self.velocity_constraints = []
@@ -619,25 +631,21 @@ class QPController:
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        qp_solver_class: Type[QPSolver]
-        if solver_name == SupportedQPSolver.gurobi:
-            from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            qp_solver_class = QPSolverGurobi
-        elif solver_name == SupportedQPSolver.cplex:
-            from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            qp_solver_class = QPSolverCplex
-        elif solver_name == SupportedQPSolver.qp_swift:
-            from giskardpy.qp.qp_solver_qpswift import QPSolverQPSwift
-            qp_solver_class = QPSolverQPSwift
+        if solver_id is not None:
+            qp_solver_class = available_solvers[solver_id]
         else:
-            from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
-            qp_solver_class = QPSolverQPOases
+            for solver_id in SupportedQPSolver:
+                if solver_id in available_solvers:
+                    qp_solver_class = available_solvers[solver_id]
+                    break
+            else:
+                raise QPSolverException(f'No qp solver found')
         num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
         self.qp_solver = qp_solver_class(num_non_slack=num_non_slack,
                                          retry_added_slack=self.retry_added_slack,
                                          retry_weight_factor=self.retry_weight_factor,
                                          retries_with_relaxed_constraints=self.retries_with_relaxed_constraints)
-        logging.loginfo(f'Using QP Solver \'{solver_name}\'')
+        logging.loginfo(f'Using QP Solver \'{solver_id}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
 
     def add_free_variables(self, free_variables):
@@ -721,7 +729,6 @@ class QPController:
         self.compiled_big_ass_M = self.big_ass_M.compile(free_symbols)
         compilation_time = time() - t
         logging.loginfo(f'Compiled symbolic controller in {compilation_time:.5f}s')
-        self.time_collector.compilations.append(compilation_time)
 
     def _compile_debug_expressions(self):
         t = time()
@@ -861,14 +868,10 @@ class QPController:
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
                    order=self.order,
-                   time_collector=self.time_collector,
                    default_limits=default_limits)
 
         logging.loginfo(f'Constructing new controller with {self.A.height} constraints '
                         f'and {self.A.width} free variables...')
-        self.time_collector.constraints.append(self.A.height)
-        self.time_collector.variables.append(self.A.width)
-
         self._init_big_ass_M()
 
         self._set_weights(w.Expression(self.H.weights()))
@@ -879,7 +882,7 @@ class QPController:
         lb, ub = self.b()
         self._set_lb(w.Expression(lb))
         self._set_ub(w.Expression(ub))
-        self.np_g_filtered = np.zeros(self.H.width)
+        self.np_g = np.zeros(self.H.width)
         # self.debug_names = list(sorted(self.debug_expressions.keys()))
         # self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
@@ -907,7 +910,6 @@ class QPController:
         bA_filter[-ll:] = b_filter[-ll:]
         self.b_filter = np.array(b_filter)
         self.bA_filter = np.array(bA_filter)
-        return np.array(b_filter), np.array(bA_filter)
 
     def __swap_compiled_matrices(self):
         if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
@@ -1008,8 +1010,9 @@ class QPController:
                                                   ub=self.np_ub_filtered,
                                                   lbA=self.np_lbA_filtered,
                                                   ubA=self.np_ubA_filtered)
-        except:
-            pass
+        except Exception as e:
+            logging.loginfo(f'Can\'t determine if hard constraints are violated: {e}.')
+            return False
         else:
             self._create_debug_pandas()
             upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]

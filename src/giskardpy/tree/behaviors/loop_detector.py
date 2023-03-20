@@ -35,8 +35,6 @@ class LoopDetector(GiskardBehavior):
             run_time = self.get_runtime()
             logging.loginfo('found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
                                                                                           run_time))
-            self.time_collector.lengths.append(planning_time * sample_period)
-            self.time_collector.times.append(run_time)
             return Status.SUCCESS
         self.past_joint_states.add(rounded_js)
         return Status.RUNNING

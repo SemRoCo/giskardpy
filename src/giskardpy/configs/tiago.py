@@ -50,7 +50,6 @@ class TiagoMujoco(TiagoBase):
     def __init__(self):
         self.add_robot_from_parameter_server(joint_state_topics=['/tiago/joint_states'])
         super().__init__()
-        self.set_qp_solver(SupportedQPSolver.qp_oases)
         self.add_sync_tf_frame('map', 'odom')
         self.add_diff_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',

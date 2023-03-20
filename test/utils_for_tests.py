@@ -243,9 +243,10 @@ class GiskardTestWrapper(GiskardWrapper):
             logging.loginfo('Inside github workflow, turning off visualization')
             self.giskard.configure_VisualizationBehavior(enabled=False)
             self.giskard.configure_CollisionMarker(enabled=False)
-            self.giskard.set_qp_solver(SupportedQPSolver.qp_oases)
             self.giskard.configure_PlotTrajectory(enabled=False)
             self.giskard.configure_PlotDebugExpressions(enabled=False)
+        if 'QP_SOLVER' in os.environ:
+            self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.giskard.grow()
         self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
@@ -349,7 +350,10 @@ class GiskardTestWrapper(GiskardWrapper):
         self._alive = True
 
     def tear_down(self):
-        self.god_map.unsafe_get_data(identifier.timer_collector).print()
+        try:
+            self.god_map.unsafe_get_data(identifier.timer_collector).pretty_print()
+        except Exception as e:
+            pass
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
@@ -672,14 +676,21 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def plan_and_execute(self, expected_error_codes=None, stop_after=None, wait=True):
+    def plan_and_execute(self, expected_error_codes: List[int] = None, stop_after: float = None,
+                         wait: bool = True) -> MoveResult:
         return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
 
-    def plan(self, expected_error_codes=None, wait: bool = True) -> MoveResult:
-        return self.send_goal(expected_error_codes, MoveGoal.PLAN_ONLY, wait)
+    def plan(self, expected_error_codes: List[int] = None, wait: bool = True) -> MoveResult:
+        return self.send_goal(expected_error_codes=expected_error_codes,
+                              goal_type=MoveGoal.PLAN_ONLY,
+                              wait=wait)
 
-    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None,
-                  wait=True):
+    def send_goal(self,
+                  expected_error_codes: Optional[List[int]] = None,
+                  goal_type: int = MoveGoal.PLAN_AND_EXECUTE,
+                  goal: Optional[MoveGoal] = None,
+                  stop_after: Optional[float] = None,
+                  wait: bool = True) -> Optional[MoveResult]:
         try:
             time_spend_giskarding = time()
             if stop_after is not None:

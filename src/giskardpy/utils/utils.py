@@ -1,5 +1,9 @@
 from __future__ import division
 
+# I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
+# fails on github actions
+import urdf_parser_py.urdf as up
+
 import errno
 import inspect
 import json
@@ -22,7 +26,6 @@ import pylab as plt
 import roslaunch
 import rospkg
 import rospy
-import urdf_parser_py.urdf as up  # I only do this, because otherwise trimesh fails github actions
 import trimesh
 from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
@@ -93,8 +96,8 @@ def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] =
                 logging.loginfo(f'Failed to load {modname}')
             continue
         for name2, value2 in inspect.getmembers(module, inspect.isclass):
-                if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
-                    classes[name2] = value2
+            if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
+                classes[name2] = value2
     return classes
 
 
@@ -475,7 +478,7 @@ def memoize(function):
 
 
 def record_time(function):
-    # return function
+    return function
     god_map = GodMap()
     time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
     if function.__name__ == 'solve':
@@ -487,8 +490,8 @@ def record_time(function):
             time_delta = time() - start_time
             time_collector.add_qp_solve_time(str(qp_solver), A.shape[1], A.shape[0], time_delta)
             return result
-        return wrapper
 
+        return wrapper
 
 
 def clear_memo(f):

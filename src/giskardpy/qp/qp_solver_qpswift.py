@@ -29,10 +29,10 @@ class QPSolverQPSwift(QPSolver):
     opts = {
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo
         # 'MAXITER': 100, # 0 < MAXITER < 200; default 100
-        # 'ABSTOL': 1, # 0 < ABSTOL < 1
+        # 'ABSTOL': 1e-5, # 0 < ABSTOL < 1
         # 'RELTOL': 1, # 0 < RELTOL < 1
         # 'SIGMA': 1,
-        # 'VERBOSE': 0 # 0 = no print; 1 = print
+        # 'VERBOSE': 1  # 0 = no print; 1 = print
     }
 
     @profile
@@ -47,7 +47,7 @@ class QPSolverQPSwift(QPSolver):
         exit_flag = result['basicInfo']['ExitFlag']
         # print(result['basicInfo']['Iterations'])
         if exit_flag != 0:
-            raise QPSolverException(f'Failed to solve qp: {QPSWIFTExitFlags(exit_flag)}')
+            raise QPSolverException(f'Failed to solve qp: {str(QPSWIFTExitFlags(exit_flag))}')
         return result['sol']
 
     # @profile

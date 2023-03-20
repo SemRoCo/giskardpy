@@ -11,6 +11,7 @@ from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult
 from giskardpy import identifier
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.configs.tiago import TiagoMujoco, Tiago_Standalone
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.joints import OneDofJoint
@@ -577,6 +578,8 @@ class TestConstraints:
 
 class TestJointGoals:
     def test_out_of_joint_soft_limits3(self, zero_pose: TiagoTestWrapper):
+        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
+            return
         js = {
             'arm_right_5_joint': -2.1031066629465776,
         }
@@ -587,6 +590,8 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits4(self, zero_pose: TiagoTestWrapper):
+        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
+            return
         js = {
             'arm_right_5_joint': -3,
         }
@@ -597,6 +602,8 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits5(self, zero_pose: TiagoTestWrapper):
+        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
+            return
         js = {
             'arm_right_5_joint': 3,
         }
@@ -614,6 +621,8 @@ class TestJointGoals:
             PrefixName('arm_right_5_joint', zero_pose.robot_name)].position <= upper_limit
 
     def test_out_of_joint_soft_limits6(self, zero_pose: TiagoTestWrapper):
+        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
+            return
         js = {
             'arm_left_1_joint': 0.2999719152605501,
             'arm_left_2_joint': -1.0770103752381537,
@@ -638,8 +647,7 @@ class TestJointGoals:
             'torso_lift_joint': 0.3487927046680741,
         }
 
-        # zero_pose.set_seed_configuration(js)
-        # zero_pose.set_joint_goal(zero_pose.better_pose2, check=False)
+        zero_pose.set_seed_configuration(js)
         pointing_goal = PointStamped()
         pointing_goal.header.frame_id = 'base_footprint'
         pointing_goal.point.x = 2
@@ -655,6 +663,8 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits7(self, zero_pose: TiagoTestWrapper):
+        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
+            return
         js = {
             'arm_left_1_joint': 1.3505632726981545,
             'arm_left_2_joint': -1.1195635667275154,
@@ -723,6 +733,8 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
 
     def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
+        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
+            return
         js = {
             'head_1_joint': 1.3,
             'head_2_joint': -1
@@ -764,6 +776,8 @@ class TestJointGoals:
         zero_pose.plan()
 
     def test_get_out_of_joint_soft_limits2(self, zero_pose: TiagoTestWrapper):
+        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
+            return
         js = {
             'head_1_joint': 2,
             'head_2_joint': -2

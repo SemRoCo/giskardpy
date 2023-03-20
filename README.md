@@ -55,12 +55,14 @@ The default is `qpalm`, as it is the easiest to install.
 You may want to install `qpSWIFT` manually, as it is a little faster than `qpalm`.
 To do so follow the instructions on their github page: https://github.com/qpSWIFT/qpSWIFT.
 
-Giskard also supports three additional solvers, which are slower than `qpalm`, sorted by how fast they are for Giskard's usecase:
+Giskard also supports two additional solvers, which are slower than `qpalm`, sorted by how fast they are for Giskard's usecase:
 - `Gurobi`: A commercial solver, which is approximately as fast as `qpalm`: 
   - ```sudo pip3 install gurobipy```
   - You can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
-- `Clarabel.rs`: `sudo pip3 install clarabel` (https://github.com/oxfordcontrol/Clarabel.rs)
 - `qpOASES`: https://github.com/SemRoCo/qpOASES/tree/noetic
+
+[//]: # (- `Clarabel.rs`: `sudo pip3 install clarabel` &#40;https://github.com/oxfordcontrol/Clarabel.rs&#41;)
+
 
 ### Tutorials
 https://github.com/SemRoCo/giskardpy/wiki

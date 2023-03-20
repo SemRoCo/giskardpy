@@ -578,8 +578,6 @@ class TestConstraints:
 
 class TestJointGoals:
     def test_out_of_joint_soft_limits3(self, zero_pose: TiagoTestWrapper):
-        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
-            return
         js = {
             'arm_right_5_joint': -2.1031066629465776,
         }
@@ -590,8 +588,6 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits4(self, zero_pose: TiagoTestWrapper):
-        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
-            return
         js = {
             'arm_right_5_joint': -3,
         }
@@ -602,8 +598,6 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits5(self, zero_pose: TiagoTestWrapper):
-        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
-            return
         js = {
             'arm_right_5_joint': 3,
         }
@@ -621,8 +615,6 @@ class TestJointGoals:
             PrefixName('arm_right_5_joint', zero_pose.robot_name)].position <= upper_limit
 
     def test_out_of_joint_soft_limits6(self, zero_pose: TiagoTestWrapper):
-        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
-            return
         js = {
             'arm_left_1_joint': 0.2999719152605501,
             'arm_left_2_joint': -1.0770103752381537,
@@ -663,8 +655,6 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits7(self, zero_pose: TiagoTestWrapper):
-        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
-            return
         js = {
             'arm_left_1_joint': 1.3505632726981545,
             'arm_left_2_joint': -1.1195635667275154,
@@ -733,8 +723,6 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
 
     def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
-        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
-            return
         js = {
             'head_1_joint': 1.3,
             'head_2_joint': -1
@@ -776,8 +764,6 @@ class TestJointGoals:
         zero_pose.plan()
 
     def test_get_out_of_joint_soft_limits2(self, zero_pose: TiagoTestWrapper):
-        if zero_pose.god_map.get_data(identifier.qp_solver_name) == SupportedQPSolver.qpSWIFT:
-            return
         js = {
             'head_1_joint': 2,
             'head_2_joint': -2

@@ -47,7 +47,10 @@ class QPSolverQPSwift(QPSolver):
         exit_flag = result['basicInfo']['ExitFlag']
         # print(result['basicInfo']['Iterations'])
         if exit_flag != 0:
-            raise QPSolverException(f'Failed to solve qp: {str(QPSWIFTExitFlags(exit_flag))}')
+            error_code = QPSWIFTExitFlags(exit_flag)
+            if error_code == QPSWIFTExitFlags.MAX_ITER_REACHED:
+                raise InfeasibleException(f'Failed to solve qp: {str(error_code)}')
+            raise QPSolverException(f'Failed to solve qp: {str(error_code)}')
         return result['sol']
 
     # @profile

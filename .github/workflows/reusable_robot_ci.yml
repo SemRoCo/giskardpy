@@ -159,6 +159,9 @@ jobs:
       #tests ===========================================================================================================
       - name: start roscore
         run: roscore &
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1
       - name: run ${{ inputs.test1 }}
         run: |
           roscd giskardpy
@@ -208,6 +211,3 @@ jobs:
         run: |
           roscd giskardpy
           python3 -m pytest -s ${{ inputs.test10 }}
-      - if: ${{ (always()) && (runner.debug == '1') }}
-        name: Setup upterm session
-        uses: lhotari/action-upterm@v1

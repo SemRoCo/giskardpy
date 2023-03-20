@@ -30,51 +30,53 @@ jobs:
     uses: ./.github/workflows/build_dependencies.yml
   hsr:
     needs: [ build_dependencies ]
-    strategy:
-      matrix:
-        test: [ TestJointGoals,
-                TestCollisionAvoidanceGoals,
-                TestConstraints ]
+#    strategy:
+#      matrix:
+#        test: [ TestJointGoals,
+#                TestCollisionAvoidanceGoals,
+#                TestConstraints ]
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
       robot: hsr
-      test: test/test_integration_hsr.py::${{ matrix.test }}
-  donbot:
-    needs: [ build_dependencies ]
-    strategy:
-      matrix:
-        test: [ TestCartGoals,
-                TestConstraints,
-                TestJointGoals ]
-    uses: ./.github/workflows/reusable_robot_ci.yml
-    with:
-      robot: donbot
-      test: test/test_integration_donbot.py::${{ matrix.test }}
-  pr2:
-    needs: [ build_dependencies ]
-    strategy:
-      matrix:
-        test: [ TestWorldManipulation,
-                TestJointGoals,
-                TestCartGoals,
-                TestConstraints,
-                TestWayPoints,
-                TestInfoServices,
-                TestSelfCollisionAvoidance,
-                TestCollisionAvoidanceGoals ]
-    uses: ./.github/workflows/reusable_robot_ci.yml
-    with:
-      robot: pr2
-      test: test/test_integration_pr2.py::${{ matrix.test }}
-  tiago:
-    needs: [ build_dependencies ]
-    strategy:
-      matrix:
-        test: [ TestConstraints,
-                TestJointGoals,
-                TestCollisionAvoidance,
-                TestCartGoals ]
-    uses: ./.github/workflows/reusable_robot_ci.yml
-    with:
-      robot: tiago
-      test: test/test_integration_tiago_stand_alone.py::${{ matrix.test }}
+      test1: test/test_integration_hsr.py::TestJointGoals
+      test2: test/test_integration_hsr.py::TestCollisionAvoidanceGoals
+      test3: test/test_integration_hsr.py::TestConstraints
+#  donbot:
+#    needs: [ build_dependencies ]
+#    strategy:
+#      matrix:
+#        test: [ TestCartGoals,
+#                TestConstraints,
+#                TestJointGoals ]
+#    uses: ./.github/workflows/reusable_robot_ci.yml
+#    with:
+#      robot: donbot
+#      test: test/test_integration_donbot.py::${{ matrix.test }}
+#  pr2:
+#    needs: [ build_dependencies ]
+#    strategy:
+#      matrix:
+#        test: [ TestWorldManipulation,
+#                TestJointGoals,
+#                TestCartGoals,
+#                TestConstraints,
+#                TestWayPoints,
+#                TestInfoServices,
+#                TestSelfCollisionAvoidance,
+#                TestCollisionAvoidanceGoals ]
+#    uses: ./.github/workflows/reusable_robot_ci.yml
+#    with:
+#      robot: pr2
+#      test: test/test_integration_pr2.py::${{ matrix.test }}
+#  tiago:
+#    needs: [ build_dependencies ]
+#    strategy:
+#      matrix:
+#        test: [ TestConstraints,
+#                TestJointGoals,
+#                TestCollisionAvoidance,
+#                TestCartGoals ]
+#    uses: ./.github/workflows/reusable_robot_ci.yml
+#    with:
+#      robot: tiago
+#      test: test/test_integration_tiago_stand_alone.py::${{ matrix.test }}

@@ -9,9 +9,36 @@ on:
         description: one of [pr2, hsr, tiago, donbot]
         required: true
         type: string
-      test:
+      test1:
         description: that that will be run, e.g. test/test_integration_hsr.py::TestJointGoals
         required: true
+        type: string
+      test2:
+        required: false
+        type: string
+      test3:
+        required: false
+        type: string
+      test4:
+        required: false
+        type: string
+      test5:
+        required: false
+        type: string
+      test6:
+        required: false
+        type: string
+      test7:
+        required: false
+        type: string
+      test8:
+        required: false
+        type: string
+      test9:
+        required: false
+        type: string
+      test10:
+        required: false
         type: string
 jobs:
   test_standalone:
@@ -132,10 +159,46 @@ jobs:
       #tests ===========================================================================================================
       - name: start roscore
         run: roscore &
-      - name: run test
+      - name: run ${{ inputs.test1 }}
         run: |
           roscd giskardpy
-          python3 -m pytest -s ${{ inputs.test }}
+          python3 -m pytest -s ${{ inputs.test1 }}
+      - name: run ${{ inputs.test2 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test2 }}
+      - name: run ${{ inputs.test3 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test3 }}
+      - name: run ${{ inputs.test4 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test4 }}
+      - name: run ${{ inputs.test5 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test5 }}
+      - name: run ${{ inputs.test6 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test6 }}
+      - name: run ${{ inputs.test7 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test7 }}
+      - name: run ${{ inputs.test8 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test8 }}
+      - name: run ${{ inputs.test9 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test9 }}
+      - name: run ${{ inputs.test10 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test10 }}
       - if: ${{ (always()) && (runner.debug == '1') }}
         name: Setup upterm session
         uses: lhotari/action-upterm@v1

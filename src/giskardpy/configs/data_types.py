@@ -33,7 +33,7 @@ class SupportedQPSolver(Enum):
     qpOASES = 5
     # quadprog = 6
     # cplex = 3
-    # osqp = 6
+    osqp = 6
     # cvxopt = 7
     # qp_solvers = 8
     # mosek = 9

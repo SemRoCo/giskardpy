@@ -4,10 +4,12 @@ from typing import Tuple
 
 import numpy as np
 
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 
 
 class QPSolver(ABC):
+    solver_id: SupportedQPSolver
 
     def __init__(self,
                  num_non_slack: int,
@@ -21,13 +23,26 @@ class QPSolver(ABC):
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.on_fail_round_to = on_fail_round_to
 
+    def transform_problem1(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray,
+                           lbA: np.ndarray, ubA: np.ndarray):
+        """
+        min_x 0.5 x^T P x + q^T x
+        s.t.  Ax = b
+              Gx <= h
+        """
+        G_b = np.eye(lb.shape[0])
+        G = np.vstack([-G_b, G_b, -A, A])
+        P = np.diag(weights)
+        h = np.concatenate([-lb, ub, -lbA, ubA])
+        return P, g, G, h
+
     @abc.abstractmethod
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         """
         x^T*H*x + x^T*g
-        s.t.: lbA < A*x < ubA
-        and    lb <  x  < ub
+        s.t.: lbA <= A*x <= ubA
+        and    lb <=  x  <= ub
         :param weights: 1d vector, len = (jc (joint constraints) + sc (soft constraints))
         :param g: 1d zero vector of len joint constraints + soft constraints
         :param A: 2d jacobi matrix of hc (hard constraints) and sc, shape = (hc + sc) * (number of joints)

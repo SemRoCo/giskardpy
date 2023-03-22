@@ -22,6 +22,7 @@ from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.collision_marker import CollisionMarker
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.behaviors.commands_remaining import CommandsRemaining
+from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.goal_reached import GoalReached
@@ -622,6 +623,8 @@ class StandAlone(TreeManager):
                     and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
                 planning_4.add_child(CollisionMarker('cpi marker'))
         planning_4.add_child(ControllerPlugin('controller'))
+        if self.god_map.get_data(identifier.debug_expr_needed):
+            planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
         planning_4.add_child(KinSimPlugin('kin sim'))
         planning_4.add_child(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):

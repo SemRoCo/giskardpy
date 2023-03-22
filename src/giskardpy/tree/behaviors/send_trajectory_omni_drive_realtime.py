@@ -90,8 +90,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
 
     def get_drive_goals(self) -> List[Goal]:
         return [SetPredictionHorizon(prediction_horizon=self.god_map.get_data(identifier.prediction_horizon) + 4),
-                BaseTrajFollowerPR2(joint_name=self.joint.name,
-                                    track_only_velocity=self.track_only_velocity)]
+                BaseTrajFollower(joint_name=self.joint.name, track_only_velocity=self.track_only_velocity)]
 
     def solver_cmd_to_twist(self, cmd: NextCommands) -> Twist:
         twist = Twist()

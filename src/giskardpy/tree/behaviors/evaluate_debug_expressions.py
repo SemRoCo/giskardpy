@@ -6,7 +6,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
-class ControllerPluginBase(GiskardBehavior):
+class EvaluateDebugExpressions(GiskardBehavior):
     controller: QPController = None
 
     @catch_and_raise_to_blackboard
@@ -17,11 +17,6 @@ class ControllerPluginBase(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @profile
     def update(self):
-        parameters = self.controller.get_parameter_names()
-        substitutions = self.god_map.get_values(parameters)
-
-        next_cmds = self.controller.get_cmd(substitutions)
-        self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
-
+        self.controller.eval_debug_exprs()
         return Status.RUNNING
 

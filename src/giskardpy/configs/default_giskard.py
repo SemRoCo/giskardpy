@@ -40,8 +40,8 @@ class Giskard:
         self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
         self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
-        self._god_map.set_data(identifier.timer_collector, TimeCollector())
         self._god_map.set_data(identifier.joints_to_add, [])
+        self._god_map.set_data(identifier.debug_expr_needed, False)
         self._god_map.set_data(identifier.hack, 0)
         blackboard = Blackboard
         blackboard.god_map = self._god_map
@@ -117,15 +117,32 @@ class Giskard:
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
 
-    def configure_PublishDebugExpressions(self, enabled: bool = True, enabled_base: bool = False):
+    def configure_PublishDebugExpressions(self, enabled: bool = True, publish_lb: bool = False,
+                                          publish_ub: bool = False, publish_lbA: bool = False,
+                                          publish_ubA: bool = False, publish_Ax: bool = False,
+                                          publish_xdot: bool = False, publish_weights: bool = False,
+                                          publish_debug: bool = False,
+                                          enabled_base: bool = False):
         """
         :param enabled: whether Giskard should publish markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
                                     the system.
         """
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled_base'] = enabled_base
-        # self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
+        publish_flags = {
+            'publish_lb': publish_lb,
+            'publish_ub': publish_ub,
+            'publish_lbA': publish_lbA,
+            'publish_ubA': publish_ubA,
+            'publish_weights': publish_weights,
+            'publish_Ax': publish_Ax,
+            'publish_xdot': publish_xdot,
+            'publish_debug': publish_debug,
+        }
+        self.behavior_tree_config.plugin_config['PublishDebugExpressions'].update(publish_flags)
 
     def configure_CollisionMarker(self, enabled: bool = True, in_planning_loop: bool = False):
         """
@@ -142,10 +159,14 @@ class Giskard:
         self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
 
     def configure_PlotDebugExpressions(self, enabled: bool = False, wait: bool = False):
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['wait'] = wait
 
     def configure_DebugMarkerPublisher(self, enabled: bool = False):
+        if enabled:
+            self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PlotDebugTF']['enabled'] = enabled
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
@@ -271,15 +292,14 @@ class Giskard:
         joint_name = PrefixName(name, robot_group_name)
         parent_link_name = PrefixName(parent_link_name, None)
         child_link_name = PrefixName(child_link_name, robot_group_name)
-        brumbrum_joint = (OmniDrivePR22, {'parent_link_name': parent_link_name,
+        brumbrum_joint = (OmniDrive, {'parent_link_name': parent_link_name,
                                       'child_link_name': child_link_name,
                                       'name': joint_name,
                                       'translation_limits': translation_limits,
                                       'rotation_limits': rotation_limits})
         self._add_joint(brumbrum_joint)
         if odometry_topic is not None:
-            self._add_odometry_topic(odometry_topic=odometry_topic,
-                                     joint_name=joint_name)
+            self._add_odometry_topic(odometry_topic=odometry_topic, joint_name=joint_name)
 
     def get_default_group_name(self):
         """
@@ -373,7 +393,6 @@ class Giskard:
         """
         Initialize the behavior tree and world. You usually don't need to call this.
         """
-        self._qp_solver_check()
         if len(self.robot_interface_configs) == 0:
             self.add_robot_from_parameter_server()
         self._create_parameter_backup()
@@ -393,19 +412,6 @@ class Giskard:
             raise KeyError(f'Robot interface mode \'{self._general_config.control_mode}\' is not supported.')
 
         self._controlled_joints_sanity_check()
-
-    def _qp_solver_check(self):
-        try:
-            if self._qp_solver_config.qp_solver == SupportedQPSolver.gurobi:
-                from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            elif self._qp_solver_config.qp_solver == SupportedQPSolver.cplex:
-                from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            elif self._qp_solver_config.qp_solver not in SupportedQPSolver:
-                raise KeyError(f'Solver \'{self._qp_solver_config.qp_solver}\' not supported.')
-        except Exception as e:
-            logging.logwarn(e)
-            logging.logwarn('Defaulting back to qpoases.')
-            self._qp_solver_config.qp_solver = SupportedQPSolver.qp_oases
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)

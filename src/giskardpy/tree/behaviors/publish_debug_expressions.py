@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import rospy
 from py_trees import Status
@@ -12,61 +14,97 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 class PublishDebugExpressions(GiskardBehavior):
     @profile
-    def __init__(self, name, enabled, expression_filter=None, **kwargs):
+    def __init__(self, name, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,
+                 publish_ubA: bool = False, publish_Ax: bool = False, publish_xdot: bool = False,
+                 publish_weights: bool = False, publish_debug: bool = False, **kwargs):
         super().__init__(name)
-        self.expression_filter = expression_filter
+        self.publish_lb = publish_lb
+        self.publish_ub = publish_ub
+        self.publish_lbA = publish_lbA
+        self.publish_ubA = publish_ubA
+        self.publish_weights = publish_weights
+        self.publish_Ax = publish_Ax
+        self.publish_xdot = publish_xdot
+        self.publish_debug = publish_debug
 
     @profile
     def setup(self, timeout):
         self.publisher = rospy.Publisher('~qp_data', JointState, queue_size=1)
         return super().setup(timeout)
 
+    @profile
+    def create_msg(self, qp_controller: QPController):
+        msg = JointState()
+        msg.header.stamp = rospy.get_rostime()
 
-    def split_traj(self, traj) -> Trajectory:
-        new_traj = Trajectory()
-        for time, js in traj.items():
-            new_js = JointStates()
-            for name, js_ in js.items():
-                # name = name.replace('/', '|')
-                # traj_name = ''.join(name.split('/')[:-1])
-                # name = name.split('/')[-1]
-                if isinstance(js_.position, np.ndarray):
-                    for x in range(js_.position.shape[0]):
-                        for y in range(js_.position.shape[1]):
-                            tmp_name = f'{name}|{x}_{y}'
-                            # tmp_name = re.escape(tmp_name)
-                            # tmp_name = tmp_name.replace('/', '|')
-                            # tmp_name = tmp_name.replace('/', '\/')
-                            new_js[tmp_name].position = js_.position[x, y]
-                            new_js[tmp_name].velocity = js_.velocity[x, y]
+        sample_period = self.god_map.get_data(identifier.sample_period)
+        b_names = qp_controller.b_names()
+        bA_names = qp_controller.bA_names()
+        filtered_b_names = np.array(b_names)[qp_controller.b_filter]
+        filtered_bA_names = np.array(bA_names)[qp_controller.bA_filter]
+        num_vel_constr = len(qp_controller.velocity_constraints) * (qp_controller.prediction_horizon - 2)
+        num_task_constr = len(qp_controller.constraints)
+        num_constr = num_vel_constr + num_task_constr
+
+        if self.publish_debug:
+            for name, value in qp_controller.evaluated_debug_expressions.items():
+                if isinstance(value, np.ndarray):
+                    if len(value) > 1:
+                        for x in range(value.shape[0]):
+                            for y in range(value.shape[1]):
+                                tmp_name = f'{name}|{x}_{y}'
+                                msg.name.append(tmp_name)
+                                msg.position.append(value[x, y])
+                    else:
+                        msg.name.append(name)
+                        msg.position.append(value.flatten())
                 else:
-                    new_js[name] = js_
-                new_traj.set(time, new_js)
+                    msg.name.append(name)
+                    msg.position.append(value)
 
-        return new_traj
+        if self.publish_lb:
+            lb_names = [f'lb/{entry_name}' for entry_name in filtered_b_names]
+            msg.name.extend(lb_names)
+            msg.position.extend(qp_controller.np_lb_filtered.tolist())
+
+        if self.publish_ub:
+            ub_names = [f'ub/{entry_name}' for entry_name in filtered_b_names]
+            msg.name.extend(ub_names)
+            msg.position.extend(qp_controller.np_ub_filtered.tolist())
+
+        if self.publish_lbA:
+            lbA_names = [f'lbA/{entry_name}' for entry_name in filtered_bA_names]
+            msg.name.extend(lbA_names)
+            msg.position.extend(qp_controller.np_lbA_filtered.tolist())
+
+        if self.publish_ubA:
+            ubA_names = [f'ubA/{entry_name}' for entry_name in filtered_bA_names]
+            msg.name.extend(ubA_names)
+            msg.position.extend(qp_controller.np_ubA_filtered.tolist())
+
+        if self.publish_weights:
+            weight_names = [f'weights/{entry_name}' for entry_name in b_names]
+            msg.name.extend(weight_names)
+            msg.position.extend(qp_controller.np_weights.tolist())
+
+        if self.publish_xdot:
+            xdot_names = [f'xdot/{entry_name}' for entry_name in filtered_b_names]
+            msg.name.extend(xdot_names)
+            msg.position.extend(qp_controller.xdot_full.tolist())
+
+        if self.publish_Ax:
+            Ax_names = [f'Ax/{entry_name}' for entry_name in filtered_bA_names]
+            msg.name.extend(Ax_names)
+            pure_xdot = qp_controller.xdot_full.copy()
+            pure_xdot[-num_constr:] = 0
+            Ax_without_slack = qp_controller.np_A_filtered.dot(pure_xdot)
+            Ax_without_slack[-num_constr:] /= sample_period
+            msg.position.extend(Ax_without_slack.tolist())
+        return msg
 
     @profile
     def update(self):
-        # print('hi')
-        debug_pandas = self.god_map.get_data(identifier.debug_expressions_evaluated)
         qp_controller: QPController = self.god_map.get_data(identifier.qp_controller)
-        qp_controller._create_debug_pandas()
-        msg = JointState()
-        msg.header.stamp = rospy.get_rostime()
-        for debug_name, debug_value in debug_pandas.items():
-            if isinstance(debug_value, float):
-                msg.name.append(debug_name)
-                msg.position.append(debug_value)
-            elif isinstance(debug_value, np.ndarray):
-                for x in range(debug_value.shape[0]):
-                    for y in range(debug_value.shape[1]):
-                        msg.name.append(f'{debug_name}|{x}_{y}')
-                        msg.position.append(debug_value[x, y])
-        for name, thing in zip(['lbA', 'ubA', 'lb', 'ub', 'weights', 'xdot', 'Ax no slack'],
-                         [qp_controller.p_lbA, qp_controller.p_ubA, qp_controller.p_lb, qp_controller.p_ub,
-                          qp_controller.p_weights, qp_controller.p_xdot, qp_controller.p_Ax_without_slack]):
-            msg.name.extend([f'{name}/{x}' for x in thing.index])
-            msg.position.extend(list(thing.values.T[0]))
-
+        msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
         return Status.RUNNING

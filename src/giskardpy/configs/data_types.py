@@ -26,9 +26,21 @@ class CollisionCheckerLib(Enum):
 
 
 class SupportedQPSolver(Enum):
-    gurobi = 1
-    qp_oases = 2
-    cplex = 3
+    qpSWIFT = 1
+    qpalm = 2
+    gurobi = 3
+    clarabel = 4
+    qpOASES = 5
+    # quadprog = 6
+    # cplex = 3
+    osqp = 6
+    # cvxopt = 7
+    # qp_solvers = 8
+    # mosek = 9
+    # scs = 11
+    # casadi = 12
+    # super_csc = 14
+    # cvxpy = 15
 
 
 class ControlModes(Enum):
@@ -55,7 +67,7 @@ class QPSolverConfig:
     joint_weights: Dict[Derivatives, Dict[PrefixName, float]]
 
     def __init__(self,
-                 qp_solver: SupportedQPSolver = SupportedQPSolver.gurobi,
+                 qp_solver: SupportedQPSolver = None,
                  prediction_horizon: int = 9,
                  retries_with_relaxed_constraints: int = 5,
                  added_slack: float = 100,

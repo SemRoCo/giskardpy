@@ -4,7 +4,7 @@ from giskardpy.configs.default_giskard import Giskard
 
 class Boxy_StandAlone(Giskard):
     def __init__(self):
-        self.add_robot_from_parameter_server()
+        self.add_robot_from_parameter_server(add_drive_joint_to_group=False)
         super().__init__('map')
         self.set_default_visualization_marker_color(1, 1, 1, 1)
         self.set_control_mode(ControlModes.stand_alone)

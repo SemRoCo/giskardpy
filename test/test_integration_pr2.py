@@ -136,8 +136,8 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def move_base(self, goal_pose):
-        self.set_move_base_goal(goal_pose=goal_pose)
-        # self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
+        # self.set_move_base_goal(goal_pose=goal_pose)
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
@@ -185,25 +185,25 @@ class PR2TestWrapper(GiskardTestWrapper):
                             root_link_group_name=self.robot_name,
                             root_link_name='r_wrist_roll_link')
 
-        self.register_group('fl_l',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='fl_caster_l_wheel_link')
-        self.dye_group('fl_l', rgba=(1, 0, 0, 1))
-
-        self.register_group('fr_l',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='fr_caster_l_wheel_link')
-        self.dye_group('fr_l', rgba=(1, 0, 0, 1))
-
-        self.register_group('bl_l',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='bl_caster_l_wheel_link')
-        self.dye_group('bl_l', rgba=(1, 0, 0, 1))
-
-        self.register_group('br_l',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='br_caster_l_wheel_link')
-        self.dye_group('br_l', rgba=(1, 0, 0, 1))
+        # self.register_group('fl_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='fl_caster_l_wheel_link')
+        # self.dye_group('fl_l', rgba=(1, 0, 0, 1))
+        #
+        # self.register_group('fr_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='fr_caster_l_wheel_link')
+        # self.dye_group('fr_l', rgba=(1, 0, 0, 1))
+        #
+        # self.register_group('bl_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='bl_caster_l_wheel_link')
+        # self.dye_group('bl_l', rgba=(1, 0, 0, 1))
+        #
+        # self.register_group('br_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='br_caster_l_wheel_link')
+        # self.dye_group('br_l', rgba=(1, 0, 0, 1))
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
@@ -239,9 +239,9 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    # launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
-    # c = PR2TestWrapper()
-    c = PR2TestWrapperMujoco()
+    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
+    c = PR2TestWrapper()
+    # c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 

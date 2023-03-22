@@ -23,10 +23,10 @@ def urdf_joint_to_class(urdf_joint: up.Joint) -> Union[Type[FixedJoint], Type[Re
     elif urdf_joint.type == 'prismatic':
         joint_class = PrismaticJoint
     elif urdf_joint.type in {'revolute', 'continuous'}:
-        if 'caster_rotation' in urdf_joint.name:
-            joint_class = PR2CasterJoint
-        else:
-            joint_class = RevoluteJoint
+        # if 'caster_rotation' in urdf_joint.name:
+        #     joint_class = PR2CasterJoint
+        # else:
+        joint_class = RevoluteJoint
     else:
         raise NotImplementedError(
             f'Joint type \'{urdf_joint.type}\' of \'{urdf_joint.name}\' is not implemented.')
@@ -337,7 +337,9 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
 
         self.roll = self.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
         self.pitch = self.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
-        self.yaw = self.world.add_free_variable(name=PrefixName('yaw', self.name))
+        self.yaw = self.world.add_free_variable(name=PrefixName('yaw', self.name),
+                                                lower_limits=rotation_lower_limits,
+                                                upper_limits=self.rotation_limits)
 
         self.x_vel = self.world.add_free_variable(name=PrefixName('x_vel', self.name),
                                                   lower_limits=translation_lower_limits,

@@ -1162,7 +1162,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_greater_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition > 0 else else_result), places=7)
+                               float(if_result if condition > 0 else else_result), places=7)
 
     def test_if_one_arg(self):
         types = [w.Point3, w.Vector3, w.Quaternion, w.Expression, w.TransMatrix, w.RotationMatrix]
@@ -1191,7 +1191,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_greater_eq_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition >= 0 else else_result), places=7)
+                               float(if_result if condition >= 0 else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1199,7 +1199,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_greater_eq(self, a, b, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
-                               np.float(if_result if a >= b else else_result), places=7)
+                               float(if_result if a >= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1207,14 +1207,14 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_less_eq(self, a, b, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
-                               np.float(if_result if a <= b else else_result), places=7)
+                               float(if_result if a <= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition == 0 else else_result), places=7)
+                               float(if_result if condition == 0 else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1222,7 +1222,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_eq(self, a, b, if_result, else_result):
         self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
-                                   np.float(if_result if a == b else else_result)))
+                                   float(if_result if a == b else else_result)))
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases(self, a):
@@ -1238,7 +1238,7 @@ class TestCASWrapper(unittest.TestCase):
                     return if_result
             return else_result
         actual = w.compile_and_execute(lambda a: w.if_eq_cases(a, b_result_cases, 0), [a])
-        expected = np.float(reference(a, b_result_cases, 0))
+        expected = float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)
 
     @given(float_no_nan_no_inf())
@@ -1260,7 +1260,7 @@ class TestCASWrapper(unittest.TestCase):
 
         self.assertAlmostEqual(w.compile_and_execute(lambda a, default: w.if_less_eq_cases(a, b_result_cases, default),
                                                      [a, 0]),
-                               np.float(reference(a, b_result_cases, 0)))
+                               float(reference(a, b_result_cases, 0)))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1269,7 +1269,7 @@ class TestCASWrapper(unittest.TestCase):
     def test_if_greater(self, a, b, if_result, else_result):
         self.assertAlmostEqual(
             w.compile_and_execute(w.if_greater, [a, b, if_result, else_result]),
-            np.float(if_result if a > b else else_result), places=7)
+            float(if_result if a > b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1278,7 +1278,7 @@ class TestCASWrapper(unittest.TestCase):
     def test_if_less(self, a, b, if_result, else_result):
         self.assertAlmostEqual(
             w.compile_and_execute(w.if_less, [a, b, if_result, else_result]),
-            np.float(if_result if a < b else else_result), places=7)
+            float(if_result if a < b else else_result), places=7)
 
     @given(vector(3),
            vector(3))
@@ -1412,10 +1412,6 @@ class TestCASWrapper(unittest.TestCase):
             axisr2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r2)
             angler2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r2)
             aa2.append([axisr2, angler2])
-        aa1 = np.array(aa1)
-        aa2 = np.array(aa2)
-        r1snp = np.array(r1s)
-        r2snp = np.array(r2s)
         qds = []
         for i in range(len(r1s) - 1):
             q1t = r1s[i]

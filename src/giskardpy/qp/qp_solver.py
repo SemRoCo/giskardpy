@@ -23,18 +23,27 @@ class QPSolver(ABC):
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.on_fail_round_to = on_fail_round_to
 
-    def transform_problem1(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray,
-                           lbA: np.ndarray, ubA: np.ndarray):
+    def transform_qpSWIFT(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray,
+                           lbA: np.ndarray, ubA: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         min_x 0.5 x^T P x + q^T x
         s.t.  Ax = b
               Gx <= h
         """
+        G_filter = lbA != ubA
+        A_filter = lbA == ubA
+        G = A[G_filter]
+        A = A[A_filter]
+        lbG = lbA[G_filter]
+        ubG = ubA[G_filter]
+        b = ubA[A_filter]
+
         G_b = np.eye(lb.shape[0])
-        G = np.vstack([-G_b, G_b, -A, A])
+        G = np.vstack([-G_b, G_b, -G, G])
+
         P = np.diag(weights)
-        h = np.concatenate([-lb, ub, -lbA, ubA])
-        return P, g, G, h
+        h = np.concatenate([-lb, ub, -lbG, ubG])
+        return P, g, G, h, A, b
 
     @abc.abstractmethod
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,

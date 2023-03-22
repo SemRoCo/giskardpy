@@ -31,11 +31,11 @@ class SupportedQPSolver(Enum):
     gurobi = 3
     clarabel = 4
     qpOASES = 5
-    # quadprog = 6
-    # cplex = 3
     osqp = 6
+    quadprog = 7
+    # cplex = 3
     # cvxopt = 7
-    # qp_solvers = 8
+    qp_solvers = 8
     # mosek = 9
     # scs = 11
     # casadi = 12

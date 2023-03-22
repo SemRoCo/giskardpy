@@ -6,7 +6,7 @@ import giskardpy.casadi_wrapper as w
 DebugConstraint = namedtuple('debug', ['expr'])
 
 
-class Constraint:
+class InequalityConstraint:
     lower_error = -1e4
     upper_error = 1e4
     lower_slack_limit = -1e4
@@ -41,6 +41,42 @@ class Constraint:
 
     def normalized_weight(self, prediction_horizon):
         weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
+        return weight_normalized
+
+
+class EqualityConstraint:
+    derivative_goal = 0
+    lower_slack_limit = -1e4
+    upper_slack_limit = 1e4
+    linear_weight = 0
+
+    def __init__(self,
+                 name: str,
+                 expression: w.Expression,
+                 derivative_goal: w.symbol_expr_float,
+                 velocity_limit: w.symbol_expr_float,
+                 quadratic_weight: w.symbol_expr_float, control_horizon: int,
+                 linear_weight: Optional[w.symbol_expr_float] = None,
+                 lower_slack_limit: Optional[w.symbol_expr_float] = None,
+                 upper_slack_limit: Optional[w.symbol_expr_float] = None):
+        self.name = name
+        self.expression = expression
+        self.quadratic_weight = quadratic_weight
+        self.control_horizon = control_horizon
+        self.velocity_limit = velocity_limit
+        self.derivative_goal = derivative_goal
+        if lower_slack_limit is not None:
+            self.lower_slack_limit = lower_slack_limit
+        if upper_slack_limit is not None:
+            self.upper_slack_limit = upper_slack_limit
+        if linear_weight is not None:
+            self.linear_weight = linear_weight
+
+    def __str__(self):
+        return self.name
+
+    def normalized_weight(self, prediction_horizon):
+        weight_normalized = self.quadratic_weight * (1 / self.velocity_limit) ** 2
         return weight_normalized
 
 

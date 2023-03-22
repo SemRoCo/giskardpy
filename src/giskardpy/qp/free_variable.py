@@ -36,9 +36,9 @@ class FreeVariable:
             self.quadratic_weights = quadratic_weights
         assert max(self._symbols.keys()) == len(self._symbols) - 1
 
-        self.horizon_functions = defaultdict(float)
+        self.horizon_functions = defaultdict(lambda: 0.00001)
         if horizon_functions is None:
-            horizon_functions = {1: 0.1}
+            horizon_functions = {Derivatives.velocity: 0.1}
         self.horizon_functions.update(horizon_functions)
 
     @property

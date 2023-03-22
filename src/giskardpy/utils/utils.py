@@ -478,7 +478,7 @@ def memoize(function):
 
 
 def record_time(function):
-    return function
+    # return function
     god_map = GodMap()
     time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
     if function.__name__ == 'solve':

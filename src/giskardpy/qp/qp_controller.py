@@ -16,7 +16,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import derivative_joint_map, Derivatives
-from giskardpy.qp.constraint import VelocityConstraint, Constraint
+from giskardpy.qp.constraint import VelocityConstraint, InequalityConstraint, EqualityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
@@ -81,7 +81,7 @@ class H(Parent):
                  default_limits=False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables
-        self.constraints = constraints  # type: list[Constraint]
+        self.constraints = constraints  # type: list[InequalityConstraint]
         self.velocity_constraints = velocity_constraints  # type: list[velocity_constraints]
         self.height = 0
         self._compute_height()
@@ -143,7 +143,7 @@ class B(Parent):
                  default_limits=False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables  # type: list[FreeVariable]
-        self.constraints = constraints  # type: list[Constraint]
+        self.constraints = constraints  # type: list[InequalityConstraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
         self.no_limits = 1e4
         self.evaluated = True
@@ -255,14 +255,10 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
-                    normal_lower_bound = w.round_up(
-                        v.get_lower_limit(Derivatives.position,
-                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
-                        self.round_to2)
-                    normal_upper_bound = w.round_down(
-                        v.get_upper_limit(Derivatives.position,
-                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
-                        self.round_to2)
+                    normal_lower_bound = v.get_lower_limit(Derivatives.position, False,
+                                                           evaluated=self.evaluated) - v.get_symbol(Derivatives.position)
+                    normal_upper_bound = v.get_upper_limit(Derivatives.position, False,
+                                                           evaluated=self.evaluated) - v.get_symbol(Derivatives.position)
                     if self.default_limits:
                         if self.order >= 4:
                             lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
@@ -308,8 +304,8 @@ class BA(Parent):
         for v in self.free_variables:
             for o in range(1, min(v.order, self.order) - 1):
                 o = Derivatives(o)
-                l_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
-                u_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
+                l_last_stuff[o][f'{v.position_name}/last_{o}'] = v.get_symbol(o)
+                u_last_stuff[o][f'{v.position_name}/last_{o}'] = v.get_symbol(o)
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
@@ -338,7 +334,7 @@ class A(Parent):
                  default_limits=False):
         super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables  # type: list[FreeVariable]
-        self.constraints = constraints  # type: list[Constraint]
+        self.constraints = constraints  # type: list[InequalityConstraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
         self.joints = {}
         self.height = 0
@@ -592,6 +588,10 @@ def detect_solvers():
 detect_solvers()
 
 
+class qpSWIFTBuilder:
+    def __init__(self):
+
+
 class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
@@ -605,7 +605,8 @@ class QPController:
                  prediction_horizon: int,
                  solver_id: Optional[SupportedQPSolver] = None,
                  free_variables: List[FreeVariable] = None,
-                 constraints: List[Constraint] = None,
+                 inequality_constraints: List[InequalityConstraint] = None,
+                 equality_constraints: List[EqualityConstraint] = None,
                  velocity_constraints: List[VelocityConstraint] = None,
                  debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
@@ -624,8 +625,8 @@ class QPController:
         self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
-        if constraints is not None:
-            self.add_constraints(constraints)
+        if inequality_constraints is not None:
+            self.add_constraints(inequality_constraints)
         if velocity_constraints is not None:
             self.add_velocity_constraints(velocity_constraints)
         if debug_expressions is not None:

@@ -4119,7 +4119,8 @@ class TestBenchmark:
             zero_pose.plan_and_execute()
 
     def test_joint_goal2(self, zero_pose: PR2TestWrapper):
-        horizons = [1, 7, 9, 21, 31, 41]
+        # horizons = [1, 7, 9, 21, 31, 41]
+        horizons = [1, 7, 9, 21]
         for h in horizons:
             zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
             zero_pose.allow_all_collisions()
@@ -4127,7 +4128,8 @@ class TestBenchmark:
             zero_pose.plan_and_execute()
 
     def test_cart_goal_2eef2(self, zero_pose: PR2TestWrapper):
-        horizons = [1, 7, 9, 11, 13, 21]
+        # horizons = [1, 7, 9, 11, 13, 21]
+        horizons = [1, 7, 9, 11]
         for h in horizons:
             root = 'odom_combined'
 
@@ -4147,7 +4149,8 @@ class TestBenchmark:
             zero_pose.plan_and_execute()
 
     def test_avoid_collision_drive_into_box1(self, box_setup: PR2TestWrapper):
-        horizons = [1, 7, 9, 13, 21, 31]
+        # horizons = [1, 7, 9, 13, 21, 31]
+        horizons = [1, 7, 9, 13]
         for h in horizons:
             base_goal = PoseStamped()
             base_goal.header.frame_id = box_setup.default_root

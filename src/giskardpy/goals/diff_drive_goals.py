@@ -42,12 +42,12 @@ class DiffDriveTangentialToPoint(Goal):
 
         if self.drive:
             angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
-            self.add_constraint(reference_velocity=0.5,
-                                lower_error=-angle,
-                                upper_error=-angle,
-                                weight=self.weight,
-                                task_expression=angle,
-                                name='/rot')
+            self.add_inequality_constraint(reference_velocity=0.5,
+                                           lower_error=-angle,
+                                           upper_error=-angle,
+                                           weight=self.weight,
+                                           task_expression=angle,
+                                           name='/rot')
         else:
             # angle = w.abs(w.angle_between_vector(w.vector3(1,0,0), map_V_tangent))
             map_R_goal = w.RotationMatrix.from_vectors(x=map_V_tangent, y=None, z=w.Vector3((0, 0, 1)))
@@ -56,12 +56,12 @@ class DiffDriveTangentialToPoint(Goal):
             axis, map_current_angle = map_R_base.to_axis_angle()
             map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
             angle_error = w.shortest_angular_distance(map_current_angle, goal_angle)
-            self.add_constraint(reference_velocity=0.5,
-                                lower_error=angle_error,
-                                upper_error=angle_error,
-                                weight=self.weight,
-                                task_expression=map_current_angle,
-                                name='/rot')
+            self.add_inequality_constraint(reference_velocity=0.5,
+                                           lower_error=angle_error,
+                                           upper_error=angle_error,
+                                           weight=self.weight,
+                                           task_expression=map_current_angle,
+                                           name='/rot')
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.root}/{self.tip}'
@@ -158,12 +158,12 @@ class KeepHandInWorkspace(Goal):
         map_V_tip.scale(1)
         angle_error = w.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
         # self.add_debug_expr('rot', angle_error)
-        self.add_constraint(reference_velocity=0.5,
-                            lower_error=-angle_error - 0.2,
-                            upper_error=-angle_error + 0.2,
-                            weight=weight,
-                            task_expression=angle_error,
-                            name='/rot')
+        self.add_inequality_constraint(reference_velocity=0.5,
+                                       lower_error=-angle_error - 0.2,
+                                       upper_error=-angle_error + 0.2,
+                                       weight=weight,
+                                       task_expression=angle_error,
+                                       name='/rot')
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=base_footprint_V_tip,
         #                                  reference_velocity=0.5)

@@ -35,15 +35,17 @@ class QPSolverQPSwift(QPSolver):
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }
 
-    @profile
     @record_time
+    @profile
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
-        A_b = np.eye(lb.shape[0])
-        G = np.vstack([-A_b, A_b, -A, A])
-        P = np.diag(weights)
-        h = np.concatenate([-lb, ub, -lbA, ubA])
-        result = qpSWIFT.run(c=g, h=h, P=P, G=G, opts=self.opts)
+        P, g, G, h, A, b = self.transform_qpSWIFT(weights, g, A, lb, ub, lbA, ubA)
+        result = qpSWIFT.run(c=g, h=h, P=P, G=G, A=A, b=b, opts=self.opts)
+        # A_b = np.eye(lb.shape[0])
+        # G = np.vstack([-A_b, A_b, -A, A])
+        # P = np.diag(weights)
+        # h = np.concatenate([-lb, ub, -lbA, ubA])
+        # result = qpSWIFT.run(c=g, h=h, P=P, G=G, opts=self.opts)
         exit_flag = result['basicInfo']['ExitFlag']
         # print(result['basicInfo']['Iterations'])
         if exit_flag != 0:

@@ -21,7 +21,7 @@ class InitQPController(GiskardBehavior):
 
         qp_controller = QPController(
             free_variables=free_variables,
-            constraints=list(constraints.values()),
+            inequality_constraints=list(constraints.values()),
             velocity_constraints=list(vel_constraints.values()),
             sample_period=self.get_god_map().unsafe_get_data(identifier.sample_period),
             prediction_horizon=self.get_god_map().unsafe_get_data(identifier.prediction_horizon),

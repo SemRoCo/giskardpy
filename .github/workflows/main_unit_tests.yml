@@ -67,9 +67,8 @@ jobs:
         build-tool: 'catkin_tools'
         # Root directory of the catkin workspace
         workspace: $GITHUB_WORKSPACE/ros_ws
-    - name: install python deps
-      run: |
-        sudo pip3 install numpy==1.23.4 pandas hypothesis
+    - name: install pip dependencies
+      run: pip3 install -r ros_ws/src/giskardpy/requirements.txt
     - name: build Giskard
       run: |
         cd ros_ws

@@ -8,16 +8,13 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionAvoidanceConfig
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
 
 
 class GiskardBehavior(Behaviour):
-    time_collector: TimeCollector
 
     def __init__(self, name):
         self.god_map: GodMap = Blackboard().god_map
-        self.time_collector = self.god_map.unsafe_get_data(identifier.timer_collector)
         self.world: WorldTree = self.get_god_map().unsafe_get_data(identifier.world)
         super().__init__(name)
 
@@ -61,7 +58,7 @@ class GiskardBehavior(Behaviour):
 
     def robot(self, robot_name=''):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldBranch
         """
         return self.collision_scene.robot(robot_name=robot_name)
 

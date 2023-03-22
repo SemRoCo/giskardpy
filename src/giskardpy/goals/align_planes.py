@@ -34,8 +34,8 @@ class AlignPlanes(Goal):
         if 'root_normal' in kwargs:
             logwarn('Deprecated warning: use goal_normal instead of root_normal')
             goal_normal = kwargs['root_normal']
-        self.root = self.world.get_link_name(root_link, root_group)
-        self.tip = self.world.get_link_name(tip_link, tip_group)
+        self.root = self.world.search_for_link_name(root_link, root_group)
+        self.tip = self.world.search_for_link_name(tip_link, tip_group)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 

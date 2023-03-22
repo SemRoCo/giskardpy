@@ -3,9 +3,11 @@ import numpy as np
 from gurobipy import GRB
 from scipy import sparse
 
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
+from giskardpy.utils.utils import record_time
 
 gurobipy.setParam('LogToConsole', False)
 
@@ -43,6 +45,7 @@ error_info = {
 
 
 class QPSolverGurobi(QPSolver):
+    solver_id = SupportedQPSolver.gurobi
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if
                          '__' not in name}
 
@@ -84,6 +87,7 @@ class QPSolverGurobi(QPSolver):
         return np.round(data, decimal_places)
 
     @profile
+    @record_time
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         H = np.diag(weights)

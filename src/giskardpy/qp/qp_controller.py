@@ -3,7 +3,7 @@ import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple, Type, Union
+from typing import List, Dict, Tuple, Type, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,8 +20,7 @@ from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout, blackboard_god_map
+from giskardpy.utils.utils import memoize, create_path, suppress_stdout, get_all_classes_in_package
 
 
 def save_pandas(dfs, names, path):
@@ -41,10 +40,8 @@ def save_pandas(dfs, names, path):
 
 
 class Parent(object):
-    time_collector: TimeCollector
 
-    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
-        self.time_collector = time_collector
+    def __init__(self, sample_period, prediction_horizon, order):
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
         self.order = order
@@ -338,8 +335,8 @@ class BA(Parent):
 
 class A(Parent):
     def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 time_collector, default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order, time_collector)
+                 default_limits=False):
+        super().__init__(sample_period, prediction_horizon, order)
         self.free_variables = free_variables  # type: list[FreeVariable]
         self.constraints = constraints  # type: list[Constraint]
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
@@ -470,7 +467,6 @@ class A(Parent):
         logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
-        self.time_collector.jacobians.append(jac_time)
 
         # position limits
         vertical_offset = number_of_joints * self.prediction_horizon
@@ -577,11 +573,29 @@ class A(Parent):
         return self.construct_A()
 
 
+available_solvers: Dict[SupportedQPSolver, Type[QPSolver]] = {}
+
+
+def detect_solvers():
+    global available_solvers
+    solver_name: str
+    qp_solver_class: Type[QPSolver]
+    for solver_name, qp_solver_class in get_all_classes_in_package('giskardpy.qp', QPSolver, silent=True).items():
+        try:
+            available_solvers[qp_solver_class.solver_id] = qp_solver_class
+        except Exception:
+            pass
+    solver_names = [str(solver_name).split('.')[1] for solver_name in available_solvers.keys()]
+    logging.loginfo(f'Found these qp solvers: {solver_names}')
+
+
+detect_solvers()
+
+
 class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
-    time_collector: TimeCollector
     debug_expressions: Dict[str, w.all_expressions]
     compiled_debug_expressions: Dict[str, w.CompiledFunction]
     evaluated_debug_expressions: Dict[str, np.ndarray]
@@ -589,16 +603,14 @@ class QPController:
     def __init__(self,
                  sample_period: float,
                  prediction_horizon: int,
-                 solver_name: str,
+                 solver_id: Optional[SupportedQPSolver] = None,
                  free_variables: List[FreeVariable] = None,
                  constraints: List[Constraint] = None,
                  velocity_constraints: List[VelocityConstraint] = None,
                  debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
-                 retry_weight_factor: float = 100,
-                 time_collector: TimeCollector = None):
-        self.time_collector = time_collector
+                 retry_weight_factor: float = 100):
         self.free_variables = []
         self.constraints = []
         self.velocity_constraints = []
@@ -608,6 +620,7 @@ class QPController:
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
         self.retry_weight_factor = retry_weight_factor
+        self.evaluated_debug_expressions = {}
         self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
@@ -618,25 +631,21 @@ class QPController:
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        qp_solver_class: Type[QPSolver]
-        if solver_name == SupportedQPSolver.gurobi:
-            from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            qp_solver_class = QPSolverGurobi
-        elif solver_name == SupportedQPSolver.cplex:
-            from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            qp_solver_class = QPSolverCplex
-        elif solver_name == SupportedQPSolver.qp_swift:
-            from giskardpy.qp.qp_solver_qpswift import QPSolverQPSwift
-            qp_solver_class = QPSolverQPSwift
+        if solver_id is not None:
+            qp_solver_class = available_solvers[solver_id]
         else:
-            from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
-            qp_solver_class = QPSolverQPOases
+            for solver_id in SupportedQPSolver:
+                if solver_id in available_solvers:
+                    qp_solver_class = available_solvers[solver_id]
+                    break
+            else:
+                raise QPSolverException(f'No qp solver found')
         num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
         self.qp_solver = qp_solver_class(num_non_slack=num_non_slack,
                                          retry_added_slack=self.retry_added_slack,
                                          retry_weight_factor=self.retry_weight_factor,
                                          retries_with_relaxed_constraints=self.retries_with_relaxed_constraints)
-        logging.loginfo(f'Using QP Solver \'{solver_name}\'')
+        logging.loginfo(f'Using QP Solver \'{solver_id}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
 
     def add_free_variables(self, free_variables):
@@ -720,7 +729,6 @@ class QPController:
         self.compiled_big_ass_M = self.big_ass_M.compile(free_symbols)
         compilation_time = time() - t
         logging.loginfo(f'Compiled symbolic controller in {compilation_time:.5f}s')
-        self.time_collector.compilations.append(compilation_time)
 
     def _compile_debug_expressions(self):
         t = time()
@@ -733,7 +741,6 @@ class QPController:
             self.compiled_debug_expressions[name] = expr.compile(free_symbols)
         compilation_time = time() - t
         logging.loginfo(f'Compiled debug expressions in {compilation_time:.5f}s')
-
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]
@@ -797,7 +804,7 @@ class QPController:
 
     @property
     def god_map(self) -> GodMap:
-        return blackboard_god_map()
+        return GodMap()
 
     @property
     def world(self) -> WorldTree:
@@ -861,14 +868,10 @@ class QPController:
                    sample_period=self.sample_period,
                    prediction_horizon=self.prediction_horizon,
                    order=self.order,
-                   time_collector=self.time_collector,
                    default_limits=default_limits)
 
         logging.loginfo(f'Constructing new controller with {self.A.height} constraints '
                         f'and {self.A.width} free variables...')
-        self.time_collector.constraints.append(self.A.height)
-        self.time_collector.variables.append(self.A.width)
-
         self._init_big_ass_M()
 
         self._set_weights(w.Expression(self.H.weights()))
@@ -884,7 +887,7 @@ class QPController:
         # self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
 
     @profile
-    def _eval_debug_exprs(self):
+    def eval_debug_exprs(self):
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
             params = self.god_map.get_values(f.str_params)
@@ -892,7 +895,7 @@ class QPController:
         return self.evaluated_debug_expressions
 
     @profile
-    def make_filters(self):
+    def update_filters(self):
         b_filter = self.np_weights != 0
         b_filter[:self.H.number_of_free_variables_with_horizon()] = True
         # offset = self.H.number_of_free_variables_with_horizon() + self.H.number_of_constraint_vel_variables()
@@ -905,17 +908,8 @@ class QPController:
         bA_filter = np.ones(self.A.height, dtype=bool)
         ll = self.H.number_of_constraint_vel_variables() + self.H.number_of_contraint_error_variables()
         bA_filter[-ll:] = b_filter[-ll:]
-        return np.array(b_filter), np.array(bA_filter)
-
-    @profile
-    def filter_zero_weight_stuff(self, b_filter, bA_filter):
-        return self.np_weights[b_filter], \
-               np.zeros(self.np_weights[b_filter].shape[0]), \
-               self.np_A[bA_filter, :][:, b_filter], \
-               self.np_lb[b_filter], \
-               self.np_ub[b_filter], \
-               self.np_lbA[bA_filter], \
-               self.np_ubA[bA_filter]
+        self.b_filter = np.array(b_filter)
+        self.bA_filter = np.array(bA_filter)
 
     def __swap_compiled_matrices(self):
         if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
@@ -933,18 +927,25 @@ class QPController:
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: list) -> Tuple[derivative_joint_map, dict]:
+    def get_cmd(self, substitutions: list) -> derivative_joint_map:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:
         :return: joint name -> joint command
         """
-        filtered_stuff = self.evaluate_and_split(substitutions)
+        self.evaluate_and_create_np_data(substitutions)
         try:
             # self.__swap_compiled_matrices()
-            self.xdot_full = self.qp_solver.solve_and_retry(*filtered_stuff)
+            self.xdot_full = self.qp_solver.solve_and_retry(weights=self.np_weights_filtered,
+                                                            g=self.np_g_filtered,
+                                                            A=self.np_A_filtered,
+                                                            lb=self.np_lb_filtered,
+                                                            ub=self.np_ub_filtered,
+                                                            lbA=self.np_lbA_filtered,
+                                                            ubA=self.np_ubA_filtered)
             # self.__swap_compiled_matrices()
-            return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+            # self._create_debug_pandas()
+            return self.split_xdot(self.xdot_full)
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
@@ -954,8 +955,15 @@ class QPController:
             if joint_limits_violated_msg is not None:
                 self.__swap_compiled_matrices()
                 try:
-                    self.xdot_full = self.qp_solver.solve(*self.evaluate_and_split(substitutions))
-                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs()
+                    self.evaluate_and_create_np_data(substitutions)
+                    self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
+                                                          g=self.np_g_filtered,
+                                                          A=self.np_A_filtered,
+                                                          lb=self.np_lb_filtered,
+                                                          ub=self.np_ub_filtered,
+                                                          lbA=self.np_lbA_filtered,
+                                                          ubA=self.np_ubA_filtered)
+                    return self.split_xdot(self.xdot_full)
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())
@@ -963,11 +971,12 @@ class QPController:
                 finally:
                     self.__swap_compiled_matrices()
             #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
-            self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
+            self._are_hard_limits_violated(str(e_original))
             self._is_inf_in_data()
             raise
 
-    def evaluate_and_split(self, substitutions):
+    @profile
+    def evaluate_and_create_np_data(self, substitutions):
         self.substitutions = substitutions
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
         self.np_weights = np_big_ass_M[self.A.height, :-2]
@@ -977,19 +986,33 @@ class QPController:
         self.np_lbA = np_big_ass_M[:self.A.height, -2]
         self.np_ubA = np_big_ass_M[:self.A.height, -1]
 
-        filters = self.make_filters()
-        filtered_stuff = self.filter_zero_weight_stuff(*filters)
-        return filtered_stuff
+        self.update_filters()
+        self.np_weights_filtered = self.np_weights[self.b_filter]
+        self.np_g_filtered = np.zeros(self.np_weights_filtered.shape[0])
+        self.np_A_filtered = self.np_A[self.bA_filter, :][:, self.b_filter]
+        self.np_lb_filtered = self.np_lb[self.b_filter]
+        self.np_ub_filtered = self.np_ub[self.b_filter]
+        self.np_lbA_filtered = self.np_lbA[self.bA_filter]
+        self.np_ubA_filtered = self.np_ubA[self.bA_filter]
 
-    def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
+    def _are_hard_limits_violated(self, error_message):
         num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
-        num_of_slack = len(lb) - num_non_slack
+        num_of_slack = len(self.np_lb_filtered) - num_non_slack
+        lb = self.np_lb_filtered.copy()
         lb[-num_of_slack:] = -100
+        ub = self.np_ub_filtered.copy()
         ub[-num_of_slack:] = 100
         try:
-            self.xdot_full = self.qp_solver.solve(weights, g, A, lb, ub, lbA, ubA)
-        except:
-            pass
+            self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
+                                                  g=self.np_g_filtered,
+                                                  A=self.np_A_filtered,
+                                                  lb=self.np_lb_filtered,
+                                                  ub=self.np_ub_filtered,
+                                                  lbA=self.np_lbA_filtered,
+                                                  ubA=self.np_ubA_filtered)
+        except Exception as e:
+            logging.loginfo(f'Can\'t determine if hard constraints are violated: {e}.')
+            return False
         else:
             self._create_debug_pandas()
             upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]
@@ -1069,20 +1092,22 @@ class QPController:
     @profile
     def _create_debug_pandas(self):
         substitutions = self.substitutions
-        self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
         b_names = self.b_names()
         bA_names = self.bA_names()
-        b_filter, bA_filter = self.make_filters()
-        filtered_b_names = np.array(b_names)[b_filter]
-        filtered_bA_names = np.array(bA_names)[bA_filter]
-        H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
+        filtered_b_names = np.array(b_names)[self.b_filter]
+        filtered_bA_names = np.array(bA_names)[self.bA_filter]
+        # H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
         # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
-        num_of_slack = len(lb) - num_non_slack
+        # num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
+        # num_of_slack = len(lb) - num_non_slack
+        num_vel_constr = len(self.velocity_constraints) * (self.prediction_horizon - 2)
+        num_task_constr = len(self.constraints)
+        num_constr = num_vel_constr + num_task_constr
+        # num_non_slack = l
 
-        self._eval_debug_exprs()
+        # self._eval_debug_exprs()
         p_debug = {}
         for name, value in self.evaluated_debug_expressions.items():
             if isinstance(value, np.ndarray):
@@ -1091,34 +1116,33 @@ class QPController:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
-        self.p_lb = pd.DataFrame(lb, filtered_b_names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(ub, filtered_b_names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(self.np_lb_filtered, filtered_b_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(self.np_ub_filtered, filtered_b_names, ['data'], dtype=float)
         # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
-        self.p_lbA_raw = pd.DataFrame(lbA, filtered_bA_names, ['data'], dtype=float)
+        self.p_lbA_raw = pd.DataFrame(self.np_lbA_filtered, filtered_bA_names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
-        self.p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, ['data'], dtype=float)
+        self.p_ubA_raw = pd.DataFrame(self.np_ubA_filtered, filtered_bA_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
         # remove sample period factor
-        self.p_lbA[-num_of_slack:] /= sample_period
-        self.p_ubA[-num_of_slack:] /= sample_period
-        self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, ['data'],
-                                      dtype=float)
-        self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
+        self.p_lbA[-num_constr:] /= sample_period
+        self.p_ubA[-num_constr:] /= sample_period
+        self.p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
+        self.p_A = pd.DataFrame(self.np_A_filtered, filtered_bA_names, filtered_b_names, dtype=float)
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
-            xH = np.dot((self.xdot_full ** 2).T, H)
-            self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
+            # xH = np.dot((self.xdot_full ** 2).T, H)
+            # self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 
             self.p_pure_xdot = deepcopy(self.p_xdot)
-            self.p_pure_xdot[num_non_slack:] = 0
+            self.p_pure_xdot[-num_constr:] = 0
             self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
             self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
                                                        dtype=float)
             self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
-            self.p_Ax_without_slack[-num_of_slack:] /= sample_period
+            self.p_Ax_without_slack[-num_constr:] /= sample_period
 
         else:
             self.p_xdot = None

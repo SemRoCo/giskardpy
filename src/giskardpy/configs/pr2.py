@@ -1,11 +1,13 @@
+from typing import Optional
+
 from giskardpy.configs.data_types import ControlModes, CollisionCheckerLib, SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard
 from giskardpy.my_types import Derivatives
 
 
 class PR2_Base(Giskard):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, root_link_name: Optional[str] = None):
+        super().__init__(root_link_name=root_link_name)
         # self.set_collision_checker(CollisionCheckerLib.none)
         # self.set_qp_solver(SupportedQPSolver.qp_oases)
         # self.configure_PlotTrajectory(enabled=True)
@@ -68,14 +70,19 @@ class PR2_Mujoco(PR2_Base):
         super().__init__()
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(parent_link_name='odom_combined',
+        self.add_omni_drive_joint(name='brumbrum',
+                                  parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
-                                  translation_velocity_limit=0.4,
-                                  rotation_velocity_limit=0.2,
-                                  translation_acceleration_limit=1,
-                                  rotation_acceleration_limit=1,
-                                  translation_jerk_limit=5,
-                                  rotation_jerk_limit=5,
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  },
                                   odometry_topic='/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/whole_body_controller/state')
@@ -134,14 +141,19 @@ class PR2_Unreal(PR2_Base):
         # self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
         # self.collision_avoidance_config.collision_checker = self.collision_avoidance_config.collision_checker.none
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(parent_link_name='odom_combined',
+        self.add_omni_drive_joint(name='brumbrum',
+                                  parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
-                                  translation_velocity_limit=0.4,
-                                  rotation_velocity_limit=0.2,
-                                  translation_acceleration_limit=1,
-                                  rotation_acceleration_limit=1,
-                                  translation_jerk_limit=5,
-                                  rotation_jerk_limit=5,
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  },
                                   odometry_topic='/base_odometry/odom')
         fill_velocity_values = False
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/follow_joint_trajectory',
@@ -158,23 +170,26 @@ class PR2_Unreal(PR2_Base):
 class PR2_StandAlone(PR2_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()
-        super().__init__()
+        super().__init__('map')
         self.set_default_visualization_marker_color(1, 1, 1, 0.8)
         self.set_control_mode(ControlModes.stand_alone)
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
-        self.add_omni_drive_joint(parent_link_name='odom_combined',
+        self.add_omni_drive_joint(name='brumbrum',
+                                  parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
-                                  name='brumbrum',
-                                  translation_velocity_limit=0.4,
-                                  rotation_velocity_limit=0.2,
-                                  translation_acceleration_limit=1,
-                                  rotation_acceleration_limit=1,
-                                  translation_jerk_limit=5,
-                                  rotation_jerk_limit=5)
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  })
         self.register_controlled_joints([
             'torso_lift_joint',
             'head_pan_joint',

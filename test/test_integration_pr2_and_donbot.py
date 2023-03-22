@@ -119,7 +119,7 @@ def kitchen_setup(zero_pose):
                        pose=tf.lookup_pose('map', 'iai_kitchen/world'),
                        js_topic='/kitchen/joint_states',
                        set_js_topic='/kitchen/cram_joint_states')
-    js = {str(k): 0.0 for k in zero_pose.world.groups[object_name].movable_joints}
+    js = {str(k): 0.0 for k in zero_pose.world.groups[object_name].movable_joint_names}
     zero_pose.set_kitchen_js(js)
     return zero_pose
 

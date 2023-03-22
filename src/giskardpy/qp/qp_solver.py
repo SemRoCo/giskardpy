@@ -4,10 +4,12 @@ from typing import Tuple
 
 import numpy as np
 
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 
 
 class QPSolver(ABC):
+    solver_id: SupportedQPSolver
 
     def __init__(self,
                  num_non_slack: int,
@@ -20,6 +22,19 @@ class QPSolver(ABC):
         self.retry_weight_factor = retry_weight_factor
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.on_fail_round_to = on_fail_round_to
+
+    def transform_problem1(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray,
+                           lbA: np.ndarray, ubA: np.ndarray):
+        """
+        min_x 0.5 x^T P x + q^T x
+        s.t.  Ax = b
+              Gx <= h
+        """
+        G_b = np.eye(lb.shape[0])
+        G = np.vstack([-G_b, G_b, -A, A])
+        P = np.diag(weights)
+        h = np.concatenate([-lb, ub, -lbA, ubA])
+        return P, g, G, h
 
     @abc.abstractmethod
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,

@@ -20,7 +20,7 @@ from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
-from tf2_py import LookupException
+from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
 import giskardpy.utils.tfwrapper as tf
@@ -35,7 +35,7 @@ from giskardpy.my_types import PrefixName
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import OneDofJoint
+from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
@@ -243,9 +243,10 @@ class GiskardTestWrapper(GiskardWrapper):
             logging.loginfo('Inside github workflow, turning off visualization')
             self.giskard.configure_VisualizationBehavior(enabled=False)
             self.giskard.configure_CollisionMarker(enabled=False)
-            self.giskard.set_qp_solver(SupportedQPSolver.qp_oases)
             self.giskard.configure_PlotTrajectory(enabled=False)
             self.giskard.configure_PlotDebugExpressions(enabled=False)
+        if 'QP_SOLVER' in os.environ:
+            self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.giskard.grow()
         self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
@@ -266,10 +267,16 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
-        self.original_number_of_links = len(self.world._links)
+        self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
         return self.general_config.control_mode == self.general_config.control_mode.stand_alone
+
+    def has_odometry_joint(self, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.robot_name
+        joint = self.world.get_joint(self.world.groups[group_name].root_link.parent_joint_name)
+        return isinstance(joint, (OmniDrive, DiffDrive))
 
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
         if group_name is None:
@@ -294,15 +301,19 @@ class GiskardTestWrapper(GiskardWrapper):
         # compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
+        result_msg = deepcopy(msg)
         try:
-            return tf.transform_msg(target_frame, msg, timeout=timeout)
-        except LookupException as e:
-            target_frame = self.world.get_link_name(target_frame)
+            if not self.is_standalone():
+                return tf.transform_msg(target_frame, result_msg, timeout=timeout)
+            else:
+                raise LookupException('just to trigger except block')
+        except (LookupException, ExtrapolationException) as e:
+            target_frame = self.world.search_for_link_name(target_frame)
             try:
-                msg.header.frame_id = self.world.get_link_name(msg.header.frame_id)
+                result_msg.header.frame_id = self.world.search_for_link_name(result_msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            return self.world.transform_msg(target_frame, msg)
+            return self.world.transform_msg(target_frame, result_msg)
 
     def wait_heartbeats(self, number=2):
         behavior_tree = self.tree.tree
@@ -319,7 +330,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_robot(self, group_name):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldBranch
         """
         return self.world.groups[group_name]
 
@@ -339,7 +350,10 @@ class GiskardTestWrapper(GiskardWrapper):
         self._alive = True
 
     def tear_down(self):
-        self.god_map.unsafe_get_data(identifier.timer_collector).print()
+        try:
+            self.god_map.unsafe_get_data(identifier.timer_collector).pretty_print()
+        except Exception as e:
+            pass
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
@@ -387,7 +401,7 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
-            joint_name = self.world.get_joint_name(joint_name)
+            joint_name = self.world.search_for_joint_name(joint_name)
             if self.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
@@ -414,19 +428,8 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
-        if root_group is None:
-            try:
-                root_group = self.world._get_group_containing_link_short_name(root_link)
-            except UnknownGroupException:
-                pass
-        root_link = PrefixName(root_link, root_group)
-        if tip_group is None:
-            try:
-                tip_group = self.world._get_group_containing_link_short_name(tip_link)
-            except UnknownGroupException:
-                pass
-        tip_link = PrefixName(tip_link, tip_group)
-        return root_link, tip_link
+        return self.world.search_for_link_name(root_link, root_group), \
+               self.world.search_for_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################
@@ -434,9 +437,6 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_joint_goal(self, goal, weight=None, hard=False, decimal=2, expected_error_codes=(MoveResult.SUCCESS,),
                        check=True, group_name=None):
-        """
-        :type goal: dict
-        """
         super().set_joint_goal(goal, group_name, weight=weight, hard=hard)
         if check:
             self.add_goal_check(JointGoalChecker(giskard=self,
@@ -478,7 +478,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                   max_velocity=max_velocity,
                                   weight=weight, **kwargs)
         if check:
-            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
             self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
@@ -497,9 +497,12 @@ class GiskardTestWrapper(GiskardWrapper):
                                      weight=weight,
                                      **kwargs)
         if check:
-            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(TranslationGoalChecker(self, full_tip_link, full_root_link, goal_point))
+            self.add_goal_check(TranslationGoalChecker(giskard=self,
+                                                       tip_link=full_tip_link,
+                                                       root_link=full_root_link,
+                                                       expected=goal_point))
 
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                       weight=None, max_velocity=None,
@@ -517,7 +520,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None, weight=None,
                       linear_velocity=None,
-                      angular_velocity=None, check=False, **kwargs):
+                      angular_velocity=None, check=True, **kwargs):
         goal_point = PointStamped()
         goal_point.header = goal_pose.header
         goal_point.point = goal_pose.pose.position
@@ -600,7 +603,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                   max_velocity=max_velocity,
                                   weight=weight)
         if check:
-            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
             self.add_goal_check(PointingGoalChecker(self,
                                                     tip_link=full_tip_link,
@@ -623,7 +626,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                       max_angular_velocity=max_angular_velocity,
                                       weight=weight)
         if check:
-            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
             self.add_goal_check(
                 AlignPlanesGoalChecker(self, full_tip_link, tip_normal, full_root_link, goal_normal))
@@ -658,7 +661,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                        weight=weight)
 
         if check:
-            full_tip_link, full_root_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
+            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
                                                                        tip_link=tip_link, tip_group=tip_group)
             goal_point = PointStamped()
             goal_point.header = goal_pose.header
@@ -673,14 +676,21 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def plan_and_execute(self, expected_error_codes=None, stop_after=None, wait=True):
+    def plan_and_execute(self, expected_error_codes: List[int] = None, stop_after: float = None,
+                         wait: bool = True) -> MoveResult:
         return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
 
-    def plan(self, expected_error_codes=None, wait: bool = True) -> MoveResult:
-        return self.send_goal(expected_error_codes, MoveGoal.PLAN_ONLY, wait)
+    def plan(self, expected_error_codes: List[int] = None, wait: bool = True) -> MoveResult:
+        return self.send_goal(expected_error_codes=expected_error_codes,
+                              goal_type=MoveGoal.PLAN_ONLY,
+                              wait=wait)
 
-    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None,
-                  wait=True):
+    def send_goal(self,
+                  expected_error_codes: Optional[List[int]] = None,
+                  goal_type: int = MoveGoal.PLAN_AND_EXECUTE,
+                  goal: Optional[MoveGoal] = None,
+                  stop_after: Optional[float] = None,
+                  wait: bool = True) -> Optional[MoveResult]:
         try:
             time_spend_giskarding = time()
             if stop_after is not None:
@@ -753,7 +763,7 @@ class GiskardTestWrapper(GiskardWrapper):
         joints = list(self.world.controlled_joints)
         for joint in joints:
             try:
-                lower_limit, upper_limit = self.world._joints[joint].get_limit_expressions(0)
+                lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
                 lower_limit = lower_limit.evaluate()
                 upper_limit = upper_limit.evaluate()
             except:
@@ -766,7 +776,7 @@ class GiskardTestWrapper(GiskardWrapper):
         trajectory_pos = self.get_result_trajectory_position()
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         for joint_name in controlled_joints:
-            if isinstance(self.world._joints[joint_name], OneDofJoint):
+            if isinstance(self.world.joints[joint_name], OneDofJoint):
                 if not self.world.is_joint_continuous(joint_name):
                     joint_limits = self.world.get_joint_position_limits(joint_name)
                     error_msg = f'{joint_name} has violated joint position limit'
@@ -803,7 +813,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 1
         assert len(self.get_group_names()) == 1
-        assert self.original_number_of_links == len(self.world._links)
+        assert self.original_number_of_links == len(self.world.links)
         return respone
 
     def remove_group(self,
@@ -867,8 +877,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 if parent_link == '':
                     parent_link = self.world.root_link_name
                 else:
-                    parent_link_group = self.world._get_group_containing_link_short_name(parent_link)
-                    parent_link = PrefixName(parent_link, parent_link_group)
+                    parent_link = self.world.search_for_link_name(parent_link)
                 assert parent_link == self.world.get_parent_link_of_link(self.world.groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
@@ -1074,7 +1083,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def check_cpi_geq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
-        links = [self.world.get_link_name(link_name) for link_name in links]
+        links = [self.world.search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1088,7 +1097,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_cpi_leq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
         min_contact: Collision = None
-        links = [self.world.get_link_name(link_name) for link_name in links]
+        links = [self.world.search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1586,8 +1595,7 @@ class JointGoalChecker(GoalChecker):
         :type decimal: int
         """
         for joint_name in goal_js:
-            group_name = self.world._get_group_containing_joint_short_name(joint_name)
-            full_joint_name = PrefixName(joint_name, group_name)
+            full_joint_name = self.world.search_for_joint_name(joint_name)
             goal = goal_js[joint_name]
             current = current_js[full_joint_name].position
             if self.world.is_joint_continuous(full_joint_name):
@@ -1664,8 +1672,8 @@ class RotationGoalChecker(GoalChecker):
         current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
 
         try:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.quaternion),
+            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
                                                  msg_to_list(current_pose.pose.orientation), decimal=2)
         except AssertionError:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.quaternion),
+            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
                                                  -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)

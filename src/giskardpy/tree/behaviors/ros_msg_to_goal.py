@@ -4,7 +4,7 @@ import json
 import traceback
 from collections import defaultdict
 from copy import deepcopy
-from typing import List
+from typing import List, Dict, Tuple
 
 from py_trees import Status
 
@@ -15,6 +15,7 @@ from giskardpy.exceptions import UnknownConstraintException, InvalidGoalExceptio
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.goals.goal import Goal
+from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard, \
@@ -107,7 +108,6 @@ class RosMsgToGoal(GetGoal):
         """
         collision_matrix = self.collision_entries_to_collision_matrix(collision_entries)
         self.god_map.set_data(identifier.collision_matrix, collision_matrix)
-        self.time_collector.collision_avoidance.append(0)
         if not collision_entries or not self.collision_scene.is_allow_all_collision(collision_entries[-1]):
             self.add_external_collision_avoidance_constraints(soft_threshold_override=collision_matrix)
         if not collision_entries or (not self.collision_scene.is_allow_all_collision(collision_entries[-1]) and
@@ -122,8 +122,9 @@ class RosMsgToGoal(GetGoal):
                                                                                     max_distances)
         return collision_matrix
 
-    def make_max_distances(self):
+    def make_max_distances(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
         default_distance = {}
+        # fixme this default is buggy, but it doesn't get triggered
         for robot_name in self.robot_names:
             collision_avoidance_config = self.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance
@@ -157,17 +158,18 @@ class RosMsgToGoal(GetGoal):
         configs = self.collision_avoidance_configs
         fixed_joints = self.collision_scene.fixed_joints
         joints = [j for j in self.world.controlled_joints if j not in fixed_joints]
+        num_constrains = 0
         for joint_name in joints:
             try:
                 robot_name = self.world.get_group_of_joint(joint_name).name
             except KeyError:
-                child_link = self.world._joints[joint_name].child_link_name
+                child_link = self.world.joints[joint_name].child_link_name
                 robot_name = self.world._get_group_name_containing_link(child_link)
             child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
             if child_links:
                 number_of_repeller = configs[robot_name].external_collision_avoidance[joint_name].number_of_repeller
                 for i in range(number_of_repeller):
-                    child_link = self.world._joints[joint_name].child_link_name
+                    child_link = self.world.joints[joint_name].child_link_name
                     hard_threshold = configs[robot_name].external_collision_avoidance[joint_name].hard_threshold
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
@@ -180,14 +182,15 @@ class RosMsgToGoal(GetGoal):
                                                             idx=i,
                                                             num_repeller=number_of_repeller)
                     constraint._save_self_on_god_map()
-                    self.time_collector.collision_avoidance[-1] += 1
-        loginfo(f'Adding {self.time_collector.collision_avoidance[-1]} external collision avoidance constraints.')
+                    num_constrains += 1
+        loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 
     @profile
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
         fixed_joints = self.collision_scene.fixed_joints
         configs = self.collision_avoidance_configs
+        num_constr = 0
         for robot_name in self.robot_names:
             for link_a_o, link_b_o in self.world.groups[robot_name].possible_collision_combinations():
                 link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
@@ -243,5 +246,5 @@ class RosMsgToGoal(GetGoal):
                                                     idx=i,
                                                     num_repeller=number_of_repeller)
                 constraint._save_self_on_god_map()
-                self.time_collector.collision_avoidance[-1] += 1
-        loginfo(f'Adding {self.time_collector.collision_avoidance[-1]} self collision avoidance constraints.')
+                num_constr += 1
+        loginfo(f'Adding {num_constr} self collision avoidance constraints.')

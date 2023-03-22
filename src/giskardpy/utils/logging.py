@@ -4,24 +4,6 @@ import rospy
 
 from giskardpy import identifier
 
-debug_param = None
-
-@profile
-def debug():
-    global debug_param
-    try:
-        if debug_param == None:
-            l = identifier.debug
-            param_name = '~' + '/'.join(s for s in l[1:])
-            debug_param = rospy.get_param(param_name)
-            return debug_param
-        else:
-            return debug_param
-    except KeyError:
-        pass
-    return False
-
-
 @profile
 def generate_debug_msg(msg):
     node_name = rospy.get_name()
@@ -32,14 +14,11 @@ def generate_debug_msg(msg):
 
 @profile
 def generate_msg(msg):
-    if(debug()):
-        return generate_debug_msg(msg)
-    else:
-        node_name = rospy.get_name()
-        new_msg = '[{}]: {}'.format(node_name, msg)
-        if node_name == '/unnamed':
-            print(new_msg)
-        return new_msg
+    node_name = rospy.get_name()
+    new_msg = '[{}]: {}'.format(node_name, msg)
+    if node_name == '/unnamed':
+        print(new_msg)
+    return new_msg
 
 @profile
 def logdebug(msg):

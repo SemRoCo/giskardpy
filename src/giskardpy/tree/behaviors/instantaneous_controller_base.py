@@ -20,9 +20,8 @@ class ControllerPluginBase(GiskardBehavior):
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)
 
-        next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
+        next_cmds = self.controller.get_cmd(substitutions)
         self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
-        self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
 
         return Status.RUNNING
 

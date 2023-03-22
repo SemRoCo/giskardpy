@@ -1,5 +1,9 @@
 from __future__ import division
 
+# I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
+# fails on github actions
+import urdf_parser_py.urdf as up
+
 import errno
 import inspect
 import json
@@ -13,6 +17,7 @@ from copy import deepcopy
 from functools import wraps
 from itertools import product
 from multiprocessing import Lock
+from time import time
 from typing import Type, Optional, Dict
 
 import matplotlib.colors as mcolors
@@ -34,8 +39,10 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
 from giskardpy.exceptions import DontPrintStackTrace
+from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
+from giskardpy.utils.time_collector import TimeCollector
 
 
 @contextmanager
@@ -72,11 +79,22 @@ class NullContextManager(object):
         pass
 
 
-def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] = None) -> Dict[str, Type]:
+def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] = None, silent: bool = False) \
+        -> Dict[str, Type]:
+    """
+    :param package_name: e.g. giskardpy.goals
+    :param parent_class: e.g. Goal
+    :return:
+    """
     classes = {}
     package = __import__(package_name, fromlist="dummy")
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-        module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
+        try:
+            module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
+        except:
+            if not silent:
+                logging.loginfo(f'Failed to load {modname}')
+            continue
         for name2, value2 in inspect.getmembers(module, inspect.isclass):
             if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
                 classes[name2] = value2
@@ -393,7 +411,7 @@ def write_to_tmp(file_name: str, file_str: str) -> str:
 
 
 def to_tmp_path(file_name: str) -> str:
-    path = blackboard_god_map().get_data(identifier.tmp_folder)
+    path = GodMap().get_data(identifier.tmp_folder)
     return resolve_ros_iris(f'{path}{file_name}')
 
 
@@ -424,12 +442,8 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
-def blackboard_god_map():
-    return Blackboard().god_map
-
-
 def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
-    first_group_name = list(blackboard_god_map().get_data(identifier.world).groups.keys())[0]
+    first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
     decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
@@ -461,6 +475,28 @@ def memoize(function):
             return rv
 
     return wrapper
+
+
+def record_time(function):
+    return function
+    god_map = GodMap()
+    time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
+    if function.__name__ == 'solve':
+        @wraps(function)
+        def wrapper(self, weights, g, A, lb, ub, lbA, ubA):
+            qp_solver = self.solver_id
+            start_time = time()
+            result = function(self, weights, g, A, lb, ub, lbA, ubA)
+            time_delta = time() - start_time
+            time_collector.add_qp_solve_time(str(qp_solver), A.shape[1], A.shape[0], time_delta)
+            return result
+
+        return wrapper
+
+
+def clear_memo(f):
+    if hasattr(f, 'memo'):
+        f.memo.clear()
 
 
 def copy_memoize(function):
@@ -560,6 +596,7 @@ def replace_prefix_name_with_str(d: dict) -> dict:
             new_d[k] = replace_prefix_name_with_str(v)
     return new_d
 
+
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?
     return original_convert_dictionary_to_ros_message(json['message_type'], json['message'])
@@ -583,7 +620,10 @@ def trajectory_to_np(tj, joint_names):
     times = np.array(times)
     return names, position, velocity, times
 
+
 _pose_publisher = None
+
+
 def publish_pose(pose: PoseStamped):
     global _pose_publisher
     if _pose_publisher is None:

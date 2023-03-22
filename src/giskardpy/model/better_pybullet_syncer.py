@@ -111,7 +111,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def bpb_result_to_collisions(self, result, collision_list_size):
-        collisions = Collisions(self.god_map, collision_list_size)
+        collisions = Collisions(collision_list_size)
         for c in self.bpb_result_to_list(result):
             collisions.add(c)
         return collisions
@@ -141,7 +141,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             self.object_name_to_id = defaultdict(list)
 
             for link_name in self.world.link_names_with_collisions:
-                link = self.world._links[link_name]
+                link = self.world.links[link_name]
                 self.add_object(link)
             self.objects_in_order = [x for link_name in self.world._fk_computer.collision_link_order for x in self.object_name_to_id[link_name]]
             # self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]

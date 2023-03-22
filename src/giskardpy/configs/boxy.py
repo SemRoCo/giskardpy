@@ -2,21 +2,15 @@ from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_giskard import Giskard
 
 
-class Boxy_Base(Giskard):
+class Boxy_StandAlone(Giskard):
     def __init__(self):
-        super().__init__()
-
-
-class Boxy_StandAlone(Boxy_Base):
-    def __init__(self):
-        self.add_robot_from_parameter_server()
-        super().__init__()
+        self.add_robot_from_parameter_server(add_drive_joint_to_group=False)
+        super().__init__('map')
         self.set_default_visualization_marker_color(1, 1, 1, 1)
         self.set_control_mode(ControlModes.stand_alone)
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
-        self.set_root_link_name('map')
         self.add_fixed_joint(parent_link='map', child_link='boxy_description/odom')
         self.register_controlled_joints([
             'neck_shoulder_pan_joint',

@@ -1,0 +1,100 @@
+name: Reusable Build Dependencies
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+on:
+  workflow_call:
+    inputs:
+      bpb:
+        description: build bpb
+        type: boolean
+        default: true
+        required: false
+      qpSWIFT:
+        description: build qpSWIFT
+        type: boolean
+        default: true
+        required: false
+jobs:
+  build_and_cache_bpb:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: load bpb
+        id: load-bpb
+        uses: actions/cache@v3
+        with:
+          path: ~/bpb
+          key: bpb
+      - if: ${{ steps.load-bpb.outputs.cache-hit != 'true' }}
+        name: install pybullet
+        run: |
+          sudo pip3 install numpy
+          mkdir -p ~/bpb
+          cd ~/bpb
+          git clone https://github.com/SemRoCo/bullet3.git
+          cd bullet3
+          ./build_better_pybullet.sh
+      - if: ${{ steps.load-bpb.outputs.cache-hit != 'true' }}
+        name: cache bpb
+        id: cache-bpb
+        uses: actions/cache/save@v3
+        with:
+          path: ~/bpb
+          key: bpb
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+  build_and_cache_qpSWIFT:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: load qpSWIFT
+        id: load-qpSWIFT
+        uses: actions/cache@v3
+        with:
+          path: ~/qpSWIFT
+          key: qpSWIFT
+      - if: ${{ steps.load-qpSWIFT.outputs.cache-hit != 'true' }}
+        name: compile qpSWIFT
+        run: |
+          sudo pip3 install numpy
+          cd ~
+          git clone https://github.com/qpSWIFT/qpSWIFT
+          cd qpSWIFT
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+          sudo cmake --build build --target install
+      - if: ${{ steps.load-qpSWIFT.outputs.cache-hit != 'true' }}
+        name: cache qpSWIFT
+        id: cache-qpSWIFT
+        uses: actions/cache/save@v3
+        with:
+          path: ~/qpSWIFT
+          key: qpSWIFT
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+  create_pip_cache:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: load pip cache
+        id: pip-load
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip
+      - if: ${{ steps.pip-load.outputs.cache-hit != 'true' }}
+        name: install pip requirements
+        run: |
+          sudo apt install libeigen3-dev
+          pip3 install -r requirements.txt
+      - if: ${{ steps.pip-load.outputs.cache-hit != 'true' }}
+        name: cache pip
+        id: cache-pip
+        uses: actions/cache/save@v3
+        with:
+          path: ~/.cache/pip
+          key: pip
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1

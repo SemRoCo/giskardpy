@@ -3,11 +3,6 @@ Giskard is an open source motion planning framework for ROS, which uses constrai
 
 ## Installation instructions for Ubuntu 20.04 + Noetic
 
-#### Python dependencies
-```
-pip3 install -r pandas numpy==1.23.4 hypothesis qpalm
-```
-
 #### Workspace
 ```
 source /opt/ros/noetic/setup.bash           # source ROS

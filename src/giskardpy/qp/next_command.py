@@ -18,10 +18,13 @@ class NextCommands:
         offset = len(free_variables)
         self.xdot_velocity = xdot[:offset]
         joint_derivative_filter = np.array(
-            [offset * prediction_horizon * (derivative - 1) for derivative in range(1, 4)])
+            [offset * prediction_horizon * (derivative - 1) for derivative in Derivatives.range(Derivatives.velocity, max_derivative)])
         # for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
         for i, free_variable in enumerate(free_variables):
-            self.free_variable_data[free_variable.name] = xdot[joint_derivative_filter + i]
+            try:
+                self.free_variable_data[free_variable.name] = xdot[joint_derivative_filter + i]
+            except IndexError as e:
+                pass
                 # OrderedDict((x.name, xdot[i + offset * prediction_horizon * (derivative - 1)]) for i, x in
                 #                                      enumerate(free_variables))
             # _JointState

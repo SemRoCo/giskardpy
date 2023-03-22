@@ -163,7 +163,13 @@ class PR2TestWrapper(GiskardTestWrapper):
         return
 
     def reset_base(self):
-        pass
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        if self.is_standalone():
+            self.teleport_base(p)
+        else:
+            self.move_base(p)
 
     def set_localization(self, map_T_odom: PoseStamped):
         map_T_odom.pose.position.z = 0

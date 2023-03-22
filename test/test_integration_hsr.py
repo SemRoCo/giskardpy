@@ -60,7 +60,10 @@ class HSRTestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        self.move_base(p)
+        if self.is_standalone():
+            self.teleport_base(p)
+        else:
+            self.move_base(p)
 
     def reset(self):
         self.clear_world()

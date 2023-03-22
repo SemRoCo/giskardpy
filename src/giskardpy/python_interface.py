@@ -313,21 +313,6 @@ class GiskardWrapper:
                            new_length=new_length,
                            **kwargs)
 
-    def pr2_hack(self):
-        limit = 1
-        self.set_limit_cartesian_velocity_goal(root_link='base_footprint',
-                                               tip_link='fl_caster_rotation_link',
-                                               max_angular_velocity=limit)
-        self.set_limit_cartesian_velocity_goal(root_link='base_footprint',
-                                               tip_link='fr_caster_rotation_link',
-                                               max_angular_velocity=limit)
-        self.set_limit_cartesian_velocity_goal(root_link='base_footprint',
-                                               tip_link='bl_caster_rotation_link',
-                                               max_angular_velocity=limit)
-        self.set_limit_cartesian_velocity_goal(root_link='base_footprint',
-                                               tip_link='br_caster_rotation_link',
-                                               max_angular_velocity=limit)
-
     def set_limit_cartesian_velocity_goal(self,
                                           tip_link: str,
                                           root_link: str,

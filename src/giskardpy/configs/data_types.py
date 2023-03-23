@@ -144,7 +144,7 @@ class BehaviorTreeConfig:
 
     plugin_config = {
         'GoalReached': {
-            'joint_convergence_threshold': 0.008,
+            'joint_convergence_threshold': 0.0095,
             'window_size': 21
         },
         'VisualizationBehavior': {

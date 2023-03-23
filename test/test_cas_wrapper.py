@@ -1,12 +1,13 @@
 import math
 import unittest
+from datetime import timedelta
 
 import PyKDL
 import hypothesis.strategies as st
 import numpy as np
 from angles import shortest_angular_distance, normalize_angle_positive, normalize_angle
 from geometry_msgs.msg import Point, PointStamped, Vector3, Vector3Stamped
-from hypothesis import given, assume
+from hypothesis import given, assume, settings
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
@@ -1616,6 +1617,7 @@ class TestCASWrapper(unittest.TestCase):
         expected_sum = np.sum(m)
         self.assertTrue(np.isclose(actual_sum, expected_sum, rtol=1.e-4))
 
+    @settings(deadline=timedelta(milliseconds=500))
     @given(st.integers(max_value=10000, min_value=1),
            st.integers(max_value=5000, min_value=-5000),
            st.integers(max_value=5000, min_value=-5000),

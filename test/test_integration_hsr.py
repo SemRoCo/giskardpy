@@ -60,7 +60,10 @@ class HSRTestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        self.move_base(p)
+        if self.is_standalone():
+            self.teleport_base(p)
+        else:
+            self.move_base(p)
 
     def reset(self):
         self.clear_world()
@@ -343,7 +346,7 @@ class TestCollisionAvoidanceGoals:
             'wrist_flex_joint': -1.55,
             'wrist_roll_joint': 0.11,
         }
-        zero_pose.set_joint_goal(js)
+        zero_pose.set_seed_configuration(js)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 

@@ -1200,6 +1200,7 @@ class TestConstraints:
                                     environment_link=handle_name,
                                     goal_joint_state=goal_angle)
         # kitchen_setup.allow_all_collisions()
+        kitchen_setup.allow_collision(group1=kitchen_setup.kitchen_name, group2=kitchen_setup.r_gripper_group)
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': goal_angle})
 

@@ -805,7 +805,7 @@ class QPController:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = Derivatives(min(self.prediction_horizon + 1, max(v.order for v in self.free_variables)))
+        self.order = Derivatives(min(self.prediction_horizon, max(v.order for v in self.free_variables)))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def get_free_variable(self, name):

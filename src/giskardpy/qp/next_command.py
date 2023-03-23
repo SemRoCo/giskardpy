@@ -10,10 +10,7 @@ from giskardpy.qp.free_variable import FreeVariable
 
 
 class NextCommands:
-    def __init__(self, free_variables: List[FreeVariable], xdot: np.ndarray):
-        god_map = GodMap()
-        max_derivative = god_map.get_data(identifier.max_derivative)
-        prediction_horizon = god_map.get_data(identifier.prediction_horizon)
+    def __init__(self, free_variables: List[FreeVariable], xdot: np.ndarray, max_derivative: Derivatives, prediction_horizon: int):
         self.free_variable_data: Dict[PrefixName, List[float]] = {}
         offset = len(free_variables)
         self.xdot_velocity = xdot[:offset]

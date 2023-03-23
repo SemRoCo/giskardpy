@@ -1093,7 +1093,8 @@ class QPController:
                                                             ubA=self.np_ubA_filtered)
             # self.__swap_compiled_matrices()
             # self._create_debug_pandas()
-            return NextCommands(self.free_variables, self.xdot_full)
+            return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
+                                prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise

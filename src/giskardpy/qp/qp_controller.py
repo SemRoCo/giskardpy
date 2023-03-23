@@ -1075,7 +1075,7 @@ class QPController:
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: list) -> Tuple[NextCommands, dict]:
+    def get_cmd(self, substitutions: list) -> NextCommands:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions:

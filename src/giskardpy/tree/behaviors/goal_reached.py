@@ -37,7 +37,7 @@ class GoalReached(GiskardBehavior):
                 return Status.SUCCESS
         return Status.RUNNING
 
-    def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
+    def make_velocity_threshold(self, min_cut_off=0.005, max_cut_off=0.06):
         joint_convergence_threshold = self.god_map.get_data(identifier.joint_convergence_threshold)
         free_variables = self.god_map.get_data(identifier.free_variables)
         thresholds = []

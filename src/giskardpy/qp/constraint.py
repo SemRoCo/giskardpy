@@ -53,7 +53,7 @@ class IntegralConstraint:
 
     def normalized_weight(self, prediction_horizon):
         weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
-        return weight_normalized
+        return weight_normalized * self.control_horizon
 
 
 class DerivativeConstraint:

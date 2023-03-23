@@ -346,7 +346,7 @@ class TestCollisionAvoidanceGoals:
             'wrist_flex_joint': -1.55,
             'wrist_roll_joint': 0.11,
         }
-        zero_pose.set_joint_goal(js)
+        zero_pose.set_seed_configuration(js)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 

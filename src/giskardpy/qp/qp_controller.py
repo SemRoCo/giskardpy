@@ -1112,7 +1112,8 @@ class QPController:
                                                           ub=self.np_ub_filtered,
                                                           lbA=self.np_lbA_filtered,
                                                           ubA=self.np_ubA_filtered)
-                    return NextCommands(self.free_variables, self.xdot_full)
+                    return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
+                                        max_derivative=self.order, prediction_horizon=self.prediction_horizon)
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())

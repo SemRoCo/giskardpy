@@ -256,6 +256,7 @@ def giskard(request, ros):
 def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
     if resetted_giskard.is_standalone():
         resetted_giskard.set_seed_configuration(pocky_pose)
+        resetted_giskard.allow_all_collisions()
     else:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.set_joint_goal(pocky_pose)

@@ -115,7 +115,7 @@ class ExternalCollisionAvoidance(Goal):
                                            qp_limits_for_lba),
                                    lower_limit_limited)
         # undo factor in A
-        upper_slack /= (sample_period * self.control_horizon)
+        upper_slack /= (sample_period * self.prediction_horizon)
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,

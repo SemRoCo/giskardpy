@@ -41,7 +41,7 @@ class Constraint:
 
     def normalized_weight(self, prediction_horizon):
         weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
-        return weight_normalized
+        return weight_normalized * prediction_horizon
 
 
 class VelocityConstraint:

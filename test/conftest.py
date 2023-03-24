@@ -137,10 +137,10 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
             js[str(joint.free_variable.name)] = 0.0
     better_pose.set_apartment_js(js)
     base_pose = PoseStamped()
-    base_pose.header.frame_id = better_pose.world.root_link_name
-    base_pose.pose.position.x = 1.376
-    base_pose.pose.position.y = 2.05
-    base_pose.pose.orientation.z = 1
+    base_pose.header.frame_id = 'iai_apartment/side_B'
+    base_pose.pose.position.x = 1.5
+    base_pose.pose.position.y = 2.4
+    base_pose.pose.orientation.w = 1
     base_pose = better_pose.transform_msg(better_pose.world.root_link_name, base_pose)
     better_pose.set_localization(base_pose)
     return better_pose

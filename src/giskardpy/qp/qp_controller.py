@@ -33,7 +33,8 @@ def save_pandas(dfs, names, path):
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
-                    csv_string += column.add_prefix(column_name + '||').to_csv(float_format='%.4f')
+                    zero_filtered_column = column.replace(0, pd.np.nan).dropna(how='all').replace(pd.np.nan, 0)
+                    csv_string += zero_filtered_column.add_prefix(column_name + '||').to_csv(float_format='%.4f')
             else:
                 csv_string += df.to_csv(float_format='%.4f')
         file_name2 = f'{folder_name}{name}.csv'

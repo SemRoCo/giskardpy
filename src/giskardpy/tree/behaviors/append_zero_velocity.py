@@ -17,6 +17,6 @@ class SetZeroVelocity(GiskardBehavior):
             for derivative in Derivatives:
                 if derivative == Derivatives.position:
                     continue
-                self.world.state[free_variable].set_derivative(derivative, 0)
+                self.world.state[free_variable][derivative] = 0
         self.world.notify_state_change()
         return Status.SUCCESS

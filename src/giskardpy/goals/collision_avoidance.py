@@ -28,6 +28,8 @@ class ExternalCollisionAvoidance(Goal):
         super().__init__()
         self.root = self.world.root_link_name
         self.robot_name = robot_name
+        self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = max(1, self.control_horizon)
 
     # def get_contact_normal_on_b_in_root(self):
     #     return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
@@ -114,7 +116,7 @@ class ExternalCollisionAvoidance(Goal):
                                            qp_limits_for_lba),
                                    lower_limit_limited)
         # undo factor in A
-        upper_slack /= (sample_period * self.prediction_horizon)
+        upper_slack /= (sample_period * self.control_horizon)
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
@@ -166,6 +168,8 @@ class SelfCollisionAvoidance(Goal):
         super().__init__()
         self.root = self.world.root_link_name
         self.robot_name = robot_name
+        self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = max(1, self.control_horizon)
 
     def get_contact_normal_in_b(self):
         return self.god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',
@@ -232,7 +236,7 @@ class SelfCollisionAvoidance(Goal):
                                    lower_limit_limited)
 
         # undo factor in A
-        upper_slack /= (sample_period * self.prediction_horizon)
+        upper_slack /= (sample_period * self.control_horizon)
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,

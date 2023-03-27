@@ -10,11 +10,13 @@ from rospy import ROSException
 from rostopic import ROSTopicException
 
 import giskardpy.identifier as identifier
-from giskardpy.goals.base_traj_follower import BaseTrajFollower
+from giskardpy.exceptions import GiskardException
+from giskardpy.goals.base_traj_follower import BaseTrajFollower, BaseTrajFollowerPR2
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.model.joints import OmniDrive, DiffDrive
+from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
 from giskardpy.my_types import Derivatives
+from giskardpy.qp.next_command import NextCommands
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
@@ -48,13 +50,12 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
 
         if joint_name is None:
             for joint in self.world.joints.values():
-                if isinstance(joint, (OmniDrive, DiffDrive)):
+                if isinstance(joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
                     # FIXME can only handle one drive
                     # self.controlled_joints = [joint]
                     self.joint = joint
             if not hasattr(self, 'joint'):
-                #TODO
-                pass
+                raise GiskardException('didnt find drive joint.')
         else:
             joint_name = self.world.search_for_joint_name(joint_name)
             self.joint = self.world.joints[joint_name]
@@ -88,26 +89,41 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         self.god_map.set_data(identifier.drive_goals, drive_goals)
 
     def get_drive_goals(self) -> List[Goal]:
-        return [SetPredictionHorizon(prediction_horizon=self.god_map.get_data(identifier.prediction_horizon)+4),
-                BaseTrajFollower(joint_name=self.joint.name,
-                                 track_only_velocity=self.track_only_velocity)]
+        return [SetPredictionHorizon(prediction_horizon=self.god_map.get_data(identifier.prediction_horizon) + 4),
+                BaseTrajFollower(joint_name=self.joint.name, track_only_velocity=self.track_only_velocity)]
 
-    def solver_cmd_to_twist(self, cmd) -> Twist:
+    def solver_cmd_to_twist(self, cmd: NextCommands) -> Twist:
         twist = Twist()
-        try:
-            twist.linear.x = cmd[Derivatives.velocity][self.joint.x_vel.position_name]
-            if abs(twist.linear.x) < self.threshold[0]:
+        if isinstance(self.joint, OmniDrivePR22):
+            try:
+                forward_velocity = cmd.free_variable_data[self.joint.forward_vel.name][0]
+                yaw1_position = self.world.state[self.joint.yaw1_vel.name].position
+                yaw2_position = self.world.state[self.joint.yaw.name].position
+                bf_yaw1 = yaw1_position - yaw2_position
+                twist.linear.x = np.cos(bf_yaw1) * forward_velocity
+                twist.linear.y = np.sin(bf_yaw1) * forward_velocity
+                if abs(twist.linear.x) < self.threshold[0]:
+                    twist.linear.x = 0
+                if abs(twist.linear.y) < self.threshold[1]:
+                    twist.linear.y = 0
+            except Exception as e:
                 twist.linear.x = 0
-        except:
-            twist.linear.x = 0
-        try:
-            twist.linear.y = cmd[Derivatives.velocity][self.joint.y_vel.position_name]
-            if abs(twist.linear.y) < self.threshold[1]:
                 twist.linear.y = 0
-        except:
-            twist.linear.y = 0
+        else:
+            try:
+                twist.linear.x = cmd.free_variable_data[self.joint.x_vel.name][0]
+                if abs(twist.linear.x) < self.threshold[0]:
+                    twist.linear.x = 0
+            except:
+                twist.linear.x = 0
+            try:
+                twist.linear.y = cmd.free_variable_data[self.joint.y_vel.name][0]
+                if abs(twist.linear.y) < self.threshold[1]:
+                    twist.linear.y = 0
+            except:
+                twist.linear.y = 0
         try:
-            twist.angular.z = cmd[Derivatives.velocity][self.joint.yaw_vel.position_name]
+            twist.angular.z = cmd.free_variable_data[self.joint.yaw.name][0]
             if abs(twist.angular.z) < self.threshold[2]:
                 twist.angular.z = 0
         except:

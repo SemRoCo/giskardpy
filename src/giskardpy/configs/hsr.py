@@ -7,7 +7,7 @@ from giskardpy.configs.default_giskard import Giskard
 class HSR_Base(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
-        self.configure_PlotTrajectory(enabled=True)
+        # self.configure_PlotTrajectory(enabled=True, wait=True)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/hsrb.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                       hard_threshold=0.0)
@@ -31,8 +31,8 @@ class HSR_Base(Giskard):
             self.overwrite_external_collision_avoidance(joint_name,
                                                         soft_threshold=0.025,
                                                         hard_threshold=0.0)
-        self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
-                                                      'head_tilt_joint'])
+        # self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
+        #                                               'head_tilt_joint'])
 
 
 class HSR_Mujoco(HSR_Base):

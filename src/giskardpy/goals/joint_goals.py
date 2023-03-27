@@ -7,8 +7,8 @@ from geometry_msgs.msg import PoseStamped
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.default_giskard import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
-from giskardpy.model.joints import OmniDrive, DiffDrive
+from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal, WEIGHT_ABOVE_CA
+from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
 from giskardpy.my_types import PrefixName
 from giskardpy.utils.math import axis_angle_from_quaternion
 
@@ -50,7 +50,7 @@ class SetOdometry(NonMotionGoal):
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = self.world.groups[group_name].root_link.child_joint_names[0]
         brumbrum_joint = self.world.joints[brumbrum_joint_name]
-        if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive)):
+        if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
             raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
         base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
         self.world.state[brumbrum_joint.x.name].position = base_pose.position.x
@@ -61,7 +61,12 @@ class SetOdometry(NonMotionGoal):
                                                  base_pose.orientation.w)
         if axis[-1] < 0:
             angle = -angle
-        self.world.state[brumbrum_joint.yaw.name].position = angle
+        if isinstance(brumbrum_joint, OmniDrivePR22):
+            self.world.state[brumbrum_joint.yaw1_vel.name].position = 0
+            # self.world.state[brumbrum_joint.yaw2_name].position = angle
+            self.world.state[brumbrum_joint.yaw.name].position = angle
+        else:
+            self.world.state[brumbrum_joint.yaw.name].position = angle
         self.world.notify_state_change()
 
     def __str__(self) -> str:
@@ -561,57 +566,6 @@ class JointPosition(Goal):
 
     def make_constraints(self):
         pass
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.joint_name}'
-
-
-class JointPositionRange(Goal):
-    def __init__(self,
-                 joint_name: str,
-                 upper_limit: float,
-                 lower_limit: float,
-                 group_name: Optional[str] = None,
-                 hard: bool = False):
-        """
-        Sets artificial joint limits.
-        :param joint_name:
-        :param upper_limit:
-        :param lower_limit:
-        :param group_name: if joint_name is not unique, search in this group for matches.
-        :param hard: turn this into a hard constraint
-        """
-        super().__init__()
-        self.joint_name = self.world.search_for_joint_name(joint_name, group_name)
-        if self.world.is_joint_continuous(self.joint_name):
-            raise NotImplementedError(f'Can\'t limit range of continues joint \'{self.joint_name}\'.')
-        self.upper_limit = upper_limit
-        self.lower_limit = lower_limit
-        self.hard = hard
-        if self.hard:
-            current_position = self.world.state[self.joint_name].position
-            if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
-                raise ConstraintInitalizationException(f'{self.joint_name} out of set limits. '
-                                                       '{self.lower_limit} <= {current_position} <= {self.upper_limit} '
-                                                       'is not true.')
-
-    def make_constraints(self):
-        joint_position = self.get_joint_position_symbol(self.joint_name)
-        if self.hard:
-            self.add_inequality_constraint(reference_velocity=self.world.get_joint_velocity_limits(self.joint_name)[1],
-                                           lower_error=self.lower_limit - joint_position,
-                                           upper_error=self.upper_limit - joint_position,
-                                           weight=WEIGHT_BELOW_CA,
-                                           task_expression=joint_position,
-                                           lower_slack_limit=0,
-                                           upper_slack_limit=0)
-        else:
-            self.add_inequality_constraint(reference_velocity=self.world.get_joint_velocity_limits(self.joint_name)[1],
-                                           lower_error=self.lower_limit - joint_position,
-                                           upper_error=self.upper_limit - joint_position,
-                                           weight=WEIGHT_BELOW_CA,
-                                           task_expression=joint_position)
 
     def __str__(self):
         s = super().__str__()

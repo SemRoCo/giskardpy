@@ -70,6 +70,10 @@ class Derivatives(IntEnum):
     crackle = 5
     pop = 6
 
+    @classmethod
+    def range(cls, start: Derivatives, stop: Derivatives, step: int = 1):
+        return [item for item in cls if start <= item <= stop][::step]
+
 
 number = Union[int, float, np.number]
 my_string = Union[str, PrefixName]

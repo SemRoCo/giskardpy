@@ -27,7 +27,7 @@ class GoalReached(GiskardBehavior):
     def update(self):
         planning_time = self.get_god_map().get_data(identifier.time)
         if planning_time - self.above_threshold_time >= self.window_size:
-            velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution)[Derivatives.velocity].values()))
+            velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution).xdot_velocity))
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
                 run_time = self.get_runtime()
@@ -42,7 +42,7 @@ class GoalReached(GiskardBehavior):
         free_variables = self.god_map.get_data(identifier.free_variables)
         thresholds = []
         for free_variable in free_variables:  # type: FreeVariable
-            velocity_limit = self.god_map.evaluate_expr(free_variable.get_upper_limit(1))
+            velocity_limit = self.god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
             thresholds.append(velocity_limit)

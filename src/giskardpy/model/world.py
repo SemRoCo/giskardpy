@@ -28,6 +28,7 @@ from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
 from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.next_command import NextCommands
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
 from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo
@@ -456,18 +457,11 @@ class WorldTree(WorldTreeInterface):
         self.virtual_free_variables[name] = free_variable
         return free_variable
 
-    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
-        for free_variable_name, free_variable in self.free_variables.items():
-            try:
-                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
-            except KeyError as e:
-                # joint is currently not part of the optimization problem
-                continue
-            self.state[free_variable_name][Derivatives.position] += vel * dt
-            self.state[free_variable_name][Derivatives.velocity] = vel
-            for derivative, cmd in new_cmds.items():
-                cmd_ = cmd[free_variable.position_name]
-                self.state[free_variable_name][derivative] = cmd_
+    def update_state(self, next_commands: NextCommands, dt: float):
+        max_derivative = self.god_map.get_data(identifier.max_derivative)
+        for free_variable_name, command in next_commands.free_variable_data.items():
+            self.state[free_variable_name][Derivatives.position] += command[0] * dt
+            self.state[free_variable_name][Derivatives.velocity:max_derivative+1] = command
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)

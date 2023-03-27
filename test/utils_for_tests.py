@@ -43,7 +43,6 @@ from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
 import os
 
-
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
 
@@ -235,8 +234,12 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_moving = 0
         self._alive = True
 
-        # self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-        #                                                UpdateTransform)
+        try:
+            from iai_naive_kinematics_sim.srv import UpdateTransform
+            self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+                                                           UpdateTransform)
+        except Exception as e:
+            self.set_localization_srv = None
 
         self.giskard = config_file()
         if 'GITHUB_WORKFLOW' in os.environ:
@@ -290,15 +293,16 @@ class GiskardTestWrapper(GiskardWrapper):
                            seed_configuration=seed_configuration)
 
     def set_localization(self, map_T_odom: PoseStamped):
-        pass
-        # map_T_odom.pose.position.z = 0
-        # req = UpdateTransformRequest()
-        # req.transform.translation = map_T_odom.pose.position
-        # req.transform.rotation = map_T_odom.pose.orientation
-        # assert self.set_localization_srv(req).success
-        # self.wait_heartbeats(15)
-        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
-        # compare_poses(p2.pose, map_T_odom.pose)
+        if self.set_localization_srv is not None:
+            from iai_naive_kinematics_sim.srv import UpdateTransformRequest
+            map_T_odom.pose.position.z = 0
+            req = UpdateTransformRequest()
+            req.transform.translation = map_T_odom.pose.position
+            req.transform.rotation = map_T_odom.pose.orientation
+            assert self.set_localization_srv(req).success
+            self.wait_heartbeats(15)
+            p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+            compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         result_msg = deepcopy(msg)
@@ -545,6 +549,24 @@ class GiskardTestWrapper(GiskardWrapper):
                                max_velocity=angular_velocity,
                                check=check,
                                **kwargs)
+
+    def set_move_base_goal(self, goal_pose, check=True):
+        self.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
+                           goal_pose=goal_pose)
+        if check:
+            full_root_link = self.default_root
+            full_tip_link = self.world.get_link_name('base_footprint')
+            goal_point = PointStamped()
+            goal_point.header = goal_pose.header
+            goal_point.point = goal_pose.pose.position
+            self.add_goal_check(TranslationGoalChecker(giskard=self,
+                                                       tip_link=full_tip_link,
+                                                       root_link=full_root_link,
+                                                       expected=goal_point))
+            goal_orientation = QuaternionStamped()
+            goal_orientation.header = goal_pose.header
+            goal_orientation.quaternion = goal_pose.pose.orientation
+            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
     def set_diff_drive_base_goal(self, goal_pose, tip_link=None, root_link=None, weight=None, linear_velocity=None,
                                  angular_velocity=None, check=True, **kwargs):

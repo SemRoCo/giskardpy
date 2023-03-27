@@ -371,6 +371,9 @@ class Expression(Symbol_):
     def T(self):
         return Expression(self.s.T)
 
+    def reshape(self, new_shape):
+        return Expression(self.s.reshape(new_shape))
+
 
 class TransMatrix(Symbol_):
     @profile
@@ -649,15 +652,15 @@ class RotationMatrix(Symbol_):
             pass
         s = ca.SX.eye(4)
 
-        s[0,0] = ca.cos(yaw) * ca.cos(pitch)
-        s[0,1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
-        s[0,2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
-        s[1,0] = ca.sin(yaw) * ca.cos(pitch)
-        s[1,1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
-        s[1,2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
-        s[2,0] = -ca.sin(pitch)
-        s[2,1] = ca.cos(pitch) * ca.sin(roll)
-        s[2,2] = ca.cos(pitch) * ca.cos(roll)
+        s[0, 0] = ca.cos(yaw) * ca.cos(pitch)
+        s[0, 1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
+        s[0, 2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
+        s[1, 0] = ca.sin(yaw) * ca.cos(pitch)
+        s[1, 1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
+        s[1, 2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
+        s[2, 0] = -ca.sin(pitch)
+        s[2, 1] = ca.cos(pitch) * ca.sin(roll)
+        s[2, 2] = ca.cos(pitch) * ca.cos(roll)
         return cls(s, sanity_check=False)
 
     def inverse(self):
@@ -1236,23 +1239,32 @@ def diag(args):
 
 
 @profile
-def jacobian(expressions, symbols, order=1):
+def jacobian(expressions, symbols):
     expressions = Expression(expressions)
-    if order == 1:
-        return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
-    elif order == 2:
-        j = jacobian(expressions, symbols, order=1)
-        for i, symbol in enumerate(symbols):
-            j[:, i] = jacobian(j[:, i], [symbol])
-        return j
-    else:
-        raise NotImplementedError('jacobian only supports order 1 and 2')
+    return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
+
+
+def jacobian_dot(expressions, symbols, symbols_dot):
+    Jd = jacobian(expressions, symbols)
+    for i in range(Jd.shape[0]):
+        for j in range(Jd.shape[1]):
+            Jd[i, j] = total_derivative(Jd[i, j], symbols, symbols_dot)
+    return Jd
+
+
+def jacobian_ddot(expressions, symbols, symbols_dot, symbols_ddot):
+    symbols_ddot = Expression(symbols_ddot)
+    Jdd = jacobian(expressions, symbols)
+    for i in range(Jdd.shape[0]):
+        for j in range(Jdd.shape[1]):
+            Jdd[i, j] = total_derivative2(Jdd[i, j], symbols, symbols_dot, symbols_ddot)
+    return Jdd
 
 
 def equivalent(expression1, expression2):
     expression1 = Expression(expression1).s
     expression2 = Expression(expression2).s
-    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
+    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 5)
 
 
 def free_symbols(expression):
@@ -1818,29 +1830,46 @@ def to_str(expression):
     """
     Turns expression into a more or less readable string.
     """
-    s = str(expression)
-    parts = s.split(', ')
-    result = parts[-1]
-    for x in reversed(parts[:-1]):
-        equal_position = len(x.split('=')[0])
-        index = x[:equal_position]
-        sub = x[equal_position+1:]
-        if index not in result:
-            raise Exception('fuck')
-        result = result.replace(index, sub)
-    return result
+    result_list = np.zeros(expression.shape).tolist()
+    for x_index in range(expression.shape[0]):
+        for y_index in range(expression.shape[1]):
+            s = str(expression[x_index, y_index])
+            parts = s.split(', ')
+            result = parts[-1]
+            for x in reversed(parts[:-1]):
+                equal_position = len(x.split('=')[0])
+                index = x[:equal_position]
+                sub = x[equal_position + 1:]
+                if index not in result:
+                    raise Exception('fuck')
+                result = result.replace(index, sub)
+            result_list[x_index][y_index] = result
+    return result_list
 
 
 def total_derivative(expr,
                      symbols,
                      symbols_dot):
-    expr_jacobian = jacobian(expr, symbols)
-    last_velocities = Expression(symbols_dot)
-    velocity = dot(expr_jacobian, last_velocities)
-    if velocity.shape[0] * velocity.shape[0] == 1:
-        return velocity[0]
-    else:
-        return velocity
+    symbols = Expression(symbols)
+    symbols_dot = Expression(symbols_dot)
+    return Expression(ca.jtimes(expr.s, symbols.s, symbols_dot.s))
+
+
+def total_derivative2(expr, symbols, symbols_dot, symbols_ddot):
+    symbols = Expression(symbols)
+    symbols_dot = Expression(symbols_dot)
+    symbols_ddot = Expression(symbols_ddot)
+    v = []
+    for i in range(len(symbols)):
+        for j in range(len(symbols)):
+            if i == j:
+                v.append(symbols_ddot[i].s)
+            else:
+                v.append(symbols_dot[i].s * symbols_dot[j].s)
+    v = Expression(v)
+    H = Expression(ca.hessian(expr.s, symbols.s)[0])
+    H = H.reshape((1, len(H) ** 2))
+    return H.dot(v)
 
 
 def quaternion_multiply(q1, q2):

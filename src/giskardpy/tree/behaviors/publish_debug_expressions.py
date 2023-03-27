@@ -6,6 +6,8 @@ from py_trees import Status
 from sensor_msgs.msg import JointState
 
 from giskardpy import identifier
+from giskardpy.data_types import JointStates
+from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 

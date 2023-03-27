@@ -14,10 +14,9 @@ class SetPredictionHorizon(Goal):
         self.new_prediction_horizon = prediction_horizon
 
     def make_constraints(self):
-        self.prediction_horizon = self.new_prediction_horizon
-        if 5 > self.prediction_horizon > 1:
+        if 5 > self.new_prediction_horizon > 1:
             logging.logwarn('Prediction horizon should be 1 or greater equal 5.')
-        self.god_map.set_data(identifier.prediction_horizon, self.prediction_horizon)
+        self.god_map.set_data(identifier.prediction_horizon, self.new_prediction_horizon)
 
     def __str__(self) -> str:
         return str(self.__class__.__name__)

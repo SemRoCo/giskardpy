@@ -697,7 +697,7 @@ class OpenLoop(StandAlone):
         execution = failure_is_success(Sequence)('execution')
         execution.add_child(IF('execute?', identifier.execute))
         if self.add_real_time_tracking:
-            execution.add_child(CleanUpBaseController('CleanUpBaseController'))
+            execution.add_child(CleanUpBaseController('CleanUpBaseController', clear_markers=False))
             execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
             execution.add_child(InitQPController('InitQPController for base'))
         execution.add_child(SetTrackingStartTime('start start time'))
@@ -744,10 +744,17 @@ class OpenLoop(StandAlone):
                 real_time_tracking.add_child(RosTime('time'))
                 real_time_tracking.add_child(ControllerPluginBase('base controller'))
                 real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
+                if self.god_map.get_data(identifier.PlotDebugTF_enabled):
+                    real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
                 if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                                          **self.god_map.unsafe_get_data(
                                                                              identifier.PublishDebugExpressions)))
+                if self.god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
+                    real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher',
+                                                                         **self.god_map.unsafe_get_data(
+                                                                             identifier.PlotDebugTF)))
+
                 real_time_tracking.add_child(SendTrajectoryToCmdVel(**drive_interface))
                 execution_action_server.add_child(real_time_tracking)
         return execution_action_server

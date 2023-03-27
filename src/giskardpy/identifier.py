@@ -1,3 +1,4 @@
+hack = ['hack']
 world = ['world']
 robot_group_name = ['robot_name']
 fk_pose = world + ['compute_fk_pose']
@@ -51,12 +52,6 @@ test_mode = general_options + ['test_mode']
 control_mode = general_options + ['control_mode']
 
 joint_limits = general_options + ['joint_limits']
-
-joint_acceleration_linear_limit = general_options + ['joint_limits', 'acceleration']
-joint_acceleration_angular_limit = general_options + ['joint_limits', 'acceleration']
-
-joint_jerk_linear_limit = general_options + ['joint_limits', 'jerk']
-joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk']
 
 
 # qp solver

@@ -213,6 +213,18 @@ class Link:
         self.parent_joint_name = None
         self.child_joint_names = []
 
+    def _clear_memo(self, f):
+        try:
+            if hasattr(f, 'memo'):
+                f.memo.clear()
+            else:
+                del f
+        except:
+            pass
+
+    def reset_cache(self):
+        self._clear_memo(self.collision_visualization_markers)
+
     def name_with_collision_id(self, collision_id):
         if collision_id > len(self.collisions):
             raise AttributeError(f'Link {self.name} only has {len(self.collisions)} collisions, '

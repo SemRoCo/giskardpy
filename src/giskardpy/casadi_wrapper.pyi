@@ -168,6 +168,8 @@ class Expression(Symbol_):
 
     def dot(self, other: Expression) -> Expression: ...
 
+    def reshape(self, new_shape: Tuple[int, int]) -> Expression:
+
 
 class Point3(Symbol_):
     reference_frame: Optional[PrefixName]
@@ -514,7 +516,12 @@ def save_division(nominator: symbol_expr_float, denominator: symbol_expr_float,
 def diag(args: Union[List[symbol_expr_float], Expression]) -> Expression: ...
 
 def jacobian(expressions: Union[symbol_expr, List[symbol_expr]],
-             symbols: Iterable[Symbol], order: int = 1) -> Expression: ...
+             symbols: Iterable[Symbol]) -> Expression: ...
+
+def jacobian_dot(expressions: Expression, symbols: List[symbol_expr], symbols_dot: List[symbol_expr]) -> Expression: ...
+
+def jacobian_ddot(expressions: Expression, symbols: List[symbol_expr], symbols_dot: List[symbol_expr],
+                  symbols_ddot: List[symbol_expr]) -> Expression: ...
 
 def equivalent(expression1: symbol_expr, expression2: symbol_expr) -> bool: ...
 
@@ -786,12 +793,17 @@ def velocity_limit_from_position_limit(acceleration_limit: Union[Symbol, float],
                                        step_size: Union[Symbol, float],
                                        eps: float = 1e-5) -> Expression: ...
 
-def to_str(expression: all_expressions) -> str: ...
+def to_str(expression: all_expressions) -> List[List[str]]: ...
 
 def total_derivative(expr: Union[Symbol, Expression],
                      symbols: Iterable[Symbol],
                      symbols_dot: Iterable[Symbol]) \
         -> Expression: ...
+
+def total_derivative2(expr: Union[Symbol, Expression],
+                      symbols: Iterable[Symbol],
+                      symbols_dot: Iterable[Symbol],
+                      symbols_ddot: Iterable[Symbol]) -> Expression:
 
 def quaternion_multiply(q1: Quaternion, q2: Quaternion) -> Quaternion: ...
 

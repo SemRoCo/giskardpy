@@ -10,9 +10,10 @@ class PR2_Base(Giskard):
         super().__init__(root_link_name=root_link_name)
         # self.set_collision_checker(CollisionCheckerLib.none)
         # self.set_qp_solver(SupportedQPSolver.qp_oases)
-        # self.configure_PlotTrajectory(enabled=True)
-        # self.configure_PlotDebugExpressions(enabled=True)
+        # self.configure_PlotTrajectory(enabled=True, wait=True)
+        # self.configure_PlotDebugExpressions(enabled=True, wait=True)
         # self.configure_DebugMarkerPublisher(enabled=True)
+        # self.configure_PublishDebugExpressions(enabled=True, enabled_base=True)
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
@@ -49,8 +50,7 @@ class PR2_Base(Giskard):
                                                           'l_gripper_l_finger_joint'])
         self.set_maximum_derivative(Derivatives.acceleration)
         self.set_default_joint_limits(velocity_limit=1,
-                                      acceleration_limit=1.5,
-                                      jerk_limit=None)
+                                      acceleration_limit=1.5)
         self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
                                              velocity_limit=2)
         self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
@@ -60,8 +60,7 @@ class PR2_Base(Giskard):
         self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
                                                  acceleration_limit=4)
         self.set_default_weights(velocity_weight=0.001,
-                                 acceleration_weight=0.001,
-                                 jerk_weight=None)
+                                 acceleration_weight=0.001)
 
 
 class PR2_Mujoco(PR2_Base):
@@ -91,7 +90,7 @@ class PR2_Mujoco(PR2_Base):
         self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/r_gripper_l_finger_controller/state')
         self.add_base_cmd_velocity(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
-                                   track_only_velocity=False)
+                                   track_only_velocity=True)
         self.overwrite_external_collision_avoidance('brumbrum',
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,

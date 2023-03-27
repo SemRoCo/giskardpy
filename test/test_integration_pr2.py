@@ -596,7 +596,7 @@ class TestConstraints:
 
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
         joint = zero_pose.world.search_for_joint_name('r_shoulder_lift_joint')
-        joint_goal = 0.95
+        joint_goal = 1
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('JointVelocityRevolute',
                                 joint_name=joint,

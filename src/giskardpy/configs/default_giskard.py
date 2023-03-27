@@ -679,9 +679,9 @@ class Giskard:
         self._general_config.joint_limits[Derivatives.jerk][joint_name] = jerk_limit
 
     def set_default_weights(self,
-                            velocity_weight: float = 0.001,
+                            velocity_weight: float = 0.01,
                             acceleration_weight: float = 0,
-                            jerk_weight: float = 0.001,
+                            jerk_weight: float = 0.01,
                             snap_weight: float = 0):
         """
         The default values are set automatically, even if this function is not called.

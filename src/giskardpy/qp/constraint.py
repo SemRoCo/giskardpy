@@ -29,7 +29,10 @@ class IntegralConstraint:
         self.name = name
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon if control_horizon is not None else max(self.prediction_horizon - 2, 1)
+        if control_horizon is None:
+            self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        else:
+            self.control_horizon = control_horizon
         self.velocity_limit = velocity_limit
         self.lower_error = lower_error
         self.upper_error = upper_error

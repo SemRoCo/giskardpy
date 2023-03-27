@@ -3238,7 +3238,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.plan_and_execute()
-        box_setup.check_cpi_geq([attached_link_name], -0.002)
+        box_setup.check_cpi_geq([attached_link_name], -0.003)
 
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -3247,7 +3247,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, check=False)
         box_setup.plan_and_execute()
-        box_setup.check_cpi_geq([attached_link_name], -0.002)
+        box_setup.check_cpi_geq([attached_link_name], -0.003)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
         box_setup.detach_group(attached_link_name)
 

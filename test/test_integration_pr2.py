@@ -490,37 +490,6 @@ class TestConstraints:
         zero_pose.plan_and_execute()
         assert zero_pose.god_map.get_data(identifier.prediction_horizon) == default_prediction_horizon
 
-    def test_JointPositionRange(self, zero_pose: PR2TestWrapper):
-        # FIXME needs to be implemented like other position limits, or override limits
-        joint_name = zero_pose.world.search_for_joint_name('head_pan_joint')
-        lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint_name)
-        lower_limit *= 0.5
-        upper_limit *= 0.5
-        zero_pose.set_joint_goal({
-            joint_name: 2
-        }, check=False)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-        zero_pose.set_json_goal('JointPositionRange',
-                                joint_name=joint_name,
-                                upper_limit=upper_limit,
-                                lower_limit=lower_limit)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-        assert zero_pose.world.state[joint_name].position <= upper_limit + 3e-3
-        assert zero_pose.world.state[joint_name].position >= lower_limit - 3e-3
-
-        zero_pose.set_json_goal('JointPositionRange',
-                                joint_name=joint_name,
-                                upper_limit=upper_limit,
-                                lower_limit=lower_limit)
-        zero_pose.set_joint_goal({
-            joint_name: -0.5
-        }, check=False)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-        assert zero_pose.world.state[joint_name].position <= upper_limit
-        assert zero_pose.world.state[joint_name].position >= lower_limit
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         tip = 'base_footprint'

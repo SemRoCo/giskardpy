@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.configs.default_giskard import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
+from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal, WEIGHT_ABOVE_CA
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
 from giskardpy.my_types import PrefixName
 from giskardpy.utils.math import axis_angle_from_quaternion
@@ -575,57 +575,6 @@ class JointPosition(Goal):
 
     def make_constraints(self):
         pass
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.joint_name}'
-
-
-class JointPositionRange(Goal):
-    def __init__(self,
-                 joint_name: str,
-                 upper_limit: float,
-                 lower_limit: float,
-                 group_name: Optional[str] = None,
-                 hard: bool = False):
-        """
-        Sets artificial joint limits.
-        :param joint_name:
-        :param upper_limit:
-        :param lower_limit:
-        :param group_name: if joint_name is not unique, search in this group for matches.
-        :param hard: turn this into a hard constraint
-        """
-        super().__init__()
-        self.joint_name = self.world.search_for_joint_name(joint_name, group_name)
-        if self.world.is_joint_continuous(self.joint_name):
-            raise NotImplementedError(f'Can\'t limit range of continues joint \'{self.joint_name}\'.')
-        self.upper_limit = upper_limit
-        self.lower_limit = lower_limit
-        self.hard = hard
-        if self.hard:
-            current_position = self.world.state[self.joint_name].position
-            if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
-                raise ConstraintInitalizationException(f'{self.joint_name} out of set limits. '
-                                                       '{self.lower_limit} <= {current_position} <= {self.upper_limit} '
-                                                       'is not true.')
-
-    def make_constraints(self):
-        joint_position = self.get_joint_position_symbol(self.joint_name)
-        if self.hard:
-            self.add_constraint(reference_velocity=self.world.get_joint_velocity_limits(self.joint_name)[1],
-                                lower_error=self.lower_limit - joint_position,
-                                upper_error=self.upper_limit - joint_position,
-                                weight=WEIGHT_BELOW_CA,
-                                task_expression=joint_position,
-                                lower_slack_limit=0,
-                                upper_slack_limit=0)
-        else:
-            self.add_constraint(reference_velocity=self.world.get_joint_velocity_limits(self.joint_name)[1],
-                                lower_error=self.lower_limit - joint_position,
-                                upper_error=self.upper_limit - joint_position,
-                                weight=WEIGHT_BELOW_CA,
-                                task_expression=joint_position)
 
     def __str__(self):
         s = super().__str__()

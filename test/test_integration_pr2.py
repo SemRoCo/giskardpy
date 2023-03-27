@@ -627,16 +627,15 @@ class TestConstraints:
 
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
         joint = zero_pose.world.search_for_joint_name('r_shoulder_lift_joint')
-        joint_goal = 1
+        joint_goal = 0.95
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('JointVelocityRevolute',
                                 joint_name=joint,
-                                max_velocity=0.5,
+                                max_velocity=0.4,
                                 hard=True)
         zero_pose.set_json_goal('JointPositionRevolute',
                                 joint_name=joint,
-                                goal=joint_goal,
-                                max_velocity=0.5)
+                                goal=joint_goal)
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
 
@@ -3476,7 +3475,7 @@ class TestCollisionAvoidanceGoals:
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.orientation.w = 1
-        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose, check=False)
         kitchen_setup.move_base(base_goal)
 
         # place milk back

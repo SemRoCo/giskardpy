@@ -33,6 +33,7 @@ class IntegralConstraint:
             self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
         else:
             self.control_horizon = control_horizon
+        self.control_horizon = max(1, self.control_horizon)
         self.velocity_limit = velocity_limit
         self.lower_error = lower_error
         self.upper_error = upper_error

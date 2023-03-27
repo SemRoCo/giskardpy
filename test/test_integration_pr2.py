@@ -590,7 +590,7 @@ class TestConstraints:
         zero_pose.set_json_goal('JointPositionRevolute',
                                 joint_name=joint,
                                 goal=joint_goal,
-                                max_velocity=0.3)
+                                max_velocity=0.23)
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
 

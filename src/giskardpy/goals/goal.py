@@ -15,7 +15,7 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
-from giskardpy.qp.constraint import VelocityConstraint, InequalityConstraint, EqualityConstraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
@@ -206,25 +206,25 @@ class Goal(ABC):
         return self.get_expr_velocity(fk)
 
     @profile
-    def get_constraints(self) -> Tuple[Dict[str, InequalityConstraint],
-                                       Dict[str, EqualityConstraint],
-                                       Dict[str, VelocityConstraint],
+    def get_constraints(self) -> Tuple[Dict[str, EqualityConstraint],
+                                       Dict[str, InequalityConstraint],
+                                       Dict[str, DerivativeInequalityConstraint],
                                        Dict[str, Union[w.Symbol, float]]]:
-        self._inequality_constraints = OrderedDict()
         self._equality_constraints = OrderedDict()
+        self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
         self.make_constraints()
         for sub_goal in self._sub_goals:
             sub_goal._save_self_on_god_map()
-            inequality_constraints, equality_constraints, velocity_constraints, debug_expressions = \
+            equality_constraints, inequality_constraints, derivative_constraints, debug_expressions = \
                 sub_goal.get_constraints()
             # TODO check for duplicates
+            self._equality_constraints.update(_prepend_prefix(self.__class__.__name__, equality_constraints))
             self._inequality_constraints.update(_prepend_prefix(self.__class__.__name__, inequality_constraints))
-            self._equality_constraints.update(_prepend_prefix(self.__class__.__name__, inequality_constraints))
-            self._derivative_constraints.update(_prepend_prefix(self.__class__.__name__, velocity_constraints))
+            self._derivative_constraints.update(_prepend_prefix(self.__class__.__name__, derivative_constraints))
             self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))
-        return self._inequality_constraints, self._equality_constraints, self._derivative_constraints, \
+        return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
                self._debug_expressions
 
     def add_constraints_of_goal(self, goal: Goal):
@@ -260,17 +260,17 @@ class Goal(ABC):
         name = str(self) + name_suffix
         if name in self._derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self._derivative_constraints[name] = DerivativeConstraint(name=name,
-                                                                  derivative=Derivatives.velocity,
-                                                                  expression=task_expression,
-                                                                  lower_limit=lower_velocity_limit,
-                                                                  upper_limit=upper_velocity_limit,
-                                                                  quadratic_weight=weight,
-                                                                  normalization_factor=velocity_limit,
-                                                                  lower_slack_limit=lower_slack_limit,
-                                                                  upper_slack_limit=upper_slack_limit,
-                                                                  control_horizon=control_horizon,
-                                                                  horizon_function=horizon_function)
+        self._derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+                                                                            derivative=Derivatives.velocity,
+                                                                            expression=task_expression,
+                                                                            lower_limit=lower_velocity_limit,
+                                                                            upper_limit=upper_velocity_limit,
+                                                                            quadratic_weight=weight,
+                                                                            normalization_factor=velocity_limit,
+                                                                            lower_slack_limit=lower_slack_limit,
+                                                                            upper_slack_limit=upper_slack_limit,
+                                                                            control_horizon=control_horizon,
+                                                                            horizon_function=horizon_function)
 
     def add_acceleration_constraint(self,
                                     lower_acceleration_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
@@ -301,17 +301,16 @@ class Goal(ABC):
         name = str(self) + name_suffix
         if name in self._derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self._derivative_constraints[name] = DerivativeConstraint(name=name,
-                                                                  derivative=Derivatives.acceleration,
-                                                                  expression=task_expression,
-                                                                  lower_limit=lower_acceleration_limit,
-                                                                  upper_limit=upper_acceleration_limit,
-                                                                  quadratic_weight=weight,
-                                                                  normalization_factor=acceleration_limit,
-                                                                  lower_slack_limit=lower_slack_limit,
-                                                                  upper_slack_limit=upper_slack_limit,
-                                                                  control_horizon=self.control_horizon,
-                                                                  horizon_function=horizon_function)
+        self._derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+                                                                            derivative=Derivatives.acceleration,
+                                                                            expression=task_expression,
+                                                                            lower_limit=lower_acceleration_limit,
+                                                                            upper_limit=upper_acceleration_limit,
+                                                                            quadratic_weight=weight,
+                                                                            normalization_factor=acceleration_limit,
+                                                                            lower_slack_limit=lower_slack_limit,
+                                                                            upper_slack_limit=upper_slack_limit,
+                                                                            horizon_function=horizon_function)
 
     def add_jerk_constraint(self,
                             lower_jerk_limit: Union[w.symbol_expr_float, List[w.symbol_expr_float]],
@@ -327,17 +326,16 @@ class Goal(ABC):
         name = str(self) + name_suffix
         if name in self._derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self._derivative_constraints[name] = DerivativeConstraint(name=name,
-                                                                  derivative=Derivatives.jerk,
-                                                                  expression=task_expression,
-                                                                  lower_limit=lower_jerk_limit,
-                                                                  upper_limit=upper_jerk_limit,
-                                                                  quadratic_weight=weight,
-                                                                  normalization_factor=acceleration_limit,
-                                                                  lower_slack_limit=lower_slack_limit,
-                                                                  upper_slack_limit=upper_slack_limit,
-                                                                  control_horizon=self.control_horizon,
-                                                                  horizon_function=horizon_function)
+        self._derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+                                                                            derivative=Derivatives.jerk,
+                                                                            expression=task_expression,
+                                                                            lower_limit=lower_jerk_limit,
+                                                                            upper_limit=upper_jerk_limit,
+                                                                            quadratic_weight=weight,
+                                                                            normalization_factor=acceleration_limit,
+                                                                            lower_slack_limit=lower_slack_limit,
+                                                                            upper_slack_limit=upper_slack_limit,
+                                                                            horizon_function=horizon_function)
 
     def add_inequality_constraint(self,
                                   reference_velocity: w.symbol_expr_float,
@@ -348,7 +346,7 @@ class Goal(ABC):
                                   name: Optional[str] = None,
                                   lower_slack_limit: Optional[w.symbol_expr_float] = None,
                                   upper_slack_limit: Optional[w.symbol_expr_float] = None,
-                       control_horizon: Optional[int] = None):
+                                  control_horizon: Optional[int] = None):
         """
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final
@@ -380,7 +378,7 @@ class Goal(ABC):
                                                                   quadratic_weight=weight,
                                                                   lower_slack_limit=lower_slack_limit,
                                                                   upper_slack_limit=upper_slack_limit,
-                                                                  control_horizon=self.control_horizon)
+                                                                  control_horizon=control_horizon)
 
     def add_equality_constraint(self,
                                 reference_velocity: w.symbol_expr_float,
@@ -389,7 +387,8 @@ class Goal(ABC):
                                 task_expression: w.symbol_expr,
                                 name: Optional[str] = None,
                                 lower_slack_limit: Optional[w.symbol_expr_float] = None,
-                                upper_slack_limit: Optional[w.symbol_expr_float] = None):
+                                upper_slack_limit: Optional[w.symbol_expr_float] = None,
+                                control_horizon: Optional[int] = None):
         """
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final
@@ -419,7 +418,7 @@ class Goal(ABC):
                                                               quadratic_weight=weight,
                                                               lower_slack_limit=lower_slack_limit,
                                                               upper_slack_limit=upper_slack_limit,
-                                                              control_horizon=self.control_horizon)
+                                                              control_horizon=control_horizon)
 
     def add_inequality_constraint_vector(self,
                                          reference_velocities: Union[

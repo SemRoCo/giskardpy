@@ -8,7 +8,7 @@ from sensor_msgs.msg import JointState
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.model.trajectory import Trajectory
-from giskardpy.qp.qp_controller import QPController
+from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 
@@ -33,7 +33,7 @@ class PublishDebugExpressions(GiskardBehavior):
         return super().setup(timeout)
 
     @profile
-    def create_msg(self, qp_controller: QPController):
+    def create_msg(self, qp_controller: QPProblemBuilder):
         msg = JointState()
         msg.header.stamp = rospy.get_rostime()
 
@@ -42,7 +42,7 @@ class PublishDebugExpressions(GiskardBehavior):
         bA_names = qp_controller.bA_names()
         filtered_b_names = np.array(b_names)[qp_controller.b_filter]
         filtered_bA_names = np.array(bA_names)[qp_controller.bA_filter]
-        num_vel_constr = len(qp_controller.velocity_constraints) * (qp_controller.prediction_horizon - 2)
+        num_vel_constr = len(qp_controller.derivative_constraints) * (qp_controller.prediction_horizon - 2)
         num_task_constr = len(qp_controller.constraints)
         num_constr = num_vel_constr + num_task_constr
 
@@ -104,7 +104,7 @@ class PublishDebugExpressions(GiskardBehavior):
 
     @profile
     def update(self):
-        qp_controller: QPController = self.god_map.get_data(identifier.qp_controller)
+        qp_controller: QPProblemBuilder = self.god_map.get_data(identifier.qp_controller)
         msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
         return Status.RUNNING

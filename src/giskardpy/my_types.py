@@ -72,6 +72,9 @@ class Derivatives(IntEnum):
 
     @classmethod
     def range(cls, start: Derivatives, stop: Derivatives, step: int = 1):
+        """
+        Includes stop!
+        """
         return [item for item in cls if start <= item <= stop][::step]
 
 

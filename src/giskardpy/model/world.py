@@ -1112,7 +1112,7 @@ class WorldTree(WorldTreeInterface):
             fks = w.vstack(fks)
             self.fast_all_fks = fks.compile(w.free_symbols(fks))
 
-        fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+        fks_evaluated = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
         result = {}
         for link in self.link_names_with_collisions:
             result[link] = fks_evaluated[self.fk_idx[link], :]
@@ -1184,8 +1184,8 @@ class WorldTree(WorldTreeInterface):
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-                self.collision_fk_matrix = self.fast_collision_fks.call2(
+                self.fks = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+                self.collision_fk_matrix = self.fast_collision_fks.fast_call(
                     self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
 
             @memoize

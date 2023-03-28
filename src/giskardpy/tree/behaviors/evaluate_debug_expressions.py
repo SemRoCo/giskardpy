@@ -1,13 +1,13 @@
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.qp.qp_controller import QPController
+from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 class EvaluateDebugExpressions(GiskardBehavior):
-    controller: QPController = None
+    controller: QPProblemBuilder = None
 
     @catch_and_raise_to_blackboard
     @profile

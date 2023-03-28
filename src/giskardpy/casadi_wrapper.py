@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from copy import copy
-from typing import Union
-
+from typing import Union, List
+import math
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
@@ -26,17 +26,16 @@ class CompiledFunction:
         if len(str_params) == 0:
             self.f_eval()
             self.__call__ = lambda **kwargs: self.out
-            self.call2 = lambda filtered_args: self.out
+            self.fast_call = lambda filtered_args: self.out
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
-        return self.call2(filtered_args)
+        return self.fast_call(filtered_args)
 
-    def call2(self, filtered_args):
+    def fast_call(self, filtered_args: List[float]) -> np.ndarray:
         """
         :param filtered_args: parameter values in the same order as in self.str_params
         """
-
         filtered_args = np.array(filtered_args, dtype=float)
         self.buf.set_arg(0, memoryview(filtered_args))  # type: ignore
         self.f_eval()
@@ -1306,7 +1305,7 @@ def compile_and_execute(f, params):
     assert isinstance(expr, Symbol_)
     fast_f = expr.compile(symbol_params2)
     input_ = np.concatenate(input_).T[0]
-    result = fast_f.call2(input_)
+    result = fast_f.fast_call(input_)
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
     elif result.shape[1] == 1:
@@ -1579,6 +1578,19 @@ def vstack(list_of_matrices):
 
 def hstack(list_of_matrices):
     return Expression(ca.horzcat(*[x.s for x in list_of_matrices]))
+
+
+def diag_stack(list_of_matrices):
+    num_rows = int(math.fsum(e.shape[0] for e in list_of_matrices))
+    num_columns = int(math.fsum(e.shape[1] for e in list_of_matrices))
+    combined_matrix = zeros(num_rows, num_columns)
+    row_counter = 0
+    column_counter = 0
+    for matrix in list_of_matrices:
+        combined_matrix[row_counter:row_counter+matrix.shape[0], column_counter:column_counter+matrix.shape[1]] = matrix
+        row_counter += matrix.shape[0]
+        column_counter += matrix.shape[1]
+    return combined_matrix
 
 
 def normalize_axis_angle(axis, angle):

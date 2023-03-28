@@ -560,7 +560,7 @@ class TestCASWrapper(unittest.TestCase):
         e = w.Expression(expected)
         f = e.compile()
         np.testing.assert_array_almost_equal(f(), expected)
-        np.testing.assert_array_almost_equal(f.call2([]), expected)
+        np.testing.assert_array_almost_equal(f.fast_call([]), expected)
 
     def test_add(self):
         s2 = 'muh'
@@ -1262,6 +1262,25 @@ class TestCASWrapper(unittest.TestCase):
         r1 = e.evaluate()
         r2 = np.hstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_diag_stack(self):
+        m1_np = np.eye(4)
+        m2_np = np.ones((2, 5))
+        m3_np = np.ones((5, 3))
+        m1_e = w.Expression(m1_np)
+        m2_e = w.Expression(m2_np)
+        m3_e = w.Expression(m3_np)
+        e = w.diag_stack([m1_e, m2_e, m3_e])
+        r1 = e.evaluate()
+        combined_matrix = np.zeros((4+2+5, 4+5+3))
+        row_counter = 0
+        column_counter = 0
+        for matrix in [m1_np, m2_np, m3_np]:
+            combined_matrix[row_counter:row_counter + matrix.shape[0],
+            column_counter:column_counter + matrix.shape[1]] = matrix
+            row_counter += matrix.shape[0]
+            column_counter += matrix.shape[1]
+        np.testing.assert_array_almost_equal(r1, combined_matrix)
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):

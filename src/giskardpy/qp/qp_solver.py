@@ -105,6 +105,7 @@ class QPSolver(ABC):
 
 class QPSWIFTFormatter(QPSolver):
 
+    @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, b: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression, ):
@@ -167,6 +168,7 @@ class QPSWIFTFormatter(QPSolver):
 
         self.qp_setup_function = combined_problem_data.compile()
 
+    @profile
     def split_results(self, combined_problem_data: np.ndarray) -> Iterable[np.ndarray]:
         self.combined_problem_data = combined_problem_data
         self.weights = combined_problem_data[self.weights_slice]
@@ -184,6 +186,7 @@ class QPSWIFTFormatter(QPSolver):
         nlb_ub_nlbA_ubA = np.concatenate([self.nlb, self.ub, self.nlb_ub])
         return self.H, self.g, self.E, self.b, A, nlb_ub_nlbA_ubA
 
+    @profile
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
                                         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """

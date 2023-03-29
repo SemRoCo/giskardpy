@@ -310,7 +310,7 @@ class FreeVariableBounds(ProblemDataPart):
         self.names_slack = self.names[num_free_variables:]
 
         derivative_slack_start = 0
-        derivative_slack_stop = derivative_slack_start+num_derivative_slack
+        derivative_slack_stop = derivative_slack_start + num_derivative_slack
         self.names_derivative_slack = self.names_slack[derivative_slack_start:derivative_slack_stop]
 
         eq_slack_start = derivative_slack_stop
@@ -531,8 +531,8 @@ class InequalityBounds(ProblemDataPart):
 
         self.names_position_limits = self.names[:num_position_limits]
         self.names_non_position_limits = self.names[num_position_limits:]
-        self.names_derivative_links = self.names[num_position_limits:num_position_limits+num_derivative_constraints]
-        self.names_neq_constraints = self.names[num_position_limits+num_derivative_constraints+num_neq_constraints:]
+        self.names_derivative_links = self.names[num_position_limits:num_position_limits + num_derivative_constraints]
+        self.names_neq_constraints = self.names[num_position_limits + num_derivative_constraints + num_neq_constraints:]
 
         # TODO replace hack?
         # for i in range(len(lbA)):
@@ -613,7 +613,7 @@ class EqualityModel(ProblemDataPart):
         x_c = -cas.eye(x_c_height)
         offset_v = 0
         offset_h = 0
-        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative-1):
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
             offset_v += self.number_of_free_variables
             derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
             offset_v += x_c_height
@@ -652,18 +652,21 @@ class EqualityModel(ProblemDataPart):
         derivative_link_model = self.derivative_link_model()
         equality_constraint_model, equality_constraint_slack_model = self.equality_constraint_model()
 
-        model = cas.zeros(derivative_link_model.shape[0] + equality_constraint_model.shape[0],
-                          equality_constraint_model.shape[1])
+        model_parts = []
+        slack_model_parts = []
+        if len(derivative_link_model) > 0:
+            model_parts.append(derivative_link_model)
+        if len(equality_constraint_model) > 0:
+            model_parts.append(equality_constraint_model)
+            slack_model_parts.append(equality_constraint_slack_model)
+        model = cas.vstack(model_parts)
+        slack_model = cas.vstack(slack_model_parts)
 
-        model[:derivative_link_model.shape[0], :derivative_link_model.shape[1]] = derivative_link_model
-        model[derivative_link_model.shape[0]:, :] = equality_constraint_model
-        combined_model = cas.vstack([derivative_link_model,
-                                     equality_constraint_model])
+        slack_model = cas.vstack([cas.zeros(derivative_link_model.shape[0],
+                                            slack_model.shape[1]),
+                                  slack_model])
         # todo replace hack?
-        combined_slack_model = cas.vstack([cas.zeros(derivative_link_model.shape[0],
-                                                     equality_constraint_slack_model.shape[1]),
-                                           equality_constraint_slack_model])
-        return combined_model, combined_slack_model
+        return model, slack_model
 
 
 class InequalityModel(ProblemDataPart):
@@ -1420,9 +1423,12 @@ class QPProblemBuilder:
         # remove sample period factor
         # self.p_lbA[-num_constr:] /= sample_period
         # self.p_ubA[-num_constr:] /= sample_period
-        self.p_E = pd.DataFrame(E, self.equality_bounds.names, self.free_variable_bounds.names_without_slack, dtype=float)
-        self.p_E_slack = pd.DataFrame(E_slack, self.equality_bounds.names, self.free_variable_bounds.names_eq_slack, dtype=float)
-        self.p_A = pd.DataFrame(A, self.inequality_bounds.names, self.free_variable_bounds.names_without_slack, dtype=float)
+        self.p_E = pd.DataFrame(E, self.equality_bounds.names, self.free_variable_bounds.names_without_slack,
+                                dtype=float)
+        self.p_E_slack = pd.DataFrame(E_slack, self.equality_bounds.names, self.free_variable_bounds.names_eq_slack,
+                                      dtype=float)
+        self.p_A = pd.DataFrame(A, self.inequality_bounds.names, self.free_variable_bounds.names_without_slack,
+                                dtype=float)
         self.p_A_slack = pd.DataFrame(A_slack,
                                       self.inequality_bounds.names,
                                       self.free_variable_bounds.names_derivative_slack + self.free_variable_bounds.names_neq_slack,

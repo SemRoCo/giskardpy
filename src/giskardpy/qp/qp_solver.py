@@ -1,6 +1,6 @@
 import abc
 from abc import ABC
-from typing import Tuple, List, Iterable
+from typing import Tuple, List, Iterable, Optional
 
 import numpy as np
 

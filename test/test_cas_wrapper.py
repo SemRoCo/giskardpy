@@ -78,8 +78,9 @@ class TestExpression(unittest.TestCase):
         m = w.Expression([[1, 1], [2, 2]])
         np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1], [2, 2]])
         m = w.Expression([])
-        with self.assertRaises(RuntimeError):
-            print(m.evaluate())
+        assert m.shape[0] == m.shape[1] == 0
+        m = w.Expression()
+        assert m.shape[0] == m.shape[1] == 0
 
     @given(float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_add(self, f1, f2):

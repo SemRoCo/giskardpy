@@ -248,7 +248,7 @@ class Expression(Symbol_):
         else:
             x = len(data)
             if x == 0:
-                self.s = ca.SX([])
+                self.s = ca.SX()
                 return
             if isinstance(data[0], list) or isinstance(data[0], tuple) or isinstance(data[0], np.ndarray):
                 y = len(data[0])

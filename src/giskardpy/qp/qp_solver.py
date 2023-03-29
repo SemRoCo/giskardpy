@@ -96,15 +96,18 @@ class QPSolver(ABC):
         raise InfeasibleException('')
 
     @abc.abstractmethod
-    def get_problem_data(self):
-        pass
+    def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        :return: weights, g, lb, ub, E, E_slack, b, A, A_slack, lbA, ubA
+        """
 
 
 class QPSWIFTFormatter(QPSolver):
 
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, b: cas.Expression,
-                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,):
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression, ):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  Ex = b
@@ -125,54 +128,78 @@ class QPSWIFTFormatter(QPSolver):
         self.num_neq_constraints = lbA.shape[0]
         self.num_free_variable_constraints = lb.shape[0]
 
-        empty_E_slack = cas.zeros(self.num_neq_constraints, E_slack.shape[1])
-        empty_A_slack = cas.zeros(self.num_eq_constraints, A_slack.shape[1])
-        A = cas.hstack([A, empty_E_slack, A_slack])
-        E = cas.hstack([E, E_slack, empty_A_slack])
-
         combined_problem_data = cas.zeros(4 + b.shape[0] + lbA.shape[0] * 2, weights.shape[0] + 1)
-        combined_problem_data[0, :-1] = weights
-        combined_problem_data[1, :-1] = g
-        combined_problem_data[2, :-1] = -lb
-        combined_problem_data[3, :-1] = ub
+        self.weights_slice = (0, slice(None, -1))
+        self.g_slice = (1, slice(None, -1))
+        self.nlb_slice = (2, slice(None, -1))
+        self.ub_slice = (3, slice(None, -1))
         offset = 4
-        combined_problem_data[offset:offset + self.num_eq_constraints, :-1] = E
-        combined_problem_data[offset:offset + self.num_eq_constraints, -1] = b
+        self.E_slice = (slice(offset, offset + self.num_eq_constraints), slice(None, E.shape[1]))
+        self.E_slack_slice = (self.E_slice[0], slice(E.shape[1], E.shape[1] + E_slack.shape[1]))
+        self.E_E_slack_slice = (self.E_slice[0], slice(None, -1))
+        self.b_slice = (self.E_slice[0], -1)
         offset += self.num_eq_constraints
-        combined_problem_data[offset:offset + self.num_neq_constraints, :-1] = -A
-        combined_problem_data[offset:offset + self.num_neq_constraints, -1] = -lbA
+
+        self.nA_slice = (slice(offset, offset + self.num_neq_constraints), slice(None, A.shape[1]))
+        self.nA_slack_slice = (self.nA_slice[0], slice(A.shape[1] + E_slack.shape[1], -1))
+        self.nlbA_slice = (self.nA_slice[0], -1)
         offset += self.num_neq_constraints
-        combined_problem_data[offset:, :-1] = A
-        combined_problem_data[offset:, -1] = ubA
+
+        self.A_slice = (slice(offset, None), self.nA_slice[1])
+        self.A_slack_slice = (self.A_slice[0], self.nA_slack_slice[1])
+        self.ubA_slice = (self.A_slice[0], -1)
+
+        self.nA_nA_slack_A_A_slack_slice = (slice(4 + self.num_eq_constraints, None), slice(None, -1))
+        self.nlb_ub_slice = (self.nA_nA_slack_A_A_slack_slice[0], -1)
+
+        combined_problem_data[self.weights_slice] = weights
+        combined_problem_data[self.g_slice] = g
+        combined_problem_data[self.nlb_slice] = -lb
+        combined_problem_data[self.ub_slice] = ub
+        combined_problem_data[self.E_slice] = E
+        combined_problem_data[self.E_slack_slice] = E_slack
+        combined_problem_data[self.b_slice] = b
+        combined_problem_data[self.nA_slice] = -A
+        combined_problem_data[self.nlbA_slice] = -lbA
+        combined_problem_data[self.A_slice] = A
+        combined_problem_data[self.A_slack_slice] = A_slack
+        combined_problem_data[self.ubA_slice] = ubA
+
         self.qp_setup_function = combined_problem_data.compile()
 
     def split_results(self, combined_problem_data: np.ndarray) -> Iterable[np.ndarray]:
-        self.weights = combined_problem_data[0, :-1]
-        self.g = combined_problem_data[1, :-1]
-        self.nlb = combined_problem_data[2, :-1]
-        self.ub = combined_problem_data[3, :-1]
-        self.E = combined_problem_data[4:self.num_eq_constraints, :-1]
-        self.b = combined_problem_data[4:self.num_eq_constraints, -1]
-        self.A = combined_problem_data[4 + self.num_eq_constraints:, :-1]
-        self.nlb_ub = combined_problem_data[4 + self.num_eq_constraints:, -1]
+        self.combined_problem_data = combined_problem_data
+        self.weights = combined_problem_data[self.weights_slice]
+        self.g = combined_problem_data[self.g_slice]
+        self.nlb = combined_problem_data[self.nlb_slice]
+        self.ub = combined_problem_data[self.ub_slice]
+        self.E = combined_problem_data[self.E_E_slack_slice]
+        self.b = combined_problem_data[self.b_slice]
+        self.nA_A = combined_problem_data[self.nA_nA_slack_A_A_slack_slice]
+        self.nlb_ub = combined_problem_data[self.nlb_ub_slice]
+
         self.H = np.diag(self.weights)
         I = np.eye(self.num_free_variable_constraints)
-        A = np.vstack([-I, I, self.A])
+        A = np.vstack([-I, I, self.nA_A])
         nlb_ub_nlbA_ubA = np.concatenate([self.nlb, self.ub, self.nlb_ub])
         return self.H, self.g, self.E, self.b, A, nlb_ub_nlbA_ubA
 
-    def get_problem_data(self):
+    def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        :return: weights, g, lb, ub, E, E_slack, b, A, A_slack, lbA, ubA
+        """
         weights = self.weights
         g = self.g
         lb = -self.nlb
         ub = self.ub
-        A = self.A
-        A_slack = 0
-        lbA = 0
-        ubA = 0
-        E = self.E
-        E_slack = 0
-        b = 0
+        A = self.combined_problem_data[self.A_slice]
+        A_slack = self.combined_problem_data[self.A_slack_slice]
+        lbA = -self.combined_problem_data[self.nlbA_slice]
+        ubA = self.combined_problem_data[self.ubA_slice]
+        E = self.combined_problem_data[self.E_slice]
+        E_slack = self.combined_problem_data[self.E_slack_slice]
+        b = self.b
         return weights, g, lb, ub, E, E_slack, b, A, A_slack, lbA, ubA
 
     @abc.abstractmethod

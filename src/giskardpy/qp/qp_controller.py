@@ -212,6 +212,12 @@ class FreeVariableBounds(ProblemDataPart):
         slack_equality_constraints
         slack_inequality_constraints
     """
+    names: List[str]
+    names_without_slack: List[str]
+    names_slack: List[str]
+    names_neq_slack: List[str]
+    names_derivative_slack: List[str]
+    names_eq_slack: List[str]
 
     def __init__(self, free_variables: List[FreeVariable],
                  equality_constraints: List[EqualityConstraint],
@@ -231,8 +237,8 @@ class FreeVariableBounds(ProblemDataPart):
         self.evaluated = True
         self.default_limits = default_limits
 
-    def free_variable_bounds(self) -> Tuple[
-        List[Dict[str, cas.symbol_expr_float]], List[Dict[str, cas.symbol_expr_float]]]:
+    def free_variable_bounds(self) -> Tuple[List[Dict[str, cas.symbol_expr_float]],
+                                            List[Dict[str, cas.symbol_expr_float]]]:
         lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         for t in range(self.prediction_horizon):
@@ -281,19 +287,38 @@ class FreeVariableBounds(ProblemDataPart):
 
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         lb_params, ub_params = self.free_variable_bounds()
+        num_free_variables = sum(len(x) for x in lb_params)
 
+        num_derivative_slack = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
             lower_slack, upper_slack = self.derivative_slack_limits(derivative)
+            num_derivative_slack += len(lower_slack)
             lb_params.append(lower_slack)
             ub_params.append(upper_slack)
 
-        lb_params.append(self.equality_constraint_slack_lower_bound())
+        equality_constraint_slack_lower_bounds = self.equality_constraint_slack_lower_bound()
+        num_eq_slacks = len(equality_constraint_slack_lower_bounds)
+        lb_params.append(equality_constraint_slack_lower_bounds)
         ub_params.append(self.equality_constraint_slack_upper_bound())
+
         lb_params.append(self.inequality_constraint_slack_lower_bound())
         ub_params.append(self.inequality_constraint_slack_upper_bound())
 
         lb, self.names = self._sorter(*lb_params)
         ub, _ = self._sorter(*ub_params)
+        self.names_without_slack = self.names[:num_free_variables]
+        self.names_slack = self.names[num_free_variables:]
+
+        derivative_slack_start = 0
+        derivative_slack_stop = derivative_slack_start+num_derivative_slack
+        self.names_derivative_slack = self.names_slack[derivative_slack_start:derivative_slack_stop]
+
+        eq_slack_start = derivative_slack_stop
+        eq_slack_stop = eq_slack_start + num_eq_slacks
+        self.names_eq_slack = self.names_slack[eq_slack_start:eq_slack_stop]
+
+        neq_slack_start = eq_slack_stop
+        self.names_neq_slack = self.names_slack[neq_slack_start:]
         # todo replace hack?
         # for i in range(len(lb)):
         #     lb[i] = self.replace_hack(lb[i], 0)
@@ -310,6 +335,9 @@ class EqualityBounds(ProblemDataPart):
         0
         equality_constraint_bounds
     """
+    names: List[str]
+    names_equality_constraints: List[str]
+    names_derivative_links: List[str]
 
     def __init__(self, free_variables: List[FreeVariable],
                  equality_constraints: List[EqualityConstraint],
@@ -353,10 +381,13 @@ class EqualityBounds(ProblemDataPart):
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
             bounds.append(self.last_derivative_values(derivative))
             bounds.append(self.derivative_links(derivative))
+        num_derivative_links = len(bounds)
 
         bounds.append(self.equality_bounds())
 
         bounds, self.names = self._sorter(*bounds)
+        self.names_derivative_links = self.names[:num_derivative_links]
+        self.names_equality_constraints = self.names[num_derivative_links:]
         # TODO replace hack?
         # for i in range(len(lbA)):
         #     lbA[i] = self.replace_hack(lbA[i], 0)
@@ -373,6 +404,11 @@ class InequalityBounds(ProblemDataPart):
         derivative jerk bounds
         inequality bounds
     """
+    names: List[str]
+    names_position_limits: List[str]
+    names_derivative_links: List[str]
+    names_neq_constraints: List[str]
+    names_non_position_limits: List[str]
 
     def __init__(self, free_variables: List[FreeVariable],
                  equality_constraints: List[EqualityConstraint],
@@ -476,17 +512,27 @@ class InequalityBounds(ProblemDataPart):
         lower_position_bounds, upper_position_bounds = self.position_limits()
         lb_params = [lower_position_bounds]
         ub_params = [upper_position_bounds]
+        num_position_limits = len(lower_position_bounds)
 
+        num_derivative_constraints = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
             lower, upper = self.derivative_constraint_bounds(derivative)
+            num_derivative_constraints += len(lower)
             lb_params.append(lower)
             ub_params.append(upper)
 
-        lb_params.append(self.lower_inequality_constraint_bound())
+        lower_inequality_constraint_bounds = self.lower_inequality_constraint_bound()
+        lb_params.append(lower_inequality_constraint_bounds)
         ub_params.append(self.upper_inequality_constraint_bound())
+        num_neq_constraints = len(lower_inequality_constraint_bounds)
 
         lbA, self.names = self._sorter(*lb_params)
         ubA, _ = self._sorter(*ub_params)
+
+        self.names_position_limits = self.names[:num_position_limits]
+        self.names_non_position_limits = self.names[num_position_limits:]
+        self.names_derivative_links = self.names[num_position_limits:num_position_limits+num_derivative_constraints]
+        self.names_neq_constraints = self.names[num_position_limits+num_derivative_constraints+num_neq_constraints:]
 
         # TODO replace hack?
         # for i in range(len(lbA)):
@@ -583,7 +629,7 @@ class EqualityModel(ProblemDataPart):
             model_rows_num = len(self.equality_constraints)
             model_column_num = self.number_of_free_variables * self.prediction_horizon * self.max_derivative
             model = cas.zeros(model_rows_num, model_column_num)
-            for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
+            for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
                 J_eq = cas.jacobian(expressions=cas.Expression(self.equality_constraint_expressions()),
                                     symbols=self.get_free_variable_symbols(derivative)) * self.dt
                 J_hstack = cas.hstack([J_eq for _ in range(self.prediction_horizon)])
@@ -718,7 +764,7 @@ class InequalityModel(ProblemDataPart):
         if number_of_vel_rows > 0:
             expressions = cas.Expression(self.get_derivative_constraint_expressions(Derivatives.velocity))
             model = cas.zeros(number_of_vel_rows, self.number_of_non_slack_columns)
-            for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
                 J_vel = cas.jacobian(expressions=expressions,
                                      symbols=self.get_free_variable_symbols(derivative)) * self.dt
                 J_vel_limit_block = cas.kron(cas.eye(self.prediction_horizon), J_vel)
@@ -823,7 +869,7 @@ class InequalityModel(ProblemDataPart):
         """
         if len(self.inequality_constraints) > 0:
             model = cas.zeros(len(self.inequality_constraints), self.number_of_non_slack_columns)
-            for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
+            for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
                 J_neq = cas.jacobian(expressions=cas.Expression(self.inequality_constraint_expressions()),
                                      symbols=self.get_free_variable_symbols(derivative)) * self.dt
                 J_hstack = cas.hstack([J_neq for _ in range(self.prediction_horizon)])
@@ -1195,7 +1241,7 @@ class QPProblemBuilder:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self.__swap_compiled_matrices()
-            # self._create_debug_pandas()
+            self._create_debug_pandas()
             return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
                                 prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:
@@ -1347,21 +1393,10 @@ class QPProblemBuilder:
 
     @profile
     def _create_debug_pandas(self):
-        substitutions = self.substitutions
-        self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
+        weights, g, lb, ub, E, E_slack, bE, A, A_slack, lbA, ubA = self.qp_solver.get_problem_data()
+        # substitutions = self.substitutions
+        # self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
-        b_names = self.b_names()
-        bA_names = self.bA_names()
-        filtered_b_names = np.array(b_names)[self.b_filter]
-        filtered_bA_names = np.array(bA_names)[self.bA_filter]
-        # H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
-        # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
-        # num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
-        # num_of_slack = len(lb) - num_non_slack
-        num_vel_constr = len(self.derivative_constraints) * (self.prediction_horizon - 2)
-        num_task_constr = len(self.constraints)
-        num_constr = num_vel_constr + num_task_constr
-        # num_non_slack = l
 
         # self._eval_debug_exprs()
         p_debug = {}
@@ -1372,33 +1407,40 @@ class QPProblemBuilder:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
-        self.p_lb = pd.DataFrame(self.np_lb_filtered, filtered_b_names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(self.np_ub_filtered, filtered_b_names, ['data'], dtype=float)
-        # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
-        self.p_lbA_raw = pd.DataFrame(self.np_lbA_filtered, filtered_bA_names, ['data'], dtype=float)
+        self.p_weights = pd.DataFrame(weights, self.free_variable_bounds.names, ['data'], dtype=float)
+        # self.p_g = pd.DataFrame(g, free_variable_names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(lb, self.free_variable_bounds.names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(ub, self.free_variable_bounds.names, ['data'], dtype=float)
+        self.p_bE_raw = pd.DataFrame(bE, self.equality_bounds.names, ['data'], dtype=float)
+        self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_bounds.names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
-        self.p_ubA_raw = pd.DataFrame(self.np_ubA_filtered, filtered_bA_names, ['data'], dtype=float)
+        self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_bounds.names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
         # remove sample period factor
-        self.p_lbA[-num_constr:] /= sample_period
-        self.p_ubA[-num_constr:] /= sample_period
-        self.p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
-        self.p_A = pd.DataFrame(self.np_A_filtered, filtered_bA_names, filtered_b_names, dtype=float)
+        # self.p_lbA[-num_constr:] /= sample_period
+        # self.p_ubA[-num_constr:] /= sample_period
+        self.p_E = pd.DataFrame(E, self.equality_bounds.names, self.free_variable_bounds.names_without_slack, dtype=float)
+        self.p_E_slack = pd.DataFrame(E_slack, self.equality_bounds.names, self.free_variable_bounds.names_eq_slack, dtype=float)
+        self.p_A = pd.DataFrame(A, self.inequality_bounds.names, self.free_variable_bounds.names_without_slack, dtype=float)
+        self.p_A_slack = pd.DataFrame(A_slack,
+                                      self.inequality_bounds.names,
+                                      self.free_variable_bounds.names_derivative_slack + self.free_variable_bounds.names_neq_slack,
+                                      dtype=float)
         if self.xdot_full is not None:
-            self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
+            self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_bounds.names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
             # xH = np.dot((self.xdot_full ** 2).T, H)
             # self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 
-            self.p_pure_xdot = deepcopy(self.p_xdot)
-            self.p_pure_xdot[-num_constr:] = 0
-            self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
-            self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
-                                                       dtype=float)
-            self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
-            self.p_Ax_without_slack[-num_constr:] /= sample_period
+            # self.p_pure_xdot = deepcopy(self.p_xdot)
+            # self.p_pure_xdot[-num_constr:] = 0
+            # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
+            # self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
+            #                                            dtype=float)
+            # self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
+            # self.p_Ax_without_slack[-num_constr:] /= sample_period
 
         else:
             self.p_xdot = None

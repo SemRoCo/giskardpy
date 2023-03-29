@@ -1052,8 +1052,8 @@ class QPProblemBuilder:
         b = self.equality_bounds.construct_expression()
 
         self.qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
-                                              A=A, A_slack=A_slack, lbA=lbA, ubA=ubA,
-                                              E=E, E_slack=E_slack, b=b)
+                                              E=E, E_slack=E_slack, b=b,
+                                              A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
         self._compile_debug_expressions()
 
     def get_parameter_names(self):

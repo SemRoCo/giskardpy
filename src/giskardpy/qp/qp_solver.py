@@ -96,15 +96,15 @@ class QPSolver(ABC):
         raise InfeasibleException('')
 
     @abc.abstractmethod
-    def _create_debug_pandas(self):
+    def get_problem_data(self):
         pass
 
 
 class QPSWIFTFormatter(QPSolver):
 
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
-                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
-                 E: cas.Expression, E_slack: cas.Expression, b: cas.Expression):
+                 E: cas.Expression, E_slack: cas.Expression, b: cas.Expression,
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  Ex = b
@@ -161,8 +161,19 @@ class QPSWIFTFormatter(QPSolver):
         nlb_ub_nlbA_ubA = np.concatenate([self.nlb, self.ub, self.nlb_ub])
         return self.H, self.g, self.E, self.b, A, nlb_ub_nlbA_ubA
 
-    def _create_debug_pandas(self):
-        pass
+    def get_problem_data(self):
+        weights = self.weights
+        g = self.g
+        lb = -self.nlb
+        ub = self.ub
+        A = self.A
+        A_slack = 0
+        lbA = 0
+        ubA = 0
+        E = self.E
+        E_slack = 0
+        b = 0
+        return weights, g, lb, ub, E, E_slack, b, A, A_slack, lbA, ubA
 
     @abc.abstractmethod
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \

@@ -95,6 +95,10 @@ class QPSolver(ABC):
         self.retries_with_relaxed_constraints += 1
         raise InfeasibleException('')
 
+    @abc.abstractmethod
+    def _create_debug_pandas(self):
+        pass
+
 
 class QPSWIFTFormatter(QPSolver):
 
@@ -113,8 +117,8 @@ class QPSWIFTFormatter(QPSolver):
         1    |     -lb       |  0  |
         1    |      ub       |  0  |
         |b|  |      E        |  b  |
-        |lb| |     -A        |-lbA |
-        |lb| |      A        | ubA |
+        |lbA||     -A        |-lbA |
+        |lbA||      A        | ubA |
              |---------------|-----|
         """
         self.num_eq_constraints = b.shape[0]
@@ -126,7 +130,7 @@ class QPSWIFTFormatter(QPSolver):
         A = cas.hstack([A, empty_E_slack, A_slack])
         E = cas.hstack([E, E_slack, empty_A_slack])
 
-        combined_problem_data = cas.zeros(4 + b.shape[0] + lb.shape[0] * 2, weights.shape[0] + 1)
+        combined_problem_data = cas.zeros(4 + b.shape[0] + lbA.shape[0] * 2, weights.shape[0] + 1)
         combined_problem_data[0, :-1] = weights
         combined_problem_data[1, :-1] = g
         combined_problem_data[2, :-1] = -lb
@@ -143,19 +147,22 @@ class QPSWIFTFormatter(QPSolver):
         self.qp_setup_function = combined_problem_data.compile()
 
     def split_results(self, combined_problem_data: np.ndarray) -> Iterable[np.ndarray]:
-        weights = combined_problem_data[0, :-1]
-        g = combined_problem_data[1, :-1]
-        nlb = combined_problem_data[2, :-1]
-        ub = combined_problem_data[3, :-1]
-        E = combined_problem_data[4:self.num_eq_constraints, :-1]
-        b = combined_problem_data[4:self.num_eq_constraints, -1]
-        A = combined_problem_data[4 + self.num_eq_constraints:, :-1]
-        nlb_ub = combined_problem_data[4 + self.num_eq_constraints:, -1]
-        H = np.diag(weights)
+        self.weights = combined_problem_data[0, :-1]
+        self.g = combined_problem_data[1, :-1]
+        self.nlb = combined_problem_data[2, :-1]
+        self.ub = combined_problem_data[3, :-1]
+        self.E = combined_problem_data[4:self.num_eq_constraints, :-1]
+        self.b = combined_problem_data[4:self.num_eq_constraints, -1]
+        self.A = combined_problem_data[4 + self.num_eq_constraints:, :-1]
+        self.nlb_ub = combined_problem_data[4 + self.num_eq_constraints:, -1]
+        self.H = np.diag(self.weights)
         I = np.eye(self.num_free_variable_constraints)
-        A = np.vstack([-I, I, A])
-        nlb_ub_nlbA_ubA = np.concatenate([nlb, ub, nlb_ub])
-        return H, g, E, b, A, nlb_ub_nlbA_ubA
+        A = np.vstack([-I, I, self.A])
+        nlb_ub_nlbA_ubA = np.concatenate([self.nlb, self.ub, self.nlb_ub])
+        return self.H, self.g, self.E, self.b, A, nlb_ub_nlbA_ubA
+
+    def _create_debug_pandas(self):
+        pass
 
     @abc.abstractmethod
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \

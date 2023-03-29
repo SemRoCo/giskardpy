@@ -674,7 +674,7 @@ class InequalityModel(ProblemDataPart):
         |===================================|
         """
         model = cas.zeros(self.number_of_free_variables * self.prediction_horizon,
-                          self.number_of_free_variables * self.prediction_horizon)
+                          self.number_of_non_slack_columns)
         # assume all joints have position limits
         for p in range(1, self.prediction_horizon + 1):
             matrix_size = self.number_of_free_variables * p
@@ -1057,7 +1057,7 @@ class QPProblemBuilder:
         self._compile_debug_expressions()
 
     def get_parameter_names(self):
-        return self.compiled_big_ass_M.str_params
+        return self.qp_solver.qp_setup_function.str_params
 
     def _compile_debug_expressions(self):
         t = time()
@@ -1190,7 +1190,7 @@ class QPProblemBuilder:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         """
-        self.evaluate_and_create_np_data(substitutions)
+        # self.evaluate_and_create_np_data(substitutions)
         try:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)

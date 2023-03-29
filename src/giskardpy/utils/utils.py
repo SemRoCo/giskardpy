@@ -346,20 +346,22 @@ def memoize(function):
 
 
 def record_time(function):
-    # return function
-    god_map = GodMap()
+    return function
+    # god_map = GodMap()
     time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
-    if function.__name__ == 'solve':
+    if function.__name__ == 'solver_call':
         @wraps(function)
-        def wrapper(self, weights, g, A, lb, ub, lbA, ubA):
+        def wrapper(self, *args, **kwargs):
             qp_solver = self.solver_id
             start_time = time()
-            result = function(self, weights, g, A, lb, ub, lbA, ubA)
+            result = function(self, *args, **kwargs)
             time_delta = time() - start_time
-            time_collector.add_qp_solve_time(str(qp_solver), A.shape[1], A.shape[0], time_delta)
+            time_collector.add_qp_solve_time(str(qp_solver), 0, 0, time_delta)
             return result
 
         return wrapper
+    else:
+        raise ValueError('Can only record time of \'solver_call\' functions.')
 
 
 def clear_memo(f):

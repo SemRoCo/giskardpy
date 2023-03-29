@@ -1156,8 +1156,11 @@ class QPProblemBuilder:
                 self.god_map.get_data(identifier.tmp_folder))
         else:
             save_pandas(
-                [self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
-                ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
+                [self.p_weights, self.p_lb, self.p_ub,
+                 self.p_E, self.p_E_slack, self.p_bE_raw,
+                 self.p_A, self.p_A_slack, self.p_lbA, self.p_ubA,
+                 self.p_debug],
+                ['weights', 'lb', 'ub', 'E', 'E_slack', 'bE', 'A', 'A_slack', 'lbA', 'ubA', 'debug'],
                 self.god_map.get_data(identifier.tmp_folder))
 
     def _is_inf_in_data(self):

@@ -96,19 +96,19 @@ class SendTrajectoryToCmdVelClosedLoop(GiskardBehavior, ABC):
     def solver_cmd_to_twist(self, cmd) -> Twist:
         twist = Twist()
         try:
-            twist.linear.x = cmd[Derivatives.velocity][self.joint.x_vel.position_name]
+            twist.linear.x = cmd[Derivatives.velocity][self.joint.x_vel.position_name]/2
             if abs(twist.linear.x) < self.threshold[0]:
                 twist.linear.x = 0
         except:
             twist.linear.x = 0
         try:
-            twist.linear.y = cmd[Derivatives.velocity][self.joint.y_vel.position_name]
+            twist.linear.y = cmd[Derivatives.velocity][self.joint.y_vel.position_name]/2
             if abs(twist.linear.y) < self.threshold[1]:
                 twist.linear.y = 0
         except:
             twist.linear.y = 0
         try:
-            twist.angular.z = cmd[Derivatives.velocity][self.joint.yaw_vel.position_name]
+            twist.angular.z = cmd[Derivatives.velocity][self.joint.yaw_vel.position_name]/2
             if abs(twist.angular.z) < self.threshold[2]:
                 twist.angular.z = 0
         except:

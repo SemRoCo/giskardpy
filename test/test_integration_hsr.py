@@ -10,7 +10,7 @@ from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco
+from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco, HSR_GazeboRealtime
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.utils import launch_launchfile
@@ -19,12 +19,12 @@ from utils_for_tests import compare_poses, GiskardTestWrapper
 
 class HSRTestWrapper(GiskardTestWrapper):
     default_pose = {
-        'arm_flex_joint': 0.0,
-        'arm_lift_joint': 0.0,
+        'arm_flex_joint': -0.5,
+        'arm_lift_joint': 0.1,
         'arm_roll_joint': 0.0,
         'head_pan_joint': 0.0,
         'head_tilt_joint': 0.0,
-        'wrist_flex_joint': 0.0,
+        'wrist_flex_joint': -0.8,
         'wrist_roll_joint': 0.0,
     }
     better_pose = default_pose
@@ -60,7 +60,7 @@ class HSRTestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        self.move_base(p)
+        # self.move_base(p)
 
     def reset(self):
         self.clear_world()
@@ -108,8 +108,8 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
-    c = HSRTestWrapper()
+    # launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
+    c = HSRTestWrapper(HSR_GazeboRealtime)
     # c = HSRTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
@@ -217,6 +217,14 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state['hsrb/arm_lift_joint'].position, 0.5, decimal=2)
 
+    def test_joint_goal2(self, zero_pose: HSRTestWrapper):
+        js = {
+            'arm_lift_joint': 0.15,
+            'arm_flex_joint': -0.3
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
 class TestCartGoals:
     def test_save_graph_pdf(self, kitchen_setup):
@@ -232,15 +240,15 @@ class TestCartGoals:
         kitchen_setup.world.save_graph_pdf()
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
-        map_T_odom = PoseStamped()
-        map_T_odom.pose.position.x = 1
-        map_T_odom.pose.position.y = 1
-        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.teleport_base(map_T_odom)
+        # map_T_odom = PoseStamped()
+        # map_T_odom.pose.position.x = 1
+        # map_T_odom.pose.position.y = 1
+        # map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        # zero_pose.teleport_base(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
-        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = 3
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
         zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()

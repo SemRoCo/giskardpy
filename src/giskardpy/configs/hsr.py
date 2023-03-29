@@ -132,9 +132,6 @@ class HSR_GazeboRealtime(HSR_Base):
                                   odometry_topic='/hsrb/odom',
                                   name='brumbrum')
         self.add_joint_group_position_controller(namespace='hsrb/realtime_arm_controller')
-        # self.add_joint_velocity_controller(namespaces=[])
-        # self.add_joint_velocity_controller(namespaces=['hsrb/realtime_base_controller1',
-        #                                                'hsrb/realtime_base_controller2'])
         self.add_base_cmd_velocity('/hsrb/command_velocity')
         self.overwrite_external_collision_avoidance(joint_name='brumbrum',
                                                     number_of_repeller=2,

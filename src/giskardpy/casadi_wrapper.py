@@ -83,7 +83,9 @@ class Symbol_:
         return free_symbols(self.s)
 
     def evaluate(self):
-        if self.s.shape[0] * self.s.shape[1] <= 1:
+        if self.shape[0] == self.shape[1] == 0:
+            return np.eye(0)
+        elif self.s.shape[0] * self.s.shape[1] <= 1:
             return float(ca.evalf(self.s))
         else:
             return np.array(ca.evalf(self.s))
@@ -1573,10 +1575,14 @@ def trace(matrix):
 
 
 def vstack(list_of_matrices):
+    if len(list_of_matrices) == 0:
+        return Expression()
     return Expression(ca.vertcat(*[x.s for x in list_of_matrices]))
 
 
 def hstack(list_of_matrices):
+    if len(list_of_matrices) == 0:
+        return Expression()
     return Expression(ca.horzcat(*[x.s for x in list_of_matrices]))
 
 

@@ -1255,8 +1255,24 @@ class TestCASWrapper(unittest.TestCase):
         r2 = np.vstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
+    def test_vstack_empty(self):
+        m = np.eye(0)
+        m1 = w.Expression(m)
+        e = w.vstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.vstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
     def test_hstack(self):
         m = np.eye(4)
+        m1 = w.Expression(m)
+        e = w.hstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.hstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_hstack_empty(self):
+        m = np.eye(0)
         m1 = w.Expression(m)
         e = w.hstack([m1, m1])
         r1 = e.evaluate()

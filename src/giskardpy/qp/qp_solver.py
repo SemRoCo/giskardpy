@@ -8,6 +8,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.utils import logging
+from giskardpy.utils.utils import memoize
 
 
 class QPSolver(ABC):
@@ -181,10 +182,15 @@ class QPSWIFTFormatter(QPSolver):
         self.nlb_ub = combined_problem_data[self.nlb_ub_slice]
 
         self.H = np.diag(self.weights)
-        I = np.eye(self.num_free_variable_constraints)
-        A = np.vstack([-I, I, self.nA_A])
+        A_d = self.__direct_limit_model(self.num_free_variable_constraints)
+        A = np.concatenate([A_d, self.nA_A])
         nlb_ub_nlbA_ubA = np.concatenate([self.nlb, self.ub, self.nlb_ub])
         return self.H, self.g, self.E, self.b, A, nlb_ub_nlbA_ubA
+
+    @memoize
+    def __direct_limit_model(self, dimensions):
+        I = np.eye(dimensions)
+        return np.concatenate([-I, I])
 
     @profile
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,

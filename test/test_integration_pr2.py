@@ -1658,7 +1658,7 @@ class TestCartGoals:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(-0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.allow_self_collision()
+        zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'base_footprint')
         zero_pose.plan_and_execute()
 

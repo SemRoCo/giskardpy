@@ -110,14 +110,14 @@ class JointPositionContinuous(Goal):
 
         if self.hard:
             self.add_equality_constraint(reference_velocity=max_velocity,
-                                         derivative_goal=error,
+                                         equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current_joint,
                                          lower_slack_limit=0,
                                          upper_slack_limit=0)
         else:
             self.add_equality_constraint(reference_velocity=max_velocity,
-                                         derivative_goal=error,
+                                         equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current_joint)
 
@@ -167,14 +167,14 @@ class JointPositionPrismatic(Goal):
 
         if self.hard:
             self.add_equality_constraint(reference_velocity=max_velocity,
-                                         derivative_goal=error,
+                                         equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current_joint,
                                          upper_slack_limit=0,
                                          lower_slack_limit=0)
         else:
             self.add_equality_constraint(reference_velocity=max_velocity,
-                                         derivative_goal=error,
+                                         equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current_joint)
 
@@ -276,14 +276,14 @@ class JointPositionRevolute(Goal):
         error = joint_goal - current_joint
         if self.hard:
             self.add_equality_constraint(reference_velocity=max_velocity,
-                                         derivative_goal=error,
+                                         equality_bound=error,
                                          weight=weight,
                                          task_expression=current_joint,
                                          upper_slack_limit=0,
                                          lower_slack_limit=0)
         else:
             self.add_equality_constraint(reference_velocity=max_velocity,
-                                         derivative_goal=error,
+                                         equality_bound=error,
                                          weight=weight,
                                          task_expression=current_joint)
 
@@ -334,7 +334,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
         capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
-        self.add_equality_constraint(derivative_goal=capped_err,
+        self.add_equality_constraint(equality_bound=capped_err,
                                      reference_velocity=max_velocity,
                                      weight=weight,
                                      task_expression=current_joint)
@@ -385,7 +385,7 @@ class ShakyJointPositionContinuous(Goal):
 
         capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
-        self.add_equality_constraint(derivative_goal=capped_err,
+        self.add_equality_constraint(equality_bound=capped_err,
                                      reference_velocity=max_velocity,
                                      weight=weight,
                                      task_expression=current_joint)
@@ -443,7 +443,7 @@ class AvoidSingleJointLimits(Goal):
         weight = weight * (error / max_error)
 
         self.add_equality_constraint(reference_velocity=max_velocity,
-                                     derivative_goal=lower_err,
+                                     equality_bound=lower_err,
                                      weight=weight,
                                      task_expression=joint_symbol)
 

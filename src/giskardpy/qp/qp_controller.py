@@ -561,6 +561,10 @@ class EqualityModel(ProblemDataPart):
     def get_free_variable_symbols(self, order: Derivatives) -> List[cas.Symbol]:
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
 
+    @property
+    def number_of_non_slack_columns(self):
+        return self.number_of_free_variables * self.prediction_horizon * self.max_derivative
+
     @profile
     def derivative_link_model(self) -> cas.Expression:
         """
@@ -626,9 +630,7 @@ class EqualityModel(ProblemDataPart):
         |-----------------------------------------------------------------------|
         """
         if len(self.equality_constraints) > 0:
-            model_rows_num = len(self.equality_constraints)
-            model_column_num = self.number_of_free_variables * self.prediction_horizon * self.max_derivative
-            model = cas.zeros(model_rows_num, model_column_num)
+            model = cas.zeros(len(self.equality_constraints), self.number_of_non_slack_columns)
             for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
                 J_eq = cas.jacobian(expressions=cas.Expression(self.equality_constraint_expressions()),
                                     symbols=self.get_free_variable_symbols(derivative)) * self.dt
@@ -691,7 +693,7 @@ class InequalityModel(ProblemDataPart):
         return len([v for v in self.free_variables if not v.has_position_limits()])
 
     def inequality_constraint_expressions(self) -> List[cas.Expression]:
-        return self._sorter({c.name: c.expression for c in self.equality_constraints})[0]
+        return self._sorter({c.name: c.expression for c in self.inequality_constraints})[0]
 
     def get_derivative_constraint_expressions(self, derivative: Derivatives):
         return self._sorter({c.name: c.expression for c in self.derivative_constraints if c.derivative == derivative})[
@@ -880,8 +882,7 @@ class InequalityModel(ProblemDataPart):
                 model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_hstack
 
             # slack variable for total error
-            slack_model = cas.diag(cas.Expression([self.dt * c.control_horizon for c in self.equality_constraints]))
-            model[:, -slack_model.shape[1]:] = slack_model
+            slack_model = cas.diag(cas.Expression([self.dt * c.control_horizon for c in self.inequality_constraints]))
             return model, slack_model
         return cas.Expression(), cas.Expression()
 
@@ -1241,7 +1242,7 @@ class QPProblemBuilder:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self.__swap_compiled_matrices()
-            self._create_debug_pandas()
+            # self._create_debug_pandas()
             return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
                                 prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:

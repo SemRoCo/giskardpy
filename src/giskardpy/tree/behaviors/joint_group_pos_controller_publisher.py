@@ -34,19 +34,19 @@ class JointGroupPosController(CommandPublisher):
         js = deepcopy(self.world.state)
         try:
             qp_data = self.god_map.get_data(identifier.qp_solver_solution)
+            dt = (time.current_real - self.stamp).to_sec() #- 1 / self.hz
         except Exception:
             return
         for joint_name in self.joint_names:
             try:
                 key = self.world.joints[joint_name].free_variables[0].position_name
                 velocity = qp_data[Derivatives.velocity][key]
-                # try:
-                #     dt = (time.current_real - time.last_real).to_sec()
-                # except:
-                #     dt = 0.0
-                # dt -= 1/self.hz
-                position = js[joint_name].position + velocity * (
-                            (time.current_real - self.stamp).to_sec() - 1 / self.hz)
+                acc = qp_data[Derivatives.acceleration][key]
+                jerk = qp_data[Derivatives.jerk][key]
+                delta = velocity * dt + (acc * dt**2) / 2 + (jerk * dt**3) / 6
+
+                position = js[joint_name].position + delta
+
             except KeyError:
                 position = js[joint_name].position
             msg.data.append(position)

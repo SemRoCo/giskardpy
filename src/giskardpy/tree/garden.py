@@ -801,7 +801,7 @@ class ClosedLoop(OpenLoop):
             planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
         planning_4.add_child(RosTime('time'))
 
-        planning_4.add_child(RealKinSimPlugin('kin sim'))
+        # planning_4.add_child(RealKinSimPlugin('kin sim'))
         for joint_group_position_controller_config in hardware_config.joint_group_position_controllers_kwargs:
             planning_4.add_child(JointGroupPosController(**joint_group_position_controller_config))
         for joint_position_controller_config in hardware_config.joint_position_controllers_kwargs:

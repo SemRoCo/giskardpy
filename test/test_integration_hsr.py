@@ -20,12 +20,12 @@ from utils_for_tests import compare_poses, GiskardTestWrapper
 class HSRTestWrapper(GiskardTestWrapper):
     default_pose = {
         'arm_flex_joint': -0.5,
-        'arm_lift_joint': 0.1,
+        'arm_lift_joint': 0.2,
         'arm_roll_joint': 0.0,
-        'head_pan_joint': 0.0,
-        'head_tilt_joint': 0.0,
-        'wrist_flex_joint': -0.8,
-        'wrist_roll_joint': 0.0,
+        'head_pan_joint': -0.1,
+        'head_tilt_joint': 0.1,
+        'wrist_flex_joint': -0.7,
+        'wrist_roll_joint': -0.1,
     }
     better_pose = default_pose
 
@@ -219,8 +219,13 @@ class TestJointGoals:
 
     def test_joint_goal2(self, zero_pose: HSRTestWrapper):
         js = {
-            'arm_lift_joint': 0.15,
-            'arm_flex_joint': -0.3
+            'arm_flex_joint': -0.3,
+            'arm_lift_joint': 0.4,
+            'arm_roll_joint': 0.1,
+            'head_pan_joint': -0.3,
+            'head_tilt_joint': 0.4,
+            'wrist_flex_joint': -0.5,
+            'wrist_roll_joint': -0.3,
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()

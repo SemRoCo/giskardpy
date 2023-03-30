@@ -160,6 +160,7 @@ class QPSWIFTFormatter(QPSolver):
                                                                self.nlbA_ubA)
         return self.problem_data_to_qpSWIFT_format(self.weights, self.nA_A, self.nlb, self.ub, self.nlbA_ubA)
 
+    @profile
     def problem_data_to_qpSWIFT_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
                                        ub: np.ndarray, nlbA_ubA: np.ndarray) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -169,6 +170,7 @@ class QPSWIFTFormatter(QPSolver):
         nlb_ub_nlbA_ubA = np.concatenate((nlb, ub, nlbA_ubA))
         return H, self.g, self.E, self.bE, A, nlb_ub_nlbA_ubA
 
+    @profile
     def relaxed_problem_data_to_qpSWIFT_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
                                                ub: np.ndarray, nlbA_ubA: np.ndarray) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

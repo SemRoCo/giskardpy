@@ -61,18 +61,6 @@ class QPSolver(ABC):
     def solver_call(self, *args, **kwargs) -> np.ndarray:
         pass
 
-    # def __init__(self,
-    #              num_non_slack: int,
-    #              retry_added_slack: float,
-    #              retry_weight_factor: float,
-    #              retries_with_relaxed_constraints: int,
-    #              on_fail_round_to: int = 4):
-    #     self.num_non_slack = num_non_slack
-    #     self.retry_added_slack = retry_added_slack
-    #     self.retry_weight_factor = retry_weight_factor
-    #     self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
-    #     self.on_fail_round_to = on_fail_round_to
-
     def compute_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         self.retries_with_relaxed_constraints -= 1
@@ -98,9 +86,9 @@ class QPSolver(ABC):
 
     @abc.abstractmethod
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        :return: weights, g, lb, ub, E, E_slack, b, A, A_slack, lbA, ubA
+        :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
 
 
@@ -129,6 +117,9 @@ class QPSWIFTFormatter(QPSolver):
         self.num_eq_constraints = b.shape[0]
         self.num_neq_constraints = lbA.shape[0]
         self.num_free_variable_constraints = lb.shape[0]
+        self.num_eq_slack_variables = E_slack.shape[1]
+        self.num_neq_slack_variables = A_slack.shape[1]
+        self.num_slack_variables = self.num_eq_slack_variables + self.num_neq_slack_variables
 
         combined_problem_data = cas.zeros(4 + b.shape[0] + lbA.shape[0] * 2, weights.shape[0] + 1)
         self.weights_slice = (0, slice(None, -1))
@@ -162,6 +153,7 @@ class QPSWIFTFormatter(QPSolver):
         combined_problem_data[self.E_slack_slice] = E_slack
         combined_problem_data[self.b_slice] = b
         combined_problem_data[self.nA_slice] = -A
+        combined_problem_data[self.nA_slack_slice] = -A_slack
         combined_problem_data[self.nlbA_slice] = -lbA
         combined_problem_data[self.A_slice] = A
         combined_problem_data[self.A_slack_slice] = A_slack
@@ -181,11 +173,41 @@ class QPSWIFTFormatter(QPSolver):
         self.nA_A = combined_problem_data[self.nA_nA_slack_A_A_slack_slice]
         self.nlb_ub = combined_problem_data[self.nlb_ub_slice]
 
+        self.update_filters()
+        self.apply_filters()
+
         self.H = np.diag(self.weights)
-        A_d = self.__direct_limit_model(self.num_free_variable_constraints)
-        A = np.concatenate([A_d, self.nA_A])
-        nlb_ub_nlbA_ubA = np.concatenate([self.nlb, self.ub, self.nlb_ub])
+        A_d = self.__direct_limit_model(self.weights.shape[0])
+        A = np.concatenate((A_d, self.nA_A))
+        nlb_ub_nlbA_ubA = np.concatenate((self.nlb, self.ub, self.nlb_ub))
         return self.H, self.g, self.E, self.b, A, nlb_ub_nlbA_ubA
+
+    @profile
+    def update_filters(self):
+        self.weight_filter = self.weights != 0
+        self.weight_filter[:-self.num_slack_variables] = True
+        slack_part = self.weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
+        bE_part = slack_part[:self.num_eq_slack_variables]
+        bA_part = slack_part[self.num_eq_slack_variables:]
+
+        self.bE_filter = np.ones(self.E.shape[0], dtype=bool)
+        if len(bE_part) > 0:
+            self.bE_filter[-len(bE_part):] = bE_part
+        self.bA_filter_half = np.ones(int(self.nA_A.shape[0] / 2), dtype=bool)
+        if len(bA_part) > 0:
+            self.bA_filter_half[-len(bA_part):] = bA_part
+        self.bA_filter = np.concatenate((self.bA_filter_half, self.bA_filter_half))
+
+    @profile
+    def apply_filters(self):
+        self.weights = self.weights[self.weight_filter]
+        self.g = np.zeros(*self.weights.shape)
+        self.nlb = self.nlb[self.weight_filter]
+        self.ub = self.ub[self.weight_filter]
+        self.E = self.E[self.bE_filter, :][:, self.weight_filter]
+        self.b = self.b[self.bE_filter]
+        self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
+        self.nlb_ub = self.nlb_ub[self.bA_filter]
 
     @memoize
     def __direct_limit_model(self, dimensions):
@@ -194,22 +216,21 @@ class QPSWIFTFormatter(QPSolver):
 
     @profile
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        :return: weights, g, lb, ub, E, E_slack, b, A, A_slack, lbA, ubA
+        :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
         weights = self.weights
         g = self.g
         lb = -self.nlb
         ub = self.ub
-        A = self.combined_problem_data[self.A_slice]
-        A_slack = self.combined_problem_data[self.A_slack_slice]
-        lbA = -self.combined_problem_data[self.nlbA_slice]
-        ubA = self.combined_problem_data[self.ubA_slice]
-        E = self.combined_problem_data[self.E_slice]
-        E_slack = self.combined_problem_data[self.E_slack_slice]
+        A = self.nA_A[int(self.nA_A.shape[0]/2):, :]
+        bA_half = int(self.nlb_ub.shape[0]/2)
+        lbA = -self.nlb_ub[bA_half:]
+        ubA = self.nlb_ub[:bA_half]
+        E = self.E
         b = self.b
-        return weights, g, lb, ub, E, E_slack, b, A, A_slack, lbA, ubA
+        return weights, g, lb, ub, E, b, A, lbA, ubA, self.weight_filter, self.bE_filter, self.bA_filter_half
 
     @abc.abstractmethod
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \

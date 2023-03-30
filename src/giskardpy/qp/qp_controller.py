@@ -101,7 +101,7 @@ class ProblemDataPart(ABC):
     def jerk_constraints(self) -> List[DerivativeInequalityConstraint]:
         return self.get_derivative_constraints(Derivatives.jerk)
 
-    def _sorter(self, *args: dict) -> Tuple[List[cas.symbol_expr], List[str]]:
+    def _sorter(self, *args: dict) -> Tuple[List[cas.symbol_expr], np.ndarray]:
         """
         Sorts every arg dict individually and then appends all of them.
         :arg args: a bunch of dicts
@@ -112,7 +112,7 @@ class ProblemDataPart(ABC):
         for arg in args:
             result.extend(self.__helper(arg))
             result_names.extend(self.__helper_names(arg))
-        return result, result_names
+        return result, np.array(result_names)
 
     def __helper(self, param: dict):
         return [x for _, x in sorted(param.items())]
@@ -127,10 +127,10 @@ class Weights(ProblemDataPart):
         free_variable_velocity
         free_variable_acceleration
         free_variable_jerk
+        equality_constraints
         derivative_constraints_velocity
         derivative_constraints_acceleration
         derivative_constraints_jerk
-        equality_constraints
         inequality_constraints
     """
 
@@ -155,8 +155,8 @@ class Weights(ProblemDataPart):
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         components = []
         components.extend(self.free_variable_weights_expression())
-        components.extend(self.derivative_weight_expressions())
         components.append(self.equality_weight_expressions())
+        components.extend(self.derivative_weight_expressions())
         components.append(self.inequality_weight_expressions())
         weights, _ = self._sorter(*components)
         weights = cas.Expression(weights)
@@ -206,18 +206,18 @@ class FreeVariableBounds(ProblemDataPart):
         free_variable_velocity
         free_variable_acceleration
         free_variable_jerk
+        slack_equality_constraints
         slack_derivative_constraints_velocity
         slack_derivative_constraints_acceleration
         slack_derivative_constraints_jerk
-        slack_equality_constraints
         slack_inequality_constraints
     """
-    names: List[str]
-    names_without_slack: List[str]
-    names_slack: List[str]
-    names_neq_slack: List[str]
-    names_derivative_slack: List[str]
-    names_eq_slack: List[str]
+    names: np.ndarray
+    names_without_slack: np.ndarray
+    names_slack: np.ndarray
+    names_neq_slack: np.ndarray
+    names_derivative_slack: np.ndarray
+    names_eq_slack: np.ndarray
 
     def __init__(self, free_variables: List[FreeVariable],
                  equality_constraints: List[EqualityConstraint],
@@ -289,17 +289,17 @@ class FreeVariableBounds(ProblemDataPart):
         lb_params, ub_params = self.free_variable_bounds()
         num_free_variables = sum(len(x) for x in lb_params)
 
+        equality_constraint_slack_lower_bounds = self.equality_constraint_slack_lower_bound()
+        num_eq_slacks = len(equality_constraint_slack_lower_bounds)
+        lb_params.append(equality_constraint_slack_lower_bounds)
+        ub_params.append(self.equality_constraint_slack_upper_bound())
+
         num_derivative_slack = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
             lower_slack, upper_slack = self.derivative_slack_limits(derivative)
             num_derivative_slack += len(lower_slack)
             lb_params.append(lower_slack)
             ub_params.append(upper_slack)
-
-        equality_constraint_slack_lower_bounds = self.equality_constraint_slack_lower_bound()
-        num_eq_slacks = len(equality_constraint_slack_lower_bounds)
-        lb_params.append(equality_constraint_slack_lower_bounds)
-        ub_params.append(self.equality_constraint_slack_upper_bound())
 
         lb_params.append(self.inequality_constraint_slack_lower_bound())
         ub_params.append(self.inequality_constraint_slack_upper_bound())
@@ -335,9 +335,9 @@ class EqualityBounds(ProblemDataPart):
         0
         equality_constraint_bounds
     """
-    names: List[str]
-    names_equality_constraints: List[str]
-    names_derivative_links: List[str]
+    names: np.ndarray
+    names_equality_constraints: np.ndarray
+    names_derivative_links: np.ndarray
 
     def __init__(self, free_variables: List[FreeVariable],
                  equality_constraints: List[EqualityConstraint],
@@ -404,11 +404,11 @@ class InequalityBounds(ProblemDataPart):
         derivative jerk bounds
         inequality bounds
     """
-    names: List[str]
-    names_position_limits: List[str]
-    names_derivative_links: List[str]
-    names_neq_constraints: List[str]
-    names_non_position_limits: List[str]
+    names: np.ndarray
+    names_position_limits: np.ndarray
+    names_derivative_links: np.ndarray
+    names_neq_constraints: np.ndarray
+    names_non_position_limits: np.ndarray
 
     def __init__(self, free_variables: List[FreeVariable],
                  equality_constraints: List[EqualityConstraint],
@@ -1150,17 +1150,19 @@ class QPProblemBuilder:
     def save_all_pandas(self):
         if hasattr(self, 'p_xdot') and self.p_xdot is not None:
             save_pandas(
-                [self.p_weights, self.p_A, self.p_Ax, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
-                 self.p_xdot],
-                ['weights', 'A', 'Ax', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
+                [self.p_weights, self.p_lb, self.p_ub,
+                 self.p_E, self.p_bE,
+                 self.p_A, self.p_lbA, self.p_ubA,
+                 self.p_debug, self.p_xdot],
+                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
                 self.god_map.get_data(identifier.tmp_folder))
         else:
             save_pandas(
                 [self.p_weights, self.p_lb, self.p_ub,
-                 self.p_E, self.p_E_slack, self.p_bE_raw,
-                 self.p_A, self.p_A_slack, self.p_lbA, self.p_ubA,
+                 self.p_E, self.p_bE,
+                 self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug],
-                ['weights', 'lb', 'ub', 'E', 'E_slack', 'bE', 'A', 'A_slack', 'lbA', 'ubA', 'debug'],
+                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
                 self.god_map.get_data(identifier.tmp_folder))
 
     def _is_inf_in_data(self):
@@ -1400,10 +1402,13 @@ class QPProblemBuilder:
 
     @profile
     def _create_debug_pandas(self):
-        weights, g, lb, ub, E, E_slack, bE, A, A_slack, lbA, ubA = self.qp_solver.get_problem_data()
+        weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = self.qp_solver.get_problem_data()
         # substitutions = self.substitutions
         # self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
+        free_variable_names = self.free_variable_bounds.names[weight_filter]
+        equality_constr_names = self.equality_bounds.names[bE_filter]
+        inequality_constr_names = self.inequality_bounds.names[bA_filter]
 
         # self._eval_debug_exprs()
         p_debug = {}
@@ -1414,30 +1419,24 @@ class QPProblemBuilder:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
-        self.p_weights = pd.DataFrame(weights, self.free_variable_bounds.names, ['data'], dtype=float)
+        self.p_weights = pd.DataFrame(weights, free_variable_names, ['data'], dtype=float)
         # self.p_g = pd.DataFrame(g, free_variable_names, ['data'], dtype=float)
-        self.p_lb = pd.DataFrame(lb, self.free_variable_bounds.names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(ub, self.free_variable_bounds.names, ['data'], dtype=float)
-        self.p_bE_raw = pd.DataFrame(bE, self.equality_bounds.names, ['data'], dtype=float)
-        self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_bounds.names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(lb, free_variable_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(ub, free_variable_names, ['data'], dtype=float)
+        self.p_bE_raw = pd.DataFrame(bE, equality_constr_names, ['data'], dtype=float)
+        self.p_bE = deepcopy(self.p_bE_raw)
+        self.p_bE[len(self.equality_bounds.names_derivative_links):] /= sample_period
+        self.p_lbA_raw = pd.DataFrame(lbA, inequality_constr_names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
-        self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_bounds.names, ['data'], dtype=float)
+        self.p_lbA[len(self.inequality_bounds.names_position_limits):] /= sample_period
+        self.p_ubA_raw = pd.DataFrame(ubA, inequality_constr_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
+        self.p_ubA[len(self.inequality_bounds.names_position_limits):] /= sample_period
         # remove sample period factor
-        # self.p_lbA[-num_constr:] /= sample_period
-        # self.p_ubA[-num_constr:] /= sample_period
-        self.p_E = pd.DataFrame(E, self.equality_bounds.names, self.free_variable_bounds.names_without_slack,
-                                dtype=float)
-        self.p_E_slack = pd.DataFrame(E_slack, self.equality_bounds.names, self.free_variable_bounds.names_eq_slack,
-                                      dtype=float)
-        self.p_A = pd.DataFrame(A, self.inequality_bounds.names, self.free_variable_bounds.names_without_slack,
-                                dtype=float)
-        self.p_A_slack = pd.DataFrame(A_slack,
-                                      self.inequality_bounds.names,
-                                      self.free_variable_bounds.names_derivative_slack + self.free_variable_bounds.names_neq_slack,
-                                      dtype=float)
+        self.p_E = pd.DataFrame(E, equality_constr_names, free_variable_names, dtype=float)
+        self.p_A = pd.DataFrame(A, inequality_constr_names, free_variable_names, dtype=float)
         if self.xdot_full is not None:
-            self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_bounds.names, ['data'], dtype=float)
+            self.p_xdot = pd.DataFrame(self.xdot_full, free_variable_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
             # xH = np.dot((self.xdot_full ** 2).T, H)
             # self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)

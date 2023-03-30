@@ -226,8 +226,8 @@ class QPSWIFTFormatter(QPSolver):
         ub = self.ub
         A = self.nA_A[int(self.nA_A.shape[0]/2):, :]
         bA_half = int(self.nlb_ub.shape[0]/2)
-        lbA = -self.nlb_ub[bA_half:]
-        ubA = self.nlb_ub[:bA_half]
+        lbA = -self.nlb_ub[:bA_half]
+        ubA = self.nlb_ub[bA_half:]
         E = self.E
         b = self.b
         return weights, g, lb, ub, E, b, A, lbA, ubA, self.weight_filter, self.bE_filter, self.bA_filter_half

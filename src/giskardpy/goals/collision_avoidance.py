@@ -338,12 +338,11 @@ class CollisionAvoidanceHint(Goal):
         expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)
-        self.add_inequality_constraint(name='avoidance_hint',
-                                       reference_velocity=max_velocity,
-                                       lower_error=max_velocity,
-                                       upper_error=max_velocity,
-                                       weight=weight,
-                                       task_expression=expr)
+        self.add_equality_constraint(name='avoidance_hint',
+                                     reference_velocity=max_velocity,
+                                     equality_bound=max_velocity,
+                                     weight=weight,
+                                     task_expression=expr)
 
     def __str__(self):
         s = super().__str__()

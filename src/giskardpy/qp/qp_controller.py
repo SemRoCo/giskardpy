@@ -1235,23 +1235,6 @@ class QPProblemBuilder:
             self.evaluated_debug_expressions[name] = f.fast_call(params).copy()
         return self.evaluated_debug_expressions
 
-    @profile
-    def update_filters(self):
-        b_filter = self.np_weights != 0
-        b_filter[:self.H.number_of_free_variables_with_horizon()] = True
-        # offset = self.H.number_of_free_variables_with_horizon() + self.H.number_of_constraint_vel_variables()
-        # map_ = self.H.make_error_id_to_vel_ids_map()
-        # for i in range(self.H.number_of_contraint_error_variables()):
-        #     index = i+offset
-        #     if not b_filter[index]:
-        #         b_filter[map_[index]] = False
-
-        bA_filter = np.ones(self.A.height, dtype=bool)
-        ll = self.H.number_of_constraint_derivative_variables() + self.H.number_of_constraint_error_variables()
-        bA_filter[-ll:] = b_filter[-ll:]
-        self.b_filter = np.array(b_filter)
-        self.bA_filter = np.array(bA_filter)
-
     def __swap_compiled_matrices(self):
         if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
             with suppress_stdout():
@@ -1310,26 +1293,6 @@ class QPProblemBuilder:
             self._is_inf_in_data()
             raise
 
-    @profile
-    def evaluate_and_create_np_data(self, substitutions):
-        self.substitutions = substitutions
-        np_big_ass_M = self.compiled_big_ass_M.fast_call(substitutions)
-        self.np_weights = np_big_ass_M[self.A.height, :-2]
-        self.np_A = np_big_ass_M[:self.A.height, :self.A.width]
-        self.np_lb = np_big_ass_M[self.A.height + 1, :-2]
-        self.np_ub = np_big_ass_M[self.A.height + 2, :-2]
-        self.np_lbA = np_big_ass_M[:self.A.height, -2]
-        self.np_ubA = np_big_ass_M[:self.A.height, -1]
-
-        self.update_filters()
-        self.np_weights_filtered = self.np_weights[self.b_filter]
-        self.np_g_filtered = np.zeros(self.np_weights_filtered.shape[0])
-        self.np_A_filtered = self.np_A[self.bA_filter, :][:, self.b_filter]
-        self.np_lb_filtered = self.np_lb[self.b_filter]
-        self.np_ub_filtered = self.np_ub[self.b_filter]
-        self.np_lbA_filtered = self.np_lbA[self.bA_filter]
-        self.np_ubA_filtered = self.np_ubA[self.bA_filter]
-
     def _are_hard_limits_violated(self, error_message):
         num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
         num_of_slack = len(self.np_lb_filtered) - num_non_slack
@@ -1362,25 +1325,6 @@ class QPProblemBuilder:
                         list(lower_violations.index))
                 raise HardConstraintsViolatedException(error_message)
         logging.loginfo('No slack limit violation detected.')
-
-    def split_xdot(self, xdot) -> derivative_joint_map:
-        split = {}
-        offset = len(self.free_variables)
-        for derivative in range(Derivatives.velocity, self.order + 1):
-            split.update(
-                {x.get_symbol(derivative): xdot[i + offset * self.prediction_horizon * (derivative - 1)] for i, x in
-                 enumerate(self.free_variables)})
-            # split[Derivatives(derivative)] = OrderedDict((x.position_name,
-            #                                               xdot[i + offset * self.prediction_horizon * (derivative - 1)])
-            #                                              for i, x in enumerate(self.free_variables))
-        return split
-        return False
-
-    def b_names(self):
-        return self.b.names
-
-    def bA_names(self):
-        return self.bA.names
 
     def _viz_mpc(self, joint_name):
         def pad(a, desired_length):

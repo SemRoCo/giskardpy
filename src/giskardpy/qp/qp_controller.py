@@ -744,15 +744,15 @@ class InequalityModel(ProblemDataPart):
     def velocity_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
         """
         model
-        |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   | prediction horizon
-        |v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3| free variables
-        |-----------------------------------------------------|
-        |  Jv*sp |        |  Ja*sp |        |  Jj*sp |        |
-        |  Jv*sp |        |  Ja*sp |        |  Jj*sp |        |
-        |-----------------------------------------------------|
-        |        |  Jv*sp |        |  Ja*sp |        |  Jj*sp |
-        |        |  Jv*sp |        |  Ja*sp |        |  Jj*sp |
-        |-----------------------------------------------------|
+        |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   | prediction horizon
+        |v1 v2 v3|v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|j1 j2 j3| free variables
+        |--------------------------------------------------------------------------------|
+        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |        |
+        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |        |
+        |--------------------------------------------------------------------------------|
+        |        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |
+        |        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |
+        |--------------------------------------------------------------------------------|
 
         slack model
         |   t1 |   t2 | prediction horizon
@@ -775,6 +775,15 @@ class InequalityModel(ProblemDataPart):
                 J_vel_limit_block = cas.kron(cas.eye(self.prediction_horizon), J_vel)
                 horizontal_offset = self.number_of_free_variables * self.prediction_horizon
                 model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_vel_limit_block
+
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            rows_to_delete = []
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_constraints):
+                    v_index = i + (t * len(self.velocity_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+            model.remove(rows_to_delete, [])
 
             # constraint slack
             num_slack_variables = sum(c.control_horizon for c in self.velocity_constraints)
@@ -811,6 +820,15 @@ class InequalityModel(ProblemDataPart):
             model[:, :horizontal_offset] = J_vel_block
             model[:, horizontal_offset:horizontal_offset * 2] = J_acc_block
             model[:, horizontal_offset * 2:horizontal_offset * 3] = J_jerk_block
+
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            rows_to_delete = []
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_constraints):
+                    v_index = i + (t * len(self.velocity_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+            model.remove(rows_to_delete, [])
 
             # slack model
             num_slack_variables = sum(c.control_horizon for c in self.acceleration_constraints)
@@ -856,6 +874,15 @@ class InequalityModel(ProblemDataPart):
             model[:, horizontal_offset:horizontal_offset * 2] = J_acc_block
             model[:, horizontal_offset * 2:horizontal_offset * 3] = J_jerk_block
             model[:, horizontal_offset * 3:horizontal_offset * 4] = J_snap_block
+
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            rows_to_delete = []
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_constraints):
+                    v_index = i + (t * len(self.velocity_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+            model.remove(rows_to_delete, [])
 
             # slack model
             num_slack_variables = sum(c.control_horizon for c in self.jerk_constraints)

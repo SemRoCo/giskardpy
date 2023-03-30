@@ -120,6 +120,7 @@ class QPSWIFTFormatter(QPSolver):
         self.num_eq_slack_variables = E_slack.shape[1]
         self.num_neq_slack_variables = A_slack.shape[1]
         self.num_slack_variables = self.num_eq_slack_variables + self.num_neq_slack_variables
+        self.num_non_slack_variables = self.num_free_variable_constraints - self.num_slack_variables
 
         combined_problem_data = cas.zeros(4 + bE.shape[0] + lbA.shape[0] * 2, weights.shape[0] + 1)
         self.weights_slice = (0, slice(None, -1))
@@ -128,13 +129,13 @@ class QPSWIFTFormatter(QPSolver):
         self.ub_slice = (3, slice(None, -1))
         offset = 4
         self.E_slice = (slice(offset, offset + self.num_eq_constraints), slice(None, E.shape[1]))
-        self.E_slack_slice = (self.E_slice[0], slice(E.shape[1], E.shape[1] + E_slack.shape[1]))
+        self.E_slack_slice = (self.E_slice[0], slice(self.num_non_slack_variables, E.shape[1] + E_slack.shape[1]))
         self.E_E_slack_slice = (self.E_slice[0], slice(None, -1))
         self.bE_slice = (self.E_slice[0], -1)
         offset += self.num_eq_constraints
 
         self.nA_slice = (slice(offset, offset + self.num_neq_constraints), slice(None, A.shape[1]))
-        self.nA_slack_slice = (self.nA_slice[0], slice(A.shape[1] + E_slack.shape[1], -1))
+        self.nA_slack_slice = (self.nA_slice[0], slice(self.num_non_slack_variables + E_slack.shape[1], -1))
         self.nlbA_slice = (self.nA_slice[0], -1)
         offset += self.num_neq_constraints
 
@@ -149,15 +150,17 @@ class QPSWIFTFormatter(QPSolver):
         combined_problem_data[self.g_slice] = g
         combined_problem_data[self.nlb_slice] = -lb
         combined_problem_data[self.ub_slice] = ub
-        combined_problem_data[self.E_slice] = E
-        combined_problem_data[self.E_slack_slice] = E_slack
-        combined_problem_data[self.bE_slice] = bE
-        combined_problem_data[self.nA_slice] = -A
-        combined_problem_data[self.nA_slack_slice] = -A_slack
-        combined_problem_data[self.nlbA_slice] = -lbA
-        combined_problem_data[self.A_slice] = A
-        combined_problem_data[self.A_slack_slice] = A_slack
-        combined_problem_data[self.ubA_slice] = ubA
+        if self.num_eq_constraints > 0:
+            combined_problem_data[self.E_slice] = E
+            combined_problem_data[self.E_slack_slice] = E_slack
+            combined_problem_data[self.bE_slice] = bE
+        if self.num_neq_constraints > 0:
+            combined_problem_data[self.nA_slice] = -A
+            combined_problem_data[self.nA_slack_slice] = -A_slack
+            combined_problem_data[self.nlbA_slice] = -lbA
+            combined_problem_data[self.A_slice] = A
+            combined_problem_data[self.A_slack_slice] = A_slack
+            combined_problem_data[self.ubA_slice] = ubA
 
         self.qp_setup_function = combined_problem_data.compile()
 

@@ -442,10 +442,11 @@ class AvoidSingleJointLimits(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        self.add_equality_constraint(reference_velocity=max_velocity,
-                                     equality_bound=lower_err,
-                                     weight=weight,
-                                     task_expression=joint_symbol)
+        self.add_inequality_constraint(reference_velocity=max_velocity,
+                                       lower_error=lower_err,
+                                       upper_error=upper_err,
+                                       weight=weight,
+                                       task_expression=joint_symbol)
 
     def __str__(self):
         s = super().__str__()

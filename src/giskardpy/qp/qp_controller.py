@@ -1099,10 +1099,10 @@ class QPProblemBuilder:
         A, A_slack = self.inequality_model.construct_expression()
         lbA, ubA = self.inequality_bounds.construct_expression()
         E, E_slack = self.equality_model.construct_expression()
-        b = self.equality_bounds.construct_expression()
+        bE = self.equality_bounds.construct_expression()
 
         self.qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
-                                              E=E, E_slack=E_slack, b=b,
+                                              E=E, E_slack=E_slack, bE=bE,
                                               A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
         self._compile_debug_expressions()
 

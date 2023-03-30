@@ -444,16 +444,24 @@ class InequalityBounds(ProblemDataPart):
         return lower, upper
 
     def lower_inequality_constraint_bound(self):
-        return {f'{c.name}/e': cas.limit(c.lower_error,
-                                         -c.velocity_limit * self.dt * c.control_horizon,
-                                         c.velocity_limit * self.dt * c.control_horizon)
-                for c in self.inequality_constraints}
+        bounds = {}
+        for constraint in self.inequality_constraints:
+            limit = constraint.velocity_limit * self.dt * constraint.control_horizon
+            if isinstance(constraint.lower_error, float) and np.isinf(constraint.lower_error):
+                bounds[f'{constraint.name}/e'] = constraint.lower_error
+            else:
+                bounds[f'{constraint.name}/e'] = cas.limit(constraint.lower_error, -limit, limit)
+        return bounds
 
     def upper_inequality_constraint_bound(self):
-        return {f'{c.name}/e': cas.limit(c.upper_error,
-                                         -c.velocity_limit * self.dt * c.control_horizon,
-                                         c.velocity_limit * self.dt * c.control_horizon)
-                for c in self.inequality_constraints}
+        bounds = {}
+        for constraint in self.inequality_constraints:
+            limit = constraint.velocity_limit * self.dt * constraint.control_horizon
+            if isinstance(constraint.upper_error, float) and np.isinf(constraint.upper_error):
+                bounds[f'{constraint.name}/e'] = constraint.upper_error
+            else:
+                bounds[f'{constraint.name}/e'] = cas.limit(constraint.upper_error, -limit, limit)
+        return bounds
 
     def position_limits(self) -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
         lb = {}

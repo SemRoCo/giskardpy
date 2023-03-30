@@ -1269,28 +1269,28 @@ class QPProblemBuilder:
             self.xdot_full = None
             self._create_debug_pandas()
             joint_limits_violated_msg = self._are_joint_limits_violated()
-            if joint_limits_violated_msg is not None:
-                self.__swap_compiled_matrices()
-                try:
-                    self.evaluate_and_create_np_data(substitutions)
-                    self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
-                                                          g=self.np_g_filtered,
-                                                          A=self.np_A_filtered,
-                                                          lb=self.np_lb_filtered,
-                                                          ub=self.np_ub_filtered,
-                                                          lbA=self.np_lbA_filtered,
-                                                          ubA=self.np_ubA_filtered)
-                    return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
-                                        max_derivative=self.order, prediction_horizon=self.prediction_horizon)
-                except Exception as e2:
-                    # self._create_debug_pandas()
-                    # raise OutOfJointLimitsException(self._are_joint_limits_violated())
-                    raise OutOfJointLimitsException(joint_limits_violated_msg)
-                finally:
-                    self.__swap_compiled_matrices()
-            #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
-            self._are_hard_limits_violated(str(e_original))
-            self._is_inf_in_data()
+            # if joint_limits_violated_msg is not None:
+            #     self.__swap_compiled_matrices()
+            #     try:
+            #         self.evaluate_and_create_np_data(substitutions)
+            #         self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
+            #                                               g=self.np_g_filtered,
+            #                                               A=self.np_A_filtered,
+            #                                               lb=self.np_lb_filtered,
+            #                                               ub=self.np_ub_filtered,
+            #                                               lbA=self.np_lbA_filtered,
+            #                                               ubA=self.np_ubA_filtered)
+            #         return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
+            #                             max_derivative=self.order, prediction_horizon=self.prediction_horizon)
+            #     except Exception as e2:
+            #         # self._create_debug_pandas()
+            #         # raise OutOfJointLimitsException(self._are_joint_limits_violated())
+            #         raise OutOfJointLimitsException(joint_limits_violated_msg)
+            #     finally:
+            #         self.__swap_compiled_matrices()
+            # #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
+            # self._are_hard_limits_violated(str(e_original))
+            # self._is_inf_in_data()
             raise
 
     def _are_hard_limits_violated(self, error_message):

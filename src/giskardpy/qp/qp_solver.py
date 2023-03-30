@@ -182,8 +182,8 @@ class QPSWIFTFormatter(QPSolver):
         try:
             relaxed_problem_data = self.problem_data_to_qpSWIFT_format(weights=weights,
                                                                        nA_A=nA_A,
-                                                                       nlb=nlb,
-                                                                       ub=ub,
+                                                                       nlb=nlb_relaxed,
+                                                                       ub=ub_relaxed,
                                                                        nlbA_ubA=nlbA_ubA)
             xdot_full = self.solver_call(*relaxed_problem_data)
         except QPSolverException as e:

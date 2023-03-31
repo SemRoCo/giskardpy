@@ -63,6 +63,8 @@ class Symbol_:
         return self.s.__hash__()
 
     def __getitem__(self, item):
+        if isinstance(item, np.ndarray) and item.dtype == bool:
+            item = np.where(item)[0]
         return Expression(self.s[item])
 
     def __setitem__(self, key, value):

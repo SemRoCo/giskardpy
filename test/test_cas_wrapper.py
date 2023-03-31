@@ -82,6 +82,17 @@ class TestExpression(unittest.TestCase):
         m = w.Expression()
         assert m.shape[0] == m.shape[1] == 0
 
+    def test_filter1(self):
+        e_np = np.arange(16) * 2
+        e = w.Expression(e_np)
+        filter_ = np.zeros(16, dtype=bool)
+        filter_[3] = True
+        filter_[5] = True
+        actual = e[filter_].evaluate()
+        expected = e_np[filter_]
+        assert np.all(actual.T[0] == expected)
+
+
     @given(float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_add(self, f1, f2):
         expected = f1 + f2

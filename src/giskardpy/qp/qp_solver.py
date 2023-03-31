@@ -155,6 +155,9 @@ class QPSWIFTFormatter(QPSolver):
 
         self.update_filters()
         self.apply_filters()
+        self.nAi_Ai = self._direct_limit_model(self.weights.shape[0])
+
+        self.filter_inf_entries()
         if relax_hard_constraints:
             return self.relaxed_problem_data_to_qpSWIFT_format(self.weights, self.nA_A, self.nlb, self.ub,
                                                                self.nlbA_ubA)
@@ -165,8 +168,7 @@ class QPSWIFTFormatter(QPSolver):
                                        ub: np.ndarray, nlbA_ubA: np.ndarray) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         H = np.diag(weights)
-        A_d = self.__direct_limit_model(weights.shape[0])
-        A = np.concatenate((A_d, nA_A))
+        A = np.concatenate((self.nAi_Ai, nA_A))
         nlb_ub_nlbA_ubA = np.concatenate((nlb, ub, nlbA_ubA))
         return H, self.g, self.E, self.bE, A, nlb_ub_nlbA_ubA
 
@@ -191,10 +193,11 @@ class QPSWIFTFormatter(QPSolver):
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
-        upper_violations = ub < xdot_full
-        lower_violations = nlb < xdot_full
+        upper_violations = ub < xdot_full[self.ub_inf_filter]
+        lower_violations = nlb < xdot_full[self.lb_inf_filter]
         if np.any(upper_violations) or np.any(lower_violations):
-            weights[upper_violations | lower_violations] *= self.retry_weight_factor
+            weights[self.ub_inf_filter][upper_violations] *= self.retry_weight_factor
+            weights[self.lb_inf_filter][lower_violations] *= self.retry_weight_factor
             return self.problem_data_to_qpSWIFT_format(weights=weights,
                                                        nA_A=nA_A,
                                                        nlb=nlb_relaxed,
@@ -220,6 +223,18 @@ class QPSWIFTFormatter(QPSolver):
         self.bA_filter = np.concatenate((self.bA_filter_half, self.bA_filter_half))
 
     @profile
+    def filter_inf_entries(self):
+        self.lb_inf_filter = self.nlb != np.inf
+        self.ub_inf_filter = self.ub != np.inf
+        self.lbA_ubA_inf_filter = self.nlbA_ubA != np.inf
+        self.lb_ub_inf_filter = np.concatenate((self.lb_inf_filter, self.ub_inf_filter))
+        self.nAi_Ai = self.nAi_Ai[self.lb_ub_inf_filter]
+        self.nlb = self.nlb[self.lb_inf_filter]
+        self.ub = self.ub[self.ub_inf_filter]
+        self.nlbA_ubA = self.nlbA_ubA[self.lbA_ubA_inf_filter]
+        self.nA_A = self.nA_A[self.lbA_ubA_inf_filter]
+
+    @profile
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
         self.g = np.zeros(*self.weights.shape)
@@ -231,7 +246,7 @@ class QPSWIFTFormatter(QPSolver):
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
 
     @memoize
-    def __direct_limit_model(self, dimensions):
+    def _direct_limit_model(self, dimensions):
         I = np.eye(dimensions)
         return np.concatenate([-I, I])
 

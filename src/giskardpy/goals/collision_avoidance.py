@@ -134,10 +134,10 @@ class ExternalCollisionAvoidance(Goal):
         #     self.add_debug_expr('actual_distance', actual_distance)
         self.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
-                                       upper_error=100,
+                                       upper_error=float('inf'),
                                        weight=weight,
                                        task_expression=dist,
-                                       lower_slack_limit=-1e4,
+                                       lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
 
     def __str__(self):
@@ -244,10 +244,10 @@ class SelfCollisionAvoidance(Goal):
 
         self.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
-                                       upper_error=100,
+                                       upper_error=float('inf'),
                                        weight=weight,
                                        task_expression=dist,
-                                       lower_slack_limit=-1e4,
+                                       lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
 
     def __str__(self):

@@ -98,11 +98,27 @@ class QPSWIFTFormatter(QPSolver):
         self.num_slack_variables = self.num_eq_slack_variables + self.num_neq_slack_variables
         self.num_non_slack_variables = self.num_free_variable_constraints - self.num_slack_variables
 
-        combined_problem_data = cas.zeros(4 + bE.shape[0] + lbA.shape[0] * 2, weights.shape[0] + 1)
+        self.lb_inf_filter = self.to_filter(lb)
+        self.ub_inf_filter = self.to_filter(ub)
+        nlb_without_inf = -lb[self.lb_inf_filter]
+        ub_without_inf = ub[self.ub_inf_filter]
+
+        self.nlbA_inf_filter = self.to_filter(lbA)
+        self.ubA_inf_filter = self.to_filter(ubA)
+        nlbA_without_inf = -lbA[self.nlbA_inf_filter]
+        ubA_without_inf = ubA[self.ubA_inf_filter]
+        nA_without_inf = -A[self.nlbA_inf_filter]
+        nA_slack_without_inf = -A_slack[self.nlbA_inf_filter]
+        A_without_inf = A[self.ubA_inf_filter]
+        A_slack_without_inf = A_slack[self.ubA_inf_filter]
+        self.nlbA_ubA_inf_filter = np.concatenate((self.nlbA_inf_filter, self.ubA_inf_filter))
+
+        combined_problem_data = cas.zeros(4 + bE.shape[0] + nlbA_without_inf.shape[0] + ubA_without_inf.shape[0],
+                                          weights.shape[0] + 1)
         self.weights_slice = (0, slice(None, -1))
         self.g_slice = (1, slice(None, -1))
-        self.nlb_slice = (2, slice(None, -1))
-        self.ub_slice = (3, slice(None, -1))
+        self.nlb_slice = (2, slice(None, len(nlb_without_inf)))
+        self.ub_slice = (3, slice(None, len(ub_without_inf)))
         offset = 4
         self.E_slice = (slice(offset, offset + self.num_eq_constraints), slice(None, E.shape[1]))
         self.E_slack_slice = (self.E_slice[0], slice(self.num_non_slack_variables, E.shape[1] + E_slack.shape[1]))
@@ -110,10 +126,11 @@ class QPSWIFTFormatter(QPSolver):
         self.bE_slice = (self.E_slice[0], -1)
         offset += self.num_eq_constraints
 
-        self.nA_slice = (slice(offset, offset + self.num_neq_constraints), slice(None, A.shape[1]))
+        next_offset = offset + nA_without_inf.shape[0]
+        self.nA_slice = (slice(offset, next_offset), slice(None, A.shape[1]))
         self.nA_slack_slice = (self.nA_slice[0], slice(self.num_non_slack_variables + E_slack.shape[1], -1))
         self.nlbA_slice = (self.nA_slice[0], -1)
-        offset += self.num_neq_constraints
+        offset = next_offset
 
         self.A_slice = (slice(offset, None), self.nA_slice[1])
         self.A_slack_slice = (self.A_slice[0], self.nA_slack_slice[1])
@@ -124,21 +141,27 @@ class QPSWIFTFormatter(QPSolver):
 
         combined_problem_data[self.weights_slice] = weights
         combined_problem_data[self.g_slice] = g
-        combined_problem_data[self.nlb_slice] = -lb
-        combined_problem_data[self.ub_slice] = ub
+        combined_problem_data[self.nlb_slice] = nlb_without_inf
+        combined_problem_data[self.ub_slice] = ub_without_inf
         if self.num_eq_constraints > 0:
             combined_problem_data[self.E_slice] = E
             combined_problem_data[self.E_slack_slice] = E_slack
             combined_problem_data[self.bE_slice] = bE
         if self.num_neq_constraints > 0:
-            combined_problem_data[self.nA_slice] = -A
-            combined_problem_data[self.nA_slack_slice] = -A_slack
-            combined_problem_data[self.nlbA_slice] = -lbA
-            combined_problem_data[self.A_slice] = A
-            combined_problem_data[self.A_slack_slice] = A_slack
-            combined_problem_data[self.ubA_slice] = ubA
+            combined_problem_data[self.nA_slice] = nA_without_inf
+            combined_problem_data[self.nA_slack_slice] = nA_slack_without_inf
+            combined_problem_data[self.nlbA_slice] = nlbA_without_inf
+            combined_problem_data[self.A_slice] = A_without_inf
+            combined_problem_data[self.A_slack_slice] = A_slack_without_inf
+            combined_problem_data[self.ubA_slice] = ubA_without_inf
 
         self.qp_setup_function = combined_problem_data.compile()
+
+    @staticmethod
+    def to_filter(casadi_array):
+        compiled = casadi_array.compile()
+        inf_filter = np.isfinite(compiled.fast_call(np.zeros(compiled.shape)).T[0])
+        return inf_filter
 
     @profile
     def split_and_filter_results(self, combined_problem_data: np.ndarray, relax_hard_constraints: bool = False) \
@@ -157,7 +180,7 @@ class QPSWIFTFormatter(QPSolver):
         self.apply_filters()
         self.nAi_Ai = self._direct_limit_model(self.weights.shape[0])
 
-        self.filter_inf_entries()
+        # self.filter_inf_entries()
         if relax_hard_constraints:
             return self.relaxed_problem_data_to_qpSWIFT_format(self.weights, self.nA_A, self.nlb, self.ub,
                                                                self.nlbA_ubA)
@@ -217,6 +240,7 @@ class QPSWIFTFormatter(QPSolver):
         self.bE_filter = np.ones(self.E.shape[0], dtype=bool)
         if len(bE_part) > 0:
             self.bE_filter[-len(bE_part):] = bE_part
+        # fixme can't divide in half anymore, since lbA and ubA might not be the same length
         self.bA_filter_half = np.ones(int(self.nA_A.shape[0] / 2), dtype=bool)
         if len(bA_part) > 0:
             self.bA_filter_half[-len(bA_part):] = bA_part
@@ -238,8 +262,8 @@ class QPSWIFTFormatter(QPSolver):
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
         self.g = np.zeros(*self.weights.shape)
-        self.nlb = self.nlb[self.weight_filter]
-        self.ub = self.ub[self.weight_filter]
+        self.nlb = self.nlb[self.weight_filter[self.lb_inf_filter]]
+        self.ub = self.ub[self.weight_filter[self.ub_inf_filter]]
         self.E = self.E[self.bE_filter, :][:, self.weight_filter]
         self.bE = self.bE[self.bE_filter]
         self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]

@@ -128,14 +128,14 @@ class QPSWIFTFormatter(QPSolver):
         self.ubA_slice = (self.A_slice[0], -1)
 
         self.nI_I_nA_nA_slack_A_A_slack_slice = (slice(1 + self.num_eq_constraints, None), slice(None, -1))
-        self.nlb_nlbA_ub_ubA_slice = (self.nI_I_nA_nA_slack_A_A_slack_slice[0], -1)
+        self.nlb_ub_nlbA_ubA_slice = (self.nI_I_nA_nA_slack_A_A_slack_slice[0], -1)
 
         combined_problem_data[self.weights_slice] = weights
         if self.num_eq_constraints > 0:
             combined_problem_data[self.E_slice] = E
             combined_problem_data[self.E_slack_slice] = E_slack
             combined_problem_data[self.bE_slice] = bE
-        combined_problem_data[self.nI_slice] = -cas.eye(self.num_free_variable_constraints)
+        combined_problem_data[self.nI_slice] = cas.eye(self.num_free_variable_constraints)
         combined_problem_data[self.nlb_slice] = -lb
         if self.num_neq_constraints > 0:
             combined_problem_data[self.nA_slice] = -A
@@ -159,7 +159,7 @@ class QPSWIFTFormatter(QPSolver):
         self.E = combined_problem_data[self.E_E_slack_slice]
         self.bE = combined_problem_data[self.bE_slice]
         self.nI_nA_I_A = combined_problem_data[self.nI_I_nA_nA_slack_A_A_slack_slice]
-        self.nlb_nlbA_ub_ubA = combined_problem_data[self.nlb_nlbA_ub_ubA_slice]
+        self.nlb_nlbA_ub_ubA = combined_problem_data[self.nlb_ub_nlbA_ubA_slice]
 
         self.update_filters()
         self.apply_filters()
@@ -168,10 +168,10 @@ class QPSWIFTFormatter(QPSolver):
         return self.problem_data_to_qpSWIFT_format(self.weights, self.nI_nA_I_A, self.nlb_nlbA_ub_ubA)
 
     @profile
-    def problem_data_to_qpSWIFT_format(self, weights: np.ndarray, nI_nA_I_A: np.ndarray, nlb_nlbA_ub_ubA: np.ndarray) \
+    def problem_data_to_qpSWIFT_format(self, weights: np.ndarray, nI_I_nA_A: np.ndarray, nlb_ub_nlbA_ubA: np.ndarray) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         H = np.diag(weights)
-        return H, self.g, self.E, self.bE, nI_nA_I_A, nlb_nlbA_ub_ubA
+        return H, self.g, self.E, self.bE, nI_I_nA_A, nlb_ub_nlbA_ubA
 
     @profile
     def relaxed_problem_data_to_qpSWIFT_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb_ub_nlbA_ubA: np.ndarray) \
@@ -232,6 +232,11 @@ class QPSWIFTFormatter(QPSolver):
         self.nI_nA_I_A = self.nI_nA_I_A[:, self.weight_filter][self.bA_filter, :]
         self.nlb_nlbA_ub_ubA = self.nlb_nlbA_ub_ubA[self.bA_filter]
 
+    @memoize
+    def __direct_limit_model(self, dimensions):
+        I = np.eye(dimensions)
+        return np.concatenate([-I, I])
+
     @profile
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
                                         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -240,21 +245,15 @@ class QPSWIFTFormatter(QPSolver):
         """
         weights = self.weights
         g = self.g
-        I_length = len(weights)
-        A_half = int(self.nI_nA_I_A.shape[0] / 2)
-        I_A = self.nI_nA_I_A[A_half:, :]
-        A = I_A[I_length:]
-
-        nlb_nlbA = self.nlb_nlbA_ub_ubA[:A_half]
-        ub_ubA = self.nlb_nlbA_ub_ubA[A_half:]
-        lb = -nlb_nlbA[:I_length]
-        lbA = -nlb_nlbA[I_length:]
-        ub = ub_ubA[:I_length]
-        ubA = ub_ubA[I_length:]
-
+        lb = -self.nlb
+        ub = self.ub
+        A = self.nA_A[int(self.nA_A.shape[0] / 2):, :]
+        bA_half = int(self.nlbA_ubA.shape[0] / 2)
+        lbA = -self.nlbA_ubA[:bA_half]
+        ubA = self.nlbA_ubA[bA_half:]
         E = self.E
         bE = self.bE
-        return weights, g, lb, ub, E, bE, A, lbA, ubA, self.weight_filter, self.bE_filter, self.bA_filter_half[len(self.weight_filter):]
+        return weights, g, lb, ub, E, bE, A, lbA, ubA, self.weight_filter, self.bE_filter, self.bA_filter_half
 
     @abc.abstractmethod
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \

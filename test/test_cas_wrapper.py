@@ -92,6 +92,16 @@ class TestExpression(unittest.TestCase):
         expected = e_np[filter_]
         assert np.all(actual.T[0] == expected)
 
+    def test_filter2(self):
+        e_np = np.arange(16) * 2
+        e_np = e_np.reshape((4, 4))
+        e = w.Expression(e_np)
+        filter_ = np.zeros(4, dtype=bool)
+        filter_[1] = True
+        filter_[2] = True
+        actual = e[filter_].evaluate()
+        expected = e_np[filter_]
+        np.testing.assert_array_almost_equal(actual, expected)
 
     @given(float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_add(self, f1, f2):
@@ -1300,7 +1310,7 @@ class TestCASWrapper(unittest.TestCase):
         m3_e = w.Expression(m3_np)
         e = w.diag_stack([m1_e, m2_e, m3_e])
         r1 = e.evaluate()
-        combined_matrix = np.zeros((4+2+5, 4+5+3))
+        combined_matrix = np.zeros((4 + 2 + 5, 4 + 5 + 3))
         row_counter = 0
         column_counter = 0
         for matrix in [m1_np, m2_np, m3_np]:

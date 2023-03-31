@@ -64,7 +64,7 @@ class Symbol_:
 
     def __getitem__(self, item):
         if isinstance(item, np.ndarray) and item.dtype == bool:
-            item = np.where(item)[0]
+            item = (np.where(item)[0], slice(None, None))
         return Expression(self.s[item])
 
     def __setitem__(self, key, value):

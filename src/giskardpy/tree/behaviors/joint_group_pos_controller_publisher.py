@@ -20,6 +20,7 @@ class JointGroupPosController(CommandPublisher):
         for i in range(len(self.joint_names)):
             self.joint_names[i] = self.world.search_for_joint_name(self.joint_names[i])
         self.world.register_controlled_joints(self.joint_names)
+        self.js = None
 
     @profile
     def initialise(self):
@@ -27,6 +28,7 @@ class JointGroupPosController(CommandPublisher):
             return self.god_map.expr_to_key[joint_symbol][-2]
 
         self.symbol_to_joint_map = KeyDefaultDict(f)
+        self.js = deepcopy(self.world.state)
         super().initialise()
 
     def publish_joint_state(self, time):
@@ -45,10 +47,11 @@ class JointGroupPosController(CommandPublisher):
                 jerk = qp_data[Derivatives.jerk][key]
                 delta = velocity * dt + (acc * dt**2) / 2 + (jerk * dt**3) / 6
 
-                position = js[joint_name].position + delta
+                position = self.js[joint_name].position + delta * 0.1
 
             except KeyError:
                 position = js[joint_name].position
             msg.data.append(position)
+            self.js[joint_name].position = position
 
         self.cmd_pub.publish(msg)

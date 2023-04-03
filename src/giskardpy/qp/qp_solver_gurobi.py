@@ -5,7 +5,7 @@ from scipy import sparse
 
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver import QPSolver, QPSWIFTFormatter
 from giskardpy.utils import logging
 from giskardpy.utils.utils import record_time
 
@@ -44,35 +44,22 @@ error_info = {
 }
 
 
-class QPSolverGurobi(QPSolver):
+class QPSolverGurobi(QPSWIFTFormatter):
     solver_id = SupportedQPSolver.gurobi
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if
                          '__' not in name}
 
-    def __init__(self, num_non_slack: int, retry_added_slack: float, retry_weight_factor: float,
-                 retries_with_relaxed_constraints: int):
-        super().__init__(num_non_slack, retry_added_slack, retry_weight_factor, retries_with_relaxed_constraints)
-        self.started = False
-
     @profile
-    def init(self, H, g, A, lb, ub, lbA, ubA):
+    def init(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray):
         self.qpProblem = gurobipy.Model('qp')
-        self.x = self.qpProblem.addMVar(lb.shape, lb=lb, ub=ub)
+        self.x = self.qpProblem.addMVar(H.shape[0], lb=-1000, ub=1000)
         self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
         # H = sparse.csc_matrix(H)
+        E = sparse.csc_matrix(E)
         A = sparse.csc_matrix(A)
-        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
-        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
+        self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
+        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, h)
         self.started = False
-
-    # def update(self, H, g, A, lb, ub, lbA, ubA):
-    #     self.x.lb = lb
-    #     self.x.ub = ub
-    #     # self.qpProblem.setMObjective()
-    #     self.qpProblem.remove(self.qpProblem.getConstrs())
-    #     self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
-    #     self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
-    #     self.qpProblem.setMObjective(H, None, 0.0)
 
     def print_debug(self):
         gurobipy.setParam('LogToConsole', True)
@@ -83,15 +70,11 @@ class QPSolverGurobi(QPSolver):
         self.qpProblem.printQuality()
         gurobipy.setParam('LogToConsole', False)
 
-    def round(self, data, decimal_places):
-        return np.round(data, decimal_places)
-
-    @profile
     @record_time
-    def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
-              ubA: np.ndarray) -> np.ndarray:
-        H = np.diag(weights)
-        self.init(H, g, A, lb, ub, lbA, ubA)
+    @profile
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \
+            -> np.ndarray:
+        self.init(H, g, E, b, A, h)
         self.qpProblem.optimize()
         success = self.qpProblem.status
         if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
@@ -101,32 +84,3 @@ class QPSolverGurobi(QPSolver):
         if success == gurobipy.GRB.INFEASIBLE:
             raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
         raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
-
-    @profile
-    def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
-        exception = None
-        for i in range(2):
-            try:
-                return self.solve(weights, g, A, lb, ub, lbA, ubA)
-            except QPSolverException as e:
-                exception = e
-                # if e.error_code == gurobipy.GRB.NUMERIC:
-                #     logging.logwarn(f'Solver returned \'{e}\', '
-                #                     f'retrying with data rounded to \'{self.on_fail_round_to}\' decimal places')
-                #     weights = self.round(weights, self.on_fail_round_to)
-                #     A = self.round(A, self.on_fail_round_to)
-                #     lb = self.round(lb, self.on_fail_round_to)
-                #     ub = self.round(ub, self.on_fail_round_to)
-                #     lbA = self.round(lbA, self.on_fail_round_to)
-                #     ubA = self.round(ubA, self.on_fail_round_to)
-                #     continue
-                # if isinstance(e, InfeasibleException):
-                try:
-                    weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
-                    logging.loginfo(f'{e}; retrying with relaxed hard constraints')
-                except InfeasibleException as e2:
-                    if isinstance(e2, HardConstraintsViolatedException):
-                        raise e2
-                    raise e
-                continue
-        raise exception

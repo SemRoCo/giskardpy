@@ -254,9 +254,8 @@ class QPSWIFTFormatter(QPSolver):
             self.nlbA_filter_half = self.nlbA_filter_half[self.nlbA_inf_filter]
             self.ubA_filter_half = self.ubA_filter_half[self.ubA_inf_filter]
         self.bA_filter = np.concatenate((self.nlbA_filter_half, self.ubA_filter_half))
-        self.nAi_filter = self.weight_filter & self.lb_inf_filter
-        self.Ai_filter = self.weight_filter & self.ub_inf_filter
-        self.nAi_Ai_filter = np.concatenate((self.nAi_filter, self.Ai_filter))
+        self.nAi_Ai_filter = np.concatenate((self.lb_inf_filter[self.weight_filter],
+                                             self.ub_inf_filter[self.weight_filter]))
 
     @profile
     def filter_inf_entries(self):
@@ -280,7 +279,7 @@ class QPSWIFTFormatter(QPSolver):
         self.bE = self.bE[self.bE_filter]
         self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
-        self.nAi_Ai = self._direct_limit_model(self.weight_filter.shape[0])[self.nAi_Ai_filter][:,self.weight_filter]
+        self.nAi_Ai = self._direct_limit_model(self.weights.shape[0])[self.nAi_Ai_filter]
 
     @memoize
     def _direct_limit_model(self, dimensions):

@@ -59,8 +59,8 @@ class PR2_Base(Giskard):
                                              velocity_limit=2)
         self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
                                                  acceleration_limit=4)
-        self.set_default_weights(velocity_weight=0.001,
-                                 acceleration_weight=0.001)
+        self.set_default_weights(velocity_weight=0.01,
+                                 acceleration_weight=0.01)
 
 
 class PR2_Mujoco(PR2_Base):

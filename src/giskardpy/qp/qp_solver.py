@@ -112,6 +112,8 @@ class QPSWIFTFormatter(QPSolver):
         A_without_inf = A[self.ubA_inf_filter]
         A_slack_without_inf = A_slack[self.ubA_inf_filter]
         self.nlbA_ubA_inf_filter = np.concatenate((self.nlbA_inf_filter, self.ubA_inf_filter))
+        self.len_lbA = nlbA_without_inf.shape[0]
+        self.len_ubA = ubA_without_inf.shape[0]
 
         combined_problem_data = cas.zeros(4 + bE.shape[0] + nlbA_without_inf.shape[0] + ubA_without_inf.shape[0],
                                           weights.shape[0] + 1)
@@ -178,7 +180,6 @@ class QPSWIFTFormatter(QPSolver):
 
         self.update_filters()
         self.apply_filters()
-        self.nAi_Ai = self._direct_limit_model(self.weights.shape[0])
 
         # self.filter_inf_entries()
         if relax_hard_constraints:
@@ -216,11 +217,15 @@ class QPSWIFTFormatter(QPSolver):
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
-        upper_violations = ub < xdot_full[self.ub_inf_filter]
-        lower_violations = nlb < xdot_full[self.lb_inf_filter]
+        ub_filter = self.ub_inf_filter[self.weight_filter]
+        lb_filter = self.lb_inf_filter[self.weight_filter]
+        upper_violations = ub < xdot_full[ub_filter]
+        lower_violations = nlb < xdot_full[lb_filter]
+        ub_filter[ub_filter] = upper_violations
+        lb_filter[lb_filter] = lower_violations
         if np.any(upper_violations) or np.any(lower_violations):
-            weights[self.ub_inf_filter][upper_violations] *= self.retry_weight_factor
-            weights[self.lb_inf_filter][lower_violations] *= self.retry_weight_factor
+            weights[ub_filter] *= self.retry_weight_factor
+            weights[lb_filter] *= self.retry_weight_factor
             return self.problem_data_to_qpSWIFT_format(weights=weights,
                                                        nA_A=nA_A,
                                                        nlb=nlb_relaxed,
@@ -235,16 +240,23 @@ class QPSWIFTFormatter(QPSolver):
         self.weight_filter[:-self.num_slack_variables] = True
         slack_part = self.weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
         bE_part = slack_part[:self.num_eq_slack_variables]
-        bA_part = slack_part[self.num_eq_slack_variables:]
+        self.bA_part = slack_part[self.num_eq_slack_variables:]
 
         self.bE_filter = np.ones(self.E.shape[0], dtype=bool)
         if len(bE_part) > 0:
             self.bE_filter[-len(bE_part):] = bE_part
         # fixme can't divide in half anymore, since lbA and ubA might not be the same length
-        self.bA_filter_half = np.ones(int(self.nA_A.shape[0] / 2), dtype=bool)
-        if len(bA_part) > 0:
-            self.bA_filter_half[-len(bA_part):] = bA_part
-        self.bA_filter = np.concatenate((self.bA_filter_half, self.bA_filter_half))
+        self.nlbA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
+        self.ubA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
+        if len(self.bA_part) > 0:
+            self.nlbA_filter_half[-len(self.bA_part):] = self.bA_part
+            self.ubA_filter_half[-len(self.bA_part):] = self.bA_part
+            self.nlbA_filter_half = self.nlbA_filter_half[self.nlbA_inf_filter]
+            self.ubA_filter_half = self.ubA_filter_half[self.ubA_inf_filter]
+        self.bA_filter = np.concatenate((self.nlbA_filter_half, self.ubA_filter_half))
+        self.nAi_filter = self.weight_filter & self.lb_inf_filter
+        self.Ai_filter = self.weight_filter & self.ub_inf_filter
+        self.nAi_Ai_filter = np.concatenate((self.nAi_filter, self.Ai_filter))
 
     @profile
     def filter_inf_entries(self):
@@ -268,6 +280,7 @@ class QPSWIFTFormatter(QPSolver):
         self.bE = self.bE[self.bE_filter]
         self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
+        self.nAi_Ai = self._direct_limit_model(self.weight_filter.shape[0])[self.nAi_Ai_filter][:,self.weight_filter]
 
     @memoize
     def _direct_limit_model(self, dimensions):
@@ -282,15 +295,42 @@ class QPSWIFTFormatter(QPSolver):
         """
         weights = self.weights
         g = self.g
-        lb = -self.nlb
-        ub = self.ub
-        A = self.nA_A[int(self.nA_A.shape[0] / 2):, :]
-        bA_half = int(self.nlbA_ubA.shape[0] / 2)
-        lbA = -self.nlbA_ubA[:bA_half]
-        ubA = self.nlbA_ubA[bA_half:]
+        lb = (np.ones(self.lb_inf_filter.shape) * -np.inf)
+        ub = (np.ones(self.ub_inf_filter.shape) * np.inf)
+        lb[self.weight_filter & self.lb_inf_filter] = -self.nlb
+        ub[self.weight_filter & self.ub_inf_filter] = self.ub
+        lb = lb[self.weight_filter]
+        ub = ub[self.weight_filter]
+
+        num_nA_rows = np.where(self.nlbA_filter_half)[0].shape[0]
+        # num_A_rows = np.where(self.ubA_filter_half)[0].shape[0]
+        nA = self.nA_A[:num_nA_rows]
+        A = self.nA_A[num_nA_rows:]
+        merged_A = np.zeros((self.ubA_inf_filter.shape[0], self.weights.shape[0]))
+        nlbA_filter = self.nlbA_inf_filter.copy()
+        nlbA_filter[nlbA_filter] = self.nlbA_filter_half
+        merged_A[nlbA_filter] = nA
+
+        ubA_filter = self.ubA_inf_filter.copy()
+        ubA_filter[ubA_filter] = self.ubA_filter_half
+        merged_A[ubA_filter] = A
+
+        lbA = (np.ones(self.nlbA_inf_filter.shape) * -np.inf)
+        ubA = (np.ones(self.ubA_inf_filter.shape) * np.inf)
+        lbA[nlbA_filter] = -self.nlbA_ubA[:num_nA_rows]
+        ubA[ubA_filter] = self.nlbA_ubA[num_nA_rows:]
+
+        bA_filter = np.ones(merged_A.shape[0], dtype=bool)
+        bA_filter[-len(self.bA_part):] = self.bA_part
+
         E = self.E
         bE = self.bE
-        return weights, g, lb, ub, E, bE, A, lbA, ubA, self.weight_filter, self.bE_filter, self.bA_filter_half
+
+        merged_A = merged_A[bA_filter]
+        lbA = lbA[bA_filter]
+        ubA = ubA[bA_filter]
+
+        return weights, g, lb, ub, E, bE, merged_A, lbA, ubA, self.weight_filter, self.bE_filter, bA_filter
 
     @abc.abstractmethod
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \

@@ -381,7 +381,7 @@ class EqualityBounds(ProblemDataPart):
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
             bounds.append(self.last_derivative_values(derivative))
             bounds.append(self.derivative_links(derivative))
-        num_derivative_links = len(bounds)
+        num_derivative_links = sum(len(x) for x in bounds)
 
         bounds.append(self.equality_bounds())
 
@@ -1268,7 +1268,7 @@ class QPProblemBuilder:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self.__swap_compiled_matrices()
-            # self._create_debug_pandas()
+            self._create_debug_pandas()
             return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
                                 prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:
@@ -1296,33 +1296,34 @@ class QPProblemBuilder:
             #         raise OutOfJointLimitsException(joint_limits_violated_msg)
             #     finally:
             #         self.__swap_compiled_matrices()
-            # #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
-            # self._are_hard_limits_violated(str(e_original))
-            # self._is_inf_in_data()
+            #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
+            self._are_hard_limits_violated(str(e_original))
+            self._is_inf_in_data()
             raise
 
     def _are_hard_limits_violated(self, error_message):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
-        num_of_slack = len(self.np_lb_filtered) - num_non_slack
-        lb = self.np_lb_filtered.copy()
-        lb[-num_of_slack:] = -100
-        ub = self.np_ub_filtered.copy()
-        ub[-num_of_slack:] = 100
+        # num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
+        # num_of_slack = len(self.np_lb_filtered) - num_non_slack
+        # lb = self.np_lb_filtered.copy()
+        # lb[-num_of_slack:] = -100
+        # ub = self.np_ub_filtered.copy()
+        # ub[-num_of_slack:] = 100
+        # try:
+        #     self.xdot_full = self.qp_solver.solve_and_retry(weights=self.np_weights_filtered,
+        #                                           g=self.np_g_filtered,
+        #                                           A=self.np_A_filtered,
+        #                                           lb=self.np_lb_filtered,
+        #                                           ub=self.np_ub_filtered,
+        #                                           lbA=self.np_lbA_filtered,
+        #                                           ubA=self.np_ubA_filtered)
+        # except Exception as e:
+        #     logging.loginfo(f'Can\'t determine if hard constraints are violated: {e}.')
+        #     return False
+        # else:
+        self._create_debug_pandas()
         try:
-            self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
-                                                  g=self.np_g_filtered,
-                                                  A=self.np_A_filtered,
-                                                  lb=self.np_lb_filtered,
-                                                  ub=self.np_ub_filtered,
-                                                  lbA=self.np_lbA_filtered,
-                                                  ubA=self.np_ubA_filtered)
-        except Exception as e:
-            logging.loginfo(f'Can\'t determine if hard constraints are violated: {e}.')
-            return False
-        else:
-            self._create_debug_pandas()
-            upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]
-            lower_violations = self.p_xdot[self.p_lb.data > self.p_xdot.data]
+            lower_violations = self.p_lb[self.qp_solver.lb_filter]
+            upper_violations = self.p_ub[self.qp_solver.ub_filter]
             if len(upper_violations) > 0 or len(lower_violations) > 0:
                 error_message += '\n'
                 if len(upper_violations) > 0:
@@ -1332,6 +1333,8 @@ class QPProblemBuilder:
                     error_message += 'lower slack bounds of following constraints might be too high: {}'.format(
                         list(lower_violations.index))
                 raise HardConstraintsViolatedException(error_message)
+        except AttributeError:
+            pass
         logging.loginfo('No slack limit violation detected.')
 
     def _viz_mpc(self, joint_name):

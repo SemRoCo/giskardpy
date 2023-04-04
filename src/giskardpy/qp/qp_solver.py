@@ -161,6 +161,8 @@ class QPSWIFTFormatter(QPSolver):
 
     @staticmethod
     def to_filter(casadi_array):
+        if casadi_array.shape[0] == 0:
+            return np.eye(0)
         compiled = casadi_array.compile()
         inf_filter = np.isfinite(compiled.fast_call(np.zeros(compiled.shape)).T[0])
         return inf_filter
@@ -203,10 +205,26 @@ class QPSWIFTFormatter(QPSolver):
         self.retries_with_relaxed_constraints -= 1
         if self.retries_with_relaxed_constraints <= 0:
             raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
+        lb_filter, nlb_relaxed, ub_filter, ub_relaxed = self.compute_violated_constraints(weights, nA_A, nlb, ub, nlbA_ubA)
+        if np.any(lb_filter) or np.any(ub_filter):
+            weights[ub_filter] *= self.retry_weight_factor
+            weights[lb_filter] *= self.retry_weight_factor
+            return self.problem_data_to_qpSWIFT_format(weights=weights,
+                                                       nA_A=nA_A,
+                                                       nlb=nlb_relaxed,
+                                                       ub=ub_relaxed,
+                                                       nlbA_ubA=nlbA_ubA)
+        self.retries_with_relaxed_constraints += 1
+        raise InfeasibleException('')
+
+    def compute_violated_constraints(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
+                                     ub: np.ndarray, nlbA_ubA: np.ndarray):
         nlb_relaxed = nlb.copy()
         ub_relaxed = ub.copy()
-        nlb_relaxed[self.num_non_slack_variables:] = self.retry_added_slack
-        ub_relaxed[self.num_non_slack_variables:] = self.retry_added_slack
+        nlb_relaxed[self.num_non_slack_variables:] += self.retry_added_slack
+        ub_relaxed[self.num_non_slack_variables:] += self.retry_added_slack
+        # nlb_relaxed += 0.01
+        # ub_relaxed += 0.01
         try:
             relaxed_problem_data = self.problem_data_to_qpSWIFT_format(weights=weights,
                                                                        nA_A=nA_A,
@@ -217,22 +235,15 @@ class QPSWIFTFormatter(QPSolver):
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
-        ub_filter = self.ub_inf_filter[self.weight_filter]
-        lb_filter = self.lb_inf_filter[self.weight_filter]
-        upper_violations = ub < xdot_full[ub_filter]
-        lower_violations = nlb < xdot_full[lb_filter]
-        ub_filter[ub_filter] = upper_violations
-        lb_filter[lb_filter] = lower_violations
-        if np.any(upper_violations) or np.any(lower_violations):
-            weights[ub_filter] *= self.retry_weight_factor
-            weights[lb_filter] *= self.retry_weight_factor
-            return self.problem_data_to_qpSWIFT_format(weights=weights,
-                                                       nA_A=nA_A,
-                                                       nlb=nlb_relaxed,
-                                                       ub=ub_relaxed,
-                                                       nlbA_ubA=nlbA_ubA)
-        self.retries_with_relaxed_constraints += 1
-        raise InfeasibleException('')
+        self.lb_filter = self.lb_inf_filter[self.weight_filter]
+        self.ub_filter = self.ub_inf_filter[self.weight_filter]
+        lower_violations = nlb < xdot_full[self.lb_filter]
+        upper_violations = ub < xdot_full[self.ub_filter]
+        self.lb_filter[self.lb_filter] = lower_violations
+        self.ub_filter[self.ub_filter] = upper_violations
+        self.lb_filter[self.num_non_slack_variables:] = False
+        self.ub_filter[self.num_non_slack_variables:] = False
+        return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
     @profile
     def update_filters(self):
@@ -320,7 +331,8 @@ class QPSWIFTFormatter(QPSolver):
         ubA[ubA_filter] = self.nlbA_ubA[num_nA_rows:]
 
         bA_filter = np.ones(merged_A.shape[0], dtype=bool)
-        bA_filter[-len(self.bA_part):] = self.bA_part
+        if len(self.bA_part) > 0:
+            bA_filter[-len(self.bA_part):] = self.bA_part
 
         E = self.E
         bE = self.bE

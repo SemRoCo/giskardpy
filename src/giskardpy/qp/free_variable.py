@@ -38,7 +38,9 @@ class FreeVariable:
 
         self.horizon_functions = defaultdict(lambda: 0.00001)
         if horizon_functions is None:
-            horizon_functions = {Derivatives.velocity: 0.1}
+            horizon_functions = {Derivatives.velocity: 0.1,
+                                 Derivatives.acceleration: 0.1,
+                                 Derivatives.jerk: 0.1}
         self.horizon_functions.update(horizon_functions)
 
     @property

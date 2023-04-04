@@ -185,14 +185,14 @@ class PR2_StandAlone(PR2_Base):
                                   parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
                                   translation_limits={
-                                      Derivatives.velocity: 0.4,
+                                      Derivatives.velocity: 0.2,
                                       Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
+                                      Derivatives.jerk: 6,
                                   },
                                   rotation_limits={
                                       Derivatives.velocity: 0.2,
                                       Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
+                                      Derivatives.jerk: 6
                                   })
         self.register_controlled_joints([
             'torso_lift_joint',

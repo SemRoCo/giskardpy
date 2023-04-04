@@ -9,11 +9,12 @@ class PR2_Base(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
         # self.set_collision_checker(CollisionCheckerLib.none)
-        # self.set_qp_solver(SupportedQPSolver.qp_oases)
+        self.set_qp_solver(SupportedQPSolver.qpSWIFT)
+        # self.set_qp_solver(SupportedQPSolver.qp_swift)
         # self.configure_PlotTrajectory(enabled=True)
         # self.configure_PlotDebugExpressions(enabled=True)
         # self.configure_DebugMarkerPublisher(enabled=True)
-        self.configure_MaxTrajectoryLength(length=30)
+        self.configure_MaxTrajectoryLength(length=60)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                       hard_threshold=0.0)

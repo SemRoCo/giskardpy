@@ -17,7 +17,8 @@ pi = ca.pi
 
 
 class CompiledFunction:
-    def __init__(self, expression, parameters=None):
+    def __init__(self, expression, parameters=None, sparse=False):
+        self.sparse = sparse
         if parameters is None:
             parameters = expression.free_symbols()
 
@@ -25,23 +26,37 @@ class CompiledFunction:
         if len(parameters) > 0:
             parameters = [Expression(parameters).s]
 
-        try:
-            self.compiled_f = ca.Function('f', parameters, [expression.s])
-        except Exception:
-            self.compiled_f = ca.Function('f', parameters, expression.s)
-        self.buf, self.f_eval = self.compiled_f.buffer()
-        csc_indices, csc_indptr = expression.s.sparsity().get_ccs()
-        self.out = sparse.csc_matrix((np.zeros(expression.s.nnz()), csc_indptr, csc_indices))
-        self.buf.set_res(0, memoryview(self.out.data))
+        if sparse:
+            try:
+                self.compiled_f = ca.Function('f', parameters, [expression.s])
+            except Exception:
+                self.compiled_f = ca.Function('f', parameters, expression.s)
+            self.buf, self.f_eval = self.compiled_f.buffer()
+            csc_indices, csc_indptr = expression.s.sparsity().get_ccs()
+            self.out = sparse.csc_matrix((np.zeros(expression.s.nnz()), csc_indptr, csc_indices))
+            self.buf.set_res(0, memoryview(self.out.data))
+        else:
+            try:
+                self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
+            except Exception:
+                self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
+            self.buf, self.f_eval = self.compiled_f.buffer()
+            self.out = np.zeros(expression.shape, order='F')
+            self.buf.set_res(0, memoryview(self.out))
         if len(self.str_params) == 0:
             self.f_eval()
-            self.__call__ = lambda **kwargs: self.out.toarray()
-            self.fast_call = lambda filtered_args: self.out.toarray()
+            if self.sparse:
+                result = self.out.toarray()
+            else:
+                result = self.out
+            self.__call__ = lambda **kwargs: result
+            self.fast_call = lambda filtered_args: result
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
         return self.fast_call(filtered_args)
 
+    @profile
     def fast_call(self, filtered_args: List[float]) -> np.ndarray:
         """
         :param filtered_args: parameter values in the same order as in self.str_params
@@ -49,7 +64,9 @@ class CompiledFunction:
         filtered_args = np.array(filtered_args, dtype=float)
         self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
-        return self.out.toarray()
+        if self.sparse:
+            return self.out.toarray()
+        return self.out
 
 
 def _operation_type_error(arg1, operation, arg2):
@@ -102,8 +119,8 @@ class Symbol_:
         else:
             return np.array(ca.evalf(self.s))
 
-    def compile(self, parameters=None):
-        return CompiledFunction(self, parameters)
+    def compile(self, parameters=None, sparse=False):
+        return CompiledFunction(self, parameters, sparse)
 
 
 class Symbol(Symbol_):

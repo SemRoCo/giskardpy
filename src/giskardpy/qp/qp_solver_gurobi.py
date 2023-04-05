@@ -1,3 +1,5 @@
+from typing import Iterable, Tuple
+
 import gurobipy
 import numpy as np
 from gurobipy import GRB
@@ -5,7 +7,7 @@ from scipy import sparse
 
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import QPSolver, QPSWIFTFormatter
+from giskardpy.qp.qp_solver_qpswift import QPSWIFTFormatter
 from giskardpy.utils import logging
 from giskardpy.utils.utils import record_time
 
@@ -50,9 +52,10 @@ class QPSolverGurobi(QPSWIFTFormatter):
                          '__' not in name}
 
     @profile
-    def init(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray):
+    def init(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, lb: np.ndarray,
+             ub: np.ndarray, h: np.ndarray):
         self.qpProblem = gurobipy.Model('qp')
-        self.x = self.qpProblem.addMVar(H.shape[0], lb=-1000, ub=1000)
+        self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
         self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
         # H = sparse.csc_matrix(H)
         E = sparse.csc_matrix(E)
@@ -70,17 +73,25 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.qpProblem.printQuality()
         gurobipy.setParam('LogToConsole', False)
 
+    @profile
+    def problem_data_to_qp_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
+                                  ub: np.ndarray, nlbA_ubA: np.ndarray) \
+            -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        H = np.diag(weights)
+        lb, ub = self.lb_ub_with_inf(nlb, ub)
+        return H, self.g, self.E, self.bE, nA_A, lb, ub, nlbA_ubA
+
     @record_time
     @profile
-    def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \
-            -> np.ndarray:
-        self.init(H, g, E, b, A, h)
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, lb: np.ndarray,
+                    ub: np.ndarray, h: np.ndarray) -> np.ndarray:
+        self.init(H, g, E, b, A, lb, ub, h)
         self.qpProblem.optimize()
         success = self.qpProblem.status
         if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
             if success == gurobipy.GRB.SUBOPTIMAL:
                 logging.logwarn('warning, suboptimal solution!')
             return np.array(self.qpProblem.X)
-        if success == gurobipy.GRB.INFEASIBLE:
+        if success in {gurobipy.GRB.INFEASIBLE, gurobipy.GRB.INF_OR_UNBD}:
             raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
         raise QPSolverException(self.STATUS_VALUE_DICT[success], success)

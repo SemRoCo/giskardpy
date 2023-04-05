@@ -34,6 +34,7 @@ class PublishDebugExpressions(GiskardBehavior):
 
     @profile
     def create_msg(self, qp_controller: QPProblemBuilder):
+        # FIXME
         msg = JointState()
         msg.header.stamp = rospy.get_rostime()
 

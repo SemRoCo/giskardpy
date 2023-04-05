@@ -158,6 +158,7 @@ class QPSWIFTFormatter(QPSolver):
             combined_problem_data[self.ubA_slice] = ubA_without_inf
 
         self.qp_setup_function = combined_problem_data.compile()
+        self._nAi_Ai_cache = {}
 
     @staticmethod
     def to_filter(casadi_array):
@@ -257,7 +258,8 @@ class QPSWIFTFormatter(QPSolver):
         self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
         if self.num_filtered_eq_constraints > 0:
             self.bE_filter[-len(bE_part):] = bE_part
-        # fixme can't divide in half anymore, since lbA and ubA might not be the same length
+
+        # self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
         self.nlbA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
         self.ubA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
         if len(self.bA_part) > 0:
@@ -295,10 +297,23 @@ class QPSWIFTFormatter(QPSolver):
         self.bE = self.bE[self.bE_filter]
         self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
-        self.nAi_Ai = self._direct_limit_model(self.weights.shape[0])[self.nAi_Ai_filter]
+        # for constraints, both rows and columns are filtered, so I can start with weights dims
+        # then only the rows need to be filtered for inf lb/ub
+        self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter)
+
+    @profile
+    def _direct_limit_model(self, dimensions: int, nAi_Ai_filter: np.ndarray) -> np.ndarray:
+        """
+        These models are often identical, yet the computation is expensive. Caching to the rescue
+        """
+        key = hash((dimensions, nAi_Ai_filter.tostring()))
+        if key not in self._nAi_Ai_cache:
+            nI_I = self._cached_eyes(dimensions)
+            self._nAi_Ai_cache[key] = nI_I[nAi_Ai_filter]
+        return self._nAi_Ai_cache[key]
 
     @memoize
-    def _direct_limit_model(self, dimensions):
+    def _cached_eyes(self, dimensions: int) -> np.ndarray:
         I = np.eye(dimensions)
         return np.concatenate([-I, I])
 

@@ -56,8 +56,9 @@ class QPSolverGurobi(QPSWIFTFormatter):
              ub: np.ndarray, h: np.ndarray):
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
+        H = sparse.diags(H, 0)
+        # H = np.diag(H)
         self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
-        # H = sparse.csc_matrix(H)
         E = sparse.csc_matrix(E)
         A = sparse.csc_matrix(A)
         self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
@@ -77,9 +78,8 @@ class QPSolverGurobi(QPSWIFTFormatter):
     def problem_data_to_qp_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
                                   ub: np.ndarray, nlbA_ubA: np.ndarray) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        H = np.diag(weights)
         lb, ub = self.lb_ub_with_inf(nlb, ub)
-        return H, self.g, self.E, self.bE, nA_A, lb, ub, nlbA_ubA
+        return weights, self.g, self.E, self.bE, nA_A, lb, ub, nlbA_ubA
 
     @record_time
     @profile

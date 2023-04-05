@@ -1110,7 +1110,7 @@ class WorldTree(WorldTreeInterface):
                     self.fk_idx[link.name] = i
                     i += 1
             fks = w.vstack(fks)
-            self.fast_all_fks = fks.compile(w.free_symbols(fks))
+            self.fast_all_fks = fks.compile()
 
         fks_evaluated = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
         result = {}

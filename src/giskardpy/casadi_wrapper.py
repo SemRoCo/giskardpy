@@ -16,14 +16,23 @@ pi = ca.pi
 
 
 class CompiledFunction:
-    def __init__(self, str_params, fast_f, shape):
-        self.str_params = str_params
-        self.fast_f = fast_f
-        self.shape = shape
-        self.buf, self.f_eval = fast_f.buffer()
+    def __init__(self, expression, parameters=None):
+        if parameters is None:
+            parameters = expression.free_symbols()
+
+        self.str_params = [str(x) for x in parameters]
+        if len(parameters) > 0:
+            parameters = [Expression(parameters).s]
+
+        try:
+            self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
+        except Exception:
+            self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
+        self.shape = expression.s.shape
+        self.buf, self.f_eval = self.compiled_f.buffer()
         self.out = np.zeros(self.shape, order='F')
-        self.buf.set_res(0, memoryview(self.out))  # type: ignore
-        if len(str_params) == 0:
+        self.buf.set_res(0, memoryview(self.out))
+        if len(self.str_params) == 0:
             self.f_eval()
             self.__call__ = lambda **kwargs: self.out
             self.fast_call = lambda filtered_args: self.out
@@ -37,7 +46,7 @@ class CompiledFunction:
         :param filtered_args: parameter values in the same order as in self.str_params
         """
         filtered_args = np.array(filtered_args, dtype=float)
-        self.buf.set_arg(0, memoryview(filtered_args))  # type: ignore
+        self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
         return self.out
 
@@ -93,16 +102,7 @@ class Symbol_:
             return np.array(ca.evalf(self.s))
 
     def compile(self, parameters=None):
-        if parameters is None:
-            parameters = self.free_symbols()
-        str_params = [str(x) for x in parameters]
-        if len(parameters) > 0:
-            parameters = [Expression(parameters).s]
-        try:
-            f = ca.Function('f', parameters, [ca.densify(self.s)])
-        except Exception:
-            f = ca.Function('f', parameters, ca.densify(self.s))
-        return CompiledFunction(str_params, f, self.shape)
+        return CompiledFunction(self, parameters)
 
 
 class Symbol(Symbol_):

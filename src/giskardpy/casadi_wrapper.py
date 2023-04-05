@@ -7,6 +7,7 @@ import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
+from scipy import sparse
 
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
@@ -25,12 +26,13 @@ class CompiledFunction:
             parameters = [Expression(parameters).s]
 
         try:
-            self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
+            self.compiled_f = ca.Function('f', parameters, [expression.s])
         except Exception:
-            self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
+            self.compiled_f = ca.Function('f', parameters, expression.s)
         self.shape = expression.s.shape
         self.buf, self.f_eval = self.compiled_f.buffer()
-        self.out = np.zeros(self.shape, order='F')
+        self.csc_indices, self.csc_indptr = expression.s.sparsity().get_ccs()
+        self.out = np.zeros(expression.s.nnz())
         self.buf.set_res(0, memoryview(self.out))
         if len(self.str_params) == 0:
             self.f_eval()
@@ -48,7 +50,8 @@ class CompiledFunction:
         filtered_args = np.array(filtered_args, dtype=float)
         self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
-        return self.out
+        data = self.out
+        return sparse.csc_matrix((data, self.csc_indptr, self.csc_indices)).toarray()
 
 
 def _operation_type_error(arg1, operation, arg2):
@@ -1310,6 +1313,8 @@ def compile_and_execute(f, params):
     fast_f = expr.compile(symbol_params2)
     input_ = np.concatenate(input_).T[0]
     result = fast_f.fast_call(input_)
+    if len(result.shape) == 1:
+        return result
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
     elif result.shape[1] == 1:

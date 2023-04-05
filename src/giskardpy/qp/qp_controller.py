@@ -225,8 +225,7 @@ class FreeVariableBounds(ProblemDataPart):
                  derivative_constraints: List[DerivativeInequalityConstraint],
                  sample_period: float,
                  prediction_horizon: int,
-                 max_derivative: Derivatives,
-                 default_limits: bool):
+                 max_derivative: Derivatives):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -235,7 +234,6 @@ class FreeVariableBounds(ProblemDataPart):
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative)
         self.evaluated = True
-        self.default_limits = default_limits
 
     def free_variable_bounds(self) -> Tuple[List[Dict[str, cas.symbol_expr_float]],
                                             List[Dict[str, cas.symbol_expr_float]]]:
@@ -345,8 +343,7 @@ class EqualityBounds(ProblemDataPart):
                  derivative_constraints: List[DerivativeInequalityConstraint],
                  sample_period: float,
                  prediction_horizon: int,
-                 max_derivative: Derivatives,
-                 default_limits: bool):
+                 max_derivative: Derivatives):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -354,7 +351,6 @@ class EqualityBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative)
-        self.default_limits = default_limits
         self.evaluated = True
 
     def equality_bounds(self) -> Dict[str, cas.Expression]:
@@ -1046,6 +1042,7 @@ class QPProblemBuilder:
 
         logging.loginfo(f'Using QP Solver \'{solver_id}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
+        self.qp_solver = self.compile()
 
     def add_free_variables(self, free_variables):
         """
@@ -1114,7 +1111,7 @@ class QPProblemBuilder:
         self.debug_expressions.update(debug_expressions)
 
     @profile
-    def compile(self):
+    def compile(self, default_limits: bool = False) -> QPSolver:
         kwargs = {'free_variables': self.free_variables,
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
@@ -1123,11 +1120,11 @@ class QPProblemBuilder:
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order}
         self.weights = Weights(**kwargs)
-        self.free_variable_bounds = FreeVariableBounds(default_limits=False, **kwargs)
+        self.free_variable_bounds = FreeVariableBounds(**kwargs)
         self.equality_model = EqualityModel(**kwargs)
-        self.equality_bounds = EqualityBounds(default_limits=False, **kwargs)
+        self.equality_bounds = EqualityBounds(**kwargs)
         self.inequality_model = InequalityModel(**kwargs)
-        self.inequality_bounds = InequalityBounds(default_limits=False, **kwargs)
+        self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
 
         weights, g = self.weights.construct_expression()
         lb, ub = self.free_variable_bounds.construct_expression()
@@ -1136,10 +1133,11 @@ class QPProblemBuilder:
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
 
-        self.qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
+        qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                               E=E, E_slack=E_slack, bE=bE,
                                               A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
         self._compile_debug_expressions()
+        return qp_solver
 
     def get_parameter_names(self):
         return self.qp_solver.qp_setup_function.str_params
@@ -1244,15 +1242,10 @@ class QPProblemBuilder:
         return self.evaluated_debug_expressions
 
     def __swap_compiled_matrices(self):
-        if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
+        if not hasattr(self, 'qp_solver_default_limits'):
             with suppress_stdout():
-                self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M
-                self._construct_big_ass_M(default_limits=True)
-                self._compile_big_ass_M()
-        else:
-            self.compiled_big_ass_M, \
-            self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M_with_default_limits, \
-                                                          self.compiled_big_ass_M
+                self.qp_solver_default_limits = self.compile(default_limits=True)
+        self.qp_solver, self.qp_solver_default_limits = self.qp_solver_default_limits, self.qp_solver
 
     @property
     def traj_time_in_sec(self):
@@ -1277,26 +1270,20 @@ class QPProblemBuilder:
             self.xdot_full = None
             self._create_debug_pandas()
             joint_limits_violated_msg = self._are_joint_limits_violated()
-            # if joint_limits_violated_msg is not None:
-            #     self.__swap_compiled_matrices()
-            #     try:
-            #         self.evaluate_and_create_np_data(substitutions)
-            #         self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
-            #                                               g=self.np_g_filtered,
-            #                                               A=self.np_A_filtered,
-            #                                               lb=self.np_lb_filtered,
-            #                                               ub=self.np_ub_filtered,
-            #                                               lbA=self.np_lbA_filtered,
-            #                                               ubA=self.np_ubA_filtered)
-            #         return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
-            #                             max_derivative=self.order, prediction_horizon=self.prediction_horizon)
-            #     except Exception as e2:
-            #         # self._create_debug_pandas()
-            #         # raise OutOfJointLimitsException(self._are_joint_limits_violated())
-            #         raise OutOfJointLimitsException(joint_limits_violated_msg)
-            #     finally:
-            #         self.__swap_compiled_matrices()
-            #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
+            if joint_limits_violated_msg is not None:
+                logging.logwarn('Joint limits violated, trying to fix.')
+                self.__swap_compiled_matrices()
+                try:
+                    self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
+                    return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
+                                        max_derivative=self.order, prediction_horizon=self.prediction_horizon)
+                except Exception as e2:
+                    # self._create_debug_pandas()
+                    # raise OutOfJointLimitsException(self._are_joint_limits_violated())
+                    raise OutOfJointLimitsException(joint_limits_violated_msg)
+                finally:
+                    self.__swap_compiled_matrices()
+                    # self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
             self._are_hard_limits_violated(str(e_original))
             # self._is_inf_in_data()
             raise

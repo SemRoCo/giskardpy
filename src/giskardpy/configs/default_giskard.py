@@ -643,7 +643,7 @@ class Giskard:
 
     def set_default_joint_limits(self,
                                  velocity_limit: float = 1,
-                                 acceleration_limit: Optional[float] = 1e3,
+                                 acceleration_limit: Optional[float] = float('inf'),
                                  jerk_limit: Optional[float] = 30,
                                  snap_limit: Optional[float] = 500):
         """

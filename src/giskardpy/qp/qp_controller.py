@@ -1298,7 +1298,7 @@ class QPProblemBuilder:
             #         self.__swap_compiled_matrices()
             #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
             self._are_hard_limits_violated(str(e_original))
-            self._is_inf_in_data()
+            # self._is_inf_in_data()
             raise
 
     def _are_hard_limits_violated(self, error_message):

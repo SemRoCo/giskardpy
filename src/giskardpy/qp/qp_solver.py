@@ -29,6 +29,11 @@ class QPSolver(ABC):
     def solve(self, substitutions: List[float], relax_hard_constraints: bool = False) -> np.ndarray:
         problem_data = self.qp_setup_function.fast_call(substitutions)
         split_problem_data = self.split_and_filter_results(problem_data, relax_hard_constraints)
+        if relax_hard_constraints:
+            try:
+                return self.solver_call(*split_problem_data)
+            except InfeasibleException as e:
+                raise HardConstraintsViolatedException(str(e))
         return self.solver_call(*split_problem_data)
 
     @profile
@@ -162,6 +167,7 @@ class QPSWIFTFormatter(QPSolver):
 
     @staticmethod
     def to_filter(casadi_array):
+        # FIXME, buggy if a function happens to evaluate with all 0 input
         if casadi_array.shape[0] == 0:
             return np.eye(0)
         compiled = casadi_array.compile()
@@ -222,8 +228,13 @@ class QPSWIFTFormatter(QPSolver):
                                      ub: np.ndarray, nlbA_ubA: np.ndarray):
         nlb_relaxed = nlb.copy()
         ub_relaxed = ub.copy()
-        nlb_relaxed[self.num_non_slack_variables:] += self.retry_added_slack
-        ub_relaxed[self.num_non_slack_variables:] += self.retry_added_slack
+        if self.num_slack_variables > 0:
+            lb_non_slack_without_inf = np.where(self.lb_inf_filter[:self.num_non_slack_variables])[0].shape[0]
+            ub_non_slack_without_inf = np.where(self.ub_inf_filter[:self.num_non_slack_variables])[0].shape[0]
+            nlb_relaxed[lb_non_slack_without_inf:] += self.retry_added_slack
+            ub_relaxed[ub_non_slack_without_inf:] += self.retry_added_slack
+        else:
+            raise InfeasibleException('Can\'t relax constraints, because there are none.')
         # nlb_relaxed += 0.01
         # ub_relaxed += 0.01
         try:
@@ -238,12 +249,12 @@ class QPSWIFTFormatter(QPSolver):
             raise e
         self.lb_filter = self.lb_inf_filter[self.weight_filter]
         self.ub_filter = self.ub_inf_filter[self.weight_filter]
-        lower_violations = nlb < xdot_full[self.lb_filter]
-        upper_violations = ub < xdot_full[self.ub_filter]
+        lower_violations = 1e-4 < xdot_full[self.lb_filter] - nlb
+        upper_violations = 1e-4 < xdot_full[self.ub_filter] - ub
         self.lb_filter[self.lb_filter] = lower_violations
         self.ub_filter[self.ub_filter] = upper_violations
-        self.lb_filter[self.num_non_slack_variables:] = False
-        self.ub_filter[self.num_non_slack_variables:] = False
+        self.lb_filter[:self.num_non_slack_variables] = False
+        self.ub_filter[:self.num_non_slack_variables] = False
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
     @profile

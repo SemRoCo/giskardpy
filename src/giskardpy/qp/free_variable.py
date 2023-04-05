@@ -98,6 +98,8 @@ class FreeVariable:
     @profile
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
                           evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
+        if np.isinf(self.god_map.evaluate_expr(self.get_upper_limit(derivative))):
+            return 0
         weight = self.quadratic_weights[derivative]
         start = weight * self.horizon_functions[derivative]
         a = (weight - start) / prediction_horizon

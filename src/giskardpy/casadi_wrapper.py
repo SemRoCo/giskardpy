@@ -29,15 +29,14 @@ class CompiledFunction:
             self.compiled_f = ca.Function('f', parameters, [expression.s])
         except Exception:
             self.compiled_f = ca.Function('f', parameters, expression.s)
-        self.shape = expression.s.shape
         self.buf, self.f_eval = self.compiled_f.buffer()
-        self.csc_indices, self.csc_indptr = expression.s.sparsity().get_ccs()
-        self.out = np.zeros(expression.s.nnz())
-        self.buf.set_res(0, memoryview(self.out))
+        csc_indices, csc_indptr = expression.s.sparsity().get_ccs()
+        self.out = sparse.csc_matrix((np.zeros(expression.s.nnz()), csc_indptr, csc_indices))
+        self.buf.set_res(0, memoryview(self.out.data))
         if len(self.str_params) == 0:
             self.f_eval()
-            self.__call__ = lambda **kwargs: self.out
-            self.fast_call = lambda filtered_args: self.out
+            self.__call__ = lambda **kwargs: self.out.toarray()
+            self.fast_call = lambda filtered_args: self.out.toarray()
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
@@ -50,8 +49,7 @@ class CompiledFunction:
         filtered_args = np.array(filtered_args, dtype=float)
         self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
-        data = self.out
-        return sparse.csc_matrix((data, self.csc_indptr, self.csc_indices)).toarray()
+        return self.out.toarray()
 
 
 def _operation_type_error(arg1, operation, arg2):

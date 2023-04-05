@@ -368,8 +368,8 @@ class Goal(ABC):
         if name in self._inequality_constraints:
             raise KeyError(f'A constraint with name \'{name}\' already exists. '
                            f'You need to set a name, if you add multiple constraints.')
-        lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
-        upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
+        lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
+        upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
         self._inequality_constraints[name] = InequalityConstraint(name=name,
                                                                   expression=task_expression,
                                                                   lower_error=lower_error,
@@ -409,8 +409,8 @@ class Goal(ABC):
         if name in self._inequality_constraints:
             raise KeyError(f'A constraint with name \'{name}\' already exists. '
                            f'You need to set a name, if you add multiple constraints.')
-        lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
-        upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
+        lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
+        upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
         self._equality_constraints[name] = EqualityConstraint(name=name,
                                                               expression=task_expression,
                                                               derivative_goal=equality_bound,

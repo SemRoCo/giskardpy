@@ -1268,7 +1268,7 @@ class QPProblemBuilder:
             # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self.__swap_compiled_matrices()
-            self._create_debug_pandas()
+            # self._create_debug_pandas()
             return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
                                 prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:

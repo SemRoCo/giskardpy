@@ -254,7 +254,8 @@ class QPSWIFTFormatter(QPSolver):
         self.bA_part = slack_part[self.num_eq_slack_variables:]
 
         self.bE_filter = np.ones(self.E.shape[0], dtype=bool)
-        if len(bE_part) > 0:
+        self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
+        if self.num_filtered_eq_constraints > 0:
             self.bE_filter[-len(bE_part):] = bE_part
         # fixme can't divide in half anymore, since lbA and ubA might not be the same length
         self.nlbA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
@@ -286,7 +287,11 @@ class QPSWIFTFormatter(QPSolver):
         self.g = np.zeros(*self.weights.shape)
         self.nlb = self.nlb[self.weight_filter[self.lb_inf_filter]]
         self.ub = self.ub[self.weight_filter[self.ub_inf_filter]]
-        self.E = self.E[self.bE_filter, :][:, self.weight_filter]
+        if self.num_filtered_eq_constraints > 0:
+            self.E = self.E[self.bE_filter, :][:, self.weight_filter]
+        else:
+            # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
+            self.E = self.E[:, :np.count_nonzero(self.weight_filter)]
         self.bE = self.bE[self.bE_filter]
         self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]

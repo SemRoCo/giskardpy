@@ -70,6 +70,7 @@ from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
 from giskardpy.tree.behaviors.sync_wrist_sensor import SyncFTSensor
+from giskardpy.tree.behaviors.send_trajectory_closedloop import SendFollowJointTrajectoryClosedLoop
 
 T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])
 
@@ -810,6 +811,12 @@ class ClosedLoop(OpenLoop):
             planning_4.add_child(JointPosController(**joint_position_controller_config))
         for kwargs in hardware_config.joint_velocity_controllers_kwargs:
             planning_4.add_child(JointVelController(**kwargs))
+
+        planning_4.add_child(SendFollowJointTrajectoryClosedLoop(
+            action_namespace='/hsrb/arm_trajectory_controller/follow_joint_trajectory',
+            state_topic='/hsrb/arm_trajectory_controller/state',
+            group_name='hsrb',
+            fill_velocity_values=True))
 
         for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
             planning_4.add_child(SendTrajectoryToCmdVelClosedLoop(**drive_interface))

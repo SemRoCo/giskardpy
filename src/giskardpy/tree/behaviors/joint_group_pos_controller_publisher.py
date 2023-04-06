@@ -25,14 +25,14 @@ class JointGroupPosController(CommandPublisher):
         self.msg = None
         self.new_stamp = None
 
-    @profile
-    def setup(self, timeout=0.0):
-        self.joint_state_sub = rospy.Subscriber('hsrb/joint_states', JointState, self.cb, queue_size=1)
-        return super().setup(timeout)
-
-    def cb(self, data):
-        self.msg = data
-        self.new_stamp = rospy.get_rostime()
+    # @profile
+    # def setup(self, timeout=0.0):
+    #     self.joint_state_sub = rospy.Subscriber('hsrb/joint_states', JointState, self.cb, queue_size=1)
+    #     return super().setup(timeout)
+    #
+    # def cb(self, data):
+    #     self.msg = data
+    #     self.new_stamp = rospy.get_rostime()
 
     @profile
     def initialise(self):
@@ -59,7 +59,7 @@ class JointGroupPosController(CommandPublisher):
                 # jerk = qp_data[Derivatives.jerk][key]
                 delta = velocity * dt #+ (acc * dt**2) / 2 + (jerk * dt**3) / 6
 
-                position = js[joint_name].position + delta * 0.7
+                position = self.js[joint_name].position + delta * 0.7
                 # implicit integration uses position from the current and velocity from the next time step
                 # it should give stable solutions irrespective of the time step
                 # position = js[joint_name].position + qp_data[Derivatives.velocity][key] * dt

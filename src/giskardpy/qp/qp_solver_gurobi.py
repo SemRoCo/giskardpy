@@ -50,6 +50,8 @@ class QPSolverGurobi(QPSWIFTFormatter):
     solver_id = SupportedQPSolver.gurobi
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if
                          '__' not in name}
+    sparse = True
+    compute_nI_I = False
 
     @profile
     def init(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, lb: np.ndarray,
@@ -57,10 +59,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
         H = sparse.diags(H, 0)
-        # H = np.diag(H)
         self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
-        E = sparse.csc_matrix(E)
-        A = sparse.csc_matrix(A)
         self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, h)
         self.started = False

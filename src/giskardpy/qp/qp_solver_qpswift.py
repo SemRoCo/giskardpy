@@ -1,6 +1,6 @@
 import abc
 from enum import IntEnum
-from typing import Tuple, Iterable, List
+from typing import Tuple, Iterable, List, Union
 
 import numpy as np
 
@@ -9,6 +9,7 @@ from giskardpy.exceptions import QPSolverException, InfeasibleException, HardCon
 from giskardpy.qp.qp_solver import QPSolver
 import qpSWIFT
 import giskardpy.casadi_wrapper as cas
+import scipy.sparse as sp
 
 from giskardpy.utils.utils import record_time, memoize
 
@@ -22,6 +23,7 @@ class QPSWIFTExitFlags(IntEnum):
 
 class QPSWIFTFormatter(QPSolver):
     sparse: bool = False
+    compute_nI_I: bool = True
 
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
@@ -89,7 +91,8 @@ class QPSWIFTFormatter(QPSolver):
 
         self.free_symbols_str = [str(x) for x in free_symbols]
 
-        self._nAi_Ai_cache = {}
+        if self.compute_nI_I:
+            self._nAi_Ai_cache = {}
 
     @staticmethod
     def to_filter(casadi_array):
@@ -192,10 +195,7 @@ class QPSWIFTFormatter(QPSolver):
         self.bA_part = slack_part[self.num_eq_slack_variables:]
 
         self.bE_filter = np.ones(self.E.shape[0], dtype=bool)
-        if self.sparse:
-            self.num_filtered_eq_constraints = bE_part.shape[1] - bE_part.nnz
-        else:
-            self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
+        self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
         if self.num_filtered_eq_constraints > 0:
             self.bE_filter[-len(bE_part):] = bE_part
 
@@ -208,8 +208,9 @@ class QPSWIFTFormatter(QPSolver):
             self.nlbA_filter_half = self.nlbA_filter_half[self.nlbA_inf_filter]
             self.ubA_filter_half = self.ubA_filter_half[self.ubA_inf_filter]
         self.bA_filter = np.concatenate((self.nlbA_filter_half, self.ubA_filter_half))
-        self.nAi_Ai_filter = np.concatenate((self.lb_inf_filter[self.weight_filter],
-                                             self.ub_inf_filter[self.weight_filter]))
+        if self.compute_nI_I:
+            self.nAi_Ai_filter = np.concatenate((self.lb_inf_filter[self.weight_filter],
+                                                 self.ub_inf_filter[self.weight_filter]))
 
     @profile
     def filter_inf_entries(self):
@@ -237,12 +238,13 @@ class QPSWIFTFormatter(QPSolver):
         self.bE = self.bE[self.bE_filter]
         self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
-        # for constraints, both rows and columns are filtered, so I can start with weights dims
-        # then only the rows need to be filtered for inf lb/ub
-        self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter)
+        if self.compute_nI_I:
+            # for constraints, both rows and columns are filtered, so I can start with weights dims
+            # then only the rows need to be filtered for inf lb/ub
+            self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter)
 
     @profile
-    def _direct_limit_model(self, dimensions: int, nAi_Ai_filter: np.ndarray) -> np.ndarray:
+    def _direct_limit_model(self, dimensions: int, nAi_Ai_filter: np.ndarray) -> Union[np.ndarray, sp.csc_matrix]:
         """
         These models are often identical, yet the computation is expensive. Caching to the rescue
         """
@@ -253,9 +255,23 @@ class QPSWIFTFormatter(QPSolver):
         return self._nAi_Ai_cache[key]
 
     @memoize
-    def _cached_eyes(self, dimensions: int) -> np.ndarray:
-        I = np.eye(dimensions)
-        return np.concatenate([-I, I])
+    def _cached_eyes(self, dimensions: int) -> Union[np.ndarray, sp.csc_matrix]:
+        if self.sparse:
+            d2 = dimensions * 2
+            data = np.ones(d2, dtype=float)
+            data[::2] *= -1
+            r1 = np.arange(dimensions)
+            r2 = np.arange(dimensions, d2)
+            row_indices = np.empty((d2,), dtype=int)
+            row_indices[0::2] = r1
+            row_indices[1::2] = r2
+            col_indices = np.arange(0, d2 + 1, 2)
+            return sp.csc_matrix((data, row_indices, col_indices))
+            # I = np.eye(dimensions)
+            # return np.concatenate([-I, I])
+        else:
+            I = np.eye(dimensions)
+            return np.concatenate([-I, I])
 
     def lb_ub_with_inf(self, nlb: np.ndarray, ub: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         lb_with_inf = (np.ones(self.lb_inf_filter.shape) * -np.inf)

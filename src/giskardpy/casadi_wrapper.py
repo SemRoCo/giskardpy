@@ -27,6 +27,7 @@ class CompiledFunction:
             parameters = [Expression(parameters).s]
 
         if sparse:
+            expression.s = ca.sparsify(expression.s)
             try:
                 self.compiled_f = ca.Function('f', parameters, [expression.s])
             except Exception:

@@ -69,6 +69,7 @@ from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
+from giskardpy.tree.behaviors.sync_wrist_sensor import SyncFTSensor
 
 T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])
 
@@ -784,6 +785,7 @@ class ClosedLoop(OpenLoop):
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                       **self.god_map.unsafe_get_data(
                                                                           identifier.SyncTfFrames)))
+        planning_4.add_child(SyncFTSensor('sync ft sensor'))
         for odometry_kwargs in hardware_config.odometry_node_kwargs:
             planning_4.add_child(SyncOdometry(**odometry_kwargs))
         if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
@@ -827,7 +829,7 @@ class ClosedLoop(OpenLoop):
         # planning_4.add_child(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-            planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True, **kwargs))
+            # planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True, **kwargs))
         return planning_4
 
 

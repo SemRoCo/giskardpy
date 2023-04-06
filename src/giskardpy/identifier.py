@@ -132,3 +132,6 @@ hardware_config = giskard + ['hardware_config']
 
 # rnd stuff
 timer_collector = ['timer_collector']
+
+# wrist FT sensor
+ft_msg = ['ft_msg']

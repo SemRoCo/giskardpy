@@ -48,6 +48,9 @@ class JointGroupPosController(CommandPublisher):
                 delta = velocity * dt + (acc * dt**2) / 2 + (jerk * dt**3) / 6
 
                 position = self.js[joint_name].position + delta * 0.1
+                # implicit integration uses position from the current and velocity from the next time step
+                # it should give stable solutions irrespective of the time step
+                # position = js[joint_name].position + qp_data[Derivatives.velocity][key] * dt
 
             except KeyError:
                 position = js[joint_name].position

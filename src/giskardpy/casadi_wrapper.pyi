@@ -19,7 +19,7 @@ pi: float
 def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeError: ...
 
 class CompiledFunction:
-    str_params: Sequence[str]
+    str_params: List[str]
     compiled_f: ca.Function
     buf: ca.FunctionBuffer
     f_eval: functools.partial
@@ -30,7 +30,7 @@ class CompiledFunction:
 
     def __call__(self, **kwargs) -> np.ndarray: ...
 
-    def fast_call(self, filtered_args: Iterable[float]) -> Union[np.ndarray, sp.csc_matrix]: ...
+    def fast_call(self, filtered_args: np.ndarray) -> Union[np.ndarray, sp.csc_matrix]: ...
 
 
 class Symbol_:

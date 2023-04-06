@@ -1140,7 +1140,7 @@ class QPProblemBuilder:
         return qp_solver
 
     def get_parameter_names(self):
-        return self.qp_solver.qp_setup_function.str_params
+        return self.qp_solver.free_symbols_str
 
     def _compile_debug_expressions(self):
         t = time()

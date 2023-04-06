@@ -388,21 +388,19 @@ class GodMap(metaclass=SingletonMeta):
             z=self.to_symbol(identifier + ['z']),
         )
 
-    def get_values(self, symbols):
+    def get_values(self, symbols) -> np.ndarray:
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
-        :rtype: list
         """
         # its a trap, this function only looks slow with lineprofiler
         with self.lock:
             return self.unsafe_get_values(symbols)
 
-    def unsafe_get_values(self, symbols):
+    def unsafe_get_values(self, symbols) -> np.ndarray:
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
-        :rtype: list
         """
-        return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
+        return np.array([self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols], dtype=float)
 
     def evaluate_expr(self, expr: w.Expression):
         if isinstance(expr, (int, float)):
@@ -412,7 +410,7 @@ class GodMap(metaclass=SingletonMeta):
             return expr.evaluate()
         result = f.fast_call(self.get_values(f.str_params))
         if len(result) == 1:
-            return result[0][0]
+            return result[0]
         else:
             return result
 

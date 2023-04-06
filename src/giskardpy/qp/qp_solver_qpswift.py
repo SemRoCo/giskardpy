@@ -1,6 +1,6 @@
 import abc
 from enum import IntEnum
-from typing import Tuple, Iterable
+from typing import Tuple, Iterable, List
 
 import numpy as np
 
@@ -31,17 +31,6 @@ class QPSWIFTFormatter(QPSolver):
         min_x 0.5 x^T H x + g^T x
         s.t.  Ex = b
               Ax <= lb/ub
-        combined matrix format:
-                   |x|          1
-             |---------------|-----|
-        1    |    weights    |  0  |
-        1    |      g        |  0  |
-        1    |     -lb       |  0  |
-        1    |      ub       |  0  |
-        |b|  |      E        |  b  |
-        |lbA||     -A        |-lbA |
-        |lbA||      A        | ubA |
-             |---------------|-----|
         """
         self.num_eq_constraints = bE.shape[0]
         self.num_neq_constraints = lbA.shape[0]
@@ -68,49 +57,38 @@ class QPSWIFTFormatter(QPSolver):
         self.len_lbA = nlbA_without_inf.shape[0]
         self.len_ubA = ubA_without_inf.shape[0]
 
-        combined_problem_data = cas.zeros(4 + bE.shape[0] + nlbA_without_inf.shape[0] + ubA_without_inf.shape[0],
-                                          weights.shape[0] + 1)
-        self.weights_slice = (0, slice(None, -1))
-        self.g_slice = (1, slice(None, -1))
-        self.nlb_slice = (2, slice(None, len(nlb_without_inf)))
-        self.ub_slice = (3, slice(None, len(ub_without_inf)))
-        offset = 4
-        self.E_slice = (slice(offset, offset + self.num_eq_constraints), slice(None, E.shape[1]))
-        self.E_slack_slice = (self.E_slice[0], slice(self.num_non_slack_variables, E.shape[1] + E_slack.shape[1]))
-        self.E_E_slack_slice = (self.E_slice[0], slice(None, -1))
-        self.bE_slice = (self.E_slice[0], -1)
-        offset += self.num_eq_constraints
+        combined_E = cas.hstack([E, E_slack, cas.zeros(E_slack.shape[0], A_slack.shape[1])])
+        combined_nA = cas.hstack([nA_without_inf,
+                                  cas.zeros(nA_slack_without_inf.shape[0], E_slack.shape[1]),
+                                  nA_slack_without_inf])
+        combined_A = cas.hstack([A_without_inf,
+                                 cas.zeros(A_slack_without_inf.shape[0], E_slack.shape[1]),
+                                 A_slack_without_inf])
+        combined_A = cas.vstack([combined_nA, combined_A])
+        nlbA_ubA = cas.vstack([nlbA_without_inf, ubA_without_inf])
 
-        next_offset = offset + nA_without_inf.shape[0]
-        self.nA_slice = (slice(offset, next_offset), slice(None, A.shape[1]))
-        self.nA_slack_slice = (self.nA_slice[0], slice(self.num_non_slack_variables + E_slack.shape[1], -1))
-        self.nlbA_slice = (self.nA_slice[0], -1)
-        offset = next_offset
+        free_symbols = set(weights.free_symbols())
+        free_symbols.update(nlbA_without_inf.free_symbols())
+        free_symbols.update(ubA_without_inf.free_symbols())
+        free_symbols.update(combined_E.free_symbols())
+        free_symbols.update(bE.free_symbols())
+        free_symbols.update(combined_A.free_symbols())
+        free_symbols.update(nlbA_ubA.free_symbols())
+        free_symbols = list(free_symbols)
 
-        self.A_slice = (slice(offset, None), self.nA_slice[1])
-        self.A_slack_slice = (self.A_slice[0], self.nA_slack_slice[1])
-        self.ubA_slice = (self.A_slice[0], -1)
+        self.weights_f = weights.compile(parameters=free_symbols, sparse=False)
+        self.nlb_f = nlb_without_inf.compile(parameters=free_symbols, sparse=False)
+        self.ub_f = ub_without_inf.compile(parameters=free_symbols, sparse=False)
 
-        self.nA_nA_slack_A_A_slack_slice = (slice(4 + self.num_eq_constraints, None), slice(None, -1))
-        self.nlbA_ubA_slice = (self.nA_nA_slack_A_A_slack_slice[0], -1)
+        self.E_f = combined_E.compile(parameters=free_symbols, sparse=self.sparse)
+        self.bE_f = bE.compile(parameters=free_symbols, sparse=False)
 
-        combined_problem_data[self.weights_slice] = weights
-        combined_problem_data[self.g_slice] = g
-        combined_problem_data[self.nlb_slice] = nlb_without_inf
-        combined_problem_data[self.ub_slice] = ub_without_inf
-        if self.num_eq_constraints > 0:
-            combined_problem_data[self.E_slice] = E
-            combined_problem_data[self.E_slack_slice] = E_slack
-            combined_problem_data[self.bE_slice] = bE
-        if self.num_neq_constraints > 0:
-            combined_problem_data[self.nA_slice] = nA_without_inf
-            combined_problem_data[self.nA_slack_slice] = nA_slack_without_inf
-            combined_problem_data[self.nlbA_slice] = nlbA_without_inf
-            combined_problem_data[self.A_slice] = A_without_inf
-            combined_problem_data[self.A_slack_slice] = A_slack_without_inf
-            combined_problem_data[self.ubA_slice] = ubA_without_inf
+        self.A_f = combined_A.compile(parameters=free_symbols, sparse=self.sparse)
 
-        self.qp_setup_function = combined_problem_data.compile(sparse=self.sparse)
+        self.nlbA_ubA_f = nlbA_ubA.compile(parameters=free_symbols, sparse=False)
+
+        self.free_symbols_str = [str(x) for x in free_symbols]
+
         self._nAi_Ai_cache = {}
 
     @staticmethod
@@ -119,21 +97,20 @@ class QPSWIFTFormatter(QPSolver):
         if casadi_array.shape[0] == 0:
             return np.eye(0)
         compiled = casadi_array.compile()
-        inf_filter = np.isfinite(compiled.fast_call(np.zeros(len(compiled.str_params))).T[0])
+        inf_filter = np.isfinite(compiled.fast_call(np.zeros(len(compiled.str_params))))
         return inf_filter
 
     @profile
-    def split_and_filter_results(self, combined_problem_data: np.ndarray, relax_hard_constraints: bool = False) \
+    def evaluate_and_filter_results(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) \
             -> Iterable[np.ndarray]:
-        self.combined_problem_data = combined_problem_data
-        self.weights = combined_problem_data[self.weights_slice]
-        self.g = combined_problem_data[self.g_slice]
-        self.nlb = combined_problem_data[self.nlb_slice]
-        self.ub = combined_problem_data[self.ub_slice]
-        self.E = combined_problem_data[self.E_E_slack_slice]
-        self.bE = combined_problem_data[self.bE_slice]
-        self.nA_A = combined_problem_data[self.nA_nA_slack_A_A_slack_slice]
-        self.nlbA_ubA = combined_problem_data[self.nlbA_ubA_slice]
+        self.weights = self.weights_f.fast_call(substitutions)
+        self.g = np.zeros(self.weights.shape)
+        self.nlb = self.nlb_f.fast_call(substitutions)
+        self.ub = self.ub_f.fast_call(substitutions)
+        self.E = self.E_f.fast_call(substitutions)
+        self.bE = self.bE_f.fast_call(substitutions)
+        self.nA_A = self.A_f.fast_call(substitutions)
+        self.nlbA_ubA = self.nlbA_ubA_f.fast_call(substitutions)
 
         self.update_filters()
         self.apply_filters()

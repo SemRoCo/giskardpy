@@ -1,6 +1,6 @@
 import abc
 from abc import ABC
-from typing import Tuple, List, Iterable, Optional
+from typing import Tuple, List, Iterable, Optional, Sequence
 
 import numpy as np
 
@@ -12,6 +12,7 @@ from giskardpy.utils.utils import memoize
 
 
 class QPSolver(ABC):
+    free_symbols_str: List[str]
     solver_id: SupportedQPSolver
     qp_setup_function: cas.CompiledFunction
     # num_non_slack = num_non_slack
@@ -26,9 +27,8 @@ class QPSolver(ABC):
         pass
 
     @profile
-    def solve(self, substitutions: List[float], relax_hard_constraints: bool = False) -> np.ndarray:
-        problem_data = self.qp_setup_function.fast_call(substitutions)
-        split_problem_data = self.split_and_filter_results(problem_data, relax_hard_constraints)
+    def solve(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) -> np.ndarray:
+        split_problem_data = self.evaluate_and_filter_results(substitutions, relax_hard_constraints)
         if relax_hard_constraints:
             try:
                 return self.solver_call(*split_problem_data)
@@ -37,7 +37,7 @@ class QPSolver(ABC):
         return self.solver_call(*split_problem_data)
 
     @profile
-    def solve_and_retry(self, substitutions: List[float]) -> np.ndarray:
+    def solve_and_retry(self, substitutions: np.ndarray) -> np.ndarray:
         """
         Calls solve and retries on exception.
         """
@@ -53,7 +53,7 @@ class QPSolver(ABC):
                 raise e
 
     @abc.abstractmethod
-    def split_and_filter_results(self, problem_data: np.ndarray, relax_hard_constraints: bool = False) \
+    def evaluate_and_filter_results(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) \
             -> List[np.ndarray]:
         pass
 

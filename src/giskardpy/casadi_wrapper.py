@@ -41,7 +41,11 @@ class CompiledFunction:
             except Exception:
                 self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
             self.buf, self.f_eval = self.compiled_f.buffer()
-            self.out = np.zeros(expression.shape, order='F')
+            if expression.shape[1] == 1:
+                shape = expression.shape[0]
+            else:
+                shape = expression.shape
+            self.out = np.zeros(shape, order='F')
             self.buf.set_res(0, memoryview(self.out))
         if len(self.str_params) == 0:
             self.f_eval()
@@ -54,6 +58,7 @@ class CompiledFunction:
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
+        filtered_args = np.array(filtered_args, dtype=float)
         return self.fast_call(filtered_args)
 
     @profile
@@ -61,7 +66,6 @@ class CompiledFunction:
         """
         :param filtered_args: parameter values in the same order as in self.str_params
         """
-        filtered_args = np.array(filtered_args, dtype=float)
         self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
         return self.out
@@ -1324,9 +1328,11 @@ def compile_and_execute(f, params):
     expr = f(*symbol_params)
     assert isinstance(expr, Symbol_)
     fast_f = expr.compile(symbol_params2)
-    input_ = np.concatenate(input_).T[0]
+    input_ = np.array(np.concatenate(input_).T[0], dtype=float)
     result = fast_f.fast_call(input_)
     if len(result.shape) == 1:
+        if result.shape[0] == 1:
+            return result[0]
         return result
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]

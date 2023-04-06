@@ -577,12 +577,16 @@ class TestQuaternion(unittest.TestCase):
 
 
 class TestCASWrapper(unittest.TestCase):
-    def test_empty_compiled_function(self):
-        expected = np.array([1, 2, 3], ndmin=2)
+    @given(st.booleans())
+    def test_empty_compiled_function(self, sparse):
+        if sparse:
+            expected = np.array([1, 2, 3], ndmin=2)
+        else:
+            expected = np.array([1, 2, 3])
         e = w.Expression(expected)
-        f = e.compile()
+        f = e.compile(sparse=sparse)
         np.testing.assert_array_almost_equal(f(), expected)
-        np.testing.assert_array_almost_equal(f.fast_call([]), expected)
+        np.testing.assert_array_almost_equal(f.fast_call(np.array([])), expected)
 
     def test_add(self):
         s2 = 'muh'

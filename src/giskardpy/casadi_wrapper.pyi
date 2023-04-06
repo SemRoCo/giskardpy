@@ -7,6 +7,7 @@ import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
 
 from giskardpy.my_types import PrefixName
+from scipy import sparse as sp
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
@@ -19,17 +20,17 @@ def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeErr
 
 class CompiledFunction:
     str_params: Sequence[str]
-    fast_f: ca.Function
-    shape: Tuple[int, int]
+    compiled_f: ca.Function
     buf: ca.FunctionBuffer
     f_eval: functools.partial
-    out: np.ndarray
+    out: Union[np.ndarray, sp.csc_matrix]
+    sparse: bool
 
     def __init__(self,  expression: Symbol_, parameters: Optional[List[str]] = None, sparse: bool = False): ...
 
     def __call__(self, **kwargs) -> np.ndarray: ...
 
-    def fast_call(self, filtered_args: Iterable[float]) -> np.ndarray: ...
+    def fast_call(self, filtered_args: Iterable[float]) -> Union[np.ndarray, sp.csc_matrix]: ...
 
 
 class Symbol_:

@@ -7,7 +7,7 @@ import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
-from scipy import sparse
+from scipy import sparse as sp
 
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
@@ -32,8 +32,8 @@ class CompiledFunction:
             except Exception:
                 self.compiled_f = ca.Function('f', parameters, expression.s)
             self.buf, self.f_eval = self.compiled_f.buffer()
-            csc_indices, csc_indptr = expression.s.sparsity().get_ccs()
-            self.out = sparse.csc_matrix((np.zeros(expression.s.nnz()), csc_indptr, csc_indices))
+            self.csc_indices, self.csc_indptr = expression.s.sparsity().get_ccs()
+            self.out = sp.csc_matrix((np.zeros(expression.s.nnz()), self.csc_indptr, self.csc_indices))
             self.buf.set_res(0, memoryview(self.out.data))
         else:
             try:
@@ -57,15 +57,13 @@ class CompiledFunction:
         return self.fast_call(filtered_args)
 
     @profile
-    def fast_call(self, filtered_args: List[float]) -> np.ndarray:
+    def fast_call(self, filtered_args):
         """
         :param filtered_args: parameter values in the same order as in self.str_params
         """
         filtered_args = np.array(filtered_args, dtype=float)
         self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
-        if self.sparse:
-            return self.out.toarray()
         return self.out
 
 

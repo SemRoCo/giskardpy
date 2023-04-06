@@ -2,9 +2,10 @@ from copy import deepcopy
 
 import rospy
 from std_msgs.msg import Float64MultiArray
+from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import KeyDefaultDict
+from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 
@@ -21,6 +22,17 @@ class JointGroupPosController(CommandPublisher):
             self.joint_names[i] = self.world.search_for_joint_name(self.joint_names[i])
         self.world.register_controlled_joints(self.joint_names)
         self.js = None
+        self.msg = None
+        self.new_stamp = None
+
+    @profile
+    def setup(self, timeout=0.0):
+        self.joint_state_sub = rospy.Subscriber('hsrb/joint_states', JointState, self.cb, queue_size=1)
+        return super().setup(timeout)
+
+    def cb(self, data):
+        self.msg = data
+        self.new_stamp = rospy.get_rostime()
 
     @profile
     def initialise(self):
@@ -33,21 +45,21 @@ class JointGroupPosController(CommandPublisher):
 
     def publish_joint_state(self, time):
         msg = Float64MultiArray()
-        js = deepcopy(self.world.state)
+        js = JointStates.from_msg(self.msg, 'hsrb')
         try:
             qp_data = self.god_map.get_data(identifier.qp_solver_solution)
-            dt = (time.current_real - self.stamp).to_sec() #- 1 / self.hz
+            dt = (time.current_real - self.new_stamp).to_sec() #- 1 / self.hz
         except Exception:
             return
         for joint_name in self.joint_names:
             try:
                 key = self.world.joints[joint_name].free_variables[0].position_name
                 velocity = qp_data[Derivatives.velocity][key]
-                acc = qp_data[Derivatives.acceleration][key]
-                jerk = qp_data[Derivatives.jerk][key]
-                delta = velocity * dt + (acc * dt**2) / 2 + (jerk * dt**3) / 6
+                # acc = qp_data[Derivatives.acceleration][key]
+                # jerk = qp_data[Derivatives.jerk][key]
+                delta = velocity * dt #+ (acc * dt**2) / 2 + (jerk * dt**3) / 6
 
-                position = self.js[joint_name].position + delta * 0.1
+                position = js[joint_name].position + delta * 0.7
                 # implicit integration uses position from the current and velocity from the next time step
                 # it should give stable solutions irrespective of the time step
                 # position = js[joint_name].position + qp_data[Derivatives.velocity][key] * dt

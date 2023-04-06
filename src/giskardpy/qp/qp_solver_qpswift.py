@@ -21,6 +21,7 @@ class QPSWIFTExitFlags(IntEnum):
 
 
 class QPSWIFTFormatter(QPSolver):
+    sparse: bool = False
 
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
@@ -109,7 +110,7 @@ class QPSWIFTFormatter(QPSolver):
             combined_problem_data[self.A_slack_slice] = A_slack_without_inf
             combined_problem_data[self.ubA_slice] = ubA_without_inf
 
-        self.qp_setup_function = combined_problem_data.compile()
+        self.qp_setup_function = combined_problem_data.compile(sparse=self.sparse)
         self._nAi_Ai_cache = {}
 
     @staticmethod
@@ -118,7 +119,7 @@ class QPSWIFTFormatter(QPSolver):
         if casadi_array.shape[0] == 0:
             return np.eye(0)
         compiled = casadi_array.compile()
-        inf_filter = np.isfinite(compiled.fast_call(np.zeros(compiled.shape)).T[0])
+        inf_filter = np.isfinite(compiled.fast_call(np.zeros(len(compiled.str_params))).T[0])
         return inf_filter
 
     @profile
@@ -214,7 +215,10 @@ class QPSWIFTFormatter(QPSolver):
         self.bA_part = slack_part[self.num_eq_slack_variables:]
 
         self.bE_filter = np.ones(self.E.shape[0], dtype=bool)
-        self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
+        if self.sparse:
+            self.num_filtered_eq_constraints = bE_part.shape[1] - bE_part.nnz
+        else:
+            self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
         if self.num_filtered_eq_constraints > 0:
             self.bE_filter[-len(bE_part):] = bE_part
 

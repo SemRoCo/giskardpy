@@ -93,3 +93,33 @@ class QPSolverGurobi(QPSWIFTFormatter):
         if success in {gurobipy.GRB.INFEASIBLE, gurobipy.GRB.INF_OR_UNBD}:
             raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
         raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
+
+    def compute_violated_constraints(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
+                                     ub: np.ndarray, nlbA_ubA: np.ndarray):
+        nlb_relaxed = nlb.copy()
+        ub_relaxed = ub.copy()
+        if self.num_slack_variables > 0:
+            lb_non_slack_without_inf = np.where(self.lb_inf_filter[:self.num_non_slack_variables])[0].shape[0]
+            ub_non_slack_without_inf = np.where(self.ub_inf_filter[:self.num_non_slack_variables])[0].shape[0]
+            nlb_relaxed[lb_non_slack_without_inf:] += self.retry_added_slack
+            ub_relaxed[ub_non_slack_without_inf:] += self.retry_added_slack
+        else:
+            raise InfeasibleException('Can\'t relax constraints, because there are none.')
+        # nlb_relaxed += 0.01
+        # ub_relaxed += 0.01
+        try:
+            lb_relaxed_inf, ub_relaxed_inf = self.lb_ub_with_inf(nlb_relaxed, ub_relaxed)
+            xdot_full = self.solver_call(H=self.weights, g=self.g, E=self.E, b=self.bE, A=self.nA_A,
+                                         lb=lb_relaxed_inf, ub=ub_relaxed_inf, h=self.nlbA_ubA)
+        except QPSolverException as e:
+            self.retries_with_relaxed_constraints += 1
+            raise e
+        self.lb_filter = self.lb_inf_filter[self.weight_filter]
+        self.ub_filter = self.ub_inf_filter[self.weight_filter]
+        lower_violations = 1e-4 < xdot_full[self.lb_filter] - nlb
+        upper_violations = 1e-4 < xdot_full[self.ub_filter] - ub
+        self.lb_filter[self.lb_filter] = lower_violations
+        self.ub_filter[self.ub_filter] = upper_violations
+        self.lb_filter[:self.num_non_slack_variables] = False
+        self.ub_filter[:self.num_non_slack_variables] = False
+        return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed

@@ -817,6 +817,11 @@ class ClosedLoop(OpenLoop):
             state_topic='/hsrb/arm_trajectory_controller/state',
             group_name='hsrb',
             fill_velocity_values=True))
+        planning_4.add_child(SendFollowJointTrajectoryClosedLoop(
+            action_namespace='/hsrb/head_trajectory_controller/follow_joint_trajectory',
+            state_topic='/hsrb/head_trajectory_controller/state',
+            group_name='hsrb',
+            fill_velocity_values=True))
 
         for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
             planning_4.add_child(SendTrajectoryToCmdVelClosedLoop(**drive_interface))

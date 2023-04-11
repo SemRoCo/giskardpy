@@ -138,8 +138,10 @@ class SendFollowJointTrajectoryClosedLoop(ActionClient, GiskardBehavior):
         except KeyError:
             print(KeyError)
             return py_trees.Status.RUNNING
+        # TODO test it on the real robot
+        # TODO use future velocities from giskard
 
-        start_time = rospy.get_rostime() + rospy.Duration(0)
+        start_time = rospy.get_rostime() + rospy.Duration(dt)
         fill_velocity_values = self.god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
@@ -147,3 +149,7 @@ class SendFollowJointTrajectoryClosedLoop(ActionClient, GiskardBehavior):
                                       fill_velocity_values)
         self.action_client.send_goal(goal)
         return py_trees.Status.RUNNING
+
+    def __str__(self):
+        return f'{super().__str__()} ({self.action_namespace})'
+

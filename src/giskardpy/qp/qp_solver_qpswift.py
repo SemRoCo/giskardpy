@@ -1,6 +1,6 @@
 import abc
 from enum import IntEnum
-from typing import Tuple, Iterable, List, Union
+from typing import Tuple, Iterable, List, Union, Optional
 
 import numpy as np
 
@@ -22,8 +22,6 @@ class QPSWIFTExitFlags(IntEnum):
 
 
 class QPSWIFTFormatter(QPSolver):
-    sparse: bool = False
-    compute_nI_I: bool = True
 
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
@@ -42,13 +40,13 @@ class QPSWIFTFormatter(QPSolver):
         self.num_slack_variables = self.num_eq_slack_variables + self.num_neq_slack_variables
         self.num_non_slack_variables = self.num_free_variable_constraints - self.num_slack_variables
 
-        self.lb_inf_filter = self.to_filter(lb)
-        self.ub_inf_filter = self.to_filter(ub)
+        self.lb_inf_filter = self.to_inf_filter(lb)
+        self.ub_inf_filter = self.to_inf_filter(ub)
         nlb_without_inf = -lb[self.lb_inf_filter]
         ub_without_inf = ub[self.ub_inf_filter]
 
-        self.nlbA_inf_filter = self.to_filter(lbA)
-        self.ubA_inf_filter = self.to_filter(ubA)
+        self.nlbA_inf_filter = self.to_inf_filter(lbA)
+        self.ubA_inf_filter = self.to_inf_filter(ubA)
         nlbA_without_inf = -lbA[self.nlbA_inf_filter]
         ubA_without_inf = ubA[self.ubA_inf_filter]
         nA_without_inf = -A[self.nlbA_inf_filter]
@@ -94,18 +92,19 @@ class QPSWIFTFormatter(QPSolver):
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
 
-    @staticmethod
-    def to_filter(casadi_array):
-        # FIXME, buggy if a function happens to evaluate with all 0 input
-        if casadi_array.shape[0] == 0:
-            return np.eye(0)
-        compiled = casadi_array.compile()
-        inf_filter = np.isfinite(compiled.fast_call(np.zeros(len(compiled.str_params))))
-        return inf_filter
-
     @profile
     def evaluate_and_filter_results(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) \
             -> Iterable[np.ndarray]:
+        self.evaluate_functions()
+        self.update_zero_filters()
+        self.apply_filters()
+
+        if relax_hard_constraints:
+            return self.relaxed_problem_data_to_qp_format(self.weights, self.nA_A, self.nlb, self.ub,
+                                                          self.nlbA_ubA)
+        return self.problem_data_to_qp_format(self.weights, self.nA_A, self.nlb, self.ub, self.nlbA_ubA)
+
+    def evaluate_functions(self, substitutions: np.ndarray):
         self.weights = self.weights_f.fast_call(substitutions)
         self.g = np.zeros(self.weights.shape)
         self.nlb = self.nlb_f.fast_call(substitutions)
@@ -115,41 +114,31 @@ class QPSWIFTFormatter(QPSolver):
         self.nA_A = self.A_f.fast_call(substitutions)
         self.nlbA_ubA = self.nlbA_ubA_f.fast_call(substitutions)
 
-        self.update_filters()
-        self.apply_filters()
-
-        # self.filter_inf_entries()
-        if relax_hard_constraints:
-            return self.relaxed_problem_data_to_qp_format(self.weights, self.nA_A, self.nlb, self.ub,
-                                                          self.nlbA_ubA)
-        return self.problem_data_to_qp_format(self.weights, self.nA_A, self.nlb, self.ub, self.nlbA_ubA)
-
     @profile
-    def problem_data_to_qp_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
-                                  ub: np.ndarray, nlbA_ubA: np.ndarray) \
+    def problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        H = np.diag(weights)
-        A = np.concatenate((self.nAi_Ai, nA_A))
-        nlb_ub_nlbA_ubA = np.concatenate((nlb, ub, nlbA_ubA))
+        H = np.diag(self.weights)
+        A = np.concatenate((self.nAi_Ai, self.nA_A))
+        nlb_ub_nlbA_ubA = np.concatenate((self.nlb, self.ub, self.nlbA_ubA))
         return H, self.g, self.E, self.bE, A, nlb_ub_nlbA_ubA
 
     @profile
-    def relaxed_problem_data_to_qp_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
-                                          ub: np.ndarray, nlbA_ubA: np.ndarray) \
+    def relaxed_problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         self.retries_with_relaxed_constraints -= 1
         if self.retries_with_relaxed_constraints <= 0:
             raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
-        lb_filter, nlb_relaxed, ub_filter, ub_relaxed = self.compute_violated_constraints(weights, nA_A, nlb, ub,
-                                                                                          nlbA_ubA)
+        lb_filter, nlb_relaxed, ub_filter, ub_relaxed = self.compute_violated_constraints(self.weights,
+                                                                                          self.nA_A,
+                                                                                          self.nlb,
+                                                                                          self.ub,
+                                                                                          self.nlbA_ubA)
         if np.any(lb_filter) or np.any(ub_filter):
-            weights[ub_filter] *= self.retry_weight_factor
-            weights[lb_filter] *= self.retry_weight_factor
-            return self.problem_data_to_qp_format(weights=weights,
-                                                  nA_A=nA_A,
-                                                  nlb=nlb_relaxed,
-                                                  ub=ub_relaxed,
-                                                  nlbA_ubA=nlbA_ubA)
+            self.weights[ub_filter] *= self.retry_weight_factor
+            self.weights[lb_filter] *= self.retry_weight_factor
+            self.nlb = nlb_relaxed
+            self.ub = ub_relaxed
+            return self.problem_data_to_qp_format()
         self.retries_with_relaxed_constraints += 1
         raise InfeasibleException('')
 
@@ -167,12 +156,9 @@ class QPSWIFTFormatter(QPSolver):
         # nlb_relaxed += 0.01
         # ub_relaxed += 0.01
         try:
-            relaxed_problem_data = self.problem_data_to_qp_format(weights=weights,
-                                                                  nA_A=nA_A,
-                                                                  nlb=nlb_relaxed,
-                                                                  ub=ub_relaxed,
-                                                                  nlbA_ubA=nlbA_ubA)
-            xdot_full = self.solver_call(*relaxed_problem_data)
+            H, g, E, bE, A, _ = self.problem_data_to_qp_format()
+            nlb_ub_nlbA_ubA = np.concatenate((nlb_relaxed, ub_relaxed, self.nlbA_ubA))
+            xdot_full = self.solver_call(H=H, g=g, E=E, b=bE, A=A, h=nlb_ub_nlbA_ubA)
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
@@ -187,7 +173,7 @@ class QPSWIFTFormatter(QPSolver):
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
     @profile
-    def update_filters(self):
+    def update_zero_filters(self):
         self.weight_filter = self.weights != 0
         self.weight_filter[:-self.num_slack_variables] = True
         slack_part = self.weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
@@ -241,37 +227,7 @@ class QPSWIFTFormatter(QPSolver):
         if self.compute_nI_I:
             # for constraints, both rows and columns are filtered, so I can start with weights dims
             # then only the rows need to be filtered for inf lb/ub
-            self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter)
-
-    @profile
-    def _direct_limit_model(self, dimensions: int, nAi_Ai_filter: np.ndarray) -> Union[np.ndarray, sp.csc_matrix]:
-        """
-        These models are often identical, yet the computation is expensive. Caching to the rescue
-        """
-        key = hash((dimensions, nAi_Ai_filter.tostring()))
-        if key not in self._nAi_Ai_cache:
-            nI_I = self._cached_eyes(dimensions)
-            self._nAi_Ai_cache[key] = nI_I[nAi_Ai_filter]
-        return self._nAi_Ai_cache[key]
-
-    @memoize
-    def _cached_eyes(self, dimensions: int) -> Union[np.ndarray, sp.csc_matrix]:
-        if self.sparse:
-            d2 = dimensions * 2
-            data = np.ones(d2, dtype=float)
-            data[::2] *= -1
-            r1 = np.arange(dimensions)
-            r2 = np.arange(dimensions, d2)
-            row_indices = np.empty((d2,), dtype=int)
-            row_indices[0::2] = r1
-            row_indices[1::2] = r2
-            col_indices = np.arange(0, d2 + 1, 2)
-            return sp.csc_matrix((data, row_indices, col_indices))
-            # I = np.eye(dimensions)
-            # return np.concatenate([-I, I])
-        else:
-            I = np.eye(dimensions)
-            return np.concatenate([-I, I])
+            self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter, True)
 
     def lb_ub_with_inf(self, nlb: np.ndarray, ub: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         lb_with_inf = (np.ones(self.lb_inf_filter.shape) * -np.inf)

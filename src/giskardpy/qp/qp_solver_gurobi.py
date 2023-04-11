@@ -74,11 +74,10 @@ class QPSolverGurobi(QPSWIFTFormatter):
         gurobipy.setParam('LogToConsole', False)
 
     @profile
-    def problem_data_to_qp_format(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
-                                  ub: np.ndarray, nlbA_ubA: np.ndarray) \
+    def problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        lb, ub = self.lb_ub_with_inf(nlb, ub)
-        return weights, self.g, self.E, self.bE, nA_A, lb, ub, nlbA_ubA
+        lb, ub = self.lb_ub_with_inf(self.nlb, self.ub)
+        return self.weights, self.g, self.E, self.bE, self.nA_A, lb, ub, self.nlbA_ubA
 
     @record_time
     @profile

@@ -1252,15 +1252,12 @@ class QPProblemBuilder:
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: List[float]) -> NextCommands:
+    def get_cmd(self, substitutions: np.ndarray) -> NextCommands:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         """
-        # self.evaluate_and_create_np_data(substitutions)
         try:
-            # self.__swap_compiled_matrices()
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
-            # self.__swap_compiled_matrices()
             # self._create_debug_pandas()
             return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
                                 prediction_horizon=self.prediction_horizon)

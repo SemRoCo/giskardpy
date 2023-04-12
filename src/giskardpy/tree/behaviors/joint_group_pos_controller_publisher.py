@@ -45,10 +45,10 @@ class JointGroupPosController(CommandPublisher):
 
     def publish_joint_state(self, time):
         msg = Float64MultiArray()
-        js = JointStates.from_msg(self.msg, 'hsrb')
+        # js = JointStates.from_msg(self.msg, 'hsrb')
         try:
             qp_data = self.god_map.get_data(identifier.qp_solver_solution)
-            dt = (time.current_real - self.new_stamp).to_sec() #- 1 / self.hz
+            # dt = (time.current_real - self.new_stamp).to_sec() #- 1 / self.hz
         except Exception:
             return
         for joint_name in self.joint_names:
@@ -57,16 +57,24 @@ class JointGroupPosController(CommandPublisher):
                 velocity = qp_data[Derivatives.velocity][key]
                 # acc = qp_data[Derivatives.acceleration][key]
                 # jerk = qp_data[Derivatives.jerk][key]
-                delta = velocity * dt #+ (acc * dt**2) / 2 + (jerk * dt**3) / 6
+                # delta = velocity * dt #+ (acc * dt**2) / 2 + (jerk * dt**3) / 6
 
-                position = self.js[joint_name].position + delta * 0.7
+                # position = self.js[joint_name].position + delta * 0.7
                 # implicit integration uses position from the current and velocity from the next time step
                 # it should give stable solutions irrespective of the time step
                 # position = js[joint_name].position + qp_data[Derivatives.velocity][key] * dt
-
+                position = velocity
             except KeyError:
-                position = js[joint_name].position
+                # position = js[joint_name].position
+                position = 0
             msg.data.append(position)
             self.js[joint_name].position = position
 
         self.cmd_pub.publish(msg)
+
+    def terminate(self, new_status):
+        msg = Float64MultiArray()
+        for joint_name in self.joint_names:
+            msg.data.append(0.0)
+        self.cmd_pub.publish(msg)
+        super().terminate(new_status)

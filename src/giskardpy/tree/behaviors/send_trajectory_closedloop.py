@@ -134,7 +134,7 @@ class SendFollowJointTrajectoryClosedLoop(ActionClient, GiskardBehavior):
                     key = self.world.joints['hsrb/' + joint_name].free_variables[0].position_name
                     velocity = qp_data[Derivatives.velocity][key]
                     js[joint_name].position += velocity * dt
-                traj.set(i, js)
+                traj.set(i, deepcopy(js))
         except KeyError:
             print(KeyError)
             return py_trees.Status.RUNNING

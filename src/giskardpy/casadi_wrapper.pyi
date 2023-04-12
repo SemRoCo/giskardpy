@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence
+from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict
 import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
@@ -17,6 +17,17 @@ symbol_expr = Union[Symbol, Expression]
 pi: float
 
 def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeError: ...
+
+
+class StackedCompiledFunction:
+    compiled_f: CompiledFunction
+    split_out_view: List[np.ndarray]
+
+    def __init__(self, expressions: List[Expression], parameters: Optional[List[str]] = None,
+                 additional_views: Optional[List[slice]] = None): ...
+
+    def fast_call(self, filtered_args: np.ndarray) -> np.ndarray: ...
+
 
 class CompiledFunction:
     str_params: List[str]

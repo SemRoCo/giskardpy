@@ -16,6 +16,27 @@ _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
 
 
+class StackedCompiledFunction:
+    def __init__(self, expressions, parameters=None, additional_views=None):
+        combined_expression = vstack(expressions)
+        self.compiled_f = combined_expression.compile(parameters=parameters)
+        slices = []
+        start = 0
+        for expression in expressions[:-1]:
+            end = start + expression.shape[0]
+            slices.append(end)
+            start = end
+        self.split_out_view = np.split(self.compiled_f.out, slices)
+        if additional_views is not None:
+            for expression_slice in additional_views:
+                self.split_out_view.append(self.compiled_f.out[expression_slice])
+
+    @profile
+    def fast_call(self, filtered_args):
+        self.compiled_f.fast_call(filtered_args)
+        return self.split_out_view
+
+
 class CompiledFunction:
     def __init__(self, expression, parameters=None, sparse=False):
         self.sparse = sparse

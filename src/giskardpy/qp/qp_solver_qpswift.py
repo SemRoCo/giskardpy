@@ -64,7 +64,7 @@ class QPSWIFTFormatter(QPSolver):
         combined_A = cas.hstack([A_without_inf,
                                  cas.zeros(A_slack_without_inf.shape[0], E_slack.shape[1]),
                                  A_slack_without_inf])
-        combined_A = cas.vstack([combined_nA, combined_A])
+        nA_A = cas.vstack([combined_nA, combined_A])
         nlbA_ubA = cas.vstack([nlbA_without_inf, ubA_without_inf])
 
         free_symbols = set(weights.free_symbols())
@@ -72,20 +72,18 @@ class QPSWIFTFormatter(QPSolver):
         free_symbols.update(ubA_without_inf.free_symbols())
         free_symbols.update(combined_E.free_symbols())
         free_symbols.update(bE.free_symbols())
-        free_symbols.update(combined_A.free_symbols())
+        free_symbols.update(nA_A.free_symbols())
         free_symbols.update(nlbA_ubA.free_symbols())
         free_symbols = list(free_symbols)
 
-        self.weights_f = weights.compile(parameters=free_symbols, sparse=False)
-        self.nlb_f = nlb_without_inf.compile(parameters=free_symbols, sparse=False)
-        self.ub_f = ub_without_inf.compile(parameters=free_symbols, sparse=False)
-
         self.E_f = combined_E.compile(parameters=free_symbols, sparse=self.sparse)
-        self.bE_f = bE.compile(parameters=free_symbols, sparse=False)
-
-        self.A_f = combined_A.compile(parameters=free_symbols, sparse=self.sparse)
-
-        self.nlbA_ubA_f = nlbA_ubA.compile(parameters=free_symbols, sparse=False)
+        self.nA_A_f = nA_A.compile(parameters=free_symbols, sparse=self.sparse)
+        self.combined_vector_f = cas.StackedCompiledFunction([weights,
+                                                              nlb_without_inf,
+                                                              ub_without_inf,
+                                                              bE,
+                                                              nlbA_ubA],
+                                                             parameters=free_symbols)
 
         self.free_symbols_str = [str(x) for x in free_symbols]
 
@@ -93,26 +91,11 @@ class QPSWIFTFormatter(QPSolver):
             self._nAi_Ai_cache = {}
 
     @profile
-    def evaluate_and_filter_results(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) \
-            -> Iterable[np.ndarray]:
-        self.evaluate_functions()
-        self.update_zero_filters()
-        self.apply_filters()
-
-        if relax_hard_constraints:
-            return self.relaxed_problem_data_to_qp_format(self.weights, self.nA_A, self.nlb, self.ub,
-                                                          self.nlbA_ubA)
-        return self.problem_data_to_qp_format(self.weights, self.nA_A, self.nlb, self.ub, self.nlbA_ubA)
-
-    def evaluate_functions(self, substitutions: np.ndarray):
-        self.weights = self.weights_f.fast_call(substitutions)
-        self.g = np.zeros(self.weights.shape)
-        self.nlb = self.nlb_f.fast_call(substitutions)
-        self.ub = self.ub_f.fast_call(substitutions)
+    def evaluate_functions(self, substitutions):
+        self.nA_A = self.nA_A_f.fast_call(substitutions)
         self.E = self.E_f.fast_call(substitutions)
-        self.bE = self.bE_f.fast_call(substitutions)
-        self.nA_A = self.A_f.fast_call(substitutions)
-        self.nlbA_ubA = self.nlbA_ubA_f.fast_call(substitutions)
+        self.weights, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(substitutions)
+        self.g = np.zeros(self.weights.shape)
 
     @profile
     def problem_data_to_qp_format(self) \
@@ -173,7 +156,7 @@ class QPSWIFTFormatter(QPSolver):
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
     @profile
-    def update_zero_filters(self):
+    def update_filters(self):
         self.weight_filter = self.weights != 0
         self.weight_filter[:-self.num_slack_variables] = True
         slack_part = self.weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]

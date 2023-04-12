@@ -32,7 +32,7 @@ class QPSolver(ABC):
     @profile
     def solve(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) -> np.ndarray:
         self.evaluate_functions(substitutions)
-        self.update_zero_filters()
+        self.update_filters()
         self.apply_filters()
 
         if relax_hard_constraints:
@@ -75,25 +75,26 @@ class QPSolver(ABC):
                 raise e
 
     @abc.abstractmethod
-    def update_zero_filters(self):
+    def update_filters(self):
         pass
 
     @profile
-    def _direct_limit_model(self, dimensions: int, Ai_filter: Optional[np.ndarray] = None, nAi_Ai: bool = False) \
+    def _direct_limit_model(self, dimensions_after_zero_filter: int,
+                            Ai_inf_filter: Optional[np.ndarray] = None, nAi_Ai: bool = False) \
             -> Union[np.ndarray, sp.csc_matrix]:
         """
         These models are often identical, yet the computation is expensive. Caching to the rescue
         """
-        if Ai_filter is None:
-            key = hash(dimensions)
+        if Ai_inf_filter is None:
+            key = hash(dimensions_after_zero_filter)
         else:
-            key = hash((dimensions, Ai_filter.tostring()))
+            key = hash((dimensions_after_zero_filter, Ai_inf_filter.tostring()))
         if key not in self._nAi_Ai_cache:
-            nI_I = self._cached_eyes(dimensions, nAi_Ai)
-            if Ai_filter is None:
+            nI_I = self._cached_eyes(dimensions_after_zero_filter, nAi_Ai)
+            if Ai_inf_filter is None:
                 self._nAi_Ai_cache[key] = nI_I
             else:
-                self._nAi_Ai_cache[key] = nI_I[Ai_filter]
+                self._nAi_Ai_cache[key] = nI_I[Ai_inf_filter]
         return self._nAi_Ai_cache[key]
 
 
@@ -112,7 +113,10 @@ class QPSolver(ABC):
                 col_indices = np.arange(0, d2 + 1, 2)
                 return sp.csc_matrix((data, row_indices, col_indices))
             else:
-                return sp.eye(dimensions)
+                data = np.ones(dimensions, dtype=float)
+                row_indices = np.arange(dimensions)
+                col_indices = np.arange(dimensions+1)
+                return sp.csc_matrix((data, row_indices, col_indices))
         else:
             I = np.eye(dimensions)
             if nAi_Ai:

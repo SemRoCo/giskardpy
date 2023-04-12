@@ -101,20 +101,17 @@ class QPSolverQPalm(QPSolver):
         self.bA_part = self.slack_part[self.num_eq_slack_variables:]
 
         self.b_bE_bA_filter = np.ones(self.lb.shape[0] + self.bE.shape[0] + self.lbA.shape[0], dtype=bool)
-        self.b_zero_inf_filter_view, self.bE_filter_view, self.bA_filter_view = np.split(self.b_bE_bA_filter,
-                                                                                         [self.lb.shape[0],
-                                                                                          self.lb.shape[0]+self.bE.shape[0]])
+        self.b_zero_inf_filter_view = self.b_bE_bA_filter[:self.lb.shape[0]]
+        self.bE_filter_view = self.b_bE_bA_filter[self.lb.shape[0]:self.lb.shape[0] + self.bE.shape[0]]
+        self.bA_filter_view = self.b_bE_bA_filter[self.lb.shape[0] + self.bE.shape[0]:]
         self.bE_bA_filter = self.b_bE_bA_filter[self.lb.shape[0]:]
 
         self.b_zero_filter = self.weight_filter.copy()
         self.b_inf_filter = np.isfinite(self.lb) | np.isfinite(self.ub)
         self.b_zero_inf_filter_view[::] = self.b_zero_filter & self.b_inf_filter
         self.Ai_inf_filter = self.b_inf_filter[self.b_zero_filter]
-        # self.len_b_filtered = np.where(self.bA_filter[:self.len_b])[0].shape[0]
 
-        # copy bA part at the end of the bE section
-        self.num_filtered_eq_constraints = np.count_nonzero(np.invert(self.bE_part))
-        if self.num_filtered_eq_constraints > 0:
+        if len(self.bE_part) > 0:
             self.bE_filter_view[-len(self.bE_part):] = self.bE_part
 
         if len(self.bA_part) > 0:
@@ -145,7 +142,6 @@ class QPSolverQPalm(QPSolver):
 
         solver = qpalm.Solver(data, self.settings)
         solver.solve()
-        # print(f'{solver.info.iter} {solver.info.iter_out}')
         if solver.info.status_val != QPALMInfo.SOLVED:
             raise InfeasibleException(f'Failed to solve qp: {str(QPALMInfo(solver.info.status_val))}')
         return solver.solution.x
@@ -155,8 +151,9 @@ class QPSolverQPalm(QPSolver):
         self.retries_with_relaxed_constraints -= 1
         if self.retries_with_relaxed_constraints <= 0:
             raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
-        lb_filter, lbA_relaxed, ub_filter, ubA_relaxed = self.compute_violated_constraints(self.lb[self.b_zero_inf_filter_view],
-                                                                                           self.ub[self.b_zero_inf_filter_view])
+        lb_filter, lbA_relaxed, ub_filter, ubA_relaxed = self.compute_violated_constraints(
+            self.lb[self.b_zero_inf_filter_view],
+            self.ub[self.b_zero_inf_filter_view])
         if np.any(lb_filter) or np.any(ub_filter):
             self.weights[ub_filter] *= self.retry_weight_factor
             self.weights[lb_filter] *= self.retry_weight_factor
@@ -216,9 +213,9 @@ class QPSolverQPalm(QPSolver):
         lb = self.lb_bE_lbA[:num_b]
         ub = self.ub_bE_ubA[:num_b]
         lb, ub = self.lb_ub_with_inf(lb, ub)
-        bE = self.lb_bE_lbA[num_b:num_b+num_bE]
-        lbA = self.lb_bE_lbA[num_b+num_bE:]
-        ubA = self.ub_bE_ubA[num_b+num_bE:]
+        bE = self.lb_bE_lbA[num_b:num_b + num_bE]
+        lbA = self.lb_bE_lbA[num_b + num_bE:]
+        ubA = self.ub_bE_ubA[num_b + num_bE:]
 
         E = self.A[:num_bE]
         A = self.A[num_bE:]

@@ -238,11 +238,17 @@ class QPSWIFTFormatter(QPSolver):
         merged_A = np.zeros((self.ubA_inf_filter.shape[0], self.weights.shape[0]))
         nlbA_filter = self.nlbA_inf_filter.copy()
         nlbA_filter[nlbA_filter] = self.nlbA_filter_half
-        merged_A[nlbA_filter] = nA
+        if self.sparse:
+            merged_A[nlbA_filter] = nA.toarray()
+        else:
+            merged_A[nlbA_filter] = nA
 
         ubA_filter = self.ubA_inf_filter.copy()
         ubA_filter[ubA_filter] = self.ubA_filter_half
-        merged_A[ubA_filter] = A
+        if self.sparse:
+            merged_A[ubA_filter] = A.toarray()
+        else:
+            merged_A[ubA_filter] = A
 
         lbA = (np.ones(self.nlbA_inf_filter.shape) * -np.inf)
         ubA = (np.ones(self.ubA_inf_filter.shape) * np.inf)
@@ -253,7 +259,10 @@ class QPSWIFTFormatter(QPSolver):
         if len(self.bA_part) > 0:
             bA_filter[-len(self.bA_part):] = self.bA_part
 
-        E = self.E
+        if self.sparse:
+            E = self.E.toarray()
+        else:
+            E = self.E
         bE = self.bE
 
         merged_A = merged_A[bA_filter]

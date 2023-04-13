@@ -13,7 +13,18 @@ class PR2_Base(Giskard):
         # self.configure_PlotTrajectory(enabled=True, wait=True)
         # self.configure_PlotDebugExpressions(enabled=True, wait=True)
         # self.configure_DebugMarkerPublisher(enabled=True)
-        # self.configure_PublishDebugExpressions(enabled=True, enabled_base=True)
+        # self.configure_PublishDebugExpressions(
+            # publish_lb=True,
+            # publish_ub=True,
+            # publish_lbA=True,
+            # publish_ubA=True,
+            # publish_bE=True,
+            # publish_Ax=True,
+            # publish_Ex=True,
+            # publish_xdot=True,
+            # publish_weights=True,
+            # publish_debug=True,
+        # )
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,

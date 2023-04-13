@@ -358,9 +358,9 @@ class EqualityBounds(ProblemDataPart):
         self.evaluated = True
 
     def equality_bounds(self) -> Dict[str, cas.Expression]:
-        return {f'{c.name}/e': cas.limit(c.bound,
-                                         -c.velocity_limit * self.dt * c.control_horizon,
-                                         c.velocity_limit * self.dt * c.control_horizon)
+        return {f'{c.name}': cas.limit(c.bound,
+                                       -c.velocity_limit * self.dt * c.control_horizon,
+                                       c.velocity_limit * self.dt * c.control_horizon)
                 for c in self.equality_constraints}
 
     def last_derivative_values(self, derivative: Derivatives) -> Dict[str, cas.symbol_expr_float]:
@@ -449,9 +449,9 @@ class InequalityBounds(ProblemDataPart):
         for constraint in self.inequality_constraints:
             limit = constraint.velocity_limit * self.dt * constraint.control_horizon
             if isinstance(constraint.lower_error, float) and np.isinf(constraint.lower_error):
-                bounds[f'{constraint.name}/e'] = constraint.lower_error
+                bounds[f'{constraint.name}'] = constraint.lower_error
             else:
-                bounds[f'{constraint.name}/e'] = cas.limit(constraint.lower_error, -limit, limit)
+                bounds[f'{constraint.name}'] = cas.limit(constraint.lower_error, -limit, limit)
         return bounds
 
     def upper_inequality_constraint_bound(self):
@@ -459,9 +459,9 @@ class InequalityBounds(ProblemDataPart):
         for constraint in self.inequality_constraints:
             limit = constraint.velocity_limit * self.dt * constraint.control_horizon
             if isinstance(constraint.upper_error, float) and np.isinf(constraint.upper_error):
-                bounds[f'{constraint.name}/e'] = constraint.upper_error
+                bounds[f'{constraint.name}'] = constraint.upper_error
             else:
-                bounds[f'{constraint.name}/e'] = cas.limit(constraint.upper_error, -limit, limit)
+                bounds[f'{constraint.name}'] = cas.limit(constraint.upper_error, -limit, limit)
         return bounds
 
     def position_limits(self) -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
@@ -1383,9 +1383,9 @@ class QPProblemBuilder:
         # substitutions = self.substitutions
         # self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
-        free_variable_names = self.free_variable_bounds.names[weight_filter]
-        equality_constr_names = self.equality_bounds.names[bE_filter]
-        inequality_constr_names = self.inequality_bounds.names[bA_filter]
+        self.free_variable_names = self.free_variable_bounds.names[weight_filter]
+        self.equality_constr_names = self.equality_bounds.names[bE_filter]
+        self.inequality_constr_names = self.inequality_bounds.names[bA_filter]
 
         # self._eval_debug_exprs()
         p_debug = {}
@@ -1396,24 +1396,24 @@ class QPProblemBuilder:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
-        self.p_weights = pd.DataFrame(weights, free_variable_names, ['data'], dtype=float)
-        # self.p_g = pd.DataFrame(g, free_variable_names, ['data'], dtype=float)
-        self.p_lb = pd.DataFrame(lb, free_variable_names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(ub, free_variable_names, ['data'], dtype=float)
-        self.p_bE_raw = pd.DataFrame(bE, equality_constr_names, ['data'], dtype=float)
+        self.p_weights = pd.DataFrame(weights, self.free_variable_names, ['data'], dtype=float)
+        # self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(lb, self.free_variable_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(ub, self.free_variable_names, ['data'], dtype=float)
+        self.p_bE_raw = pd.DataFrame(bE, self.equality_constr_names, ['data'], dtype=float)
         self.p_bE = deepcopy(self.p_bE_raw)
         self.p_bE[len(self.equality_bounds.names_derivative_links):] /= sample_period
-        self.p_lbA_raw = pd.DataFrame(lbA, inequality_constr_names, ['data'], dtype=float)
+        self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
         self.p_lbA[len(self.inequality_bounds.names_position_limits):] /= sample_period
-        self.p_ubA_raw = pd.DataFrame(ubA, inequality_constr_names, ['data'], dtype=float)
+        self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
         self.p_ubA[len(self.inequality_bounds.names_position_limits):] /= sample_period
         # remove sample period factor
-        self.p_E = pd.DataFrame(E, equality_constr_names, free_variable_names, dtype=float)
-        self.p_A = pd.DataFrame(A, inequality_constr_names, free_variable_names, dtype=float)
+        self.p_E = pd.DataFrame(E, self.equality_constr_names, self.free_variable_names, dtype=float)
+        self.p_A = pd.DataFrame(A, self.inequality_constr_names, self.free_variable_names, dtype=float)
         if self.xdot_full is not None:
-            self.p_xdot = pd.DataFrame(self.xdot_full, free_variable_names, ['data'], dtype=float)
+            self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
             # xH = np.dot((self.xdot_full ** 2).T, H)
             # self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)

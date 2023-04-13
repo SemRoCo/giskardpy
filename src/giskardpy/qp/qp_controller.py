@@ -1118,6 +1118,7 @@ class QPProblemBuilder:
 
     @profile
     def compile(self, default_limits: bool = False) -> QPSolver:
+        logging.loginfo('Creating controller')
         kwargs = {'free_variables': self.free_variables,
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
@@ -1140,8 +1141,12 @@ class QPProblemBuilder:
         bE = self.equality_bounds.construct_expression()
 
         qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
-                                              E=E, E_slack=E_slack, bE=bE,
-                                              A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+                                         E=E, E_slack=E_slack, bE=bE,
+                                         A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+        logging.loginfo('Done compiling controller:')
+        logging.loginfo(f'  #free variables: {weights.shape[0]}')
+        logging.loginfo(f'  #equality constraints: {bE.shape[0]}')
+        logging.loginfo(f'  #inequality constraints: {lbA.shape[0]}')
         self._compile_debug_expressions()
         return qp_solver
 
@@ -1149,7 +1154,6 @@ class QPProblemBuilder:
         return self.qp_solver.free_symbols_str
 
     def _compile_debug_expressions(self):
-        t = time()
         self.compiled_debug_expressions = {}
         free_symbols = set()
         for name, expr in self.debug_expressions.items():
@@ -1157,8 +1161,9 @@ class QPProblemBuilder:
         free_symbols = list(free_symbols)
         for name, expr in self.debug_expressions.items():
             self.compiled_debug_expressions[name] = expr.compile(free_symbols)
-        compilation_time = time() - t
-        logging.loginfo(f'Compiled debug expressions in {compilation_time:.5f}s')
+        num_debug_expressions = len(self.compiled_debug_expressions)
+        if num_debug_expressions > 0:
+            logging.loginfo(f'  #debug expressions: {len(self.compiled_debug_expressions)}')
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]

@@ -13,7 +13,7 @@ from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.math import rpy_from_quaternion
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class SyncOdometry(GiskardBehavior):

@@ -7,7 +7,7 @@ from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.tfwrapper import lookup_pose, msg_to_homogeneous_matrix
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class SyncTfFrames(GiskardBehavior):

@@ -18,8 +18,8 @@ from giskardpy.goals.goal import Goal
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard, \
-    catch_and_raise_to_blackboard
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class RosMsgToGoal(GetGoal):

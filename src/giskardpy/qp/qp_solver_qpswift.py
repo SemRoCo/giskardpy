@@ -11,7 +11,7 @@ import qpSWIFT
 import giskardpy.casadi_wrapper as cas
 import scipy.sparse as sp
 
-from giskardpy.utils.utils import record_time, memoize
+from giskardpy.utils.decorators import memoize, record_time
 
 
 class QPSWIFTExitFlags(IntEnum):

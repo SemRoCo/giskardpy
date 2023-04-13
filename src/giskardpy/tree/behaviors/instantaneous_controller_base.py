@@ -3,7 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class ControllerPluginBase(GiskardBehavior):

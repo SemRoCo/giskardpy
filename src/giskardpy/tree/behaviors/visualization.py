@@ -3,7 +3,7 @@ import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class VisualizationBehavior(GiskardBehavior):

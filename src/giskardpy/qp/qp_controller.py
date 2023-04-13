@@ -24,7 +24,8 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout, get_all_classes_in_package
+from giskardpy.utils.utils import create_path, suppress_stdout, get_all_classes_in_package
+from giskardpy.utils.decorators import memoize
 
 
 def save_pandas(dfs, names, path):
@@ -165,6 +166,7 @@ class Weights(ProblemDataPart):
         #     weights[i] = self.replace_hack(weights[i], 0)
         return cas.Expression(weights), cas.zeros(*weights.shape)
 
+    @profile
     def free_variable_weights_expression(self) -> List[defaultdict]:
         params = []
         weights = defaultdict(dict)  # maps order to joints
@@ -235,6 +237,7 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
+    @profile
     def free_variable_bounds(self) -> Tuple[List[Dict[str, cas.symbol_expr_float]],
                                             List[Dict[str, cas.symbol_expr_float]]]:
         lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
@@ -283,6 +286,7 @@ class FreeVariableBounds(ProblemDataPart):
     def inequality_constraint_slack_upper_bound(self):
         return {f'{c.name}/error': c.upper_slack_limit for c in self.inequality_constraints}
 
+    @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         lb_params, ub_params = self.free_variable_bounds()
         num_free_variables = sum(len(x) for x in lb_params)
@@ -372,6 +376,7 @@ class EqualityBounds(ProblemDataPart):
                 derivative_link[f't{t:03}/{derivative}/{v.name}/link'] = 0
         return derivative_link
 
+    @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         bounds = []
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
@@ -512,6 +517,7 @@ class InequalityBounds(ProblemDataPart):
                         ub[f't{t:03d}/{v.name}/p_limit'] = normal_upper_bound
         return lb, ub
 
+    @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         lower_position_bounds, upper_position_bounds = self.position_limits()
         lb_params = [lower_position_bounds]

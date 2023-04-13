@@ -27,8 +27,8 @@ import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import raise_to_blackboard, \
-    catch_and_raise_to_blackboard
+from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):

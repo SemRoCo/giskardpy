@@ -6,7 +6,8 @@ import giskardpy.identifier as identifier
 from giskardpy.exceptions import SelfCollisionViolatedException
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.utils import raise_to_blackboard, catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
+from giskardpy.utils.utils import raise_to_blackboard
 
 
 class CollisionChecker(GiskardBehavior):

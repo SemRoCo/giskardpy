@@ -31,7 +31,8 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo
+from giskardpy.utils.utils import suppress_stderr
+from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
 
 class TravelCompanion:
@@ -250,6 +251,8 @@ class WorldTree(WorldTreeInterface):
         clear_memo(self.compose_fk_expression)
         clear_memo(self.compute_chain)
         clear_memo(self.is_link_controlled)
+        for free_variable in self.free_variables.values():
+            free_variable.reset_cache()
 
     @profile
     def notify_model_change(self):

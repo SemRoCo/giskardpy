@@ -5,6 +5,7 @@ import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import Derivatives, PrefixName
+from giskardpy.utils.decorators import memoize
 
 
 class FreeVariable:
@@ -53,6 +54,14 @@ class FreeVariable:
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {derivative}')
 
+    def reset_cache(self):
+        for method_name in dir(self):
+            try:
+                getattr(self, method_name).memo.clear()
+            except:
+                pass
+
+    @memoize
     def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[
         w.Expression, float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
@@ -73,8 +82,9 @@ class FreeVariable:
     def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[w.Symbol, float], float]):
         self.upper_limits[derivative] = limit
 
-    def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[
-        Union[w.Symbol, float], float]:
+    @memoize
+    def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
+            -> Union[Union[w.Symbol, float], float]:
         if not default and derivative in self.default_upper_limits and derivative in self.upper_limits:
             expr = w.min(self.default_upper_limits[derivative], self.upper_limits[derivative])
         elif derivative in self.default_upper_limits:
@@ -95,11 +105,10 @@ class FreeVariable:
         except KeyError:
             return False
 
+    @memoize
     @profile
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
                           evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
-        if np.isinf(self.god_map.evaluate_expr(self.get_upper_limit(derivative))):
-            return 0
         weight = self.quadratic_weights[derivative]
         start = weight * self.horizon_functions[derivative]
         a = (weight - start) / prediction_horizon

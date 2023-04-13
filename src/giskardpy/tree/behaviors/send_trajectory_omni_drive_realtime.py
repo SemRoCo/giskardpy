@@ -40,7 +40,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         try:
             msg_type, _, _ = rostopic.get_topic_class(self.cmd_vel_topic)
             if msg_type is None:
-                raise ROSTopicException()
+                raise ROSTopicException(f'can not connect to {self.cmd_vel_topic}')
             if msg_type not in self.supported_state_types:
                 raise TypeError(f'Cmd_vel topic of type \'{msg_type}\' is not supported. '
                                 f'Must be one of: \'{self.supported_state_types}\'')

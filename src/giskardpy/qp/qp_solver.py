@@ -1,6 +1,9 @@
 import abc
 from abc import ABC
-from typing import Tuple, List, Iterable, Optional, Sequence, Union
+from collections import defaultdict
+from functools import wraps
+from time import time
+from typing import Tuple, List, Iterable, Optional, Sequence, Union, Dict
 import scipy.sparse as sp
 import numpy as np
 
@@ -9,6 +12,22 @@ from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize
+
+
+def record_solver_call_time(function):
+    return function
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        self: QPSolver = args[0]
+        start_time = time()
+        result = function(*args, **kwargs)
+        time_delta = time() - start_time
+        self._times[self.num_free_variable_constraints, self.num_eq_constraints, self.num_neq_constraints].append(
+            time_delta)
+        return result
+
+    return wrapper
 
 
 class QPSolver(ABC):
@@ -22,12 +41,22 @@ class QPSolver(ABC):
     _nAi_Ai_cache: dict = {}
     sparse: bool = False
     compute_nI_I: bool = True
+    num_eq_constraints: int
+    num_neq_constraints: int
+    num_free_variable_constraints: int
+    _times: Dict[Tuple[int, int, int], list]
 
     @abc.abstractmethod
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression):
         pass
+
+    @classmethod
+    def get_solver_times(self) -> dict:
+        if hasattr(self, '_times'):
+            return self._times
+        return {}
 
     @profile
     def solve(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) -> np.ndarray:
@@ -58,6 +87,7 @@ class QPSolver(ABC):
     def apply_filters(self):
         pass
 
+    @record_solver_call_time
     @profile
     def solve_and_retry(self, substitutions: np.ndarray) -> np.ndarray:
         """
@@ -97,7 +127,6 @@ class QPSolver(ABC):
                 self._nAi_Ai_cache[key] = nI_I[Ai_inf_filter]
         return self._nAi_Ai_cache[key]
 
-
     @memoize
     def _cached_eyes(self, dimensions: int, nAi_Ai: bool = False) -> Union[np.ndarray, sp.csc_matrix]:
         if self.sparse:
@@ -115,7 +144,7 @@ class QPSolver(ABC):
             else:
                 data = np.ones(dimensions, dtype=float)
                 row_indices = np.arange(dimensions)
-                col_indices = np.arange(dimensions+1)
+                col_indices = np.arange(dimensions + 1)
                 return sp.csc_matrix((data, row_indices, col_indices))
         else:
             I = np.eye(dimensions)

@@ -1046,7 +1046,7 @@ class QPProblemBuilder:
 
         # num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
 
-        logging.loginfo(f'Using QP Solver \'{solver_id}\'')
+        logging.loginfo(f'Using QP Solver \'{solver_id.name}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
         self.qp_solver = self.compile()
 

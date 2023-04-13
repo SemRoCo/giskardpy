@@ -1,4 +1,5 @@
-from typing import Iterable, Tuple
+from collections import defaultdict
+from typing import Iterable, Tuple, Dict
 
 import gurobipy
 import numpy as np
@@ -7,6 +8,7 @@ from scipy import sparse
 
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
+from giskardpy.qp.qp_solver import record_solver_call_time
 from giskardpy.qp.qp_solver_qpswift import QPSWIFTFormatter
 from giskardpy.utils import logging
 
@@ -51,6 +53,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
                          '__' not in name}
     sparse = True
     compute_nI_I = False
+    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
 
     @profile
     def init(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, lb: np.ndarray,

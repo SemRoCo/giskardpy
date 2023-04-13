@@ -1,3 +1,4 @@
+import csv
 import keyword
 from collections import defaultdict
 from copy import deepcopy
@@ -38,6 +39,8 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy.qp.qp_controller import available_solvers
+from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
@@ -353,11 +356,25 @@ class GiskardTestWrapper(GiskardWrapper):
     def restart_ticking(self):
         self._alive = True
 
+    def print_qp_solver_times(self):
+        with open('benchmark.csv', mode='w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            csvwriter.writerow(['solver', 'variables', 'eq_constraints', 'neq_constraints', 'avg', 'std'])
+
+            for solver_id, solver_class in available_solvers.items():
+                times = solver_class.get_solver_times()
+                for (variables, eq_constraints, neq_constraints), times in sorted(times.items()):
+                    csvwriter.writerow([solver_id.name,
+                                        str(variables),
+                                        str(eq_constraints),
+                                        str(neq_constraints),
+                                        str(np.average(times)),
+                                        str(np.std(times))])
+
+        logging.loginfo('saved benchmark file')
+
     def tear_down(self):
-        try:
-            self.god_map.unsafe_get_data(identifier.timer_collector).pretty_print()
-        except Exception as e:
-            pass
+        self.print_qp_solver_times()
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:

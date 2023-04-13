@@ -1,5 +1,6 @@
+from collections import defaultdict
 from enum import IntEnum
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 import numpy as np
 import qpalm
@@ -30,7 +31,7 @@ class QPSolverQPalm(QPSolver):
     s.t.  lb <= Ax <= ub
     https://github.com/kul-optec/QPALM
     """
-
+    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
     sparse = True
     compute_nI_I = True
     settings = qpalm.Settings()

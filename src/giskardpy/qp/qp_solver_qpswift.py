@@ -1,12 +1,13 @@
 import abc
+from collections import defaultdict
 from enum import IntEnum
-from typing import Tuple, Iterable, List, Union, Optional
+from typing import Tuple, Iterable, List, Union, Optional, Dict
 
 import numpy as np
 
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver import QPSolver, record_solver_call_time
 import qpSWIFT
 import giskardpy.casadi_wrapper as cas
 import scipy.sparse as sp
@@ -284,6 +285,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
           Gx <= h
     """
     solver_id = SupportedQPSolver.qpSWIFT
+    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
 
     opts = {
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo

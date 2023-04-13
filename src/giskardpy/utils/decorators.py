@@ -61,7 +61,7 @@ def memoize(function):
 
 
 def record_time(function):
-    # return function
+    return function
     function_name = function.__name__
 
     @wraps(function)

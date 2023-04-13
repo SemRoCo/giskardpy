@@ -143,9 +143,9 @@ class DebugMarkerPublisher(GiskardBehavior):
                 elif isinstance(expr, w.Point3):
                     ref_P_d = value
                     map_P_d = np.dot(map_T_ref, ref_P_d)
-                    m.pose.position.x = map_P_d[0][0]
-                    m.pose.position.y = map_P_d[1][0]
-                    m.pose.position.z = map_P_d[2][0]
+                    m.pose.position.x = map_P_d[0]
+                    m.pose.position.y = map_P_d[1]
+                    m.pose.position.z = map_P_d[2]
                     m.pose.orientation.w = 1
                     m.type = m.SPHERE
                     m.color = self.colors[color_counter]

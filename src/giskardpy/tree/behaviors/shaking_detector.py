@@ -6,6 +6,7 @@ import giskardpy.identifier as identifier
 from giskardpy.exceptions import ShakingException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 
 
 # fast
@@ -33,6 +34,7 @@ class WiggleCancel(GiskardBehavior):
             thresholds.append(velocity_limit)
         return np.array(thresholds)
 
+    @record_time
     @profile
     def initialise(self):
         super().initialise()
@@ -60,6 +62,7 @@ class WiggleCancel(GiskardBehavior):
         self.velocity_limits = np.array(self.velocity_limits)
         self.js_samples = [[] for _ in range(len(self.keys))]
 
+    @record_time
     @profile
     def update(self):
         prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)

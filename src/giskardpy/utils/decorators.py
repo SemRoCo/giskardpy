@@ -11,7 +11,7 @@ import os
 import pkgutil
 import sys
 import traceback
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
@@ -61,22 +61,21 @@ def memoize(function):
 
 
 def record_time(function):
-    return function
-    # god_map = GodMap()
-    time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
-    if function.__name__ == 'solver_call':
-        @wraps(function)
-        def wrapper(self, *args, **kwargs):
-            qp_solver = self.solver_id
-            start_time = time()
-            result = function(self, *args, **kwargs)
-            time_delta = time() - start_time
-            time_collector.add_qp_solve_time(str(qp_solver), 0, 0, time_delta)
-            return result
+    # return function
+    function_name = function.__name__
 
-        return wrapper
-    else:
-        raise ValueError('Can only record time of \'solver_call\' functions.')
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        if not hasattr(self, '__times'):
+            setattr(self, '__times', defaultdict(list))
+        start_time = time()
+        result = function(*args, **kwargs)
+        time_delta = time() - start_time
+        self.__times[function_name].append(time_delta)
+        return result
+
+    return wrapper
 
 
 def clear_memo(f):

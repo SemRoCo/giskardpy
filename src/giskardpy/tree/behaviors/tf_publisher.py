@@ -5,6 +5,7 @@ from tf2_msgs.msg import TFMessage
 
 from giskardpy.configs.data_types import TfPublishingModes
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg
 
 
@@ -33,6 +34,7 @@ class TFPublisher(GiskardBehavior):
         tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
         return tf
 
+    @record_time
     @profile
     def update(self):
         try:

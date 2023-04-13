@@ -347,10 +347,10 @@ class GiskardTestWrapper(GiskardWrapper):
         if self._alive:
             self.tree.tick()
 
-    def induce_cardioplegia(self):
+    def stop_ticking(self):
         self._alive = False
 
-    def resuscitate(self):
+    def restart_ticking(self):
         self._alive = True
 
     def tear_down(self):

@@ -20,12 +20,13 @@ from giskardpy.qp.next_command import NextCommands
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
 class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     supported_state_types = [Twist]
 
+    @record_time
     @profile
     def __init__(self, cmd_vel_topic: str, goal_time_tolerance: float = 1, track_only_velocity: bool = False,
                  joint_name: Optional[str] = None):
@@ -66,6 +67,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         return f'{super().__str__()} ({self.cmd_vel_topic})'
 
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def initialise(self):
         super().initialise()
@@ -75,6 +77,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
         self.end_time = self.start_time + self.trajectory.points[-1].time_from_start + self.goal_time_tolerance
 
+    @record_time
     @profile
     def setup(self, timeout):
         super().setup(timeout)
@@ -131,6 +134,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         return twist
 
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def update(self):
         t = rospy.get_rostime()

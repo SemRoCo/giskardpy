@@ -266,7 +266,7 @@ def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
 
 @pytest.fixture()
 def world_setup(zero_pose: PR2TestWrapper) -> WorldTree:
-    zero_pose.induce_cardioplegia()
+    zero_pose.stop_ticking()
     return zero_pose.world
 
 

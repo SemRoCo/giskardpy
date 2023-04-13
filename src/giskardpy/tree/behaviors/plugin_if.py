@@ -1,6 +1,7 @@
 from py_trees import Status
 
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class IF(GiskardBehavior):
@@ -22,6 +23,7 @@ class IfFunction(GiskardBehavior):
         super().__init__(name)
         self.function = function
 
+    @record_time
     @profile
     def update(self):
         if self.function():

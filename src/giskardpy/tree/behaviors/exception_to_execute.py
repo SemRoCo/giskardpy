@@ -2,9 +2,11 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class ExceptionToExecute(GiskardBehavior):
+    @record_time
     @profile
     def update(self):
         if self.get_blackboard_exception() is not None:

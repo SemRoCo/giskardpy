@@ -25,6 +25,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
 
 
@@ -78,6 +79,7 @@ class WorldUpdater(GiskardBehavior):
         self.update_ticked = Queue(maxsize=1)
         self.timer_state = self.READY
 
+    @record_time
     @profile
     def setup(self, timeout: float = 5.0):
         self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
@@ -141,6 +143,7 @@ class WorldUpdater(GiskardBehavior):
 
         return res
 
+    @record_time
     @profile
     def update(self):
         try:

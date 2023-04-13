@@ -4,6 +4,7 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.logging import logwarn
 
 
@@ -34,6 +35,7 @@ class PlotTrajectory(GiskardBehavior):
                 logwarn(e)
                 logwarn('failed to save trajectory.pdf')
 
+    @record_time
     @profile
     def update(self):
         if self.wait and self.plot_thread.is_alive():

@@ -3,7 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
 class ControllerPluginBase(GiskardBehavior):
@@ -15,6 +15,7 @@ class ControllerPluginBase(GiskardBehavior):
         self.controller = self.god_map.get_data(identifier.qp_controller)
 
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def update(self):
         parameters = self.controller.get_parameter_names()

@@ -10,6 +10,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class PublishDebugExpressions(GiskardBehavior):
@@ -103,6 +104,7 @@ class PublishDebugExpressions(GiskardBehavior):
             msg.position.extend(Ax_without_slack.tolist())
         return msg
 
+    @record_time
     @profile
     def update(self):
         qp_controller: QPProblemBuilder = self.god_map.get_data(identifier.qp_controller)

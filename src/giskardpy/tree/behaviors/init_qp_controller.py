@@ -10,11 +10,12 @@ from giskardpy.goals.goal import Goal
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
 class InitQPController(GiskardBehavior):
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def update(self):
         eq_constraints, neq_constraints, derivative_constraints, debug_expressions = self.get_constraints_from_goals()

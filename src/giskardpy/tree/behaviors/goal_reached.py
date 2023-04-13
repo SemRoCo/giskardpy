@@ -6,6 +6,7 @@ from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 
 
 # fast
@@ -23,6 +24,7 @@ class GoalReached(GiskardBehavior):
         self.thresholds = self.make_velocity_threshold()
         self.number_of_controlled_joints = len(self.thresholds)
 
+    @record_time
     @profile
     def update(self):
         planning_time = self.get_god_map().get_data(identifier.time)

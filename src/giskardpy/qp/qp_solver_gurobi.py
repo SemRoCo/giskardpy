@@ -9,7 +9,6 @@ from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver_qpswift import QPSWIFTFormatter
 from giskardpy.utils import logging
-from giskardpy.utils.utils import record_time
 
 gurobipy.setParam('LogToConsole', False)
 
@@ -79,7 +78,6 @@ class QPSolverGurobi(QPSWIFTFormatter):
         lb, ub = self.lb_ub_with_inf(self.nlb, self.ub)
         return self.weights, self.g, self.E, self.bE, self.nA_A, lb, ub, self.nlbA_ubA
 
-    @record_time
     @profile
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, lb: np.ndarray,
                     ub: np.ndarray, h: np.ndarray) -> np.ndarray:

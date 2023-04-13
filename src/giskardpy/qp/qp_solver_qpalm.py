@@ -8,9 +8,7 @@ from scipy import sparse as sp
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.utils import logging
 
-from giskardpy.utils.utils import record_time
 import giskardpy.casadi_wrapper as cas
 
 

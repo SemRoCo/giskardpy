@@ -11,7 +11,7 @@ import qpSWIFT
 import giskardpy.casadi_wrapper as cas
 import scipy.sparse as sp
 
-from giskardpy.utils.decorators import memoize, record_time
+from giskardpy.utils.decorators import record_time
 
 
 class QPSWIFTExitFlags(IntEnum):
@@ -285,7 +285,6 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }
 
-    @record_time
     @profile
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \
             -> np.ndarray:

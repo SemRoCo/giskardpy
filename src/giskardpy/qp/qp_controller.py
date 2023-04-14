@@ -1048,7 +1048,7 @@ class QPProblemBuilder:
 
         logging.loginfo(f'Using QP Solver \'{solver_id.name}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
-        self.qp_solver = self.compile()
+        self.qp_solver = self.compile(self.qp_solver_class)
 
     def add_free_variables(self, free_variables):
         """
@@ -1117,7 +1117,7 @@ class QPProblemBuilder:
         self.debug_expressions.update(debug_expressions)
 
     @profile
-    def compile(self, default_limits: bool = False) -> QPSolver:
+    def compile(self, solver_class: Type[QPSolver], default_limits: bool = False) -> QPSolver:
         logging.loginfo('Creating controller')
         kwargs = {'free_variables': self.free_variables,
                   'equality_constraints': self.equality_constraints,
@@ -1140,9 +1140,9 @@ class QPProblemBuilder:
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
 
-        qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
-                                         E=E, E_slack=E_slack, bE=bE,
-                                         A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+        qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
+                                 E=E, E_slack=E_slack, bE=bE,
+                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
         logging.loginfo('Done compiling controller:')
         logging.loginfo(f'  #free variables: {weights.shape[0]}')
         logging.loginfo(f'  #equality constraints: {bE.shape[0]}')
@@ -1378,8 +1378,8 @@ class QPProblemBuilder:
         plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self):
-        weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = self.qp_solver.get_problem_data()
+    def _create_debug_pandas(self, qp_solver):
+        weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
         # substitutions = self.substitutions
         # self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
@@ -1412,6 +1412,7 @@ class QPProblemBuilder:
         # remove sample period factor
         self.p_E = pd.DataFrame(E, self.equality_constr_names, self.free_variable_names, dtype=float)
         self.p_A = pd.DataFrame(A, self.inequality_constr_names, self.free_variable_names, dtype=float)
+        self.p_xdot = None
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)

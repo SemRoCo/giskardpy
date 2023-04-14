@@ -123,4 +123,8 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.ub_filter[self.ub_filter] = upper_violations
         self.lb_filter[:self.num_non_slack_variables] = False
         self.ub_filter[:self.num_non_slack_variables] = False
+        nlb_relaxed[lb_non_slack_without_inf:] -= self.retry_added_slack
+        ub_relaxed[ub_non_slack_without_inf:] -= self.retry_added_slack
+        nlb_relaxed[lower_violations] += self.retry_added_slack
+        ub_relaxed[upper_violations] += self.retry_added_slack
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed

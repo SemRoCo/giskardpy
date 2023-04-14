@@ -154,8 +154,7 @@ class QPSolverQPalm(QPSolver):
             self.lb[self.b_zero_inf_filter_view],
             self.ub[self.b_zero_inf_filter_view])
         if np.any(lb_filter) or np.any(ub_filter):
-            self.weights[ub_filter] *= self.retry_weight_factor
-            self.weights[lb_filter] *= self.retry_weight_factor
+            self.weights[ub_filter | lb_filter] *= self.retry_weight_factor
             self.lb_bE_lbA = lbA_relaxed
             self.ub_bE_ubA = ubA_relaxed
             return self.problem_data_to_qp_format()
@@ -182,6 +181,12 @@ class QPSolverQPalm(QPSolver):
         upper_violations = xdot_full > self.ub[self.b_zero_filter] + eps
         lower_violations[:-num_constraints_not_filtered] = False
         upper_violations[:-num_constraints_not_filtered] = False
+        lb_relaxed[-num_constraints_not_filtered:] += self.retry_added_slack
+        ub_relaxed[-num_constraints_not_filtered:] -= self.retry_added_slack
+        lb_relaxed[lower_violations[self.b_inf_filter[self.b_zero_filter]]] -= self.retry_added_slack
+        ub_relaxed[upper_violations[self.b_inf_filter[self.b_zero_filter]]] += self.retry_added_slack
+        lbA_relaxed[:lb_relaxed.shape[0]] = lb_relaxed
+        ubA_relaxed[:ub_relaxed.shape[0]] = ub_relaxed
         return lower_violations, lbA_relaxed, upper_violations, ubA_relaxed
 
     @profile

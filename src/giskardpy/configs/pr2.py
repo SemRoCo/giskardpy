@@ -14,16 +14,16 @@ class PR2_Base(Giskard):
         # self.configure_PlotDebugExpressions(enabled=True, wait=True)
         # self.configure_DebugMarkerPublisher(enabled=True)
         # self.configure_PublishDebugExpressions(
-            # publish_lb=True,
-            # publish_ub=True,
-            # publish_lbA=True,
-            # publish_ubA=True,
-            # publish_bE=True,
-            # publish_Ax=True,
-            # publish_Ex=True,
-            # publish_xdot=True,
-            # publish_weights=True,
-            # publish_debug=True,
+        #     publish_lb=True,
+        #     publish_ub=True,
+        #     publish_lbA=True,
+        #     publish_ubA=True,
+        #     publish_bE=True,
+        #     publish_Ax=True,
+        #     publish_Ex=True,
+        #     publish_xdot=True,
+        #     publish_weights=True,
+        #     publish_debug=True,
         # )
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
@@ -59,19 +59,19 @@ class PR2_Base(Giskard):
                                                       'l_gripper_l_finger_joint'])
         self.fix_joints_for_external_collision_avoidance(['r_gripper_l_finger_joint',
                                                           'l_gripper_l_finger_joint'])
-        # self.set_maximum_derivative(Derivatives.acceleration)
-        # self.set_default_joint_limits(velocity_limit=1,
-        #                               acceleration_limit=1.5)
-        # self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
-        #                                      velocity_limit=2)
-        # self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
-        #                                          acceleration_limit=4)
-        # self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
-        #                                      velocity_limit=2)
-        # self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
-        #                                          acceleration_limit=4)
-        # self.set_default_weights(velocity_weight=0.01,
-        #                          acceleration_weight=0.01)
+        self.set_maximum_derivative(Derivatives.acceleration)
+        self.set_default_joint_limits(velocity_limit=1,
+                                      acceleration_limit=1.5)
+        self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
+                                             velocity_limit=2)
+        self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
+                                                 acceleration_limit=4)
+        self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
+                                             velocity_limit=2)
+        self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
+                                                 acceleration_limit=4)
+        self.set_default_weights(velocity_weight=0.01,
+                                 acceleration_weight=0.01)
 
 
 class PR2_Mujoco(PR2_Base):
@@ -191,6 +191,8 @@ class PR2_StandAlone(PR2_Base):
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
+        # self.configure_VisualizationBehavior(enabled=False)
+        # self.configure_CollisionMarker(enabled=False)
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
         self.add_omni_drive_joint(name='brumbrum',
                                   parent_link_name='odom_combined',

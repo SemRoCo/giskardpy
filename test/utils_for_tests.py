@@ -359,17 +359,31 @@ class GiskardTestWrapper(GiskardWrapper):
     def print_qp_solver_times(self):
         with open('benchmark.csv', mode='w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csvwriter.writerow(['solver', 'variables', 'eq_constraints', 'neq_constraints', 'avg', 'std'])
+            csvwriter.writerow(['solver',
+                                'filtered_variables',
+                                'variables',
+                                'eq_constraints',
+                                'neq_constraints',
+                                'num_eq_slack_variables',
+                                'num_neq_slack_variables',
+                                'num_slack_variables',
+                                'max_derivative',
+                                'data'])
 
             for solver_id, solver_class in available_solvers.items():
                 times = solver_class.get_solver_times()
-                for (variables, eq_constraints, neq_constraints), times in sorted(times.items()):
+                for (filtered_variables, variables, eq_constraints, neq_constraints, num_eq_slack_variables,
+                     num_neq_slack_variables, num_slack_variables), times in sorted(times.items()):
                     csvwriter.writerow([solver_id.name,
+                                        str(filtered_variables),
                                         str(variables),
                                         str(eq_constraints),
                                         str(neq_constraints),
-                                        str(np.average(times)),
-                                        str(np.std(times))])
+                                        str(num_eq_slack_variables),
+                                        str(num_neq_slack_variables),
+                                        str(num_slack_variables),
+                                        str(int(self.god_map.get_data(identifier.max_derivative))),
+                                        str(times)])
 
         logging.loginfo('saved benchmark file')
 
@@ -450,7 +464,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
         return self.world.search_for_link_name(root_link, root_group), \
-               self.world.search_for_link_name(tip_link, tip_group)
+            self.world.search_for_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################

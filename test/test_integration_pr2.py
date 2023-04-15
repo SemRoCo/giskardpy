@@ -51,6 +51,8 @@ pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
               'torso_lift_joint': 0.2,
               'head_pan_joint': 0,
               'head_tilt_joint': 0,
+              'l_gripper_l_finger_joint': 0.55,
+              'r_gripper_l_finger_joint': 0.55
               }
 
 pick_up_pose = {
@@ -71,6 +73,8 @@ pick_up_pose = {
     'r_wrist_flex_joint': -0.100010762609,
     'r_wrist_roll_joint': 0.0509923457388,
     'torso_lift_joint': 0.261791330751,
+    'l_gripper_l_finger_joint': 0.55,
+    'r_gripper_l_finger_joint': 0.55
 }
 
 
@@ -345,7 +349,7 @@ def fake_table_setup(pocky_pose_setup: PR2TestWrapper) -> PR2TestWrapper:
 
 
 class TestJointGoals:
-    def test_joint_goal2(self, zero_pose: PR2TestWrapper):
+    def test_joint_goal(self, zero_pose: PR2TestWrapper):
         js = {
             'torso_lift_joint': 0.2999225173357618,
             'head_pan_joint': 0.041880780651479044,
@@ -4129,6 +4133,7 @@ class TestBenchmark:
 
     def test_joint_goal_torso_lift_joint(self, zero_pose: PR2TestWrapper):
         horizons = [1, 7, 9, 21, 31, 41, 51]
+        # horizons = [1]
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 js = {'torso_lift_joint': 1}
@@ -4138,9 +4143,14 @@ class TestBenchmark:
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
 
+                zero_pose.set_seed_configuration(zero_pose.default_pose)
+                zero_pose.allow_all_collisions()
+                zero_pose.reset_base()
+
     def test_joint_goal2(self, zero_pose: PR2TestWrapper):
-        # horizons = [1, 7, 9, 21, 31, 41]
-        horizons = [1, 7, 9, 21]
+        horizons = [1, 7, 9, 21, 31, 41]
+        # horizons = [1, 7, 9, 21]
+        # horizons = [9]
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
@@ -4149,9 +4159,13 @@ class TestBenchmark:
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
 
+                zero_pose.set_seed_configuration(zero_pose.default_pose)
+                zero_pose.allow_all_collisions()
+                zero_pose.reset_base()
+
     def test_cart_goal_2eef2(self, zero_pose: PR2TestWrapper):
-        # horizons = [1, 7, 9, 11, 13, 21]
-        horizons = [1, 7, 9, 11]
+        horizons = [1, 7, 9, 11, 13, 21]
+        # horizons = [9]
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
@@ -4172,31 +4186,31 @@ class TestBenchmark:
                 zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
                 zero_pose.plan_and_execute()
 
-    def test_avoid_collision_drive_into_box1(self, box_setup: PR2TestWrapper):
-        # horizons = [1, 7, 9, 13, 21, 31]
-        horizons = [1, 7, 9, 13]
+                zero_pose.set_seed_configuration(zero_pose.default_pose)
+                zero_pose.allow_all_collisions()
+                zero_pose.reset_base()
+
+    def test_avoid_collision_go_around_corner(self, fake_table_setup: PR2TestWrapper):
+        horizons = [1, 7, 9, 13, 21, 31]
+        # horizons = [7]
         for qp_solver in self.qp_solvers:
             for h in horizons:
-                box_setup.set_prediction_horizon(h)
-                box_setup.set_json_goal('SetQPSolver', qp_solver_id=qp_solver)
 
-                base_goal = PoseStamped()
-                base_goal.header.frame_id = box_setup.default_root
-                base_goal.pose.position.x = 0.25
-                base_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-                box_setup.teleport_base(base_goal)
-                base_goal = PoseStamped()
-                base_goal.header.frame_id = 'base_footprint'
-                base_goal.pose.position.x = -1
-                base_goal.pose.orientation.w = 1
-                box_setup.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map',
-                                        weight=WEIGHT_BELOW_CA,
-                                        check=False)
-                try:
-                    box_setup.plan_and_execute()
-                except:
-                    pass
-                box_setup.check_cpi_geq(['base_link'], 0.09)
+                fake_table_setup.set_prediction_horizon(h)
+                fake_table_setup.set_json_goal('SetQPSolver', qp_solver_id=qp_solver)
+                r_goal = PoseStamped()
+                r_goal.header.frame_id = 'map'
+                r_goal.pose.position.x = 0.8
+                r_goal.pose.position.y = -0.38
+                r_goal.pose.position.z = 0.84
+                r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+                fake_table_setup.avoid_all_collisions(0.1)
+                fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip, check=False)
+                fake_table_setup.plan_and_execute()
+
+                fake_table_setup.set_seed_configuration(pocky_pose)
+                fake_table_setup.allow_all_collisions()
+                fake_table_setup.reset_base()
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

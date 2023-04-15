@@ -23,8 +23,17 @@ def record_solver_call_time(function):
         start_time = time()
         result = function(*args, **kwargs)
         time_delta = time() - start_time
-        self._times[self.num_free_variable_constraints, self.num_eq_constraints, self.num_neq_constraints].append(
-            time_delta)
+        if not ('relax_hard_constraints' in kwargs and kwargs['relax_hard_constraints']):
+            key = (len(self.weights),
+                   self.num_free_variable_constraints,
+                   self.num_eq_constraints,
+                   self.num_neq_constraints,
+                   self.num_eq_slack_variables,
+                   self.num_neq_slack_variables,
+                   self.num_slack_variables)
+            self._times[key].append(time_delta)
+        else:
+            logging.loginfo('skipped record time because hard constraints were violated')
         return result
 
     return wrapper
@@ -44,7 +53,7 @@ class QPSolver(ABC):
     num_eq_constraints: int
     num_neq_constraints: int
     num_free_variable_constraints: int
-    _times: Dict[Tuple[int, int, int], list]
+    _times: Dict[Tuple[int, int, int, int], list]
 
     @abc.abstractmethod
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
@@ -58,6 +67,7 @@ class QPSolver(ABC):
             return self._times
         return {}
 
+    @record_solver_call_time
     @profile
     def solve(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) -> np.ndarray:
         self.evaluate_functions(substitutions)
@@ -87,7 +97,6 @@ class QPSolver(ABC):
     def apply_filters(self):
         pass
 
-    @record_solver_call_time
     @profile
     def solve_and_retry(self, substitutions: np.ndarray) -> np.ndarray:
         """
@@ -97,9 +106,10 @@ class QPSolver(ABC):
             return self.solve(substitutions)
         except QPSolverException as e:
             try:
-                logging.loginfo(f'{e}; retrying with relaxed hard constraints')
+                logging.loginfo(f'{e}; retrying with relaxed constraints.')
                 return self.solve(substitutions, relax_hard_constraints=True)
             except InfeasibleException as e2:
+                logging.loginfo('Failed to relax constraints.')
                 if isinstance(e2, HardConstraintsViolatedException):
                     raise e2
                 raise e
@@ -171,7 +181,7 @@ class QPSolver(ABC):
 
     @abc.abstractmethod
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """

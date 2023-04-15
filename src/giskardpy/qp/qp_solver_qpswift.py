@@ -212,7 +212,7 @@ class QPSWIFTFormatter(QPSolver):
             # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
             self.E = self.E[:, :np.count_nonzero(self.weight_filter)]
         self.bE = self.bE[self.bE_filter]
-        if len(self.nA_A) > 0:
+        if self.nA_A.shape[0] * self.nA_A.shape[1] > 0:
             self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
         if self.compute_nI_I:
@@ -297,8 +297,8 @@ class QPSolverQPSwift(QPSWIFTFormatter):
     opts = {
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo
         # 'MAXITER': 100, # 0 < MAXITER < 200; default 100
-        # 'ABSTOL': 1e-5, # 0 < ABSTOL < 1
-        # 'RELTOL': 1, # 0 < RELTOL < 1
+        # 'ABSTOL': 1e-4, # 0 < ABSTOL < 1; default 1e-6
+        'RELTOL': 1e-4, # 0 < RELTOL < 1; default 1e-6
         # 'SIGMA': 1,
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }

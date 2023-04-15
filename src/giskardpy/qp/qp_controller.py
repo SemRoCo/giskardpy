@@ -1255,7 +1255,7 @@ class QPProblemBuilder:
     def __swap_compiled_matrices(self):
         if not hasattr(self, 'qp_solver_default_limits'):
             with suppress_stdout():
-                self.qp_solver_default_limits = self.compile(default_limits=True)
+                self.qp_solver_default_limits = self.compile(self.qp_solver_class, default_limits=True)
         self.qp_solver, self.qp_solver_default_limits = self.qp_solver_default_limits, self.qp_solver
 
     @property

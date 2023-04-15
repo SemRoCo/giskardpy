@@ -40,6 +40,8 @@ class StackedCompiledFunction:
 class CompiledFunction:
     def __init__(self, expression, parameters=None, sparse=False):
         self.sparse = sparse
+        if len(expression) == 0:
+            self.sparse = False
         if parameters is None:
             parameters = expression.free_symbols()
 
@@ -47,7 +49,7 @@ class CompiledFunction:
         if len(parameters) > 0:
             parameters = [Expression(parameters).s]
 
-        if sparse:
+        if self.sparse:
             expression.s = ca.sparsify(expression.s)
             try:
                 self.compiled_f = ca.Function('f', parameters, [expression.s])

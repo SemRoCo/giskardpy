@@ -1276,7 +1276,7 @@ class QPProblemBuilder:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
             self.xdot_full = None
-            self._create_debug_pandas()
+            self._create_debug_pandas(self.qp_solver)
             joint_limits_violated_msg = self._are_joint_limits_violated()
             if joint_limits_violated_msg is not None:
                 logging.logwarn('Joint limits violated, trying to fix.')
@@ -1315,7 +1315,7 @@ class QPProblemBuilder:
         #     logging.loginfo(f'Can\'t determine if hard constraints are violated: {e}.')
         #     return False
         # else:
-        self._create_debug_pandas()
+        self._create_debug_pandas(self.qp_solver)
         try:
             lower_violations = self.p_lb[self.qp_solver.lb_filter]
             upper_violations = self.p_ub[self.qp_solver.ub_filter]

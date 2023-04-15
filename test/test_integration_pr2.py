@@ -1249,7 +1249,7 @@ class TestConstraints:
 
         goal_vector = Vector3Stamped()
         goal_vector.header.frame_id = 'map'
-        goal_vector.vector.y = -1
+        goal_vector.vector.x = 1
         goal_vector.vector = tf.normalize(goal_vector.vector)
         zero_pose.set_align_planes_goal(tip_link='base_footprint', tip_normal=eef_vector, goal_normal=goal_vector)
         zero_pose.allow_all_collisions()

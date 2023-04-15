@@ -102,7 +102,10 @@ class QPSWIFTFormatter(QPSolver):
     def problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         H = np.diag(self.weights)
-        A = np.concatenate((self.nAi_Ai, self.nA_A))
+        if len(self.nA_A) > 0:
+            A = np.concatenate((self.nAi_Ai, self.nA_A))
+        else:
+            A = self.nAi_Ai
         nlb_ub_nlbA_ubA = np.concatenate((self.nlb, self.ub, self.nlbA_ubA))
         return H, self.g, self.E, self.bE, A, nlb_ub_nlbA_ubA
 
@@ -209,7 +212,8 @@ class QPSWIFTFormatter(QPSolver):
             # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
             self.E = self.E[:, :np.count_nonzero(self.weight_filter)]
         self.bE = self.bE[self.bE_filter]
-        self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
+        if len(self.nA_A) > 0:
+            self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
         if self.compute_nI_I:
             # for constraints, both rows and columns are filtered, so I can start with weights dims

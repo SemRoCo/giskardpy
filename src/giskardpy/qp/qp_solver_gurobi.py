@@ -4,6 +4,7 @@ from typing import Iterable, Tuple, Dict
 import gurobipy
 import numpy as np
 from gurobipy import GRB
+from gurobipy.gurobipy import GurobiError
 from scipy import sparse
 
 from giskardpy.configs.data_types import SupportedQPSolver
@@ -62,8 +63,14 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
         H = sparse.diags(H, 0)
         self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
-        self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
-        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, h)
+        try:
+            self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
+        except GurobiError:
+            pass  # no eq constraints
+        try:
+            self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, h)
+        except GurobiError:
+            pass # no neq constraints
         self.started = False
 
     def print_debug(self):

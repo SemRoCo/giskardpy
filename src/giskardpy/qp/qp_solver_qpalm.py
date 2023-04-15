@@ -59,8 +59,11 @@ class QPSolverQPalm(QPSolver):
         self.num_slack_variables = self.num_eq_slack_variables + self.num_neq_slack_variables
         self.num_non_slack_variables = self.num_free_variable_constraints - self.num_slack_variables
 
-        combined_A = cas.vstack([cas.hstack([E, E_slack, cas.zeros(E.shape[0], A_slack.shape[1])]),
-                                 cas.hstack([A, cas.zeros(A.shape[0], E_slack.shape[1]), A_slack])])
+        if len(A) == 0:
+            combined_A = cas.hstack([E, E_slack])
+        else:
+            combined_A = cas.vstack([cas.hstack([E, E_slack, cas.zeros(E.shape[0], A_slack.shape[1])]),
+                                     cas.hstack([A, cas.zeros(A.shape[0], E_slack.shape[1]), A_slack])])
 
         free_symbols = set(weights.free_symbols())
         free_symbols.update(combined_A.free_symbols())

@@ -365,6 +365,6 @@ class TestGodMap(unittest.TestCase):
         data = [1, 2, 3]
         gm.set_data(['muh'], data)
         expr = gm.to_expr(['muh'])
-        assert gm.evaluate_expr(expr)[0][0] == data[0]
-        assert gm.evaluate_expr(expr)[1][0] == data[1]
-        assert gm.evaluate_expr(expr)[2][0] == data[2]
+        assert gm.evaluate_expr(expr)[0] == data[0]
+        assert gm.evaluate_expr(expr)[1] == data[1]
+        assert gm.evaluate_expr(expr)[2] == data[2]

@@ -23,6 +23,7 @@ class QPSWIFTExitFlags(IntEnum):
 
 
 class QPSWIFTFormatter(QPSolver):
+    sparse: bool = True
 
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
@@ -102,8 +103,8 @@ class QPSWIFTFormatter(QPSolver):
     def problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         H = np.diag(self.weights)
-        if len(self.nA_A) > 0:
-            A = np.concatenate((self.nAi_Ai, self.nA_A))
+        if np.product(self.nA_A.shape) > 0:
+            A = sp.vstack((self.nAi_Ai, self.nA_A))
         else:
             A = self.nAi_Ai
         nlb_ub_nlbA_ubA = np.concatenate((self.nlb, self.ub, self.nlbA_ubA))
@@ -304,8 +305,10 @@ class QPSolverQPSwift(QPSWIFTFormatter):
     }
 
     @profile
-    def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, h: np.ndarray) \
-            -> np.ndarray:
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
+                    h: np.ndarray) -> np.ndarray:
+        A = A.toarray()
+        E = E.toarray()
         result = qpSWIFT.run(c=g, h=h, P=H, G=A, A=E, b=b, opts=self.opts)
         exit_flag = result['basicInfo']['ExitFlag']
         if exit_flag != 0:

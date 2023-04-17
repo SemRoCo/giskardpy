@@ -3,6 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class KinSimPlugin(GiskardBehavior):
@@ -14,6 +15,7 @@ class KinSimPlugin(GiskardBehavior):
         self.symbol_to_joint_map = KeyDefaultDict(f)
         super().initialise()
 
+    @record_time
     @profile
     def update(self):
         next_cmds = self.god_map.get_data(identifier.qp_solver_solution)

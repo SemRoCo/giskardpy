@@ -1,3 +1,4 @@
+import csv
 import keyword
 from collections import defaultdict
 from copy import deepcopy
@@ -38,6 +39,8 @@ from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy.qp.qp_controller import available_solvers
+from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
@@ -347,17 +350,45 @@ class GiskardTestWrapper(GiskardWrapper):
         if self._alive:
             self.tree.tick()
 
-    def induce_cardioplegia(self):
+    def stop_ticking(self):
         self._alive = False
 
-    def resuscitate(self):
+    def restart_ticking(self):
         self._alive = True
 
+    def print_qp_solver_times(self):
+        with open('benchmark.csv', mode='w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            csvwriter.writerow(['solver',
+                                'filtered_variables',
+                                'variables',
+                                'eq_constraints',
+                                'neq_constraints',
+                                'num_eq_slack_variables',
+                                'num_neq_slack_variables',
+                                'num_slack_variables',
+                                'max_derivative',
+                                'data'])
+
+            for solver_id, solver_class in available_solvers.items():
+                times = solver_class.get_solver_times()
+                for (filtered_variables, variables, eq_constraints, neq_constraints, num_eq_slack_variables,
+                     num_neq_slack_variables, num_slack_variables), times in sorted(times.items()):
+                    csvwriter.writerow([solver_id.name,
+                                        str(filtered_variables),
+                                        str(variables),
+                                        str(eq_constraints),
+                                        str(neq_constraints),
+                                        str(num_eq_slack_variables),
+                                        str(num_neq_slack_variables),
+                                        str(num_slack_variables),
+                                        str(int(self.god_map.get_data(identifier.max_derivative))),
+                                        str(times)])
+
+        logging.loginfo('saved benchmark file')
+
     def tear_down(self):
-        try:
-            self.god_map.unsafe_get_data(identifier.timer_collector).pretty_print()
-        except Exception as e:
-            pass
+        self.print_qp_solver_times()
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
@@ -433,7 +464,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
         return self.world.search_for_link_name(root_link, root_group), \
-               self.world.search_for_link_name(tip_link, tip_group)
+            self.world.search_for_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################

@@ -327,64 +327,6 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
     return new_path
 
 
-def memoize(function):
-    memo = function.memo = {}
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
-        key = (args, frozenset(kwargs.items()))
-        try:
-            return memo[key]
-        except KeyError:
-            rv = function(*args, **kwargs)
-            memo[key] = rv
-            return rv
-
-    return wrapper
-
-
-def record_time(function):
-    return function
-    god_map = GodMap()
-    time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
-    if function.__name__ == 'solve':
-        @wraps(function)
-        def wrapper(self, weights, g, A, lb, ub, lbA, ubA):
-            qp_solver = self.solver_id
-            start_time = time()
-            result = function(self, weights, g, A, lb, ub, lbA, ubA)
-            time_delta = time() - start_time
-            time_collector.add_qp_solve_time(str(qp_solver), A.shape[1], A.shape[0], time_delta)
-            return result
-
-        return wrapper
-
-
-def clear_memo(f):
-    if hasattr(f, 'memo'):
-        f.memo.clear()
-
-
-def copy_memoize(function):
-    memo = function.memo = {}
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
-        key = (args, frozenset(kwargs.items()))
-        try:
-            return deepcopy(memo[key])
-        except KeyError:
-            rv = function(*args, **kwargs)
-            memo[key] = rv
-            return rv
-
-    return wrapper
-
-
 def launch_launchfile(file_name: str):
     launch_file = resolve_ros_iris(file_name)
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
@@ -413,23 +355,6 @@ def get_blackboard_exception():
 
 def clear_blackboard_exception():
     raise_to_blackboard(None)
-
-
-def catch_and_raise_to_blackboard(function):
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        if has_blackboard_exception():
-            return Status.FAILURE
-        try:
-            r = function(*args, **kwargs)
-        except Exception as e:
-            if not isinstance(e, DontPrintStackTrace):
-                traceback.print_exc()
-            raise_to_blackboard(e)
-            return Status.FAILURE
-        return r
-
-    return wrapper
 
 
 def make_pose_from_parts(pose, frame_id, position, orientation):

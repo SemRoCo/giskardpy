@@ -18,11 +18,12 @@ from giskardpy.goals.goal import Goal
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard, \
-    catch_and_raise_to_blackboard
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
 class RosMsgToGoal(GetGoal):
+    @record_time
     @profile
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
@@ -32,11 +33,13 @@ class RosMsgToGoal(GetGoal):
             self.allowed_constraint_types.update(get_all_classes_in_package(path, Goal))
         self.robot_names = self.collision_scene.robot_names
 
+    @record_time
     @profile
     def initialise(self):
         self.clear_blackboard_exception()
 
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def update(self):
         loginfo('Parsing goal message.')

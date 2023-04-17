@@ -5,6 +5,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from giskardpy import identifier
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class CleanUp(GiskardBehavior):
@@ -21,6 +22,7 @@ class CleanUp(GiskardBehavior):
         msg.markers.append(marker)
         self.marker_pub.publish(msg)
 
+    @record_time
     @profile
     def initialise(self):
         if self.clear_markers_:

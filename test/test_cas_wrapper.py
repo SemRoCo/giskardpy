@@ -78,8 +78,30 @@ class TestExpression(unittest.TestCase):
         m = w.Expression([[1, 1], [2, 2]])
         np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1], [2, 2]])
         m = w.Expression([])
-        with self.assertRaises(RuntimeError):
-            print(m.evaluate())
+        assert m.shape[0] == m.shape[1] == 0
+        m = w.Expression()
+        assert m.shape[0] == m.shape[1] == 0
+
+    def test_filter1(self):
+        e_np = np.arange(16) * 2
+        e = w.Expression(e_np)
+        filter_ = np.zeros(16, dtype=bool)
+        filter_[3] = True
+        filter_[5] = True
+        actual = e[filter_].evaluate()
+        expected = e_np[filter_]
+        assert np.all(actual.T[0] == expected)
+
+    def test_filter2(self):
+        e_np = np.arange(16) * 2
+        e_np = e_np.reshape((4, 4))
+        e = w.Expression(e_np)
+        filter_ = np.zeros(4, dtype=bool)
+        filter_[1] = True
+        filter_[2] = True
+        actual = e[filter_].evaluate()
+        expected = e_np[filter_]
+        np.testing.assert_array_almost_equal(actual, expected)
 
     @given(float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_add(self, f1, f2):
@@ -555,12 +577,16 @@ class TestQuaternion(unittest.TestCase):
 
 
 class TestCASWrapper(unittest.TestCase):
-    def test_empty_compiled_function(self):
-        expected = np.array([1, 2, 3], ndmin=2)
+    @given(st.booleans())
+    def test_empty_compiled_function(self, sparse):
+        if sparse:
+            expected = np.array([1, 2, 3], ndmin=2)
+        else:
+            expected = np.array([1, 2, 3])
         e = w.Expression(expected)
-        f = e.compile()
+        f = e.compile(sparse=sparse)
         np.testing.assert_array_almost_equal(f(), expected)
-        np.testing.assert_array_almost_equal(f.call2([]), expected)
+        np.testing.assert_array_almost_equal(f.fast_call(np.array([])), expected)
 
     def test_add(self):
         s2 = 'muh'
@@ -1255,6 +1281,14 @@ class TestCASWrapper(unittest.TestCase):
         r2 = np.vstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
+    def test_vstack_empty(self):
+        m = np.eye(0)
+        m1 = w.Expression(m)
+        e = w.vstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.vstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
     def test_hstack(self):
         m = np.eye(4)
         m1 = w.Expression(m)
@@ -1262,6 +1296,33 @@ class TestCASWrapper(unittest.TestCase):
         r1 = e.evaluate()
         r2 = np.hstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_hstack_empty(self):
+        m = np.eye(0)
+        m1 = w.Expression(m)
+        e = w.hstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.hstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_diag_stack(self):
+        m1_np = np.eye(4)
+        m2_np = np.ones((2, 5))
+        m3_np = np.ones((5, 3))
+        m1_e = w.Expression(m1_np)
+        m2_e = w.Expression(m2_np)
+        m3_e = w.Expression(m3_np)
+        e = w.diag_stack([m1_e, m2_e, m3_e])
+        r1 = e.evaluate()
+        combined_matrix = np.zeros((4 + 2 + 5, 4 + 5 + 3))
+        row_counter = 0
+        column_counter = 0
+        for matrix in [m1_np, m2_np, m3_np]:
+            combined_matrix[row_counter:row_counter + matrix.shape[0],
+            column_counter:column_counter + matrix.shape[1]] = matrix
+            row_counter += matrix.shape[0]
+            column_counter += matrix.shape[1]
+        np.testing.assert_array_almost_equal(r1, combined_matrix)
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):

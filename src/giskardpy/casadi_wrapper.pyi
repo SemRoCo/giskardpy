@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import functools
-from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence
+from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict
 import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
 
 from giskardpy.my_types import PrefixName
+from scipy import sparse as sp
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
@@ -17,19 +18,30 @@ pi: float
 
 def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeError: ...
 
+
+class StackedCompiledFunction:
+    compiled_f: CompiledFunction
+    split_out_view: List[np.ndarray]
+
+    def __init__(self, expressions: List[Expression], parameters: Optional[List[str]] = None,
+                 additional_views: Optional[List[slice]] = None): ...
+
+    def fast_call(self, filtered_args: np.ndarray) -> np.ndarray: ...
+
+
 class CompiledFunction:
-    str_params: Sequence[str]
-    fast_f: ca.Function
-    shape: Tuple[int, int]
+    str_params: List[str]
+    compiled_f: ca.Function
     buf: ca.FunctionBuffer
     f_eval: functools.partial
-    out: np.ndarray
+    out: Union[np.ndarray, sp.csc_matrix]
+    sparse: bool
 
-    def __init__(self, str_params: Sequence[str], fast_f: ca.Function, shape: Tuple[int, int]): ...
+    def __init__(self,  expression: Symbol_, parameters: Optional[List[str]] = None, sparse: bool = False): ...
 
     def __call__(self, **kwargs) -> np.ndarray: ...
 
-    def call2(self, filtered_args: Iterable[float]) -> np.ndarray: ...
+    def fast_call(self, filtered_args: np.ndarray) -> Union[np.ndarray, sp.csc_matrix]: ...
 
 
 class Symbol_:
@@ -38,9 +50,9 @@ class Symbol_:
     @property
     def shape(self) -> Tuple[int, int]: ...
 
-    def __getitem__(self, item: Union[int, Tuple[int, int]]) -> Expression: ...
+    def __getitem__(self, item: Union[np.ndarray, Union[int, slice], Tuple[Union[int, slice], Union[int, slice]]]) -> Expression: ...
 
-    def __setitem__(self, key: Union[int, Tuple[int, int]], value: symbol_expr_float): ...
+    def __setitem__(self, key: Union[Union[int, slice], Tuple[Union[int, slice], Union[int, slice]]], value: symbol_expr_float): ...
 
     def __len__(self) -> int: ...
 
@@ -48,7 +60,7 @@ class Symbol_:
 
     def evaluate(self) -> Union[float, np.ndarray]: ...
 
-    def compile(self, parameters: Optional[List[Symbol]] = None) -> CompiledFunction: ...
+    def compile(self, parameters: Optional[List[Symbol]] = None, sparse: bool = False) -> CompiledFunction: ...
 
     def __hash__(self) -> int: ...
 
@@ -739,6 +751,11 @@ def vstack(list_of_matrices: List[Expression]) -> Expression: ...
 def hstack(list_of_matrices: List[TransMatrix]) -> Expression: ...
 @overload
 def hstack(list_of_matrices: List[Expression]) -> Expression: ...
+
+@overload
+def diag_stack(list_of_matrices: List[TransMatrix]) -> Expression: ...
+@overload
+def diag_stack(list_of_matrices: List[Expression]) -> Expression: ...
 
 def normalize_axis_angle(axis: Vector3, angle: symbol_expr_float) -> Tuple[Vector3, Expression]: ...
 

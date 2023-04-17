@@ -1,5 +1,5 @@
 from collections import defaultdict
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Optional, List, Tuple, Dict, Union
 
 from std_msgs.msg import ColorRGBA
@@ -25,17 +25,17 @@ class CollisionCheckerLib(Enum):
     none = 3
 
 
-class SupportedQPSolver(Enum):
+class SupportedQPSolver(IntEnum):
     qpSWIFT = 1
     qpalm = 2
     gurobi = 3
     clarabel = 4
     qpOASES = 5
-    # quadprog = 6
-    # cplex = 3
     osqp = 6
+    quadprog = 7
+    # cplex = 3
     # cvxopt = 7
-    # qp_solvers = 8
+    qp_solvers = 8
     # mosek = 9
     # scs = 11
     # casadi = 12

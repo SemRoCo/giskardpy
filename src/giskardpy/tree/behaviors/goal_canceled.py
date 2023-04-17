@@ -3,6 +3,7 @@ from py_trees import Status
 from giskardpy.exceptions import PreemptedException
 from giskardpy.tree.behaviors.action_server import ActionServerBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import raise_to_blackboard
 
 
@@ -12,6 +13,7 @@ class GoalCanceled(ActionServerBehavior):
         super().__init__(name, as_name, action_type)
         self.feedback = feedback
 
+    @record_time
     @profile
     def update(self):
         if self.get_as().is_preempt_requested() and self.get_blackboard_exception() is None:

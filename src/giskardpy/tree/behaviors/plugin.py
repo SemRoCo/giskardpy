@@ -14,7 +14,7 @@ from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_excep
 class GiskardBehavior(Behaviour):
 
     def __init__(self, name):
-        self.god_map: GodMap = Blackboard().god_map
+        self.god_map = GodMap()
         self.world: WorldTree = self.get_god_map().unsafe_get_data(identifier.world)
         super().__init__(name)
 

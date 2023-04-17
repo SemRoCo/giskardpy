@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from copy import copy
-from typing import Union
-
+from typing import Union, List
+import math
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
+from scipy import sparse as sp
 
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
@@ -15,30 +16,81 @@ _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
 
 
+class StackedCompiledFunction:
+    def __init__(self, expressions, parameters=None, additional_views=None):
+        combined_expression = vstack(expressions)
+        self.compiled_f = combined_expression.compile(parameters=parameters)
+        slices = []
+        start = 0
+        for expression in expressions[:-1]:
+            end = start + expression.shape[0]
+            slices.append(end)
+            start = end
+        self.split_out_view = np.split(self.compiled_f.out, slices)
+        if additional_views is not None:
+            for expression_slice in additional_views:
+                self.split_out_view.append(self.compiled_f.out[expression_slice])
+
+    @profile
+    def fast_call(self, filtered_args):
+        self.compiled_f.fast_call(filtered_args)
+        return self.split_out_view
+
+
 class CompiledFunction:
-    def __init__(self, str_params, fast_f, shape):
-        self.str_params = str_params
-        self.fast_f = fast_f
-        self.shape = shape
-        self.buf, self.f_eval = fast_f.buffer()
-        self.out = np.zeros(self.shape, order='F')
-        self.buf.set_res(0, memoryview(self.out))  # type: ignore
-        if len(str_params) == 0:
+    def __init__(self, expression, parameters=None, sparse=False):
+        self.sparse = sparse
+        if len(expression) == 0:
+            self.sparse = False
+        if parameters is None:
+            parameters = expression.free_symbols()
+
+        self.str_params = [str(x) for x in parameters]
+        if len(parameters) > 0:
+            parameters = [Expression(parameters).s]
+
+        if self.sparse:
+            expression.s = ca.sparsify(expression.s)
+            try:
+                self.compiled_f = ca.Function('f', parameters, [expression.s])
+            except Exception:
+                self.compiled_f = ca.Function('f', parameters, expression.s)
+            self.buf, self.f_eval = self.compiled_f.buffer()
+            self.csc_indices, self.csc_indptr = expression.s.sparsity().get_ccs()
+            self.out = sp.csc_matrix((np.zeros(expression.s.nnz()), self.csc_indptr, self.csc_indices))
+            self.buf.set_res(0, memoryview(self.out.data))
+        else:
+            try:
+                self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
+            except Exception:
+                self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
+            self.buf, self.f_eval = self.compiled_f.buffer()
+            if expression.shape[1] == 1:
+                shape = expression.shape[0]
+            else:
+                shape = expression.shape
+            self.out = np.zeros(shape, order='F')
+            self.buf.set_res(0, memoryview(self.out))
+        if len(self.str_params) == 0:
             self.f_eval()
-            self.__call__ = lambda **kwargs: self.out
-            self.call2 = lambda filtered_args: self.out
+            if self.sparse:
+                result = self.out.toarray()
+            else:
+                result = self.out
+            self.__call__ = lambda **kwargs: result
+            self.fast_call = lambda filtered_args: result
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
-        return self.call2(filtered_args)
+        filtered_args = np.array(filtered_args, dtype=float)
+        return self.fast_call(filtered_args)
 
-    def call2(self, filtered_args):
+    @profile
+    def fast_call(self, filtered_args):
         """
         :param filtered_args: parameter values in the same order as in self.str_params
         """
-
-        filtered_args = np.array(filtered_args, dtype=float)
-        self.buf.set_arg(0, memoryview(filtered_args))  # type: ignore
+        self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
         return self.out
 
@@ -64,6 +116,8 @@ class Symbol_:
         return self.s.__hash__()
 
     def __getitem__(self, item):
+        if isinstance(item, np.ndarray) and item.dtype == bool:
+            item = (np.where(item)[0], slice(None, None))
         return Expression(self.s[item])
 
     def __setitem__(self, key, value):
@@ -84,22 +138,15 @@ class Symbol_:
         return free_symbols(self.s)
 
     def evaluate(self):
-        if self.s.shape[0] * self.s.shape[1] <= 1:
+        if self.shape[0] == self.shape[1] == 0:
+            return np.eye(0)
+        elif self.s.shape[0] * self.s.shape[1] <= 1:
             return float(ca.evalf(self.s))
         else:
             return np.array(ca.evalf(self.s))
 
-    def compile(self, parameters=None):
-        if parameters is None:
-            parameters = self.free_symbols()
-        str_params = [str(x) for x in parameters]
-        if len(parameters) > 0:
-            parameters = [Expression(parameters).s]
-        try:
-            f = ca.Function('f', parameters, [ca.densify(self.s)])
-        except Exception:
-            f = ca.Function('f', parameters, ca.densify(self.s))
-        return CompiledFunction(str_params, f, self.shape)
+    def compile(self, parameters=None, sparse=False):
+        return CompiledFunction(self, parameters, sparse)
 
 
 class Symbol(Symbol_):
@@ -247,7 +294,7 @@ class Expression(Symbol_):
         else:
             x = len(data)
             if x == 0:
-                self.s = ca.SX([])
+                self.s = ca.SX()
                 return
             if isinstance(data[0], list) or isinstance(data[0], tuple) or isinstance(data[0], np.ndarray):
                 y = len(data[0])
@@ -1305,8 +1352,12 @@ def compile_and_execute(f, params):
     expr = f(*symbol_params)
     assert isinstance(expr, Symbol_)
     fast_f = expr.compile(symbol_params2)
-    input_ = np.concatenate(input_).T[0]
-    result = fast_f.call2(input_)
+    input_ = np.array(np.concatenate(input_).T[0], dtype=float)
+    result = fast_f.fast_call(input_)
+    if len(result.shape) == 1:
+        if result.shape[0] == 1:
+            return result[0]
+        return result
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
     elif result.shape[1] == 1:
@@ -1574,11 +1625,28 @@ def trace(matrix):
 
 
 def vstack(list_of_matrices):
+    if len(list_of_matrices) == 0:
+        return Expression()
     return Expression(ca.vertcat(*[x.s for x in list_of_matrices]))
 
 
 def hstack(list_of_matrices):
+    if len(list_of_matrices) == 0:
+        return Expression()
     return Expression(ca.horzcat(*[x.s for x in list_of_matrices]))
+
+
+def diag_stack(list_of_matrices):
+    num_rows = int(math.fsum(e.shape[0] for e in list_of_matrices))
+    num_columns = int(math.fsum(e.shape[1] for e in list_of_matrices))
+    combined_matrix = zeros(num_rows, num_columns)
+    row_counter = 0
+    column_counter = 0
+    for matrix in list_of_matrices:
+        combined_matrix[row_counter:row_counter+matrix.shape[0], column_counter:column_counter+matrix.shape[1]] = matrix
+        row_counter += matrix.shape[0]
+        column_counter += matrix.shape[1]
+    return combined_matrix
 
 
 def normalize_axis_angle(axis, angle):

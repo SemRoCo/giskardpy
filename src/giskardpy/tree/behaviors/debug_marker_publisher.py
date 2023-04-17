@@ -12,6 +12,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point_to_kdl, kdl_to_point, \
     quaternion_to_kdl, transform_to_kdl, kdl_to_transform_stamped
 
@@ -32,6 +33,7 @@ class DebugMarkerPublisher(GiskardBehavior):
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.marker_pub = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
 
+    @record_time
     def setup(self, timeout):
         self.clear_markers()
 
@@ -141,9 +143,9 @@ class DebugMarkerPublisher(GiskardBehavior):
                 elif isinstance(expr, w.Point3):
                     ref_P_d = value
                     map_P_d = np.dot(map_T_ref, ref_P_d)
-                    m.pose.position.x = map_P_d[0][0]
-                    m.pose.position.y = map_P_d[1][0]
-                    m.pose.position.z = map_P_d[2][0]
+                    m.pose.position.x = map_P_d[0]
+                    m.pose.position.y = map_P_d[1]
+                    m.pose.position.z = map_P_d[2]
                     m.pose.orientation.w = 1
                     m.type = m.SPHERE
                     m.color = self.colors[color_counter]
@@ -161,6 +163,7 @@ class DebugMarkerPublisher(GiskardBehavior):
         msg.markers.append(marker)
         self.marker_pub.publish(msg)
 
+    @record_time
     @profile
     def update(self):
         with self.get_god_map() as god_map:

@@ -9,7 +9,7 @@ from giskardpy.my_types import Derivatives
 DebugConstraint = namedtuple('debug', ['expr'])
 
 
-class IntegralConstraint:
+class InequalityConstraint:
     lower_error = -1e4
     upper_error = 1e4
     lower_slack_limit = -1e4
@@ -55,12 +55,60 @@ class IntegralConstraint:
     def __str__(self):
         return self.name
 
-    def normalized_weight(self, prediction_horizon):
+    def normalized_weight(self):
         weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
         return weight_normalized * self.control_horizon
 
 
-class DerivativeConstraint:
+class EqualityConstraint:
+    bound = 0
+    lower_slack_limit = -1e4
+    upper_slack_limit = 1e4
+    linear_weight = 0
+
+    def __init__(self,
+                 name: str,
+                 expression: w.Expression,
+                 derivative_goal: w.symbol_expr_float,
+                 velocity_limit: w.symbol_expr_float,
+                 quadratic_weight: w.symbol_expr_float, control_horizon: int,
+                 linear_weight: Optional[w.symbol_expr_float] = None,
+                 lower_slack_limit: Optional[w.symbol_expr_float] = None,
+                 upper_slack_limit: Optional[w.symbol_expr_float] = None):
+        self.name = name
+        self.expression = expression
+        self.quadratic_weight = quadratic_weight
+        if control_horizon is None:
+            self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        else:
+            self.control_horizon = control_horizon
+        self.control_horizon = max(1, self.control_horizon)
+        self.velocity_limit = velocity_limit
+        self.bound = derivative_goal
+        if lower_slack_limit is not None:
+            self.lower_slack_limit = lower_slack_limit
+        if upper_slack_limit is not None:
+            self.upper_slack_limit = upper_slack_limit
+        if linear_weight is not None:
+            self.linear_weight = linear_weight
+
+    @property
+    def god_map(self) -> GodMap:
+        return GodMap()
+
+    @property
+    def prediction_horizon(self) -> int:
+        return self.god_map.get_data(identifier.prediction_horizon)
+
+    def __str__(self):
+        return self.name
+
+    def normalized_weight(self):
+        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
+        return weight_normalized * self.control_horizon
+
+
+class DerivativeInequalityConstraint:
 
     def __init__(self,
                  name: str,

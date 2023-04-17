@@ -199,14 +199,13 @@ class CartesianPositionStraight(Goal):
         # self.add_debug_matrix(self.tip_link + '_T_a', w.inverse_frame(a_T_t))
         # self.add_debug_expr('error', dist)
 
-        self.add_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
-                                   lower_errors=[dist, 0, 0],
-                                   upper_errors=[dist, 0, 0],
-                                   weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
-                                   task_expression=expr_p[:3],
-                                   names=['line/x',
-                                          'line/y',
-                                          'line/z'])
+        self.add_equality_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
+                                            equality_bounds=[dist, 0, 0],
+                                            weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
+                                            task_expression=expr_p[:3],
+                                            names=['line/x',
+                                                   'line/y',
+                                                   'line/z'])
 
         if self.max_velocity is not None:
             self.add_translational_velocity_limit(frame_P_current=root_P_tip,
@@ -385,22 +384,20 @@ class DiffDriveBaseGoal(Goal):
                                        self.weight,
                                        0)
 
-        self.add_constraint(reference_velocity=self.max_angular_velocity,
-                            lower_error=rotate_to_goal_error,
-                            upper_error=rotate_to_goal_error,
-                            weight=weight_rotate_to_goal,
-                            task_expression=map_current_angle,
-                            name='/rot1')
+        self.add_equality_constraint(reference_velocity=self.max_angular_velocity,
+                                     equality_bound=rotate_to_goal_error,
+                                     weight=weight_rotate_to_goal,
+                                     task_expression=map_current_angle,
+                                     name='/rot1')
         self.add_point_goal_constraints(frame_P_current=map_P_base_footprint,
                                         frame_P_goal=map_P_base_footprint_goal,
                                         reference_velocity=self.max_linear_velocity,
                                         weight=weight_translation)
-        self.add_constraint(reference_velocity=self.max_angular_velocity,
-                            lower_error=final_rotation_error,
-                            upper_error=final_rotation_error,
-                            weight=weight_final_rotation,
-                            task_expression=map_current_angle,
-                            name='/rot2')
+        self.add_equality_constraint(reference_velocity=self.max_angular_velocity,
+                                     equality_bound=final_rotation_error,
+                                     weight=weight_final_rotation,
+                                     task_expression=map_current_angle,
+                                     name='/rot2')
 
     def __str__(self):
         s = super().__str__()

@@ -6,9 +6,11 @@ from std_msgs.msg import Float64MultiArray
 import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
+from giskardpy.utils.decorators import record_time
 
 
 class JointGroupPosController(CommandPublisher):
+    @record_time
     @profile
     def __init__(self, name, namespace='/joint_group_pos_controller', hz=100):
         self.namespace = namespace

@@ -31,7 +31,8 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo
+from giskardpy.utils.utils import suppress_stderr
+from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
 
 class TravelCompanion:
@@ -250,6 +251,8 @@ class WorldTree(WorldTreeInterface):
         clear_memo(self.compose_fk_expression)
         clear_memo(self.compute_chain)
         clear_memo(self.is_link_controlled)
+        for free_variable in self.free_variables.values():
+            free_variable.reset_cache()
 
     @profile
     def notify_model_change(self):
@@ -1110,9 +1113,9 @@ class WorldTree(WorldTreeInterface):
                     self.fk_idx[link.name] = i
                     i += 1
             fks = w.vstack(fks)
-            self.fast_all_fks = fks.compile(w.free_symbols(fks))
+            self.fast_all_fks = fks.compile()
 
-        fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+        fks_evaluated = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
         result = {}
         for link in self.link_names_with_collisions:
             result[link] = fks_evaluated[self.fk_idx[link], :]
@@ -1184,8 +1187,8 @@ class WorldTree(WorldTreeInterface):
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-                self.collision_fk_matrix = self.fast_collision_fks.call2(
+                self.fks = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+                self.collision_fk_matrix = self.fast_collision_fks.fast_call(
                     self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
 
             @memoize

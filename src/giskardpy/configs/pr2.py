@@ -9,11 +9,22 @@ class PR2_Base(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
         # self.set_collision_checker(CollisionCheckerLib.none)
-        # self.set_qp_solver(SupportedQPSolver.qp_oases)
+        # self.set_qp_solver(SupportedQPSolver.gurobi)
         # self.configure_PlotTrajectory(enabled=True, wait=True)
         # self.configure_PlotDebugExpressions(enabled=True, wait=True)
         # self.configure_DebugMarkerPublisher(enabled=True)
-        # self.configure_PublishDebugExpressions(enabled=True, enabled_base=True)
+        # self.configure_PublishDebugExpressions(
+        #     publish_lb=True,
+        #     publish_ub=True,
+        #     publish_lbA=True,
+        #     publish_ubA=True,
+        #     publish_bE=True,
+        #     publish_Ax=True,
+        #     publish_Ex=True,
+        #     publish_xdot=True,
+        #     publish_weights=True,
+        #     publish_debug=True,
+        # )
         self.configure_MaxTrajectoryLength(length=30)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
@@ -59,8 +70,8 @@ class PR2_Base(Giskard):
                                              velocity_limit=2)
         self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
                                                  acceleration_limit=4)
-        self.set_default_weights(velocity_weight=0.001,
-                                 acceleration_weight=0.001)
+        self.set_default_weights(velocity_weight=0.01,
+                                 acceleration_weight=0.01)
 
 
 class PR2_Mujoco(PR2_Base):
@@ -82,14 +93,14 @@ class PR2_Mujoco(PR2_Base):
                                       Derivatives.acceleration: 1,
                                       Derivatives.jerk: 5
                                   },
-                                  odometry_topic='/pr2_calibrated_with_ft2_without_virtual_joints/base_footprint')
+                                  odometry_topic='/pr2/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/whole_body_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/l_gripper_l_finger_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/r_gripper_l_finger_controller/state')
-        self.add_base_cmd_velocity(cmd_vel_topic='/pr2_calibrated_with_ft2_without_virtual_joints/cmd_vel',
+        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
                                    track_only_velocity=True)
         self.overwrite_external_collision_avoidance('brumbrum',
                                                     number_of_repeller=2,
@@ -180,19 +191,21 @@ class PR2_StandAlone(PR2_Base):
         self.publish_all_tf()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
+        # self.configure_VisualizationBehavior(enabled=False)
+        # self.configure_CollisionMarker(enabled=False)
         self.add_fixed_joint(parent_link='map', child_link='odom_combined')
         self.add_omni_drive_joint(name='brumbrum',
                                   parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
                                   translation_limits={
-                                      Derivatives.velocity: 0.4,
+                                      Derivatives.velocity: 0.2,
                                       Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
+                                      Derivatives.jerk: 6,
                                   },
                                   rotation_limits={
                                       Derivatives.velocity: 0.2,
                                       Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
+                                      Derivatives.jerk: 6
                                   })
         self.register_controlled_joints([
             'torso_lift_joint',

@@ -109,19 +109,17 @@ class JointPositionContinuous(Goal):
         error = w.shortest_angular_distance(current_joint, self.joint_goal)
 
         if self.hard:
-            self.add_constraint(reference_velocity=max_velocity,
-                                lower_error=error,
-                                upper_error=error,
-                                weight=self.weight,
-                                task_expression=current_joint,
-                                lower_slack_limit=0,
-                                upper_slack_limit=0)
+            self.add_equality_constraint(reference_velocity=max_velocity,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current_joint,
+                                         lower_slack_limit=0,
+                                         upper_slack_limit=0)
         else:
-            self.add_constraint(reference_velocity=max_velocity,
-                                lower_error=error,
-                                upper_error=error,
-                                weight=self.weight,
-                                task_expression=current_joint)
+            self.add_equality_constraint(reference_velocity=max_velocity,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -168,19 +166,17 @@ class JointPositionPrismatic(Goal):
         error = self.goal - current_joint
 
         if self.hard:
-            self.add_constraint(reference_velocity=max_velocity,
-                                lower_error=error,
-                                upper_error=error,
-                                weight=self.weight,
-                                task_expression=current_joint,
-                                upper_slack_limit=0,
-                                lower_slack_limit=0)
+            self.add_equality_constraint(reference_velocity=max_velocity,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current_joint,
+                                         upper_slack_limit=0,
+                                         lower_slack_limit=0)
         else:
-            self.add_constraint(reference_velocity=max_velocity,
-                                lower_error=error,
-                                upper_error=error,
-                                weight=self.weight,
-                                task_expression=current_joint)
+            self.add_equality_constraint(reference_velocity=max_velocity,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -279,19 +275,17 @@ class JointPositionRevolute(Goal):
 
         error = joint_goal - current_joint
         if self.hard:
-            self.add_constraint(reference_velocity=max_velocity,
-                                lower_error=error,
-                                upper_error=error,
-                                weight=weight,
-                                task_expression=current_joint,
-                                upper_slack_limit=0,
-                                lower_slack_limit=0)
+            self.add_equality_constraint(reference_velocity=max_velocity,
+                                         equality_bound=error,
+                                         weight=weight,
+                                         task_expression=current_joint,
+                                         upper_slack_limit=0,
+                                         lower_slack_limit=0)
         else:
-            self.add_constraint(reference_velocity=max_velocity,
-                                lower_error=error,
-                                upper_error=error,
-                                weight=weight,
-                                task_expression=current_joint)
+            self.add_equality_constraint(reference_velocity=max_velocity,
+                                         equality_bound=error,
+                                         weight=weight,
+                                         task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -340,11 +334,10 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
         capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
-        self.add_constraint(lower_error=capped_err,
-                            upper_error=capped_err,
-                            reference_velocity=max_velocity,
-                            weight=weight,
-                            task_expression=current_joint)
+        self.add_equality_constraint(equality_bound=capped_err,
+                                     reference_velocity=max_velocity,
+                                     weight=weight,
+                                     task_expression=current_joint)
 
     def __str__(self):
         s = super(ShakyJointPositionRevoluteOrPrismatic, self).__str__()
@@ -392,11 +385,10 @@ class ShakyJointPositionContinuous(Goal):
 
         capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
-        self.add_constraint(lower_error=capped_err,
-                            upper_error=capped_err,
-                            reference_velocity=max_velocity,
-                            weight=weight,
-                            task_expression=current_joint)
+        self.add_equality_constraint(equality_bound=capped_err,
+                                     reference_velocity=max_velocity,
+                                     weight=weight,
+                                     task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()
@@ -450,11 +442,11 @@ class AvoidSingleJointLimits(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        self.add_constraint(reference_velocity=max_velocity,
-                            lower_error=lower_err,
-                            upper_error=upper_err,
-                            weight=weight,
-                            task_expression=joint_symbol)
+        self.add_inequality_constraint(reference_velocity=max_velocity,
+                                       lower_error=lower_err,
+                                       upper_error=upper_err,
+                                       weight=weight,
+                                       task_expression=joint_symbol)
 
     def __str__(self):
         s = super().__str__()

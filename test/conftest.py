@@ -4,6 +4,8 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 from tf.transformations import quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
+from giskardpy import identifier
+from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils import logging
 from giskardpy.utils.utils import launch_launchfile
@@ -23,6 +25,7 @@ def ros(request):
     tf.init(60)
 
     def kill_ros():
+        GodMap().get_data(identifier.tree_manager).render()
         logging.loginfo('shutdown ros')
         rospy.signal_shutdown('die')
         try:
@@ -51,7 +54,7 @@ def ros(request):
 @pytest.fixture()
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     logging.loginfo('resetting giskard')
-    giskard.resuscitate()
+    giskard.restart_ticking()
     if giskard.is_standalone() and giskard.has_odometry_joint():
         zero = PoseStamped()
         zero.header.frame_id = 'map'

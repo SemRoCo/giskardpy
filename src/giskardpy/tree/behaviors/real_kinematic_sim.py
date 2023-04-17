@@ -2,6 +2,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class RealKinSimPlugin(GiskardBehavior):
@@ -11,6 +12,7 @@ class RealKinSimPlugin(GiskardBehavior):
     #     self.last_time = None
         # self.start_time = self.god_map.get_data(identifier.tracking_start_time)
 
+    @record_time
     @profile
     def update(self):
         next_time = self.god_map.get_data(identifier.time)

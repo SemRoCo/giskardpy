@@ -13,7 +13,7 @@ from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.math import rpy_from_quaternion
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
 class SyncOdometry(GiskardBehavior):
@@ -30,6 +30,7 @@ class SyncOdometry(GiskardBehavior):
         return f'{super().__str__()} ({self.odometry_topic})'
 
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def setup(self, timeout=0.0):
         msg: Optional[Odometry] = None
@@ -60,6 +61,7 @@ class SyncOdometry(GiskardBehavior):
         self.lock.put(data)
 
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def update(self):
         try:

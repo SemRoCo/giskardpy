@@ -3,6 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import PlanningException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class MaxTrajectoryLength(GiskardBehavior):
@@ -13,6 +14,7 @@ class MaxTrajectoryLength(GiskardBehavior):
     def initialise(self):
         self.length = self.god_map.get_data(identifier.MaxTrajectoryLength + ['length'])
 
+    @record_time
     @profile
     def update(self):
         t = self.get_god_map().get_data(identifier.time)

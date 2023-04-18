@@ -246,23 +246,27 @@ class QPSWIFTFormatter(QPSolver):
         A = self.nA_A[num_nA_rows:]
         merged_A = np.zeros((self.ubA_inf_filter.shape[0], self.weights.shape[0]))
         nlbA_filter = self.nlbA_inf_filter.copy()
-        nlbA_filter[nlbA_filter] = self.nlbA_filter_half
-        if self.sparse:
-            merged_A[nlbA_filter] = nA.toarray()
-        else:
-            merged_A[nlbA_filter] = nA
+        if len(nlbA_filter) > 0:
+            nlbA_filter[nlbA_filter] = self.nlbA_filter_half
+            if self.sparse:
+                merged_A[nlbA_filter] = nA.toarray()
+            else:
+                merged_A[nlbA_filter] = nA
 
         ubA_filter = self.ubA_inf_filter.copy()
-        ubA_filter[ubA_filter] = self.ubA_filter_half
-        if self.sparse:
-            merged_A[ubA_filter] = A.toarray()
-        else:
-            merged_A[ubA_filter] = A
+        if len(ubA_filter) > 0:
+            ubA_filter[ubA_filter] = self.ubA_filter_half
+            if self.sparse:
+                merged_A[ubA_filter] = A.toarray()
+            else:
+                merged_A[ubA_filter] = A
 
         lbA = (np.ones(self.nlbA_inf_filter.shape) * -np.inf)
         ubA = (np.ones(self.ubA_inf_filter.shape) * np.inf)
-        lbA[nlbA_filter] = -self.nlbA_ubA[:num_nA_rows]
-        ubA[ubA_filter] = self.nlbA_ubA[num_nA_rows:]
+        if len(nlbA_filter) > 0:
+            lbA[nlbA_filter] = -self.nlbA_ubA[:num_nA_rows]
+        if len(ubA_filter) > 0:
+            ubA[ubA_filter] = self.nlbA_ubA[num_nA_rows:]
 
         bA_filter = np.ones(merged_A.shape[0], dtype=bool)
         if len(self.bA_part) > 0:

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from copy import deepcopy
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
+import numpy as np
 from sensor_msgs.msg import JointState
 
 from giskardpy.my_types import PrefixName, Derivatives
@@ -54,15 +55,7 @@ class _JointState:
                  snap: float = 0,
                  crackle: float = 0,
                  pop: float = 0):
-        self.state: Dict[Derivatives, float] = {
-            Derivatives.position: position,
-            Derivatives.velocity: velocity,
-            Derivatives.acceleration: acceleration,
-            Derivatives.jerk: jerk,
-            Derivatives.snap: snap,
-            Derivatives.crackle: crackle,
-            Derivatives.pop: pop,
-        }
+        self.state: np.ndarray = np.array([position, velocity, acceleration, jerk, snap, crackle, pop], dtype=float)
 
     def __getitem__(self, derivative):
         return self.state[derivative]
@@ -136,8 +129,7 @@ class _JointState:
         return str(self)
 
     def __deepcopy__(self, memodict=None):
-        return _JointState(self.position, self.velocity, self.acceleration, self.jerk, self.snap, self.crackle,
-                           self.pop)
+        return _JointState(*self.state)
 
 
 class JointStates(defaultdict):
@@ -169,7 +161,7 @@ class JointStates(defaultdict):
         return {k: v.position for k, v in self.items()}
 
     def pretty_print(self):
-        for joint_name, joint_state in self.items():
+        for joint_name, joint_state in sorted(self.items()):
             print(f'{joint_name}:')
             print(f'\tposition: {joint_state.position}')
             print(f'\tvelocity: {joint_state.velocity}')

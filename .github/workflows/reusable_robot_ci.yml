@@ -1,0 +1,213 @@
+name: Reusable Robot CI
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+on:
+  workflow_call:
+    inputs:
+      robot:
+        description: one of [pr2, hsr, tiago, donbot]
+        required: true
+        type: string
+      test1:
+        description: that that will be run, e.g. test/test_integration_hsr.py::TestJointGoals
+        required: true
+        type: string
+      test2:
+        required: false
+        type: string
+      test3:
+        required: false
+        type: string
+      test4:
+        required: false
+        type: string
+      test5:
+        required: false
+        type: string
+      test6:
+        required: false
+        type: string
+      test7:
+        required: false
+        type: string
+      test8:
+        required: false
+        type: string
+      test9:
+        required: false
+        type: string
+      test10:
+        required: false
+        type: string
+jobs:
+  test_standalone:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        qp_solver: [qpalm, qpSWIFT]
+    env:
+      QP_SOLVER: ${{ matrix.qp_solver }}
+    steps:
+      #load cache ------------------------------------------------------------------------------------------------------
+      - name: load pip cache
+        id: pip-load
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip
+      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
+        name: load qpSWIFT
+        id: load-qpSWIFT
+        uses: actions/cache@v3
+        with:
+          path: ~/qpSWIFT
+          key: qpSWIFT
+      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
+        name: install qpSWIFT python wrapper
+        run: |
+          sudo pip3 install numpy
+          cd ~/qpSWIFT/python
+          sudo python3 setup.py install
+      - name: load bpb # -----------------------------------------------------------------------------------------------
+        id: load-bpb
+        uses: actions/cache@v3
+        with:
+          path: ~/bpb
+          key: bpb
+      - name: add bpb to bashrc
+        run: |
+          cd ~/bpb/bullet3
+          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
+      #pull github deps ================================================================================================
+      - uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/giskardpy'
+          repository: SemRoCo/giskardpy
+      - name: install pip dependencies
+        run: pip3 install -r ros_ws/src/giskardpy/requirements.txt
+      - name: Checkout giskard msgs
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/giskard_msgs'
+          repository: SemRoCo/giskard_msgs
+      - name: Checkout iai_maps
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_maps'
+          repository: code-iai/iai_maps
+          ref: master
+      # install robots -------------------------------------------------------------------------------------------------
+      - if: ${{ inputs.robot == 'hsr' }}
+        name: Checkout hsr_description
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/hsr_description'
+          repository: code-iai/hsr_description
+          ref: master
+      - if: ${{ inputs.robot == 'hsr' }}
+        name: Checkout hsr_meshes
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/hsr_meshes'
+          repository: ToyotaResearchInstitute/hsr_meshes
+          ref: master
+      - if: ${{ inputs.robot == 'donbot' }}
+        name: Checkout iai_robots
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_robots'
+          repository: code-iai/iai_robots
+          ref: noetic
+      - if: ${{ inputs.robot == 'pr2' }}
+        name: Checkout iai_pr2
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_pr2'
+          repository: code-iai/iai_pr2
+          ref: mujoco_sim_setup
+      - if: ${{ inputs.robot == 'pr2' }}
+        name: ignore some packages in iai_pr2
+        run: |
+          cd ros_ws
+          touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
+          touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
+      # build workspace ------------------------------------------------------------------------------------------------
+      - name: install ros and rosdeps
+        uses: betwo/github-setup-catkin@master
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+        with:
+          ros-version: noetic
+          build-tool: 'catkin_tools'
+          workspace: $GITHUB_WORKSPACE/ros_ws
+      - if: ${{ inputs.robot == 'tiago' }} # tiago has to be pulled now because it has fucked up package.xml
+        name: Checkout iai_tiago
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_tiago'
+          repository: code-iai/iai_tiago
+          ref: main
+          submodules: recursive
+      - name: build Giskard
+        run: |
+          cd ros_ws
+          . /opt/ros/noetic/setup.bash
+          catkin build
+          echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
+          echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
+      #tests ===========================================================================================================
+      - name: start roscore
+        run: roscore &
+      - if: ${{ (always()) && (runner.debug == '1') }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+      - name: run ${{ inputs.test1 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test1 }}
+      - if: ${{ inputs.test2 != '' }}
+        name: run ${{ inputs.test2 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test2 }}
+      - if: ${{ inputs.test3 != '' }}
+        name: run ${{ inputs.test3 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test3 }}
+      - if: ${{ inputs.test4 != '' }}
+        name: run ${{ inputs.test4 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test4 }}
+      - if: ${{ inputs.test5 != '' }}
+        name: run ${{ inputs.test5 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test5 }}
+      - if: ${{ inputs.test6 != '' }}
+        name: run ${{ inputs.test6 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test6 }}
+      - if: ${{ inputs.test7 != '' }}
+        name: run ${{ inputs.test7 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test7 }}
+      - if: ${{ inputs.test8 != '' }}
+        name: run ${{ inputs.test8 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test8 }}
+      - if: ${{ inputs.test9 != '' }}
+        name: run ${{ inputs.test9 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test9 }}
+      - if: ${{ inputs.test10 != '' }}
+        name: run ${{ inputs.test10 }}
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s ${{ inputs.test10 }}

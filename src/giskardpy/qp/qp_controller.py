@@ -1,27 +1,31 @@
+import abc
 import datetime
 import os
+from abc import ABC
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-from typing import List, Dict, Tuple, Type, Union
+from typing import List, Dict, Tuple, Type, Union, Optional, DefaultDict
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from giskardpy import casadi_wrapper as w, identifier
+import giskardpy.casadi_wrapper as cas
+from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import derivative_joint_map, Derivatives
-from giskardpy.qp.constraint import VelocityConstraint, Constraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
-from giskardpy.utils.utils import memoize, create_path, suppress_stdout
+from giskardpy.utils.utils import create_path, suppress_stdout, get_all_classes_in_package
+from giskardpy.utils.decorators import memoize
 
 
 def save_pandas(dfs, names, path):
@@ -32,7 +36,8 @@ def save_pandas(dfs, names, path):
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
-                    csv_string += column.add_prefix(column_name + '||').to_csv(float_format='%.4f')
+                    zero_filtered_column = column.replace(0, pd.np.nan).dropna(how='all').replace(pd.np.nan, 0)
+                    csv_string += zero_filtered_column.add_prefix(column_name + '||').to_csv(float_format='%.4f')
             else:
                 csv_string += df.to_csv(float_format='%.4f')
         file_name2 = f'{folder_name}{name}.csv'
@@ -40,16 +45,64 @@ def save_pandas(dfs, names, path):
             f.write(csv_string)
 
 
-class Parent(object):
-    time_collector: TimeCollector
+class ProblemDataPart(ABC):
+    """
+    min_x 0.5*x^T*diag(w)*x + g^T*x
+    s.t.  lb <= x <= ub
+        lbA <= A*x <= ubA
+               E*x = b
+    """
+    free_variables: List[FreeVariable]
+    equality_constraints: List[EqualityConstraint]
+    inequality_constraints: List[InequalityConstraint]
+    derivative_constraints: List[DerivativeInequalityConstraint]
+    sample_period: float
+    prediction_horizon: int
+    max_derivative: Derivatives
 
-    def __init__(self, sample_period, prediction_horizon, order, time_collector=None):
-        self.time_collector = time_collector
+    def __init__(self,
+                 free_variables: List[FreeVariable],
+                 equality_constraints: List[EqualityConstraint],
+                 inequality_constraints: List[InequalityConstraint],
+                 derivative_constraints: List[DerivativeInequalityConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 max_derivative: Derivatives):
+        self.free_variables = free_variables
+        self.equality_constraints = equality_constraints
+        self.inequality_constraints = inequality_constraints
+        self.derivative_constraints = derivative_constraints
         self.prediction_horizon = prediction_horizon
-        self.sample_period = sample_period
-        self.order = order
+        self.dt = sample_period
+        self.max_derivative = max_derivative
 
-    def _sorter(self, *args):
+    def replace_hack(self, expression: Union[float, cas.Expression], new_value):
+        if not isinstance(expression, cas.Expression):
+            return expression
+        hack = GodMap().to_symbol(identifier.hack)
+        expression.s = cas.ca.substitute(expression.s, hack.s, new_value)
+        return expression
+
+    def get_derivative_constraints(self, derivative: Derivatives) -> List[DerivativeInequalityConstraint]:
+        return [c for c in self.derivative_constraints if c.derivative == derivative]
+
+    @abc.abstractmethod
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        pass
+
+    @property
+    def velocity_constraints(self) -> List[DerivativeInequalityConstraint]:
+        return self.get_derivative_constraints(Derivatives.velocity)
+
+    @property
+    def acceleration_constraints(self) -> List[DerivativeInequalityConstraint]:
+        return self.get_derivative_constraints(Derivatives.acceleration)
+
+    @property
+    def jerk_constraints(self) -> List[DerivativeInequalityConstraint]:
+        return self.get_derivative_constraints(Derivatives.jerk)
+
+    def _sorter(self, *args: dict) -> Tuple[List[cas.symbol_expr], np.ndarray]:
         """
         Sorts every arg dict individually and then appends all of them.
         :arg args: a bunch of dicts
@@ -60,548 +113,908 @@ class Parent(object):
         for arg in args:
             result.extend(self.__helper(arg))
             result_names.extend(self.__helper_names(arg))
-        return result, result_names
+        return result, np.array(result_names)
 
-    def __helper(self, param):
+    def __helper(self, param: dict):
         return [x for _, x in sorted(param.items())]
 
-    def __helper_names(self, param):
+    def __helper_names(self, param: dict):
         return [x for x, _ in sorted(param.items())]
 
-    def blow_up(self, d, num_of_copies, weight_inc_f=None):
-        result = {}
-        for t in range(num_of_copies):
-            for name, value in d.items():
-                if weight_inc_f is not None:
-                    result['t{:03d}/{}'.format(t, name)] = weight_inc_f(value, t)
-                else:
-                    result['t{:03d}/{}'.format(t, name)] = value
-        return result
 
+class Weights(ProblemDataPart):
+    """
+    format:
+        free_variable_velocity
+        free_variable_acceleration
+        free_variable_jerk
+        equality_constraints
+        derivative_constraints_velocity
+        derivative_constraints_acceleration
+        derivative_constraints_jerk
+        inequality_constraints
+    """
 
-class H(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order)
-        self.free_variables = free_variables
-        self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[velocity_constraints]
-        self.height = 0
-        self._compute_height()
-        self.evaluted = True
-
-    def _compute_height(self):
-        self.height = self.number_of_free_variables_with_horizon()
-        self.height += self.number_of_constraint_vel_variables()
-        self.height += self.number_of_contraint_error_variables()
-
-    @property
-    def width(self):
-        return self.height
-
-    def number_of_free_variables_with_horizon(self):
-        h = 0
-        for v in self.free_variables:
-            h += (min(v.order, self.order) - 1) * self.prediction_horizon
-        return h
-
-    def number_of_constraint_vel_variables(self):
-        h = 0
-        for c in self.velocity_constraints:
-            h += c.control_horizon
-        return h
-
-    def number_of_contraint_error_variables(self):
-        return len(self.constraints)
+    def __init__(self, free_variables: List[FreeVariable],
+                 equality_constraints: List[EqualityConstraint],
+                 inequality_constraints: List[InequalityConstraint],
+                 derivative_constraints: List[DerivativeInequalityConstraint],
+                 sample_period: float,
+                 prediction_horizon: int, max_derivative: Derivatives):
+        super().__init__(free_variables=free_variables,
+                         equality_constraints=equality_constraints,
+                         inequality_constraints=inequality_constraints,
+                         derivative_constraints=derivative_constraints,
+                         sample_period=sample_period,
+                         prediction_horizon=prediction_horizon,
+                         max_derivative=max_derivative)
+        # self.height = 0
+        # self._compute_height()
+        self.evaluated = True
 
     @profile
-    def weights(self):
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        components = []
+        components.extend(self.free_variable_weights_expression())
+        components.append(self.equality_weight_expressions())
+        components.extend(self.derivative_weight_expressions())
+        components.append(self.inequality_weight_expressions())
+        weights, _ = self._sorter(*components)
+        weights = cas.Expression(weights)
+        # todo replace hack?
+        # for i in range(len(weights)):
+        #     weights[i] = self.replace_hack(weights[i], 0)
+        return cas.Expression(weights), cas.zeros(*weights.shape)
+
+    @profile
+    def free_variable_weights_expression(self) -> List[defaultdict]:
+        params = []
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
-            for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, min(v.order, self.order)):
+            for v in self.free_variables:
+                for o in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
                     o = Derivatives(o)
                     weights[o][f't{t:03}/{v.position_name}/{o}'] = v.normalized_weight(t, o,
                                                                                        self.prediction_horizon,
-                                                                                       evaluated=self.evaluted)
-        slack_weights = {}
-        for t in range(self.prediction_horizon):
-            for c in self.velocity_constraints:  # type: VelocityConstraint
-                if t < c.control_horizon:
-                    slack_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
+                                                                                       evaluated=self.evaluated)
+        for _, weight in sorted(weights.items()):
+            params.append(weight)
+        return params
 
-        error_slack_weights = {f'{c.name}/error': c.normalized_weight(self.prediction_horizon) for c in
-                               self.constraints}
-
+    def derivative_weight_expressions(self) -> List[Dict[str, cas.Expression]]:
         params = []
-        for o, w in sorted(weights.items()):
-            params.append(w)
-        params.append(slack_weights)
-        params.append(error_slack_weights)
-        return self._sorter(*params)[0]
+        for d in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            derivative_constr_weights = {}
+            for t in range(self.prediction_horizon):
+                d = Derivatives(d)
+                for c in self.get_derivative_constraints(d):
+                    if t < c.control_horizon:
+                        derivative_constr_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
+            params.append(derivative_constr_weights)
+        return params
+
+    def equality_weight_expressions(self) -> dict:
+        error_slack_weights = {f'{c.name}/error': c.normalized_weight() for c in self.equality_constraints}
+        return error_slack_weights
+
+    def inequality_weight_expressions(self) -> dict:
+        error_slack_weights = {f'{c.name}/error': c.normalized_weight() for c in self.inequality_constraints}
+        return error_slack_weights
 
 
-class B(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order)
-        self.free_variables = free_variables  # type: list[FreeVariable]
-        self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
-        self.no_limits = 1e4
+class FreeVariableBounds(ProblemDataPart):
+    """
+    format:
+        free_variable_velocity
+        free_variable_acceleration
+        free_variable_jerk
+        slack_equality_constraints
+        slack_derivative_constraints_velocity
+        slack_derivative_constraints_acceleration
+        slack_derivative_constraints_jerk
+        slack_inequality_constraints
+    """
+    names: np.ndarray
+    names_without_slack: np.ndarray
+    names_slack: np.ndarray
+    names_neq_slack: np.ndarray
+    names_derivative_slack: np.ndarray
+    names_eq_slack: np.ndarray
+
+    def __init__(self, free_variables: List[FreeVariable],
+                 equality_constraints: List[EqualityConstraint],
+                 inequality_constraints: List[InequalityConstraint],
+                 derivative_constraints: List[DerivativeInequalityConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 max_derivative: Derivatives):
+        super().__init__(free_variables=free_variables,
+                         equality_constraints=equality_constraints,
+                         inequality_constraints=inequality_constraints,
+                         derivative_constraints=derivative_constraints,
+                         sample_period=sample_period,
+                         prediction_horizon=prediction_horizon,
+                         max_derivative=max_derivative)
         self.evaluated = True
-        self.default_limits = default_limits
 
-    def get_lower_slack_limits(self):
-        result = {}
+    @profile
+    def free_variable_bounds(self) -> Tuple[List[Dict[str, cas.symbol_expr_float]],
+                                            List[Dict[str, cas.symbol_expr_float]]]:
+        lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
+        ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         for t in range(self.prediction_horizon):
-            for c in self.velocity_constraints:
-                if t < c.control_horizon:
-                    result[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
-        return result
-
-    def get_upper_slack_limits(self):
-        result = {}
-        for t in range(self.prediction_horizon):
-            for c in self.velocity_constraints:
-                if t < c.control_horizon:
-                    result[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
-        return result
-
-    def get_lower_error_slack_limits(self):
-        return {f'{c.name}/error': c.lower_slack_limit for c in self.constraints}
-
-    def get_upper_error_slack_limits(self):
-        return {f'{c.name}/error': c.upper_slack_limit for c in self.constraints}
-
-    def __call__(self):
-        lb = defaultdict(dict)
-        ub = defaultdict(dict)
-        for t in range(self.prediction_horizon):
-            for v in self.free_variables:  # type: FreeVariable
-                for o in range(1, min(v.order, self.order)):  # start with velocity
-                    o = Derivatives(o)
+            for v in self.free_variables:
+                for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
                     if t == self.prediction_horizon - 1 \
-                            and o < min(v.order, self.order) - 1 \
+                            and derivative < min(v.order, self.max_derivative) \
                             and self.prediction_horizon > 2:  # and False:
-                        lb[o][f't{t:03}/{v.position_name}/{o}'] = 0
-                        ub[o][f't{t:03}/{v.position_name}/{o}'] = 0
+                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
+                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
                     else:
-                        lb[o][f't{t:03}/{v.position_name}/{o}'] = v.get_lower_limit(o, evaluated=self.evaluated)
-                        ub[o][f't{t:03}/{v.position_name}/{o}'] = v.get_upper_limit(o, evaluated=self.evaluated)
+                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = v.get_lower_limit(derivative,
+                                                                                             evaluated=self.evaluated)
+                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = v.get_upper_limit(derivative,
+                                                                                             evaluated=self.evaluated)
         lb_params = []
-        for o, x in sorted(lb.items()):
-            lb_params.append(x)
-        lb_params.append(self.get_lower_slack_limits())
-        lb_params.append(self.get_lower_error_slack_limits())
-
         ub_params = []
-        for o, x in sorted(ub.items()):
-            ub_params.append(x)
-        ub_params.append(self.get_upper_slack_limits())
-        ub_params.append(self.get_upper_error_slack_limits())
+        for derivative, name_to_bound_map in sorted(lb.items()):
+            lb_params.append(name_to_bound_map)
+        for derivative, name_to_bound_map in sorted(ub.items()):
+            ub_params.append(name_to_bound_map)
+        return lb_params, ub_params
+
+    def derivative_slack_limits(self, derivative: Derivatives) \
+            -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
+        lower_slack = {}
+        upper_slack = {}
+        for t in range(self.prediction_horizon):
+            for c in self.get_derivative_constraints(derivative):
+                if t < c.control_horizon:
+                    lower_slack[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
+                    upper_slack[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
+        return lower_slack, upper_slack
+
+    def equality_constraint_slack_lower_bound(self):
+        return {f'{c.name}/error': c.lower_slack_limit for c in self.equality_constraints}
+
+    def equality_constraint_slack_upper_bound(self):
+        return {f'{c.name}/error': c.upper_slack_limit for c in self.equality_constraints}
+
+    def inequality_constraint_slack_lower_bound(self):
+        return {f'{c.name}/error': c.lower_slack_limit for c in self.inequality_constraints}
+
+    def inequality_constraint_slack_upper_bound(self):
+        return {f'{c.name}/error': c.upper_slack_limit for c in self.inequality_constraints}
+
+    @profile
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        lb_params, ub_params = self.free_variable_bounds()
+        num_free_variables = sum(len(x) for x in lb_params)
+
+        equality_constraint_slack_lower_bounds = self.equality_constraint_slack_lower_bound()
+        num_eq_slacks = len(equality_constraint_slack_lower_bounds)
+        lb_params.append(equality_constraint_slack_lower_bounds)
+        ub_params.append(self.equality_constraint_slack_upper_bound())
+
+        num_derivative_slack = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            lower_slack, upper_slack = self.derivative_slack_limits(derivative)
+            num_derivative_slack += len(lower_slack)
+            lb_params.append(lower_slack)
+            ub_params.append(upper_slack)
+
+        lb_params.append(self.inequality_constraint_slack_lower_bound())
+        ub_params.append(self.inequality_constraint_slack_upper_bound())
 
         lb, self.names = self._sorter(*lb_params)
-        return lb, self._sorter(*ub_params)[0]
+        ub, _ = self._sorter(*ub_params)
+        self.names_without_slack = self.names[:num_free_variables]
+        self.names_slack = self.names[num_free_variables:]
+
+        derivative_slack_start = 0
+        derivative_slack_stop = derivative_slack_start + num_derivative_slack
+        self.names_derivative_slack = self.names_slack[derivative_slack_start:derivative_slack_stop]
+
+        eq_slack_start = derivative_slack_stop
+        eq_slack_stop = eq_slack_start + num_eq_slacks
+        self.names_eq_slack = self.names_slack[eq_slack_start:eq_slack_stop]
+
+        neq_slack_start = eq_slack_stop
+        self.names_neq_slack = self.names_slack[neq_slack_start:]
+        # todo replace hack?
+        # for i in range(len(lb)):
+        #     lb[i] = self.replace_hack(lb[i], 0)
+        #     ub[i] = self.replace_hack(ub[i], 0)
+        return cas.Expression(lb), cas.Expression(ub)
 
 
-class BA(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order)
-        self.free_variables = free_variables
-        self.constraints = constraints
-        self.velocity_constraints = velocity_constraints
-        self.round_to = 5
-        self.round_to2 = 10
+class EqualityBounds(ProblemDataPart):
+    """
+    Format:
+        last free variable velocity
+        0
+        last free variable acceleration
+        0
+        equality_constraint_bounds
+    """
+    names: np.ndarray
+    names_equality_constraints: np.ndarray
+    names_derivative_links: np.ndarray
+
+    def __init__(self, free_variables: List[FreeVariable],
+                 equality_constraints: List[EqualityConstraint],
+                 inequality_constraints: List[InequalityConstraint],
+                 derivative_constraints: List[DerivativeInequalityConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 max_derivative: Derivatives):
+        super().__init__(free_variables=free_variables,
+                         equality_constraints=equality_constraints,
+                         inequality_constraints=inequality_constraints,
+                         derivative_constraints=derivative_constraints,
+                         sample_period=sample_period,
+                         prediction_horizon=prediction_horizon,
+                         max_derivative=max_derivative)
+        self.evaluated = True
+
+    def equality_bounds(self) -> Dict[str, cas.Expression]:
+        return {f'{c.name}': cas.limit(c.bound,
+                                       -c.velocity_limit * self.dt * c.control_horizon,
+                                       c.velocity_limit * self.dt * c.control_horizon)
+                for c in self.equality_constraints}
+
+    def last_derivative_values(self, derivative: Derivatives) -> Dict[str, cas.symbol_expr_float]:
+        last_values = {}
+        for v in self.free_variables:
+            last_values[f'{v.name}/last_{derivative}'] = v.get_symbol(derivative)
+        return last_values
+
+    def derivative_links(self, derivative: Derivatives) -> Dict[str, cas.symbol_expr_float]:
+        derivative_link = {}
+        for t in range(self.prediction_horizon - 1):
+            for v in self.free_variables:
+                derivative_link[f't{t:03}/{derivative}/{v.name}/link'] = 0
+        return derivative_link
+
+    @profile
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        bounds = []
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
+            bounds.append(self.last_derivative_values(derivative))
+            bounds.append(self.derivative_links(derivative))
+        num_derivative_links = sum(len(x) for x in bounds)
+
+        bounds.append(self.equality_bounds())
+
+        bounds, self.names = self._sorter(*bounds)
+        self.names_derivative_links = self.names[:num_derivative_links]
+        self.names_equality_constraints = self.names[num_derivative_links:]
+        # TODO replace hack?
+        # for i in range(len(lbA)):
+        #     lbA[i] = self.replace_hack(lbA[i], 0)
+        #     ubA[i] = self.replace_hack(ubA[i], 0)
+        return cas.Expression(bounds)
+
+
+class InequalityBounds(ProblemDataPart):
+    """
+    Format:
+        position limits
+        derivative velocity bounds
+        derivative acceleration bounds
+        derivative jerk bounds
+        inequality bounds
+    """
+    names: np.ndarray
+    names_position_limits: np.ndarray
+    names_derivative_links: np.ndarray
+    names_neq_constraints: np.ndarray
+    names_non_position_limits: np.ndarray
+
+    def __init__(self, free_variables: List[FreeVariable],
+                 equality_constraints: List[EqualityConstraint],
+                 inequality_constraints: List[InequalityConstraint],
+                 derivative_constraints: List[DerivativeInequalityConstraint],
+                 sample_period: float,
+                 prediction_horizon: int,
+                 max_derivative: Derivatives,
+                 default_limits: bool):
+        super().__init__(free_variables=free_variables,
+                         equality_constraints=equality_constraints,
+                         inequality_constraints=inequality_constraints,
+                         derivative_constraints=derivative_constraints,
+                         sample_period=sample_period,
+                         prediction_horizon=prediction_horizon,
+                         max_derivative=max_derivative)
         self.default_limits = default_limits
         self.evaluated = True
 
-    def get_lower_constraint_velocities(self):
-        result = {}
+    def derivative_constraint_bounds(self, derivative: Derivatives) \
+            -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
+        lower = {}
+        upper = {}
         for t in range(self.prediction_horizon):
-            for c in self.velocity_constraints:
+            for c in self.get_derivative_constraints(derivative):
                 if t < c.control_horizon:
-                    result[f't{t:03}/{c.name}'] = w.limit(c.lower_velocity_limit[t] * self.sample_period,
-                                                          -c.velocity_limit * self.sample_period,
-                                                          c.velocity_limit * self.sample_period)
-        return result
+                    lower[f't{t:03}/{c.name}'] = cas.limit(c.lower_limit[t] * self.dt,
+                                                           -c.normalization_factor * self.dt,
+                                                           c.normalization_factor * self.dt)
+                    upper[f't{t:03}/{c.name}'] = cas.limit(c.upper_limit[t] * self.dt,
+                                                           -c.normalization_factor * self.dt,
+                                                           c.normalization_factor * self.dt)
+        return lower, upper
 
-    def get_upper_constraint_velocities(self):
-        result = {}
-        for t in range(self.prediction_horizon):
-            for c in self.velocity_constraints:
-                if t < c.control_horizon:
-                    result[f't{t:03}/{c.name}'] = w.limit(c.upper_velocity_limit[t] * self.sample_period,
-                                                          -c.velocity_limit * self.sample_period,
-                                                          c.velocity_limit * self.sample_period)
-        return result
+    def lower_inequality_constraint_bound(self):
+        bounds = {}
+        for constraint in self.inequality_constraints:
+            limit = constraint.velocity_limit * self.dt * constraint.control_horizon
+            if isinstance(constraint.lower_error, float) and np.isinf(constraint.lower_error):
+                bounds[f'{constraint.name}'] = constraint.lower_error
+            else:
+                bounds[f'{constraint.name}'] = cas.limit(constraint.lower_error, -limit, limit)
+        return bounds
 
-    @memoize
-    def get_lower_constraint_error(self):
-        return {f'{c.name}/e': w.limit(c.lower_error,
-                                       -c.velocity_limit * self.sample_period * c.control_horizon,
-                                       c.velocity_limit * self.sample_period * c.control_horizon)
-                for c in self.constraints}
+    def upper_inequality_constraint_bound(self):
+        bounds = {}
+        for constraint in self.inequality_constraints:
+            limit = constraint.velocity_limit * self.dt * constraint.control_horizon
+            if isinstance(constraint.upper_error, float) and np.isinf(constraint.upper_error):
+                bounds[f'{constraint.name}'] = constraint.upper_error
+            else:
+                bounds[f'{constraint.name}'] = cas.limit(constraint.upper_error, -limit, limit)
+        return bounds
 
-    @memoize
-    def get_upper_constraint_error(self):
-        return {f'{c.name}/e': w.limit(c.upper_error,
-                                       -c.velocity_limit * self.sample_period * c.control_horizon,
-                                       c.velocity_limit * self.sample_period * c.control_horizon)
-                for c in self.constraints}
-
-    def __call__(self) -> tuple:
+    def position_limits(self) -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
         lb = {}
         ub = {}
-        # position limits
         for t in range(self.prediction_horizon):
-            for v in self.free_variables:  # type: FreeVariable
-                if v.has_position_limits():
-                    normal_lower_bound = w.round_up(
-                        v.get_lower_limit(Derivatives.position,
-                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
-                        self.round_to2)
-                    normal_upper_bound = w.round_down(
-                        v.get_upper_limit(Derivatives.position,
-                                          False, evaluated=self.evaluated) - v.get_symbol(Derivatives.position),
-                        self.round_to2)
-                    if self.default_limits:
-                        if self.order >= 4:
-                            lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
-                                                                default=False,
-                                                                evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(derivative=Derivatives.jerk,
-                                                                default=False,
-                                                                evaluated=self.evaluated) * self.sample_period ** 3)
-                            upper_vel = w.max(v.get_lower_limit(derivative=Derivatives.velocity,
-                                                                default=False,
-                                                                evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(derivative=Derivatives.jerk,
-                                                                default=False,
-                                                                evaluated=self.evaluated) * self.sample_period ** 3)
-                        else:
-                            lower_vel = w.min(v.get_upper_limit(derivative=Derivatives.velocity,
-                                                                default=False,
-                                                                evaluated=True) * self.sample_period,
-                                              v.get_upper_limit(derivative=Derivatives.acceleration,
-                                                                default=False,
-                                                                evaluated=self.evaluated) * self.sample_period ** 2)
-                            upper_vel = w.max(v.get_lower_limit(derivative=Derivatives.velocity,
-                                                                default=False,
-                                                                evaluated=True) * self.sample_period,
-                                              v.get_lower_limit(derivative=Derivatives.acceleration,
-                                                                default=False,
-                                                                evaluated=self.evaluated) * self.sample_period ** 2)
-                        lower_bound = w.if_greater(normal_lower_bound, 0,
-                                                   if_result=lower_vel,
-                                                   else_result=normal_lower_bound)
-                        lb[f't{t:03d}/{v.position_name}/p_limit'] = lower_bound
-
-                        upper_bound = w.if_less(normal_upper_bound, 0,
-                                                if_result=upper_vel,
-                                                else_result=normal_upper_bound)
-                        ub[f't{t:03d}/{v.position_name}/p_limit'] = upper_bound
-                    else:
-                        lb[f't{t:03d}/{v.position_name}/p_limit'] = normal_lower_bound
-                        ub[f't{t:03d}/{v.position_name}/p_limit'] = normal_upper_bound
-
-        l_last_stuff = defaultdict(dict)
-        u_last_stuff = defaultdict(dict)
-        for v in self.free_variables:
-            for o in range(1, min(v.order, self.order) - 1):
-                o = Derivatives(o)
-                l_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_down(v.get_symbol(o), self.round_to)
-                u_last_stuff[o][f'{v.position_name}/last_{o}'] = w.round_up(v.get_symbol(o), self.round_to)
-
-        derivative_link = defaultdict(dict)
-        for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
-                for o in range(1, min(v.order, self.order) - 1):
-                    derivative_link[o][f't{t:03}/{o}/{v.position_name}/link'] = 0
+                if v.has_position_limits():
+                    normal_lower_bound = v.get_lower_limit(Derivatives.position, False,
+                                                           evaluated=self.evaluated) - v.get_symbol(
+                        Derivatives.position)
+                    normal_upper_bound = v.get_upper_limit(Derivatives.position, False,
+                                                           evaluated=self.evaluated) - v.get_symbol(
+                        Derivatives.position)
+                    if self.default_limits:
+                        if self.max_derivative >= Derivatives.jerk:
+                            lower_vel = cas.min(v.get_upper_limit(derivative=Derivatives.velocity,
+                                                                  default=False,
+                                                                  evaluated=True) * self.dt,
+                                                v.get_upper_limit(derivative=Derivatives.jerk,
+                                                                  default=False,
+                                                                  evaluated=self.evaluated) * self.dt ** 3)
+                            upper_vel = cas.max(v.get_lower_limit(derivative=Derivatives.velocity,
+                                                                  default=False,
+                                                                  evaluated=True) * self.dt,
+                                                v.get_lower_limit(derivative=Derivatives.jerk,
+                                                                  default=False,
+                                                                  evaluated=self.evaluated) * self.dt ** 3)
+                        else:
+                            lower_vel = cas.min(v.get_upper_limit(derivative=Derivatives.velocity,
+                                                                  default=False,
+                                                                  evaluated=True) * self.dt,
+                                                v.get_upper_limit(derivative=Derivatives.acceleration,
+                                                                  default=False,
+                                                                  evaluated=self.evaluated) * self.dt ** 2)
+                            upper_vel = cas.max(v.get_lower_limit(derivative=Derivatives.velocity,
+                                                                  default=False,
+                                                                  evaluated=True) * self.dt,
+                                                v.get_lower_limit(derivative=Derivatives.acceleration,
+                                                                  default=False,
+                                                                  evaluated=self.evaluated) * self.dt ** 2)
+                        lower_bound = cas.if_greater(normal_lower_bound, 0,
+                                                     if_result=lower_vel,
+                                                     else_result=normal_lower_bound)
+                        lb[f't{t:03d}/{v.name}/p_limit'] = lower_bound
 
-        lb_params = [lb]
-        ub_params = [ub]
-        for o in range(1, self.order - 1):
-            lb_params.append(l_last_stuff[o])
-            lb_params.append(derivative_link[o])
-            ub_params.append(u_last_stuff[o])
-            ub_params.append(derivative_link[o])
-        lb_params.append(self.get_lower_constraint_velocities())
-        lb_params.append(self.get_lower_constraint_error())
-        ub_params.append(self.get_upper_constraint_velocities())
-        ub_params.append(self.get_upper_constraint_error())
+                        upper_bound = cas.if_less(normal_upper_bound, 0,
+                                                  if_result=upper_vel,
+                                                  else_result=normal_upper_bound)
+                        ub[f't{t:03d}/{v.name}/p_limit'] = upper_bound
+                    else:
+                        lb[f't{t:03d}/{v.name}/p_limit'] = normal_lower_bound
+                        ub[f't{t:03d}/{v.name}/p_limit'] = normal_upper_bound
+        return lb, ub
+
+    @profile
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        lower_position_bounds, upper_position_bounds = self.position_limits()
+        lb_params = [lower_position_bounds]
+        ub_params = [upper_position_bounds]
+        num_position_limits = len(lower_position_bounds)
+
+        num_derivative_constraints = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            lower, upper = self.derivative_constraint_bounds(derivative)
+            num_derivative_constraints += len(lower)
+            lb_params.append(lower)
+            ub_params.append(upper)
+
+        lower_inequality_constraint_bounds = self.lower_inequality_constraint_bound()
+        lb_params.append(lower_inequality_constraint_bounds)
+        ub_params.append(self.upper_inequality_constraint_bound())
+        num_neq_constraints = len(lower_inequality_constraint_bounds)
 
         lbA, self.names = self._sorter(*lb_params)
-        return lbA, self._sorter(*ub_params)[0]
+        ubA, _ = self._sorter(*ub_params)
+
+        self.names_position_limits = self.names[:num_position_limits]
+        self.names_non_position_limits = self.names[num_position_limits:]
+        self.names_derivative_links = self.names[num_position_limits:num_position_limits + num_derivative_constraints]
+        self.names_neq_constraints = self.names[num_position_limits + num_derivative_constraints + num_neq_constraints:]
+
+        # TODO replace hack?
+        # for i in range(len(lbA)):
+        #     lbA[i] = self.replace_hack(lbA[i], 0)
+        #     ubA[i] = self.replace_hack(ubA[i], 0)
+        return cas.Expression(lbA), cas.Expression(ubA)
 
 
-class A(Parent):
-    def __init__(self, free_variables, constraints, velocity_constraints, sample_period, prediction_horizon, order,
-                 time_collector, default_limits=False):
-        super().__init__(sample_period, prediction_horizon, order, time_collector)
-        self.free_variables = free_variables  # type: list[FreeVariable]
-        self.constraints = constraints  # type: list[Constraint]
-        self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
-        self.joints = {}
-        self.height = 0
-        self._compute_height()
-        self.width = 0
-        self._compute_width()
-        self.default_limits = default_limits
-
-    def _compute_height(self):
-        # rows for position limits of non continuous joints
-        self.height = self.prediction_horizon * (self.num_position_limits())
-        # rows for linking vel/acc/jerk
-        self.height += self.number_of_joints * self.prediction_horizon * (self.order - 2)
-        # rows for velocity constraints
-        for i, c in enumerate(self.velocity_constraints):
-            self.height += c.control_horizon
-        # row for constraint error
-        self.height += len(self.constraints)
-
-    def _compute_width(self):
-        # columns for joint vel/acc/jerk symbols
-        self.width = self.number_of_joints * self.prediction_horizon * (self.order - 1)
-        # columns for velocity constraints
-        for i, c in enumerate(self.velocity_constraints):
-            self.width += c.control_horizon
-        # slack variable for constraint error
-        self.width += len(self.constraints)
-        # constraints for getting out of hard limits
-        # if self.default_limits:
-        #     self.width += self.num_position_limits()
+class EqualityModel(ProblemDataPart):
+    """
+    Format:
+        last free variable velocity
+        0
+        last free variable acceleration
+        0
+        equality_constraint_bounds
+    """
 
     @property
-    def number_of_joints(self):
+    def number_of_free_variables(self):
         return len(self.free_variables)
+
+    def equality_constraint_expressions(self) -> List[cas.Expression]:
+        return self._sorter({c.name: c.expression for c in self.equality_constraints})[0]
+
+    def get_free_variable_symbols(self, order: Derivatives) -> List[cas.Symbol]:
+        return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
+
+    @property
+    def number_of_non_slack_columns(self):
+        return self.number_of_free_variables * self.prediction_horizon * self.max_derivative
+
+    @profile
+    def derivative_link_model(self) -> cas.Expression:
+        """
+        |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   | prediction horizon
+        |v1 v2 v3|v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|j1 j2 j3| free variables / slack
+        |--------------------------------------------------------------------------------|
+        | 1      |        |        |-sp     |        |        |        |        |        | # v_n - a_n * dt = last vel
+        |    1   |        |        |   -sp  |        |        |        |        |        | = last velocity
+        |       1|        |        |     -sp|        |        |        |        |        |
+        |--------------------------------------------------------------------------------|
+        |-1      | 1      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
+        |   -1   |    1   |        |        |   -sp  |        |        |        |        | = 0
+        |      -1|       1|        |        |     -sp|        |        |        |        |
+        |--------------------------------------------------------------------------------|
+        |        |-1      | 1      |        |        |-sp     |        |        |        | # -v_c + v_n - a_n * dt = 0
+        |        |   -1   |    1   |        |        |   -sp  |        |        |        | = 0
+        |        |      -1|       1|        |        |     -sp|        |        |        |
+        |================================================================================|
+        |        |        |        | 1      |        |        |-sp     |        |        | # a_n - j_n * dt = last acc
+        |        |        |        |    1   |        |        |   -sp  |        |        | = last acceleration
+        |        |        |        |       1|        |        |     -sp|        |        |
+        |--------------------------------------------------------------------------------|
+        |        |        |        |-1      | 1      |        |        |-sp     |        | # -a_c + a_n - j_n * dt = 0
+        |        |        |        |   -1   |    1   |        |        |   -sp  |        | = 0
+        |        |        |        |      -1|       1|        |        |     -sp|        |
+        |--------------------------------------------------------------------------------|
+        |        |        |        |        |-1      | 1      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
+        |        |        |        |        |   -1   |    1   |        |        |   -sp  | = 0
+        |        |        |        |        |      -1|       1|        |        |     -sp|
+        |--------------------------------------------------------------------------------|
+        x_n - xd_n * dt = x_c
+        - x_c + x_n - xd_n * dt = 0
+        """
+        num_rows = self.number_of_free_variables * self.prediction_horizon * (self.max_derivative - 1)
+        num_columns = self.number_of_free_variables * self.prediction_horizon * self.max_derivative
+        derivative_link_model = cas.zeros(num_rows, num_columns)
+
+        x_n = cas.eye(num_rows)
+        derivative_link_model[:, :x_n.shape[0]] += x_n
+
+        xd_n = -cas.eye(num_rows) * self.dt
+        h_offset = self.number_of_free_variables * self.prediction_horizon
+        derivative_link_model[:, h_offset:] += xd_n
+
+        x_c_height = self.number_of_free_variables * (self.prediction_horizon - 1)
+        x_c = -cas.eye(x_c_height)
+        offset_v = 0
+        offset_h = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
+            offset_v += self.number_of_free_variables
+            derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
+            offset_v += x_c_height
+            offset_h += self.prediction_horizon * self.number_of_free_variables
+        return derivative_link_model
+
+    @profile
+    def equality_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
+        """
+        |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   | prediction horizon
+        |v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|s1 s2 s3|s1 s2 s3| free variables / slack
+        |-----------------------------------------------------------------------|
+        |  J1*sp |  J1*sp |  J2*sp |  J2*sp |  J3*sp | J3*sp  | sp*ch  | sp*ch  |
+        |-----------------------------------------------------------------------|
+        """
+        if len(self.equality_constraints) > 0:
+            model = cas.zeros(len(self.equality_constraints), self.number_of_non_slack_columns)
+            for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
+                J_eq = cas.jacobian(expressions=cas.Expression(self.equality_constraint_expressions()),
+                                    symbols=self.get_free_variable_symbols(derivative)) * self.dt
+                J_hstack = cas.hstack([J_eq for _ in range(self.prediction_horizon)])
+                # set jacobian entry to 0 if control horizon shorter than prediction horizon
+                for i, c in enumerate(self.equality_constraints):
+                    # offset = vertical_offset + i
+                    J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
+                horizontal_offset = J_hstack.shape[1]
+                model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_hstack
+
+            # slack variable for total error
+            slack_model = cas.diag(cas.Expression([self.dt * c.control_horizon for c in self.equality_constraints]))
+            return model, slack_model
+        return cas.Expression(), cas.Expression()
+
+    @profile
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        derivative_link_model = self.derivative_link_model()
+        equality_constraint_model, equality_constraint_slack_model = self.equality_constraint_model()
+
+        model_parts = []
+        slack_model_parts = []
+        if len(derivative_link_model) > 0:
+            model_parts.append(derivative_link_model)
+        if len(equality_constraint_model) > 0:
+            model_parts.append(equality_constraint_model)
+            slack_model_parts.append(equality_constraint_slack_model)
+        model = cas.vstack(model_parts)
+        slack_model = cas.vstack(slack_model_parts)
+
+        slack_model = cas.vstack([cas.zeros(derivative_link_model.shape[0],
+                                            slack_model.shape[1]),
+                                  slack_model])
+        # todo replace hack?
+        return model, slack_model
+
+
+class InequalityModel(ProblemDataPart):
+    """
+    Format:
+        free variable position constraints
+        velocity constraints
+        acceleration constraints
+        jerk constraints
+        inequality constraints
+    """
+
+    @property
+    def number_of_free_variables(self):
+        return len(self.free_variables)
+
+    @property
+    def number_of_non_slack_columns(self):
+        return self.number_of_free_variables * self.prediction_horizon * self.max_derivative
 
     @memoize
     def num_position_limits(self):
-        return self.number_of_joints - self.num_of_continuous_joints()
+        return self.number_of_free_variables - self.num_of_continuous_joints()
 
     @memoize
     def num_of_continuous_joints(self):
         return len([v for v in self.free_variables if not v.has_position_limits()])
 
-    def get_constraint_expressions(self):
-        return self._sorter({c.name: c.expression for c in self.constraints})[0]
+    def inequality_constraint_expressions(self) -> List[cas.Expression]:
+        return self._sorter({c.name: c.expression for c in self.inequality_constraints})[0]
 
-    def get_velocity_constraint_expressions(self):
-        return self._sorter({c.name: c.expression for c in self.velocity_constraints})[0]
+    def get_derivative_constraint_expressions(self, derivative: Derivatives):
+        return self._sorter({c.name: c.expression for c in self.derivative_constraints if c.derivative == derivative})[
+            0]
 
-    def get_free_variable_symbols(self, order):
+    def get_free_variable_symbols(self, order: Derivatives):
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
 
-    @profile
-    def construct_A(self):
-        #         |   t1   |   tn   |   t1   |   tn   |   t1   |   tn   |   t1   |   tn   |
-        #         |v1 v2 vn|v1 v2 vn|a1 a2 an|a1 a2 an|j1 j2 jn|j1 j2 jn|s1 s2 sn|s1 s2 sn|
-        #         |-----------------------------------------------------------------------|
-        #         |sp      |        |        |        |        |        |        |        |
-        #         |   sp   |        |        |        |        |        |        |        |
-        #         |      sp|        |        |        |        |        |        |        |
-        #         |-----------------------------------------------------------------------|
-        #         |sp      |sp      |        |        |        |        |        |        |
-        #         |   sp   |   sp   |        |        |        |        |        |        |
-        #         |      sp|      sp|        |        |        |        |        |        |
-        #         |=======================================================================|
-        #         | 1      |        |-sp     |        |        |        |        |        |
-        #         |    1   |        |   -sp  |        |        |        |        |        |
-        #         |       1|        |     -sp|        |        |        |        |        |
-        #         |-----------------------------------------------------------------------|
-        #         |-1      | 1      |        |-sp     |        |        |        |        |
-        #         |   -1   |    1   |        |   -sp  |        |        |        |        |
-        #         |      -1|       1|        |     -sp|        |        |        |        |
-        #         |=======================================================================|
-        #         |        |        | 1      |        |-sp     |        |-sp     |        |
-        #         |        |        |    1   |        |   -sp  |        |   -sp  |        |
-        #         |        |        |       1|        |     -sp|        |     -sp|        |
-        #         |-----------------------------------------------------------------------|
-        #         |        |        |-1      | 1      |        |-sp     |        |-sp     |
-        #         |        |        |   -1   |    1   |        |   -sp  |        |   -sp  |
-        #         |        |        |      -1|       1|        |     -sp|        |     -sp|
-        #         |=======================================================================|
-        #         |  J*sp  |        |        |        |        |        |   sp   |        |
-        #         |-----------------------------------------------------------------------|
-        #         |        |  J*sp  |        |        |        |        |        |   sp   |
-        #         |-----------------------------------------------------------------------|
-        #         |  J*sp  |  J*sp  |        |        |        |        | sp*ph  | sp*ph  |
-        #         |-----------------------------------------------------------------------|
-
-        #         |   t1   |   t2   |   t3   |   t3   |
-        #         |v1 v2 vn|v1 v2 vn|v1 v2 vn|v1 v2 vn|
-        #         |-----------------------------------|
-        #         |sp      |        |        |        |
-        #         |   sp   |        |        |        |
-        #         |      sp|        |        |        |
-        #         |sp      |sp      |        |        |
-        #         |   sp   |   sp   |        |        |
-        #         |      sp|      sp|        |        |
-        #         |sp      |sp      |sp      |        |
-        #         |   sp   |   sp   |   sp   |        |
-        #         |      sp|      sp|      sp|        |
-        #         |sp      |sp      |sp      |sp      |
-        #         |   sp   |   sp   |   sp   |   sp   |
-        #         |      sp|      sp|      sp|      sp|
-        #         |===================================|
-        number_of_joints = self.number_of_joints
-        A_soft = w.zeros(
-            self.prediction_horizon * number_of_joints +  # joint position constraints
-            number_of_joints * self.prediction_horizon * (self.order - 2) +  # links
-            len(self.velocity_constraints) * (self.prediction_horizon) +  # velocity constraints
-            len(self.constraints),  # constraints
-            # (self.num_position_limits() if self.default_limits else 0) +  # weights for position limits
-            number_of_joints * self.prediction_horizon * (self.order - 1) +
-            len(self.velocity_constraints) * self.prediction_horizon + len(self.constraints)
-        )
-        t = time()
-        J_vel = []
-        J_err = []
-        for order in range(self.order):
-            J_vel.append(w.jacobian(expressions=w.Expression(self.get_velocity_constraint_expressions()),
-                                    symbols=self.get_free_variable_symbols(order),
-                                    order=1) * self.sample_period)
-            J_err.append(w.jacobian(expressions=w.Expression(self.get_constraint_expressions()),
-                                    symbols=self.get_free_variable_symbols(order),
-                                    order=1) * self.sample_period)
-        jac_time = time() - t
-        logging.loginfo('computed Jacobian in {:.5f}s'.format(jac_time))
-        # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
-        # logging.loginfo('computed Jacobian dot in {:.5f}s'.format(time() - t))
-        self.time_collector.jacobians.append(jac_time)
-
-        # position limits
-        vertical_offset = number_of_joints * self.prediction_horizon
+    def position_limit_model(self) -> cas.Expression:
+        """
+        |   t1   |   t2   |   t3   |   t4   |
+        |v1 v2 vn|v1 v2 vn|v1 v2 vn|v1 v2 vn|
+        |-----------------------------------|
+        |sp      |        |        |        |
+        |   sp   |        |        |        |
+        |      sp|        |        |        |
+        |sp      |sp      |        |        |
+        |   sp   |   sp   |        |        |
+        |      sp|      sp|        |        |
+        |sp      |sp      |sp      |        |
+        |   sp   |   sp   |   sp   |        |
+        |      sp|      sp|      sp|        |
+        |sp      |sp      |sp      |sp      |
+        |   sp   |   sp   |   sp   |   sp   |
+        |      sp|      sp|      sp|      sp|
+        |===================================|
+        """
+        model = cas.zeros(self.number_of_free_variables * self.prediction_horizon,
+                          self.number_of_non_slack_columns)
+        # assume all joints have position limits
         for p in range(1, self.prediction_horizon + 1):
-            matrix_size = number_of_joints * p
-            I = w.eye(matrix_size) * self.sample_period
-            start = vertical_offset - matrix_size
-            A_soft[start:vertical_offset, :matrix_size] += I
+            matrix_size = self.number_of_free_variables * p
+            I = cas.eye(matrix_size) * self.dt
+            model[-matrix_size:, :matrix_size] += I
 
-        # derivative links
-        block_size = number_of_joints * (self.order - 2) * self.prediction_horizon
-        I = w.eye(block_size)
-        A_soft[vertical_offset:vertical_offset + block_size, :block_size] += I
-        h_offset = number_of_joints * self.prediction_horizon
-        A_soft[vertical_offset:vertical_offset + block_size, h_offset:h_offset + block_size] += -I * self.sample_period
-
-        I_height = number_of_joints * (self.prediction_horizon - 1)
-        I = -w.eye(I_height)
-        offset_v = vertical_offset
-        offset_h = 0
-        for o in range(self.order - 2):
-            offset_v += number_of_joints
-            A_soft[offset_v:offset_v + I_height, offset_h:offset_h + I_height] += I
-            offset_v += I_height
-            offset_h += self.prediction_horizon * number_of_joints
-        vertical_offset = vertical_offset + block_size
-
-        # constraints
-        # TODO i don't need vel checks for the last 2 entries because the have to be zero with current B's
-        # velocity limits
-        next_vertical_offset = vertical_offset
-        for order in range(self.order - 1):
-            J_vel_tmp = J_vel[order]
-            J_vel_limit_block = w.kron(w.eye(self.prediction_horizon), J_vel_tmp)
-            horizontal_offset = J_vel_limit_block.shape[1]
-            if order == 0:
-                next_vertical_offset = vertical_offset + J_vel_limit_block.shape[0]
-            A_soft[vertical_offset:next_vertical_offset,
-            horizontal_offset * order:horizontal_offset * (order + 1)] = J_vel_limit_block
-        # velocity constraint slack
-        I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
-        if J_err[0].shape[0] > 0:
-            A_soft[vertical_offset:next_vertical_offset, -I.shape[1] - J_err[0].shape[0]:-J_err[0].shape[0]] = I
-        else:
-            A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
-        # delete rows if control horizon of constraint shorter than prediction horizon
+        # delete rows corresponding to joints without limits
         rows_to_delete = []
-        for t in range(self.prediction_horizon):
-            for i, c in enumerate(self.velocity_constraints):
-                index = vertical_offset + i + (t * len(self.velocity_constraints))
-                if t + 1 > c.control_horizon:
-                    rows_to_delete.append(index)
+        for variable_index, free_variable in enumerate(self.free_variables):
+            if not free_variable.has_position_limits():
+                for p in range(self.prediction_horizon):
+                    rows_to_delete.append(variable_index + len(self.free_variables) * p)
+        model.remove(rows_to_delete, [])
+        return model
 
-        # delete columns where control horizon is shorter than prediction horizon
-        columns_to_delete = []
-        horizontal_offset = A_soft.shape[1] - I.shape[1] - J_err[0].shape[0]
-        for t in range(self.prediction_horizon):
-            for i, c in enumerate(self.velocity_constraints):
-                index = horizontal_offset + (t * len(self.velocity_constraints)) + i
-                if t + 1 > c.control_horizon:
-                    columns_to_delete.append(index)
+    def velocity_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
+        """
+        model
+        |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   | prediction horizon
+        |v1 v2 v3|v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|j1 j2 j3| free variables
+        |--------------------------------------------------------------------------------|
+        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |        |
+        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |        |
+        |--------------------------------------------------------------------------------|
+        |        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |
+        |        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |
+        |--------------------------------------------------------------------------------|
 
-        # J stack for total error
-        if len(self.constraints) > 0:
-            for order in range(self.order - 1):
-                J_hstack = w.hstack([J_err[order] for _ in range(self.prediction_horizon)])
-                if order == 0:
-                    vertical_offset = next_vertical_offset
-                    next_vertical_offset = vertical_offset + J_hstack.shape[0]
+        slack model
+        |   t1 |   t2 | prediction horizon
+        |s1 s2 |s1 s2 | slack
+        |------|------|
+        |sp    |      | vel constr 1
+        |   sp |      | vel constr 2
+        |-------------|
+        |      |sp    | vel constr 1
+        |      |   sp | vel constr 2
+        |-------------|
+        """
+        number_of_vel_rows = len(self.velocity_constraints) * self.prediction_horizon
+        if number_of_vel_rows > 0:
+            expressions = cas.Expression(self.get_derivative_constraint_expressions(Derivatives.velocity))
+            model = cas.zeros(number_of_vel_rows, self.number_of_non_slack_columns)
+            for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
+                J_vel = cas.jacobian(expressions=expressions,
+                                     symbols=self.get_free_variable_symbols(derivative)) * self.dt
+                J_vel_limit_block = cas.kron(cas.eye(self.prediction_horizon), J_vel)
+                horizontal_offset = self.number_of_free_variables * self.prediction_horizon
+                model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_vel_limit_block
+
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            rows_to_delete = []
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_constraints):
+                    v_index = i + (t * len(self.velocity_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+            model.remove(rows_to_delete, [])
+
+            # constraint slack
+            num_slack_variables = sum(c.control_horizon for c in self.velocity_constraints)
+            slack_model = cas.eye(num_slack_variables) * self.dt
+            return model, slack_model
+        return cas.Expression(), cas.Expression()
+
+    def acceleration_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
+        """
+        same structure as vel constraint model
+        task acceleration = Jd_q * qd + (J_q + Jd_qd) * qdd + J_qd * qddd
+        """
+        # FIXME no test case for this so probably buggy
+        number_of_acc_rows = len(self.acceleration_constraints) * self.prediction_horizon
+        if number_of_acc_rows > 0:
+            expressions = cas.Expression(self.get_derivative_constraint_expressions(Derivatives.acceleration))
+            assert self.max_derivative >= Derivatives.jerk
+            model = cas.zeros(number_of_acc_rows, self.number_of_non_slack_columns)
+            J_q = cas.jacobian(expressions=expressions,
+                               symbols=self.get_free_variable_symbols(Derivatives.position)) * self.dt
+            Jd_q = cas.jacobian_dot(expressions=expressions,
+                                    symbols=self.get_free_variable_symbols(Derivatives.position),
+                                    symbols_dot=self.get_free_variable_symbols(Derivatives.velocity)) * self.dt
+            J_qd = cas.jacobian(expressions=expressions,
+                                symbols=self.get_free_variable_symbols(Derivatives.velocity)) * self.dt
+            Jd_qd = cas.jacobian_dot(expressions=expressions,
+                                     symbols=self.get_free_variable_symbols(Derivatives.velocity),
+                                     symbols_dot=self.get_free_variable_symbols(
+                                         Derivatives.acceleration)) * self.dt
+            J_vel_block = cas.kron(cas.eye(self.prediction_horizon), Jd_q)
+            J_acc_block = cas.kron(cas.eye(self.prediction_horizon), J_q + Jd_qd)
+            J_jerk_block = cas.kron(cas.eye(self.prediction_horizon), J_qd)
+            horizontal_offset = self.number_of_free_variables * self.prediction_horizon
+            model[:, :horizontal_offset] = J_vel_block
+            model[:, horizontal_offset:horizontal_offset * 2] = J_acc_block
+            model[:, horizontal_offset * 2:horizontal_offset * 3] = J_jerk_block
+
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            rows_to_delete = []
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_constraints):
+                    v_index = i + (t * len(self.velocity_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+            model.remove(rows_to_delete, [])
+
+            # slack model
+            num_slack_variables = sum(c.control_horizon for c in self.acceleration_constraints)
+            slack_model = cas.eye(num_slack_variables) * self.dt
+            return model, slack_model
+        return cas.Expression(), cas.Expression()
+
+    def jerk_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
+        """
+        same structure as vel constraint model
+        task acceleration = Jd_q * qd + (J_q + Jd_qd) * qdd + J_qd * qddd
+        """
+        # FIXME no test case for this so probably buggy
+        number_of_jerk_rows = len(self.jerk_constraints) * self.prediction_horizon
+        if number_of_jerk_rows > 0:
+            expressions = cas.Expression(self.get_derivative_constraint_expressions(Derivatives.jerk))
+            assert self.max_derivative >= Derivatives.snap
+            model = cas.zeros(number_of_jerk_rows, self.number_of_non_slack_columns)
+            J_q = self.dt * cas.jacobian(expressions=expressions,
+                                         symbols=self.get_free_variable_symbols(Derivatives.position))
+            Jd_q = self.dt * cas.jacobian_dot(expressions=expressions,
+                                              symbols=self.get_free_variable_symbols(Derivatives.position),
+                                              symbols_dot=self.get_free_variable_symbols(Derivatives.velocity))
+            Jdd_q = self.dt * cas.jacobian_ddot(expressions=expressions,
+                                                symbols=self.get_free_variable_symbols(Derivatives.position),
+                                                symbols_dot=self.get_free_variable_symbols(Derivatives.velocity),
+                                                symbols_ddot=self.get_free_variable_symbols(Derivatives.acceleration))
+            J_qd = self.dt * cas.jacobian(expressions=expressions,
+                                          symbols=self.get_free_variable_symbols(Derivatives.velocity))
+            Jd_qd = self.dt * cas.jacobian_dot(expressions=expressions,
+                                               symbols=self.get_free_variable_symbols(Derivatives.velocity),
+                                               symbols_dot=self.get_free_variable_symbols(Derivatives.acceleration))
+            Jdd_qd = self.dt * cas.jacobian_ddot(expressions=expressions,
+                                                 symbols=self.get_free_variable_symbols(Derivatives.velocity),
+                                                 symbols_dot=self.get_free_variable_symbols(Derivatives.acceleration),
+                                                 symbols_ddot=self.get_free_variable_symbols(Derivatives.jerk))
+            J_vel_block = cas.kron(cas.eye(self.prediction_horizon), Jdd_q)
+            J_acc_block = cas.kron(cas.eye(self.prediction_horizon), 2 * Jd_q + Jdd_qd)
+            J_jerk_block = cas.kron(cas.eye(self.prediction_horizon), J_q + 2 * Jd_qd)
+            J_snap_block = cas.kron(cas.eye(self.prediction_horizon), J_qd)
+            horizontal_offset = self.number_of_free_variables * self.prediction_horizon
+            model[:, :horizontal_offset] = J_vel_block
+            model[:, horizontal_offset:horizontal_offset * 2] = J_acc_block
+            model[:, horizontal_offset * 2:horizontal_offset * 3] = J_jerk_block
+            model[:, horizontal_offset * 3:horizontal_offset * 4] = J_snap_block
+
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            rows_to_delete = []
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_constraints):
+                    v_index = i + (t * len(self.velocity_constraints))
+                    if t + 1 > c.control_horizon:
+                        rows_to_delete.append(v_index)
+            model.remove(rows_to_delete, [])
+
+            # slack model
+            num_slack_variables = sum(c.control_horizon for c in self.jerk_constraints)
+            slack_model = cas.eye(num_slack_variables) * self.dt
+            return model, slack_model
+        return cas.Expression(), cas.Expression()
+
+    @profile
+    def inequality_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
+        """
+        |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   | prediction horizon
+        |v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|s1 s2 s3|s1 s2 s3| free variables / slack
+        |-----------------------------------------------------------------------|
+        |  J1*sp |  J1*sp |  J2*sp |  J2*sp |  J3*sp | J3*sp  | sp*ch  | sp*ch  |
+        |-----------------------------------------------------------------------|
+        """
+        if len(self.inequality_constraints) > 0:
+            model = cas.zeros(len(self.inequality_constraints), self.number_of_non_slack_columns)
+            for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
+                J_neq = cas.jacobian(expressions=cas.Expression(self.inequality_constraint_expressions()),
+                                     symbols=self.get_free_variable_symbols(derivative)) * self.dt
+                J_hstack = cas.hstack([J_neq for _ in range(self.prediction_horizon)])
                 # set jacobian entry to 0 if control horizon shorter than prediction horizon
-                for i, c in enumerate(self.constraints):
-                    # offset = vertical_offset + i
+                for i, c in enumerate(self.inequality_constraints):
                     J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
                 horizontal_offset = J_hstack.shape[1]
-                A_soft[vertical_offset:next_vertical_offset,
-                horizontal_offset * (order):horizontal_offset * (order + 1)] = J_hstack
+                model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_hstack
 
-                # sum of vel slack for total error
-                # I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
-                #            w.eye(J_hstack.shape[0])) * self.sample_period
-                # A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
-            # extra slack variable for total error
-            I = w.eye(J_hstack.shape[0]) * self.sample_period * self.prediction_horizon
-            A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
+            # slack variable for total error
+            slack_model = cas.diag(cas.Expression([self.dt * c.control_horizon for c in self.inequality_constraints]))
+            return model, slack_model
+        return cas.Expression(), cas.Expression()
 
-        # delete rows with position limits of continuous joints
-        continuous_joint_indices = [i for i, v in enumerate(self.free_variables) if not v.has_position_limits()]
-        for o in range(self.prediction_horizon):
-            for i in continuous_joint_indices:
-                rows_to_delete.append(i + len(self.free_variables) * (o))
+    @profile
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        position_limit_model = self.position_limit_model()
+        vel_constr_model, vel_constr_slack_model = self.velocity_constraint_model()
+        acc_constr_model, acc_constr_slack_model = self.acceleration_constraint_model()
+        jerk_constr_model, jerk_constr_slack_model = self.jerk_constraint_model()
+        inequality_model, inequality_slack_model = self.inequality_constraint_model()
+        model_parts = []
+        slack_model_parts = []
+        if len(position_limit_model) > 0:
+            model_parts.append(position_limit_model)
+        if len(vel_constr_model) > 0:
+            model_parts.append(vel_constr_model)
+            slack_model_parts.append(vel_constr_slack_model)
+        if len(acc_constr_model) > 0:
+            model_parts.append(acc_constr_model)
+            slack_model_parts.append(acc_constr_slack_model)
+        if len(jerk_constr_model) > 0:
+            model_parts.append(jerk_constr_model)
+            slack_model_parts.append(jerk_constr_slack_model)
+        if len(inequality_model) > 0:
+            model_parts.append(inequality_model)
+            slack_model_parts.append(inequality_slack_model)
 
-        A_soft.remove(rows_to_delete, [])
-        A_soft.remove([], columns_to_delete)
-
-        # position constraints if limits are violated
-        # if self.default_limits:
-        #     A_soft[0:self.num_position_limits() * self.prediction_horizon,
-        #     self.prediction_horizon:self.num_position_limits] = w.eye(self.num_position_limits())
-        # hack = blackboard_god_map().to_symbol(identifier.hack)
-        # A_soft = w.ca.substitute(A_soft, hack, 1)
-        return A_soft
-
-    def A(self):
-        return self.construct_A()
+        combined_model = cas.vstack(model_parts)
+        combined_slack_model = cas.diag_stack(slack_model_parts)
+        combined_slack_model = cas.vstack([cas.zeros(position_limit_model.shape[0],
+                                                     combined_slack_model.shape[1]),
+                                           combined_slack_model])
+        return combined_model, combined_slack_model
 
 
-class QPController:
+available_solvers: Dict[SupportedQPSolver, Type[QPSolver]] = {}
+
+
+def detect_solvers():
+    global available_solvers
+    solver_name: str
+    qp_solver_class: Type[QPSolver]
+    for solver_name, qp_solver_class in get_all_classes_in_package('giskardpy.qp', QPSolver, silent=True).items():
+        try:
+            available_solvers[qp_solver_class.solver_id] = qp_solver_class
+        except Exception:
+            pass
+    solver_names = [str(solver_name).split('.')[1] for solver_name in available_solvers.keys()]
+    logging.loginfo(f'Found these qp solvers: {solver_names}')
+
+
+detect_solvers()
+
+
+# class qpSWIFTBuilder:
+#     def __init__(self):
+
+
+class QPProblemBuilder:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
-    time_collector: TimeCollector
-    debug_expressions: Dict[str, w.all_expressions]
-    compiled_debug_expressions: Dict[str, w.CompiledFunction]
+    debug_expressions: Dict[str, cas.all_expressions]
+    compiled_debug_expressions: Dict[str, cas.CompiledFunction]
     evaluated_debug_expressions: Dict[str, np.ndarray]
+    inequality_constraints: List[InequalityConstraint]
+    equality_constraints: List[EqualityConstraint]
+    derivative_constraints: List[DerivativeInequalityConstraint]
+    weights: Weights
+    free_variable_bounds: FreeVariableBounds
+    equality_model: EqualityModel
+    equality_bounds: EqualityBounds
+    inequality_model: InequalityModel
+    inequality_bounds: InequalityBounds
+    qp_solver: QPSolver
 
     def __init__(self,
                  sample_period: float,
                  prediction_horizon: int,
-                 solver_name: str,
+                 solver_id: Optional[SupportedQPSolver] = None,
                  free_variables: List[FreeVariable] = None,
-                 constraints: List[Constraint] = None,
-                 velocity_constraints: List[VelocityConstraint] = None,
-                 debug_expressions: Dict[str, Union[w.Symbol, float]] = None,
+                 equality_constraints: List[EqualityConstraint] = None,
+                 inequality_constraints: List[InequalityConstraint] = None,
+                 derivative_constraints: List[DerivativeInequalityConstraint] = None,
+                 debug_expressions: Dict[str, Union[cas.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
-                 retry_weight_factor: float = 100,
-                 time_collector: TimeCollector = None):
-        self.time_collector = time_collector
+                 retry_weight_factor: float = 100):
         self.free_variables = []
-        self.constraints = []
-        self.velocity_constraints = []
+        self.equality_constraints = []
+        self.inequality_constraints = []
+        self.derivative_constraints = []
         self.debug_expressions = {}
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
@@ -612,30 +1025,30 @@ class QPController:
         self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
-        if constraints is not None:
-            self.add_constraints(constraints)
-        if velocity_constraints is not None:
-            self.add_velocity_constraints(velocity_constraints)
+        if inequality_constraints is not None:
+            self.add_inequality_constraints(inequality_constraints)
+        if equality_constraints is not None:
+            self.add_equality_constraints(equality_constraints)
+        if derivative_constraints is not None:
+            self.add_derivative_constraints(derivative_constraints)
         if debug_expressions is not None:
             self.add_debug_expressions(debug_expressions)
 
-        qp_solver_class: Type[QPSolver]
-        if solver_name == SupportedQPSolver.gurobi:
-            from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            qp_solver_class = QPSolverGurobi
-        elif solver_name == SupportedQPSolver.cplex:
-            from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            qp_solver_class = QPSolverCplex
+        if solver_id is not None:
+            self.qp_solver_class = available_solvers[solver_id]
         else:
-            from giskardpy.qp.qp_solver_qpoases import QPSolverQPOases
-            qp_solver_class = QPSolverQPOases
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
-        self.qp_solver = qp_solver_class(num_non_slack=num_non_slack,
-                                         retry_added_slack=self.retry_added_slack,
-                                         retry_weight_factor=self.retry_weight_factor,
-                                         retries_with_relaxed_constraints=self.retries_with_relaxed_constraints)
-        logging.loginfo(f'Using QP Solver \'{solver_name}\'')
+            for solver_id in SupportedQPSolver:
+                if solver_id in available_solvers:
+                    self.qp_solver_class = available_solvers[solver_id]
+                    break
+            else:
+                raise QPSolverException(f'No qp solver found')
+
+        # num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
+
+        logging.loginfo(f'Using QP Solver \'{solver_id.name}\'')
         logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
+        self.qp_solver = self.compile(self.qp_solver_class)
 
     def add_free_variables(self, free_variables):
         """
@@ -646,7 +1059,7 @@ class QPController:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = min(self.prediction_horizon + 1, max(v.order for v in self.free_variables))
+        self.order = Derivatives(min(self.prediction_horizon, max(v.order for v in self.free_variables)))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def get_free_variable(self, name):
@@ -659,27 +1072,30 @@ class QPController:
                 return v
         raise KeyError(f'No free variable with name: {name}')
 
-    def add_constraints(self, constraints):
-        """
-        :type constraints: list
-        """
-        self.constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
+    def add_inequality_constraints(self, constraints: List[InequalityConstraint]):
+        self.inequality_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-        for c in self.constraints:
+        for c in self.inequality_constraints:
             c.control_horizon = min(c.control_horizon, self.prediction_horizon)
             self.check_control_horizon(c)
 
-    def add_velocity_constraints(self, constraints):
-        """
-        :type constraints: list
-        """
-        self.velocity_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
+    def add_equality_constraints(self, constraints: List[EqualityConstraint]):
+        self.equality_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-        for c in self.velocity_constraints:
+        for c in self.equality_constraints:
+            c.control_horizon = min(c.control_horizon, self.prediction_horizon)
+            self.check_control_horizon(c)
+
+    def add_derivative_constraints(self, constraints: List[DerivativeInequalityConstraint]):
+        self.derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
+        l = [x.name for x in constraints]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
+        for c in self.derivative_constraints:
             self.check_control_horizon(c)
 
     def check_control_horizon(self, constraint):
@@ -701,27 +1117,43 @@ class QPController:
         self.debug_expressions.update(debug_expressions)
 
     @profile
-    def compile(self):
-        self._construct_big_ass_M(default_limits=False)
-        self._compile_big_ass_M()
+    def compile(self, solver_class: Type[QPSolver], default_limits: bool = False) -> QPSolver:
+        logging.loginfo('Creating controller')
+        kwargs = {'free_variables': self.free_variables,
+                  'equality_constraints': self.equality_constraints,
+                  'inequality_constraints': self.inequality_constraints,
+                  'derivative_constraints': self.derivative_constraints,
+                  'sample_period': self.sample_period,
+                  'prediction_horizon': self.prediction_horizon,
+                  'max_derivative': self.order}
+        self.weights = Weights(**kwargs)
+        self.free_variable_bounds = FreeVariableBounds(**kwargs)
+        self.equality_model = EqualityModel(**kwargs)
+        self.equality_bounds = EqualityBounds(**kwargs)
+        self.inequality_model = InequalityModel(**kwargs)
+        self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
+
+        weights, g = self.weights.construct_expression()
+        lb, ub = self.free_variable_bounds.construct_expression()
+        A, A_slack = self.inequality_model.construct_expression()
+        lbA, ubA = self.inequality_bounds.construct_expression()
+        E, E_slack = self.equality_model.construct_expression()
+        bE = self.equality_bounds.construct_expression()
+
+        qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
+                                 E=E, E_slack=E_slack, bE=bE,
+                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+        logging.loginfo('Done compiling controller:')
+        logging.loginfo(f'  #free variables: {weights.shape[0]}')
+        logging.loginfo(f'  #equality constraints: {bE.shape[0]}')
+        logging.loginfo(f'  #inequality constraints: {lbA.shape[0]}')
         self._compile_debug_expressions()
+        return qp_solver
 
     def get_parameter_names(self):
-        return self.compiled_big_ass_M.str_params
-
-    @profile
-    def _compile_big_ass_M(self):
-        t = time()
-        free_symbols = w.free_symbols(self.big_ass_M)
-        # free_symbols = set(free_symbols)
-        # free_symbols = list(free_symbols)
-        self.compiled_big_ass_M = self.big_ass_M.compile(free_symbols)
-        compilation_time = time() - t
-        logging.loginfo(f'Compiled symbolic controller in {compilation_time:.5f}s')
-        self.time_collector.compilations.append(compilation_time)
+        return self.qp_solver.free_symbols_str
 
     def _compile_debug_expressions(self):
-        t = time()
         self.compiled_debug_expressions = {}
         free_symbols = set()
         for name, expr in self.debug_expressions.items():
@@ -729,8 +1161,9 @@ class QPController:
         free_symbols = list(free_symbols)
         for name, expr in self.debug_expressions.items():
             self.compiled_debug_expressions[name] = expr.compile(free_symbols)
-        compilation_time = time() - t
-        logging.loginfo(f'Compiled debug expressions in {compilation_time:.5f}s')
+        num_debug_expressions = len(self.compiled_debug_expressions)
+        if num_debug_expressions > 0:
+            logging.loginfo(f'  #debug expressions: {len(self.compiled_debug_expressions)}')
 
     def _are_joint_limits_violated(self, percentage: float = 0.0):
         joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]
@@ -761,14 +1194,19 @@ class QPController:
     def save_all_pandas(self):
         if hasattr(self, 'p_xdot') and self.p_xdot is not None:
             save_pandas(
-                [self.p_weights, self.p_A, self.p_Ax, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
-                 self.p_xdot],
-                ['weights', 'A', 'Ax', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
+                [self.p_weights, self.p_lb, self.p_ub,
+                 self.p_E, self.p_bE,
+                 self.p_A, self.p_lbA, self.p_ubA,
+                 self.p_debug, self.p_xdot],
+                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
                 self.god_map.get_data(identifier.tmp_folder))
         else:
             save_pandas(
-                [self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
-                ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
+                [self.p_weights, self.p_lb, self.p_ub,
+                 self.p_E, self.p_bE,
+                 self.p_A, self.p_lbA, self.p_ubA,
+                 self.p_debug],
+                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
                 self.god_map.get_data(identifier.tmp_folder))
 
     def _is_inf_in_data(self):
@@ -806,210 +1244,81 @@ class QPController:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(array)
 
-    def _init_big_ass_M(self):
-        self.big_ass_M = w.zeros(self.A.height + 3,
-                                 self.A.width + 2)
-        # self.debug_v = w.zeros(len(self.debug_expressions), 1)
-
-    def _set_A_soft(self, A_soft):
-        self.big_ass_M[:self.A.height, :self.A.width] = A_soft
-
-    def _set_weights(self, weights):
-        self.big_ass_M[self.A.height, :-2] = weights
-
-    def _set_lb(self, lb):
-        self.big_ass_M[self.A.height + 1, :-2] = lb
-
-    def _set_ub(self, ub):
-        self.big_ass_M[self.A.height + 2, :-2] = ub
-
-    def _set_lbA(self, lbA):
-        self.big_ass_M[:self.A.height, self.A.width] = lbA
-
-    def _set_ubA(self, ubA):
-        self.big_ass_M[:self.A.height, self.A.width + 1] = ubA
-
-    @profile
-    def _construct_big_ass_M(self, default_limits=False):
-        self.b = B(free_variables=self.free_variables,
-                   constraints=self.constraints,
-                   velocity_constraints=self.velocity_constraints,
-                   sample_period=self.sample_period,
-                   prediction_horizon=self.prediction_horizon,
-                   order=self.order,
-                   default_limits=default_limits)
-        self.H = H(free_variables=self.free_variables,
-                   constraints=self.constraints,
-                   velocity_constraints=self.velocity_constraints,
-                   sample_period=self.sample_period,
-                   prediction_horizon=self.prediction_horizon,
-                   order=self.order,
-                   default_limits=default_limits)
-        self.bA = BA(free_variables=self.free_variables,
-                     constraints=self.constraints,
-                     velocity_constraints=self.velocity_constraints,
-                     sample_period=self.sample_period,
-                     prediction_horizon=self.prediction_horizon,
-                     order=self.order,
-                     default_limits=default_limits)
-        self.A = A(free_variables=self.free_variables,
-                   constraints=self.constraints,
-                   velocity_constraints=self.velocity_constraints,
-                   sample_period=self.sample_period,
-                   prediction_horizon=self.prediction_horizon,
-                   order=self.order,
-                   time_collector=self.time_collector,
-                   default_limits=default_limits)
-
-        logging.loginfo(f'Constructing new controller with {self.A.height} constraints '
-                        f'and {self.A.width} free variables...')
-        self.time_collector.constraints.append(self.A.height)
-        self.time_collector.variables.append(self.A.width)
-
-        self._init_big_ass_M()
-
-        self._set_weights(w.Expression(self.H.weights()))
-        self._set_A_soft(self.A.A())
-        lbA, ubA = self.bA()
-        self._set_lbA(w.Expression(lbA))
-        self._set_ubA(w.Expression(ubA))
-        lb, ub = self.b()
-        self._set_lb(w.Expression(lb))
-        self._set_ub(w.Expression(ub))
-        self.np_g_filtered = np.zeros(self.H.width)
-        # self.debug_names = list(sorted(self.debug_expressions.keys()))
-        # self.debug_v = w.Expression([self.debug_expressions[name] for name in self.debug_names])
-
     @profile
     def eval_debug_exprs(self):
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
             params = self.god_map.get_values(f.str_params)
-            self.evaluated_debug_expressions[name] = f.call2(params).copy()
+            self.evaluated_debug_expressions[name] = f.fast_call(params).copy()
         return self.evaluated_debug_expressions
 
-    @profile
-    def update_filters(self):
-        b_filter = self.np_weights != 0
-        b_filter[:self.H.number_of_free_variables_with_horizon()] = True
-        # offset = self.H.number_of_free_variables_with_horizon() + self.H.number_of_constraint_vel_variables()
-        # map_ = self.H.make_error_id_to_vel_ids_map()
-        # for i in range(self.H.number_of_contraint_error_variables()):
-        #     index = i+offset
-        #     if not b_filter[index]:
-        #         b_filter[map_[index]] = False
-
-        bA_filter = np.ones(self.A.height, dtype=bool)
-        ll = self.H.number_of_constraint_vel_variables() + self.H.number_of_contraint_error_variables()
-        bA_filter[-ll:] = b_filter[-ll:]
-        self.b_filter = np.array(b_filter)
-        self.bA_filter = np.array(bA_filter)
-
     def __swap_compiled_matrices(self):
-        if not hasattr(self, 'compiled_big_ass_M_with_default_limits'):
+        if not hasattr(self, 'qp_solver_default_limits'):
             with suppress_stdout():
-                self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M
-                self._construct_big_ass_M(default_limits=True)
-                self._compile_big_ass_M()
-        else:
-            self.compiled_big_ass_M, \
-            self.compiled_big_ass_M_with_default_limits = self.compiled_big_ass_M_with_default_limits, \
-                                                          self.compiled_big_ass_M
+                self.qp_solver_default_limits = self.compile(self.qp_solver_class, default_limits=True)
+        self.qp_solver, self.qp_solver_default_limits = self.qp_solver_default_limits, self.qp_solver
 
     @property
     def traj_time_in_sec(self):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: list) -> derivative_joint_map:
+    def get_cmd(self, substitutions: np.ndarray) -> NextCommands:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
-        :param substitutions:
-        :return: joint name -> joint command
         """
-        self.evaluate_and_create_np_data(substitutions)
         try:
-            # self.__swap_compiled_matrices()
-            self.xdot_full = self.qp_solver.solve_and_retry(weights=self.np_weights_filtered,
-                                                            g=self.np_g_filtered,
-                                                            A=self.np_A_filtered,
-                                                            lb=self.np_lb_filtered,
-                                                            ub=self.np_ub_filtered,
-                                                            lbA=self.np_lbA_filtered,
-                                                            ubA=self.np_ubA_filtered)
-            # self.__swap_compiled_matrices()
+            self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas()
-            return self.split_xdot(self.xdot_full)
+            return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
+                                prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
             self.xdot_full = None
-            self._create_debug_pandas()
+            self._create_debug_pandas(self.qp_solver)
             joint_limits_violated_msg = self._are_joint_limits_violated()
             if joint_limits_violated_msg is not None:
+                logging.logwarn('Joint limits violated, trying to fix.')
                 self.__swap_compiled_matrices()
                 try:
-                    self.evaluate_and_create_np_data(substitutions)
-                    self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
-                                                          g=self.np_g_filtered,
-                                                          A=self.np_A_filtered,
-                                                          lb=self.np_lb_filtered,
-                                                          ub=self.np_ub_filtered,
-                                                          lbA=self.np_lbA_filtered,
-                                                          ubA=self.np_ubA_filtered)
-                    return self.split_xdot(self.xdot_full)
+                    self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
+                    return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
+                                        max_derivative=self.order, prediction_horizon=self.prediction_horizon)
                 except Exception as e2:
                     # self._create_debug_pandas()
                     # raise OutOfJointLimitsException(self._are_joint_limits_violated())
                     raise OutOfJointLimitsException(joint_limits_violated_msg)
                 finally:
                     self.__swap_compiled_matrices()
-            #         self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
+                    # self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
             self._are_hard_limits_violated(str(e_original))
-            self._is_inf_in_data()
+            # self._is_inf_in_data()
             raise
 
-    @profile
-    def evaluate_and_create_np_data(self, substitutions):
-        self.substitutions = substitutions
-        np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
-        self.np_weights = np_big_ass_M[self.A.height, :-2]
-        self.np_A = np_big_ass_M[:self.A.height, :self.A.width]
-        self.np_lb = np_big_ass_M[self.A.height + 1, :-2]
-        self.np_ub = np_big_ass_M[self.A.height + 2, :-2]
-        self.np_lbA = np_big_ass_M[:self.A.height, -2]
-        self.np_ubA = np_big_ass_M[:self.A.height, -1]
-
-        self.update_filters()
-        self.np_weights_filtered = self.np_weights[self.b_filter]
-        self.np_g_filtered = np.zeros(self.b_filter.shape[0])
-        self.np_A_filtered = self.np_A[self.bA_filter, :][:, self.b_filter]
-        self.np_lb_filtered = self.np_lb[self.b_filter]
-        self.np_ub_filtered = self.np_ub[self.b_filter]
-        self.np_lbA_filtered = self.np_lbA[self.bA_filter]
-        self.np_ubA_filtered = self.np_ubA[self.bA_filter]
-
     def _are_hard_limits_violated(self, error_message):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order - 1)
-        num_of_slack = len(self.np_lb_filtered) - num_non_slack
-        lb = self.np_lb_filtered.copy()
-        lb[-num_of_slack:] = -100
-        ub = self.np_ub_filtered.copy()
-        ub[-num_of_slack:] = 100
+        # num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order)
+        # num_of_slack = len(self.np_lb_filtered) - num_non_slack
+        # lb = self.np_lb_filtered.copy()
+        # lb[-num_of_slack:] = -100
+        # ub = self.np_ub_filtered.copy()
+        # ub[-num_of_slack:] = 100
+        # try:
+        #     self.xdot_full = self.qp_solver.solve_and_retry(weights=self.np_weights_filtered,
+        #                                           g=self.np_g_filtered,
+        #                                           A=self.np_A_filtered,
+        #                                           lb=self.np_lb_filtered,
+        #                                           ub=self.np_ub_filtered,
+        #                                           lbA=self.np_lbA_filtered,
+        #                                           ubA=self.np_ubA_filtered)
+        # except Exception as e:
+        #     logging.loginfo(f'Can\'t determine if hard constraints are violated: {e}.')
+        #     return False
+        # else:
+        self._create_debug_pandas(self.qp_solver)
         try:
-            self.xdot_full = self.qp_solver.solve(weights=self.np_weights_filtered,
-                                                  g=self.np_g_filtered,
-                                                  A=self.np_A_filtered,
-                                                  lb=self.np_lb_filtered,
-                                                  ub=self.np_ub_filtered,
-                                                  lbA=self.np_lbA_filtered,
-                                                  ubA=self.np_ubA_filtered)
-        except:
-            pass
-        else:
-            self._create_debug_pandas()
-            upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]
-            lower_violations = self.p_xdot[self.p_lb.data > self.p_xdot.data]
+            lower_violations = self.p_lb[self.qp_solver.lb_filter]
+            upper_violations = self.p_ub[self.qp_solver.ub_filter]
             if len(upper_violations) > 0 or len(lower_violations) > 0:
                 error_message += '\n'
                 if len(upper_violations) > 0:
@@ -1019,23 +1328,9 @@ class QPController:
                     error_message += 'lower slack bounds of following constraints might be too high: {}'.format(
                         list(lower_violations.index))
                 raise HardConstraintsViolatedException(error_message)
+        except AttributeError:
+            pass
         logging.loginfo('No slack limit violation detected.')
-        return False
-
-    def split_xdot(self, xdot) -> derivative_joint_map:
-        split = {}
-        offset = len(self.free_variables)
-        for derivative in range(self.order - 1):
-            split[Derivatives(derivative + 1)] = OrderedDict((x.position_name,
-                                                              xdot[i + offset * self.prediction_horizon * derivative])
-                                                             for i, x in enumerate(self.free_variables))
-        return split
-
-    def b_names(self):
-        return self.b.names
-
-    def bA_names(self):
-        return self.bA.names
 
     def _viz_mpc(self, joint_name):
         def pad(a, desired_length):
@@ -1083,22 +1378,14 @@ class QPController:
         plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self):
-        substitutions = self.substitutions
-        self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
+    def _create_debug_pandas(self, qp_solver):
+        weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
+        # substitutions = self.substitutions
+        # self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.sample_period
-        b_names = self.b_names()
-        bA_names = self.bA_names()
-        filtered_b_names = np.array(b_names)[self.b_filter]
-        filtered_bA_names = np.array(bA_names)[self.bA_filter]
-        # H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
-        # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
-        # num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
-        # num_of_slack = len(lb) - num_non_slack
-        num_vel_constr = len(self.velocity_constraints) * (self.prediction_horizon - 2)
-        num_task_constr = len(self.constraints)
-        num_constr = num_vel_constr + num_task_constr
-        # num_non_slack = l
+        self.free_variable_names = self.free_variable_bounds.names[weight_filter]
+        self.equality_constr_names = self.equality_bounds.names[bE_filter]
+        self.inequality_constr_names = self.inequality_bounds.names[bA_filter]
 
         self.eval_debug_exprs()
         p_debug = {}
@@ -1109,33 +1396,38 @@ class QPController:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
-        self.p_lb = pd.DataFrame(self.np_lb_filtered, filtered_b_names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(self.np_ub_filtered, filtered_b_names, ['data'], dtype=float)
-        # self.p_g = pd.DataFrame(g, filtered_b_names, ['data'], dtype=float)
-        self.p_lbA_raw = pd.DataFrame(self.np_lbA_filtered, filtered_bA_names, ['data'], dtype=float)
+        self.p_weights = pd.DataFrame(weights, self.free_variable_names, ['data'], dtype=float)
+        # self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(lb, self.free_variable_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(ub, self.free_variable_names, ['data'], dtype=float)
+        self.p_bE_raw = pd.DataFrame(bE, self.equality_constr_names, ['data'], dtype=float)
+        self.p_bE = deepcopy(self.p_bE_raw)
+        self.p_bE[len(self.equality_bounds.names_derivative_links):] /= sample_period
+        self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
         self.p_lbA = deepcopy(self.p_lbA_raw)
-        self.p_ubA_raw = pd.DataFrame(self.np_ubA_filtered, filtered_bA_names, ['data'], dtype=float)
+        self.p_lbA[len(self.inequality_bounds.names_position_limits):] /= sample_period
+        self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
         self.p_ubA = deepcopy(self.p_ubA_raw)
+        self.p_ubA[len(self.inequality_bounds.names_position_limits):] /= sample_period
         # remove sample period factor
-        self.p_lbA[-num_constr:] /= sample_period
-        self.p_ubA[-num_constr:] /= sample_period
-        self.p_weights = pd.DataFrame(self.np_weights, b_names, ['data'], dtype=float)
-        self.p_A = pd.DataFrame(self.np_A_filtered, filtered_bA_names, filtered_b_names, dtype=float)
+        self.p_E = pd.DataFrame(E, self.equality_constr_names, self.free_variable_names, dtype=float)
+        self.p_A = pd.DataFrame(A, self.inequality_constr_names, self.free_variable_names, dtype=float)
+        self.p_xdot = None
         if self.xdot_full is not None:
-            self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, ['data'], dtype=float)
+            self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_names, ['data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
             # xH = np.dot((self.xdot_full ** 2).T, H)
             # self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 
-            self.p_pure_xdot = deepcopy(self.p_xdot)
-            self.p_pure_xdot[-num_constr:] = 0
-            self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
-            self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
-                                                       dtype=float)
-            self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
-            self.p_Ax_without_slack[-num_constr:] /= sample_period
+            # self.p_pure_xdot = deepcopy(self.p_xdot)
+            # self.p_pure_xdot[-num_constr:] = 0
+            # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
+            # self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
+            #                                            dtype=float)
+            # self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
+            # self.p_Ax_without_slack[-num_constr:] /= sample_period
 
         else:
             self.p_xdot = None

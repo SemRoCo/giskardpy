@@ -7,6 +7,8 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.model.joints import OmniDrivePR22
+from giskardpy.my_types import Derivatives
 
 
 class DiffDriveTangentialToPoint(Goal):
@@ -42,12 +44,11 @@ class DiffDriveTangentialToPoint(Goal):
 
         if self.drive:
             angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
-            self.add_constraint(reference_velocity=0.5,
-                                lower_error=-angle,
-                                upper_error=-angle,
-                                weight=self.weight,
-                                task_expression=angle,
-                                name='/rot')
+            self.add_equality_constraint(reference_velocity=0.5,
+                                         equality_bound=-angle,
+                                         weight=self.weight,
+                                         task_expression=angle,
+                                         name='/rot')
         else:
             # angle = w.abs(w.angle_between_vector(w.vector3(1,0,0), map_V_tangent))
             map_R_goal = w.RotationMatrix.from_vectors(x=map_V_tangent, y=None, z=w.Vector3((0, 0, 1)))
@@ -56,12 +57,11 @@ class DiffDriveTangentialToPoint(Goal):
             axis, map_current_angle = map_R_base.to_axis_angle()
             map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
             angle_error = w.shortest_angular_distance(map_current_angle, goal_angle)
-            self.add_constraint(reference_velocity=0.5,
-                                lower_error=angle_error,
-                                upper_error=angle_error,
-                                weight=self.weight,
-                                task_expression=map_current_angle,
-                                name='/rot')
+            self.add_equality_constraint(reference_velocity=0.5,
+                                         equality_bound=angle_error,
+                                         weight=self.weight,
+                                         task_expression=map_current_angle,
+                                         name='/rot')
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.root}/{self.tip}'
@@ -158,12 +158,12 @@ class KeepHandInWorkspace(Goal):
         map_V_tip.scale(1)
         angle_error = w.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
         # self.add_debug_expr('rot', angle_error)
-        self.add_constraint(reference_velocity=0.5,
-                            lower_error=-angle_error - 0.2,
-                            upper_error=-angle_error + 0.2,
-                            weight=weight,
-                            task_expression=angle_error,
-                            name='/rot')
+        self.add_inequality_constraint(reference_velocity=0.5,
+                                       lower_error=-angle_error - 0.2,
+                                       upper_error=-angle_error + 0.2,
+                                       weight=weight,
+                                       task_expression=angle_error,
+                                       name='/rot')
         # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
         #                                  frame_V_goal=base_footprint_V_tip,
         #                                  reference_velocity=0.5)
@@ -195,3 +195,49 @@ class KeepHandInWorkspace(Goal):
     def __str__(self):
         s = super().__str__()
         return f'{s}/{self.base_footprint}/{self.tip_link}'
+
+
+class PR2DiffDriveOrient(Goal):
+
+    def __init__(self, eef_link, max_linear_velocity: float = 0.1,
+                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
+                 root_group: Optional[str] = None, tip_group: Optional[str] = None):
+        super().__init__()
+        self.max_angular_velocity = max_angular_velocity
+        self.max_linear_velocity = max_linear_velocity
+        diff_drive_joints = [v for k, v in self.world.joints.items() if isinstance(v, OmniDrivePR22)]
+        assert len(diff_drive_joints) == 1
+        self.joint: OmniDrivePR22 = diff_drive_joints[0]
+        self.weight = weight
+        self.base_root_link = self.joint.parent_link_name
+        self.base_tip_link = self.joint.child_link_name
+        self.eef_tip_link = self.world.get_link_name(eef_link)
+        # self.root_T_goal = self.transform_msg(self.root_link, goal_pose)
+
+    def make_constraints(self):
+        base_root_T_base_tip = self.get_fk(self.base_root_link, self.base_tip_link)
+
+        base_tip_T_eef_tip = self.get_fk(self.base_tip_link, self.eef_tip_link)
+        base_tip_P_eef_tip = base_tip_T_eef_tip.to_position()
+        base_tip_V_eef_vel = w.Vector3(self.get_expr_velocity(base_tip_P_eef_tip))
+        base_root_V_eef_vel = base_root_T_base_tip.dot(base_tip_V_eef_vel)
+        velocity_magnitude_mps = base_root_V_eef_vel.norm()
+        base_root_V_eef_vel.scale(1)
+
+        root_yaw1 = self.joint.caster_yaw1.get_symbol(Derivatives.position)
+        root_V_forward = w.Vector3((w.cos(root_yaw1), w.sin(root_yaw1), 0))
+        root_V_forward.vis_frame = self.base_tip_link
+
+        self.add_debug_expr('root_V_forward', root_V_forward)
+        self.add_debug_expr('base_root_V_eef_vel', base_root_V_eef_vel)
+
+        weight = w.if_greater(velocity_magnitude_mps, 0.01, self.weight, 0)
+
+        self.add_vector_goal_constraints(frame_V_current=root_V_forward,
+                                         frame_V_goal=base_root_V_eef_vel,
+                                         reference_velocity=self.max_angular_velocity,
+                                         weight=weight,
+                                         name='angle')
+
+    def __str__(self) -> str:
+        return super().__str__()

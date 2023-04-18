@@ -1,0 +1,74 @@
+name: CI standalone
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+      - devel
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'info'
+        type: choice
+        options:
+          - info
+          - warning
+          - debug
+      tags:
+        description: 'Test scenario tags'
+        required: false
+        type: boolean
+jobs:
+  build_dependencies:
+    uses: ./.github/workflows/build_dependencies.yml
+  hsr:
+    needs: [ build_dependencies ]
+    uses: ./.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: hsr
+      test1: test/test_integration_hsr.py::TestJointGoals
+      test2: test/test_integration_hsr.py::TestCollisionAvoidanceGoals
+      test3: test/test_integration_hsr.py::TestConstraints
+  donbot:
+    needs: [ build_dependencies ]
+    uses: ./.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: donbot
+      test1: test/test_integration_donbot.py::TestCartGoals
+      test2: test/test_integration_donbot.py::TestConstraints
+      test3: test/test_integration_donbot.py::TestJointGoals
+  pr2_part1:
+    needs: [ build_dependencies ]
+    uses: ./.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: pr2
+      test1: test/test_integration_pr2.py::TestConstraints
+      test2: test/test_integration_pr2.py::TestCartGoals
+      test3: test/test_integration_pr2.py::TestWorldManipulation
+  pr2_part2:
+    needs: [ build_dependencies ]
+    uses: ./.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: pr2
+      test1: test/test_integration_pr2.py::TestCollisionAvoidanceGoals
+      test2: test/test_integration_pr2.py::TestWorld
+      test3: test/test_integration_pr2.py::TestSelfCollisionAvoidance
+      test4: test/test_integration_pr2.py::TestInfoServices
+      test5: test/test_integration_pr2.py::TestJointGoals
+      test6: test/test_integration_pr2.py::TestWayPoints
+  tiago:
+    needs: [ build_dependencies ]
+    uses: ./.github/workflows/reusable_robot_ci.yml
+    with:
+      robot: tiago
+      test1: test/test_integration_tiago_stand_alone.py::TestConstraints
+      test2: test/test_integration_tiago_stand_alone.py::TestJointGoals
+      test3: test/test_integration_tiago_stand_alone.py::TestCollisionAvoidance
+      test4: test/test_integration_tiago_stand_alone.py::TestCartGoals

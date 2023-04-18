@@ -3,11 +3,13 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class CommandPublisher(GiskardBehavior):
     joint_names = []
 
+    @record_time
     @profile
     def __init__(self, name, hz=100):
         super().__init__(name)

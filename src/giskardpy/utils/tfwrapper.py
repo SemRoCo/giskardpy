@@ -16,7 +16,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.utils import memoize
+from giskardpy.utils.decorators import memoize
 
 tfBuffer: Buffer = None
 tf_listener: TransformListener = None

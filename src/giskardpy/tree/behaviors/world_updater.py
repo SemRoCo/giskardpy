@@ -14,7 +14,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 import giskardpy.casadi_wrapper as w
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
-    GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup
+    GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup, \
+    DyeGroupRequest
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
@@ -24,6 +25,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
 
 
@@ -77,6 +79,7 @@ class WorldUpdater(GiskardBehavior):
         self.update_ticked = Queue(maxsize=1)
         self.timer_state = self.READY
 
+    @record_time
     @profile
     def setup(self, timeout: float = 5.0):
         self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
@@ -88,11 +91,14 @@ class WorldUpdater(GiskardBehavior):
         # self.dump_state_srv = rospy.Service('~dump_state', Trigger, self.dump_state_cb)
         return super(WorldUpdater, self).setup(timeout)
 
-    def dye_group(self, req):
+    def dye_group(self, req: DyeGroupRequest):
         res = DyeGroupResponse()
         try:
             self.world.dye_group(req.group_name, req.color)
             res.error_codes = DyeGroupResponse.SUCCESS
+            for link_name in self.world.groups[req.group_name].links:
+                self.world.links[link_name].reset_cache()
+            logging.loginfo(f'dyed group \'{req.group_name}\' to r:{req.color.r} g:{req.color.g} b:{req.color.b} a:{req.color.a}')
         except UnknownGroupException:
             res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
         return res
@@ -132,11 +138,12 @@ class WorldUpdater(GiskardBehavior):
                 res.joint_state.position.append(value.position)
                 res.joint_state.velocity.append(value.velocity)
         except KeyError as e:
-            logging.logerr('no object with the name {} was found'.format(req.group_name))
+            logging.logerr(f'no object with the name {req.group_name} was found')
             res.error_codes = GetGroupInfoResponse.GROUP_NOT_FOUND_ERROR
 
         return res
 
+    @record_time
     @profile
     def update(self):
         try:

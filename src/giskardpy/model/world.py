@@ -28,9 +28,11 @@ from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
 from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.next_command import NextCommands
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo
+from giskardpy.utils.utils import suppress_stderr
+from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
 
 class TravelCompanion:
@@ -249,6 +251,8 @@ class WorldTree(WorldTreeInterface):
         clear_memo(self.compose_fk_expression)
         clear_memo(self.compute_chain)
         clear_memo(self.is_link_controlled)
+        for free_variable in self.free_variables.values():
+            free_variable.reset_cache()
 
     @profile
     def notify_model_change(self):
@@ -456,18 +460,11 @@ class WorldTree(WorldTreeInterface):
         self.virtual_free_variables[name] = free_variable
         return free_variable
 
-    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
-        for free_variable_name, free_variable in self.free_variables.items():
-            try:
-                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
-            except KeyError as e:
-                # joint is currently not part of the optimization problem
-                continue
-            self.state[free_variable_name][Derivatives.position] += vel * dt
-            self.state[free_variable_name][Derivatives.velocity] = vel
-            for derivative, cmd in new_cmds.items():
-                cmd_ = cmd[free_variable.position_name]
-                self.state[free_variable_name][derivative] = cmd_
+    def update_state(self, next_commands: NextCommands, dt: float):
+        max_derivative = self.god_map.get_data(identifier.max_derivative)
+        for free_variable_name, command in next_commands.free_variable_data.items():
+            self.state[free_variable_name][Derivatives.position] += command[0] * dt
+            self.state[free_variable_name][Derivatives.velocity:max_derivative+1] = command
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)
@@ -1116,9 +1113,9 @@ class WorldTree(WorldTreeInterface):
                     self.fk_idx[link.name] = i
                     i += 1
             fks = w.vstack(fks)
-            self.fast_all_fks = fks.compile(w.free_symbols(fks))
+            self.fast_all_fks = fks.compile()
 
-        fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+        fks_evaluated = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
         result = {}
         for link in self.link_names_with_collisions:
             result[link] = fks_evaluated[self.fk_idx[link], :]
@@ -1190,8 +1187,8 @@ class WorldTree(WorldTreeInterface):
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-                self.collision_fk_matrix = self.fast_collision_fks.call2(
+                self.fks = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+                self.collision_fk_matrix = self.fast_collision_fks.fast_call(
                     self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
 
             @memoize

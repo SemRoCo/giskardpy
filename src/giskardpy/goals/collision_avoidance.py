@@ -28,6 +28,8 @@ class ExternalCollisionAvoidance(Goal):
         super().__init__()
         self.root = self.world.root_link_name
         self.robot_name = robot_name
+        self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = max(1, self.control_horizon)
 
     # def get_contact_normal_on_b_in_root(self):
     #     return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
@@ -114,7 +116,7 @@ class ExternalCollisionAvoidance(Goal):
                                            qp_limits_for_lba),
                                    lower_limit_limited)
         # undo factor in A
-        upper_slack /= (sample_period * self.prediction_horizon)
+        upper_slack /= (sample_period * self.control_horizon)
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
@@ -130,13 +132,13 @@ class ExternalCollisionAvoidance(Goal):
         #     self.add_debug_expr('soft_threshold', soft_threshold)
         #     self.add_debug_expr('dist', dist)
         #     self.add_debug_expr('actual_distance', actual_distance)
-        self.add_constraint(reference_velocity=self.max_velocity,
-                            lower_error=lower_limit,
-                            upper_error=100,
-                            weight=weight,
-                            task_expression=dist,
-                            lower_slack_limit=-1e4,
-                            upper_slack_limit=upper_slack)
+        self.add_inequality_constraint(reference_velocity=self.max_velocity,
+                                       lower_error=lower_limit,
+                                       upper_error=float('inf'),
+                                       weight=weight,
+                                       task_expression=dist,
+                                       lower_slack_limit=-float('inf'),
+                                       upper_slack_limit=upper_slack)
 
     def __str__(self):
         s = super().__str__()
@@ -166,6 +168,8 @@ class SelfCollisionAvoidance(Goal):
         super().__init__()
         self.root = self.world.root_link_name
         self.robot_name = robot_name
+        self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = max(1, self.control_horizon)
 
     def get_contact_normal_in_b(self):
         return self.god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',
@@ -232,19 +236,19 @@ class SelfCollisionAvoidance(Goal):
                                    lower_limit_limited)
 
         # undo factor in A
-        upper_slack /= (sample_period * self.prediction_horizon)
+        upper_slack /= (sample_period * self.control_horizon)
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    w.max(0, upper_slack))
 
-        self.add_constraint(reference_velocity=self.max_velocity,
-                            lower_error=lower_limit,
-                            upper_error=100,
-                            weight=weight,
-                            task_expression=dist,
-                            lower_slack_limit=-1e4,
-                            upper_slack_limit=upper_slack)
+        self.add_inequality_constraint(reference_velocity=self.max_velocity,
+                                       lower_error=lower_limit,
+                                       upper_error=float('inf'),
+                                       weight=weight,
+                                       task_expression=dist,
+                                       lower_slack_limit=-float('inf'),
+                                       upper_slack_limit=upper_slack)
 
     def __str__(self):
         s = super().__str__()
@@ -334,12 +338,11 @@ class CollisionAvoidanceHint(Goal):
         expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)
-        self.add_constraint(name='avoidance_hint',
-                            reference_velocity=max_velocity,
-                            lower_error=max_velocity,
-                            upper_error=max_velocity,
-                            weight=weight,
-                            task_expression=expr)
+        self.add_equality_constraint(name='avoidance_hint',
+                                     reference_velocity=max_velocity,
+                                     equality_bound=max_velocity,
+                                     weight=weight,
+                                     task_expression=expr)
 
     def __str__(self):
         s = super().__str__()

@@ -4,6 +4,7 @@ from py_trees import Status
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class LogDebugExpressionsPlugin(GiskardBehavior):
@@ -17,6 +18,7 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
     def initialise(self):
         self.trajectory = self.god_map.get_data(identifier.debug_trajectory)
 
+    @record_time
     @profile
     def update(self):
         debug_data = self.god_map.get_data(identifier.debug_expressions_evaluated)

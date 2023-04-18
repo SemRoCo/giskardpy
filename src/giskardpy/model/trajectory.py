@@ -1,13 +1,24 @@
 from __future__ import annotations
-from collections import OrderedDict, defaultdict
-from typing import List, Union, Dict
 
+import os
+from collections import OrderedDict, defaultdict
+from itertools import product
+from threading import Lock
+from typing import List, Union, Dict, Tuple
+import numpy as np
+import matplotlib.colors as mcolors
+import pylab as plt
 import rospy
+from sortedcontainers import SortedDict
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.data_types import JointStates
 from giskardpy.model.joints import Joint, OmniDrive, MovableJoint
-from giskardpy.my_types import PrefixName
+from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.utils import logging
+from giskardpy.utils.utils import cm_to_inch
+
+plot_lock = Lock()
 
 
 class Trajectory:
@@ -79,3 +90,128 @@ class Trajectory:
                         raise NotImplementedError('generated traj does not contain all joints')
             trajectory_msg.points.append(p)
         return trajectory_msg
+
+    def to_dict(self, normalize_position: bool = False) -> Dict[Derivatives, Dict[PrefixName, np.ndarray]]:
+        data = defaultdict(lambda: defaultdict(list))
+        for time, joint_states in self.items():
+            for free_variable, joint_state in joint_states.items():
+                for derivative, state in enumerate(joint_state.state):
+                    data[derivative][free_variable].append(state)
+        for derivative, d_data in data.items():
+            for free_variable, trajectory in d_data.items():
+                d_data[free_variable] = np.array(trajectory)
+                if normalize_position and derivative == Derivatives.position:
+                    d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2
+        for free_variable, trajectory in list(data[Derivatives.velocity].items()):
+            if abs(trajectory.max() - trajectory.min()) < 1e-5:
+                for derivative, d_data in list(data.items()):
+                    del d_data[free_variable]
+        for derivative, d_data in data.items():
+            data[derivative] = SortedDict(sorted(d_data.items()))
+        return data
+
+    @profile
+    def plot_trajectory(self,
+                        path_to_data_folder: str,
+                        sample_period: float,
+                        cm_per_second: float = 0.2,
+                        normalize_position: bool = False,
+                        tick_stride: float = 1.0,
+                        file_name: str = 'trajectory.pdf',
+                        history: int = 5,
+                        height_per_derivative: float = 3.5,
+                        print_last_tick: bool = False,
+                        legend: bool = True,
+                        hspace: float = 1,
+                        y_limits: bool = None):
+        """
+        :type tj: Trajectory
+        :param controlled_joints: only joints in this list will be added to the plot
+        :type controlled_joints: list
+        :param velocity_threshold: only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
+        :param cm_per_second: determines how much the x axis is scaled with the length(time) of the trajectory
+        :param normalize_position: centers the joint positions around 0 on the y axis
+        :param tick_stride: the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
+        """
+        cm_per_second = cm_to_inch(cm_per_second)
+        height_per_derivative = cm_to_inch(height_per_derivative)
+        hspace = cm_to_inch(hspace)
+        with plot_lock:
+            def ceil(val, base=0.0, stride=1.0):
+                base = base % stride
+                return np.ceil((float)(val - base) / stride) * stride + base
+
+            def floor(val, base=0.0, stride=1.0):
+                base = base % stride
+                return np.floor((float)(val - base) / stride) * stride + base
+
+            if len(self._points) <= 0:
+                return
+            colors = list(mcolors.TABLEAU_COLORS.keys())
+            colors.append('k')
+
+            line_styles = ['-', '--', '-.', ':']
+            graph_styles = list(product(line_styles, colors))
+            color_map: Dict[str, Tuple[str, str]] = defaultdict(lambda: graph_styles[len(color_map) + 1])
+            data = self.to_dict(normalize_position)
+            times = np.arange(len(self)) * sample_period
+
+            f, axs = plt.subplots(len(Derivatives), sharex=True, gridspec_kw={'hspace': hspace})
+            f.set_size_inches(w=(times[-1] - times[0]) * cm_per_second, h=len(Derivatives) * height_per_derivative)
+
+            plt.xlim(times[0], times[-1])
+
+            if tick_stride > 0:
+                first = ceil(times[0], stride=tick_stride)
+                last = floor(times[-1], stride=tick_stride)
+                ticks = np.arange(first, last, tick_stride)
+                ticks = np.insert(ticks, 0, times[0])
+                ticks = np.append(ticks, last)
+                if print_last_tick:
+                    ticks = np.append(ticks, times[-1])
+                for derivative in data:
+                    axs[derivative].set_title(str(derivative))
+                    axs[derivative].xaxis.set_ticks(ticks)
+                    if y_limits is not None:
+                        axs[derivative].set_ylim(y_limits)
+            else:
+                for derivative in data:
+                    axs[derivative].set_title(str(derivative))
+                    if y_limits is not None:
+                        axs[derivative].set_ylim(y_limits)
+            for derivative, d_data in data.items():
+                for free_variable, f_data in d_data.items():
+                    try:
+                        style, color = color_map[str(free_variable)]
+                        axs[derivative].plot(times, f_data, color=color,
+                                             linestyle=style,
+                                             label=free_variable)
+                    except KeyError:
+                        logging.logwarn(f'Not enough colors to plot all joints, skipping {free_variable}.')
+                    except Exception as e:
+                        pass
+                axs[derivative].grid()
+
+            if legend:
+                axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+
+            axs[-1].set_xlabel('time [s]')
+
+            file_name = path_to_data_folder + file_name
+            last_file_name = file_name.replace('.pdf', f'{history}.pdf')
+
+            if os.path.isfile(file_name):
+                if os.path.isfile(last_file_name):
+                    os.remove(last_file_name)
+                for i in np.arange(history, 0, -1):
+                    if i == 1:
+                        previous_file_name = file_name
+                    else:
+                        previous_file_name = file_name.replace('.pdf', f'{i - 1}.pdf')
+                    current_file_name = file_name.replace('.pdf', f'{i}.pdf')
+                    try:
+                        os.rename(previous_file_name, current_file_name)
+                    except FileNotFoundError:
+                        pass
+            plt.savefig(file_name, bbox_inches="tight")
+            logging.loginfo(f'saved {file_name}')

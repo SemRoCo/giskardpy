@@ -7,9 +7,11 @@ import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
+from giskardpy.utils.decorators import record_time
 
 
 class JointGroupPosController(CommandPublisher):
+    @record_time
     @profile
     def __init__(self, namespace='/joint_group_pos_controller', group_name: str = None, hz=100):
         super().__init__(namespace, hz)

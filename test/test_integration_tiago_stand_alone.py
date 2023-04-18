@@ -11,6 +11,7 @@ from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult
 from giskardpy import identifier
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.configs.tiago import TiagoMujoco, Tiago_Standalone
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.joints import OneDofJoint
@@ -125,7 +126,13 @@ class TiagoTestWrapper(GiskardTestWrapper):
         self.reset_base()
 
     def reset_base(self):
-        pass
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        if self.is_standalone():
+            self.teleport_base(p)
+        else:
+            self.move_base(p)
 
     def set_localization(self, map_T_odom: PoseStamped):
         map_T_odom.pose.position.z = 0
@@ -638,8 +645,7 @@ class TestJointGoals:
             'torso_lift_joint': 0.3487927046680741,
         }
 
-        # zero_pose.set_seed_configuration(js)
-        # zero_pose.set_joint_goal(zero_pose.better_pose2, check=False)
+        zero_pose.set_seed_configuration(js)
         pointing_goal = PointStamped()
         pointing_goal.header.frame_id = 'base_footprint'
         pointing_goal.point.x = 2

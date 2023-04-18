@@ -4,9 +4,11 @@ from giskard_msgs.msg import MoveResult
 from giskardpy import identifier
 from giskardpy.tree.behaviors.action_server import ActionServerBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 
 
 class SendResult(ActionServerBehavior):
+    @record_time
     @profile
     def update(self):
         skip_failures = self.get_god_map().get_data(identifier.skip_failures)

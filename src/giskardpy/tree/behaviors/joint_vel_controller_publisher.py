@@ -10,7 +10,7 @@ from giskardpy.data_types import KeyDefaultDict
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class JointVelController(GiskardBehavior):
@@ -74,3 +74,11 @@ class JointVelController(GiskardBehavior):
             msg.data = js[joint_name].velocity
             self.publishers[i].publish(msg)
         return Status.RUNNING
+
+    def terminate(self, new_status):
+        super().terminate(new_status)
+        msg = Float64()
+        for i, joint_name in enumerate(self.joint_names):
+            self.publishers[i].publish(msg)
+
+

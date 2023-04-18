@@ -1,3 +1,4 @@
+hack = ['hack']
 world = ['world']
 robot_group_name = ['robot_name']
 fk_pose = world + ['compute_fk_pose']
@@ -17,8 +18,9 @@ qp_solver_solution = ['qp_solver_solution']
 goal_msg = ['goal_msg']
 goals = ['goals']
 drive_goals = ['drive_goals']
-constraints = ['constraints']
-vel_constraints = ['vel_constraints']
+eq_constraints = ['eq_constraints']
+neq_constraints = ['neq_constraints']
+derivative_constraints = ['derivative_constraints']
 free_variables = ['free_variables']
 debug_expressions = ['debug_expressions']
 
@@ -52,12 +54,6 @@ test_mode = general_options + ['test_mode']
 control_mode = general_options + ['control_mode']
 
 joint_limits = general_options + ['joint_limits']
-
-joint_acceleration_linear_limit = general_options + ['joint_limits', 'acceleration']
-joint_acceleration_angular_limit = general_options + ['joint_limits', 'acceleration']
-
-joint_jerk_linear_limit = general_options + ['joint_limits', 'jerk']
-joint_jerk_angular_limit = general_options + ['joint_limits', 'jerk']
 
 
 # qp solver

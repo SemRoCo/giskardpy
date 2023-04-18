@@ -1,4 +1,7 @@
+from typing import Union
+
 from giskardpy import identifier
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.utils import logging
 
@@ -14,10 +17,20 @@ class SetPredictionHorizon(Goal):
         self.new_prediction_horizon = prediction_horizon
 
     def make_constraints(self):
-        self.prediction_horizon = self.new_prediction_horizon
-        if 5 > self.prediction_horizon > 1:
+        if 5 > self.new_prediction_horizon > 1:
             logging.logwarn('Prediction horizon should be 1 or greater equal 5.')
-        self.god_map.set_data(identifier.prediction_horizon, self.prediction_horizon)
+        self.god_map.set_data(identifier.prediction_horizon, self.new_prediction_horizon)
+
+    def __str__(self) -> str:
+        return str(self.__class__.__name__)
+
+
+class SetQPSolver(NonMotionGoal):
+
+    def __init__(self, qp_solver_id: Union[SupportedQPSolver, int]):
+        super().__init__()
+        qp_solver_id = SupportedQPSolver(qp_solver_id)
+        self.god_map.set_data(identifier.qp_solver_name, qp_solver_id)
 
     def __str__(self) -> str:
         return str(self.__class__.__name__)

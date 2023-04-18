@@ -2,6 +2,7 @@ from collections import defaultdict
 from time import time
 from typing import Type, TypeVar, Union
 
+import numpy as np
 import py_trees
 import pydot
 import rospy
@@ -231,21 +232,6 @@ def search_for(lines, function_name):
     return result
 
 
-def extract_data_from_profile(path):
-    data = defaultdict(lambda: defaultdict(lambda: 'n/a'))
-    with open(path, 'r') as f:
-        profile = f.read()
-    lines = profile.split('\n')
-    keywords = ['__init__', 'setup', 'initialise', 'update']
-    for function_name in keywords:
-        new_data = search_for(lines, function_name)
-        for file_name, function_data in new_data.items():
-            data[file_name].update(function_data)
-    for file_name, function_data in data.items():
-        for function_name in keywords:
-            data[file_name][function_name]
-    return data
-
 
 class TreeManager:
     god_map = GodMap()
@@ -265,9 +251,7 @@ class TreeManager:
         self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
-        # self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/profile2.txt')))
-        self.render()
-        # self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/test_open_cabinet_left2.txt')))
+        # self.render()
 
     def live(self):
         sleeper = rospy.Rate(1 / self.god_map.get_data(identifier.tree_tick_rate))
@@ -389,13 +373,13 @@ class TreeManager:
         """
         return self.tree_nodes[node_name].node
 
-    def render(self, profile=None):
+    def render(self):
         path = self.god_map.get_data(identifier.tmp_folder) + 'tree'
         create_path(path)
-        render_dot_tree(self.tree.root, name=path, profile=profile)
+        render_dot_tree(self.tree.root, name=path)
 
 
-def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None, profile=None):
+def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
     """
     Render the dot tree to .dot, .svg, .png. files in the current
     working directory. These will be named with the root behaviour name.
@@ -427,7 +411,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
         A good practice is to provide a command line argument for optional rendering of a program so users
         can quickly visualise what tree the program will execute.
     """
-    graph = generate_pydot_graph(root, visibility_level, profile)
+    graph = generate_pydot_graph(root, visibility_level)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
     logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
     # graph.write(filename_wo_extension + '.dot')
@@ -435,7 +419,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     # graph.write_svg(filename_wo_extension + '.svg')
 
 
-def generate_pydot_graph(root, visibility_level, profile=None):
+def generate_pydot_graph(root, visibility_level):
     """
     Generate the pydot graph - this is usually the first step in
     rendering the tree to file. See also :py:func:`render_dot_tree`.
@@ -476,19 +460,20 @@ def generate_pydot_graph(root, visibility_level, profile=None):
         return attributes
 
     fontsize = 11
+    fontname = 'Courier'
     graph = pydot.Dot(graph_type='digraph')
-    graph.set_name(root.name.lower().replace(" ", "_"))
+    graph.set_name(root.name.lower().replace(' ', '_'))
     # fonts: helvetica, times-bold, arial (times-roman is the default, but this helps some viewers, like kgraphviewer)
     graph.set_graph_defaults(fontname='times-roman')
     graph.set_node_defaults(fontname='times-roman')
     graph.set_edge_defaults(fontname='times-roman')
     (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
     node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize,
-                           fontcolor=node_font_colour)
+                           fontcolor=node_font_colour, fontname=fontname)
     graph.add_node(node_root)
     names = [root.name]
 
-    def add_edges(root, root_dot_name, visibility_level, profile):
+    def add_edges(root, root_dot_name, visibility_level):
         if visibility_level < root.blackbox_level:
             if isinstance(root, AsyncBehavior) \
                     or (hasattr(root, 'original') and isinstance(root.original, AsyncBehavior)):
@@ -506,32 +491,44 @@ def generate_pydot_graph(root, visibility_level, profile=None):
                 if hasattr(c, 'original'):
                     proposed_dot_name += f'\n{type(c).__name__}'
                 color = 'black'
-                if (isinstance(c, GiskardBehavior) or (hasattr(c, 'original')
-                                                       and isinstance(c.original, GiskardBehavior))) \
-                        and not isinstance(c, AsyncBehavior) and profile is not None:
-                    if hasattr(c, 'original'):
-                        file_name = str(c.original.__class__).split('.')[-2]
+                if hasattr(c, 'original'):
+                    original_c = c.original
+                else:
+                    original_c = c
+                if isinstance(original_c, GiskardBehavior) and not isinstance(original_c, AsyncBehavior):
+                    function_names = ['__init__', 'setup', 'initialise', 'update']
+                    function_name_padding = 20
+                    entry_name_padding = 8
+                    number_padding = function_name_padding-entry_name_padding
+                    if hasattr(original_c, '__times'):
+                        time_dict = original_c.__times
                     else:
-                        file_name = str(c.__class__).split('.')[-2]
-                    if file_name in profile:
-                        max_time = max(profile[file_name].values(), key=lambda x: 0 if x == 'n/a' else x)
-                        if max_time > 1:
-                            color = 'red'
-                        proposed_dot_name += '\n' + '\n'.join(
-                            [f'{k}= {v}' for k, v in sorted(profile[file_name].items())])
+                        time_dict = {}
+                    for function_name in function_names:
+                        if function_name in time_dict:
+                            times = time_dict[function_name]
+                            average_time = np.average(times)
+                            total_time = np.sum(times)
+                            if total_time > 1:
+                                color = 'red'
+                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
+                                                 f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.3}".ljust(number_padding)}' \
+                                                 f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.3}".ljust(number_padding)}'
+                        else:
+                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
 
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
                 names.append(proposed_dot_name)
                 node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
-                                  fontsize=fontsize, fontcolor=node_font_colour, color=color)
+                                  fontsize=fontsize, fontcolor=node_font_colour, color=color, fontname=fontname)
                 graph.add_node(node)
                 edge = pydot.Edge(root_dot_name, proposed_dot_name)
                 graph.add_edge(edge)
                 if (hasattr(c, 'children') and c.children != []) or (hasattr(c, '_children') and c._children != []):
-                    add_edges(c, proposed_dot_name, visibility_level, profile)
+                    add_edges(c, proposed_dot_name, visibility_level)
 
-    add_edges(root, root.name, visibility_level, profile)
+    add_edges(root, root.name, visibility_level)
     return graph
 
 
@@ -702,7 +699,7 @@ class OpenLoop(StandAlone):
         execution = failure_is_success(Sequence)('execution')
         execution.add_child(IF('execute?', identifier.execute))
         if self.add_real_time_tracking:
-            execution.add_child(CleanUpBaseController('CleanUpBaseController'))
+            execution.add_child(CleanUpBaseController('CleanUpBaseController', clear_markers=False))
             execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
             execution.add_child(InitQPController('InitQPController for base'))
         execution.add_child(SetTrackingStartTime('start start time'))
@@ -749,10 +746,17 @@ class OpenLoop(StandAlone):
                 real_time_tracking.add_child(RosTime('time'))
                 real_time_tracking.add_child(ControllerPluginBase('base controller'))
                 real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
+                if self.god_map.get_data(identifier.PlotDebugTF_enabled):
+                    real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
                 if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
                     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
                                                                          **self.god_map.unsafe_get_data(
                                                                              identifier.PublishDebugExpressions)))
+                if self.god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
+                    real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher',
+                                                                         **self.god_map.unsafe_get_data(
+                                                                             identifier.PlotDebugTF)))
+
                 real_time_tracking.add_child(SendTrajectoryToCmdVel(**drive_interface))
                 execution_action_server.add_child(real_time_tracking)
         return execution_action_server

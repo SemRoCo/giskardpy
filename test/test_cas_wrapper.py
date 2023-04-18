@@ -1,12 +1,13 @@
 import math
 import unittest
+from datetime import timedelta
 
 import PyKDL
 import hypothesis.strategies as st
 import numpy as np
 from angles import shortest_angular_distance, normalize_angle_positive, normalize_angle
 from geometry_msgs.msg import Point, PointStamped, Vector3, Vector3Stamped
-from hypothesis import given, assume
+from hypothesis import given, assume, settings
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
@@ -56,6 +57,9 @@ class TestSymbol:
 
 
 class TestExpression(unittest.TestCase):
+    def test_pretty_str(self):
+        e = w.eye(4)
+        e.pretty_str()
 
     def test_create(self):
         w.Expression(w.Symbol('muh'))
@@ -74,8 +78,30 @@ class TestExpression(unittest.TestCase):
         m = w.Expression([[1, 1], [2, 2]])
         np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1], [2, 2]])
         m = w.Expression([])
-        with self.assertRaises(RuntimeError):
-            print(m.evaluate())
+        assert m.shape[0] == m.shape[1] == 0
+        m = w.Expression()
+        assert m.shape[0] == m.shape[1] == 0
+
+    def test_filter1(self):
+        e_np = np.arange(16) * 2
+        e = w.Expression(e_np)
+        filter_ = np.zeros(16, dtype=bool)
+        filter_[3] = True
+        filter_[5] = True
+        actual = e[filter_].evaluate()
+        expected = e_np[filter_]
+        assert np.all(actual.T[0] == expected)
+
+    def test_filter2(self):
+        e_np = np.arange(16) * 2
+        e_np = e_np.reshape((4, 4))
+        e = w.Expression(e_np)
+        filter_ = np.zeros(4, dtype=bool)
+        filter_[1] = True
+        filter_[2] = True
+        actual = e[filter_].evaluate()
+        expected = e_np[filter_]
+        np.testing.assert_array_almost_equal(actual, expected)
 
     @given(float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_add(self, f1, f2):
@@ -551,12 +577,16 @@ class TestQuaternion(unittest.TestCase):
 
 
 class TestCASWrapper(unittest.TestCase):
-    def test_empty_compiled_function(self):
-        expected = np.array([1, 2, 3], ndmin=2)
+    @given(st.booleans())
+    def test_empty_compiled_function(self, sparse):
+        if sparse:
+            expected = np.array([1, 2, 3], ndmin=2)
+        else:
+            expected = np.array([1, 2, 3])
         e = w.Expression(expected)
-        f = e.compile()
+        f = e.compile(sparse=sparse)
         np.testing.assert_array_almost_equal(f(), expected)
-        np.testing.assert_array_almost_equal(f.call2([]), expected)
+        np.testing.assert_array_almost_equal(f.fast_call(np.array([])), expected)
 
     def test_add(self):
         s2 = 'muh'
@@ -1083,15 +1113,144 @@ class TestCASWrapper(unittest.TestCase):
             for j in range(expected.shape[1]):
                 assert w.equivalent(jac[i, j], expected[i, j])
 
-    def test_jacobian_order2(self):
-        a = w.Symbol('a')
-        b = w.Symbol('b')
-        m = w.Expression([a + b, a ** 2 + b, a ** 3 + b ** 2])
-        jac = w.jacobian(m, [a, b], order=2)
-        expected = w.Expression([[0, 0], [2, 0], [6 * a, 2]])
-        for i in range(expected.shape[0]):
-            for j in range(expected.shape[1]):
-                assert w.equivalent(jac[i, j], expected[i, j])
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_jacobian_dot(self, a, ad, b, bd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'b': b,
+            'bd': bd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        m = w.Expression([
+            a_s ** 3 * b_s ** 3,
+            # b_s ** 2,
+            -a_s * w.cos(b_s),
+            # a_s * b_s ** 4
+        ])
+        jac = w.jacobian_dot(m, [a_s, b_s], [ad_s, bd_s])
+        expected_expr = w.Expression([
+            [6 * ad_s * a_s * b_s ** 3 + 9 * a_s ** 2 * bd_s * b_s ** 2,
+             9 * ad_s * a_s ** 2 * b_s ** 2 + 6 * a_s ** 3 * bd_s * b],
+            # [0, 2 * bd_s],
+            [bd_s * w.sin(b_s), ad_s * w.sin(b_s) + a_s * bd_s * w.cos(b_s)],
+            # [4 * bd * b ** 3, 4 * ad * b ** 3 + 12 * a * bd * b ** 2]
+        ])
+        actual = jac.compile()(**kwargs)
+        expected = expected_expr.compile()(**kwargs)
+        assert np.allclose(actual, expected)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_jacobian_ddot(self, a, ad, add, b, bd, bdd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'add': add,
+            'b': b,
+            'bd': bd,
+            'bdd': bdd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        add_s = w.Symbol('add')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        bdd_s = w.Symbol('bdd')
+        m = w.Expression([
+            a_s ** 3 * b_s ** 3,
+            b_s ** 2,
+            -a_s * w.cos(b_s),
+        ])
+        jac = w.jacobian_ddot(m, [a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
+        expected = np.array([
+            [add * 6 * b ** 3 + bdd * 18 * a ** 2 * b + 2 * ad * bd * 18 * a * b ** 2,
+             bdd * 6 * a ** 3 + add * 18 * b ** 2 * a + 2 * ad * bd * 18 * b * a ** 2],
+            [0, 0],
+            [bdd * np.cos(b),
+             bdd * -a * np.sin(b) + 2 * ad * bd * np.cos(b)],
+        ])
+        actual = jac.compile()(**kwargs)
+        assert np.allclose(actual, expected)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_total_derivative2(self, a, b, ad, bd, add, bdd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'add': add,
+            'b': b,
+            'bd': bd,
+            'bdd': bdd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        add_s = w.Symbol('add')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        bdd_s = w.Symbol('bdd')
+        m = w.Expression(a_s * b_s ** 2)
+        jac = w.total_derivative2(m, [a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
+        actual = jac.compile()(**kwargs)
+        expected = bdd * 2 * a + 2 * ad * bd * 2 * b
+        assert np.allclose(actual, expected)
+
+    @given(float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf(),
+           float_no_nan_no_inf())
+    def test_total_derivative2_2(self, a, b, c, ad, bd, cd, add, bdd, cdd):
+        kwargs = {
+            'a': a,
+            'ad': ad,
+            'add': add,
+            'b': b,
+            'bd': bd,
+            'bdd': bdd,
+            'c': c,
+            'cd': cd,
+            'cdd': cdd,
+        }
+        a_s = w.Symbol('a')
+        ad_s = w.Symbol('ad')
+        add_s = w.Symbol('add')
+        b_s = w.Symbol('b')
+        bd_s = w.Symbol('bd')
+        bdd_s = w.Symbol('bdd')
+        c_s = w.Symbol('c')
+        cd_s = w.Symbol('cd')
+        cdd_s = w.Symbol('cdd')
+        m = w.Expression(a_s * b_s ** 2 * c_s ** 3)
+        jac = w.total_derivative2(m, [a_s, b_s, c_s], [ad_s, bd_s, cd_s], [add_s, bdd_s, cdd_s])
+        # expected_expr = w.Expression(add_s + bdd_s*2*a*c**3 + 4*ad_s*)
+        actual = jac.compile()(**kwargs)
+        # expected = expected_expr.compile()(**kwargs)
+        expected = bdd * 2 * a * c ** 3 \
+                   + cdd * 6 * a * b ** 2 * c \
+                   + 4 * ad * bd * b * c ** 3 \
+                   + 6 * ad * b ** 2 * cd * c ** 2 \
+                   + 12 * a * bd * b * cd * c ** 2
+        assert np.allclose(actual, expected)
 
     def test_var(self):
         result = w.var('a b c')
@@ -1122,6 +1281,14 @@ class TestCASWrapper(unittest.TestCase):
         r2 = np.vstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
+    def test_vstack_empty(self):
+        m = np.eye(0)
+        m1 = w.Expression(m)
+        e = w.vstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.vstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
     def test_hstack(self):
         m = np.eye(4)
         m1 = w.Expression(m)
@@ -1129,6 +1296,33 @@ class TestCASWrapper(unittest.TestCase):
         r1 = e.evaluate()
         r2 = np.hstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_hstack_empty(self):
+        m = np.eye(0)
+        m1 = w.Expression(m)
+        e = w.hstack([m1, m1])
+        r1 = e.evaluate()
+        r2 = np.hstack([m, m])
+        np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_diag_stack(self):
+        m1_np = np.eye(4)
+        m2_np = np.ones((2, 5))
+        m3_np = np.ones((5, 3))
+        m1_e = w.Expression(m1_np)
+        m2_e = w.Expression(m2_np)
+        m3_e = w.Expression(m3_np)
+        e = w.diag_stack([m1_e, m2_e, m3_e])
+        r1 = e.evaluate()
+        combined_matrix = np.zeros((4 + 2 + 5, 4 + 5 + 3))
+        row_counter = 0
+        column_counter = 0
+        for matrix in [m1_np, m2_np, m3_np]:
+            combined_matrix[row_counter:row_counter + matrix.shape[0],
+            column_counter:column_counter + matrix.shape[1]] = matrix
+            row_counter += matrix.shape[0]
+            column_counter += matrix.shape[1]
+        np.testing.assert_array_almost_equal(r1, combined_matrix)
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
@@ -1162,7 +1356,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_greater_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition > 0 else else_result), places=7)
+                               float(if_result if condition > 0 else else_result), places=7)
 
     def test_if_one_arg(self):
         types = [w.Point3, w.Vector3, w.Quaternion, w.Expression, w.TransMatrix, w.RotationMatrix]
@@ -1191,7 +1385,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_greater_eq_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition >= 0 else else_result), places=7)
+                               float(if_result if condition >= 0 else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1199,7 +1393,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_greater_eq(self, a, b, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
-                               np.float(if_result if a >= b else else_result), places=7)
+                               float(if_result if a >= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1207,14 +1401,14 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_less_eq(self, a, b, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
-                               np.float(if_result if a <= b else else_result), places=7)
+                               float(if_result if a <= b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq_zero(self, condition, if_result, else_result):
         self.assertAlmostEqual(w.compile_and_execute(w.if_eq_zero, [condition, if_result, else_result]),
-                               np.float(if_result if condition == 0 else else_result), places=7)
+                               float(if_result if condition == 0 else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1222,7 +1416,7 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf())
     def test_if_eq(self, a, b, if_result, else_result):
         self.assertTrue(np.isclose(w.compile_and_execute(w.if_eq, [a, b, if_result, else_result]),
-                                   np.float(if_result if a == b else else_result)))
+                                   float(if_result if a == b else else_result)))
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases(self, a):
@@ -1232,13 +1426,15 @@ class TestCASWrapper(unittest.TestCase):
                           (-1, -1),
                           (0.5, 0.5),
                           (-0.5, -0.5)]
+
         def reference(a_, b_result_cases_, else_result):
             for b, if_result in b_result_cases_:
                 if a_ == b:
                     return if_result
             return else_result
+
         actual = w.compile_and_execute(lambda a: w.if_eq_cases(a, b_result_cases, 0), [a])
-        expected = np.float(reference(a, b_result_cases, 0))
+        expected = float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)
 
     @given(float_no_nan_no_inf())
@@ -1260,7 +1456,7 @@ class TestCASWrapper(unittest.TestCase):
 
         self.assertAlmostEqual(w.compile_and_execute(lambda a, default: w.if_less_eq_cases(a, b_result_cases, default),
                                                      [a, 0]),
-                               np.float(reference(a, b_result_cases, 0)))
+                               float(reference(a, b_result_cases, 0)))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1269,7 +1465,7 @@ class TestCASWrapper(unittest.TestCase):
     def test_if_greater(self, a, b, if_result, else_result):
         self.assertAlmostEqual(
             w.compile_and_execute(w.if_greater, [a, b, if_result, else_result]),
-            np.float(if_result if a > b else else_result), places=7)
+            float(if_result if a > b else else_result), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1278,7 +1474,7 @@ class TestCASWrapper(unittest.TestCase):
     def test_if_less(self, a, b, if_result, else_result):
         self.assertAlmostEqual(
             w.compile_and_execute(w.if_less, [a, b, if_result, else_result]),
-            np.float(if_result if a < b else else_result), places=7)
+            float(if_result if a < b else else_result), places=7)
 
     @given(vector(3),
            vector(3))
@@ -1412,10 +1608,6 @@ class TestCASWrapper(unittest.TestCase):
             axisr2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[0], r2)
             angler2 = w.compile_and_execute(lambda x, y, z, w_: w.Quaternion((x, y, z, w_)).to_axis_angle()[1], r2)
             aa2.append([axisr2, angler2])
-        aa1 = np.array(aa1)
-        aa2 = np.array(aa2)
-        r1snp = np.array(r1s)
-        r2snp = np.array(r2s)
         qds = []
         for i in range(len(r1s) - 1):
             q1t = r1s[i]
@@ -1486,6 +1678,7 @@ class TestCASWrapper(unittest.TestCase):
         expected_sum = np.sum(m)
         self.assertTrue(np.isclose(actual_sum, expected_sum, rtol=1.e-4))
 
+    @settings(deadline=timedelta(milliseconds=500))
     @given(st.integers(max_value=10000, min_value=1),
            st.integers(max_value=5000, min_value=-5000),
            st.integers(max_value=5000, min_value=-5000),
@@ -1558,14 +1751,14 @@ class TestCASWrapper(unittest.TestCase):
         angle = w.Symbol('alpha')
         q = w.Quaternion.from_axis_angle(axis, angle)
         expr = w.norm(q)
-        assert w.to_str(expr) == 'sqrt((((sq((v1*sin((alpha/2))))' \
-                                 '+sq((v2*sin((alpha/2)))))' \
-                                 '+sq((v3*sin((alpha/2)))))' \
-                                 '+sq(cos((alpha/2)))))'
+        assert w.to_str(expr) == [['sqrt((((sq((v1*sin((alpha/2))))'
+                                   '+sq((v2*sin((alpha/2)))))'
+                                   '+sq((v3*sin((alpha/2)))))'
+                                   '+sq(cos((alpha/2)))))']]
         assert w.to_str(expr) == expr.pretty_str()
 
     def test_to_str2(self):
         a, b = w.var('a b')
         e = w.if_eq(a, 0, a, b)
-        assert w.to_str(e) == '(((a==0)?a:0)+((!(a==0))?b:0))'
+        assert w.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert w.to_str(e) == e.pretty_str()

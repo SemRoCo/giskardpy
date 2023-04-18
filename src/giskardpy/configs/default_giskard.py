@@ -20,7 +20,7 @@ from giskardpy.configs.data_types import CollisionCheckerLib, GeneralConfig, \
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, TFJoint
+from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, OmniDrivePR22, TFJoint
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
@@ -43,15 +43,17 @@ class Giskard:
         self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
         self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
-        self._god_map.set_data(identifier.timer_collector, TimeCollector())
         self._god_map.set_data(identifier.joints_to_add, [])
         self._god_map.set_data(identifier.debug_expr_needed, False)
+        self._god_map.set_data(identifier.hack, 0)
         blackboard = Blackboard
         blackboard.god_map = self._god_map
         self.world = WorldTree(self._root_link_name)
         self._controlled_joints = []
         self._backup = {}
         self.goal_package_paths = ['giskardpy.goals']
+        self.set_default_joint_limits()
+        self.set_default_weights()
 
     def add_goal_package_name(self, package_name: str):
         new_goals = get_all_classes_in_package(package_name, Goal)
@@ -118,26 +120,27 @@ class Giskard:
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['VisualizationBehavior']['in_planning_loop'] = in_planning_loop
 
-    def configure_PublishDebugExpressions(self, enabled: bool = True, publish_lb: bool = False,
-                                          publish_ub: bool = False, publish_lbA: bool = False,
-                                          publish_ubA: bool = False, publish_Ax: bool = False,
-                                          publish_xdot: bool = False, publish_weights: bool = False,
-                                          publish_debug: bool = False):
-        """
-        :param enabled: whether Giskard should publish markers during planning
-        :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
-                                    the system.
-        """
+    def configure_PublishDebugExpressions(self, publish_lb: bool = False, publish_ub: bool = False,
+                                          publish_lbA: bool = False, publish_ubA: bool = False,
+                                          publish_bE: bool = False, publish_Ax: bool = False,
+                                          publish_Ex: bool = False, publish_xdot: bool = False,
+                                          publish_weights: bool = False, publish_debug: bool = False,
+                                          enabled_base: bool = False):
+        enabled = publish_lb or publish_ub or publish_lbA or publish_ubA or publish_bE or publish_Ax or publish_Ex \
+                  or publish_xdot or publish_weights or publish_debug
         if enabled:
             self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled_base'] = enabled_base
         publish_flags = {
             'publish_lb': publish_lb,
             'publish_ub': publish_ub,
             'publish_lbA': publish_lbA,
             'publish_ubA': publish_ubA,
             'publish_weights': publish_weights,
+            'publish_bE': publish_bE,
             'publish_Ax': publish_Ax,
+            'publish_Ex': publish_Ex,
             'publish_xdot': publish_xdot,
             'publish_debug': publish_debug,
         }
@@ -152,14 +155,16 @@ class Giskard:
         self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
         self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
 
-    def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False):
+    def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
         self.behavior_tree_config.plugin_config['PlotTrajectory']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PlotTrajectory']['wait'] = wait
         self.behavior_tree_config.plugin_config['PlotTrajectory']['normalize_position'] = normalize_position
 
-    def configure_PlotDebugExpressions(self, enabled: bool = False):
+    def configure_PlotDebugExpressions(self, enabled: bool = False, wait: bool = False):
         if enabled:
             self._god_map.set_data(identifier.debug_expr_needed, True)
         self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
+        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['wait'] = wait
 
     def configure_DebugMarkerPublisher(self, enabled: bool = False):
         if enabled:
@@ -314,8 +319,7 @@ class Giskard:
                                       'rotation_limits': rotation_limits})
         self._add_joint(brumbrum_joint)
         if odometry_topic is not None:
-            self._add_odometry_topic(odometry_topic=odometry_topic,
-                                     joint_name=joint_name)
+            self._add_odometry_topic(odometry_topic=odometry_topic, joint_name=joint_name)
 
     def get_default_group_name(self):
         """
@@ -409,7 +413,6 @@ class Giskard:
         """
         Initialize the behavior tree and world. You usually don't need to call this.
         """
-        self._qp_solver_check()
         if len(self.robot_interface_configs) == 0:
             self.add_robot_from_parameter_server()
         self._create_parameter_backup()
@@ -429,19 +432,6 @@ class Giskard:
             raise KeyError(f'Robot interface mode \'{self._general_config.control_mode}\' is not supported.')
 
         self._controlled_joints_sanity_check()
-
-    def _qp_solver_check(self):
-        try:
-            if self._qp_solver_config.qp_solver == SupportedQPSolver.gurobi:
-                from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-            elif self._qp_solver_config.qp_solver == SupportedQPSolver.cplex:
-                from giskardpy.qp.qp_solver_cplex import QPSolverCplex
-            elif self._qp_solver_config.qp_solver not in SupportedQPSolver:
-                raise KeyError(f'Solver \'{self._qp_solver_config.qp_solver}\' not supported.')
-        except Exception as e:
-            logging.logwarn(e)
-            logging.logwarn('Defaulting back to qpoases.')
-            self._qp_solver_config.qp_solver = SupportedQPSolver.qp_oases
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)
@@ -673,8 +663,9 @@ class Giskard:
 
     def set_default_joint_limits(self,
                                  velocity_limit: float = 1,
-                                 acceleration_limit: Optional[float] = 1e3,
-                                 jerk_limit: Optional[float] = 30):
+                                 acceleration_limit: Optional[float] = float('inf'),
+                                 jerk_limit: Optional[float] = 30,
+                                 snap_limit: Optional[float] = 500):
         """
         The default values will be set automatically, even if this function is not called.
         :param velocity_limit: in m/s or rad/s
@@ -682,14 +673,11 @@ class Giskard:
         :param jerk_limit: in m/s**3 or rad/s**3
         """
         if jerk_limit is not None and acceleration_limit is None:
-            raise AttributeError('If jerk limits are set, acceleration limits also have to be set/')
-        self._general_config.joint_limits = {
-            Derivatives.velocity: defaultdict(lambda: velocity_limit)
-        }
-        if acceleration_limit is not None:
-            self._general_config.joint_limits[Derivatives.acceleration] = defaultdict(lambda: acceleration_limit)
-        if jerk_limit is not None:
-            self._general_config.joint_limits[Derivatives.jerk] = defaultdict(lambda: jerk_limit)
+            raise AttributeError('If jerk limits are set, acceleration limits also have to be set.')
+        self._general_config.joint_limits = {Derivatives.velocity: defaultdict(lambda: velocity_limit),
+                                             Derivatives.acceleration: defaultdict(lambda: acceleration_limit),
+                                             Derivatives.jerk: defaultdict(lambda: jerk_limit),
+                                             Derivatives.snap: defaultdict(lambda: snap_limit)}
 
     def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
         if group_name is None:
@@ -711,21 +699,18 @@ class Giskard:
         self._general_config.joint_limits[Derivatives.jerk][joint_name] = jerk_limit
 
     def set_default_weights(self,
-                            velocity_weight: float = 0.001,
-                            acceleration_weight: Optional[float] = None,
-                            jerk_weight: Optional[float] = 0.001):
+                            velocity_weight: float = 0.01,
+                            acceleration_weight: float = 0,
+                            jerk_weight: float = 0.01,
+                            snap_weight: float = 0):
         """
         The default values are set automatically, even if this function is not called.
         A typical goal has a weight of 1, so the values in here should be sufficiently below that.
         """
-        self._qp_solver_config.joint_weights = {
-            Derivatives.velocity: defaultdict(lambda: velocity_weight)
-        }
-        if jerk_weight is not None:
-            self._qp_solver_config.joint_weights[Derivatives.acceleration] = defaultdict(lambda: acceleration_weight)
-            self._qp_solver_config.joint_weights[Derivatives.jerk] = defaultdict(lambda: jerk_weight)
-        elif acceleration_weight is not None:
-            self._qp_solver_config.joint_weights[Derivatives.acceleration] = defaultdict(lambda: acceleration_weight)
+        self._qp_solver_config.joint_weights = {Derivatives.velocity: defaultdict(lambda: velocity_weight),
+                                                Derivatives.acceleration: defaultdict(lambda: acceleration_weight),
+                                                Derivatives.jerk: defaultdict(lambda: jerk_weight),
+                                                Derivatives.snap: defaultdict(lambda: snap_weight)}
 
     def overwrite_joint_velocity_weight(self,
                                         joint_name: str,

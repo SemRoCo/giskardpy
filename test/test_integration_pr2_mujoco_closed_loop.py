@@ -22,7 +22,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         self.r_gripper_group = 'r_gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        self.mujoco_reset = rospy.ServiceProxy('pr2/reset', Trigger)
+        self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom_combined'
         super().__init__(PR2_MujocoRealTime)
 
@@ -53,7 +53,7 @@ def giskard(request, ros):
 
 
 class TestJointGoalsMujoco(TestJointGoals):
-    def test_joint_goal2(self, zero_pose: PR2TestWrapper):
+    def test_joint_goal(self, zero_pose: PR2TestWrapper):
         js = {
             # 'torso_lift_joint': 0.2999225173357618,
             'head_pan_joint': 0.041880780651479044,

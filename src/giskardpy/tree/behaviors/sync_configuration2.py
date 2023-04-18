@@ -49,10 +49,10 @@ class SyncConfiguration2(GiskardBehavior):
         # except Empty:
         #     pass
         self.msg = data
-        try:
-            self.lock.release()
-        except Exception:
-            pass
+        # try:
+        #     self.lock.release()
+        # except Exception:
+        #     pass
         # self.lock.put(data)
 
     @profile
@@ -63,7 +63,7 @@ class SyncConfiguration2(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        self.lock.acquire()
+        # self.lock.acquire()
         # try:
         # if self.mjs is None:
         # js = self.lock.get()

@@ -74,3 +74,11 @@ class JointVelController(GiskardBehavior):
             msg.data = js[joint_name].velocity
             self.publishers[i].publish(msg)
         return Status.RUNNING
+
+    def terminate(self, new_status):
+        msg = Float64()
+        for i, joint_name in enumerate(self.joint_names):
+            self.publishers[i].publish(msg)
+        return Status.RUNNING
+
+

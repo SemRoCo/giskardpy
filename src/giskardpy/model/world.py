@@ -1492,6 +1492,13 @@ class WorldBranch(WorldTreeInterface):
                 self.world.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
 
+    def get_unmovable_links(self) -> List[PrefixName]:
+        unmovable_links, _ = self.world.search_branch(link_name=self.root_link_name,
+                                                   stop_at_joint_when=lambda
+                                                       joint_name: joint_name in self.controlled_joints,
+                                                   collect_link_when=self.world.has_link_collisions)
+        return unmovable_links
+
     @property
     def base_pose(self) -> Pose:
         return self.world.compute_fk_pose(self.world.root_link_name, self.root_link_name).pose

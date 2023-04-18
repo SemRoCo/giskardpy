@@ -789,9 +789,9 @@ class ClosedLoop(OpenLoop):
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                       **self.god_map.unsafe_get_data(
                                                                           identifier.SyncTfFrames)))
-        planning_4.add_child(success_is_running(NotifyStateChange)())
         for odometry_kwargs in hardware_config.odometry_node_kwargs:
             planning_4.add_child(SyncOdometry(**odometry_kwargs))
+        planning_4.add_child(success_is_running(NotifyStateChange)())
         if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
                 and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
             planning_4.add_child(VisualizationBehavior('visualization'))
@@ -814,6 +814,8 @@ class ClosedLoop(OpenLoop):
             planning_4.add_child(JointPosController(**joint_position_controller_config))
         for kwargs in hardware_config.joint_velocity_controllers_kwargs:
             planning_4.add_child(JointVelController(**kwargs))
+        # for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
+        #     planning_4.add_child(SendTrajectoryToCmdVel(**drive_interface))
 
         for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
             planning_4.add_child(SendTrajectoryToCmdVelClosedLoop(**drive_interface))

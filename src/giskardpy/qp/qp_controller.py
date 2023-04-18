@@ -1292,6 +1292,8 @@ class QPProblemBuilder:
                 finally:
                     self.__swap_compiled_matrices()
                     # self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
+            else:
+                logging.loginfo('Joint limits not violated.')
             self._are_hard_limits_violated(str(e_original))
             # self._is_inf_in_data()
             raise
@@ -1391,7 +1393,10 @@ class QPProblemBuilder:
         p_debug = {}
         for name, value in self.evaluated_debug_expressions.items():
             if isinstance(value, np.ndarray):
-                p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
+                if len(value.shape) == 1:
+                    p_debug[name] = value
+                else:
+                    p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
             else:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()

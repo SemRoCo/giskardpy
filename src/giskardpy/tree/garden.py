@@ -40,6 +40,7 @@ from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
+from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -788,6 +789,7 @@ class ClosedLoop(OpenLoop):
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                       **self.god_map.unsafe_get_data(
                                                                           identifier.SyncTfFrames)))
+        planning_4.add_child(success_is_running(NotifyStateChange)())
         for odometry_kwargs in hardware_config.odometry_node_kwargs:
             planning_4.add_child(SyncOdometry(**odometry_kwargs))
         if self.god_map.get_data(identifier.enable_VisualizationBehavior) \

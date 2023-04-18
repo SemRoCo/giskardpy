@@ -10,12 +10,13 @@ from giskardpy.data_types import KeyDefaultDict
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
 class JointVelController(GiskardBehavior):
     last_time: float
 
+    @record_time
     @profile
     def __init__(self, namespaces=None, group_name: str = None):
         super().__init__('joint velocity publisher')
@@ -41,6 +42,8 @@ class JointVelController(GiskardBehavior):
         super().initialise()
 
     @catch_and_raise_to_blackboard
+    @record_time
+    @profile
     def update(self):
         # next_time = self.god_map.get_data(identifier.time)
         # if next_time <= 0.0 or not hasattr(self, 'last_time'):
@@ -59,7 +62,7 @@ class JointVelController(GiskardBehavior):
         # next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
         # self.world.update_state(next_cmds, self.sample_period)
         msg = Float64()
-        js = deepcopy(self.world.state)
+        # js = deepcopy(self.world.state)
         # try:
         #     qp_data = self.god_map.get_data(identifier.qp_solver_solution)
         #     if qp_data is None:
@@ -71,7 +74,7 @@ class JointVelController(GiskardBehavior):
         # except:
         #     dt = 0
         for i, joint_name in enumerate(self.joint_names):
-            msg.data = js[joint_name].velocity
+            msg.data = self.world.state[joint_name].velocity
             self.publishers[i].publish(msg)
         return Status.RUNNING
 

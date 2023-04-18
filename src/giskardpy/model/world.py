@@ -468,7 +468,6 @@ class WorldTree(WorldTreeInterface):
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)
-        self.notify_state_change()
 
     def add_urdf(self,
                  urdf: str,
@@ -1152,6 +1151,7 @@ class WorldTree(WorldTreeInterface):
             idx_start: Dict[PrefixName, int]
             fast_collision_fks: CompiledFunction
             fast_all_fks: CompiledFunction
+            str_params: List[str]
 
             def __init__(self, world: WorldTree):
                 self.world = world
@@ -1180,16 +1180,21 @@ class WorldTree(WorldTreeInterface):
                         collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
                 self.collision_link_order = list(collision_ids)
-                self.fast_all_fks = all_fks.compile()
-                self.fast_collision_fks = collision_fks.compile()
+                params = set()
+                params.update(all_fks.free_symbols())
+                params.update(collision_fks.free_symbols())
+                params = list(params)
+                self.str_params = [str(v) for v in params]
+                self.fast_all_fks = all_fks.compile(parameters=params)
+                self.fast_collision_fks = collision_fks.compile(parameters=params)
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
 
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-                self.collision_fk_matrix = self.fast_collision_fks.fast_call(
-                    self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
+                substitutions = self.god_map.unsafe_get_values(self.str_params)
+                self.fks = self.fast_all_fks.fast_call(substitutions)
+                self.collision_fk_matrix = self.fast_collision_fks.fast_call(substitutions)
 
             @memoize
             @profile

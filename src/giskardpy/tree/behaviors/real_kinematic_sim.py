@@ -30,5 +30,5 @@ class RealKinSimPlugin(GiskardBehavior):
         # print(f'dt: {dt}')
         self.world.update_state(next_cmds, dt)
         self.last_time = next_time
-        self.world.notify_state_change()
+        # self.world.notify_state_change()
         return Status.RUNNING

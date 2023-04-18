@@ -70,5 +70,4 @@ class SyncOdometry(GiskardBehavior):
 
         except Empty:
             pass
-        self.world.notify_state_change()
         return Status.RUNNING

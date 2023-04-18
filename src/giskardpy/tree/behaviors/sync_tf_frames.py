@@ -24,11 +24,11 @@ class SyncTfFrames(GiskardBehavior):
             for joint_name in self.joint_names:
                 joint: TFJoint = self.world.joints[joint_name]
                 parent_T_child = lookup_pose(joint.parent_link_name, joint.child_link_name)
-                parent_T_child_old = self.world.compute_fk_pose(joint.parent_link_name, joint.child_link_name)
-                try:
-                    compare_poses(parent_T_child_old.pose, parent_T_child.pose, decimal=3)
-                    # raise Exception()
-                except AssertionError as e:
-                    joint.update_transform(parent_T_child.pose)
+                # parent_T_child_old = self.world.compute_fk_pose(joint.parent_link_name, joint.child_link_name)
+                # try:
+                #     compare_poses(parent_T_child_old.pose, parent_T_child.pose, decimal=3)
+                #     raise Exception()
+                # except AssertionError as e:
+                joint.update_transform(parent_T_child.pose)
 
         return Status.SUCCESS

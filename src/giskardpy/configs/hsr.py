@@ -1,6 +1,6 @@
 from typing import Optional
 
-from giskardpy.configs.data_types import ControlModes
+from giskardpy.configs.data_types import ControlModes, SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard
 from giskardpy.my_types import PrefixName
 
@@ -76,9 +76,9 @@ class HSR_StandAlone(HSR_Base):
         self.add_omni_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
                                   name='brumbrum',
-                                  x_vel_name='odom_x',
-                                  y_vel_name='odom_y',
-                                  yaw_vel_name='odom_t')
+                                  x_vel_name=PrefixName('odom_x', self.get_default_group_name()),
+                                  y_vel_name=PrefixName('odom_y', self.get_default_group_name()),
+                                  yaw_vel_name=PrefixName('odom_t', self.get_default_group_name()))
         self.register_controlled_joints([
             'arm_flex_joint',
             'arm_lift_joint',

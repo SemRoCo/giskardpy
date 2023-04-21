@@ -83,16 +83,15 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
     def __init__(self):
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        self.mujoco_reset = rospy.ServiceProxy('hsrb4s/reset', Trigger)
+        self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom'
         super().__init__(HSR_Mujoco)
 
     def reset_base(self):
         p = PoseStamped()
-        p.header.frame_id = tf.get_tf_root()
+        p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        self.set_localization(p)
-        self.wait_heartbeats()
+        self.move_base(p)
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.move_base(goal_pose)
@@ -131,6 +130,13 @@ def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
 
 
 class TestJointGoals:
+    def test_continuous_joint1(self, zero_pose: HSRTestWrapper):
+        zero_pose.allow_self_collision()
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        js = {'wrist_roll_joint': -pi}
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
         arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
@@ -236,6 +242,7 @@ class TestCartGoals:
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
@@ -249,11 +256,34 @@ class TestCartGoals:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
+    def test_move_base_1m_forward(self, zero_pose: HSRTestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.orientation.w = 1
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(map_T_odom)
+
+    def test_move_base_1m_left(self, zero_pose: HSRTestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation.w = 1
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(map_T_odom)
+
+    def test_move_base_rotate(self, zero_pose: HSRTestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(map_T_odom)
+
     def test_rotate_gripper(self, zero_pose: HSRTestWrapper):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip, root_link='arm_roll_link')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 

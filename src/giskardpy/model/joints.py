@@ -384,14 +384,11 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
 
         x_vel = state[self.x_vel.name].velocity
         y_vel = state[self.y_vel.name].velocity
-        rot_vel = state[self.yaw.name].velocity
         delta = state[self.yaw.name].position
         state[self.x.name].velocity = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
         state[self.x.name].position += state[self.x.name].velocity * dt
         state[self.y.name].velocity = (np.sin(delta) * x_vel + np.cos(delta) * y_vel)
         state[self.y.name].position += state[self.y.name].velocity * dt
-        state[self.yaw.name].velocity = rot_vel
-        state[self.yaw.name].position += rot_vel * dt
 
     def get_free_variable_names(self) -> List[PrefixName]:
         return [self.x_vel.name, self.y_vel.name, self.yaw.name]

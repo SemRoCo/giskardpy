@@ -318,9 +318,9 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
 
         if rotation_limits is None:
             self.rotation_limits = {
-                Derivatives.velocity: 1,
+                Derivatives.velocity: 0.6,
                 Derivatives.acceleration: np.inf,
-                Derivatives.jerk: 30
+                Derivatives.jerk: 10
             }
         else:
             self.rotation_limits = rotation_limits

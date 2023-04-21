@@ -5,9 +5,8 @@ from giskardpy.my_types import PrefixName
 
 class Tracebot(Giskard):
     def __init__(self):
-        super().__init__()
-        self.set_root_link_name('map')
-        self.add_fixed_joint('map', 'tracy/world')
+        super().__init__(root_link_name='map')
+        self.add_fixed_joint('map', 'dual_panda/base')
 
 
 class TracebotMujoco(Tracebot):

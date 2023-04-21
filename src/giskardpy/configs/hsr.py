@@ -2,12 +2,13 @@ from typing import Optional
 
 from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.default_giskard import Giskard
+from giskardpy.my_types import PrefixName
 
 
 class HSR_Base(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
-        # self.configure_PlotTrajectory(enabled=True, wait=True)
+        self.configure_PlotTrajectory(enabled=True, wait=True)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/hsrb.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                       hard_threshold=0.0)
@@ -42,9 +43,10 @@ class HSR_Mujoco(HSR_Base):
         self.add_sync_tf_frame('map', 'odom')
         self.add_omni_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
-                                  odom_x_name='odom_x',
-                                  odom_y_name='odom_y',
-                                  odom_yaw_name='odom_t',
+                                  name='brumbrum',
+                                  x_vel_name=PrefixName('odom_x', self.get_default_group_name()),
+                                  y_vel_name=PrefixName('odom_y', self.get_default_group_name()),
+                                  yaw_vel_name=PrefixName('odom_t', self.get_default_group_name()),
                                   odometry_topic='/hsrb4s/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/hsrb4s/arm_trajectory_controller/follow_joint_trajectory',
                                                 state_topic='/hsrb4s/arm_trajectory_controller/state',
@@ -73,7 +75,10 @@ class HSR_StandAlone(HSR_Base):
         self.add_fixed_joint(parent_link='map', child_link='odom')
         self.add_omni_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
-                                  name='brumbrum')
+                                  name='brumbrum',
+                                  x_vel_name='odom_x',
+                                  y_vel_name='odom_y',
+                                  yaw_vel_name='odom_t')
         self.register_controlled_joints([
             'arm_flex_joint',
             'arm_lift_joint',

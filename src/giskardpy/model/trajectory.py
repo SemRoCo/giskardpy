@@ -75,7 +75,7 @@ class Trajectory:
             p = JointTrajectoryPoint()
             p.time_from_start = rospy.Duration(time * sample_period)
             for joint in joints:
-                free_variables = joint.get_position_variables()
+                free_variables = joint.get_controllable_variables()
                 for free_variable in free_variables:
                     if free_variable in traj_point:
                         if i == 0:

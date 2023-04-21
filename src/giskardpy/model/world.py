@@ -926,7 +926,7 @@ class WorldTree(WorldTreeInterface):
         except KeyError:
             return []
 
-    def register_controlled_joints(self, controlled_joints: List[str]):
+    def register_controlled_joints(self, controlled_joints: List[PrefixName]):
         """
         Flag these joints as controlled.
         """

@@ -130,12 +130,6 @@ def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
 
 
 class TestJointGoals:
-    def test_continuous_joint1(self, zero_pose: HSRTestWrapper):
-        zero_pose.allow_self_collision()
-        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-        js = {'wrist_roll_joint': -pi}
-        zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
 
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
         arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')

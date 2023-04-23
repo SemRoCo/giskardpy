@@ -108,7 +108,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                     self.controlled_joints.append(joint)
                     controlled_joint_names.remove(joint.free_variable.name)
             elif isinstance(joint, OmniDrive):
-                degrees_of_freedom = {joint.x_vel.name, joint.y_vel.name, joint.yaw.name}
+                degrees_of_freedom = {joint.x.name, joint.y.name, joint.yaw.name}
                 if set(controlled_joint_names) == degrees_of_freedom:
                     self.controlled_joints.append(joint)
                     for position_variable in degrees_of_freedom:

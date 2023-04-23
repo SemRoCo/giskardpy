@@ -276,8 +276,8 @@ class Giskard:
                              odometry_topic: Optional[str] = None,
                              translation_limits: Optional[derivative_map] = None,
                              rotation_limits: Optional[derivative_map] = None,
-                             x_vel_name: Optional[PrefixName] = None,
-                             y_vel_name: Optional[PrefixName] = None,
+                             x_name: Optional[PrefixName] = None,
+                             y_name: Optional[PrefixName] = None,
                              yaw_vel_name: Optional[PrefixName] = None):
         """
         Use this to connect a robot urdf of a mobile robot to the world if it has an omni-directional drive.
@@ -299,12 +299,12 @@ class Giskard:
                                       'name': joint_name,
                                       'translation_limits': translation_limits,
                                       'rotation_limits': rotation_limits})
-        if x_vel_name is not None:
-            brumbrum_joint[1]['x_vel_name'] = x_vel_name
-        if y_vel_name is not None:
-            brumbrum_joint[1]['y_vel_name'] = y_vel_name
+        if x_name is not None:
+            brumbrum_joint[1]['x_name'] = x_name
+        if y_name is not None:
+            brumbrum_joint[1]['y_name'] = y_name
         if yaw_vel_name is not None:
-            brumbrum_joint[1]['yaw_vel_name'] = yaw_vel_name
+            brumbrum_joint[1]['yaw_name'] = yaw_vel_name
         self._add_joint(brumbrum_joint)
         if odometry_topic is not None:
             self._add_odometry_topic(odometry_topic=odometry_topic, joint_name=joint_name)

@@ -44,8 +44,8 @@ class HSR_Mujoco(HSR_Base):
         self.add_omni_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
                                   name='brumbrum',
-                                  x_vel_name=PrefixName('odom_x', self.get_default_group_name()),
-                                  y_vel_name=PrefixName('odom_y', self.get_default_group_name()),
+                                  x_name=PrefixName('odom_x', self.get_default_group_name()),
+                                  y_name=PrefixName('odom_y', self.get_default_group_name()),
                                   yaw_vel_name=PrefixName('odom_t', self.get_default_group_name()),
                                   odometry_topic='/hsrb4s/base_footprint')
         self.add_follow_joint_trajectory_server(namespace='/hsrb4s/arm_trajectory_controller/follow_joint_trajectory',
@@ -76,9 +76,9 @@ class HSR_StandAlone(HSR_Base):
         self.add_omni_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',
                                   name='brumbrum',
-                                  # x_vel_name=PrefixName('odom_x', self.get_default_group_name()),
-                                  # y_vel_name=PrefixName('odom_y', self.get_default_group_name()),
-                                  # yaw_vel_name=PrefixName('odom_t', self.get_default_group_name())
+                                  x_name=PrefixName('odom_x', self.get_default_group_name()),
+                                  y_name=PrefixName('odom_y', self.get_default_group_name()),
+                                  yaw_vel_name=PrefixName('odom_t', self.get_default_group_name())
                                   )
         self.register_controlled_joints([
             'arm_flex_joint',

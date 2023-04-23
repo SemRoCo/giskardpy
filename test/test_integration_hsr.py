@@ -272,9 +272,26 @@ class TestCartGoals:
         zero_pose.allow_all_collisions()
         zero_pose.move_base(map_T_odom)
 
+    def test_move_base_1m_diagonal(self, zero_pose: HSRTestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation.w = 1
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(map_T_odom)
+
     def test_move_base_rotate(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()
         map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(map_T_odom)
+
+    def test_move_base_forward_rotate(self, zero_pose: HSRTestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
         zero_pose.allow_all_collisions()
         zero_pose.move_base(map_T_odom)

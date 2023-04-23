@@ -289,22 +289,22 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
                  child_link_name: PrefixName,
                  translation_limits: Optional[derivative_map] = None,
                  rotation_limits: Optional[derivative_map] = None,
-                 x_vel_name: Optional[PrefixName] = None,
-                 y_vel_name: Optional[PrefixName] = None,
-                 yaw_vel_name: Optional[PrefixName] = None):
+                 x_name: Optional[PrefixName] = None,
+                 y_name: Optional[PrefixName] = None,
+                 yaw_name: Optional[PrefixName] = None):
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
-        if x_vel_name is not None:
-            self.x_vel_name = x_vel_name
+        if x_name is not None:
+            self.x_name = x_name
         else:
-            self.x_vel_name = PrefixName('x_vel', self.name)
-        if y_vel_name is not None:
-            self.y_vel_name = y_vel_name
+            self.x_name = PrefixName('x', self.name)
+        if y_name is not None:
+            self.y_name = y_name
         else:
-            self.y_vel_name = PrefixName('y_vel', self.name)
-        if yaw_vel_name is not None:
-            self.yaw_vel_name = yaw_vel_name
+            self.y_name = PrefixName('y', self.name)
+        if yaw_name is not None:
+            self.yaw_vel_name = yaw_name
         else:
             self.yaw_vel_name = PrefixName('yaw', self.name)
         if translation_limits is None:
@@ -346,8 +346,8 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
         rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
 
-        self.x = self.world.add_virtual_free_variable(name=PrefixName('x', self.name))
-        self.y = self.world.add_virtual_free_variable(name=PrefixName('y', self.name))
+        self.x = self.world.add_virtual_free_variable(name=self.x_name)
+        self.y = self.world.add_virtual_free_variable(name=self.y_name)
         self.z = self.world.add_virtual_free_variable(name=PrefixName('z', self.name))
 
         self.roll = self.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
@@ -356,10 +356,10 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
                                                 lower_limits=rotation_lower_limits,
                                                 upper_limits=self.rotation_limits)
 
-        self.x_vel = self.world.add_free_variable(name=self.x_vel_name,
+        self.x_vel = self.world.add_free_variable(name=PrefixName('x_vel', self.name),
                                                   lower_limits=translation_lower_limits,
                                                   upper_limits=self.translation_limits)
-        self.y_vel = self.world.add_free_variable(name=self.y_vel_name,
+        self.y_vel = self.world.add_free_variable(name=PrefixName('y_vel', self.name),
                                                   lower_limits=translation_lower_limits,
                                                   upper_limits=self.translation_limits)
         self.free_variables = [self.x_vel, self.y_vel, self.yaw]
@@ -391,7 +391,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         state[self.y.name].position += state[self.y.name].velocity * dt
 
     def get_free_variable_names(self) -> List[PrefixName]:
-        return [self.x_vel.name, self.y_vel.name, self.yaw.name]
+        return [self.x.name, self.y.name, self.yaw.name]
 
 
 class DiffDrive(MovableJoint, VirtualFreeVariables):

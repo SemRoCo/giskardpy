@@ -272,6 +272,12 @@ class Giskard:
         self.hardware_config.joint_group_position_controllers_kwargs.append({'namespace': namespace,
                                                                              'group_name': group_name})
 
+    def add_joint_group_velocity_controller(self, namespace: str, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self.hardware_config.joint_group_velocity_controllers_kwargs.append({'namespace': namespace,
+                                                                             'group_name': group_name})
+
     def add_joint_position_controller(self, namespaces: List[str], group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.get_default_group_name()

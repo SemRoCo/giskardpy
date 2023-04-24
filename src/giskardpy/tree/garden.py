@@ -31,6 +31,7 @@ from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
 from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
+from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
 from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
@@ -811,6 +812,8 @@ class ClosedLoop(OpenLoop):
             planning_4.add_child(JointPosController(**joint_position_controller_config))
         for kwargs in hardware_config.joint_velocity_controllers_kwargs:
             planning_4.add_child(JointVelController(**kwargs))
+        for joint_group_velocity_controller_config in hardware_config.joint_group_velocity_controllers_kwargs:
+            planning_4.add_child(JointGroupVelController(**joint_group_velocity_controller_config))
 
         # planning_4.add_child(SendFollowJointTrajectoryClosedLoop(
         #     action_namespace='/hsrb/arm_trajectory_controller/follow_joint_trajectory',

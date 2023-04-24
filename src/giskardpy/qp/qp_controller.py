@@ -1409,19 +1409,29 @@ class QPProblemBuilder:
             self.p_bE_raw = pd.DataFrame(bE, self.equality_constr_names, ['data'], dtype=float)
             self.p_bE = deepcopy(self.p_bE_raw)
             self.p_bE[len(self.equality_bounds.names_derivative_links):] /= sample_period
+        else:
+            self.p_bE = pd.DataFrame()
         if len(lbA) > 0:
             self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_lbA = deepcopy(self.p_lbA_raw)
             self.p_lbA[len(self.inequality_bounds.names_position_limits):] /= sample_period
+        else:
+            self.p_lbA = pd.DataFrame()
         if len(ubA) > 0:
             self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_ubA = deepcopy(self.p_ubA_raw)
             self.p_ubA[len(self.inequality_bounds.names_position_limits):] /= sample_period
+        else:
+            self.p_ubA = pd.DataFrame()
         # remove sample period factor
         if len(E) > 0:
             self.p_E = pd.DataFrame(E, self.equality_constr_names, self.free_variable_names, dtype=float)
+        else:
+            self.p_E = pd.DataFrame()
         if len(A) > 0:
             self.p_A = pd.DataFrame(A, self.inequality_constr_names, self.free_variable_names, dtype=float)
+        else:
+            self.p_A = pd.DataFrame()
         self.p_xdot = None
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_names, ['data'], dtype=float)

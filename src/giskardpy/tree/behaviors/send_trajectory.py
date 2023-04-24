@@ -69,8 +69,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                     if action_msg_type not in self.supported_action_types:
                         raise TypeError()
                 except Exception as e:
-                    raise TypeError('Action server of type \'{}\' is not supported. '
-                                    'Must be one of: {}'.format(action_msg_type, self.supported_action_types))
+                    raise TypeError(f'Action server of type \'{action_msg_type}\' is not supported. '
+                                    f'Must be one of: {self.supported_action_types}')
             except ROSTopicException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(self.action_namespace))
                 rospy.sleep(1)
@@ -87,8 +87,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 if status_msg_type is None:
                     raise ROSTopicException()
                 if status_msg_type not in self.supported_state_types:
-                    raise TypeError('State topic of type \'{}\' is not supported. '
-                                    'Must be one of: {}'.format(status_msg_type, self.supported_state_types))
+                    raise TypeError(f'State topic of type \'{status_msg_type}\' is not supported. '
+                                    f'Must be one of: {self.supported_state_types}')
                 msg = rospy.wait_for_message(state_topic, status_msg_type, timeout=2.0)
                 if isinstance(msg, JointState):
                     controlled_joint_names = msg.name

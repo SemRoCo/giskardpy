@@ -721,12 +721,12 @@ class TestJointGoals:
             'head_1_joint': 99,
             'head_2_joint': 99
         }
-        zero_pose.set_joint_goal(js1, check=False)
+        zero_pose.set_joint_goal(js1, check=False, weight=WEIGHT_ABOVE_CA)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        # zero_pose.set_joint_goal(zero_pose.default_pose)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.plan_and_execute()
 
     def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {
@@ -737,6 +737,17 @@ class TestJointGoals:
                                 seed_configuration=js)
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan()
+
+    def test_try_to_stay_out_of_soft_limits(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'head_1_joint': 2,
+            'head_2_joint': -2
+        }
+        zero_pose.set_json_goal('SetSeedConfiguration',
+                                seed_configuration=js)
+        zero_pose.set_joint_goal(js, weight=WEIGHT_BELOW_CA, check=False)
+        zero_pose.plan_and_execute()
+        zero_pose.are_joint_limits_violated()
 
     def test_torso_goal(self, zero_pose: TiagoTestWrapper):
         # js1 = {

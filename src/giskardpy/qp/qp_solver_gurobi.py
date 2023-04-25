@@ -65,11 +65,11 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
         try:
             self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
-        except GurobiError:
+        except (GurobiError, ValueError) as e:
             pass  # no eq constraints
         try:
             self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, h)
-        except GurobiError:
+        except (GurobiError, ValueError) as e:
             pass # no neq constraints
         self.started = False
 

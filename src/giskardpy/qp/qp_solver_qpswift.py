@@ -71,8 +71,8 @@ class QPSWIFTFormatter(QPSolver):
 
         free_symbols = set(weights.free_symbols())
         free_symbols.update(g.free_symbols())
-        free_symbols.update(nlbA_without_inf.free_symbols())
-        free_symbols.update(ubA_without_inf.free_symbols())
+        free_symbols.update(nlb_without_inf.free_symbols())
+        free_symbols.update(ub_without_inf.free_symbols())
         free_symbols.update(combined_E.free_symbols())
         free_symbols.update(bE.free_symbols())
         free_symbols.update(nA_A.free_symbols())

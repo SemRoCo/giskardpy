@@ -224,9 +224,9 @@ class Weights(ProblemDataPart):
         # for i in range(len(weights)):
         #     weights[i] = self.replace_hack(weights[i], 0)
         linear_weights = cas.zeros(*weights.shape)
-        position_limits = self.construct_linear_weight()
-        position_limits = cas.Expression(self._sorter(*position_limits)[0])
-        linear_weights[:position_limits.shape[0]] = position_limits
+        # position_limits = self.construct_linear_weight()
+        # position_limits = cas.Expression(self._sorter(*position_limits)[0])
+        # linear_weights[:position_limits.shape[0]] = position_limits
         return cas.Expression(weights), linear_weights
 
     @profile
@@ -300,9 +300,32 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
+    def velocity_limit(self, v: FreeVariable, t: int):
+        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
+        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
+        current_position = v.get_symbol(Derivatives.position)
+        lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
+        upper_velocity_limit = v.get_upper_limit(Derivatives.velocity, evaluated=True)
+        lb = cas.max(lower_limit - current_position - lower_velocity_limit * t * self.dt,
+                     lower_velocity_limit * self.dt) / self.dt
+        ub = cas.min(upper_limit - current_position - upper_velocity_limit * t * self.dt,
+                     upper_velocity_limit * self.dt) / self.dt
+
+        if t == 0:
+            # fixme should consider minimum based on all derivatives
+            lower_one_step_vel = v.get_lower_limit(self.max_derivative, evaluated=True) * self.dt ** (self.max_derivative-1)
+            upper_one_step_vel = v.get_upper_limit(self.max_derivative, evaluated=True) * self.dt ** (self.max_derivative-1)
+            lb = cas.limit(lb, lower_velocity_limit, upper_one_step_vel)
+            ub = cas.limit(ub, lower_one_step_vel, upper_velocity_limit)
+        else:
+            lb = cas.limit(lb, lower_velocity_limit, 0)
+            ub = cas.limit(ub, 0, upper_velocity_limit)
+        return lb, ub
+
+
     @profile
-    def free_variable_bounds(self) -> Tuple[List[Dict[str, cas.symbol_expr_float]],
-    List[Dict[str, cas.symbol_expr_float]]]:
+    def free_variable_bounds(self) \
+            -> Tuple[List[Dict[str, cas.symbol_expr_float]], List[Dict[str, cas.symbol_expr_float]]]:
         lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         for t in range(self.prediction_horizon):
@@ -314,10 +337,13 @@ class FreeVariableBounds(ProblemDataPart):
                         lb[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
                         ub[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
                     else:
-                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = v.get_lower_limit(derivative,
-                                                                                             evaluated=self.evaluated)
-                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = v.get_upper_limit(derivative,
-                                                                                             evaluated=self.evaluated)
+                        if derivative == Derivatives.velocity and v.has_position_limits():
+                            lower_limit, upper_limit = self.velocity_limit(v, t)
+                        else:
+                            lower_limit = v.get_lower_limit(derivative, evaluated=self.evaluated)
+                            upper_limit = v.get_upper_limit(derivative, evaluated=self.evaluated)
+                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lower_limit
+                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = upper_limit
         lb_params = []
         ub_params = []
         for derivative, name_to_bound_map in sorted(lb.items()):
@@ -544,13 +570,13 @@ class InequalityBounds(ProblemDataPart):
 
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
-        lower_position_bounds, upper_position_bounds = self.position_limits()
-        lb_params = [lower_position_bounds]
-        ub_params = [upper_position_bounds]
-        num_position_limits = len(lower_position_bounds)
-        # lb_params = []
-        # ub_params = []
-        # num_position_limits = 0
+        # lower_position_bounds, upper_position_bounds = self.position_limits()
+        # lb_params = [lower_position_bounds]
+        # ub_params = [upper_position_bounds]
+        # num_position_limits = len(lower_position_bounds)
+        lb_params = []
+        ub_params = []
+        num_position_limits = 0
 
         num_derivative_constraints = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
@@ -956,8 +982,8 @@ class InequalityModel(ProblemDataPart):
 
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
-        position_limit_model = self.position_limit_model()
-        # position_limit_model = cas.Expression()
+        # position_limit_model = self.position_limit_model()
+        position_limit_model = cas.Expression()
         vel_constr_model, vel_constr_slack_model = self.velocity_constraint_model()
         acc_constr_model, acc_constr_slack_model = self.acceleration_constraint_model()
         jerk_constr_model, jerk_constr_slack_model = self.jerk_constraint_model()

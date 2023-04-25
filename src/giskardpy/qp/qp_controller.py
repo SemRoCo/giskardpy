@@ -16,6 +16,7 @@ from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException, QPSolverException, InfeasibleException
+from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_MAX
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import derivative_joint_map, Derivatives
@@ -152,6 +153,64 @@ class Weights(ProblemDataPart):
         # self._compute_height()
         self.evaluated = True
 
+    def linear_f(self, current_position, limit, target_value, a=10, exp=2) -> Tuple[cas.Expression, float]:
+        f = cas.abs(current_position * a) ** exp
+        x_offset = cas.solve_for(f, target_value)
+        return (cas.abs(current_position + x_offset - limit) * a) ** exp, x_offset
+
+    def asdf(self, current_position: cas.Symbol,
+             lower_limit: float,
+             upper_limit: float,
+             target_weight: float = 100,
+             threshold: float = 0.1, exp: float = 2) \
+            -> Tuple[float, cas.Expression, float, cas.Expression]:
+        range_half = (upper_limit - lower_limit) / 2
+        center = (upper_limit + lower_limit) / 2
+        soft_lower_limit = center - range_half * (1 - threshold)
+        soft_upper_limit = center + range_half * (1 - threshold)
+
+        lower_weight_f = cas.abs(current_position - soft_lower_limit) ** exp
+        a = target_weight / lower_weight_f.compile().fast_call(np.array([lower_limit]))[0]
+        lower_weight_f *= -a
+
+        upper_weight_f = cas.abs(current_position - soft_upper_limit) ** exp
+        a = target_weight / upper_weight_f.compile().fast_call(np.array([upper_limit]))[0]
+        upper_weight_f *= a
+
+        return soft_lower_limit, lower_weight_f, soft_upper_limit, upper_weight_f
+
+
+    def construct_linear_weight(self, threshold: float = 0.1) -> Dict[str, Union[float, cas.Expression]]:
+        params = []
+        linear_weights = defaultdict(dict)  # maps order to joints
+        # linear_weights: Dict[str, Union[float, cas.Expression]] = {}
+        for t in range(self.prediction_horizon):
+            for v in self.free_variables:
+                for o in Derivatives.range(Derivatives.velocity, min(v.order, Derivatives.jerk)):
+                    if not v.has_position_limits():
+                        linear_weights[o][f't{t:03d}/{v.name}/p_limit'] = 0
+                        continue
+                    lower_limit = v.get_lower_limit(Derivatives.position, False, evaluated=self.evaluated)
+                    upper_limit = v.get_upper_limit(Derivatives.position, False, evaluated=self.evaluated)
+                    current_position = v.get_symbol(Derivatives.position)
+                    soft_lower_limit, lower_weight_f, soft_upper_limit, upper_weight_f = self.asdf(current_position,
+                                                                                                   lower_limit,
+                                                                                                   upper_limit,
+                                                                                                   threshold=0.1*o)
+                    weight = cas.if_less(a=current_position,
+                                         b=soft_lower_limit,
+                                         if_result=lower_weight_f*o,
+                                         else_result=0)
+                    weight = cas.if_greater(a=current_position,
+                                            b=soft_upper_limit,
+                                            if_result=upper_weight_f*o,
+                                            else_result=weight)
+                    weight = cas.limit(weight, -WEIGHT_MAX, WEIGHT_MAX)
+                    linear_weights[o][f't{t:03d}/{v.name}/p_limit/{o}'] = weight
+        for _, weight in sorted(linear_weights.items()):
+            params.append(weight)
+        return params
+
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         components = []
@@ -164,7 +223,11 @@ class Weights(ProblemDataPart):
         # todo replace hack?
         # for i in range(len(weights)):
         #     weights[i] = self.replace_hack(weights[i], 0)
-        return cas.Expression(weights), cas.zeros(*weights.shape)
+        linear_weights = cas.zeros(*weights.shape)
+        position_limits = self.construct_linear_weight()
+        position_limits = cas.Expression(self._sorter(*position_limits)[0])
+        linear_weights[:position_limits.shape[0]] = position_limits
+        return cas.Expression(weights), linear_weights
 
     @profile
     def free_variable_weights_expression(self) -> List[defaultdict]:
@@ -239,7 +302,7 @@ class FreeVariableBounds(ProblemDataPart):
 
     @profile
     def free_variable_bounds(self) -> Tuple[List[Dict[str, cas.symbol_expr_float]],
-                                            List[Dict[str, cas.symbol_expr_float]]]:
+    List[Dict[str, cas.symbol_expr_float]]]:
         lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         for t in range(self.prediction_horizon):
@@ -470,51 +533,13 @@ class InequalityBounds(ProblemDataPart):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:
                 if v.has_position_limits():
-                    normal_lower_bound = v.get_lower_limit(Derivatives.position, False,
-                                                           evaluated=self.evaluated) - v.get_symbol(
-                        Derivatives.position)
-                    normal_upper_bound = v.get_upper_limit(Derivatives.position, False,
-                                                           evaluated=self.evaluated) - v.get_symbol(
-                        Derivatives.position)
-                    if self.default_limits:
-                        if self.max_derivative >= Derivatives.jerk:
-                            lower_vel = cas.min(v.get_upper_limit(derivative=Derivatives.velocity,
-                                                                  default=False,
-                                                                  evaluated=True) * self.dt,
-                                                v.get_upper_limit(derivative=Derivatives.jerk,
-                                                                  default=False,
-                                                                  evaluated=self.evaluated) * self.dt ** 3)
-                            upper_vel = cas.max(v.get_lower_limit(derivative=Derivatives.velocity,
-                                                                  default=False,
-                                                                  evaluated=True) * self.dt,
-                                                v.get_lower_limit(derivative=Derivatives.jerk,
-                                                                  default=False,
-                                                                  evaluated=self.evaluated) * self.dt ** 3)
-                        else:
-                            lower_vel = cas.min(v.get_upper_limit(derivative=Derivatives.velocity,
-                                                                  default=False,
-                                                                  evaluated=True) * self.dt,
-                                                v.get_upper_limit(derivative=Derivatives.acceleration,
-                                                                  default=False,
-                                                                  evaluated=self.evaluated) * self.dt ** 2)
-                            upper_vel = cas.max(v.get_lower_limit(derivative=Derivatives.velocity,
-                                                                  default=False,
-                                                                  evaluated=True) * self.dt,
-                                                v.get_lower_limit(derivative=Derivatives.acceleration,
-                                                                  default=False,
-                                                                  evaluated=self.evaluated) * self.dt ** 2)
-                        lower_bound = cas.if_greater(normal_lower_bound, 0,
-                                                     if_result=lower_vel,
-                                                     else_result=normal_lower_bound)
-                        lb[f't{t:03d}/{v.name}/p_limit'] = lower_bound
-
-                        upper_bound = cas.if_less(normal_upper_bound, 0,
-                                                  if_result=upper_vel,
-                                                  else_result=normal_upper_bound)
-                        ub[f't{t:03d}/{v.name}/p_limit'] = upper_bound
-                    else:
-                        lb[f't{t:03d}/{v.name}/p_limit'] = normal_lower_bound
-                        ub[f't{t:03d}/{v.name}/p_limit'] = normal_upper_bound
+                    current_position = v.get_symbol(Derivatives.position)
+                    lower_limit = v.get_lower_limit(Derivatives.position, False, evaluated=self.evaluated)
+                    lower_limit_capped = cas.min(lower_limit, current_position)
+                    upper_limit = v.get_upper_limit(Derivatives.position, False, evaluated=self.evaluated)
+                    upper_limit_capped = cas.max(upper_limit, current_position)
+                    lb[f't{t:03d}/{v.name}/p_limit'] = lower_limit_capped - current_position
+                    ub[f't{t:03d}/{v.name}/p_limit'] = upper_limit_capped - current_position
         return lb, ub
 
     @profile
@@ -523,6 +548,9 @@ class InequalityBounds(ProblemDataPart):
         lb_params = [lower_position_bounds]
         ub_params = [upper_position_bounds]
         num_position_limits = len(lower_position_bounds)
+        # lb_params = []
+        # ub_params = []
+        # num_position_limits = 0
 
         num_derivative_constraints = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
@@ -929,6 +957,7 @@ class InequalityModel(ProblemDataPart):
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         position_limit_model = self.position_limit_model()
+        # position_limit_model = cas.Expression()
         vel_constr_model, vel_constr_slack_model = self.velocity_constraint_model()
         acc_constr_model, acc_constr_slack_model = self.acceleration_constraint_model()
         jerk_constr_model, jerk_constr_slack_model = self.jerk_constraint_model()
@@ -1391,13 +1420,16 @@ class QPProblemBuilder:
         p_debug = {}
         for name, value in self.evaluated_debug_expressions.items():
             if isinstance(value, np.ndarray):
-                p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
+                if len(value.shape) == 2:
+                    p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
+                else:
+                    p_debug[name] = value
             else:
                 p_debug[name] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
         self.p_weights = pd.DataFrame(weights, self.free_variable_names, ['data'], dtype=float)
-        # self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)
+        self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)
         self.p_lb = pd.DataFrame(lb, self.free_variable_names, ['data'], dtype=float)
         self.p_ub = pd.DataFrame(ub, self.free_variable_names, ['data'], dtype=float)
         if len(bE) > 0:

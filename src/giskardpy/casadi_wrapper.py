@@ -1994,15 +1994,15 @@ def atan2(x, y):
     return Expression(ca.atan2(x, y))
 
 
-def solve_for(expression, target_value, start_value=0.0001, max_tries=10000, eps=1e-10, max_step=1):
+def solve_for(expression, target_value, start_value=0.0001, max_tries=10000, eps=1e-10, max_step=50):
     f_dx = jacobian(expression, expression.free_symbols()).compile()
     f = expression.compile()
     x = start_value
     for tries in range(max_tries):
-        err = f(x=x)[0] - target_value
+        err = f.fast_call(np.array([x]))[0] - target_value
         if builtin_abs(err) < eps:
             return x
-        slope = f_dx(x=x)[0]
+        slope = f_dx.fast_call(np.array([x]))[0]
         if slope == 0:
             if start_value > 0:
                 slope = -0.001

@@ -197,7 +197,7 @@ class BehaviorTreeConfig:
             'length': 60  # seconds
         },
         'LoopDetector': {
-            'precision': 4
+            'precision': 3
         },
         'SyncTfFrames': {
             'joint_names': [],

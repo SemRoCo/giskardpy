@@ -9,7 +9,7 @@ class PR2_Base(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
         # self.set_collision_checker(CollisionCheckerLib.none)
-        # self.set_qp_solver(SupportedQPSolver.gurobi)
+        # self.set_qp_solver(SupportedQPSolver.qpalm)
         # self.configure_PlotTrajectory(enabled=True, wait=True)
         # self.configure_PlotDebugExpressions(enabled=True, wait=True)
         # self.configure_DebugMarkerPublisher(enabled=True)

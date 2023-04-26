@@ -91,7 +91,7 @@ class Trajectory:
             trajectory_msg.points.append(p)
         return trajectory_msg
 
-    def to_dict(self, normalize_position: bool = False) -> Dict[Derivatives, Dict[PrefixName, np.ndarray]]:
+    def to_dict(self, normalize_position: bool = False, filter_0_vel: bool = True) -> Dict[Derivatives, Dict[PrefixName, np.ndarray]]:
         data = defaultdict(lambda: defaultdict(list))
         for time, joint_states in self.items():
             for free_variable, joint_state in joint_states.items():
@@ -102,10 +102,11 @@ class Trajectory:
                 d_data[free_variable] = np.array(trajectory)
                 if normalize_position and derivative == Derivatives.position:
                     d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2
-        for free_variable, trajectory in list(data[Derivatives.velocity].items()):
-            if abs(trajectory.max() - trajectory.min()) < 1e-5:
-                for derivative, d_data in list(data.items()):
-                    del d_data[free_variable]
+        if filter_0_vel:
+            for free_variable, trajectory in list(data[Derivatives.velocity].items()):
+                if abs(trajectory.max() - trajectory.min()) < 1e-5:
+                    for derivative, d_data in list(data.items()):
+                        del d_data[free_variable]
         for derivative, d_data in data.items():
             data[derivative] = SortedDict(sorted(d_data.items()))
         return data
@@ -123,7 +124,8 @@ class Trajectory:
                         print_last_tick: bool = False,
                         legend: bool = True,
                         hspace: float = 1,
-                        y_limits: bool = None):
+                        y_limits: bool = None,
+                        filter_0_vel: bool = True):
         """
         :type tj: Trajectory
         :param controlled_joints: only joints in this list will be added to the plot
@@ -153,7 +155,7 @@ class Trajectory:
             line_styles = ['-', '--', '-.', ':']
             graph_styles = list(product(line_styles, colors))
             color_map: Dict[str, Tuple[str, str]] = defaultdict(lambda: graph_styles[len(color_map) + 1])
-            data = self.to_dict(normalize_position)
+            data = self.to_dict(normalize_position, filter_0_vel=filter_0_vel)
             times = np.arange(len(self)) * sample_period
 
             f, axs = plt.subplots(len(Derivatives), sharex=True, gridspec_kw={'hspace': hspace})

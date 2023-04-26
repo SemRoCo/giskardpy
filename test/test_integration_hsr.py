@@ -369,6 +369,13 @@ class TestConstraints:
 
 class TestCollisionAvoidanceGoals:
 
+    def test_self_collision_avoidance_empty(self, zero_pose: HSRTestWrapper):
+        zero_pose.plan_and_execute()
+        current_state = zero_pose.world.state.to_position_dict()
+        current_state = {k.short_name: v for k, v in current_state.items()}
+        zero_pose.compare_joint_state(current_state, zero_pose.default_pose)
+
+
     def test_self_collision_avoidance(self, zero_pose: HSRTestWrapper):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip

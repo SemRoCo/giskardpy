@@ -32,13 +32,14 @@ from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver
 from giskardpy.configs.default_giskard import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
-from giskardpy.my_types import PrefixName
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging, utils
@@ -812,17 +813,19 @@ class GiskardTestWrapper(GiskardWrapper):
             trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])
         return trajectory2
 
-    def are_joint_limits_violated(self):
-        joints = list(self.world.controlled_joints)
-        for joint in joints:
-            try:
-                lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
-                lower_limit = lower_limit.evaluate()
-                upper_limit = upper_limit.evaluate()
-            except:
-                continue
-            assert lower_limit <= self.world.state[joint].position <= upper_limit, \
-                f'joint limit of {joint} is violated {lower_limit} <= {self.world.state[joint].position} <= {upper_limit}'
+    def are_joint_limits_violated(self, eps=1e-6):
+        active_free_variables: List[FreeVariable] = self.god_map.get_data(identifier.qp_controller).free_variables
+        for free_variable in active_free_variables:
+            if free_variable.has_position_limits():
+                lower_limit = free_variable.get_lower_limit(Derivatives.position)
+                upper_limit = free_variable.get_upper_limit(Derivatives.position)
+                if not isinstance(lower_limit, float):
+                    lower_limit = lower_limit.evaluate()
+                if not isinstance(upper_limit, float):
+                    upper_limit = upper_limit.evaluate()
+                current_position = self.world.state[free_variable.name].position
+                assert lower_limit - eps <= current_position <= upper_limit + eps, \
+                    f'joint limit of {free_variable.name} is violated {lower_limit} <= {current_position} <= {upper_limit}'
 
     def are_joint_limits_in_traj_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()

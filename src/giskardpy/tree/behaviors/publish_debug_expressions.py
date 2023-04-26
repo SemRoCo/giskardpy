@@ -18,7 +18,7 @@ class PublishDebugExpressions(GiskardBehavior):
     def __init__(self, name, publish_lb: bool = False, publish_ub: bool = False, publish_xdot: bool = False,
                  publish_lbA: bool = False, publish_ubA: bool = False, publish_Ax: bool = False,
                  publish_Ex: bool = False, publish_bE: bool = False,
-                 publish_weights: bool = False, publish_debug: bool = False, **kwargs):
+                 publish_weights: bool = False, publish_g: bool = False, publish_debug: bool = False, **kwargs):
         super().__init__(name)
         self.publish_lb = publish_lb
         self.publish_ub = publish_ub
@@ -26,6 +26,7 @@ class PublishDebugExpressions(GiskardBehavior):
         self.publish_ubA = publish_ubA
         self.publish_bE = publish_bE
         self.publish_weights = publish_weights
+        self.publish_g = publish_g
         self.publish_Ax = publish_Ax
         self.publish_Ex = publish_Ex
         self.publish_xdot = publish_xdot
@@ -97,6 +98,11 @@ class PublishDebugExpressions(GiskardBehavior):
             names = [f'weights/{entry_name}' for entry_name in free_variable_names]
             msg.name.extend(names)
             msg.position.extend(weights.tolist())
+
+        if self.publish_g:
+            names = [f'g/{entry_name}' for entry_name in free_variable_names]
+            msg.name.extend(names)
+            msg.position.extend(g.tolist())
 
         if self.publish_xdot:
             names = [f'xdot/{entry_name}' for entry_name in free_variable_names]

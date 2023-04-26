@@ -121,8 +121,8 @@ class Giskard:
                                           publish_lbA: bool = False, publish_ubA: bool = False,
                                           publish_bE: bool = False, publish_Ax: bool = False,
                                           publish_Ex: bool = False, publish_xdot: bool = False,
-                                          publish_weights: bool = False, publish_debug: bool = False,
-                                          enabled_base: bool = False):
+                                          publish_weights: bool = False, publish_g: bool = False,
+                                          publish_debug: bool = False, enabled_base: bool = False):
         enabled = publish_lb or publish_ub or publish_lbA or publish_ubA or publish_bE or publish_Ax or publish_Ex \
                   or publish_xdot or publish_weights or publish_debug
         if enabled:
@@ -135,6 +135,7 @@ class Giskard:
             'publish_lbA': publish_lbA,
             'publish_ubA': publish_ubA,
             'publish_weights': publish_weights,
+            'publish_g': publish_g,
             'publish_bE': publish_bE,
             'publish_Ax': publish_Ax,
             'publish_Ex': publish_Ex,

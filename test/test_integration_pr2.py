@@ -495,7 +495,6 @@ class TestConstraints:
         zero_pose.plan_and_execute()
         assert zero_pose.god_map.get_data(identifier.prediction_horizon) == default_prediction_horizon
 
-
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         tip = 'base_footprint'
         base_pose = PoseStamped()
@@ -3227,19 +3226,25 @@ class TestCollisionAvoidanceGoals:
         box_setup.detach_group(attached_link_name)
 
     def test_attached_get_out_of_collision_and_stay_in_hard_threshold(self, box_setup: PR2TestWrapper):
+        # TODO this creates shaking with a box
         attached_link_name = 'pocky'
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.pose.position.x = 0.05
-        p.pose.orientation.w = 1
-        box_setup.add_box(attached_link_name,
-                          size=(0.2, 0.04, 0.04),
-                          parent_link=box_setup.r_tip,
-                          pose=p)
+        p.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                 [0, 1, 0, 0],
+                                                                 [-1, 0, 0, 0],
+                                                                 [0, 0, 0, 1]]))
+        box_setup.add_cylinder(attached_link_name,
+                               # size=(0.2, 0.04, 0.04),
+                               height=0.2,
+                               radius=0.04,
+                               parent_link=box_setup.r_tip,
+                               pose=p)
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
-        p.pose.position.x = -0.08
+        p.pose.position.x = -0.09
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.plan_and_execute()
@@ -4195,7 +4200,6 @@ class TestBenchmark:
         # horizons = [7]
         for qp_solver in self.qp_solvers:
             for h in horizons:
-
                 fake_table_setup.set_prediction_horizon(h)
                 fake_table_setup.set_json_goal('SetQPSolver', qp_solver_id=qp_solver)
                 r_goal = PoseStamped()

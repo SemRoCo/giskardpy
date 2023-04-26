@@ -52,6 +52,7 @@ class PlotDebugExpressions(PlotTrajectory):
                 traj.plot_trajectory(path_to_data_folder=self.path_to_data_folder,
                                      sample_period=sample_period,
                                      file_name=f'debug.pdf',
+                                     filter_0_vel=False,
                                      **self.kwargs)
             except Exception:
                 traceback.print_exc()

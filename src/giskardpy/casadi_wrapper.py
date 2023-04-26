@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from copy import copy
 from typing import Union, List
 import math
@@ -11,6 +12,10 @@ from scipy import sparse as sp
 
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
+
+builtin_max = builtins.max
+builtin_min = builtins.min
+builtin_abs = builtins.abs
 
 _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
@@ -1643,7 +1648,8 @@ def diag_stack(list_of_matrices):
     row_counter = 0
     column_counter = 0
     for matrix in list_of_matrices:
-        combined_matrix[row_counter:row_counter+matrix.shape[0], column_counter:column_counter+matrix.shape[1]] = matrix
+        combined_matrix[row_counter:row_counter + matrix.shape[0],
+        column_counter:column_counter + matrix.shape[1]] = matrix
         row_counter += matrix.shape[0]
         column_counter += matrix.shape[1]
     return combined_matrix
@@ -1986,3 +1992,21 @@ def atan2(x, y):
     x = Expression(x).s
     y = Expression(y).s
     return Expression(ca.atan2(x, y))
+
+
+def solve_for(expression, target_value, start_value=0.0001, max_tries=10000, eps=1e-10, max_step=50):
+    f_dx = jacobian(expression, expression.free_symbols()).compile()
+    f = expression.compile()
+    x = start_value
+    for tries in range(max_tries):
+        err = f.fast_call(np.array([x]))[0] - target_value
+        if builtin_abs(err) < eps:
+            return x
+        slope = f_dx.fast_call(np.array([x]))[0]
+        if slope == 0:
+            if start_value > 0:
+                slope = -0.001
+            else:
+                slope = 0.001
+        x -= builtin_max(builtin_min(err / slope, max_step), -max_step)
+    raise ValueError('no solution found')

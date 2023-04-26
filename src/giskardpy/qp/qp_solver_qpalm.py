@@ -36,7 +36,7 @@ class QPSolverQPalm(QPSolver):
     compute_nI_I = True
     settings = qpalm.Settings()
     settings.verbose = False
-    settings.eps_abs = 1e-5
+    settings.eps_abs = 3e-5
     settings.eps_rel = 1e-8
     settings.nonconvex = False
 

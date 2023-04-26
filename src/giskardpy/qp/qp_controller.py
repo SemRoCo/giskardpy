@@ -1277,13 +1277,13 @@ class QPProblemBuilder:
         if len(lbA) > 0:
             self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_lbA = deepcopy(self.p_lbA_raw)
-            self.p_lbA[len(self.inequality_bounds.names_position_limits):] /= sample_period
+            self.p_lbA /= sample_period
         else:
             self.p_lbA = pd.DataFrame()
         if len(ubA) > 0:
             self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_ubA = deepcopy(self.p_ubA_raw)
-            self.p_ubA[len(self.inequality_bounds.names_position_limits):] /= sample_period
+            self.p_ubA /= sample_period
         else:
             self.p_ubA = pd.DataFrame()
         # remove sample period factor

@@ -1337,21 +1337,21 @@ class QPProblemBuilder:
                 raise
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)
-            joint_limits_violated_msg = self._are_joint_limits_violated()
-            if joint_limits_violated_msg is not None:
-                logging.logwarn('Joint limits violated, trying to fix.')
-                self.__swap_compiled_matrices()
-                try:
-                    self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
-                    return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
-                                        max_derivative=self.order, prediction_horizon=self.prediction_horizon)
-                except Exception as e2:
-                    # self._create_debug_pandas()
-                    # raise OutOfJointLimitsException(self._are_joint_limits_violated())
-                    raise OutOfJointLimitsException(joint_limits_violated_msg)
-                finally:
-                    self.__swap_compiled_matrices()
-                    # self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
+            # joint_limits_violated_msg = self._are_joint_limits_violated()
+            # if joint_limits_violated_msg is not None:
+            #     logging.logwarn('Joint limits violated, trying to fix.')
+            #     self.__swap_compiled_matrices()
+            #     try:
+            #         self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
+            #         return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full,
+            #                             max_derivative=self.order, prediction_horizon=self.prediction_horizon)
+            #     except Exception as e2:
+            #         # self._create_debug_pandas()
+            #         # raise OutOfJointLimitsException(self._are_joint_limits_violated())
+            #         raise OutOfJointLimitsException(joint_limits_violated_msg)
+            #     finally:
+            #         self.__swap_compiled_matrices()
+            #         # self.free_variables[0].god_map.get_data(['world']).state.pretty_print()
             self._are_hard_limits_violated(str(e_original))
             # self._is_inf_in_data()
             raise

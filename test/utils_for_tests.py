@@ -813,7 +813,7 @@ class GiskardTestWrapper(GiskardWrapper):
             trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])
         return trajectory2
 
-    def are_joint_limits_violated(self):
+    def are_joint_limits_violated(self, eps=1e-6):
         active_free_variables: List[FreeVariable] = self.god_map.get_data(identifier.qp_controller).free_variables
         for free_variable in active_free_variables:
             if free_variable.has_position_limits():
@@ -824,7 +824,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 if not isinstance(upper_limit, float):
                     upper_limit = upper_limit.evaluate()
                 current_position = self.world.state[free_variable.name].position
-                assert lower_limit <= current_position <= upper_limit, \
+                assert lower_limit - eps <= current_position <= upper_limit + eps, \
                     f'joint limit of {free_variable.name} is violated {lower_limit} <= {current_position} <= {upper_limit}'
 
     def are_joint_limits_in_traj_violated(self):

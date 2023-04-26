@@ -312,9 +312,14 @@ class FreeVariableBounds(ProblemDataPart):
                      upper_velocity_limit * self.dt) / self.dt
 
         if t == 0:
-            # fixme should consider minimum based on all derivatives
-            lower_one_step_vel = v.get_lower_limit(self.max_derivative, evaluated=True) * self.dt ** (self.max_derivative-1)
-            upper_one_step_vel = v.get_upper_limit(self.max_derivative, evaluated=True) * self.dt ** (self.max_derivative-1)
+            lower_one_step_velocities = []
+            upper_one_step_velocities = []
+            for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+                step_size = self.dt ** (derivative-1)
+                lower_one_step_velocities.append(v.get_lower_limit(derivative, evaluated=True) * step_size)
+                upper_one_step_velocities.append(v.get_upper_limit(derivative, evaluated=True) * step_size)
+            lower_one_step_vel = max(lower_one_step_velocities)
+            upper_one_step_vel = min(upper_one_step_velocities)
             lb = cas.limit(lb, lower_velocity_limit, upper_one_step_vel)
             ub = cas.limit(ub, lower_one_step_vel, upper_velocity_limit)
         else:

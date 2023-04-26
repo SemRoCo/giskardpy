@@ -471,7 +471,7 @@ class EqualityBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
-    def equality_bounds(self) -> Dict[str, cas.Expression]:
+    def equality_constraint_bounds(self) -> Dict[str, cas.Expression]:
         return {f'{c.name}': cas.limit(c.bound,
                                        -c.velocity_limit * self.dt * c.control_horizon,
                                        c.velocity_limit * self.dt * c.control_horizon)
@@ -486,6 +486,8 @@ class EqualityBounds(ProblemDataPart):
     def derivative_links(self, derivative: Derivatives) -> Dict[str, cas.symbol_expr_float]:
         derivative_link = {}
         for t in range(self.prediction_horizon - 1):
+            if t >= self.prediction_horizon - (self.max_derivative - derivative):
+                continue  # this row is all zero in the model, because the system has to stop at 0 vel
             for v in self.free_variables:
                 derivative_link[f't{t:03}/{derivative}/{v.name}/link'] = 0
         return derivative_link
@@ -498,7 +500,7 @@ class EqualityBounds(ProblemDataPart):
             bounds.append(self.derivative_links(derivative))
         num_derivative_links = sum(len(x) for x in bounds)
 
-        bounds.append(self.equality_bounds())
+        bounds.append(self.equality_constraint_bounds())
 
         bounds, self.names = self._sorter(*bounds)
         self.names_derivative_links = self.names[:num_derivative_links]
@@ -703,7 +705,20 @@ class EqualityModel(ProblemDataPart):
             derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
             offset_v += x_c_height
             offset_h += self.prediction_horizon * self.number_of_free_variables
+        derivative_link_model = self._remove_rows_columns_where_variables_are_zero(derivative_link_model)
+        return derivative_link_model
 
+    def _remove_rows_columns_where_variables_are_zero(self, derivative_link_model: cas.Expression) -> cas.Expression:
+        if np.prod(derivative_link_model.shape) == 0:
+            return derivative_link_model
+        row_ids = []
+        end = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
+            last_non_zero_variable = self.prediction_horizon - (self.max_derivative - derivative - 1)
+            start = end + self.number_of_free_variables * last_non_zero_variable
+            end += self.number_of_free_variables * self.prediction_horizon
+            row_ids.extend(range(start, end))
+        derivative_link_model.remove(row_ids, [])
         return derivative_link_model
 
     @profile

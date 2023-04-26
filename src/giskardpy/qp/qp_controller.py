@@ -1479,6 +1479,10 @@ class QPProblemBuilder:
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
         self.equality_constr_names = self.equality_bounds.names[bE_filter]
         self.inequality_constr_names = self.inequality_bounds.names[bA_filter]
+        num_vel_constr = len(self.derivative_constraints) * (self.prediction_horizon - 2)
+        num_neq_constr = len(self.inequality_constraints)
+        num_eq_constr = len(self.equality_constraints)
+        num_constr = num_vel_constr + num_neq_constr + num_eq_constr
 
         # self._eval_debug_exprs()
         p_debug = {}
@@ -1526,19 +1530,21 @@ class QPProblemBuilder:
         self.p_xdot = None
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_names, ['data'], dtype=float)
-            # Ax = np.dot(self.np_A, xdot_full)
+            # Ax = np.dot(A, self.xdot_full)
             # xH = np.dot((self.xdot_full ** 2).T, H)
             # self.p_xH = pd.DataFrame(xH, filtered_b_names, ['data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 
-            # self.p_pure_xdot = deepcopy(self.p_xdot)
-            # self.p_pure_xdot[-num_constr:] = 0
-            # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, ['data'], dtype=float)
-            # self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, ['data'],
-            #                                            dtype=float)
+            self.p_pure_xdot = deepcopy(self.p_xdot)
+            self.p_pure_xdot[-num_constr:] = 0
+            # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), self.inequality_constr_names, ['data'], dtype=float)
+            self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), self.inequality_constr_names,
+                                                       ['data'], dtype=float)
             # self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
             # self.p_Ax_without_slack[-num_constr:] /= sample_period
+            self.p_Ex_without_slack_raw = pd.DataFrame(self.p_E.dot(self.p_pure_xdot), self.equality_constr_names,
+                                                       ['data'], dtype=float)
 
         else:
             self.p_xdot = None

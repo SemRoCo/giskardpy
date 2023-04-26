@@ -77,6 +77,10 @@ class ProblemDataPart(ABC):
         self.dt = sample_period
         self.max_derivative = max_derivative
 
+    @property
+    def number_of_free_variables(self) -> int:
+        return len(self.free_variables)
+
     def replace_hack(self, expression: Union[float, cas.Expression], new_value):
         if not isinstance(expression, cas.Expression):
             return expression
@@ -121,6 +125,19 @@ class ProblemDataPart(ABC):
 
     def __helper_names(self, param: dict):
         return [x for x, _ in sorted(param.items())]
+
+    def _remove_columns_columns_where_variables_are_zero(self, free_variable_model: cas.Expression) -> cas.Expression:
+        if np.prod(free_variable_model.shape) == 0:
+            return free_variable_model
+        column_ids = []
+        end = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
+            last_non_zero_variable = self.prediction_horizon - (self.max_derivative - derivative)
+            start = end + self.number_of_free_variables * last_non_zero_variable
+            end += self.number_of_free_variables * self.prediction_horizon
+            column_ids.extend(range(start, end))
+        free_variable_model.remove([], column_ids)
+        return free_variable_model
 
 
 class Weights(ProblemDataPart):
@@ -195,11 +212,12 @@ class Weights(ProblemDataPart):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
             for v in self.free_variables:
-                for o in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
-                    o = Derivatives(o)
-                    weights[o][f't{t:03}/{v.position_name}/{o}'] = v.normalized_weight(t, o,
-                                                                                       self.prediction_horizon,
-                                                                                       evaluated=self.evaluated)
+                for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
+                    if t >= self.prediction_horizon - (self.max_derivative - derivative):
+                        continue
+                    normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
+                                                            evaluated=self.evaluated)
+                    weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -295,19 +313,21 @@ class FreeVariableBounds(ProblemDataPart):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:
                 for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
-                    if t == self.prediction_horizon - 1 \
-                            and derivative < min(v.order, self.max_derivative) \
-                            and self.prediction_horizon > 2:  # and False:
-                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
-                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
+                    if t >= self.prediction_horizon - (self.max_derivative - derivative):
+                        continue
+                    # if t == self.prediction_horizon - 1 \
+                    #         and derivative < min(v.order, self.max_derivative) \
+                    #         and self.prediction_horizon > 2:  # and False:
+                    #     lb[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
+                    #     ub[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
+                    # else:
+                    if derivative == Derivatives.velocity and v.has_position_limits():
+                        lower_limit, upper_limit = self.velocity_limit(v, t)
                     else:
-                        if derivative == Derivatives.velocity and v.has_position_limits():
-                            lower_limit, upper_limit = self.velocity_limit(v, t)
-                        else:
-                            lower_limit = v.get_lower_limit(derivative, evaluated=self.evaluated)
-                            upper_limit = v.get_upper_limit(derivative, evaluated=self.evaluated)
-                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lower_limit
-                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = upper_limit
+                        lower_limit = v.get_lower_limit(derivative, evaluated=self.evaluated)
+                        upper_limit = v.get_upper_limit(derivative, evaluated=self.evaluated)
+                    lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lower_limit
+                    ub[derivative][f't{t:03}/{v.name}/{derivative}'] = upper_limit
         lb_params = []
         ub_params = []
         for derivative, name_to_bound_map in sorted(lb.items()):
@@ -406,7 +426,7 @@ class EqualityBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
-    def equality_bounds(self) -> Dict[str, cas.Expression]:
+    def equality_constraint_bounds(self) -> Dict[str, cas.Expression]:
         return {f'{c.name}': cas.limit(c.bound,
                                        -c.velocity_limit * self.dt * c.control_horizon,
                                        c.velocity_limit * self.dt * c.control_horizon)
@@ -421,6 +441,8 @@ class EqualityBounds(ProblemDataPart):
     def derivative_links(self, derivative: Derivatives) -> Dict[str, cas.symbol_expr_float]:
         derivative_link = {}
         for t in range(self.prediction_horizon - 1):
+            if t >= self.prediction_horizon - (self.max_derivative - derivative):
+                continue  # this row is all zero in the model, because the system has to stop at 0 vel
             for v in self.free_variables:
                 derivative_link[f't{t:03}/{derivative}/{v.name}/link'] = 0
         return derivative_link
@@ -433,7 +455,7 @@ class EqualityBounds(ProblemDataPart):
             bounds.append(self.derivative_links(derivative))
         num_derivative_links = sum(len(x) for x in bounds)
 
-        bounds.append(self.equality_bounds())
+        bounds.append(self.equality_constraint_bounds())
 
         bounds, self.names = self._sorter(*bounds)
         self.names_derivative_links = self.names[:num_derivative_links]
@@ -544,10 +566,6 @@ class EqualityModel(ProblemDataPart):
         equality_constraint_bounds
     """
 
-    @property
-    def number_of_free_variables(self):
-        return len(self.free_variables)
-
     def equality_constraint_expressions(self) -> List[cas.Expression]:
         return self._sorter({c.name: c.expression for c in self.equality_constraints})[0]
 
@@ -568,13 +586,13 @@ class EqualityModel(ProblemDataPart):
         |    1   |        |        |   -sp  |        |        |        |        |        | = last velocity
         |       1|        |        |     -sp|        |        |        |        |        |
         |--------------------------------------------------------------------------------|
-        |-1      | 1      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |   -1   |    1   |        |        |   -sp  |        |        |        |        | = 0
-        |      -1|       1|        |        |     -sp|        |        |        |        |
+        |-1      | 0      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
+        |   -1   |    0   |        |        |   -sp  |        |        |        |        | = 0
+        |      -1|       0|        |        |     -sp|        |        |        |        |
         |--------------------------------------------------------------------------------|
-        |        |-1      | 1      |        |        |-sp     |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |        |   -1   |    1   |        |        |   -sp  |        |        |        | = 0
-        |        |      -1|       1|        |        |     -sp|        |        |        |
+        |        | 0      | 0      |        |        | 0      |        |        |        | # -v_c + v_n - a_n * dt = 0
+        |        |    0   |    0   |        |        |    0   |        |        |        | = 0
+        |        |       0|       0|        |        |       0|        |        |        |
         |================================================================================|
         |        |        |        | 1      |        |        |-sp     |        |        | # a_n - j_n * dt = last acc
         |        |        |        |    1   |        |        |   -sp  |        |        | = last acceleration
@@ -584,9 +602,9 @@ class EqualityModel(ProblemDataPart):
         |        |        |        |   -1   |    1   |        |        |   -sp  |        | = 0
         |        |        |        |      -1|       1|        |        |     -sp|        |
         |--------------------------------------------------------------------------------|
-        |        |        |        |        |-1      | 1      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |        |   -1   |    1   |        |        |   -sp  | = 0
-        |        |        |        |        |      -1|       1|        |        |     -sp|
+        |        |        |        |        |-1      | 0      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
+        |        |        |        |        |   -1   |    0   |        |        |   -sp  | = 0
+        |        |        |        |        |      -1|       0|        |        |     -sp|
         |--------------------------------------------------------------------------------|
         x_n - xd_n * dt = x_c
         - x_c + x_n - xd_n * dt = 0
@@ -611,6 +629,20 @@ class EqualityModel(ProblemDataPart):
             derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
             offset_v += x_c_height
             offset_h += self.prediction_horizon * self.number_of_free_variables
+        derivative_link_model = self._remove_rows_columns_where_variables_are_zero(derivative_link_model)
+        return derivative_link_model
+
+    def _remove_rows_columns_where_variables_are_zero(self, derivative_link_model: cas.Expression) -> cas.Expression:
+        if np.prod(derivative_link_model.shape) == 0:
+            return derivative_link_model
+        row_ids = []
+        end = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
+            last_non_zero_variable = self.prediction_horizon - (self.max_derivative - derivative - 1)
+            start = end + self.number_of_free_variables * last_non_zero_variable
+            end += self.number_of_free_variables * self.prediction_horizon
+            row_ids.extend(range(start, end))
+        derivative_link_model.remove(row_ids, [])
         return derivative_link_model
 
     @profile
@@ -658,7 +690,7 @@ class EqualityModel(ProblemDataPart):
         slack_model = cas.vstack([cas.zeros(derivative_link_model.shape[0],
                                             slack_model.shape[1]),
                                   slack_model])
-        # todo replace hack?
+        model = self._remove_columns_columns_where_variables_are_zero(model)
         return model, slack_model
 
 
@@ -895,6 +927,7 @@ class InequalityModel(ProblemDataPart):
 
         combined_model = cas.vstack(model_parts)
         combined_slack_model = cas.diag_stack(slack_model_parts)
+        combined_model = self._remove_columns_columns_where_variables_are_zero(combined_model)
         return combined_model, combined_slack_model
 
 

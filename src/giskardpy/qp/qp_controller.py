@@ -1171,10 +1171,10 @@ class QPProblemBuilder:
             return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
                                 prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:
+            self._create_debug_pandas(self.qp_solver, print_iis=True)
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
             self.xdot_full = None
-            self._create_debug_pandas(self.qp_solver)
             self._are_hard_limits_violated(str(e_original))
             raise
 
@@ -1242,7 +1242,7 @@ class QPProblemBuilder:
         plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self, qp_solver):
+    def _create_debug_pandas(self, qp_solver: QPSolver, print_iis: bool = False):
         weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
         sample_period = self.sample_period
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
@@ -1311,3 +1311,17 @@ class QPProblemBuilder:
 
         else:
             self.p_xdot = None
+        if print_iis:
+            result = self.qp_solver.analyze_infeasibility()
+            if result is None:
+                logging.loginfo(f'Can only compute possible causes with gurobi, '
+                                f'but current solver is {self.qp_solver_class.solver_id.name}.')
+                return
+            eq_ids, lbA_ids, ubA_ids = result
+            logging.loginfo('Irreducible Infeasible Subsystem:')
+            logging.loginfo('  Equality constraints:')
+            print(self.equality_constr_names[eq_ids])
+            logging.loginfo('  Inequality constraint lower bounds:')
+            print(self.inequality_constr_names[lbA_ids])
+            logging.loginfo('  Inequality constraint upper bounds:')
+            print(self.inequality_constr_names[ubA_ids])

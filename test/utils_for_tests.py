@@ -1716,7 +1716,7 @@ class PointingGoalChecker(GoalChecker):
 
 
 class RotationGoalChecker(GoalChecker):
-    def __init__(self, giskard, tip_link, root_link, expected):
+    def __init__(self, giskard, tip_link, root_link, expected: QuaternionStamped):
         super().__init__(giskard)
         self.expected = deepcopy(expected)
         self.tip_link = tip_link

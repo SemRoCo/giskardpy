@@ -401,8 +401,7 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
     roll: FreeVariable
     pitch: FreeVariable
     yaw: FreeVariable
-    x_vel: FreeVariable
-    z_vel: FreeVariable
+    forward: FreeVariable
 
     def __init__(self,
                  name: PrefixName,
@@ -438,8 +437,7 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),
                                                yaw=self.yaw.get_symbol(Derivatives.position))
-        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
-                                                 yaw=self.yaw_vel.get_symbol(Derivatives.position))
+        bf_T_bf_vel = w.TransMatrix.from_xyz_rpy(x=self.forward.get_symbol(Derivatives.position))
         self.parent_T_child = w.dot(odom_T_bf, bf_T_bf_vel)
 
     def create_free_variables(self):
@@ -452,15 +450,14 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
 
         self.roll = self.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
         self.pitch = self.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
-        self.yaw = self.world.add_virtual_free_variable(name=PrefixName('yaw', self.name))
 
-        self.x_vel = self.world.add_free_variable(name=PrefixName('x_vel', self.name),
-                                                  lower_limits=translation_lower_limits,
-                                                  upper_limits=self.translation_limits)
-        self.yaw_vel = self.world.add_free_variable(name=PrefixName('yaw_vel', self.name),
+        self.forward = self.world.add_free_variable(name=PrefixName('forward', self.name),
+                                                    lower_limits=translation_lower_limits,
+                                                    upper_limits=self.translation_limits)
+        self.yaw = self.world.add_free_variable(name=PrefixName('yaw', self.name),
                                                     lower_limits=rotation_lower_limits,
                                                     upper_limits=self.rotation_limits)
-        self.free_variables = [self.x_vel, self.yaw_vel]
+        self.free_variables = [self.forward, self.yaw]
 
     def update_transform(self, new_parent_T_child: Pose):
         roll, pitch, yaw = rpy_from_quaternion(new_parent_T_child.orientation.x,
@@ -477,18 +474,14 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
 
     def update_state(self, dt: float):
         state = self.world.state
-        state[self.x_vel.name].position = 0
-        state[self.yaw_vel.name].position = 0
+        state[self.forward.name].position = 0
 
-        x_vel = state[self.x_vel.name].velocity
-        rot_vel = state[self.yaw_vel.name].velocity
+        x_vel = state[self.forward.name].velocity
         yaw = state[self.yaw.name].position
         state[self.x.name].velocity = np.cos(yaw) * x_vel
         state[self.x.name].position += state[self.x.name].velocity * dt
         state[self.y.name].velocity = np.sin(yaw) * x_vel
         state[self.y.name].position += state[self.y.name].velocity * dt
-        state[self.yaw.name].velocity = rot_vel
-        state[self.yaw.name].position += rot_vel * dt
 
     def get_free_variable_names(self) -> List[PrefixName]:
         return [self.x.name, self.y.name, self.yaw.name]

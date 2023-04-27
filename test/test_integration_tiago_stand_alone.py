@@ -17,7 +17,7 @@ from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.utils import publish_pose, launch_launchfile
-from utils_for_tests import GiskardTestWrapper, RotationGoalChecker
+from utils_for_tests import GiskardTestWrapper, RotationGoalChecker, TranslationGoalChecker
 
 
 @pytest.fixture(scope='module')
@@ -109,6 +109,13 @@ class TiagoTestWrapper(GiskardTestWrapper):
                            root_link=root_link,
                            goal_pose=goal_pose)
         # self.allow_all_collisions()
+
+        goal_position = PointStamped()
+        goal_position.header = goal_pose.header
+        goal_position.point = goal_pose.pose.position
+        full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group='',
+                                                                   tip_link='base_footprint', tip_group=self.robot_name)
+        self.add_goal_check(TranslationGoalChecker(self, full_tip_link, full_root_link, goal_position))
 
         goal_orientation = QuaternionStamped()
         goal_orientation.header = goal_pose.header

@@ -4,7 +4,7 @@ from typing import Optional
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vector3Stamped, QuaternionStamped
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 
@@ -17,7 +17,7 @@ from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.utils import publish_pose, launch_launchfile
-from utils_for_tests import GiskardTestWrapper
+from utils_for_tests import GiskardTestWrapper, RotationGoalChecker
 
 
 @pytest.fixture(scope='module')
@@ -101,7 +101,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
             config = Tiago_Standalone
         super().__init__(config)
 
-    def move_base(self, goal_pose):
+    def move_base(self, goal_pose: PoseStamped):
         tip_link = PrefixName('base_footprint', self.robot_name)
         root_link = self.default_root
         self.set_json_goal(constraint_type='DiffDriveBaseGoal',
@@ -109,6 +109,13 @@ class TiagoTestWrapper(GiskardTestWrapper):
                            root_link=root_link,
                            goal_pose=goal_pose)
         # self.allow_all_collisions()
+
+        goal_orientation = QuaternionStamped()
+        goal_orientation.header = goal_pose.header
+        goal_orientation.quaternion = goal_pose.pose.orientation
+        full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group='',
+                                                                   tip_link='base_footprint', tip_group=self.robot_name)
+        self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
         self.plan_and_execute()
 
     def open_right_gripper(self, goal: float = 0.45):
@@ -180,6 +187,13 @@ class TestCartGoals:
         zero_pose.move_base(goal)
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()
+
+    def test_drive_rotate(self, zero_pose: TiagoTestWrapper):
+        goal = PoseStamped()
+        goal.header.frame_id = 'map'
+        goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(goal)
 
     def test_drive_backward_backward(self, zero_pose: TiagoTestWrapper):
         goal = PoseStamped()

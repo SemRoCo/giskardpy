@@ -5,6 +5,7 @@ from typing import Optional
 import numpy as np
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
 from geometry_msgs.msg import Vector3Stamped
+from tf.transformations import rotation_from_matrix
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
@@ -315,6 +316,7 @@ class DiffDriveBaseGoal(Goal):
         diff_drive_joints = [v for k, v in self.world.joints.items() if isinstance(v, DiffDrive)]
         assert len(diff_drive_joints) == 1
         self.joint: DiffDrive = diff_drive_joints[0]
+        self.odom = self.joint.parent_link_name
 
         if pointing_axis is not None:
             self.base_footprint_V_pointing_axis = self.transform_msg(self.base_footprint, pointing_axis)
@@ -326,13 +328,15 @@ class DiffDriveBaseGoal(Goal):
 
     def make_constraints(self):
         map_T_base_current = w.TransMatrix(self.world.compute_fk_np(self.map, self.base_footprint))
+        map_T_odom_current = self.world.compute_fk_np(self.map, self.odom)
+        map_odom_angle, _, _ = rotation_from_matrix(map_T_odom_current)
         map_R_base_current = map_T_base_current.to_rotation()
         axis_start, angle_start = map_R_base_current.to_axis_angle()
         angle_start = w.if_greater_zero(axis_start[2], angle_start, -angle_start)
 
         map_T_base_footprint = self.get_fk(self.map, self.base_footprint)
         map_P_base_footprint = map_T_base_footprint.to_position()
-        map_R_base_footprint = map_T_base_footprint.to_rotation()
+        # map_R_base_footprint = map_T_base_footprint.to_rotation()
         map_T_base_footprint_goal = w.TransMatrix(self.goal_pose)
         map_P_base_footprint_goal = map_T_base_footprint_goal.to_position()
         map_R_base_footprint_goal = map_T_base_footprint_goal.to_rotation()
@@ -340,8 +344,10 @@ class DiffDriveBaseGoal(Goal):
         map_V_goal_x = map_P_base_footprint_goal - map_P_base_footprint
         distance = map_V_goal_x.norm()
 
-        axis, map_current_angle = map_R_base_footprint.to_axis_angle()
-        map_current_angle = w.if_greater_zero(axis.z, map_current_angle, -map_current_angle)
+        # axis, map_current_angle = map_R_base_footprint.to_axis_angle()
+        # map_current_angle = w.if_greater_zero(axis.z, map_current_angle, -map_current_angle)
+        odom_current_angle = self.joint.yaw.get_symbol(Derivatives.position)
+        map_current_angle = map_odom_angle + odom_current_angle
 
         axis2, map_goal_angle2 = map_R_base_footprint_goal.to_axis_angle()
         map_goal_angle2 = w.if_greater_zero(axis2.z, map_goal_angle2, -map_goal_angle2)

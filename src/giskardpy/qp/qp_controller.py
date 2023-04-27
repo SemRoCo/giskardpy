@@ -290,6 +290,7 @@ class FreeVariableBounds(ProblemDataPart):
                      upper_velocity_limit * self.dt) / self.dt
 
         if t == 0:
+            current_velocity = v.get_symbol(Derivatives.velocity)
             lower_one_step_velocities = []
             upper_one_step_velocities = []
             for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
@@ -298,6 +299,8 @@ class FreeVariableBounds(ProblemDataPart):
                 upper_one_step_velocities.append(v.get_upper_limit(derivative, evaluated=True) * step_size)
             lower_one_step_vel = max(lower_one_step_velocities)
             upper_one_step_vel = min(upper_one_step_velocities)
+            # lower_one_step_vel = cas.min(lower_one_step_vel, current_velocity - lower_one_step_vel)
+            # upper_one_step_vel = cas.max(upper_one_step_vel, - current_velocity + upper_one_step_vel)
             lb = cas.limit(lb, lower_velocity_limit, upper_one_step_vel)
             ub = cas.limit(ub, lower_one_step_vel, upper_velocity_limit)
         else:
@@ -1171,7 +1174,9 @@ class QPProblemBuilder:
             return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
                                 prediction_horizon=self.prediction_horizon)
         except InfeasibleException as e_original:
-            self._create_debug_pandas(self.qp_solver, print_iis=True)
+            self.xdot_full = None
+            self._create_debug_pandas(self.qp_solver)
+            self._print_iis()
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
             self.xdot_full = None
@@ -1242,7 +1247,7 @@ class QPProblemBuilder:
         plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self, qp_solver: QPSolver, print_iis: bool = False):
+    def _create_debug_pandas(self, qp_solver: QPSolver):
         weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
         sample_period = self.sample_period
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
@@ -1302,26 +1307,48 @@ class QPProblemBuilder:
             self.p_pure_xdot = deepcopy(self.p_xdot)
             self.p_pure_xdot[-num_constr:] = 0
             # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), self.inequality_constr_names, ['data'], dtype=float)
-            self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), self.inequality_constr_names,
-                                                       ['data'], dtype=float)
+            if len(self.p_A) > 0:
+                self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), self.inequality_constr_names,
+                                         ['data'], dtype=float)
+            else:
+                self.p_Ax = pd.DataFrame()
             # self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
             # self.p_Ax_without_slack[-num_constr:] /= sample_period
-            self.p_Ex_without_slack_raw = pd.DataFrame(self.p_E.dot(self.p_pure_xdot), self.equality_constr_names,
-                                                       ['data'], dtype=float)
+            if len(self.p_E) > 0:
+                self.p_Ex = pd.DataFrame(self.p_E.dot(self.p_pure_xdot), self.equality_constr_names,
+                                         ['data'], dtype=float)
+            else:
+                self.p_Ex = pd.DataFrame()
 
         else:
             self.p_xdot = None
-        if print_iis:
-            result = self.qp_solver.analyze_infeasibility()
-            if result is None:
-                logging.loginfo(f'Can only compute possible causes with gurobi, '
-                                f'but current solver is {self.qp_solver_class.solver_id.name}.')
-                return
-            eq_ids, lbA_ids, ubA_ids = result
+
+    def _print_iis(self):
+        result = self.qp_solver.analyze_infeasibility()
+        if result is None:
+            logging.loginfo(f'Can only compute possible causes with gurobi, '
+                            f'but current solver is {self.qp_solver_class.solver_id.name}.')
+            return
+        lb_ids, ub_ids, eq_ids, lbA_ids, ubA_ids = result
+        b_ids = lb_ids | ub_ids
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', None):
             logging.loginfo('Irreducible Infeasible Subsystem:')
+            logging.loginfo('  Free variable bounds')
+            free_variables = self.p_lb[b_ids]
+            free_variables['ub'] = self.p_ub[b_ids]
+            free_variables = free_variables.rename(columns={'data': 'lb'})
+            print(free_variables)
             logging.loginfo('  Equality constraints:')
-            print(self.equality_constr_names[eq_ids])
+            self._print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
             logging.loginfo('  Inequality constraint lower bounds:')
-            print(self.inequality_constr_names[lbA_ids])
+            self._print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
             logging.loginfo('  Inequality constraint upper bounds:')
-            print(self.inequality_constr_names[ubA_ids])
+            self._print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
+
+    def _print_iis_matrix(self, row_filter: np.ndarray, column_filter: np.ndarray, matrix: pd.DataFrame,
+                          bounds: pd.DataFrame):
+        row_ids = np.where(row_filter)[0]
+        for row_id in row_ids:
+            row = matrix.iloc[[row_id], column_filter]
+            row['bound'] = bounds.values[row_id]
+            print(row)

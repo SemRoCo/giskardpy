@@ -82,6 +82,16 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.qpProblem.printQuality()
         gurobipy.setParam('LogToConsole', False)
 
+    def analyze_infeasibility(self):
+        self.qpProblem.computeIIS()
+        constraint_filter = self.qpProblem.IISConstr
+        eq_constraint_ids = np.array(constraint_filter[:self.E.shape[0]], dtype=bool)
+        neq_constraint_ids = constraint_filter[self.E.shape[0]:]
+        num_nA_rows = np.where(self.nlbA_filter_half)[0].shape[0]
+        lbA_constraint_ids = np.array(neq_constraint_ids[:num_nA_rows], dtype=bool)
+        ubA_constraint_ids = np.array(neq_constraint_ids[num_nA_rows:], dtype=bool)
+        return eq_constraint_ids, lbA_constraint_ids, ubA_constraint_ids
+
     @profile
     def problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

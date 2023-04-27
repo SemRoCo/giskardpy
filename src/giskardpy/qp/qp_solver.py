@@ -67,6 +67,9 @@ class QPSolver(ABC):
             return self._times
         return {}
 
+    def analyze_infeasibility(self):
+        pass
+
     @record_solver_call_time
     @profile
     def solve(self, substitutions: np.ndarray, relax_hard_constraints: bool = False) -> np.ndarray:

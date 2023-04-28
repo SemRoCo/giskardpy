@@ -820,15 +820,24 @@ class WorldTree(WorldTreeInterface):
         :param joint_name:
         :param new_parent_link_name:
         """
-        if not self.is_joint_fixed(joint_name):
-            raise NotImplementedError('Can only change fixed joints')
+        # TODO: change parent link from TFJoints
+        # if not self.is_joint_fixed(joint_name):
+        #     raise NotImplementedError('Can only change fixed joints')
         joint = self.joints[joint_name]
-        fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
         old_parent_link = self.links[joint.parent_link_name]
         new_parent_link = self.links[new_parent_link_name]
 
-        joint.parent_link_name = new_parent_link_name
-        joint.parent_T_child = fk
+        if isinstance(joint, FixedJoint):
+            fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
+            joint.parent_link_name = new_parent_link_name
+            joint.parent_T_child = fk
+        elif isinstance(joint, TFJoint):
+            pose = self.compute_fk_pose(new_parent_link_name, joint.child_link_name)
+            joint.parent_link_name = new_parent_link_name
+            joint.update_transform(pose.pose)
+        else:
+            raise NotImplementedError('Can only change fixed joints and TFJoints')
+
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()

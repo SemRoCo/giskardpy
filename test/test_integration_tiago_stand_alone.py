@@ -721,19 +721,25 @@ class TestJointGoals:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-        zero_pose.are_joint_limits_violated()
 
     def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {
-            'head_1_joint': 1.3,
-            'head_2_joint': -1
+            'head_1_joint': 2,
+            'head_2_joint': -2
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
         zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.plan_and_execute()
+        zero_pose.are_joint_limits_violated()
+
+    def test_get_out_of_joint_soft_limits_passive(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_right_5_joint': 3,
+            'arm_left_5_joint': -3
+        }
+        zero_pose.set_json_goal('SetSeedConfiguration',
+                                seed_configuration=js)
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
 

@@ -114,6 +114,12 @@ class QPSolverGurobi(QPSWIFTFormatter):
             raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
         raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
 
+    def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
+        weights = H.diagonal()
+        A = np.vstack((-A, A))
+        h = np.concatenate((-lbA, ubA))
+        return self.solver_call(weights, g, E, bE, A, lb, ub, h)
+
     def compute_violated_constraints(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
                                      ub: np.ndarray, nlbA_ubA: np.ndarray):
         nlb_relaxed = nlb.copy()

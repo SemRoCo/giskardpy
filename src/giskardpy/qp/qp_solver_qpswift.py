@@ -98,7 +98,8 @@ class QPSWIFTFormatter(QPSolver):
     def evaluate_functions(self, substitutions):
         self.nA_A = self.nA_A_f.fast_call(substitutions)
         self.E = self.E_f.fast_call(substitutions)
-        self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(substitutions)
+        self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
+            substitutions)
 
     @profile
     def problem_data_to_qp_format(self) \
@@ -233,7 +234,7 @@ class QPSWIFTFormatter(QPSolver):
 
     @profile
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
@@ -304,7 +305,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo
         # 'MAXITER': 100, # 0 < MAXITER < 200; default 100
         # 'ABSTOL': 1e-4, # 0 < ABSTOL < 1; default 1e-6
-        'RELTOL': 1e-5, # 0 < RELTOL < 1; default 1e-6
+        'RELTOL': 1e-5,  # 0 < RELTOL < 1; default 1e-6
         # 'SIGMA': 1,
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }

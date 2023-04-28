@@ -101,7 +101,7 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
         # super(HSRTestWrapper, self).set_localization(map_T_odom)
 
     def reset(self):
-        self.mujoco_reset()
+        # self.mujoco_reset()
         super().reset()
 
     def command_gripper(self, width):
@@ -110,9 +110,9 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
-    c = HSRTestWrapper()
-    # c = HSRTestWrapperMujoco()
+    # launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
+    # c = HSRTestWrapper()
+    c = HSRTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -446,4 +446,16 @@ class TestCollisionAvoidanceGoals:
 
         js = {'arm_flex_joint': 0}
         zero_pose.set_joint_goal(js, check=False)
+        zero_pose.plan_and_execute()
+
+    def test_add(self, zero_pose):
+        box1_name = 'box1'
+        pose = PoseStamped()
+        pose.header.frame_id = zero_pose.default_root
+        pose.pose.orientation.w = 1
+        zero_pose.add_box(name=box1_name,
+                              size=(1, 1, 1),
+                              pose=pose,
+                              parent_link='hand_palm_link',
+                              parent_link_group='hsrb')
         zero_pose.plan_and_execute()

@@ -743,6 +743,17 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
 
+    def test_get_out_of_joint_soft_limits_passive_with_velocity(self, zero_pose: TiagoTestWrapper):
+        js = {
+            'arm_right_5_joint': 3,
+            'arm_left_5_joint': -3
+        }
+        zero_pose.set_json_goal('SetSeedConfiguration',
+                                seed_configuration=js)
+        zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
+        zero_pose.plan_and_execute()
+        zero_pose.are_joint_limits_violated()
+
     def test_try_to_stay_out_of_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {
             'head_1_joint': 2,

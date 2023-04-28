@@ -25,15 +25,6 @@ class JointGroupPosController(CommandPublisher):
         self.msg = None
         self.new_stamp = None
 
-    # @profile
-    # def setup(self, timeout=0.0):
-    #     self.joint_state_sub = rospy.Subscriber('hsrb/joint_states', JointState, self.cb, queue_size=1)
-    #     return super().setup(timeout)
-    #
-    # def cb(self, data):
-    #     self.msg = data
-    #     self.new_stamp = rospy.get_rostime()
-
     @profile
     def initialise(self):
         def f(joint_symbol):
@@ -45,36 +36,20 @@ class JointGroupPosController(CommandPublisher):
 
     def publish_joint_state(self, time):
         msg = Float64MultiArray()
-        # js = JointStates.from_msg(self.msg, 'hsrb')
         try:
             qp_data = self.god_map.get_data(identifier.qp_solver_solution)
-            # dt = (time.current_real - self.new_stamp).to_sec() #- 1 / self.hz
+            dt = (time.current_real - self.new_stamp).to_sec()
         except Exception:
             return
         for joint_name in self.joint_names:
             try:
                 key = self.world.joints[joint_name].free_variables[0].position_name
                 velocity = qp_data[Derivatives.velocity][key]
-                # acc = qp_data[Derivatives.acceleration][key]
-                # jerk = qp_data[Derivatives.jerk][key]
-                # delta = velocity * dt #+ (acc * dt**2) / 2 + (jerk * dt**3) / 6
 
-                # position = self.js[joint_name].position + delta * 0.7
-                # implicit integration uses position from the current and velocity from the next time step
-                # it should give stable solutions irrespective of the time step
-                # position = js[joint_name].position + qp_data[Derivatives.velocity][key] * dt
-                position = velocity
+                position = self.js[joint_name].position + velocity * dt
             except KeyError:
-                # position = js[joint_name].position
-                position = 0
+                position = self.js[joint_name].position
             msg.data.append(position)
             self.js[joint_name].position = position
 
         self.cmd_pub.publish(msg)
-
-    def terminate(self, new_status):
-        msg = Float64MultiArray()
-        for joint_name in self.joint_names:
-            msg.data.append(0.0)
-        self.cmd_pub.publish(msg)
-        super().terminate(new_status)

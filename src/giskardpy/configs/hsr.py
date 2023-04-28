@@ -36,6 +36,7 @@ class HSR_Base(Giskard):
                                                         hard_threshold=0.0)
         self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
                                                       'head_tilt_joint'])
+        # self.world.get_joint_velocity_limits()
 
 
 class HSR_Mujoco(HSR_Base):
@@ -131,7 +132,7 @@ class HSR_GazeboRealtime(HSR_Base):
                                   child_link_name='base_footprint',
                                   odometry_topic='/hsrb/odom',
                                   name='brumbrum')
-        self.add_joint_group_position_controller(namespace='hsrb/realtime_body_controller')
+        self.add_joint_group_velocity_controller(namespace='hsrb/realtime_body_controller_real')
         self.add_base_cmd_velocity('/hsrb/command_velocity')
         self.overwrite_external_collision_avoidance(joint_name='brumbrum',
                                                     number_of_repeller=2,

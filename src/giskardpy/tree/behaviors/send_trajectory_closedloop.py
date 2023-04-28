@@ -129,7 +129,7 @@ class SendFollowJointTrajectoryClosedLoop(ActionClient, GiskardBehavior):
         traj = Trajectory()
         js = deepcopy(self.god_map.get_data(identifier.joint_states))
         try:
-            for i in range(0, 9):
+            for i in range(0, 2):
                 for joint_name in self.joint_names:
                     key = self.world.joints['hsrb/' + joint_name].free_variables[0].position_name
                     velocity = qp_data[Derivatives.velocity][key]
@@ -141,7 +141,7 @@ class SendFollowJointTrajectoryClosedLoop(ActionClient, GiskardBehavior):
         # TODO test it on the real robot
         # TODO use future velocities from giskard
 
-        start_time = rospy.get_rostime() + rospy.Duration(dt)
+        start_time = rospy.get_rostime() + rospy.Duration(0)
         fill_velocity_values = self.god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values

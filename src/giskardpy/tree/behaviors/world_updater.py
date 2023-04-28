@@ -254,10 +254,10 @@ class WorldUpdater(GiskardBehavior):
         # pose = w.TransMatrix(pose)
         self.world.joints[joint_name].update_transform(pose)
         # self.world.update_joint_parent_T_child(joint_name, pose)
-        # self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
-        # self.collision_scene.update_collision_blacklist(
-        #     link_combinations=set(product(group.link_names_with_collisions,
-        #                                   self.world.link_names_with_collisions)))
+        self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
+        self.collision_scene.update_collision_blacklist(
+            link_combinations=set(product(group.link_names_with_collisions,
+                                          self.world.link_names_with_collisions)))
 
     @profile
     def update_parent_link(self, req: UpdateWorldRequest):

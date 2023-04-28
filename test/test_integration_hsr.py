@@ -110,9 +110,9 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    # launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
-    # c = HSRTestWrapper()
-    c = HSRTestWrapperMujoco()
+    launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
+    c = HSRTestWrapper()
+    # c = HSRTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 

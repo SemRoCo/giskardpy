@@ -7,15 +7,18 @@ from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
-
+import giskardpy.utils.math as giskard_math
 
 class NextCommands:
-    def __init__(self, free_variables: List[FreeVariable], xdot: np.ndarray, max_derivative: Derivatives, prediction_horizon: int):
+    def __init__(self, free_variables: List[FreeVariable], xdot: np.ndarray, max_derivative: Derivatives,
+                 prediction_horizon: int):
         self.free_variable_data: Dict[PrefixName, List[float]] = {}
         offset = len(free_variables)
         self.xdot_velocity = xdot[:offset]
-        joint_derivative_filter = np.array(
-            [offset * prediction_horizon * (derivative - 1) for derivative in Derivatives.range(Derivatives.velocity, max_derivative)])
+        x = prediction_horizon - max_derivative + 1
+        derivative_offset = {d: offset*((d-1)*x+giskard_math.gauss(d-2)) for d in Derivatives.range(Derivatives.velocity, max_derivative)}
+        joint_derivative_filter = np.array([int(derivative_offset[derivative])
+                                            for derivative in Derivatives.range(Derivatives.velocity, max_derivative)])
         # for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
         for i, free_variable in enumerate(free_variables):
             try:

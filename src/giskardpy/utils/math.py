@@ -145,7 +145,7 @@ def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_pe
     return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
 
 
-def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+def mpc_velocities(limits: Dict[Derivatives, float], current_values: Dict[Derivatives, float], dt: float, ph: int) -> np.ndarray:
     """
     Computes the maximum velocity that can be reached given a prediction horizon under the following assumptions:
     """
@@ -153,13 +153,16 @@ def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) 
     b = []
     max_d = max(limits.keys())
     for derivative, d_limit in sorted(limits.items()):
-        b.extend([d_limit]*ph)
+        b.extend([d_limit] * ph)
         if derivative != max_d:
             b[-1] = 0
     b = np.array(b)
     ub = b
     lb = -b
-    lb[0] = limits[Derivatives.velocity]
+    lb[0] = current_values[Derivatives.velocity]
+    ub[0] = current_values[Derivatives.velocity]
+    # lb[ph] = current_values[Derivatives.acceleration]
+    # ub[ph] = current_values[Derivatives.acceleration]
     num_rows = ph * (max_d - 1)
     num_columns = ph * max_d
     derivative_link_model = np.zeros((num_rows, num_columns))
@@ -180,18 +183,27 @@ def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) 
         derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
         offset_v += x_c_height
         offset_h += ph
-    bE = np.zeros(derivative_link_model.shape[0])
-    lbA = -bE
-    bE[0] = limits[Derivatives.velocity]
-    H = np.zeros((len(b), len(b)))
+    ubA = np.zeros(derivative_link_model.shape[0])
+    lbA = -ubA
+    ubA[0] = current_values[Derivatives.velocity]
+    ubA[ph] = current_values[Derivatives.acceleration]
+    lbA[0] = current_values[Derivatives.velocity]
+    lbA[ph] = current_values[Derivatives.acceleration]
+    w = np.zeros(len(b))
+    w[:-ph] = 1
+    H = np.diag(w)
     g = np.zeros(len(b))
     g[:ph] = 1
     empty = np.eye(0)
     result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
                                                   E=empty, bE=empty,
-                                                  A=derivative_link_model, lbA=lbA, ubA=bE)
+                                                  A=derivative_link_model, lbA=lbA, ubA=ubA)
     velocities = result[:ph]
-    return np.sum(velocities) * dt
+    return velocities
+
+
+def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+    return np.sum(mpc_velocities(limits, dt, ph)) * dt
 
 
 def limit(a, lower_limit, upper_limit):

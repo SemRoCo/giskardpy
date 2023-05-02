@@ -166,8 +166,27 @@ class QPSolver(ABC):
             else:
                 return I
 
+    @classmethod
+    def empty(cls):
+        self = cls(weights=cas.Expression(),
+                   g=cas.Expression(),
+                   lb=cas.Expression(),
+                   ub=cas.Expression(),
+                   E=cas.Expression(),
+                   E_slack=cas.Expression(),
+                   bE=cas.Expression(),
+                   A=cas.Expression(),
+                   A_slack=cas.Expression(),
+                   lbA=cas.Expression(),
+                   ubA=cas.Expression())
+        return self
+
     @abc.abstractmethod
     def solver_call(self, *args, **kwargs) -> np.ndarray:
+        pass
+
+    @abc.abstractmethod
+    def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
         pass
 
     @abc.abstractmethod

@@ -1273,6 +1273,7 @@ class QPProblemBuilder:
         self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)
         self.p_lb = pd.DataFrame(lb, self.free_variable_names, ['data'], dtype=float)
         self.p_ub = pd.DataFrame(ub, self.free_variable_names, ['data'], dtype=float)
+        self.p_b = pd.DataFrame({'lb': lb, 'ub': ub}, self.free_variable_names, dtype=float)
         if len(bE) > 0:
             self.p_bE_raw = pd.DataFrame(bE, self.equality_constr_names, ['data'], dtype=float)
             self.p_bE = deepcopy(self.p_bE_raw)
@@ -1283,13 +1284,16 @@ class QPProblemBuilder:
             self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_lbA = deepcopy(self.p_lbA_raw)
             self.p_lbA /= sample_period
-        else:
-            self.p_lbA = pd.DataFrame()
-        if len(ubA) > 0:
+
             self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_ubA = deepcopy(self.p_ubA_raw)
             self.p_ubA /= sample_period
+
+            self.p_bA_raw = pd.DataFrame({'lbA': lbA, 'ubA': ubA}, self.inequality_constr_names, dtype=float)
+            self.p_bA = deepcopy(self.p_bA_raw)
+            self.p_bA /= sample_period
         else:
+            self.p_lbA = pd.DataFrame()
             self.p_ubA = pd.DataFrame()
         # remove sample period factor
         if len(E) > 0:
@@ -1303,7 +1307,8 @@ class QPProblemBuilder:
         self.p_xdot = None
         if self.xdot_full is not None:
             self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_names, ['data'], dtype=float)
-
+            self.p_b['xdot'] = self.p_xdot
+            self.p_b = self.p_b[['lb', 'xdot', 'ub']]
             self.p_pure_xdot = deepcopy(self.p_xdot)
             self.p_pure_xdot[-num_constr:] = 0
             # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), self.inequality_constr_names, ['data'], dtype=float)
@@ -1347,8 +1352,8 @@ class QPProblemBuilder:
 
     def _print_iis_matrix(self, row_filter: np.ndarray, column_filter: np.ndarray, matrix: pd.DataFrame,
                           bounds: pd.DataFrame):
-        row_ids = np.where(row_filter)[0]
-        for row_id in row_ids:
-            row = matrix.iloc[[row_id], column_filter]
-            row['bound'] = bounds.values[row_id]
-            print(row)
+        if len(row_filter) == 0:
+            return
+        filtered_matrix = matrix.loc[row_filter, column_filter]
+        filtered_matrix['bounds'] = bounds.loc[row_filter]
+        print(filtered_matrix)

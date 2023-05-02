@@ -148,6 +148,16 @@ class QPSolverQPalm(QPSolver):
             raise InfeasibleException(f'Failed to solve qp: {str(QPALMInfo(solver.info.status_val))}')
         return solver.solution.x
 
+    def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
+        A2 = np.eye(len(ub))
+        if len(E) > 0:
+            A2 = np.vstack((A2, E))
+        if len(A) > 0:
+            A2 = np.vstack((A2, A))
+        lbA = np.concatenate((lb, lbA))
+        ubA = np.concatenate((ub, ubA))
+        return self.solver_call(H, g, A2, lbA, ubA)
+
     @profile
     def relaxed_problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         self.retries_with_relaxed_constraints -= 1

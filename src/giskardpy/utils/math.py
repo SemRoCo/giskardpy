@@ -1,8 +1,12 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, Dict
 
 import numpy as np
 from geometry_msgs.msg import Quaternion, Point
 from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
+
+from giskardpy.my_types import Derivatives
+from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
+from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
 
 
 def qv_mult(quaternion, vector):
@@ -131,13 +135,67 @@ def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[
     return np.array([x, y, z]), angle
 
 
-def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period):
-    def gauss(n):
-        return (n ** 2 + n) / 2
+def gauss(n: float) -> float:
+    return (n ** 2 + n) / 2
 
+
+def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period):
     n2 = int((prediction_horizon) / 2)
     (prediction_horizon ** 2 + prediction_horizon) / 2
     return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
+
+
+def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+    """
+    Computes the maximum velocity that can be reached given a prediction horizon under the following assumptions:
+    """
+    solver = QPSolverQPalm.empty()
+    b = []
+    max_d = max(limits.keys())
+    for derivative, d_limit in sorted(limits.items()):
+        b.extend([d_limit]*ph)
+        if derivative != max_d:
+            b[-1] = 0
+    b = np.array(b)
+    ub = b
+    lb = -b
+    lb[0] = limits[Derivatives.velocity]
+    num_rows = ph * (max_d - 1)
+    num_columns = ph * max_d
+    derivative_link_model = np.zeros((num_rows, num_columns))
+
+    x_n = np.eye(num_rows)
+    derivative_link_model[:, :x_n.shape[0]] += x_n
+
+    xd_n = -np.eye(num_rows) * dt
+    h_offset = ph
+    derivative_link_model[:, h_offset:] += xd_n
+
+    x_c_height = ph - 1
+    x_c = -np.eye(x_c_height)
+    offset_v = 0
+    offset_h = 0
+    for derivative in Derivatives.range(Derivatives.velocity, max_d - 1):
+        offset_v += 1
+        derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
+        offset_v += x_c_height
+        offset_h += ph
+    bE = np.zeros(derivative_link_model.shape[0])
+    lbA = -bE
+    bE[0] = limits[Derivatives.velocity]
+    H = np.zeros((len(b), len(b)))
+    g = np.zeros(len(b))
+    g[:ph] = 1
+    empty = np.eye(0)
+    result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
+                                                  E=empty, bE=empty,
+                                                  A=derivative_link_model, lbA=lbA, ubA=bE)
+    velocities = result[:ph]
+    return np.sum(velocities) * dt
+
+
+def limit(a, lower_limit, upper_limit):
+    return max(lower_limit, min(upper_limit, a))
 
 
 def inverse_frame(f1_T_f2):

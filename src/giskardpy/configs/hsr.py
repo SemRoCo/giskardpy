@@ -42,7 +42,7 @@ class HSR_Base(Giskard):
 
 class HSR_Mujoco(HSR_Base):
     def __init__(self):
-        self.add_robot_from_parameter_server(joint_state_topics=['hsrb4s/joint_states'])
+        self.add_robot_from_parameter_server(parameter_name='hsrb4s/robot_description', joint_state_topics=['hsrb4s/joint_states'])
         super().__init__()
         self.add_sync_tf_frame('map', 'odom')
         self.add_omni_drive_joint(parent_link_name='odom',
@@ -58,9 +58,7 @@ class HSR_Mujoco(HSR_Base):
         self.add_follow_joint_trajectory_server(namespace='/hsrb4s/head_trajectory_controller/follow_joint_trajectory',
                                                 state_topic='/hsrb4s/head_trajectory_controller/state',
                                                 fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/omni_pose_follower/follow_joint_trajectory',
-                                                state_topic='/omni_pose_follower/state',
-                                                fill_velocity_values=True)
+        self.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel')
         self.overwrite_external_collision_avoidance(joint_name='brumbrum',
                                                     number_of_repeller=2,
                                                     soft_threshold=0.1,

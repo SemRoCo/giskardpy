@@ -2010,3 +2010,32 @@ def solve_for(expression, target_value, start_value=0.0001, max_tries=10000, eps
                 slope = 0.001
         x -= builtin_max(builtin_min(err / slope, max_step), -max_step)
     raise ValueError('no solution found')
+
+
+def gauss(n: float) -> float:
+    return (n ** 2 + n) / 2
+
+
+def velocity_profile(vc, ac, vg, jl, dt, ph) -> List[Expression]:
+    def f(vc, ac, jl, t, dt):
+        return vc + t * ac * dt + gauss(t) * jl * dt ** 2
+
+    def f_r(vc, ac, jl, t, dt, ph):
+        return vc + (ph - 1 - t) * ac * dt + gauss(ph - 1 - t) * jl * dt ** 2
+
+    def compute_jerk(vc, vg, ac, dt, x):
+        return (vg - vc - x * ac * dt) / (gauss(x) * dt ** 2)
+
+    x = list(range(ph))
+    half1 = ceil(ph / 2)
+    half2 = ((ph - 1) / 2)
+    vn = (vg + vc) / 2
+    j = compute_jerk(vc, vn, ac, dt, half2)
+    j = min(max(j, -jl), jl)
+    intersection = f(vc, ac, j, half2, dt)
+    new_vg = vc - (vc - intersection) * 2
+    y = [f(vc, ac, j, t, dt) for t in x[:half1]]
+    y_r = [f_r(new_vg, 0, -j, t, dt, ph) for t in x[half1:]]
+    return y + y_r
+
+

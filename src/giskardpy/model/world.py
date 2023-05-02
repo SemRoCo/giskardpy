@@ -22,7 +22,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
-    urdf_to_joint, VirtualFreeVariables, MovableJoint
+    urdf_to_joint, VirtualFreeVariables, MovableJoint, TFJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
@@ -744,10 +744,10 @@ class WorldTree(WorldTreeInterface):
             link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
                                         color=self.default_link_color)
             self._add_link(link)
-            joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
+            joint = TFJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,
-                               child_link_name=link.name,
-                               parent_T_child=w.TransMatrix(pose))
+                               child_link_name=link.name)
+            joint.update_transform(pose)
             self._link_joint_to_links(joint)
             self.register_group(group_name, link.name)
             self.notify_model_change()
@@ -820,15 +820,24 @@ class WorldTree(WorldTreeInterface):
         :param joint_name:
         :param new_parent_link_name:
         """
-        if not self.is_joint_fixed(joint_name):
-            raise NotImplementedError('Can only change fixed joints')
+        # TODO: change parent link from TFJoints
+        # if not self.is_joint_fixed(joint_name):
+        #     raise NotImplementedError('Can only change fixed joints')
         joint = self.joints[joint_name]
-        fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
         old_parent_link = self.links[joint.parent_link_name]
         new_parent_link = self.links[new_parent_link_name]
 
-        joint.parent_link_name = new_parent_link_name
-        joint.parent_T_child = fk
+        if isinstance(joint, FixedJoint):
+            fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
+            joint.parent_link_name = new_parent_link_name
+            joint.parent_T_child = fk
+        elif isinstance(joint, TFJoint):
+            pose = self.compute_fk_pose(new_parent_link_name, joint.child_link_name)
+            joint.parent_link_name = new_parent_link_name
+            joint.update_transform(pose.pose)
+        else:
+            raise NotImplementedError('Can only change fixed joints and TFJoints')
+
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()

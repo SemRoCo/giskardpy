@@ -10,7 +10,7 @@ from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco
+from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco, HSR_Mujoco_Closedloop
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.utils import launch_launchfile
@@ -19,13 +19,13 @@ from utils_for_tests import compare_poses, GiskardTestWrapper
 
 class HSRTestWrapper(GiskardTestWrapper):
     default_pose = {
-        'arm_flex_joint': 0.0,
-        'arm_lift_joint': 0.0,
+        'arm_flex_joint': -0.7,
+        'arm_lift_joint': 0.2,
         'arm_roll_joint': 0.0,
-        'head_pan_joint': 0.0,
-        'head_tilt_joint': 0.0,
-        'wrist_flex_joint': 0.0,
-        'wrist_roll_joint': 0.0,
+        'head_pan_joint': -0.1,
+        'head_tilt_joint': 0.1,
+        'wrist_flex_joint': -0.9,
+        'wrist_roll_joint': -0.1,
     }
     better_pose = default_pose
 
@@ -68,7 +68,7 @@ class HSRTestWrapper(GiskardTestWrapper):
     def reset(self):
         self.clear_world()
         # self.close_gripper()
-        self.reset_base()
+        # self.reset_base()
         self.register_group('gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='hand_palm_link')
@@ -85,7 +85,7 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom'
-        super().__init__(HSR_Mujoco)
+        super().__init__(HSR_Mujoco_Closedloop)
 
     def reset_base(self):
         p = PoseStamped()
@@ -110,9 +110,9 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
-    c = HSRTestWrapper()
-    # c = HSRTestWrapperMujoco()
+    # launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
+    # c = HSRTestWrapper()
+    c = HSRTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -462,5 +462,190 @@ class TestAddObject:
                               parent_link='hand_palm_link',
                               parent_link_group='hsrb4s')
 
-        zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
+        zero_pose.set_joint_goal({'arm_flex_joint': -0.3})
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+
+class TestPouring:
+    def test_pouring(self, zero_pose):
+        containerPose = PoseStamped()
+        containerPose.header.frame_id = 'map'
+        containerPose.pose.position.x = 2
+        containerPose.pose.position.y = 0
+        containerPose.pose.position.z = 0.8
+        containerPose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                             [0, 1, 0, 0],
+                                                                             [0, 0, 1, 0],
+                                                                             [0, 0, 0, 1]]))
+        cupPose = PoseStamped()
+        cupPose.header.frame_id = 'hand_palm_link'
+        cupPose.pose.position.x = 0
+        cupPose.pose.position.y = 0
+        cupPose.pose.position.z = 0
+        cupPose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                       [0, -1, 0, 0],
+                                                                       [1, 0, 0, 0],
+                                                                       [0, 0, 0, 1]]))
+        edgePose = PoseStamped()
+        edgePose.header.frame_id = 'cup'
+        edgePose.pose.position.x = 0
+        edgePose.pose.position.y = 0.03
+        edgePose.pose.position.z = 0.045
+        edgePose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                        [0, 1, 0, 0],
+                                                                        [0, 0, 1, 0],
+                                                                        [0, 0, 0, 1]]))
+
+        # zero_pose.add_box('container', (0.2, 0.2, 0.03), containerPose)
+        zero_pose.add_mesh('container', mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj',
+                           pose=containerPose)
+        zero_pose.add_cylinder('cup', 0.10, 0.03, cupPose, parent_link=cupPose.header.frame_id)
+        zero_pose.add_box('edge', (0.02, 0.01, 0.01), edgePose, 'cup', 'cup')
+
+        # held object
+        object_link = 'cup'
+        # object axis for keep upright
+        object_axis = Vector3Stamped()
+        object_axis.header.frame_id = object_link
+        object_axis.vector.z = 1
+
+        # goal object and keep above parameter
+        container_plane = PointStamped()
+        container_plane.header.frame_id = 'container'
+        lower_distance = 0.19
+        upper_distance = 0.19
+        plane_radius = 0.0
+
+        # reference axis for keep upright
+        reference_axis = Vector3Stamped()
+        reference_axis.header.frame_id = 'map'
+        reference_axis.vector.z = 1
+
+        reference_axis2 = Vector3Stamped()
+        reference_axis2.header.frame_id = 'map'
+        reference_axis2.vector.x = 1
+
+        # rotation axis for tilting
+        rotation_axis = Vector3Stamped()
+        rotation_axis.header.frame_id = 'edge'
+        rotation_axis.vector.x = 1
+        tilt_angle = -1.5708
+        tilt_velocity = 0.9
+
+        # First phase KeepObjectUpright & KeepObjectAbovePlane
+
+        zero_pose.set_json_goal('KeepObjectAbovePlane',
+                                object_link='edge',
+                                plane_center_point=container_plane,
+                                lower_distance=lower_distance,
+                                upper_distance=upper_distance,
+                                plane_radius=plane_radius,
+                                root_link='map')
+
+        zero_pose.set_json_goal('KeepObjectUpright',
+                                object_link_axis=object_axis,
+                                reference_link_axis=reference_axis,
+                                root_link='map')
+        # align x planes of object and map
+        zero_pose.set_json_goal('KeepObjectUpright',
+                                object_link_axis=rotation_axis,
+                                reference_link_axis=reference_axis2,
+                                root_link='map')
+
+        zero_pose.set_avoid_joint_limits_goal(30)
+        zero_pose.add_cmd()
+
+        # Second phase TiltObject & KeepObjectAbovePlane
+        zero_pose.set_json_goal('KeepObjectAbovePlane',
+                                object_link='edge',
+                                plane_center_point=container_plane,
+                                lower_distance=lower_distance,
+                                upper_distance=upper_distance,
+                                plane_radius=plane_radius,
+                                root_link='map')
+
+        zero_pose.set_json_goal('TiltObject',
+                                object_link='edge',
+                                reference_link='map',
+                                rotation_velocity=tilt_velocity,
+                                root_link='map',
+                                lower_angle=tilt_angle,
+                                rotation_axis=rotation_axis)
+        # align x planes of object and map
+        zero_pose.set_json_goal('KeepObjectUpright',
+                                object_link_axis=rotation_axis,
+                                reference_link_axis=reference_axis2,
+                                root_link='map')
+
+        zero_pose.add_cmd()
+
+        # # Third phase KeepObjectUpright & KeepObjectAbovePlane
+        zero_pose.set_json_goal('KeepObjectAbovePlane',
+                                object_link='edge',
+                                plane_center_point=container_plane,
+                                lower_distance=lower_distance,
+                                upper_distance=upper_distance,
+                                plane_radius=plane_radius,
+                                root_link='map')
+        zero_pose.set_json_goal('KeepObjectUpright',
+                                object_link_axis=object_axis,
+                                reference_link_axis=reference_axis,
+                                root_link='map')
+        # align x planes of object and map
+        zero_pose.set_json_goal('KeepObjectUpright',
+                                object_link_axis=rotation_axis,
+                                reference_link_axis=reference_axis2,
+                                root_link='map')
+
+        zero_pose.plan_and_execute()
+
+    def test_tilt(self, zero_pose):
+        containerPose = PoseStamped()
+        containerPose.header.frame_id = 'map'
+        containerPose.pose.position.x = 2
+        containerPose.pose.position.y = 0
+        containerPose.pose.position.z = 0.8
+        containerPose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                             [0, 1, 0, 0],
+                                                                             [0, 0, 1, 0],
+                                                                             [0, 0, 0, 1]]))
+        cupPose = PoseStamped()
+        cupPose.header.frame_id = 'hand_gripper_tool_frame'
+        cupPose.pose.position.x = 0
+        cupPose.pose.position.y = 0
+        cupPose.pose.position.z = 0
+        cupPose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                       [0, -1, 0, 0],
+                                                                       [1, 0, 0, 0],
+                                                                       [0, 0, 0, 1]]))
+        edgePose = PoseStamped()
+        edgePose.header.frame_id = 'cup'
+        edgePose.pose.position.x = 0
+        edgePose.pose.position.y = 0.03
+        edgePose.pose.position.z = 0.045
+        edgePose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                        [0, 1, 0, 0],
+                                                                        [0, 0, 1, 0],
+                                                                        [0, 0, 0, 1]]))
+
+        zero_pose.add_mesh('container', mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj',
+                           pose=containerPose)
+        zero_pose.add_cylinder('cup', 0.10, 0.03, cupPose, parent_link=cupPose.header.frame_id)
+        zero_pose.add_box('edge', (0.02, 0.01, 0.01), edgePose, 'cup', 'cup')
+
+        # rotation axis for tilting
+        rotation_axis = Vector3Stamped()
+        rotation_axis.header.frame_id = 'edge'
+        rotation_axis.vector.x = 1
+        tilt_angle = -90
+        tilt_velocity = 0.5
+
+        zero_pose.set_json_goal('TiltObject',
+                                object_link='edge',
+                                reference_link='map',
+                                rotation_velocity=tilt_velocity,
+                                root_link='map',
+                                lower_angle=tilt_angle,
+                                rotation_axis=rotation_axis)
         zero_pose.plan_and_execute()

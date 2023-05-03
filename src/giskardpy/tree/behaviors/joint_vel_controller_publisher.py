@@ -28,7 +28,10 @@ class JointVelController(GiskardBehavior):
             cmd_topic = f'{namespace}/command'
             self.cmd_topics.append(cmd_topic)
             self.publishers.append(rospy.Publisher(cmd_topic, Float64, queue_size=10))
-            self.joint_names.append(rospy.get_param(f'{namespace}/joint'))
+            try:
+                self.joint_names.append(rospy.get_param(f'{namespace}/joint'))
+            except Exception:
+                raise Exception('Wrong controller namespace: ' + namespace)
         for i in range(len(self.joint_names)):
             self.joint_names[i] = self.world.search_for_joint_name(self.joint_names[i])
         self.world.register_controlled_joints(self.joint_names)
@@ -45,22 +48,6 @@ class JointVelController(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        # next_time = self.god_map.get_data(identifier.time)
-        # if next_time <= 0.0 or not hasattr(self, 'last_time'):
-        #     self.last_time = next_time
-        #     return Status.RUNNING
-        # # if self.last_time is None:
-        # next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
-        # # joints = self.world.joints
-        # # next_time = rospy.get_rostime()
-        # dt = next_time - self.last_time
-        # print(f'dt: {dt}')
-        # self.world.update_state(next_cmds, dt)
-        # self.last_time = next_time
-        # self.world.notify_state_change()
-
-        # next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
-        # self.world.update_state(next_cmds, self.sample_period)
         msg = Float64()
         # js = deepcopy(self.world.state)
         # try:

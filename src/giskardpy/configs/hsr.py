@@ -65,6 +65,33 @@ class HSR_Mujoco(HSR_Base):
                                                     hard_threshold=0.03)
 
 
+class HSR_Mujoco_Closedloop(HSR_Base):
+    def __init__(self):
+        self.add_robot_from_parameter_server(parameter_name='hsrb4s/robot_description', joint_state_topics=['hsrb4s/joint_states'])
+        super().__init__()
+        self.set_control_mode(ControlModes.close_loop)
+        self.add_sync_tf_frame('map', 'odom')
+        self.add_omni_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  name='brumbrum',
+                                  x_name=PrefixName('odom_x', self.get_default_group_name()),
+                                  y_name=PrefixName('odom_y', self.get_default_group_name()),
+                                  yaw_vel_name=PrefixName('odom_t', self.get_default_group_name()),
+                                  odometry_topic='/hsrb4s/base_footprint')
+        self.add_joint_velocity_controller(namespaces=['hsrb4s/arm_flex_joint_velocity_controller',
+                                                       'hsrb4s/arm_lift_joint_velocity_controller',
+                                                       'hsrb4s/arm_roll_joint_velocity_controller',
+                                                       'hsrb4s/head_pan_joint_velocity_controller',
+                                                       'hsrb4s/head_tilt_joint_velocity_controller',
+                                                       'hsrb4s/wrist_flex_joint_velocity_controller',
+                                                       'hsrb4s/wrist_roll_joint_velocity_controller'])
+        self.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel')
+        self.overwrite_external_collision_avoidance(joint_name='brumbrum',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.1,
+                                                    hard_threshold=0.03)
+
+
 class HSR_StandAlone(HSR_Base):
     def __init__(self):
         self.add_robot_from_parameter_server()

@@ -842,3 +842,24 @@ def atan2(x: symbol_expr_float, y: symbol_expr_float) -> Expression: ...
 
 def solve_for(expression: Expression, target_value: float, start_value: float = 0.0001, max_tries: int = 10000,
               eps: float = 1e-10, max_step: float = 1) -> float: ...
+
+def one_step_change(current_acceleration: symbol_expr_float, jerk_limit: symbol_expr_float, dt: float) \
+        -> Expression: ...
+
+def velocity_profile(current_position: symbol_expr_float,
+                     current_velocity: symbol_expr_float,
+                     position_limit: symbol_expr_float,
+                     velocity_limit: symbol_expr_float,
+                     current_acceleration: symbol_expr_float,
+                     jerk_limit: symbol_expr_float,
+                     dt: float,
+                     ph: int) -> Expression: ...
+
+def inverted_velocity_profile(current_position: symbol_expr_float,
+                     current_velocity: symbol_expr_float,
+                     position_limit: symbol_expr_float,
+                     velocity_limit: symbol_expr_float,
+                     current_acceleration: symbol_expr_float,
+                     jerk_limit: symbol_expr_float,
+                     dt: float,
+                     ph: int) -> Expression: ...

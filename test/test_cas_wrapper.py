@@ -13,6 +13,8 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 
 from giskardpy import casadi_wrapper as w
+import giskardpy.utils.math as giskard_math
+from giskardpy.my_types import Derivatives
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
 from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix
@@ -1762,3 +1764,49 @@ class TestCASWrapper(unittest.TestCase):
         e = w.if_eq(a, 0, a, b)
         assert w.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert w.to_str(e) == e.pretty_str()
+
+    def test_velocity_profile(self):
+        dt = 0.05
+        ph = 9
+        params = [
+            [2, 0, 0,
+             -1, -1, -30,
+             1, 1, 30]
+        ]
+        for p_c, v_c, a_c, p_lb, v_lb, j_lb, p_ub, v_ub, j_ub in params:
+            lb = w.inverted_velocity_profile(current_position=p_c,
+                                             current_velocity=v_c,
+                                             current_acceleration=a_c,
+                                             position_limit=p_lb,
+                                             velocity_limit=v_lb,
+                                             jerk_limit=j_lb,
+                                             dt=dt,
+                                             ph=ph).evaluate()
+            ub = w.velocity_profile(current_position=p_c,
+                                    current_velocity=v_c,
+                                    current_acceleration=a_c,
+                                    position_limit=p_ub,
+                                    velocity_limit=v_ub,
+                                    jerk_limit=j_ub,
+                                    dt=dt,
+                                    ph=ph).evaluate()
+            b = np.hstack((lb, ub))
+            lower_limits = {
+                Derivatives.velocity: lb.T[0],
+                Derivatives.acceleration: np.ones(len(lb)) * -np.inf,
+                Derivatives.jerk: np.ones(len(lb)) * j_lb
+            }
+            upper_limits = {
+                Derivatives.velocity: ub.T[0],
+                Derivatives.acceleration: np.ones(len(ub)) * np.inf,
+                Derivatives.jerk: np.ones(len(ub)) * j_ub
+            }
+            current_values = {
+                Derivatives.velocity: v_c,
+                Derivatives.acceleration: a_c,
+            }
+            giskard_math.mpc_velocities(upper_limits=upper_limits,
+                                        lower_limits=lower_limits,
+                                        current_values=current_values,
+                                        dt=0.05,
+                                        ph=9)

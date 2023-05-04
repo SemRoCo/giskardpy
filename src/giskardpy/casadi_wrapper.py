@@ -2016,26 +2016,35 @@ def gauss(n: float) -> float:
     return (n ** 2 + n) / 2
 
 
-def velocity_profile(vc, ac, vg, jl, dt, ph) -> List[Expression]:
-    def f(vc, ac, jl, t, dt):
-        return vc + t * ac * dt + gauss(t) * jl * dt ** 2
-
-    def f_r(vc, ac, jl, t, dt, ph):
-        return vc + (ph - 1 - t) * ac * dt + gauss(ph - 1 - t) * jl * dt ** 2
-
-    def compute_jerk(vc, vg, ac, dt, x):
-        return (vg - vc - x * ac * dt) / (gauss(x) * dt ** 2)
-
-    x = list(range(ph))
-    half1 = ceil(ph / 2)
-    half2 = ((ph - 1) / 2)
-    vn = (vg + vc) / 2
-    j = compute_jerk(vc, vn, ac, dt, half2)
-    j = min(max(j, -jl), jl)
-    intersection = f(vc, ac, j, half2, dt)
-    new_vg = vc - (vc - intersection) * 2
-    y = [f(vc, ac, j, t, dt) for t in x[:half1]]
-    y_r = [f_r(new_vg, 0, -j, t, dt, ph) for t in x[half1:]]
-    return y + y_r
+def one_step_change(current_acceleration, jerk_limit, dt):
+    return current_acceleration * dt + jerk_limit * dt ** 2
 
 
+def desired_velocity(current_position, goal_position, dt, ph):
+    e = goal_position - current_position
+    a = e / (gauss(ph) * dt)
+    return a * ph
+
+
+def velocity_profile(current_position, current_velocity, current_acceleration,
+                     position_limit, velocity_limit, jerk_limit, dt, ph):
+    target_velocity = desired_velocity(current_position, position_limit, dt, ph)
+    target_velocity = limit(target_velocity,
+                            current_velocity + one_step_change(current_acceleration, -jerk_limit, dt),
+                            current_velocity + one_step_change(current_acceleration, jerk_limit, dt))
+    target_velocity = limit(target_velocity, -velocity_limit, velocity_limit)
+    jerk_limit = -jerk_limit
+
+    linear = lambda t: (t * -(target_velocity / (ph - 1)) + target_velocity)
+    quadratic = lambda t: (target_velocity + t * current_acceleration * dt + gauss(t) * jerk_limit * dt ** 2)
+    l = Expression([linear(t) for t in range(ph)])
+    q = Expression([quadratic(t) for t in range(ph)])
+    q2 = zeros(*l.shape)
+    q2[0] = target_velocity
+    return if_less(target_velocity, 0, q2, max(l, q))
+
+
+def inverted_velocity_profile(current_position, current_velocity, current_acceleration,
+                              position_limit, velocity_limit, jerk_limit, dt, ph):
+    return -velocity_profile(-current_position, current_velocity, current_acceleration,
+                     -position_limit, -velocity_limit, -jerk_limit, dt, ph)

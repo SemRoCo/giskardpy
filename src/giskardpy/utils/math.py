@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Dict
+from typing import Tuple, Union, Dict, List
 
 import numpy as np
 from geometry_msgs.msg import Quaternion, Point
@@ -145,26 +145,46 @@ def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_pe
     return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
 
 
-def mpc_velocities(limits: Dict[Derivatives, float], current_values: Dict[Derivatives, float], dt: float, ph: int) -> np.ndarray:
+def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
+                   lower_limits: Dict[Derivatives, List[float]],
+                   current_values: Dict[Derivatives, float],
+                   dt: float,
+                   ph: int) -> np.ndarray:
     """
     Computes the maximum velocity that can be reached given a prediction horizon under the following assumptions:
     """
     solver = QPSolverQPalm.empty()
-    b = []
-    max_d = max(limits.keys())
-    for derivative, d_limit in sorted(limits.items()):
-        b.extend([d_limit] * ph)
+    max_d = max(upper_limits.keys())
+    lb = []
+    ub = []
+    for (derivative, lb_), (_, ub_) in sorted(zip(lower_limits.items(), upper_limits.items())):
+        lb.extend(lb_)
+        ub.extend(ub_)
         if derivative != max_d:
-            b[-1] = 0
-    b = np.array(b)
-    ub = b
-    lb = -b
-    lb[0] = current_values[Derivatives.velocity]
-    ub[0] = current_values[Derivatives.velocity]
-    # lb[ph] = current_values[Derivatives.acceleration]
-    # ub[ph] = current_values[Derivatives.acceleration]
-    num_rows = ph * (max_d - 1)
-    num_columns = ph * max_d
+            lb[-1] = 0
+            ub[-1] = 0
+    model = derivative_link_model(dt, ph, max_d)
+    lbA = np.zeros(model.shape[0])
+    ubA = np.zeros(model.shape[0])
+    for derivative, current_value in sorted(current_values.items()):
+        ubA[ph * (derivative - 1)] = current_value
+        lbA[ph * (derivative - 1)] = current_value
+    w = np.zeros(len(lb))
+    w[:-ph] = 1
+    H = np.diag(w)
+    g = np.zeros(len(lb))
+    # g[:ph] = 1
+    empty = np.eye(0)
+    result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
+                                                  E=empty, bE=empty,
+                                                  A=model, lbA=lbA, ubA=ubA)
+    velocities = result[:ph]
+    return velocities
+
+
+def derivative_link_model(dt, ph, max_derivative):
+    num_rows = ph * (max_derivative - 1)
+    num_columns = ph * max_derivative
     derivative_link_model = np.zeros((num_rows, num_columns))
 
     x_n = np.eye(num_rows)
@@ -178,32 +198,18 @@ def mpc_velocities(limits: Dict[Derivatives, float], current_values: Dict[Deriva
     x_c = -np.eye(x_c_height)
     offset_v = 0
     offset_h = 0
-    for derivative in Derivatives.range(Derivatives.velocity, max_d - 1):
+    for derivative in Derivatives.range(Derivatives.velocity, max_derivative - 1):
         offset_v += 1
         derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
         offset_v += x_c_height
         offset_h += ph
-    ubA = np.zeros(derivative_link_model.shape[0])
-    lbA = -ubA
-    ubA[0] = current_values[Derivatives.velocity]
-    ubA[ph] = current_values[Derivatives.acceleration]
-    lbA[0] = current_values[Derivatives.velocity]
-    lbA[ph] = current_values[Derivatives.acceleration]
-    w = np.zeros(len(b))
-    w[:-ph] = 1
-    H = np.diag(w)
-    g = np.zeros(len(b))
-    g[:ph] = 1
-    empty = np.eye(0)
-    result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
-                                                  E=empty, bE=empty,
-                                                  A=derivative_link_model, lbA=lbA, ubA=ubA)
-    velocities = result[:ph]
-    return velocities
+    return derivative_link_model
 
 
 def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
-    return np.sum(mpc_velocities(limits, dt, ph)) * dt
+    return np.sum(mpc_velocities(limits, {Derivatives.velocity: limits[Derivatives.velocity],
+                                          Derivatives.acceleration: 0,
+                                          Derivatives.jerk: 0}, dt, ph)) * dt
 
 
 def limit(a, lower_limit, upper_limit):

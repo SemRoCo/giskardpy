@@ -2029,9 +2029,11 @@ def desired_velocity(current_position, goal_position, dt, ph):
 def velocity_profile(current_position, current_velocity, current_acceleration,
                      position_limit, velocity_limit, jerk_limit, dt, ph):
     target_velocity = desired_velocity(current_position, position_limit, dt, ph)
-    target_velocity = limit(target_velocity,
-                            current_velocity + one_step_change(current_acceleration, -jerk_limit, dt),
-                            current_velocity + one_step_change(current_acceleration, jerk_limit, dt))
+    target_velocity = max(target_velocity,
+                          current_velocity + one_step_change(current_acceleration, -jerk_limit, dt))
+    target_velocity = max(target_velocity,
+                          max(-velocity_limit,
+                              current_velocity + one_step_change(current_acceleration, jerk_limit, dt)))
     target_velocity = limit(target_velocity, -velocity_limit, velocity_limit)
     jerk_limit = -jerk_limit
 
@@ -2046,5 +2048,5 @@ def velocity_profile(current_position, current_velocity, current_acceleration,
 
 def inverted_velocity_profile(current_position, current_velocity, current_acceleration,
                               position_limit, velocity_limit, jerk_limit, dt, ph):
-    return -velocity_profile(-current_position, current_velocity, current_acceleration,
-                     -position_limit, -velocity_limit, -jerk_limit, dt, ph)
+    return -velocity_profile(-current_position, -current_velocity, -current_acceleration,
+                             -position_limit, -velocity_limit, -jerk_limit, dt, ph)

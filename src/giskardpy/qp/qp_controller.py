@@ -6,7 +6,7 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
 from typing import List, Dict, Tuple, Type, Union, Optional, DefaultDict
-
+import giskardpy.utils.math as giskard_math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -278,34 +278,39 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
-    def velocity_limit(self, v: FreeVariable, t: int):
-        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
-        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
+    def velocity_limit(self, v: FreeVariable):
         current_position = v.get_symbol(Derivatives.position)
         lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
         upper_velocity_limit = v.get_upper_limit(Derivatives.velocity, evaluated=True)
-        lb = cas.max(lower_limit - current_position - lower_velocity_limit * t * self.dt,
-                     lower_velocity_limit * self.dt) / self.dt
-        ub = cas.min(upper_limit - current_position - upper_velocity_limit * t * self.dt,
-                     upper_velocity_limit * self.dt) / self.dt
+        lower_acc_limit = v.get_lower_limit(Derivatives.acceleration, evaluated=True)
+        upper_acc_limit = v.get_upper_limit(Derivatives.acceleration, evaluated=True)
+        current_vel = v.get_symbol(Derivatives.velocity)
+        current_acc = v.get_symbol(Derivatives.acceleration)
 
-        if t == 0:
-            current_velocity = v.get_symbol(Derivatives.velocity)
-            lower_one_step_velocities = []
-            upper_one_step_velocities = []
-            for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
-                step_size = self.dt ** (derivative - 1)
-                lower_one_step_velocities.append(v.get_lower_limit(derivative, evaluated=True) * step_size)
-                upper_one_step_velocities.append(v.get_upper_limit(derivative, evaluated=True) * step_size)
-            lower_one_step_vel = max(lower_one_step_velocities)
-            upper_one_step_vel = min(upper_one_step_velocities)
-            # lower_one_step_vel = cas.min(lower_one_step_vel, current_velocity - lower_one_step_vel)
-            # upper_one_step_vel = cas.max(upper_one_step_vel, - current_velocity + upper_one_step_vel)
-            lb = cas.limit(lb, lower_velocity_limit, upper_one_step_vel)
-            ub = cas.limit(ub, lower_one_step_vel, upper_velocity_limit)
-        else:
-            lb = cas.limit(lb, lower_velocity_limit, 0)
-            ub = cas.limit(ub, 0, upper_velocity_limit)
+        lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
+        upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
+
+        if not v.has_position_limits():
+            lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
+                                + [lower_acc_limit] * self.prediction_horizon
+                                + [lower_jerk_limit] * self.prediction_horizon)
+            ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
+                                + [upper_acc_limit] * self.prediction_horizon
+                                + [upper_jerk_limit] * self.prediction_horizon)
+            return lb, ub
+
+        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
+        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
+
+        lb, ub = cas.b_profile(current_position=current_position,
+                               current_velocity=current_vel,
+                               current_acceleration=current_acc,
+                               position_limits=(lower_limit, upper_limit),
+                               velocity_limits=(lower_velocity_limit, upper_velocity_limit),
+                               acceleration_limits=(lower_acc_limit, upper_acc_limit),
+                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                               dt=self.dt,
+                               ph=self.prediction_horizon)
         return lb, ub
 
     @profile
@@ -313,24 +318,15 @@ class FreeVariableBounds(ProblemDataPart):
             -> Tuple[List[Dict[str, cas.symbol_expr_float]], List[Dict[str, cas.symbol_expr_float]]]:
         lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
-        for t in range(self.prediction_horizon):
-            for v in self.free_variables:
+        for v in self.free_variables:
+            lb_, ub_ = self.velocity_limit(v)
+            for t in range(self.prediction_horizon):
                 for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
                     if t >= self.prediction_horizon - (self.max_derivative - derivative):
                         continue
-                    # if t == self.prediction_horizon - 1 \
-                    #         and derivative < min(v.order, self.max_derivative) \
-                    #         and self.prediction_horizon > 2:  # and False:
-                    #     lb[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
-                    #     ub[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
-                    # else:
-                    if derivative == Derivatives.velocity and v.has_position_limits():
-                        lower_limit, upper_limit = self.velocity_limit(v, t)
-                    else:
-                        lower_limit = v.get_lower_limit(derivative, evaluated=self.evaluated)
-                        upper_limit = v.get_upper_limit(derivative, evaluated=self.evaluated)
-                    lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lower_limit
-                    ub[derivative][f't{t:03}/{v.name}/{derivative}'] = upper_limit
+                    index = t + self.prediction_horizon * (derivative - 1)
+                    lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lb_[index]
+                    ub[derivative][f't{t:03}/{v.name}/{derivative}'] = ub_[index]
         lb_params = []
         ub_params = []
         for derivative, name_to_bound_map in sorted(lb.items()):

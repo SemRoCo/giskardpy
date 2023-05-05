@@ -1409,8 +1409,13 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
+    if isinstance(if_result, float):
+        if_result = Expression(if_result)
+    if isinstance(else_result, float):
+        else_result = Expression(else_result)
     if isinstance(if_result, (Point3, Vector3, TransMatrix, RotationMatrix, Quaternion)):
-        assert type(if_result) == type(else_result)
+        assert type(if_result) == type(else_result), \
+            f'if_else: result types are not equal {type(if_result)} != {type(else_result)}'
     return_type = type(if_result)
     if return_type in (int, float):
         return_type = Expression
@@ -2023,30 +2028,70 @@ def one_step_change(current_acceleration, jerk_limit, dt):
 def desired_velocity(current_position, goal_position, dt, ph):
     e = goal_position - current_position
     a = e / (gauss(ph) * dt)
+    # a = e / ((gauss(ph-1) + ph - 1)*dt)
     return a * ph
+    # return a * (ph-2)
 
 
-def velocity_profile(current_position, current_velocity, current_acceleration,
-                     position_limit, velocity_limit, jerk_limit, dt, ph):
-    target_velocity = desired_velocity(current_position, position_limit, dt, ph)
-    target_velocity = max(target_velocity,
-                          current_velocity + one_step_change(current_acceleration, -jerk_limit, dt))
-    target_velocity = max(target_velocity,
-                          max(-velocity_limit,
-                              current_velocity + one_step_change(current_acceleration, jerk_limit, dt)))
-    target_velocity = limit(target_velocity, -velocity_limit, velocity_limit)
-    jerk_limit = -jerk_limit
+def ub_profile(current_position, current_velocity, current_acceleration,
+               position_limit, acceleration_limit, velocity_limit, jerk_limit, dt, ph):
+    ph -= 1
+    target_velocity = desired_velocity(current_position, position_limit, dt, ph - 1)
+    target_velocity = min(target_velocity, velocity_limit)
+    lower_velocity_limit = max(-velocity_limit,
+                               one_step_change(0, - jerk_limit, dt))
+    lower_velocity_limit = min(lower_velocity_limit,
+                               one_step_change(0, - jerk_limit, dt))
+    target_velocity = max(target_velocity, lower_velocity_limit)
+    target_velocity = limit(target_velocity, - velocity_limit, velocity_limit)
+    target_velocity = if_less(target_velocity, 0,
+                              one_step_change(0, - jerk_limit, dt),
+                              target_velocity)
 
     linear = lambda t: (t * -(target_velocity / (ph - 1)) + target_velocity)
-    quadratic = lambda t: (target_velocity + t * current_acceleration * dt + gauss(t) * jerk_limit * dt ** 2)
-    l = Expression([linear(t) for t in range(ph)])
-    q = Expression([quadratic(t) for t in range(ph)])
+    quadratic = lambda t: (target_velocity + t * (jerk_limit * dt) * dt + gauss(t) * -jerk_limit * dt ** 2)
+    l = Expression([linear(t) for t in range(ph + 1)])
+    q = Expression([quadratic(t) for t in range(ph + 1)])
+    l[-2] = 0
+    q[-2] = 0
+    l[-1] = 0
+    q[-1] = 0
     q2 = zeros(*l.shape)
     q2[0] = target_velocity
-    return if_less(target_velocity, 0, q2, max(l, q))
+    velocity_profile = if_less(target_velocity, 0, q2, max(l, q))
+    acceleration_profile = ones(*l.shape) * acceleration_limit
+    jerk_profile = ones(*l.shape) * jerk_limit
+
+    vel_error = target_velocity - current_velocity
+    target_acc = vel_error / dt - current_acceleration
+    target_jerk = target_acc / dt
+    # jerk_profile[0] = max(jerk_limit, -target_jerk)
+    # jerk_profile[1] = max(jerk_limit, -target_jerk)
+    target_jerk = if_less(target_acc, 0, target_jerk, 0)
+
+    return vstack([velocity_profile, acceleration_profile, jerk_profile]), target_jerk
 
 
-def inverted_velocity_profile(current_position, current_velocity, current_acceleration,
-                              position_limit, velocity_limit, jerk_limit, dt, ph):
-    return -velocity_profile(-current_position, -current_velocity, -current_acceleration,
-                             -position_limit, -velocity_limit, -jerk_limit, dt, ph)
+def b_profile(current_position, current_velocity, current_acceleration,
+              position_limits, velocity_limits, acceleration_limits, jerk_limits, dt, ph):
+    lb, jerk_lb = ub_profile(-current_position, -current_velocity, -current_acceleration,
+                             -position_limits[0], -acceleration_limits[0], -velocity_limits[0], -jerk_limits[0],
+                             dt, ph)
+    lb = -lb
+    ub, jerk_ub = ub_profile(current_position, current_velocity, current_acceleration,
+                             position_limits[1], acceleration_limits[1], velocity_limits[1], jerk_limits[1], dt,
+                             ph)
+    jerk_lb = abs(jerk_lb)
+    jerk_ub = abs(jerk_ub)
+    jerk_b = max(jerk_lb, jerk_ub)
+    jerk_b = max(jerk_b, jerk_limits[1])
+    jerk_lb = -jerk_b
+    jerk_ub = jerk_b
+    # jerk_lb = min(jerk_limits[0], jerk_lb)
+    # jerk_lb = min(jerk_ub, jerk_lb)
+    # jerk = max(jerk_lb, jerk_ub)
+    lb[ph * 2] = jerk_lb
+    ub[ph * 2] = jerk_ub
+    lb[ph * 2 + 1] = lb[ph * 2]
+    ub[ph * 2 + 1] = ub[ph * 2]
+    return lb, ub

@@ -1,6 +1,7 @@
 import math
 import unittest
 from datetime import timedelta
+from itertools import combinations, product
 
 import PyKDL
 import hypothesis.strategies as st
@@ -1766,54 +1767,63 @@ class TestCASWrapper(unittest.TestCase):
         assert w.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert w.to_str(e) == e.pretty_str()
 
-    @given(float_no_nan_no_inf(2),
-           float_no_nan_no_inf(1),
-           float_no_nan_no_inf(1),
-           float_no_nan_no_inf(2),
-           float_no_nan_no_inf(2),
-           float_no_nan_no_inf_min_max(0.1, 1),
-           float_no_nan_no_inf_min_max(25, 50),
-           float_no_nan_no_inf_min_max(0.05, 1))
-    def test_velocity_profile(self, p_c, v_c, a_c, p_lb, p_ub, v_b, j_b, dt):
-        assume(p_ub - p_lb > 0.1)
-        assume(-v_b <= v_c <= v_b)
+    def test_velocity_profile(self):
+        p_cs = [2.75, -2, -1, -0.05, -0.01, 0, 0.01, 0.05, 1, 2]
+        p_centers = [0, -1, -0.5, -0.01, 0.01, 0.05, 1]
+        p_ranges = [2.07, 0.1, 0.3, 1, 2]
+        v_cs = [-0.9, -0.81, -1, -0.05, -0.01, 0, 0.01, 0.05, 1]
+        a_cs = [-1.5, -1.36, -3, -1, 0, 1, 1.5, 3]
+        v_bs = [1]
+        j_bs = [30]
+        a_lb = -np.inf
+        a_ub = np.inf
         ph = 9
-        j_lb, j_ub = -j_b, j_b
-        v_lb = -v_b
-        v_ub = v_b
-        lb = w.inverted_velocity_profile(current_position=p_c,
-                                         current_velocity=v_c,
-                                         current_acceleration=a_c,
-                                         position_limit=p_lb,
-                                         velocity_limit=v_lb,
-                                         jerk_limit=j_lb,
-                                         dt=dt,
-                                         ph=ph).evaluate()
-        ub = w.velocity_profile(current_position=p_c,
-                                current_velocity=v_c,
-                                current_acceleration=a_c,
-                                position_limit=p_ub,
-                                velocity_limit=v_ub,
-                                jerk_limit=j_ub,
-                                dt=dt,
-                                ph=ph).evaluate()
-        b = np.hstack((lb, ub))
-        lower_limits = {
-            Derivatives.velocity: lb.T[0],
-            Derivatives.acceleration: np.ones(len(lb)) * -np.inf,
-            Derivatives.jerk: np.ones(len(lb)) * j_lb
-        }
-        upper_limits = {
-            Derivatives.velocity: ub.T[0],
-            Derivatives.acceleration: np.ones(len(ub)) * np.inf,
-            Derivatives.jerk: np.ones(len(ub)) * j_ub
-        }
-        current_values = {
-            Derivatives.velocity: v_c,
-            Derivatives.acceleration: a_c,
-        }
-        giskard_math.mpc_velocities(upper_limits=upper_limits,
-                                    lower_limits=lower_limits,
-                                    current_values=current_values,
-                                    dt=dt,
-                                    ph=ph)
+        dt = 0.05
+
+        for p_c, v_c, a_c, p_center, p_range, v_b, j_b in product(p_cs, v_cs, a_cs, p_centers, p_ranges, v_bs, j_bs):
+            p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, -0.9, -3, 0, 2.07, 1, 30
+            p_lb = p_center - p_range
+            p_ub = p_center + p_range
+            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 0, 0, 0, -2.07, 2.07, 1, 30
+            j_lb, j_ub = -j_b, j_b
+            v_lb, v_ub = -v_b, v_b
+            lb, ub = w.b_profile(current_position=p_c,
+                                 current_velocity=v_c,
+                                 current_acceleration=a_c,
+                                 position_limits=(p_lb, p_ub),
+                                 velocity_limits=(v_lb, v_ub),
+                                 acceleration_limits=(a_lb, a_ub),
+                                 jerk_limits=(j_lb, j_ub),
+                                 dt=dt,
+                                 ph=ph)
+            lb = lb.evaluate()
+            ub = ub.evaluate()
+            b = np.hstack((lb, ub))
+            lower_limits = {
+                Derivatives.velocity: lb.T[0][:ph],
+                Derivatives.acceleration: lb.T[0][ph:ph * 2],
+                Derivatives.jerk: lb.T[0][-ph:]
+            }
+            upper_limits = {
+                Derivatives.velocity: ub.T[0][:ph],
+                Derivatives.acceleration: ub.T[0][ph:ph * 2],
+                Derivatives.jerk: ub.T[0][-ph:]
+            }
+            current_values = {
+                Derivatives.velocity: v_c,
+                Derivatives.acceleration: a_c,
+            }
+            try:
+                if p_c > p_ub:
+                    assert ub[0][0] < max(v_c, 0)
+                if p_c < p_lb:
+                    assert lb[0][0] > min(v_c, 0)
+                # print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                giskard_math.mpc_velocities(upper_limits=upper_limits,
+                                            lower_limits=lower_limits,
+                                            current_values=current_values,
+                                            dt=dt,
+                                            ph=ph)
+            except Exception as e:
+                print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                raise

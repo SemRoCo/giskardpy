@@ -55,7 +55,7 @@ class _JointState:
                  snap: float = 0,
                  crackle: float = 0,
                  pop: float = 0):
-        self.state: np.ndarray = np.array([position, velocity, acceleration, jerk, snap, crackle, pop], dtype=float)
+        self.state: np.ndarray = [position, velocity, acceleration, jerk, snap, crackle, pop]
 
     def __getitem__(self, derivative):
         return self.state[derivative]

@@ -1562,7 +1562,7 @@ def if_less_eq_cases(a, b_result_cases, else_result):
     """
     a = _to_sx(a)
     result = _to_sx(else_result)
-    for i in reversed(range(len(b_result_cases) - 1)):
+    for i in reversed(range(len(b_result_cases))):
         b = _to_sx(b_result_cases[i][0])
         b_result = _to_sx(b_result_cases[i][1])
         result = ca.if_else(ca.le(a, b), b_result, result)

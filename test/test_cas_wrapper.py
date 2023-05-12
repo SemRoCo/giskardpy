@@ -1441,7 +1441,7 @@ class TestCASWrapper(unittest.TestCase):
         expected = float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)
 
-    @given(float_no_nan_no_inf())
+    @given(float_no_nan_no_inf(10))
     def test_if_less_eq_cases(self, a):
         b_result_cases = [
             (-1, -1),

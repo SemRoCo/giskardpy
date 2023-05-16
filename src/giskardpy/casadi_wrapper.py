@@ -1472,9 +1472,9 @@ def logic_and(*args):
 def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
-        return ca.logic_or(args[0], args[1])
+        return Expression(ca.logic_or(args[0].s, args[1].s))
     else:
-        return ca.logic_or(args[0], logic_and(*args[1:]))
+        return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
 
 
 def if_greater(a, b, if_result, else_result):

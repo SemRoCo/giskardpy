@@ -145,14 +145,11 @@ def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_pe
     return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
 
 
-def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
-                   lower_limits: Dict[Derivatives, List[float]],
-                   current_values: Dict[Derivatives, float],
-                   dt: float,
-                   ph: int) -> np.ndarray:
-    """
-    Computes the maximum velocity that can be reached given a prediction horizon under the following assumptions:
-    """
+def mpc(upper_limits: Dict[Derivatives, List[float]],
+        lower_limits: Dict[Derivatives, List[float]],
+        current_values: Dict[Derivatives, float],
+        dt: float,
+        ph: int, asdf) -> np.ndarray:
     solver = QPSolverQPalm.empty()
     max_d = max(upper_limits.keys())
     lb = []
@@ -170,16 +167,44 @@ def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
         ubA[ph * (derivative - 1)] = current_value
         lbA[ph * (derivative - 1)] = current_value
     w = np.zeros(len(lb))
-    w[:-ph] = 1
+    if asdf==0:
+        w[:-ph] = 1
     H = np.diag(w)
     g = np.zeros(len(lb))
-    # g[:ph] = 1
+    if asdf==1:
+        g[:ph] = -1
+    if asdf==2:
+        g[:ph] = 1
     empty = np.eye(0)
+    lb = np.array(lb)
+    ub = np.array(ub)
     result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
                                                   E=empty, bE=empty,
                                                   A=model, lbA=lbA, ubA=ubA)
-    velocities = result[:ph]
-    return velocities
+    return result
+
+
+def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, asdf):
+    upper_limits = {
+        Derivatives.velocity: np.ones(ph) * vel_limit,
+        Derivatives.acceleration: np.ones(ph) * acc_limit,
+        Derivatives.jerk: np.ones(ph) * jerk_limit
+    }
+    lower_limits = {
+        Derivatives.velocity: np.ones(ph) * -vel_limit,
+        Derivatives.acceleration: np.ones(ph) * -acc_limit,
+        Derivatives.jerk: np.ones(ph) * -jerk_limit
+    }
+    return mpc(upper_limits, lower_limits,
+               {Derivatives.velocity: current_vel + jerk_limit * dt ** 2,
+                Derivatives.acceleration: current_acc}, dt, ph, asdf)
+
+def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
+                   lower_limits: Dict[Derivatives, List[float]],
+                   current_values: Dict[Derivatives, float],
+                   dt: float,
+                   ph: int):
+    return mpc(upper_limits, lower_limits, current_values, dt, ph, 0)
 
 
 def derivative_link_model(dt, ph, max_derivative):
@@ -207,9 +232,37 @@ def derivative_link_model(dt, ph, max_derivative):
 
 
 def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
-    return np.sum(mpc_velocities(limits, {Derivatives.velocity: limits[Derivatives.velocity],
-                                          Derivatives.acceleration: 0,
-                                          Derivatives.jerk: 0}, dt, ph)) * dt
+    upper_limits = {
+        Derivatives.velocity: np.ones(ph) * limits[Derivatives.velocity],
+        Derivatives.acceleration: np.ones(ph) * limits[Derivatives.acceleration],
+        Derivatives.jerk: np.ones(ph) * limits[Derivatives.jerk]
+    }
+    lower_limits = {
+        Derivatives.velocity: np.ones(ph) * -limits[Derivatives.velocity],
+        Derivatives.acceleration: np.ones(ph) * -limits[Derivatives.acceleration],
+        Derivatives.jerk: np.ones(ph) * -limits[Derivatives.jerk]
+    }
+    return np.sum(mpc_velocities(upper_limits, lower_limits,
+                                 {Derivatives.velocity: limits[Derivatives.velocity] + limits[
+                                     Derivatives.jerk] * dt ** 2,
+                                  Derivatives.acceleration: 0}, dt, ph)) * dt
+
+
+def mpc_velocity_integral2(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+    ph -= 2
+    i1 = gauss(ph) * (limits[Derivatives.velocity] / (ph)) * dt
+    ph -= 1
+    i2 = gauss(ph) * (limits[Derivatives.velocity] / (ph)) * dt
+    return (i1 + i2) / 2
+
+
+def mpc_velocity_integral3(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+    ph -= 1
+    v = limits[Derivatives.velocity]
+    i1 = (v * dt * ph) / 2
+    ph -= 1
+    i2 = (v * dt * ph) / 2
+    return (i1 + i2) / 2
 
 
 def limit(a, lower_limit, upper_limit):

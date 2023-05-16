@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 import giskardpy.casadi_wrapper as cas
+import giskardpy.casadi_wrapper2 as cas2
 from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import OutOfJointLimitsException, \
@@ -302,7 +303,7 @@ class FreeVariableBounds(ProblemDataPart):
         lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
         upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-        lb, ub = cas.b_profile(current_position=current_position,
+        lb, ub = cas2.b_profile(current_position=current_position,
                                current_velocity=current_vel,
                                current_acceleration=current_acc,
                                position_limits=(lower_limit, upper_limit),

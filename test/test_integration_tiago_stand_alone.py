@@ -656,6 +656,7 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits7(self, zero_pose: TiagoTestWrapper):
+        #fixme
         js = {
             'arm_left_1_joint': 1.3505632726981545,
             'arm_left_2_joint': -1.1195635667275154,
@@ -714,9 +715,10 @@ class TestJointGoals:
 
     def test_joint_goals_at_limits(self, zero_pose: TiagoTestWrapper):
         js1 = {
-            'head_1_joint': 5,
-            'head_2_joint': -5
+            'arm_right_5_joint': 3,
+            # 'arm_left_5_joint': -3
         }
+        # zero_pose.set_seed_configuration(start_state)
         zero_pose.set_joint_goal(js1, check=False, weight=WEIGHT_ABOVE_CA)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -736,7 +738,7 @@ class TestJointGoals:
     def test_get_out_of_joint_soft_limits_passive(self, zero_pose: TiagoTestWrapper):
         js = {
             'arm_right_5_joint': 3,
-            'arm_left_5_joint': -3
+            # 'arm_left_5_joint': -3
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
@@ -746,22 +748,24 @@ class TestJointGoals:
     def test_get_out_of_joint_soft_limits_passive_with_velocity(self, zero_pose: TiagoTestWrapper):
         js = {
             'arm_right_5_joint': 3,
-            'arm_left_5_joint': -3
+            # 'arm_left_5_joint': -3
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
         zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
+        # zero_pose.world.state[PrefixName('arm_left_5_joint', 'tiago_dual')].velocity = -1
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
 
     def test_try_to_stay_out_of_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {
-            'head_1_joint': 2,
-            'head_2_joint': -2
+            'arm_right_5_joint': 3,
+            # 'arm_left_5_joint': -3
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
-        zero_pose.set_joint_goal(js, weight=WEIGHT_BELOW_CA, check=False)
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()

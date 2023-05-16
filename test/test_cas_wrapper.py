@@ -1,5 +1,6 @@
 import math
 import unittest
+from copy import deepcopy
 from datetime import timedelta
 from itertools import combinations, product
 
@@ -14,6 +15,7 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 
 from giskardpy import casadi_wrapper as w
+from giskardpy import casadi_wrapper2 as cas2
 import giskardpy.utils.math as giskard_math
 from giskardpy.my_types import Derivatives
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
@@ -1767,12 +1769,15 @@ class TestCASWrapper(unittest.TestCase):
         assert w.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert w.to_str(e) == e.pretty_str()
 
+    def test_integral(self):
+        w.vel_integral(1, 30, 0.05, 9)
+
     def test_velocity_profile(self):
         p_cs = [2.75, -2, -1, -0.05, -0.01, 0, 0.01, 0.05, 1, 2]
-        p_centers = [0, -1, -0.5, -0.01, 0.01, 0.05, 1]
+        p_centers = [0, -0.01, 0.5]
         p_ranges = [2.07, 0.1, 0.3, 1, 2]
         v_cs = [-0.9, -0.81, -1, -0.05, -0.01, 0, 0.01, 0.05, 1]
-        a_cs = [-1.5, -1.36, -3, -1, 0, 1, 1.5, 3]
+        a_cs = [-20, 20, -1.5, -1.36, -3, -1, 0, 1, 1.5, 3]
         v_bs = [1]
         j_bs = [30]
         a_lb = -np.inf
@@ -1781,21 +1786,28 @@ class TestCASWrapper(unittest.TestCase):
         dt = 0.05
 
         for p_c, v_c, a_c, p_center, p_range, v_b, j_b in product(p_cs, v_cs, a_cs, p_centers, p_ranges, v_bs, j_bs):
-            p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, -0.9, -3, 0, 2.07, 1, 30
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.9, -20, 0, 2.07, 1, 30
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.81, 0, -0.01, 2.07, 1, 30
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, 1, -3, 0, 2.07, 1, 30
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.9, 1.5, 0, 2.07, 1, 30
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, -0.9, -3, 0, 2.07, 1, 30
+            p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, -1, -1.5, 0, 2.07, 1, 30
             p_lb = p_center - p_range
             p_ub = p_center + p_range
+            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 3, -0.075, -21.5, -2.07, 2.07, 1, 30
             # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 0, 0, 0, -2.07, 2.07, 1, 30
+            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b =
             j_lb, j_ub = -j_b, j_b
             v_lb, v_ub = -v_b, v_b
-            lb, ub = w.b_profile(current_position=p_c,
-                                 current_velocity=v_c,
-                                 current_acceleration=a_c,
-                                 position_limits=(p_lb, p_ub),
-                                 velocity_limits=(v_lb, v_ub),
-                                 acceleration_limits=(a_lb, a_ub),
-                                 jerk_limits=(j_lb, j_ub),
-                                 dt=dt,
-                                 ph=ph)
+            lb, ub = cas2.b_profile(current_position=p_c,
+                                    current_velocity=v_c,
+                                    current_acceleration=a_c,
+                                    position_limits=(p_lb, p_ub),
+                                    velocity_limits=(v_lb, v_ub),
+                                    acceleration_limits=(a_lb, a_ub),
+                                    jerk_limits=(j_lb, j_ub),
+                                    dt=dt,
+                                    ph=ph)
             lb = lb.evaluate()
             ub = ub.evaluate()
             b = np.hstack((lb, ub))
@@ -1809,21 +1821,34 @@ class TestCASWrapper(unittest.TestCase):
                 Derivatives.acceleration: ub.T[0][ph:ph * 2],
                 Derivatives.jerk: ub.T[0][-ph:]
             }
+            lower_limits2 = deepcopy(lower_limits)
+            upper_limits2 = deepcopy(upper_limits)
+            lower_limits2[Derivatives.jerk] = -np.ones(ph) * j_b
+            upper_limits2[Derivatives.jerk] = np.ones(ph) * j_b
             current_values = {
                 Derivatives.velocity: v_c,
                 Derivatives.acceleration: a_c,
             }
             try:
-                if p_c > p_ub:
-                    assert ub[0][0] < max(v_c, 0)
-                if p_c < p_lb:
-                    assert lb[0][0] > min(v_c, 0)
-                # print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
-                giskard_math.mpc_velocities(upper_limits=upper_limits,
-                                            lower_limits=lower_limits,
+                giskard_math.mpc_velocities(upper_limits=upper_limits2,
+                                            lower_limits=lower_limits2,
                                             current_values=current_values,
                                             dt=dt,
                                             ph=ph)
             except Exception as e:
-                print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
-                raise
+                try:
+                    giskard_math.mpc_velocities(upper_limits=upper_limits,
+                                                lower_limits=lower_limits,
+                                                current_values=current_values,
+                                                dt=dt,
+                                                ph=ph)
+                except Exception as e:
+                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                    raise
+            else:
+                try:
+                    np.testing.assert_array_almost_equal(lb.T[0][-ph:], -np.ones(ph) * j_b)
+                    np.testing.assert_array_almost_equal(ub.T[0][-ph:], np.ones(ph) * j_b)
+                except AssertionError as e:
+                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                    raise

@@ -323,3 +323,11 @@ class QPSolverQPSwift(QPSWIFTFormatter):
                 raise InfeasibleException(f'Failed to solve qp: {str(error_code)}')
             raise QPSolverException(f'Failed to solve qp: {str(error_code)}')
         return result['sol']
+
+    def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
+        A_lb_ub = np.eye(len(ub))
+        if len(A) > 0:
+            A_lb_ub = np.vstack((-A_lb_ub, A_lb_ub, -A, A))
+        h = np.concatenate((-lb, ub, lbA, ubA))
+        return self.solver_call(H=H, g=g, E=E, b=bE, A=A_lb_ub, h=h)
+

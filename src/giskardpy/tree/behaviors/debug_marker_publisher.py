@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import rospy
@@ -28,8 +28,12 @@ class DebugMarkerPublisher(GiskardBehavior):
               ColorRGBA(1, 1, 1, 1)]  # white
 
     @profile
-    def __init__(self, name, tf_topic='/tf'):
+    def __init__(self, name, tf_topic='/tf', map_frame: Optional[str] = None):
         super().__init__(name)
+        if map_frame is None:
+            self.map_frame = str(self.world.root_link_name)
+        else:
+            self.map_frame = map_frame
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.marker_pub = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
 
@@ -62,7 +66,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 map_V_x_offset = np.dot(map_T_d, d_V_x_offset)
                 mx = Marker()
                 mx.action = mx.ADD
-                mx.header.frame_id = 'map'
+                mx.header.frame_id = self.map_frame
                 mx.ns = f'debug{name}'
                 mx.id = 0
                 mx.type = mx.CYLINDER
@@ -82,7 +86,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 map_V_y_offset = np.dot(map_T_d, d_V_y_offset)
                 my = Marker()
                 my.action = my.ADD
-                my.header.frame_id = 'map'
+                my.header.frame_id = self.map_frame
                 my.ns = f'debug{name}'
                 my.id = 1
                 my.type = my.CYLINDER
@@ -102,7 +106,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 map_V_z_offset = np.dot(map_T_d, d_V_z_offset)
                 mz = Marker()
                 mz.action = mz.ADD
-                mz.header.frame_id = 'map'
+                mz.header.frame_id = self.map_frame
                 mz.ns = f'debug{name}'
                 mz.id = 2
                 mz.type = mz.CYLINDER
@@ -120,7 +124,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 m.action = m.ADD
                 m.ns = f'debug/{name}'
                 m.id = 0
-                m.header.frame_id = 'map'
+                m.header.frame_id = self.map_frame
                 m.pose.orientation.w = 1
                 if isinstance(expr, w.Vector3):
                     ref_V_d = value
@@ -129,11 +133,11 @@ class DebugMarkerPublisher(GiskardBehavior):
                     else:
                         map_T_vis = np.eye(4)
                     map_V_d = np.dot(map_T_ref, ref_V_d)
-                    map_P_vis = map_T_vis[:4, 3:]
+                    map_P_vis = map_T_vis[:4, 3:].T[0]
                     map_P_p1 = map_P_vis
                     map_P_p2 = map_P_vis + map_V_d
-                    m.points.append(Point(map_P_p1[0][0], map_P_p1[1][0], map_P_p1[2][0]))
-                    m.points.append(Point(map_P_p2[0][0], map_P_p2[1][0], map_P_p2[2][0]))
+                    m.points.append(Point(map_P_p1[0], map_P_p1[1], map_P_p1[2]))
+                    m.points.append(Point(map_P_p2[0], map_P_p2[1], map_P_p2[2]))
                     m.type = m.ARROW
                     m.color = self.colors[color_counter]
                     m.scale.x = width / 2

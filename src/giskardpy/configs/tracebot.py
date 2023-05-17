@@ -5,8 +5,7 @@ from giskardpy.my_types import PrefixName
 
 class Tracebot(Giskard):
     def __init__(self):
-        super().__init__(root_link_name='world')
-        self.add_fixed_joint('world', 'tracy/world')
+        super().__init__(root_link_name='tracy/world')
 
 
 class TracebotMujoco(Tracebot):

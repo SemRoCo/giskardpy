@@ -6,6 +6,7 @@ from giskardpy.my_types import PrefixName
 class Tracebot(Giskard):
     def __init__(self):
         super().__init__(root_link_name='tracy/world')
+        self.load_moveit_self_collision_matrix('package://giskardpy/config/iai_tracy.srdf')
 
 
 class TracebotMujoco(Tracebot):

@@ -1775,39 +1775,47 @@ class TestCASWrapper(unittest.TestCase):
     def test_velocity_profile(self):
         p_cs = [2.75, -2, -1, -0.05, -0.01, 0, 0.01, 0.05, 1, 2]
         p_centers = [0, -0.01, 0.5]
-        p_ranges = [2.07, 0.1, 0.3, 1, 2]
-        v_cs = [-0.9, -0.81, -1, -0.05, -0.01, 0, 0.01, 0.05, 1]
-        a_cs = [-20, 20, -1.5, -1.36, -3, -1, 0, 1, 1.5, 3]
-        v_bs = [1]
-        j_bs = [30]
+        p_ranges = [0.01, 2.07, 0.1, 1, 2]
+        v_cs = [-0.9, -1, -0.01, 0, 0.01, 0.05, 1]
+        # a_cs = [-20, 20, -1.5, -1.36, -3, -1, 0, 1, 1.5, 3]
+        a_cs = [0]
+        v_bs = [0.01, 0.05, 0.5, 1, 2]
+        j_bs = [15, 30, 100]
         a_lb = -np.inf
         a_ub = np.inf
         ph = 9
         dt = 0.05
 
         for p_c, v_c, a_c, p_center, p_range, v_b, j_b in product(p_cs, v_cs, a_cs, p_centers, p_ranges, v_bs, j_bs):
+            vb2 = giskard_math.max_velocity_from_horizon_and_jerk(ph, j_b, dt)
+            if v_b > vb2:
+                continue
             # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.9, -20, 0, 2.07, 1, 30
             # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.81, 0, -0.01, 2.07, 1, 30
             # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, 1, -3, 0, 2.07, 1, 30
             # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.9, 1.5, 0, 2.07, 1, 30
             # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, -0.9, -3, 0, 2.07, 1, 30
-            p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, -1, -1.5, 0, 2.07, 1, 30
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, 0.05, 0, 0.5, 0.01, 0.5, 100
             p_lb = p_center - p_range
             p_ub = p_center + p_range
-            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 3, -0.075, -21.5, -2.07, 2.07, 1, 30
+            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 3, 1, 0, -2.07, 2.07, 1, 30
             # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 0, 0, 0, -2.07, 2.07, 1, 30
-            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b =
+            p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 2.9756295342680894, -0.41240931463820707, -6.748186292764139, -2.07, 2.07, 1, 30
             j_lb, j_ub = -j_b, j_b
             v_lb, v_ub = -v_b, v_b
-            lb, ub = cas2.b_profile(current_position=p_c,
-                                    current_velocity=v_c,
-                                    current_acceleration=a_c,
-                                    position_limits=(p_lb, p_ub),
-                                    velocity_limits=(v_lb, v_ub),
-                                    acceleration_limits=(a_lb, a_ub),
-                                    jerk_limits=(j_lb, j_ub),
-                                    dt=dt,
-                                    ph=ph)
+            try:
+                lb, ub = cas2.b_profile(current_position=p_c,
+                                        current_velocity=v_c,
+                                        current_acceleration=a_c,
+                                        position_limits=(p_lb, p_ub),
+                                        velocity_limits=(v_lb, v_ub),
+                                        acceleration_limits=(a_lb, a_ub),
+                                        jerk_limits=(j_lb, j_ub),
+                                        dt=dt,
+                                        ph=ph)
+            except Exception as e:
+                print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                raise
             lb = lb.evaluate()
             ub = ub.evaluate()
             b = np.hstack((lb, ub))

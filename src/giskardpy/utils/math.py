@@ -149,8 +149,10 @@ def mpc(upper_limits: Dict[Derivatives, List[float]],
         lower_limits: Dict[Derivatives, List[float]],
         current_values: Dict[Derivatives, float],
         dt: float,
-        ph: int, asdf) -> np.ndarray:
-    solver = QPSolverQPalm.empty()
+        ph: int,
+        q_weight: Tuple[float],
+        lin_weight: Tuple[float]) -> np.ndarray:
+    solver = QPSolverGurobi.empty()
     max_d = max(upper_limits.keys())
     lb = []
     ub = []
@@ -167,14 +169,14 @@ def mpc(upper_limits: Dict[Derivatives, List[float]],
         ubA[ph * (derivative - 1)] = current_value
         lbA[ph * (derivative - 1)] = current_value
     w = np.zeros(len(lb))
-    if asdf==0:
-        w[:-ph] = 1
+    w[:ph] = q_weight[0]
+    w[ph:ph*2] = q_weight[1]
+    w[-ph:] = q_weight[2]
     H = np.diag(w)
     g = np.zeros(len(lb))
-    if asdf==1:
-        g[:ph] = -1
-    if asdf==2:
-        g[:ph] = 1
+    g[:ph] = lin_weight[0]
+    g[ph:ph*2] = lin_weight[1]
+    g[-ph:] = lin_weight[2]
     empty = np.eye(0)
     lb = np.array(lb)
     ub = np.array(ub)
@@ -184,7 +186,7 @@ def mpc(upper_limits: Dict[Derivatives, List[float]],
     return result
 
 
-def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, asdf):
+def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, q_weight, lin_weight):
     upper_limits = {
         Derivatives.velocity: np.ones(ph) * vel_limit,
         Derivatives.acceleration: np.ones(ph) * acc_limit,
@@ -196,15 +198,15 @@ def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, p
         Derivatives.jerk: np.ones(ph) * -jerk_limit
     }
     return mpc(upper_limits, lower_limits,
-               {Derivatives.velocity: current_vel + jerk_limit * dt ** 2,
-                Derivatives.acceleration: current_acc}, dt, ph, asdf)
+               {Derivatives.velocity: current_vel,
+                Derivatives.acceleration: current_acc}, dt, ph, q_weight, lin_weight)
 
 def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
                    lower_limits: Dict[Derivatives, List[float]],
                    current_values: Dict[Derivatives, float],
                    dt: float,
                    ph: int):
-    return mpc(upper_limits, lower_limits, current_values, dt, ph, 0)
+    return mpc(upper_limits, lower_limits, current_values, dt, ph, (1, 0, 0), (0,0,0))
 
 
 def derivative_link_model(dt, ph, max_derivative):

@@ -465,6 +465,12 @@ class WorldTree(WorldTreeInterface):
         for free_variable_name, command in next_commands.free_variable_data.items():
             self.state[free_variable_name][Derivatives.position] += command[0] * dt
             self.state[free_variable_name][Derivatives.velocity:max_derivative+1] = command
+            lower_limit = self.free_variables[free_variable_name].get_lower_limit(max_derivative, False, True)
+            upper_limit = self.free_variables[free_variable_name].get_upper_limit(max_derivative, False, True)
+            if not lower_limit <= command[-1] <= upper_limit:
+                logging.logwarn(f'{max_derivative.name} limits violated, '
+                                f'resetting {Derivatives.acceleration.name}-{max_derivative.name} to 0.')
+                self.state[free_variable_name][Derivatives.acceleration:] = 0
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)

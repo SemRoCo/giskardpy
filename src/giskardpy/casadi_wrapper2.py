@@ -16,23 +16,27 @@ def desired_velocity(current_position, goal_position, dt, ph):
     # return a * (ph-2)
 
 
-def shifted_velocity_profile(vel_profile, distance, dt):
+def shifted_velocity_profile(vel_limit, vel_profile, distance, dt):
     distance = cas.Expression(distance)
     vel_profile = vel_profile.copy()
     vel_profile[vel_profile < 0] = 0
-    if_cases = [(dt * sum(vel_profile[x:]), np.concatenate([vel_profile[x + 1:], np.zeros(x + 1)])) for x in
-                range(len(vel_profile) - 1, -1, -1)]
-    return cas.if_less_eq_cases(distance, if_cases, np.ones(vel_profile.shape) * vel_profile[0])
+    if_cases = []
+    for x in range(len(vel_profile) - 1, -1, -1):
+        condition = dt * sum(vel_profile[x:])
+        result = np.concatenate([vel_profile[x + 1:], np.zeros(x + 1)])
+        if_cases.append((condition, result))
+    return cas.if_less_eq_cases(distance, if_cases, np.ones(vel_profile.shape) * vel_limit)
 
 
 def ub_profile(current_pos, current_vel, current_acc,
-               pos_limit, vel_limit, acc_limit, jerk_limit, dt, ph):
-    profile = gm.simple_mpc(vel_limit, acc_limit, jerk_limit, vel_limit, 0, dt, ph, 1)
+               pos_range, pos_limit, vel_limit, acc_limit, jerk_limit, dt, ph):
+    vel_limit = min(vel_limit * dt, pos_range/2) /dt
+    profile = gm.simple_mpc(vel_limit, acc_limit, jerk_limit, vel_limit, 0, dt, ph, (0, 0, 0), (-1, 0, 0))
     vel_profile = profile[:ph]
-    acc_profile = cas.Expression(profile[ph:ph * 2])
-    jerk_profile = cas.Expression(profile[-ph:])
+    acc_profile_mpc = cas.Expression(profile[ph:ph * 2])
+    jerk_profile_mpc = cas.Expression(profile[-ph:])
     pos_error = pos_limit - current_pos
-    vel_profile = shifted_velocity_profile(vel_profile, pos_error, dt)
+    vel_profile = shifted_velocity_profile(vel_limit, vel_profile, pos_error, dt)
     ph -= 1
     one_step_change_ = -jerk_limit * dt ** 2
     one_step_change_ = cas.limit(one_step_change_, -vel_limit, vel_limit)
@@ -44,17 +48,21 @@ def ub_profile(current_pos, current_vel, current_acc,
 
     vel_error = target_velocity - current_vel
     position_limit_active = cas.less(target_velocity, vel_limit)
-    min_next_vel = current_vel + current_acc * dt - jerk_limit * dt**2
-    max_next_vel = current_vel + current_acc * dt + jerk_limit * dt**2
-    above_req_vel = cas.less(target_velocity - min_next_vel, 0)
+    min_next_vel = current_vel + current_acc * dt - jerk_limit * dt ** 2
+    max_next_vel = current_vel + current_acc * dt + jerk_limit * dt ** 2
+    position_limit_already_satisfied = cas.less(max_next_vel, target_velocity)
+    above_req_vel = cas.greater(cas.round_up(min_next_vel, 5), cas.round_up(target_velocity, 5))
+
     acc_would_violate_vel_limit = cas.logic_or(cas.less(max_next_vel, -vel_limit),
-                                               cas.greater(min_next_vel, target_velocity),
-                                               cas.less((target_velocity - current_vel)/dt, current_acc),
-                                               cas.greater((-vel_limit - current_vel)/dt, current_acc))
-    cant_decc_within_horizon = cas.greater(cas.abs(current_acc), jerk_limit * dt * (ph-1))
-    special_jerk_limits = cas.logic_or(cas.logic_and(position_limit_active, above_req_vel),
+                                               above_req_vel)
+    cant_decc_within_horizon = cas.greater(cas.abs(current_acc), jerk_limit * dt * (ph - 1))
+    special_jerk_limits = cas.logic_or(cas.logic_and(position_limit_active,
+                                                     above_req_vel,
+                                                     cas.logic_not(position_limit_already_satisfied)),
                                        acc_would_violate_vel_limit,
                                        cant_decc_within_horizon)
+    # 4.3413243808023
+    # 2.8413243808023
     # vel_error = cas.if_else(special_jerk_limits, vel_error, 0)
     target_acc = vel_error / dt - current_acc
     target_jerk = target_acc / dt
@@ -75,22 +83,25 @@ def ub_profile(current_pos, current_vel, current_acc,
 
 def b_profile(current_position, current_velocity, current_acceleration,
               position_limits, velocity_limits, acceleration_limits, jerk_limits, dt, ph):
+    position_range = position_limits[1] - position_limits[0]
     lb = ub_profile(-current_position, -current_velocity, -current_acceleration,
-                             -position_limits[0], -velocity_limits[0], -acceleration_limits[0], -jerk_limits[0],
-                             dt, ph)
+                    position_range,
+                    -position_limits[0], -velocity_limits[0], -acceleration_limits[0], -jerk_limits[0],
+                    dt, ph)
     lb = -lb
     ub = ub_profile(current_position, current_velocity, current_acceleration,
-                             position_limits[1], velocity_limits[1], acceleration_limits[1], jerk_limits[1], dt,
-                             ph)
-    jerk_lb = cas.abs(lb[ph*2])
-    jerk_ub = cas.abs(ub[ph*2])
+                    position_range,
+                    position_limits[1], velocity_limits[1], acceleration_limits[1], jerk_limits[1], dt,
+                    ph)
+    jerk_lb = cas.abs(lb[ph * 2])
+    jerk_ub = cas.abs(ub[ph * 2])
     jerk_b = cas.max(jerk_lb, jerk_ub)
     jerk_b = cas.max(jerk_b, jerk_limits[1])
     lb[ph * 2] = -jerk_b
     ub[ph * 2] = jerk_b
 
-    jerk2_lb = cas.abs(lb[ph*2+1])
-    jerk2_ub = cas.abs(ub[ph*2+1])
+    jerk2_lb = cas.abs(lb[ph * 2 + 1])
+    jerk2_ub = cas.abs(ub[ph * 2 + 1])
     jerk2_b = cas.max(jerk2_lb, jerk2_ub)
     jerk2_b = cas.max(jerk2_b, jerk_limits[1])
     lb[ph * 2 + 1] = -jerk2_b
@@ -98,4 +109,6 @@ def b_profile(current_position, current_velocity, current_acceleration,
     # jerk_lb = min(jerk_limits[0], jerk_lb)
     # jerk_lb = min(jerk_ub, jerk_lb)
     # jerk = max(jerk_lb, jerk_ub)
+    lb = cas.min(lb, ub)
+    ub = cas.max(lb, ub)
     return lb, ub

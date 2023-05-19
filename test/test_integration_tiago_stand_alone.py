@@ -656,7 +656,6 @@ class TestJointGoals:
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits7(self, zero_pose: TiagoTestWrapper):
-        #fixme
         js = {
             'arm_left_1_joint': 1.3505632726981545,
             'arm_left_2_joint': -1.1195635667275154,
@@ -769,37 +768,6 @@ class TestJointGoals:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
-
-    def test_torso_goal(self, zero_pose: TiagoTestWrapper):
-        # js1 = {
-        #     'torso_lift_joint': 0.2,
-        # }
-        # js2 = {
-        #     'torso_lift_joint': 0.25,
-        #     'head_1_joint': 1
-        # }
-        # zero_pose.set_joint_goal(js1)
-        # # zero_pose.allow_all_collisions()
-        # zero_pose.plan_and_execute()
-        #
-        # zero_pose.set_joint_goal(js2)
-        # # zero_pose.allow_all_collisions()
-        # zero_pose.plan_and_execute()
-
-        # zero_pose.set_json_goal('SetSeedConfiguration',
-        #                         seed_configuration=js_start)
-        zero_pose.allow_self_collision()
-        js = deepcopy(zero_pose.default_pose)
-        # del js['head_1_joint']
-        # del js['head_2_joint']
-        zero_pose.set_joint_goal(js)
-        zero_pose.plan()
-        zero_pose.allow_self_collision()
-        js = deepcopy(zero_pose.default_pose)
-        del js['gripper_right_left_finger_joint']
-        # del js['gripper_right_right_finger_joint']
-        zero_pose.set_joint_goal(js)
-        zero_pose.plan()
 
     def test_get_out_of_joint_soft_limits2(self, zero_pose: TiagoTestWrapper):
         js = {

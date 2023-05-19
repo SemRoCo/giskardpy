@@ -1481,6 +1481,10 @@ def logic_or(*args):
         return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
 
 
+def logic_not(expr):
+    return Expression(ca.logic_not(expr.s))
+
+
 def if_greater(a, b, if_result, else_result):
     a = Expression(a).s
     b = Expression(b).s

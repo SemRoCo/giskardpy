@@ -62,7 +62,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
         H = sparse.diags(H, 0)
-        self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
+        self.qpProblem.setMObjective(Q=H, c=g, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
         try:
             self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
         except (GurobiError, ValueError) as e:

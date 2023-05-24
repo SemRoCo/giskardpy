@@ -32,7 +32,6 @@ class Donbot_Base(Giskard):
                                                     hard_threshold=0.0)
 
         self.set_default_joint_limits(velocity_limit=0.5,
-                                      acceleration_limit=1e3,
                                       jerk_limit=15)
         self.overwrite_joint_velocity_limits(joint_name='odom_x_joint',
                                              velocity_limit=0.1)

@@ -1802,52 +1802,106 @@ class TestCASWrapper(unittest.TestCase):
         assert w.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert w.to_str(e) == e.pretty_str()
 
-    def test_integral(self):
-        w.vel_integral(1, 30, 0.05, 9)
+    def test_acc_cap(self):
+        cases = [
+            (0.075, 30, 0.05),
+            (0.08, 30, 0.05),
+            (0.14, 30, 0.05),
+            (0.15, 30, 0.05),
+            (0.16, 30, 0.05),
+            (1, 30, 0.05),
+            (0.17, 10, 0.05),
+            (-0.9, 15, 0.01),
+            (0.05, 15, 0.05),
+            (0.0125, 15, 0.05),
+            (-0.075, 15, 0.05),
+            (-0.07500000000000001, 15, 0.05),
+            (-0.465195, 15, 0.123),
+            (-0.796065, 15, 0.123),
+        ]
+        for current_vel, jerk_limit, dt in cases:
+            try:
+                integral = 0
+                prev_acc = None
+                jerk_step = jerk_limit * dt
+                while abs(integral) < abs(current_vel):
+                    acc_cap = cas2.acc_cap(current_vel - integral, jerk_limit, dt).evaluate()
+                    # if abs(acc_cap) <= jerk_step:
+                    #     acc_cap = np.sign(current_vel) * (current_vel - integral) / dt
+                    integral += np.sign(current_vel) * acc_cap * dt
+                    if prev_acc is not None:
+                        acc_step = abs(prev_acc) - abs(acc_cap)
+                        self.assertAlmostEqual(jerk_step - acc_step, 0)
+                    prev_acc = acc_cap
+                self.assertAlmostEqual(integral - current_vel, 0)
+            except Exception as e:
+                print(f'{current_vel} {jerk_limit} {dt}')
+                raise
 
     def test_velocity_profile(self):
-        p_cs = [2.75, -2, -1, -0.05, -0.01, 0, 0.01, 0.05, 1, 2]
+        special_test_cases = [
+            # (2.75, -0.9, -1, 0, 0.01, 0.05, 100, 7, 0.1),
+            # (2.75, 0.05, -1, 0, 0.01, 0.01, 15, 7, 0.05),
+            (2.75, -0.9, -1, 0, 2.07, 1, 15, 7, 0.1),
+            (2.75, -0.9, -1, 0, 2.07, 1, 15, 9, 0.1),
+            # (2.75, 0.05, -1, 0, 0.01, 0.05, 15, 7, 0.05),
+            (-2, -0.9, 20, 0, 2.07, 1, 100, 9, 0.05),
+            # (-2, -0.01, -1, 0, 2.07, 0.05, 15, 14, 0.01),
+            # (-2, 1, -1, 0, 2.07, 0.01, 100, 9, 0.01),
+            # (2.75, 1, -1, 0, 0.01, 0.05, 15, 14, 0.01),
+            # (2.75, 1, -1, 0, 0.01, 0.01, 100, 7, 0.01),
+            # (-2, 1, -0.5, 0, 0.01, 0.05, 15, 14, 0.01),
+            # (2.75, -0.9, -1, 0, 0.01, 0.01, 15, 7, 0.01),
+            (2.75, -0.9, -1, 0, 2.07, 0.5, 100, 7, 0.1),
+            # (0.01, 0.05, -1, -0.01, 0.01, 0.5, 15, 9, 0.05),
+            (2.75, -0.9, -0.5, 0, 2.07, 1, 30, 14, 0.05),
+            (2.75, 0.05, -1, 0, 0.01, 0.5, 15, 9, 0.05),
+            (-2, -0.01, -0.5, 0, 2.07, 0.5, 30, 7, 0.05),
+            # (2.75, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
+            (2.75, -0.9, -1, 0, 2.07, 1, 15, 7, 0.123),
+            # (-2, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
+            # (-2, 1, -1, 0, 0.01, 0.01, 15, 14, 0.01),
+            (0, 0.05, -1, -0.01, 0.01, 0.1, 15, 7, 0.05),
+        ]
+        p_cs = [2.75, -2, -0.05, 0, 0.01]
         p_centers = [0, -0.01, 0.5]
-        p_ranges = [0.01, 2.07, 0.1, 1, 2]
-        v_cs = [-0.9, -1, -0.01, 0, 0.01, 0.05, 1]
+        p_ranges = [0.01, 2.07, 0.1]
+        v_cs = [-0.9, -0.01, 0, 0.05, 1]
         # a_cs = [-20, 20, -1.5, -1.36, -3, -1, 0, 1, 1.5, 3]
-        a_cs = [0]
-        v_bs = [0.01, 0.05, 0.5, 1, 2]
+        a_cs = [-1, -0.5, 0, 0.01, 20]
+        # v_bs = [0.01, 0.05, 0.5, 1, 2]
+        v_bs = [0.1, 0.5, 1, 2]
         j_bs = [15, 30, 100]
         a_lb = -np.inf
         a_ub = np.inf
-        ph = 9
-        dt = 0.05
+        phs = [7, 9, 14]
+        dts = [0.01, 0.05, 0.123]
 
-        for p_c, v_c, a_c, p_center, p_range, v_b, j_b in product(p_cs, v_cs, a_cs, p_centers, p_ranges, v_bs, j_bs):
+        # for p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt in product(p_cs, v_cs, a_cs, p_centers, p_ranges, v_bs,
+        #                                                                   j_bs, phs, dts):
+        for p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt in special_test_cases:
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt = 0, 0.05, -1, -0.01, 0.01, 0.1, 15, 7, 0.05
             vb2 = giskard_math.max_velocity_from_horizon_and_jerk(ph, j_b, dt)
             if v_b > vb2:
                 continue
-            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.9, -20, 0, 2.07, 1, 30
-            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.81, 0, -0.01, 2.07, 1, 30
-            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, 1, -3, 0, 2.07, 1, 30
-            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = -2, -0.9, 1.5, 0, 2.07, 1, 30
-            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, -0.9, -3, 0, 2.07, 1, 30
-            # p_c, v_c, a_c, p_center, p_range, v_b, j_b = 2.75, 0.05, 0, 0.5, 0.01, 0.5, 100
+
             p_lb = p_center - p_range
             p_ub = p_center + p_range
-            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 3, 1, 0, -2.07, 2.07, 1, 30
-            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 0, 0, 0, -2.07, 2.07, 1, 30
-            p_c, v_c, a_c, p_lb, p_ub, v_b, j_b = 2.9756295342680894, -0.41240931463820707, -6.748186292764139, -2.07, 2.07, 1, 30
+            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b, ph, dt = 2.975, -0.4124, -6.748, -2.07, 2.07, 1, 30, 9, 0.05
             j_lb, j_ub = -j_b, j_b
             v_lb, v_ub = -v_b, v_b
             try:
-                lb, ub = cas2.b_profile(current_position=p_c,
-                                        current_velocity=v_c,
-                                        current_acceleration=a_c,
-                                        position_limits=(p_lb, p_ub),
-                                        velocity_limits=(v_lb, v_ub),
-                                        acceleration_limits=(a_lb, a_ub),
+                lb, ub = cas2.b_profile(current_pos=p_c,
+                                        current_vel=v_c,
+                                        current_acc=a_c,
+                                        pos_limits=(p_lb, p_ub),
+                                        vel_limits=(v_lb, v_ub),
+                                        acc_limits=(a_lb, a_ub),
                                         jerk_limits=(j_lb, j_ub),
                                         dt=dt,
                                         ph=ph)
             except Exception as e:
-                print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}, {ph}, {dt}')
                 raise
             lb = lb.evaluate()
             ub = ub.evaluate()
@@ -1871,25 +1925,25 @@ class TestCASWrapper(unittest.TestCase):
                 Derivatives.acceleration: a_c,
             }
             try:
-                giskard_math.mpc_velocities(upper_limits=upper_limits2,
-                                            lower_limits=lower_limits2,
-                                            current_values=current_values,
-                                            dt=dt,
-                                            ph=ph)
+                result = giskard_math.mpc_velocities(upper_limits=upper_limits2,
+                                                     lower_limits=lower_limits2,
+                                                     current_values=current_values,
+                                                     dt=dt,
+                                                     ph=ph).reshape((ph * 3, 1))
             except Exception as e:
                 try:
-                    giskard_math.mpc_velocities(upper_limits=upper_limits,
-                                                lower_limits=lower_limits,
-                                                current_values=current_values,
-                                                dt=dt,
-                                                ph=ph)
+                    result = giskard_math.mpc_velocities(upper_limits=upper_limits,
+                                                         lower_limits=lower_limits,
+                                                         current_values=current_values,
+                                                         dt=dt,
+                                                         ph=ph)
                 except Exception as e:
-                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}, {ph}, {dt}')
                     raise
             else:
                 try:
                     np.testing.assert_array_almost_equal(lb.T[0][-ph:], -np.ones(ph) * j_b)
                     np.testing.assert_array_almost_equal(ub.T[0][-ph:], np.ones(ph) * j_b)
                 except AssertionError as e:
-                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}')
+                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}, {ph}, {dt}')
                     raise

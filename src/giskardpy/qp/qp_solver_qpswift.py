@@ -328,6 +328,24 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         A_lb_ub = np.eye(len(ub))
         if len(A) > 0:
             A_lb_ub = np.vstack((-A_lb_ub, A_lb_ub, -A, A))
-        h = np.concatenate((-lb, ub, lbA, ubA))
-        return self.solver_call(H=H, g=g, E=E, b=bE, A=A_lb_ub, h=h)
+            h = np.concatenate((-lb, ub, -lbA, ubA))
+        else:
+            A_lb_ub = np.vstack((-A_lb_ub, A_lb_ub))
+            h = np.concatenate((-lb, ub))
+        h_filter = np.isfinite(h)
+        h = h[h_filter]
+        A_lb_ub = A_lb_ub[h_filter, :]
+        bE_filter = np.isfinite(bE)
+        E = E[bE_filter, :]
+        if len(E) == 0:
+            result = qpSWIFT.run(c=g, h=h, P=H, G=A_lb_ub, opts=self.opts)
+        else:
+            result = qpSWIFT.run(c=g, h=h, P=H, G=A_lb_ub, A=E, b=bE, opts=self.opts)
+        exit_flag = result['basicInfo']['ExitFlag']
+        if exit_flag != 0:
+            error_code = QPSWIFTExitFlags(exit_flag)
+            if error_code == QPSWIFTExitFlags.MAX_ITER_REACHED:
+                raise InfeasibleException(f'Failed to solve qp: {str(error_code)}')
+            raise QPSolverException(f'Failed to solve qp: {str(error_code)}')
+        return result['sol']
 

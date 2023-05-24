@@ -303,15 +303,15 @@ class FreeVariableBounds(ProblemDataPart):
         lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
         upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-        lb, ub = cas2.b_profile(current_position=current_position,
-                               current_velocity=current_vel,
-                               current_acceleration=current_acc,
-                               position_limits=(lower_limit, upper_limit),
-                               velocity_limits=(lower_velocity_limit, upper_velocity_limit),
-                               acceleration_limits=(lower_acc_limit, upper_acc_limit),
-                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                               dt=self.dt,
-                               ph=self.prediction_horizon)
+        lb, ub = cas2.b_profile(current_pos=current_position,
+                                current_vel=current_vel,
+                                current_acc=current_acc,
+                                pos_limits=(lower_limit, upper_limit),
+                                vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                                acc_limits=(lower_acc_limit, upper_acc_limit),
+                                jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                                dt=self.dt,
+                                ph=self.prediction_horizon)
         return lb, ub
 
     @profile

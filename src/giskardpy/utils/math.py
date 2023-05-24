@@ -1,12 +1,14 @@
-from typing import Tuple, Union, Dict, List
+from typing import Tuple, Union, Dict, List, Type, Optional
 
 import numpy as np
 from geometry_msgs.msg import Quaternion, Point
 from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
 
 from giskardpy.my_types import Derivatives
+from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
+from giskardpy.qp.qp_solver_qpswift import QPSolverQPSwift
 
 
 def qv_mult(quaternion, vector):
@@ -151,8 +153,14 @@ def mpc(upper_limits: Dict[Derivatives, List[float]],
         dt: float,
         ph: int,
         q_weight: Tuple[float],
-        lin_weight: Tuple[float]) -> np.ndarray:
-    solver = QPSolverGurobi.empty()
+        lin_weight: Tuple[float],
+        solver_class: Optional[Type[QPSolver]] = None) -> np.ndarray:
+    if solver_class is None:
+        solver = QPSolverQPalm.empty()
+        # solver = QPSolverQPSwift.empty()
+        # solver = QPSolverGurobi.empty()
+    else:
+        solver = solver_class.empty()
     max_d = max(upper_limits.keys())
     lb = []
     ub = []
@@ -181,12 +189,12 @@ def mpc(upper_limits: Dict[Derivatives, List[float]],
     lb = np.array(lb)
     ub = np.array(ub)
     result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
-                                                  E=empty, bE=empty,
-                                                  A=model, lbA=lbA, ubA=ubA)
+                                                  E=model, bE=ubA,
+                                                  A=empty, lbA=np.array([]), ubA=np.array([]))
     return result
 
 
-def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, q_weight, lin_weight):
+def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, q_weight, lin_weight, solver_class = None):
     upper_limits = {
         Derivatives.velocity: np.ones(ph) * vel_limit,
         Derivatives.acceleration: np.ones(ph) * acc_limit,
@@ -199,14 +207,15 @@ def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, p
     }
     return mpc(upper_limits, lower_limits,
                {Derivatives.velocity: current_vel,
-                Derivatives.acceleration: current_acc}, dt, ph, q_weight, lin_weight)
+                Derivatives.acceleration: current_acc}, dt, ph, q_weight, lin_weight, solver_class=solver_class)
 
 def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
                    lower_limits: Dict[Derivatives, List[float]],
                    current_values: Dict[Derivatives, float],
                    dt: float,
-                   ph: int):
-    return mpc(upper_limits, lower_limits, current_values, dt, ph, (1, 0, 0), (0,0,0))
+                   ph: int,
+                   solver_class = None):
+    return mpc(upper_limits, lower_limits, current_values, dt, ph, (1, 1, 1), (0,0,0), solver_class)
 
 
 def derivative_link_model(dt, ph, max_derivative):

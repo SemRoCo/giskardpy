@@ -2,31 +2,27 @@ import abc
 import datetime
 import os
 from abc import ABC
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from copy import deepcopy
-from time import time
 from typing import List, Dict, Tuple, Type, Union, Optional, DefaultDict
-import giskardpy.utils.math as giskard_math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 import giskardpy.casadi_wrapper as cas
-import giskardpy.casadi_wrapper2 as cas2
 from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver
-from giskardpy.exceptions import OutOfJointLimitsException, \
-    HardConstraintsViolatedException, QPSolverException, InfeasibleException
-from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_MAX
+from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import derivative_joint_map, Derivatives
+from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
+from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.utils import create_path, suppress_stdout, get_all_classes_in_package
+from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
 
 
@@ -303,15 +299,15 @@ class FreeVariableBounds(ProblemDataPart):
         lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
         upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-        lb, ub = cas2.b_profile(current_pos=current_position,
-                                current_vel=current_vel,
-                                current_acc=current_acc,
-                                pos_limits=(lower_limit, upper_limit),
-                                vel_limits=(lower_velocity_limit, upper_velocity_limit),
-                                acc_limits=(lower_acc_limit, upper_acc_limit),
-                                jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                                dt=self.dt,
-                                ph=self.prediction_horizon)
+        lb, ub = b_profile(current_pos=current_position,
+                           current_vel=current_vel,
+                           current_acc=current_acc,
+                           pos_limits=(lower_limit, upper_limit),
+                           vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                           acc_limits=(lower_acc_limit, upper_acc_limit),
+                           jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                           dt=self.dt,
+                           ph=self.prediction_horizon)
         return lb, ub
 
     @profile

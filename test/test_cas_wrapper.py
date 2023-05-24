@@ -2,7 +2,6 @@ import math
 import unittest
 from copy import deepcopy
 from datetime import timedelta
-from itertools import combinations, product
 
 import PyKDL
 import hypothesis.strategies as st
@@ -15,7 +14,7 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 
 from giskardpy import casadi_wrapper as w
-from giskardpy import casadi_wrapper2 as cas2
+from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
 from giskardpy.my_types import Derivatives
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion

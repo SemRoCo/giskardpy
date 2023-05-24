@@ -841,7 +841,7 @@ def total_derivative(expr: Union[Symbol, Expression],
 def total_derivative2(expr: Union[Symbol, Expression],
                       symbols: Iterable[Symbol],
                       symbols_dot: Iterable[Symbol],
-                      symbols_ddot: Iterable[Symbol]) -> Expression:
+                      symbols_ddot: Iterable[Symbol]) -> Expression: ...
 
 def quaternion_multiply(q1: Quaternion, q2: Quaternion) -> Quaternion: ...
 
@@ -871,23 +871,3 @@ def gauss(n: symbol_expr_float) -> Expression: ...
 
 
 def r_gauss(integral: symbol_expr_float) -> Expression: ...
-
-def ub_profile(current_position: symbol_expr_float,
-               current_velocity: symbol_expr_float,
-               current_acceleration: symbol_expr_float,
-               position_limit: symbol_expr_float,
-               velocity_limit: symbol_expr_float,
-               acceleration_limit: symbol_expr_float,
-               jerk_limit: symbol_expr_float,
-               dt: float,
-               ph: int) -> Expression: ...
-
-def b_profile(current_position: symbol_expr_float,
-              current_velocity: symbol_expr_float,
-              current_acceleration: symbol_expr_float,
-              position_limits: Tuple[symbol_expr_float, symbol_expr_float],
-              velocity_limits: Tuple[symbol_expr_float, symbol_expr_float],
-              acceleration_limits: Tuple[symbol_expr_float, symbol_expr_float],
-              jerk_limits: Tuple[symbol_expr_float, symbol_expr_float],
-              dt: float,
-              ph: int) -> Tuple[Expression, Expression]: ...

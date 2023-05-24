@@ -6,9 +6,7 @@ from tf.transformations import quaternion_multiply, quaternion_conjugate, quater
 
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
-from giskardpy.qp.qp_solver_qpswift import QPSolverQPSwift
 
 
 def qv_mult(quaternion, vector):

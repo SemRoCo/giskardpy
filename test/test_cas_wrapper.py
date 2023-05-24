@@ -165,6 +165,32 @@ class TestExpression(unittest.TestCase):
         assert isinstance(m[0, 0], w.Expression)
         print(m.shape)
 
+    def test_comparisons(self):
+        logic_functions = [
+            lambda a, b: a > b,
+            lambda a, b: a >= b,
+            lambda a, b: a < b,
+            lambda a, b: a <= b,
+            lambda a, b: a == b,
+        ]
+        e1_np = np.array([1, 2, 3, -1])
+        e2_np = np.array([1, 1, -1, 3])
+        e1_cas = w.Expression(e1_np)
+        e2_cas = w.Expression(e2_np)
+        for f in logic_functions:
+            r_np = f(e1_np, e2_np)
+            r_cas = f(e1_cas, e2_cas)
+            assert isinstance(r_cas, w.Expression)
+            r_cas = r_cas.evaluate()
+            np.all(r_np == r_cas)
+
+    def test_lt(self):
+        e1 = w.Expression([1, 2, 3, -1])
+        e2 = w.Expression([1, 1, -1, 3])
+        gt_result = e1 < e2
+        assert isinstance(gt_result, w.Expression)
+        assert w.logic_all(gt_result == w.Expression([0, 0, 0, 1])).evaluate()
+
 
 class TestRotationMatrix(unittest.TestCase):
     def test_transpose(self):
@@ -1689,7 +1715,7 @@ class TestCASWrapper(unittest.TestCase):
            st.integers(max_value=5000, min_value=-5000),
            st.integers(max_value=5000, min_value=-5000),
            st.integers(max_value=1000, min_value=1))
-    def test_r_gauss(self, acceleration, desired_result, j, step_size):
+    def test_velocity_limit_from_position_limit(self, acceleration, desired_result, j, step_size):
         step_size /= 1000
         acceleration /= 1000
         desired_result /= 1000
@@ -1706,6 +1732,13 @@ class TestCASWrapper(unittest.TestCase):
             i += 1
         # np.testing.assert_almost_equal(position, desired_result)
         assert math.isclose(position, desired_result, abs_tol=4, rel_tol=4)
+
+    @given(float_no_nan_no_inf_min_max(min_value=0))
+    def test_r_gauss(self, n):
+        result = w.compile_and_execute(lambda x: w.r_gauss(w.gauss(x)), [n])
+        self.assertAlmostEqual(result, n)
+        result = w.compile_and_execute(lambda x: w.gauss(w.r_gauss(x)), [n])
+        self.assertAlmostEqual(result, n)
 
     @given(sq_matrix())
     def test_sum_row(self, m):

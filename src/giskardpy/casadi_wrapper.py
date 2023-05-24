@@ -229,6 +229,24 @@ class Symbol(Symbol_):
             return Expression(self.s.__rtruediv__(other))
         raise _operation_type_error(other, '/', self)
 
+    def __floordiv__(self, other):
+        return floor(self / other)
+
+    def __mod__(self, other):
+        return fmod(self, other)
+
+    def __divmod__(self, other):
+        return self // other, self % other
+
+    def __rfloordiv__(self, other):
+        return floor(other / self)
+
+    def __rmod__(self, other):
+        return fmod(other, self)
+
+    def __rdivmod__(self, other):
+        return other // self, other % self
+
     def __lt__(self, other):
         if isinstance(other, Symbol_):
             other = other.s
@@ -365,6 +383,45 @@ class Expression(Symbol_):
         if isinstance(other, (int, float)):
             return Expression(self.s.__rtruediv__(other))
         raise _operation_type_error(other, '/', self)
+
+    def __floordiv__(self, other):
+        return floor(self / other)
+
+    def __mod__(self, other):
+        return fmod(self, other)
+
+    def __divmod__(self, other):
+        return self // other, self % other
+
+    def __rfloordiv__(self, other):
+        return floor(other / self)
+
+    def __rmod__(self, other):
+        return fmod(other, self)
+
+    def __rdivmod__(self, other):
+        return other // self, other % self
+
+    def __abs__(self):
+        return abs(self)
+
+    def __floor__(self):
+        return floor(self)
+
+    def __ceil__(self):
+        return ceil(self)
+
+    def __ge__(self, other):
+        return greater_equal(self, other)
+
+    def __gt__(self, other):
+        return greater(self, other)
+
+    def __le__(self, other):
+        return less_equal(self, other)
+
+    def __lt__(self, other):
+        return less(self, other)
 
     def __mul__(self, other):
         if isinstance(other, (int, float)):
@@ -1457,7 +1514,10 @@ def less(x, y):
     return Expression(ca.lt(x, y))
 
 
-def greater(x, y):
+def greater(x, y, decimal_places=None):
+    if decimal_places is not None:
+        x = round_up(x, decimal_places)
+        y = round_up(y, decimal_places)
     if isinstance(x, Symbol_):
         x = x.s
     if isinstance(y, Symbol_):
@@ -1471,6 +1531,14 @@ def logic_and(*args):
         return Expression(ca.logic_and(args[0].s, args[1].s))
     else:
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
+
+
+def logic_any(args):
+    return Expression(ca.logic_any(args.s))
+
+
+def logic_all(args):
+    return Expression(ca.logic_all(args.s))
 
 
 def logic_or(*args):
@@ -1695,6 +1763,10 @@ def fmod(a, b):
     a = Expression(a).s
     b = Expression(b).s
     return Expression(ca.fmod(a, b))
+
+
+def euclidean_division(nominator, denominator):
+    pass
 
 
 def normalize_angle_positive(angle):
@@ -2020,8 +2092,12 @@ def solve_for(expression, target_value, start_value=0.0001, max_tries=10000, eps
     raise ValueError('no solution found')
 
 
-def gauss(n: float) -> float:
+def gauss(n):
     return (n ** 2 + n) / 2
+
+
+def r_gauss(integral):
+    return sqrt(2 * integral + (1 / 4)) - 1 / 2
 
 
 def one_step_change(current_acceleration, jerk_limit, dt):

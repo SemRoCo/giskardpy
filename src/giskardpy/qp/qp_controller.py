@@ -12,7 +12,8 @@ import pandas as pd
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver
-from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException
+from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
+    VelocityLimitUnreachableException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import Derivatives
@@ -24,6 +25,7 @@ from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
+import giskardpy.utils.math as giskard_math
 
 
 def save_pandas(dfs, names, path):
@@ -299,16 +301,27 @@ class FreeVariableBounds(ProblemDataPart):
         lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
         upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-        lb, ub = b_profile(current_pos=current_position,
-                           current_vel=current_vel,
-                           current_acc=current_acc,
-                           pos_limits=(lower_limit, upper_limit),
-                           vel_limits=(lower_velocity_limit, upper_velocity_limit),
-                           acc_limits=(lower_acc_limit, upper_acc_limit),
-                           jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                           dt=self.dt,
-                           ph=self.prediction_horizon)
+        try:
+            lb, ub = b_profile(current_pos=current_position,
+                               current_vel=current_vel,
+                               current_acc=current_acc,
+                               pos_limits=(lower_limit, upper_limit),
+                               vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                               acc_limits=(lower_acc_limit, upper_acc_limit),
+                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                               dt=self.dt,
+                               ph=self.prediction_horizon)
+        except InfeasibleException as e:
+            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
+                                                                                upper_jerk_limit, self.dt)
+            error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                        f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                        f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+            logging.logerr(error_msg)
+            raise VelocityLimitUnreachableException(error_msg)
+
         return lb, ub
+
 
     @profile
     def free_variable_bounds(self) \
@@ -331,6 +344,7 @@ class FreeVariableBounds(ProblemDataPart):
         for derivative, name_to_bound_map in sorted(ub.items()):
             ub_params.append(name_to_bound_map)
         return lb_params, ub_params
+
 
     def derivative_slack_limits(self, derivative: Derivatives) \
             -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:

@@ -14,13 +14,13 @@ class SetPredictionHorizon(Goal):
         :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
         """
         super().__init__()
-        # self.new_prediction_horizon = prediction_horizon
+        self.new_prediction_horizon = prediction_horizon
 
     def make_constraints(self):
         pass
-    #     if 5 > self.new_prediction_horizon > 1:
-    #         logging.logwarn('Prediction horizon should be 1 or greater equal 5.')
-    #     self.god_map.set_data(identifier.prediction_horizon, self.new_prediction_horizon)
+        if self.new_prediction_horizon < 7:
+            logging.logwarn('Prediction horizon must be >= 7.')
+        self.god_map.set_data(identifier.prediction_horizon, self.new_prediction_horizon)
 
     def __str__(self) -> str:
         return str(self.__class__.__name__)

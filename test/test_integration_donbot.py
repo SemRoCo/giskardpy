@@ -407,7 +407,6 @@ class TestCartGoals:
         hand_goal.header.frame_id = tip
         hand_goal.pose.position.x = -0.6
         hand_goal.pose.orientation.w = 1
-        zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         zero_pose.set_cart_goal(hand_goal, tip, 'base_footprint', weight=WEIGHT_BELOW_CA / 2, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()

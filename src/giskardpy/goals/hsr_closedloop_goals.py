@@ -38,12 +38,11 @@ class MoveAlongUntilForce(Goal):
         max_force = w.max(max_force,
                           self.god_map.to_expr(identifier.ft_msg + ['wrench', 'force', 'z']))
         weight = w.if_greater(max_force, self.max_force, 0, WEIGHT_BELOW_CA)
-        self.add_constraint_vector(reference_velocities=[self.max_velocity] * 3,
-                                   lower_errors=error[:3],
-                                   upper_errors=error[:3],
-                                   weights=[weight] * 3,
-                                   task_expression=root_P_tip[:3],
-                                   names=['movex', 'movey', 'movez'])
+        self.add_equality_constraint_vector(reference_velocities=[self.max_velocity] * 3,
+                                            equality_bounds=error[:3],
+                                            weights=[weight] * 3,
+                                            task_expression=root_P_tip[:3],
+                                            names=['movex', 'movey', 'movez'])
         # TODO: test this on the real robot
 
     def __str__(self):

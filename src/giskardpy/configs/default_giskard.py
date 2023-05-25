@@ -4,12 +4,9 @@ from typing import Dict, Optional, List, Tuple, Type, Any
 
 import numpy as np
 import rospy
-import rosservice
-from controller_manager_msgs.srv import ListControllers, ListControllersRequest
 from numpy.typing import NDArray
 from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
-from std_srvs.srv import Trigger
 from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
@@ -26,7 +23,6 @@ from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 

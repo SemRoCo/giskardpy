@@ -8,6 +8,7 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped, QuaternionStamped
 from giskardpy.goals.cartesian_goals import CartesianOrientation, RotationVelocityLimit
 from giskardpy.goals.align_planes import AlignPlanes
 
+
 # Todo: the HoldObjectUpright constraint could be realized using the align planes goal
 # Info: a pouring action can be realized in three steps
 #       1. KeepObjectUpright & KeepObjectAbovePlane
@@ -61,7 +62,6 @@ class KeepObjectAbovePlane(Goal):
         p.point.z = 0
         self.root_P_height_origin = self.transform_msg(self.root, p)
 
-
     def make_constraints(self):
         root_T_object = self.get_fk(self.root, self.tip)
         root_P_object = root_T_object.to_position()
@@ -78,19 +78,20 @@ class KeepObjectAbovePlane(Goal):
         distance = w.euclidean_distance(root_P_object_proj, root_P_plane_proj)
 
         # constrain object to be above plane
-        self.add_constraint_vector(reference_velocities=[self.max_velocity]*3,
-                                   lower_errors=root_P_plane_proj[:3] - root_P_object_proj[:3],
-                                   upper_errors=root_V_height_axis[:3],
-                                   weights=[WEIGHT_ABOVE_CA]*3, # WEIGHT needs to be that high, to work for start positions  where the tip is below the plane
-                                   task_expression=root_P_object_proj[:3],
-                                   names=['abovex', 'abovey', 'abovez'])
+        self.add_inequality_constraint_vector(reference_velocities=[self.max_velocity] * 3,
+                                              lower_errors=root_P_plane_proj[:3] - root_P_object_proj[:3],
+                                              upper_errors=root_V_height_axis[:3],
+                                              weights=[WEIGHT_ABOVE_CA] * 3,
+                                              # WEIGHT needs to be that high, to work for start positions  where the tip is below the plane
+                                              task_expression=root_P_object_proj[:3],
+                                              names=['abovex', 'abovey', 'abovez'])
         # constrain object to be at a certain distance
-        self.add_constraint(reference_velocity=self.max_velocity,
-                            lower_error=self.lower_distance - distance,
-                            upper_error=self.upper_distance - distance,
-                            task_expression=distance,
-                            weight=self.weight,
-                            name='distance')
+        self.add_inequality_constraint(reference_velocity=self.max_velocity,
+                                       lower_error=self.lower_distance - distance,
+                                       upper_error=self.upper_distance - distance,
+                                       task_expression=distance,
+                                       weight=self.weight,
+                                       name='distance')
 
         # constrain the x-y-plane to be above the point
         def project_point_onto_plane(point, plane_normal, plane_origin):
@@ -100,12 +101,12 @@ class KeepObjectAbovePlane(Goal):
         root_P_object_proj_plane = project_point_onto_plane(root_P_object, root_V_height_axis, root_P_height_origin)
         root_P_plane_proj_plane = project_point_onto_plane(root_P_plane, root_V_height_axis, root_P_height_origin)
         distance2 = w.euclidean_distance(root_P_plane_proj_plane, root_P_object_proj_plane)
-        self.add_constraint(reference_velocity=self.max_velocity,
-                            lower_error=0 - distance2,
-                            upper_error=self.plane_radius - distance2,
-                            task_expression=distance2,
-                            weight=self.weight,
-                            name='distance2')
+        self.add_inequality_constraint(reference_velocity=self.max_velocity,
+                                       lower_error=0 - distance2,
+                                       upper_error=self.plane_radius - distance2,
+                                       task_expression=distance2,
+                                       weight=self.weight,
+                                       name='distance2')
         self.add_debug_expr('distancexy', distance2)
         self.add_debug_expr('distance_height', distance)
 
@@ -115,7 +116,7 @@ class KeepObjectAbovePlane(Goal):
 
 
 class TiltObject(Goal):
-    #Todo: look into constraining the velocity to a specific value. What about ramp up and ramp down?
+    # Todo: look into constraining the velocity to a specific value. What about ramp up and ramp down?
     def __init__(self,
                  object_link: str,
                  reference_link: str,
@@ -209,7 +210,6 @@ class KeepObjectUpright(Goal):
         self.object_link_axis = object_link_axis
 
     def make_constraints(self):
-
         self.add_constraints_of_goal(AlignPlanes(root_link=self.root,
                                                  tip_link=self.tip,
                                                  goal_normal=self.reference_link_axis,

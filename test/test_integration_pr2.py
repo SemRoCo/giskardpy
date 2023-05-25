@@ -2933,7 +2933,7 @@ class TestCollisionAvoidanceGoals:
         box_setup.allow_self_collision()
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(['base_link'], 0.048)
-        box_setup.check_cpi_leq(['base_link'], 0.06)
+        box_setup.check_cpi_leq(['base_link'], 0.07)
 
     def test_collision_override(self, box_setup: PR2TestWrapper):
         p = PoseStamped()

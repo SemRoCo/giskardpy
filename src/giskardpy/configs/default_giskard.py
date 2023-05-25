@@ -344,11 +344,13 @@ class Giskard:
             self._add_odometry_topic(odometry_topic=odometry_topic,
                                      joint_name=joint_name)
 
-    def set_maximum_derivative(self, new_value: Derivatives = Derivatives.jerk):
-        """
-        Setting this to e.g. jerk will enable jerk and acceleration constraints.
-        """
-        self._general_config.maximum_derivative = new_value
+    # def set_maximum_derivative(self, new_value: Derivatives = Derivatives.jerk):
+    #     """
+    #     Setting this to e.g. jerk will enable jerk and acceleration constraints.
+    #     """
+    #     max derivative must be jerk atm
+    #     self._general_config.maximum_derivative = new_value
+
 
     def add_base_cmd_velocity(self,
                               cmd_vel_topic: str,

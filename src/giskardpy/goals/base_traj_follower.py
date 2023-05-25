@@ -31,6 +31,7 @@ class BaseTrajFollower(Goal):
             b = t * self.sample_period
             eq_result = self.x_symbol(t, free_variable_name, derivative)
             b_result_cases.append((b, eq_result))
+            #FIXME if less eq cases behavior changed
         return w.if_less_eq_cases(a=time + start_t,
                                   b_result_cases=b_result_cases,
                                   else_result=self.x_symbol(self.trajectory_length - 1, free_variable_name, derivative))

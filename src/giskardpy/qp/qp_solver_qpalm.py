@@ -154,8 +154,8 @@ class QPSolverQPalm(QPSolver):
             A2 = np.vstack((A2, E))
         if len(A) > 0:
             A2 = np.vstack((A2, A))
-        lbA = np.concatenate((lb, lbA))
-        ubA = np.concatenate((ub, ubA))
+        lbA = np.concatenate((lb, bE, lbA))
+        ubA = np.concatenate((ub, bE, ubA))
         return self.solver_call(H, g, A2, lbA, ubA)
 
     @profile

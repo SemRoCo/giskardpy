@@ -1,5 +1,6 @@
 import math
 import unittest
+from copy import deepcopy
 from datetime import timedelta
 
 import PyKDL
@@ -13,9 +14,13 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 
 from giskardpy import casadi_wrapper as w
+from giskardpy.qp import pos_in_vel_limits as cas2
+import giskardpy.utils.math as giskard_math
+from giskardpy.my_types import Derivatives
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
 from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
-    pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix
+    pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
+    float_no_nan_no_inf_min_max
 
 
 class TestSymbol:
@@ -158,6 +163,32 @@ class TestExpression(unittest.TestCase):
         assert m[1, 0] == w.Expression(0)
         assert isinstance(m[0, 0], w.Expression)
         print(m.shape)
+
+    def test_comparisons(self):
+        logic_functions = [
+            lambda a, b: a > b,
+            lambda a, b: a >= b,
+            lambda a, b: a < b,
+            lambda a, b: a <= b,
+            lambda a, b: a == b,
+        ]
+        e1_np = np.array([1, 2, 3, -1])
+        e2_np = np.array([1, 1, -1, 3])
+        e1_cas = w.Expression(e1_np)
+        e2_cas = w.Expression(e2_np)
+        for f in logic_functions:
+            r_np = f(e1_np, e2_np)
+            r_cas = f(e1_cas, e2_cas)
+            assert isinstance(r_cas, w.Expression)
+            r_cas = r_cas.evaluate()
+            np.all(r_np == r_cas)
+
+    def test_lt(self):
+        e1 = w.Expression([1, 2, 3, -1])
+        e2 = w.Expression([1, 1, -1, 3])
+        gt_result = e1 < e2
+        assert isinstance(gt_result, w.Expression)
+        assert w.logic_all(gt_result == w.Expression([0, 0, 0, 1])).evaluate()
 
 
 class TestRotationMatrix(unittest.TestCase):
@@ -1437,7 +1468,7 @@ class TestCASWrapper(unittest.TestCase):
         expected = float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)
 
-    @given(float_no_nan_no_inf())
+    @given(float_no_nan_no_inf(10))
     def test_if_less_eq_cases(self, a):
         b_result_cases = [
             (-1, -1),
@@ -1683,7 +1714,7 @@ class TestCASWrapper(unittest.TestCase):
            st.integers(max_value=5000, min_value=-5000),
            st.integers(max_value=5000, min_value=-5000),
            st.integers(max_value=1000, min_value=1))
-    def test_r_gauss(self, acceleration, desired_result, j, step_size):
+    def test_velocity_limit_from_position_limit(self, acceleration, desired_result, j, step_size):
         step_size /= 1000
         acceleration /= 1000
         desired_result /= 1000
@@ -1700,6 +1731,13 @@ class TestCASWrapper(unittest.TestCase):
             i += 1
         # np.testing.assert_almost_equal(position, desired_result)
         assert math.isclose(position, desired_result, abs_tol=4, rel_tol=4)
+
+    @given(float_no_nan_no_inf_min_max(min_value=0))
+    def test_r_gauss(self, n):
+        result = w.compile_and_execute(lambda x: w.r_gauss(w.gauss(x)), [n])
+        self.assertAlmostEqual(result, n)
+        result = w.compile_and_execute(lambda x: w.gauss(w.r_gauss(x)), [n])
+        self.assertAlmostEqual(result, n)
 
     @given(sq_matrix())
     def test_sum_row(self, m):
@@ -1762,3 +1800,149 @@ class TestCASWrapper(unittest.TestCase):
         e = w.if_eq(a, 0, a, b)
         assert w.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert w.to_str(e) == e.pretty_str()
+
+    def test_acc_cap(self):
+        cases = [
+            (0.075, 30, 0.05),
+            (0.08, 30, 0.05),
+            (0.14, 30, 0.05),
+            (0.15, 30, 0.05),
+            (0.16, 30, 0.05),
+            (1, 30, 0.05),
+            (0.17, 10, 0.05),
+            (-0.9, 15, 0.01),
+            (0.05, 15, 0.05),
+            (0.0125, 15, 0.05),
+            (-0.075, 15, 0.05),
+            (-0.07500000000000001, 15, 0.05),
+            (-0.465195, 15, 0.123),
+            (-0.796065, 15, 0.123),
+        ]
+        for current_vel, jerk_limit, dt in cases:
+            try:
+                integral = 0
+                prev_acc = None
+                jerk_step = jerk_limit * dt
+                while abs(integral) < abs(current_vel):
+                    acc_cap = cas2.acc_cap(current_vel - integral, jerk_limit, dt).evaluate()
+                    # if abs(acc_cap) <= jerk_step:
+                    #     acc_cap = np.sign(current_vel) * (current_vel - integral) / dt
+                    integral += np.sign(current_vel) * acc_cap * dt
+                    if prev_acc is not None:
+                        acc_step = abs(prev_acc) - abs(acc_cap)
+                        self.assertAlmostEqual(jerk_step - acc_step, 0)
+                    prev_acc = acc_cap
+                self.assertAlmostEqual(integral - current_vel, 0)
+            except Exception as e:
+                print(f'{current_vel} {jerk_limit} {dt}')
+                raise
+
+    def test_velocity_profile(self):
+        special_test_cases = [
+            # (2.75, -0.9, -1, 0, 0.01, 0.05, 100, 7, 0.1),
+            # (2.75, 0.05, -1, 0, 0.01, 0.01, 15, 7, 0.05),
+            (2.75, -0.9, -1, 0, 2.07, 1, 15, 7, 0.1),
+            (2.75, -0.9, -1, 0, 2.07, 1, 15, 9, 0.1),
+            # (2.75, 0.05, -1, 0, 0.01, 0.05, 15, 7, 0.05),
+            (-2, -0.9, 20, 0, 2.07, 1, 100, 9, 0.05),
+            # (-2, -0.01, -1, 0, 2.07, 0.05, 15, 14, 0.01),
+            # (-2, 1, -1, 0, 2.07, 0.01, 100, 9, 0.01),
+            # (2.75, 1, -1, 0, 0.01, 0.05, 15, 14, 0.01),
+            # (2.75, 1, -1, 0, 0.01, 0.01, 100, 7, 0.01),
+            # (-2, 1, -0.5, 0, 0.01, 0.05, 15, 14, 0.01),
+            # (2.75, -0.9, -1, 0, 0.01, 0.01, 15, 7, 0.01),
+            (2.75, -0.9, -1, 0, 2.07, 0.5, 100, 7, 0.1),
+            # (0.01, 0.05, -1, -0.01, 0.01, 0.5, 15, 9, 0.05),
+            (2.75, -0.9, -0.5, 0, 2.07, 1, 30, 14, 0.05),
+            (2.75, 0.05, -1, 0, 0.01, 0.5, 15, 9, 0.05),
+            (-2, -0.01, -0.5, 0, 2.07, 0.5, 30, 7, 0.05),
+            # (2.75, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
+            (2.75, -0.9, -1, 0, 2.07, 1, 15, 7, 0.123),
+            # (-2, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
+            # (-2, 1, -1, 0, 0.01, 0.01, 15, 14, 0.01),
+            (0, 0.05, -1, -0.01, 0.01, 0.1, 15, 7, 0.05),
+        ]
+        p_cs = [2.75, -2, -0.05, 0, 0.01]
+        p_centers = [0, -0.01, 0.5]
+        p_ranges = [0.01, 2.07, 0.1]
+        v_cs = [-0.9, -0.01, 0, 0.05, 1]
+        # a_cs = [-20, 20, -1.5, -1.36, -3, -1, 0, 1, 1.5, 3]
+        a_cs = [-1, -0.5, 0, 0.01, 20]
+        # v_bs = [0.01, 0.05, 0.5, 1, 2]
+        v_bs = [0.1, 0.5, 1, 2]
+        j_bs = [15, 30, 100]
+        a_lb = -np.inf
+        a_ub = np.inf
+        phs = [7, 9, 14]
+        dts = [0.01, 0.05, 0.123]
+
+        # for p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt in product(p_cs, v_cs, a_cs, p_centers, p_ranges, v_bs,
+        #                                                                   j_bs, phs, dts):
+        for p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt in special_test_cases:
+            # p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt = 0, 0.05, -1, -0.01, 0.01, 0.1, 15, 7, 0.05
+            vb2 = giskard_math.max_velocity_from_horizon_and_jerk(ph, j_b, dt)
+            if v_b > vb2:
+                continue
+
+            p_lb = p_center - p_range
+            p_ub = p_center + p_range
+            # p_c, v_c, a_c, p_lb, p_ub, v_b, j_b, ph, dt = 2.975, -0.4124, -6.748, -2.07, 2.07, 1, 30, 9, 0.05
+            j_lb, j_ub = -j_b, j_b
+            v_lb, v_ub = -v_b, v_b
+            try:
+                lb, ub = cas2.b_profile(current_pos=p_c,
+                                        current_vel=v_c,
+                                        current_acc=a_c,
+                                        pos_limits=(p_lb, p_ub),
+                                        vel_limits=(v_lb, v_ub),
+                                        acc_limits=(a_lb, a_ub),
+                                        jerk_limits=(j_lb, j_ub),
+                                        dt=dt,
+                                        ph=ph)
+            except Exception as e:
+                print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}, {ph}, {dt}')
+                raise
+            lb = lb.evaluate()
+            ub = ub.evaluate()
+            b = np.hstack((lb, ub))
+            lower_limits = {
+                Derivatives.velocity: lb.T[0][:ph],
+                Derivatives.acceleration: lb.T[0][ph:ph * 2],
+                Derivatives.jerk: lb.T[0][-ph:]
+            }
+            upper_limits = {
+                Derivatives.velocity: ub.T[0][:ph],
+                Derivatives.acceleration: ub.T[0][ph:ph * 2],
+                Derivatives.jerk: ub.T[0][-ph:]
+            }
+            lower_limits2 = deepcopy(lower_limits)
+            upper_limits2 = deepcopy(upper_limits)
+            lower_limits2[Derivatives.jerk] = -np.ones(ph) * j_b
+            upper_limits2[Derivatives.jerk] = np.ones(ph) * j_b
+            current_values = {
+                Derivatives.velocity: v_c,
+                Derivatives.acceleration: a_c,
+            }
+            try:
+                result = giskard_math.mpc_velocities(upper_limits=upper_limits2,
+                                                     lower_limits=lower_limits2,
+                                                     current_values=current_values,
+                                                     dt=dt,
+                                                     ph=ph).reshape((ph * 3, 1))
+            except Exception as e:
+                try:
+                    result = giskard_math.mpc_velocities(upper_limits=upper_limits,
+                                                         lower_limits=lower_limits,
+                                                         current_values=current_values,
+                                                         dt=dt,
+                                                         ph=ph)
+                except Exception as e:
+                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}, {ph}, {dt}')
+                    raise
+            else:
+                try:
+                    np.testing.assert_array_almost_equal(lb.T[0][-ph:], -np.ones(ph) * j_b)
+                    np.testing.assert_array_almost_equal(ub.T[0][-ph:], np.ones(ph) * j_b)
+                except AssertionError as e:
+                    print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}, {ph}, {dt}')
+                    raise

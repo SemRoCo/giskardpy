@@ -406,7 +406,7 @@ class Goal(ABC):
             raise GiskardException(f'expression must have shape (1,1), has {task_expression.shape}')
         name = name if name else ''
         name = str(self) + name
-        if name in self._inequality_constraints:
+        if name in self._equality_constraints:
             raise KeyError(f'A constraint with name \'{name}\' already exists. '
                            f'You need to set a name, if you add multiple constraints.')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
@@ -494,10 +494,10 @@ class Goal(ABC):
         self._debug_expressions[name] = expr
 
     def add_position_constraint(self,
-                                expr_current: Union[w.Symbol, float],
-                                expr_goal: Union[w.Symbol, float],
-                                reference_velocity: Union[w.Symbol, float],
-                                weight: Union[w.Symbol, float] = WEIGHT_BELOW_CA,
+                                expr_current: Union[w.symbol_expr, float],
+                                expr_goal: Union[w.symbol_expr_float, float],
+                                reference_velocity: Union[w.symbol_expr_float, float],
+                                weight: Union[w.symbol_expr_float, float] = WEIGHT_BELOW_CA,
                                 name: str = ''):
         """
         A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.

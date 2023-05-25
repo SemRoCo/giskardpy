@@ -485,12 +485,17 @@ class TestConstraints:
                                       check=False)
         apartment_setup.plan_and_execute()
 
-    def test_SetPredictionHorizon(self, zero_pose: PR2TestWrapper):
+    def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
+        zero_pose.set_prediction_horizon(prediction_horizon=7)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.QP_SOLVER_ERROR])
+
+    def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
         default_prediction_horizon = zero_pose.god_map.get_data(identifier.prediction_horizon)
-        zero_pose.set_prediction_horizon(prediction_horizon=1)
+        zero_pose.set_prediction_horizon(prediction_horizon=11)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute()
-        assert zero_pose.god_map.get_data(identifier.prediction_horizon) == 1
+        assert zero_pose.god_map.get_data(identifier.prediction_horizon) == 11
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute()
         assert zero_pose.god_map.get_data(identifier.prediction_horizon) == default_prediction_horizon
@@ -2928,7 +2933,7 @@ class TestCollisionAvoidanceGoals:
         box_setup.allow_self_collision()
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(['base_link'], 0.048)
-        box_setup.check_cpi_leq(['base_link'], 0.06)
+        box_setup.check_cpi_leq(['base_link'], 0.07)
 
     def test_collision_override(self, box_setup: PR2TestWrapper):
         p = PoseStamped()

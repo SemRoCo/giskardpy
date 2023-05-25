@@ -21,6 +21,10 @@ class InfeasibleException(QPSolverException):
     pass
 
 
+class VelocityLimitUnreachableException(QPSolverException):
+    pass
+
+
 class OutOfJointLimitsException(InfeasibleException):
     pass
 

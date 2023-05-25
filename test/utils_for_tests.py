@@ -176,19 +176,13 @@ def hsr_urdf():
     return urdf_string
 
 
-def float_no_nan_no_inf(outer_limit=1e5, min_dist_to_zero=None):
-    if outer_limit is not None:
-        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit,
-                         allow_subnormal=False)
-    else:
-        return st.floats(allow_nan=False, allow_infinity=False)
-    # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
-    # # f = st.floats(allow_nan=False, allow_infinity=False)
-    # if min_dist_to_zero is not None:
-    #     f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
-    # else:
-    #     f = f.filter(lambda x: abs(x) < outer_limit)
-    # return f
+def float_no_nan_no_inf(outer_limit=1e5):
+    return float_no_nan_no_inf_min_max(-outer_limit, outer_limit)
+
+
+def float_no_nan_no_inf_min_max(min_value=-1e5, max_value=1e5):
+    return st.floats(allow_nan=False, allow_infinity=False, max_value=max_value, min_value=min_value,
+                     allow_subnormal=False)
 
 
 @composite
@@ -201,7 +195,7 @@ def sq_matrix(draw):
 
 def unit_vector(length, elements=None):
     if elements is None:
-        elements = float_no_nan_no_inf(min_dist_to_zero=1e-5)
+        elements = float_no_nan_no_inf()
     vector = st.lists(elements,
                       min_size=length,
                       max_size=length).filter(lambda x: SMALL_NUMBER < np.linalg.norm(x) < BIG_NUMBER)
@@ -282,7 +276,10 @@ class GiskardTestWrapper(GiskardWrapper):
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.robot_name
-        joint = self.world.get_joint(self.world.groups[group_name].root_link.parent_joint_name)
+        parent_joint_name = self.world.groups[group_name].root_link.parent_joint_name
+        if parent_joint_name is None:
+            return False
+        joint = self.world.get_joint(parent_joint_name)
         return isinstance(joint, (OmniDrive, DiffDrive))
 
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):

@@ -62,7 +62,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
         H = sparse.diags(H, 0)
-        self.qpProblem.setMObjective(Q=H, c=None, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
+        self.qpProblem.setMObjective(Q=H, c=g, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
         try:
             self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
         except (GurobiError, ValueError) as e:
@@ -110,7 +110,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
             if success == gurobipy.GRB.SUBOPTIMAL:
                 logging.logwarn('warning, suboptimal solution!')
             return np.array(self.qpProblem.X)
-        if success in {gurobipy.GRB.INFEASIBLE, gurobipy.GRB.INF_OR_UNBD}:
+        if success in {gurobipy.GRB.INFEASIBLE, gurobipy.GRB.INF_OR_UNBD, gurobipy.GRB.NUMERIC}:
             raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
         raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
 
@@ -140,10 +140,11 @@ class QPSolverGurobi(QPSWIFTFormatter):
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
+        eps = 1e-4
         self.lb_filter = self.lb_inf_filter[self.weight_filter]
         self.ub_filter = self.ub_inf_filter[self.weight_filter]
-        lower_violations = 1e-4 < xdot_full[self.lb_filter] - nlb
-        upper_violations = 1e-4 < xdot_full[self.ub_filter] - ub
+        lower_violations = xdot_full[self.lb_filter] < - nlb - eps
+        upper_violations = xdot_full[self.ub_filter] > ub + eps
         self.lb_filter[self.lb_filter] = lower_violations
         self.ub_filter[self.ub_filter] = upper_violations
         self.lb_filter[:self.num_non_slack_variables] = False

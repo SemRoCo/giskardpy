@@ -9,8 +9,7 @@ import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
 from scipy import sparse as sp
-
-from giskardpy.my_types import PrefixName
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils import logging
 
 builtin_max = builtins.max
@@ -230,6 +229,24 @@ class Symbol(Symbol_):
             return Expression(self.s.__rtruediv__(other))
         raise _operation_type_error(other, '/', self)
 
+    def __floordiv__(self, other):
+        return floor(self / other)
+
+    def __mod__(self, other):
+        return fmod(self, other)
+
+    def __divmod__(self, other):
+        return self // other, self % other
+
+    def __rfloordiv__(self, other):
+        return floor(other / self)
+
+    def __rmod__(self, other):
+        return fmod(other, self)
+
+    def __rdivmod__(self, other):
+        return other // self, other % self
+
     def __lt__(self, other):
         if isinstance(other, Symbol_):
             other = other.s
@@ -366,6 +383,45 @@ class Expression(Symbol_):
         if isinstance(other, (int, float)):
             return Expression(self.s.__rtruediv__(other))
         raise _operation_type_error(other, '/', self)
+
+    def __floordiv__(self, other):
+        return floor(self / other)
+
+    def __mod__(self, other):
+        return fmod(self, other)
+
+    def __divmod__(self, other):
+        return self // other, self % other
+
+    def __rfloordiv__(self, other):
+        return floor(other / self)
+
+    def __rmod__(self, other):
+        return fmod(other, self)
+
+    def __rdivmod__(self, other):
+        return other // self, other % self
+
+    def __abs__(self):
+        return abs(self)
+
+    def __floor__(self):
+        return floor(self)
+
+    def __ceil__(self):
+        return ceil(self)
+
+    def __ge__(self, other):
+        return greater_equal(self, other)
+
+    def __gt__(self, other):
+        return greater(self, other)
+
+    def __le__(self, other):
+        return less_equal(self, other)
+
+    def __lt__(self, other):
+        return less(self, other)
 
     def __mul__(self, other):
         if isinstance(other, (int, float)):
@@ -1409,8 +1465,13 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
+    if isinstance(if_result, float):
+        if_result = Expression(if_result)
+    if isinstance(else_result, float):
+        else_result = Expression(else_result)
     if isinstance(if_result, (Point3, Vector3, TransMatrix, RotationMatrix, Quaternion)):
-        assert type(if_result) == type(else_result)
+        assert type(if_result) == type(else_result), \
+            f'if_else: result types are not equal {type(if_result)} != {type(else_result)}'
     return_type = type(if_result)
     if return_type in (int, float):
         return_type = Expression
@@ -1453,7 +1514,10 @@ def less(x, y):
     return Expression(ca.lt(x, y))
 
 
-def greater(x, y):
+def greater(x, y, decimal_places=None):
+    if decimal_places is not None:
+        x = round_up(x, decimal_places)
+        y = round_up(y, decimal_places)
     if isinstance(x, Symbol_):
         x = x.s
     if isinstance(y, Symbol_):
@@ -1469,12 +1533,24 @@ def logic_and(*args):
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
 
 
+def logic_any(args):
+    return Expression(ca.logic_any(args.s))
+
+
+def logic_all(args):
+    return Expression(ca.logic_all(args.s))
+
+
 def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
-        return ca.logic_or(args[0], args[1])
+        return Expression(ca.logic_or(args[0].s, args[1].s))
     else:
-        return ca.logic_or(args[0], logic_and(*args[1:]))
+        return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
+
+
+def logic_not(expr):
+    return Expression(ca.logic_not(expr.s))
 
 
 def if_greater(a, b, if_result, else_result):
@@ -1557,7 +1633,7 @@ def if_less_eq_cases(a, b_result_cases, else_result):
     """
     a = _to_sx(a)
     result = _to_sx(else_result)
-    for i in reversed(range(len(b_result_cases) - 1)):
+    for i in reversed(range(len(b_result_cases))):
         b = _to_sx(b_result_cases[i][0])
         b_result = _to_sx(b_result_cases[i][1])
         result = ca.if_else(ca.le(a, b), b_result, result)
@@ -1687,6 +1763,10 @@ def fmod(a, b):
     a = Expression(a).s
     b = Expression(b).s
     return Expression(ca.fmod(a, b))
+
+
+def euclidean_division(nominator, denominator):
+    pass
 
 
 def normalize_angle_positive(angle):
@@ -2010,3 +2090,32 @@ def solve_for(expression, target_value, start_value=0.0001, max_tries=10000, eps
                 slope = 0.001
         x -= builtin_max(builtin_min(err / slope, max_step), -max_step)
     raise ValueError('no solution found')
+
+
+def gauss(n):
+    return (n ** 2 + n) / 2
+
+
+def r_gauss(integral):
+    return sqrt(2 * integral + (1 / 4)) - 1 / 2
+
+
+def one_step_change(current_acceleration, jerk_limit, dt):
+    return current_acceleration * dt + jerk_limit * dt ** 2
+
+
+def desired_velocity(current_position, goal_position, dt, ph):
+    e = goal_position - current_position
+    a = e / (gauss(ph) * dt)
+    # a = e / ((gauss(ph-1) + ph - 1)*dt)
+    return a * ph
+    # return a * (ph-2)
+
+
+def vel_integral(vel_limit, jerk_limit, dt, ph):
+    def f(vc, ac, jl, t, dt, ph):
+        return vc + (t) * ac * dt + gauss(t) * jl * dt ** 2
+
+    half1 = math.floor(ph / 2)
+    x = f(0, 0, jerk_limit, half1, dt, ph)
+    return x

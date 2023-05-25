@@ -151,10 +151,11 @@ class QPSWIFTFormatter(QPSolver):
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
+        eps = 1e-4
         self.lb_filter = self.lb_inf_filter[self.weight_filter]
         self.ub_filter = self.ub_inf_filter[self.weight_filter]
-        lower_violations = 1e-4 < xdot_full[self.lb_filter] - nlb
-        upper_violations = 1e-4 < xdot_full[self.ub_filter] - ub
+        lower_violations = xdot_full[self.lb_filter] < - nlb - eps
+        upper_violations = xdot_full[self.ub_filter] > ub + eps
         self.lb_filter[self.lb_filter] = lower_violations
         self.ub_filter[self.ub_filter] = upper_violations
         self.lb_filter[:self.num_non_slack_variables] = False
@@ -305,7 +306,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo
         # 'MAXITER': 100, # 0 < MAXITER < 200; default 100
         # 'ABSTOL': 1e-4, # 0 < ABSTOL < 1; default 1e-6
-        'RELTOL': 1e-5,  # 0 < RELTOL < 1; default 1e-6
+        'RELTOL': 9e-4,  # 0 < RELTOL < 1; default 1e-6
         # 'SIGMA': 1,
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }
@@ -325,5 +326,27 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         return result['sol']
 
     def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
-        pass
+        A_lb_ub = np.eye(len(ub))
+        if len(A) > 0:
+            A_lb_ub = np.vstack((-A_lb_ub, A_lb_ub, -A, A))
+            h = np.concatenate((-lb, ub, -lbA, ubA))
+        else:
+            A_lb_ub = np.vstack((-A_lb_ub, A_lb_ub))
+            h = np.concatenate((-lb, ub))
+        h_filter = np.isfinite(h)
+        h = h[h_filter]
+        A_lb_ub = A_lb_ub[h_filter, :]
+        bE_filter = np.isfinite(bE)
+        E = E[bE_filter, :]
+        if len(E) == 0:
+            result = qpSWIFT.run(c=g, h=h, P=H, G=A_lb_ub, opts=self.opts)
+        else:
+            result = qpSWIFT.run(c=g, h=h, P=H, G=A_lb_ub, A=E, b=bE, opts=self.opts)
+        exit_flag = result['basicInfo']['ExitFlag']
+        if exit_flag != 0:
+            error_code = QPSWIFTExitFlags(exit_flag)
+            if error_code == QPSWIFTExitFlags.MAX_ITER_REACHED:
+                raise InfeasibleException(f'Failed to solve qp: {str(error_code)}')
+            raise QPSolverException(f'Failed to solve qp: {str(error_code)}')
+        return result['sol']
 

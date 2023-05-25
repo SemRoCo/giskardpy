@@ -8,21 +8,22 @@ from giskardpy.my_types import Derivatives
 class TiagoBase(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
-        # self.set_qp_solver(SupportedQPSolver.qpalm)
+        self.set_qp_solver(SupportedQPSolver.gurobi)
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
-        # self.configure_PublishDebugExpressions(
-        #     publish_lb=True,
-        #     publish_ub=True,
+        self.configure_PublishDebugExpressions(
+            publish_lb=True,
+            publish_ub=True,
         #     publish_lbA=True,
         #     publish_ubA=True,
         #     publish_bE=True,
         #     publish_Ax=True,
         #     publish_Ex=True,
-        #     publish_xdot=True,
+            publish_xdot=True,
         #     publish_weights=True,
         #     publish_g=True,
-        #     publish_debug=True,
-        # )
+            publish_debug=True,
+        )
+        self.configure_PlotDebugExpressions(enabled=True, wait=True)
         self.configure_PlotTrajectory(enabled=True, wait=True)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/tiago.srdf')
         self.overwrite_external_collision_avoidance('brumbrum',

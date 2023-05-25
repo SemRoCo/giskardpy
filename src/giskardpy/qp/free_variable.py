@@ -73,7 +73,7 @@ class FreeVariable:
         else:
             raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {derivative}')
         if evaluated:
-            return self.god_map.evaluate_expr(expr)
+            return float(self.god_map.evaluate_expr(expr))
         return expr
 
     def set_lower_limit(self, derivative: Derivatives, limit: Union[w.Expression, float]):
@@ -96,6 +96,18 @@ class FreeVariable:
         if evaluated:
             return self.god_map.evaluate_expr(expr)
         return expr
+
+    def get_lower_limits(self, max_derivative: Derivatives) -> Dict[Derivatives, float]:
+        lower_limits = {}
+        for derivative in Derivatives.range(Derivatives.position, max_derivative):
+            lower_limits[derivative] = self.get_lower_limit(derivative, default=False, evaluated=True)
+        return lower_limits
+
+    def get_upper_limits(self, max_derivative: Derivatives) -> Dict[Derivatives, float]:
+        upper_limits = {}
+        for derivative in Derivatives.range(Derivatives.position, max_derivative):
+            upper_limits[derivative] = self.get_upper_limit(derivative, default=False, evaluated=True)
+        return upper_limits
 
     def has_position_limits(self) -> bool:
         try:

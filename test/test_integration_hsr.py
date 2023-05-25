@@ -294,7 +294,7 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.set_cart_goal(r_goal, zero_pose.tip, root_link='arm_roll_link')
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 

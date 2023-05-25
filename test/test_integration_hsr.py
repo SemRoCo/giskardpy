@@ -19,13 +19,13 @@ from utils_for_tests import compare_poses, GiskardTestWrapper
 
 class HSRTestWrapper(GiskardTestWrapper):
     default_pose = {
-        'arm_flex_joint': -0.7,
-        'arm_lift_joint': 0.2,
+        'arm_flex_joint': 0.0,
+        'arm_lift_joint': 0.0,
         'arm_roll_joint': 0.0,
-        'head_pan_joint': -0.1,
-        'head_tilt_joint': 0.1,
-        'wrist_flex_joint': -0.9,
-        'wrist_roll_joint': -0.1,
+        'head_pan_joint': 0.0,
+        'head_tilt_joint': 0.0,
+        'wrist_flex_joint': 0.0,
+        'wrist_roll_joint': 0.0,
     }
     better_pose = default_pose
 

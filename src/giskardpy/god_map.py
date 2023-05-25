@@ -3,7 +3,7 @@ import numbers
 from collections import defaultdict
 from copy import copy, deepcopy
 from multiprocessing import RLock
-from typing import Sequence, Union, Any
+from typing import Sequence, Union, Any, List
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
@@ -388,21 +388,19 @@ class GodMap(metaclass=SingletonMeta):
             z=self.to_symbol(identifier + ['z']),
         )
 
-    def get_values(self, symbols):
+    def get_values(self, symbols) -> np.ndarray:
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
-        :rtype: list
         """
         # its a trap, this function only looks slow with lineprofiler
         with self.lock:
             return self.unsafe_get_values(symbols)
 
-    def unsafe_get_values(self, symbols):
+    def unsafe_get_values(self, symbols: List[str]) -> np.ndarray:
         """
-        :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
-        :rtype: list
+        :return: an array which maps all registered expressions to their values or 0 if there is no number entry
         """
-        return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
+        return np.array([self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols], dtype=float)
 
     def evaluate_expr(self, expr: w.Expression):
         if isinstance(expr, (int, float)):
@@ -410,9 +408,9 @@ class GodMap(metaclass=SingletonMeta):
         f = expr.compile()
         if len(f.str_params) == 0:
             return expr.evaluate()
-        result = f.call2(self.get_values(f.str_params))
+        result = f.fast_call(self.get_values(f.str_params))
         if len(result) == 1:
-            return result[0][0]
+            return result[0]
         else:
             return result
 

@@ -1,3 +1,4 @@
+import csv
 import keyword
 from collections import defaultdict
 from copy import deepcopy
@@ -31,18 +32,20 @@ from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver
 from giskardpy.configs.default_giskard import ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
-from giskardpy.my_types import PrefixName
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.qp_controller import available_solvers
+from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
 import os
-
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -173,19 +176,13 @@ def hsr_urdf():
     return urdf_string
 
 
-def float_no_nan_no_inf(outer_limit=1e5, min_dist_to_zero=None):
-    if outer_limit is not None:
-        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit,
-                         allow_subnormal=False)
-    else:
-        return st.floats(allow_nan=False, allow_infinity=False)
-    # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
-    # # f = st.floats(allow_nan=False, allow_infinity=False)
-    # if min_dist_to_zero is not None:
-    #     f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
-    # else:
-    #     f = f.filter(lambda x: abs(x) < outer_limit)
-    # return f
+def float_no_nan_no_inf(outer_limit=1e5):
+    return float_no_nan_no_inf_min_max(-outer_limit, outer_limit)
+
+
+def float_no_nan_no_inf_min_max(min_value=-1e5, max_value=1e5):
+    return st.floats(allow_nan=False, allow_infinity=False, max_value=max_value, min_value=min_value,
+                     allow_subnormal=False)
 
 
 @composite
@@ -198,7 +195,7 @@ def sq_matrix(draw):
 
 def unit_vector(length, elements=None):
     if elements is None:
-        elements = float_no_nan_no_inf(min_dist_to_zero=1e-5)
+        elements = float_no_nan_no_inf()
     vector = st.lists(elements,
                       min_size=length,
                       max_size=length).filter(lambda x: SMALL_NUMBER < np.linalg.norm(x) < BIG_NUMBER)
@@ -235,17 +232,22 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_moving = 0
         self._alive = True
 
-        # self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-        #                                                UpdateTransform)
+        try:
+            from iai_naive_kinematics_sim.srv import UpdateTransform
+            self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
+                                                           UpdateTransform)
+        except Exception as e:
+            self.set_localization_srv = None
 
         self.giskard = config_file()
         if 'GITHUB_WORKFLOW' in os.environ:
             logging.loginfo('Inside github workflow, turning off visualization')
             self.giskard.configure_VisualizationBehavior(enabled=False)
             self.giskard.configure_CollisionMarker(enabled=False)
-            self.giskard.set_qp_solver(SupportedQPSolver.qp_oases)
             self.giskard.configure_PlotTrajectory(enabled=False)
             self.giskard.configure_PlotDebugExpressions(enabled=False)
+        if 'QP_SOLVER' in os.environ:
+            self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.giskard.grow()
         self.tree = self.giskard._tree
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
@@ -274,7 +276,10 @@ class GiskardTestWrapper(GiskardWrapper):
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.robot_name
-        joint = self.world.get_joint(self.world.groups[group_name].root_link.parent_joint_name)
+        parent_joint_name = self.world.groups[group_name].root_link.parent_joint_name
+        if parent_joint_name is None:
+            return False
+        joint = self.world.get_joint(parent_joint_name)
         return isinstance(joint, (OmniDrive, DiffDrive))
 
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
@@ -289,15 +294,16 @@ class GiskardTestWrapper(GiskardWrapper):
                            seed_configuration=seed_configuration)
 
     def set_localization(self, map_T_odom: PoseStamped):
-        pass
-        # map_T_odom.pose.position.z = 0
-        # req = UpdateTransformRequest()
-        # req.transform.translation = map_T_odom.pose.position
-        # req.transform.rotation = map_T_odom.pose.orientation
-        # assert self.set_localization_srv(req).success
-        # self.wait_heartbeats(15)
-        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
-        # compare_poses(p2.pose, map_T_odom.pose)
+        if self.set_localization_srv is not None:
+            from iai_naive_kinematics_sim.srv import UpdateTransformRequest
+            map_T_odom.pose.position.z = 0
+            req = UpdateTransformRequest()
+            req.transform.translation = map_T_odom.pose.position
+            req.transform.rotation = map_T_odom.pose.orientation
+            assert self.set_localization_srv(req).success
+            self.wait_heartbeats(15)
+            p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+            compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         result_msg = deepcopy(msg)
@@ -342,14 +348,45 @@ class GiskardTestWrapper(GiskardWrapper):
         if self._alive:
             self.tree.tick()
 
-    def induce_cardioplegia(self):
+    def stop_ticking(self):
         self._alive = False
 
-    def resuscitate(self):
+    def restart_ticking(self):
         self._alive = True
 
+    def print_qp_solver_times(self):
+        with open('benchmark.csv', mode='w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            csvwriter.writerow(['solver',
+                                'filtered_variables',
+                                'variables',
+                                'eq_constraints',
+                                'neq_constraints',
+                                'num_eq_slack_variables',
+                                'num_neq_slack_variables',
+                                'num_slack_variables',
+                                'max_derivative',
+                                'data'])
+
+            for solver_id, solver_class in available_solvers.items():
+                times = solver_class.get_solver_times()
+                for (filtered_variables, variables, eq_constraints, neq_constraints, num_eq_slack_variables,
+                     num_neq_slack_variables, num_slack_variables), times in sorted(times.items()):
+                    csvwriter.writerow([solver_id.name,
+                                        str(filtered_variables),
+                                        str(variables),
+                                        str(eq_constraints),
+                                        str(neq_constraints),
+                                        str(num_eq_slack_variables),
+                                        str(num_neq_slack_variables),
+                                        str(num_slack_variables),
+                                        str(int(self.god_map.get_data(identifier.max_derivative))),
+                                        str(times)])
+
+        logging.loginfo('saved benchmark file')
+
     def tear_down(self):
-        self.god_map.unsafe_get_data(identifier.timer_collector).print()
+        self.print_qp_solver_times()
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
@@ -425,7 +462,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
         return self.world.search_for_link_name(root_link, root_group), \
-               self.world.search_for_link_name(tip_link, tip_group)
+            self.world.search_for_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################
@@ -541,6 +578,24 @@ class GiskardTestWrapper(GiskardWrapper):
                                max_velocity=angular_velocity,
                                check=check,
                                **kwargs)
+
+    def set_move_base_goal(self, goal_pose, check=True):
+        self.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
+                           goal_pose=goal_pose)
+        if check:
+            full_root_link = self.default_root
+            full_tip_link = self.world.get_link_name('base_footprint')
+            goal_point = PointStamped()
+            goal_point.header = goal_pose.header
+            goal_point.point = goal_pose.pose.position
+            self.add_goal_check(TranslationGoalChecker(giskard=self,
+                                                       tip_link=full_tip_link,
+                                                       root_link=full_root_link,
+                                                       expected=goal_point))
+            goal_orientation = QuaternionStamped()
+            goal_orientation.header = goal_pose.header
+            goal_orientation.quaternion = goal_pose.pose.orientation
+            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
     def set_diff_drive_base_goal(self, goal_pose, tip_link=None, root_link=None, weight=None, linear_velocity=None,
                                  angular_velocity=None, check=True, **kwargs):
@@ -672,14 +727,21 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def plan_and_execute(self, expected_error_codes=None, stop_after=None, wait=True):
+    def plan_and_execute(self, expected_error_codes: List[int] = None, stop_after: float = None,
+                         wait: bool = True) -> MoveResult:
         return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
 
-    def plan(self, expected_error_codes=None, wait: bool = True) -> MoveResult:
-        return self.send_goal(expected_error_codes, MoveGoal.PLAN_ONLY, wait)
+    def plan(self, expected_error_codes: List[int] = None, wait: bool = True) -> MoveResult:
+        return self.send_goal(expected_error_codes=expected_error_codes,
+                              goal_type=MoveGoal.PLAN_ONLY,
+                              wait=wait)
 
-    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None,
-                  wait=True):
+    def send_goal(self,
+                  expected_error_codes: Optional[List[int]] = None,
+                  goal_type: int = MoveGoal.PLAN_AND_EXECUTE,
+                  goal: Optional[MoveGoal] = None,
+                  stop_after: Optional[float] = None,
+                  wait: bool = True) -> Optional[MoveResult]:
         try:
             time_spend_giskarding = time()
             if stop_after is not None:
@@ -748,17 +810,19 @@ class GiskardTestWrapper(GiskardWrapper):
             trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])
         return trajectory2
 
-    def are_joint_limits_violated(self):
-        joints = list(self.world.controlled_joints)
-        for joint in joints:
-            try:
-                lower_limit, upper_limit = self.world.joints[joint].get_limit_expressions(0)
-                lower_limit = lower_limit.evaluate()
-                upper_limit = upper_limit.evaluate()
-            except:
-                continue
-            assert lower_limit <= self.world.state[joint].position <= upper_limit, \
-                f'joint limit of {joint} is violated {lower_limit} <= {self.world.state[joint].position} <= {upper_limit}'
+    def are_joint_limits_violated(self, eps=1e-6):
+        active_free_variables: List[FreeVariable] = self.god_map.get_data(identifier.qp_controller).free_variables
+        for free_variable in active_free_variables:
+            if free_variable.has_position_limits():
+                lower_limit = free_variable.get_lower_limit(Derivatives.position)
+                upper_limit = free_variable.get_upper_limit(Derivatives.position)
+                if not isinstance(lower_limit, float):
+                    lower_limit = lower_limit.evaluate()
+                if not isinstance(upper_limit, float):
+                    upper_limit = upper_limit.evaluate()
+                current_position = self.world.state[free_variable.name].position
+                assert lower_limit - eps <= current_position <= upper_limit + eps, \
+                    f'joint limit of {free_variable.name} is violated {lower_limit} <= {current_position} <= {upper_limit}'
 
     def are_joint_limits_in_traj_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
@@ -1649,7 +1713,7 @@ class PointingGoalChecker(GoalChecker):
 
 
 class RotationGoalChecker(GoalChecker):
-    def __init__(self, giskard, tip_link, root_link, expected):
+    def __init__(self, giskard, tip_link, root_link, expected: QuaternionStamped):
         super().__init__(giskard)
         self.expected = deepcopy(expected)
         self.tip_link = tip_link

@@ -5,9 +5,11 @@ from py_trees import Status
 from giskardpy import identifier
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class NewTrajectory(GiskardBehavior):
+    @record_time
     @profile
     def initialise(self):
         current_js = deepcopy(self.god_map.get_data(identifier.joint_states))

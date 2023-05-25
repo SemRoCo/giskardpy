@@ -4,9 +4,11 @@ import numpy as np
 import qpoases
 from qpoases import PyReturnValue
 
+from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
+from giskardpy.utils.utils import record_time
 
 
 class QPoasesModes(IntEnum):
@@ -17,6 +19,7 @@ class QPoasesModes(IntEnum):
 
 
 class QPSolverQPOases(QPSolver):
+    solver_id = SupportedQPSolver.qpOASES
     STATUS_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
 
     def __init__(self, num_non_slack: int, retry_added_slack: float, retry_weight_factor: float,
@@ -45,6 +48,8 @@ class QPSolverQPOases(QPSolver):
     def did_problem_change(self, A):
         return A.shape != self.shape
 
+    @profile
+    @record_time
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
         H = np.diag(weights).copy()
@@ -78,7 +83,7 @@ class QPSolverQPOases(QPSolver):
             raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
         raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
 
-    # @profile
+    @profile
     def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
         relaxed = False
         for number_of_retries in range(2 + len(QPoasesModes)):

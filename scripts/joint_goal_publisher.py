@@ -163,7 +163,7 @@ class JointGoalPublisher(object):
         #self.pub_def_vels = get_param("publish_default_velocities", False)
         #self.pub_def_efforts = get_param("publish_default_efforts", False)
 
-        self.giskard_joints = self.giskard_wrapper.get_controlled_joints()
+        self.giskard_joints = self.giskard_wrapper.get_controlled_joints(self.giskard_wrapper.robot_name)
 
         robot = minidom.parseString(description)
         if robot.getElementsByTagName('COLLADA'):

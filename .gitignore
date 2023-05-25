@@ -1,3 +1,5 @@
+tmp/
+*.mypy_cache/
 build/
 data/
 test/tmp_data/

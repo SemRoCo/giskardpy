@@ -10,7 +10,7 @@ from giskardpy.data_types import KeyDefaultDict
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class JointPosController(GiskardBehavior):

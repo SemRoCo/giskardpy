@@ -6,6 +6,7 @@ import giskardpy.identifier as identifier
 from giskardpy.data_types import JointStates
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 
 
 class LoopDetector(GiskardBehavior):
@@ -17,6 +18,7 @@ class LoopDetector(GiskardBehavior):
         self.precision = self.get_god_map().get_data(identifier.LoopDetector_precision)
         self.window_size = 21
 
+    @record_time
     @profile
     def initialise(self):
         super().initialise()
@@ -24,6 +26,7 @@ class LoopDetector(GiskardBehavior):
         self.velocity_limits = defaultdict(lambda: 1)
         self.velocity_limits.update(self.world.get_all_free_variable_velocity_limits())
 
+    @record_time
     @profile
     def update(self):
         current_js = self.get_god_map().get_data(identifier.joint_states)
@@ -35,8 +38,6 @@ class LoopDetector(GiskardBehavior):
             run_time = self.get_runtime()
             logging.loginfo('found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
                                                                                           run_time))
-            self.time_collector.lengths.append(planning_time * sample_period)
-            self.time_collector.times.append(run_time)
             return Status.SUCCESS
         self.past_joint_states.add(rounded_js)
         return Status.RUNNING

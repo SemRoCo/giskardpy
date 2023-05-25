@@ -27,8 +27,8 @@ import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import raise_to_blackboard, \
-    catch_and_raise_to_blackboard
+from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
@@ -44,6 +44,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction]
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
 
+    @record_time
     @profile
     def __init__(self, action_namespace: str, state_topic: str, group_name: str,
                  goal_time_tolerance: float = 1, fill_velocity_values: bool = True):
@@ -68,8 +69,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                     if action_msg_type not in self.supported_action_types:
                         raise TypeError()
                 except Exception as e:
-                    raise TypeError('Action server of type \'{}\' is not supported. '
-                                    'Must be one of: {}'.format(action_msg_type, self.supported_action_types))
+                    raise TypeError(f'Action server of type \'{action_msg_type}\' is not supported. '
+                                    f'Must be one of: {self.supported_action_types}')
             except ROSTopicException as e:
                 logging.logwarn('Couldn\'t connect to {}. Is it running?'.format(self.action_namespace))
                 rospy.sleep(1)
@@ -86,8 +87,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                 if status_msg_type is None:
                     raise ROSTopicException()
                 if status_msg_type not in self.supported_state_types:
-                    raise TypeError('State topic of type \'{}\' is not supported. '
-                                    'Must be one of: {}'.format(status_msg_type, self.supported_state_types))
+                    raise TypeError(f'State topic of type \'{status_msg_type}\' is not supported. '
+                                    f'Must be one of: {self.supported_state_types}')
                 msg = rospy.wait_for_message(state_topic, status_msg_type, timeout=2.0)
                 if isinstance(msg, JointState):
                     controlled_joint_names = msg.name
@@ -124,6 +125,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     def __str__(self):
         return f'{super().__str__()} ({self.action_namespace})'
 
+    @record_time
     @profile
     def initialise(self):
         super().initialise()
@@ -145,6 +147,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.cancel_tries = 0
 
     @catch_and_raise_to_blackboard
+    @record_time
     @profile
     def update(self):
         """

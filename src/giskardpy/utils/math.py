@@ -1,8 +1,12 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, Dict, List, Type, Optional
 
 import numpy as np
 from geometry_msgs.msg import Quaternion, Point
 from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
+
+from giskardpy.my_types import Derivatives
+from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
 
 
 def qv_mult(quaternion, vector):
@@ -131,13 +135,147 @@ def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[
     return np.array([x, y, z]), angle
 
 
-def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period):
-    def gauss(n):
-        return (n ** 2 + n) / 2
+def gauss(n: float) -> float:
+    return (n ** 2 + n) / 2
 
+
+def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period):
     n2 = int((prediction_horizon) / 2)
     (prediction_horizon ** 2 + prediction_horizon) / 2
     return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
+
+
+def mpc(upper_limits: Dict[Derivatives, List[float]],
+        lower_limits: Dict[Derivatives, List[float]],
+        current_values: Dict[Derivatives, float],
+        dt: float,
+        ph: int,
+        q_weight: Tuple[float],
+        lin_weight: Tuple[float],
+        solver_class: Optional[Type[QPSolver]] = None) -> np.ndarray:
+    if solver_class is None:
+        solver = QPSolverQPalm.empty()
+        # solver = QPSolverQPSwift.empty()
+        # solver = QPSolverGurobi.empty()
+    else:
+        solver = solver_class.empty()
+    max_d = max(upper_limits.keys())
+    lb = []
+    ub = []
+    for (derivative, lb_), (_, ub_) in sorted(zip(lower_limits.items(), upper_limits.items())):
+        lb.extend(lb_)
+        ub.extend(ub_)
+        if derivative != max_d:
+            lb[-1] = 0
+            ub[-1] = 0
+    model = derivative_link_model(dt, ph, max_d)
+    lbA = np.zeros(model.shape[0])
+    ubA = np.zeros(model.shape[0])
+    for derivative, current_value in sorted(current_values.items()):
+        ubA[ph * (derivative - 1)] = current_value
+        lbA[ph * (derivative - 1)] = current_value
+    w = np.zeros(len(lb))
+    w[:ph] = q_weight[0]
+    w[ph:ph*2] = q_weight[1]
+    w[-ph:] = q_weight[2]
+    H = np.diag(w)
+    g = np.zeros(len(lb))
+    g[:ph] = lin_weight[0]
+    g[ph:ph*2] = lin_weight[1]
+    g[-ph:] = lin_weight[2]
+    empty = np.eye(0)
+    lb = np.array(lb)
+    ub = np.array(ub)
+    result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
+                                                  E=model, bE=ubA,
+                                                  A=empty, lbA=np.array([]), ubA=np.array([]))
+    return result
+
+
+def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, q_weight, lin_weight, solver_class = None):
+    upper_limits = {
+        Derivatives.velocity: np.ones(ph) * vel_limit,
+        Derivatives.acceleration: np.ones(ph) * acc_limit,
+        Derivatives.jerk: np.ones(ph) * jerk_limit
+    }
+    lower_limits = {
+        Derivatives.velocity: np.ones(ph) * -vel_limit,
+        Derivatives.acceleration: np.ones(ph) * -acc_limit,
+        Derivatives.jerk: np.ones(ph) * -jerk_limit
+    }
+    return mpc(upper_limits, lower_limits,
+               {Derivatives.velocity: current_vel,
+                Derivatives.acceleration: current_acc}, dt, ph, q_weight, lin_weight, solver_class=solver_class)
+
+def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
+                   lower_limits: Dict[Derivatives, List[float]],
+                   current_values: Dict[Derivatives, float],
+                   dt: float,
+                   ph: int,
+                   solver_class = None):
+    return mpc(upper_limits, lower_limits, current_values, dt, ph, (1, 1, 1), (0,0,0), solver_class)
+
+
+def derivative_link_model(dt, ph, max_derivative):
+    num_rows = ph * (max_derivative - 1)
+    num_columns = ph * max_derivative
+    derivative_link_model = np.zeros((num_rows, num_columns))
+
+    x_n = np.eye(num_rows)
+    derivative_link_model[:, :x_n.shape[0]] += x_n
+
+    xd_n = -np.eye(num_rows) * dt
+    h_offset = ph
+    derivative_link_model[:, h_offset:] += xd_n
+
+    x_c_height = ph - 1
+    x_c = -np.eye(x_c_height)
+    offset_v = 0
+    offset_h = 0
+    for derivative in Derivatives.range(Derivatives.velocity, max_derivative - 1):
+        offset_v += 1
+        derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
+        offset_v += x_c_height
+        offset_h += ph
+    return derivative_link_model
+
+
+def mpc_velocity_integral(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+    upper_limits = {
+        Derivatives.velocity: np.ones(ph) * limits[Derivatives.velocity],
+        Derivatives.acceleration: np.ones(ph) * limits[Derivatives.acceleration],
+        Derivatives.jerk: np.ones(ph) * limits[Derivatives.jerk]
+    }
+    lower_limits = {
+        Derivatives.velocity: np.ones(ph) * -limits[Derivatives.velocity],
+        Derivatives.acceleration: np.ones(ph) * -limits[Derivatives.acceleration],
+        Derivatives.jerk: np.ones(ph) * -limits[Derivatives.jerk]
+    }
+    return np.sum(mpc_velocities(upper_limits, lower_limits,
+                                 {Derivatives.velocity: limits[Derivatives.velocity] + limits[
+                                     Derivatives.jerk] * dt ** 2,
+                                  Derivatives.acceleration: 0}, dt, ph)) * dt
+
+
+def mpc_velocity_integral2(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+    ph -= 2
+    i1 = gauss(ph) * (limits[Derivatives.velocity] / (ph)) * dt
+    ph -= 1
+    i2 = gauss(ph) * (limits[Derivatives.velocity] / (ph)) * dt
+    return (i1 + i2) / 2
+
+
+def mpc_velocity_integral3(limits: Dict[Derivatives, float], dt: float, ph: int) -> float:
+    ph -= 1
+    v = limits[Derivatives.velocity]
+    i1 = (v * dt * ph) / 2
+    ph -= 1
+    i2 = (v * dt * ph) / 2
+    return (i1 + i2) / 2
+
+
+def limit(a, lower_limit, upper_limit):
+    return max(lower_limit, min(upper_limit, a))
 
 
 def inverse_frame(f1_T_f2):

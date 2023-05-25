@@ -5,6 +5,7 @@ from tf2_msgs.msg import TFMessage
 
 from giskardpy.configs.data_types import TfPublishingModes
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg
 
 
@@ -33,6 +34,7 @@ class TFPublisher(GiskardBehavior):
         tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
         return tf
 
+    @record_time
     @profile
     def update(self):
         try:
@@ -48,7 +50,7 @@ class TFPublisher(GiskardBehavior):
                         if attached_links:
                             get_fk = self.world.compute_fk_pose
                             for link_name in attached_links:
-                                parent_link_name = self.world.groups[robot_name].get_parent_link_of_link(link_name)
+                                parent_link_name = self.world.get_parent_link_of_link(link_name)
                                 fk = get_fk(parent_link_name, link_name)
                                 if self.include_prefix:
                                     tf = self.make_transform(fk.header.frame_id, str(link_name), fk.pose)

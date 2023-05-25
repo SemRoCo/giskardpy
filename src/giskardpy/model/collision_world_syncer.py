@@ -420,6 +420,17 @@ class CollisionWorldSynchronizer:
     def blacklist_inter_group_collisions(self):
         for group_a_name, group_b_name in combinations(self.world.minimal_group_names, 2):
             if group_a_name in self.robot_names or group_b_name in self.robot_names:
+                if group_a_name in self.robot_names:
+                    robot_group = self.world.groups[group_a_name]
+                    other_group = self.world.groups[group_b_name]
+                else:
+                    robot_group = self.world.groups[group_b_name]
+                    other_group = self.world.groups[group_a_name]
+                unmovable_links = robot_group.get_unmovable_links()
+                if len(unmovable_links) > 0:
+                    for link_a, link_b in product(unmovable_links,
+                                                  other_group.link_names_with_collisions):
+                        self.add_black_list_entry(*self.world.sort_links(link_a, link_b))
                 continue
             group_a: WorldBranch = self.world.groups[group_a_name]
             group_b: WorldBranch = self.world.groups[group_b_name]

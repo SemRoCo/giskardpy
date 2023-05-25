@@ -17,8 +17,8 @@ from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import catch_and_raise_to_blackboard
 
 
 # can be used during closed-loop control, instead of for tracking a trajectory

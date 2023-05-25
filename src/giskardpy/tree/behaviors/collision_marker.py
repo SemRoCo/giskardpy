@@ -10,6 +10,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 import giskardpy.identifier as identifier
 from giskardpy.model.collision_world_syncer import Collision, Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 
 class CollisionMarker(GiskardBehavior):
@@ -22,6 +23,7 @@ class CollisionMarker(GiskardBehavior):
         super().__init__(name)
         self.map_frame = str(self.world.root_link_name)
 
+    @record_time
     @profile
     def setup(self, timeout=10.0, name_space='pybullet_collisions'):
         super().setup(timeout)
@@ -29,6 +31,7 @@ class CollisionMarker(GiskardBehavior):
         self.name_space = name_space
         return True
 
+    @record_time
     @profile
     def update(self):
         """

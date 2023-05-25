@@ -5,6 +5,7 @@ from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.tree.behaviors.get_goal import GetGoal
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import raise_to_blackboard
 
 
@@ -21,6 +22,7 @@ class SetCmd(GetGoal):
         """
         return self.god_map.get_data(identifier.goal_msg)
 
+    @record_time
     @profile
     def initialise(self):
         if self.goal is None:
@@ -82,6 +84,7 @@ class SetCmd(GetGoal):
     def get_set_bits(self, goal_type):
         return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(goal_type))) if int(bit) != 0]
 
+    @record_time
     @profile
     def update(self):
         if self.get_blackboard_exception() is not None:

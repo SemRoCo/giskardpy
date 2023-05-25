@@ -8,7 +8,23 @@ from giskardpy.my_types import Derivatives
 class TiagoBase(Giskard):
     def __init__(self, root_link_name: Optional[str] = None):
         super().__init__(root_link_name=root_link_name)
+        self.set_qp_solver(SupportedQPSolver.gurobi)
         self.set_default_visualization_marker_color(1, 1, 1, 0.7)
+        self.configure_PublishDebugExpressions(
+            publish_lb=True,
+            publish_ub=True,
+        #     publish_lbA=True,
+        #     publish_ubA=True,
+        #     publish_bE=True,
+        #     publish_Ax=True,
+        #     publish_Ex=True,
+            publish_xdot=True,
+        #     publish_weights=True,
+        #     publish_g=True,
+            publish_debug=True,
+        )
+        self.configure_PlotDebugExpressions(enabled=True, wait=True)
+        self.configure_PlotTrajectory(enabled=True, wait=True)
         self.load_moveit_self_collision_matrix('package://giskardpy/config/tiago.srdf')
         self.overwrite_external_collision_avoidance('brumbrum',
                                                     number_of_repeller=2,
@@ -50,7 +66,6 @@ class TiagoMujoco(TiagoBase):
     def __init__(self):
         self.add_robot_from_parameter_server(joint_state_topics=['/tiago/joint_states'])
         super().__init__()
-        self.set_qp_solver(SupportedQPSolver.qp_oases)
         self.add_sync_tf_frame('map', 'odom')
         self.add_diff_drive_joint(parent_link_name='odom',
                                   child_link_name='base_footprint',

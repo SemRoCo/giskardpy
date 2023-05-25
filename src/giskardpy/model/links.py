@@ -16,7 +16,8 @@ from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cyli
 from giskardpy.my_types import PrefixName
 from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
-from giskardpy.utils.utils import resolve_ros_iris, memoize
+from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy.utils.decorators import memoize
 import giskardpy.casadi_wrapper as w
 
 
@@ -212,6 +213,18 @@ class Link:
         self.collisions = []
         self.parent_joint_name = None
         self.child_joint_names = []
+
+    def _clear_memo(self, f):
+        try:
+            if hasattr(f, 'memo'):
+                f.memo.clear()
+            else:
+                del f
+        except:
+            pass
+
+    def reset_cache(self):
+        self._clear_memo(self.collision_visualization_markers)
 
     def name_with_collision_id(self, collision_id):
         if collision_id > len(self.collisions):

@@ -113,7 +113,7 @@ def check_dependencies():
     dependecy is not installed a message is printed.
     """
 
-    with open(get_ros_pkg_path('giskardpy') + '/dependencies.txt') as f:
+    with open(get_ros_pkg_path('giskardpy') + '/requirements.txt') as f:
         dependencies = f.readlines()
 
     dependencies = [x.split('#')[0] for x in dependencies]

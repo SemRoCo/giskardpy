@@ -22,15 +22,17 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
-    urdf_to_joint, VirtualFreeVariables, MovableJoint
+    urdf_to_joint, VirtualFreeVariables, MovableJoint, TFJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
 from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.next_command import NextCommands
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr, memoize, copy_memoize, clear_memo
+from giskardpy.utils.utils import suppress_stderr
+from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
 
 class TravelCompanion:
@@ -249,6 +251,8 @@ class WorldTree(WorldTreeInterface):
         clear_memo(self.compose_fk_expression)
         clear_memo(self.compute_chain)
         clear_memo(self.is_link_controlled)
+        for free_variable in self.free_variables.values():
+            free_variable.reset_cache()
 
     @profile
     def notify_model_change(self):
@@ -456,22 +460,14 @@ class WorldTree(WorldTreeInterface):
         self.virtual_free_variables[name] = free_variable
         return free_variable
 
-    def update_state(self, new_cmds: Dict[int, Dict[str, float]], dt: float):
-        for free_variable_name, free_variable in self.free_variables.items():
-            try:
-                vel = new_cmds[Derivatives.velocity][free_variable.position_name]
-            except KeyError as e:
-                # joint is currently not part of the optimization problem
-                continue
-            self.state[free_variable_name][Derivatives.position] += vel * dt
-            self.state[free_variable_name][Derivatives.velocity] = vel
-            for derivative, cmd in new_cmds.items():
-                cmd_ = cmd[free_variable.position_name]
-                self.state[free_variable_name][derivative] = cmd_
+    def update_state(self, next_commands: NextCommands, dt: float):
+        max_derivative = self.god_map.get_data(identifier.max_derivative)
+        for free_variable_name, command in next_commands.free_variable_data.items():
+            self.state[free_variable_name][Derivatives.position] += command[0] * dt
+            self.state[free_variable_name][Derivatives.velocity:max_derivative+1] = command
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)
-        self.notify_state_change()
 
     def add_urdf(self,
                  urdf: str,
@@ -747,10 +743,10 @@ class WorldTree(WorldTreeInterface):
             link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
                                         color=self.default_link_color)
             self._add_link(link)
-            joint = FixedJoint(name=PrefixName(group_name, self.connection_prefix),
+            joint = TFJoint(name=PrefixName(group_name, self.connection_prefix),
                                parent_link_name=parent_link_name,
-                               child_link_name=link.name,
-                               parent_T_child=w.TransMatrix(pose))
+                               child_link_name=link.name)
+            joint.update_transform(pose)
             self._link_joint_to_links(joint)
             self.register_group(group_name, link.name)
             self.notify_model_change()
@@ -823,15 +819,24 @@ class WorldTree(WorldTreeInterface):
         :param joint_name:
         :param new_parent_link_name:
         """
-        if not self.is_joint_fixed(joint_name):
-            raise NotImplementedError('Can only change fixed joints')
+        # TODO: change parent link from TFJoints
+        # if not self.is_joint_fixed(joint_name):
+        #     raise NotImplementedError('Can only change fixed joints')
         joint = self.joints[joint_name]
-        fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
         old_parent_link = self.links[joint.parent_link_name]
         new_parent_link = self.links[new_parent_link_name]
 
-        joint.parent_link_name = new_parent_link_name
-        joint.parent_T_child = fk
+        if isinstance(joint, FixedJoint):
+            fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
+            joint.parent_link_name = new_parent_link_name
+            joint.parent_T_child = fk
+        elif isinstance(joint, TFJoint):
+            pose = self.compute_fk_pose(new_parent_link_name, joint.child_link_name)
+            joint.parent_link_name = new_parent_link_name
+            joint.update_transform(pose.pose)
+        else:
+            raise NotImplementedError('Can only change fixed joints and TFJoints')
+
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
         self.notify_model_change()
@@ -929,7 +934,7 @@ class WorldTree(WorldTreeInterface):
         except KeyError:
             return []
 
-    def register_controlled_joints(self, controlled_joints: List[str]):
+    def register_controlled_joints(self, controlled_joints: List[PrefixName]):
         """
         Flag these joints as controlled.
         """
@@ -1116,9 +1121,9 @@ class WorldTree(WorldTreeInterface):
                     self.fk_idx[link.name] = i
                     i += 1
             fks = w.vstack(fks)
-            self.fast_all_fks = fks.compile(w.free_symbols(fks))
+            self.fast_all_fks = fks.compile()
 
-        fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+        fks_evaluated = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
         result = {}
         for link in self.link_names_with_collisions:
             result[link] = fks_evaluated[self.fk_idx[link], :]
@@ -1155,6 +1160,7 @@ class WorldTree(WorldTreeInterface):
             idx_start: Dict[PrefixName, int]
             fast_collision_fks: CompiledFunction
             fast_all_fks: CompiledFunction
+            str_params: List[str]
 
             def __init__(self, world: WorldTree):
                 self.world = world
@@ -1183,16 +1189,21 @@ class WorldTree(WorldTreeInterface):
                         collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
                 self.collision_link_order = list(collision_ids)
-                self.fast_all_fks = all_fks.compile()
-                self.fast_collision_fks = collision_fks.compile()
+                params = set()
+                params.update(all_fks.free_symbols())
+                params.update(collision_fks.free_symbols())
+                params = list(params)
+                self.str_params = [str(v) for v in params]
+                self.fast_all_fks = all_fks.compile(parameters=params)
+                self.fast_collision_fks = collision_fks.compile(parameters=params)
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
 
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-                self.collision_fk_matrix = self.fast_collision_fks.call2(
-                    self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
+                substitutions = self.god_map.unsafe_get_values(self.str_params)
+                self.fks = self.fast_all_fks.fast_call(substitutions)
+                self.collision_fk_matrix = self.fast_collision_fks.fast_call(substitutions)
 
             @memoize
             @profile
@@ -1494,6 +1505,13 @@ class WorldBranch(WorldTreeInterface):
             link_combinations.difference_update(
                 self.world.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
+
+    def get_unmovable_links(self) -> List[PrefixName]:
+        unmovable_links, _ = self.world.search_branch(link_name=self.root_link_name,
+                                                   stop_at_joint_when=lambda
+                                                       joint_name: joint_name in self.controlled_joints,
+                                                   collect_link_when=self.world.has_link_collisions)
+        return unmovable_links
 
     @property
     def base_pose(self) -> Pose:

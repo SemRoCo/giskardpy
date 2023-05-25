@@ -314,11 +314,14 @@ class FreeVariableBounds(ProblemDataPart):
         except InfeasibleException as e:
             max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
                                                                                 upper_jerk_limit, self.dt)
-            error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                        f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                        f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-            logging.logerr(error_msg)
-            raise VelocityLimitUnreachableException(error_msg)
+            if max_reachable_vel < upper_velocity_limit:
+                error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                            f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                            f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+                logging.logerr(error_msg)
+                raise VelocityLimitUnreachableException(error_msg)
+            else:
+                raise
 
         return lb, ub
 

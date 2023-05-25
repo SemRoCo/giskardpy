@@ -485,8 +485,7 @@ class TestConstraints:
                                       check=False)
         apartment_setup.plan_and_execute()
 
-    def test_SetPredictionHorizon(self, zero_pose: PR2TestWrapper):
-        default_prediction_horizon = zero_pose.god_map.get_data(identifier.prediction_horizon)
+    def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
         zero_pose.set_prediction_horizon(prediction_horizon=7)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.QP_SOLVER_ERROR])

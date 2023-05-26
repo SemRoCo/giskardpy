@@ -9,8 +9,7 @@ from scipy import sparse
 
 from giskardpy.configs.data_types import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import record_solver_call_time
-from giskardpy.qp.qp_solver_qpswift import QPSWIFTFormatter
+from giskardpy.qp.qp_solver import record_solver_call_time, QPSWIFTFormatter
 from giskardpy.utils import logging
 
 gurobipy.setParam('LogToConsole', False)

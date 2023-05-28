@@ -36,7 +36,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         orientation = pose[4:]
         pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[str(link.name)], position, orientation)
 
-    def check_collisions2(self, link_combinations, distance):
+    def find_colliding_combinations(self, link_combinations, distance):
         in_collision = set()
         self.sync()
         for link_a, link_b in link_combinations:

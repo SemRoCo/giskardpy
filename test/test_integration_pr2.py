@@ -20,6 +20,7 @@ from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName, Derivatives
@@ -250,7 +251,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
+    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_cableguide.launch')
     c = PR2TestWrapper()
     # c = PR2TestWrapperMujoco()
     request.addfinalizer(c.tear_down)
@@ -2584,6 +2585,14 @@ class TestWorldManipulation:
 
 class TestSelfCollisionAvoidance:
 
+    def test_cable_guide_collision(self, zero_pose: PR2TestWrapper):
+        js = {
+            'head_pan_joint': 2.84,
+            'head_tilt_joint': 1.
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+
     def test_attached_self_collision_avoid_stick(self, zero_pose: PR2TestWrapper):
         collision_pose = {
             'l_elbow_flex_joint': - 1.1343683863086362,
@@ -3829,6 +3838,11 @@ class TestInfoServices:
 
 
 class TestWorld:
+    def test_compute_self_collision_matrix(self, world_setup: WorldTree):
+        collision_scene: CollisionWorldSynchronizer = world_setup.god_map.get_data(identifier.collision_scene)
+        collision_scene.compute_self_collision_matrix('pr2')
+        pass
+
     def test_compute_chain_reduced_to_controlled_joints(self, world_setup: WorldTree):
         r_gripper_tool_frame = world_setup.search_for_link_name('r_gripper_tool_frame')
         l_gripper_tool_frame = world_setup.search_for_link_name('l_gripper_tool_frame')
@@ -4233,3 +4247,4 @@ class TestBenchmark:
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
 # pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])
+# pytest.main(['-s', __file__ + '::TestWorld::test_compute_self_collision_matrix'])

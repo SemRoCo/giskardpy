@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Dict, Tuple, DefaultDict, List, Set, Optional, Iterable
 
 import betterpybullet as bpb
 from betterpybullet import ClosestPair
@@ -7,17 +8,18 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 from sortedcontainers import SortedDict
 
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
-    load_convex_mesh_shape
+    load_convex_mesh_shape, MyCollisionObject
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry, Link
+from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world):
         self.kw = bpb.KineverseWorld()
-        self.object_name_to_id = defaultdict(list)
-        self.query = None
+        self.object_name_to_id: DefaultDict[PrefixName, List[MyCollisionObject]] = defaultdict(list)
+        self.query: Optional[DefaultDict[PrefixName, Set[Tuple[MyCollisionObject, float]]]] = None
         super().__init__(world)
 
 
@@ -53,7 +55,8 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 pass
 
     @profile
-    def cut_off_distances_to_query(self, cut_off_distances, buffer=0.05):
+    def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
+                                   buffer: float = 0.05) -> DefaultDict[PrefixName, Set[Tuple[MyCollisionObject, float]]]:
         if self.query is None:
             self.query = defaultdict(set)
             for (link_a, link_b), dist in cut_off_distances.items():
@@ -63,25 +66,30 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return self.query
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_sizes):
+    def check_collisions(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
+                         collision_list_sizes: int) -> Collisions:
         """
-        :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
-                                    dict or further away than the cut off distance will be ignored.
-        :type cut_off_distances: dict
-        :param self_collision_d: distances grater than this value will be ignored
-        :type self_collision_d: float
-        :type enable_self_collision: bool
-        :return: (robot_link, body_b, link_b) -> Collision
-        :rtype: Collisions
+        :param cut_off_distances: (link_a, link_b) -> max distance. Contacts between objects not in this
+                                    dict or further away than the cutoff distance will be ignored.
+        :param collision_list_sizes: max number of collisions
         """
 
         query = self.cut_off_distances_to_query(cut_off_distances)
-        result = self.kw.get_closest_filtered_POD_batch(query)
+        result: Dict[MyCollisionObject, List[ClosestPair]] = self.kw.get_closest_filtered_POD_batch(query)
 
         return self.bpb_result_to_collisions(result, collision_list_sizes)
 
+    def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],
+                                    distance: float) -> Set[Tuple[PrefixName, PrefixName]]:
+        self.query = None
+        self.sync()
+        cut_off_distance = {link_combination: distance for link_combination in link_combinations}
+        collisions = self.check_collisions(cut_off_distance, 15)
+        colliding_combinations = {(c.original_link_a, c.original_link_b) for c in collisions.all_collisions}
+        return colliding_combinations
+
     @profile
-    def bpb_result_to_list(self, result):
+    def bpb_result_to_list(self, result: Dict[MyCollisionObject, List[ClosestPair]]) -> List[Collision]:
         result_list = []
         for obj_a, contacts in result.items():
             if not contacts:
@@ -103,14 +111,15 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                     result_list.append(c)
         return result_list
 
-    def bpb_result_to_dict(self, result):
+    def bpb_result_to_dict(self, result: Dict[MyCollisionObject, List[ClosestPair]]):
         result_dict = {}
         for c in self.bpb_result_to_list(result):
             result_dict[c.link_a, c.link_b] = c
         return SortedDict({k: v for k, v in sorted(result_dict.items())})
 
     @profile
-    def bpb_result_to_collisions(self, result, collision_list_size):
+    def bpb_result_to_collisions(self, result: Dict[MyCollisionObject, List[ClosestPair]],
+                                 collision_list_size: int) -> Collisions:
         collisions = Collisions(collision_list_size)
         for c in self.bpb_result_to_list(result):
             collisions.add(c)

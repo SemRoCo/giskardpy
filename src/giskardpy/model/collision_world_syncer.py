@@ -1,9 +1,12 @@
+import itertools
 from collections import defaultdict
 from itertools import product, combinations_with_replacement, combinations
 from time import time
-from typing import List, Dict, Optional
-
+from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict
+from lxml import etree
+import hashlib
 import numpy as np
+from progress.bar import Bar
 from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
@@ -14,7 +17,8 @@ from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldBranch
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string
+from giskardpy.my_types import my_string, Derivatives, PrefixName
+from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 
 np.random.seed(1337)
@@ -350,7 +354,7 @@ class CollisionWorldSynchronizer:
 
         unknown = link_combinations.difference(self.black_list)
         self.set_joint_state_to_zero()
-        for link_a, link_b in self.check_collisions2(unknown, distance_threshold_zero):
+        for link_a, link_b in self.find_colliding_combinations(unknown, distance_threshold_zero):
             link_combination = self.world.sort_links(link_a, link_b)
             self.add_black_list_entry(*link_combination)
         unknown = unknown.difference(self.black_list)
@@ -398,6 +402,108 @@ class CollisionWorldSynchronizer:
         # self.black_list[group_name] = unknown
         # return self.collision_matrices[group_name]
 
+    def compute_self_collision_matrix(self,
+                                      group_name: str,
+                                      link_combinations: Optional[set] = None,
+                                      distance_threshold_zero: float = 0.0,
+                                      distance_threshold_rnd: float = 0.0,
+                                      non_controlled: bool = False,
+                                      steps: int = 10):
+        joint_state_tmp = self.world.state
+        black_list = []
+        white_list = set()
+        default_ = set()
+        group = self.world.groups[group_name]
+        # 0. GENERATE ALL POSSIBLE LINK PAIRS
+        if link_combinations is None:
+            link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
+        # sort links
+        for link_a, link_b in list(link_combinations):
+            white_list.add(self.world.sort_links(link_a, link_b))
+        # 1. FIND CONNECTING LINKS and DISABLE ALL ADJACENT LINK COLLISIONS
+        # find meaningless collisions
+        adjacent = set()
+        for link_a, link_b in list(white_list):
+            element = link_a, link_b
+            if link_a == link_b \
+                    or self.world.are_linked(link_a, link_b, do_not_ignore_non_controlled_joints=non_controlled,
+                                             joints_to_be_assumed_fixed=self.fixed_joints) \
+                    or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
+                white_list.remove(element)
+                adjacent.add(element)
+        # 2. DISABLE "DEFAULT" COLLISIONS
+        self.set_default_joint_state(group)
+        for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_zero):
+            link_combination = self.world.sort_links(link_a, link_b)
+            white_list.remove(link_combination)
+            default_.add(link_combination)
+        # 3. (almost) ALWAYS IN COLLISION
+        always_tries = 200
+        almost_always = set()
+        counts: DefaultDict[Tuple[PrefixName, PrefixName], int] = defaultdict(int)
+        for try_id in range(always_tries):
+            self.set_rnd_joint_state(group)
+            for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_rnd):
+                link_combination = self.world.sort_links(link_a, link_b)
+                counts[link_combination] += 1
+        for link_combination, count in counts.items():
+            if count > always_tries * 95:
+                white_list.remove(link_combination)
+                almost_always.add(link_combination)
+        # 4. NEVER IN COLLISION
+        never_tries = 10000
+        sometimes = set()
+        with Bar('never in collision', max=never_tries) as bar:
+            for try_id in range(never_tries):
+                self.set_rnd_joint_state(group)
+                for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_rnd):
+                    link_combination = self.world.sort_links(link_a, link_b)
+                    white_list.remove(link_combination)
+                    sometimes.add(link_combination)
+                bar.next()
+        never_in_contact = white_list
+        self.world.state = joint_state_tmp
+        self.white_list = white_list
+        self.black_list = never_in_contact.union(default_).union(almost_always).union(adjacent)
+        self.save_black_list(group, adjacent, default_, almost_always, never_in_contact)
+        pass
+
+    def save_black_list(self,
+                        group: WorldBranch,
+                        adjacent: Set[Tuple[PrefixName, PrefixName]],
+                        by_default: Set[Tuple[PrefixName, PrefixName]],
+                        almost_always: Set[Tuple[PrefixName, PrefixName]],
+                        never: Set[Tuple[PrefixName, PrefixName]]):
+        # Create the root element
+        root = etree.Element('robot')
+        root.set('name', group.name)
+
+        hash_object = hashlib.sha256()
+        hash_object.update(str(list(sorted(group.link_names_with_collisions))).encode("utf-8"))
+        child = etree.SubElement(root, 'hash')
+        child.text = hash_object.hexdigest()
+
+        for link_a, link_b in sorted(itertools.chain(adjacent, by_default, almost_always, never)):
+            child = etree.SubElement(root, 'disable_collisions')
+            child.set('link1', link_a.short_name)
+            child.set('link2', link_b.short_name)
+            if (link_a, link_b) in adjacent:
+                child.set('reason', 'Adjacent')
+            elif (link_a, link_b) in by_default:
+                child.set('reason', 'Default')
+            elif (link_a, link_b) in almost_always:
+                child.set('reason', 'AlmostAlways')
+            else:
+                child.set('reason', 'Never')
+
+        # Create the XML tree
+        tree = etree.ElementTree(root)
+
+        path_to_tmp = self.god_map.get_data(identifier.tmp_folder)
+        file_name = f'{path_to_tmp}{group.name}.srdf'
+        logging.loginfo(f'Saved self collision matrix for {group.name} in {file_name}.')
+        tree.write(file_name, pretty_print=True)
+
     def add_black_list_entry(self, link_a, link_b):
         self.black_list.add((link_a, link_b))
 
@@ -412,9 +518,9 @@ class CollisionWorldSynchronizer:
                                    distance_threshold_rnd: float = 0.0,
                                    non_controlled: bool = False,
                                    steps: int = 10):
-        for group_name in self.world.minimal_group_names:
-            self.update_group_blacklist(group_name, link_combinations, white_list_combinations, distance_threshold_zero,
-                                        distance_threshold_rnd, non_controlled, steps)
+        # for group_name in self.world.minimal_group_names:
+        #     self.update_group_blacklist(group_name, link_combinations, white_list_combinations, distance_threshold_zero,
+        #                                 distance_threshold_rnd, non_controlled, steps)
         self.blacklist_inter_group_collisions()
 
     def blacklist_inter_group_collisions(self):
@@ -433,49 +539,31 @@ class CollisionWorldSynchronizer:
         self.world.state = JointStates()
         self.world.notify_state_change()
 
-    def set_max_joint_state(self, group):
-        def f(joint_name):
-            _, upper_limit = group.get_joint_position_limits(joint_name)
-            if upper_limit is None:
-                return np.pi * 2
-            return upper_limit
+    def set_default_joint_state(self, group: WorldBranch):
+        for joint_name in group.controlled_joints:
+            free_variable: FreeVariable
+            for free_variable in group.joints[joint_name].free_variables:
+                if free_variable.has_position_limits():
+                    lower_limit = free_variable.get_lower_limit(Derivatives.position)
+                    upper_limit = free_variable.get_upper_limit(Derivatives.position)
+                    self.world.state[free_variable.name].position = (upper_limit + lower_limit)/2
+        self.world.notify_state_change()
 
-        group.state = self.generate_joint_state(group, f)
+    def set_rnd_joint_state(self, group: WorldBranch):
+        for joint_name in group.controlled_joints:
+            free_variable: FreeVariable
+            for free_variable in group.joints[joint_name].free_variables:
+                if free_variable.has_position_limits():
+                    lower_limit = free_variable.get_lower_limit(Derivatives.position)
+                    upper_limit = free_variable.get_upper_limit(Derivatives.position)
+                    rnd_position = (np.random.random() * (upper_limit - lower_limit)) + lower_limit
+                else:
+                    rnd_position = np.random.random() * np.pi * 2
+                self.world.state[joint_name].position = rnd_position
+        self.world.notify_state_change()
 
-    def set_min_joint_state(self, group):
-        def f(joint_name):
-            lower_limit, _ = group.get_joint_position_limits(joint_name)
-            if lower_limit is None:
-                return -np.pi * 2
-            return lower_limit
-
-        group.state = self.generate_joint_state(group, f)
-
-    def set_rnd_joint_state(self, group):
-        def f(joint_name):
-            lower_limit, upper_limit = group.get_joint_position_limits(joint_name)
-            if lower_limit is None:
-                return np.random.random() * np.pi * 2
-            lower_limit = max(lower_limit, -10)
-            upper_limit = min(upper_limit, 10)
-            return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
-
-        group.state = self.generate_joint_state(group, f)
-
-    def generate_joint_state(self, group, f):
-        """
-        :param f: lambda joint_info: float
-        :return:
-        """
-        js = JointStates()
-        for joint_name in sorted(group.movable_joint_names):
-            if group.search_downwards_for_links(joint_name):
-                js[joint_name].position = f(joint_name)
-            else:
-                js[joint_name].position = 0
-        return js
-
-    def check_collisions2(self, link_combinations, distance):
+    def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],
+                                    distance: float) -> Set[Tuple[PrefixName, PrefixName]]:
         in_collision = set()
         self.sync()
         for link_a_name, link_b_name in link_combinations:
@@ -573,13 +661,13 @@ class CollisionWorldSynchronizer:
 
     def is_avoid_all_self_collision(self, collision_entry: CollisionEntry) -> bool:
         return self.is_avoid_collision(collision_entry) \
-               and collision_entry.group1 == collision_entry.group2 \
-               and collision_entry.group1 in self.robot_names
+            and collision_entry.group1 == collision_entry.group2 \
+            and collision_entry.group1 in self.robot_names
 
     def is_allow_all_self_collision(self, collision_entry: CollisionEntry) -> bool:
         return self.is_allow_collision(collision_entry) \
-               and collision_entry.group1 == collision_entry.group2 \
-               and collision_entry.group1 in self.robot_names
+            and collision_entry.group1 == collision_entry.group2 \
+            and collision_entry.group1 in self.robot_names
 
     def is_avoid_all_collision(self, collision_entry: CollisionEntry) -> bool:
         """
@@ -587,7 +675,7 @@ class CollisionWorldSynchronizer:
         :return: bool
         """
         return self.is_avoid_collision(collision_entry) \
-               and collision_entry.group1 == collision_entry.ALL and collision_entry.group2 == collision_entry.ALL
+            and collision_entry.group1 == collision_entry.ALL and collision_entry.group2 == collision_entry.ALL
 
     def is_allow_all_collision(self, collision_entry: CollisionEntry) -> bool:
         """
@@ -595,7 +683,7 @@ class CollisionWorldSynchronizer:
         :return: bool
         """
         return self.is_allow_collision(collision_entry) \
-               and collision_entry.group1 == collision_entry.ALL and collision_entry.group2 == collision_entry.ALL
+            and collision_entry.group1 == collision_entry.ALL and collision_entry.group2 == collision_entry.ALL
 
     def reset_cache(self):
         pass

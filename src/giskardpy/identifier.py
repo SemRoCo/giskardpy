@@ -1,5 +1,6 @@
 hack = ['hack']
 world = ['world']
+ros_visualizer = ['ros_visualizer']
 robot_group_name = ['robot_name']
 fk_pose = world + ['compute_fk_pose']
 fk_np = world + ['compute_fk_np']

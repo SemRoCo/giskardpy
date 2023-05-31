@@ -74,7 +74,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         :param collision_list_sizes: max number of collisions
         """
 
-        query = self.cut_off_distances_to_query(cut_off_distances)
+        query = self.cut_off_distances_to_query(cut_off_distances, buffer=0.0)
         result: Dict[MyCollisionObject, List[ClosestPair]] = self.kw.get_closest_filtered_POD_batch(query)
 
         return self.bpb_result_to_collisions(result, collision_list_sizes)

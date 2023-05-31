@@ -1,5 +1,6 @@
 import itertools
 from collections import defaultdict
+from enum import Enum
 from itertools import product, combinations_with_replacement, combinations
 from time import time
 from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict
@@ -20,6 +21,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
+from giskardpy.utils.utils import resolve_ros_iris
 
 np.random.seed(1337)
 
@@ -245,6 +247,14 @@ class Collisions:
         return self.all_collisions
 
 
+class DisableCollisionReason(Enum):
+    Unknown = -1
+    Never = 1
+    Adjacent = 2
+    Default = 3
+    AlmostAlways = 4
+
+
 class CollisionWorldSynchronizer:
     black_list: set
 
@@ -272,6 +282,35 @@ class CollisionWorldSynchronizer:
             self.world_version = self.world.model_version
             return True
         return False
+
+    def load_from_srdf(self, path: str) -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+        path_to_srdf = resolve_ros_iris(path)
+        srdf = etree.parse(path_to_srdf)
+        srdf_root = srdf.getroot()
+        black_list = set()
+        reasons = {}
+        for child in srdf_root:
+            if hasattr(child, 'tag') and child.tag == 'disable_collisions':
+                link_a = child.attrib['link1']
+                link_b = child.attrib['link2']
+                link_a = self.world.search_for_link_name(link_a)
+                link_b = self.world.search_for_link_name(link_b)
+                reason_id = child.attrib['reason']
+                if link_a not in self.world.link_names_with_collisions \
+                        or link_b not in self.world.link_names_with_collisions:
+                    continue
+                try:
+                    reason = DisableCollisionReason[reason_id]
+                except KeyError as e:
+                    reason = DisableCollisionReason.Unknown
+                combi = self.world.sort_links(link_a, link_b)
+                black_list.add(combi)
+                reasons[combi] = reason
+        for link_name in self.world.link_names_with_collisions:
+            black_list.add((link_name, link_name))
+        self.black_list = black_list
+        logging.loginfo(f'loaded {path_to_srdf} for self collision avoidance matrix')
+        return reasons
 
     def robot(self, robot_name=''):
         """
@@ -408,11 +447,13 @@ class CollisionWorldSynchronizer:
                                       distance_threshold_zero: float = 0.0,
                                       distance_threshold_rnd: float = 0.0,
                                       non_controlled: bool = False,
-                                      steps: int = 10):
+                                      steps: int = 10) -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+        np.random.seed(1337)
         joint_state_tmp = self.world.state
         black_list = []
         white_list = set()
         default_ = set()
+        reasons = {}
         group = self.world.groups[group_name]
         # 0. GENERATE ALL POSSIBLE LINK PAIRS
         if link_combinations is None:
@@ -431,12 +472,14 @@ class CollisionWorldSynchronizer:
                     or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
                 white_list.remove(element)
                 adjacent.add(element)
+                reasons[element] = DisableCollisionReason.Adjacent
         # 2. DISABLE "DEFAULT" COLLISIONS
         self.set_default_joint_state(group)
         for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_zero):
             link_combination = self.world.sort_links(link_a, link_b)
             white_list.remove(link_combination)
             default_.add(link_combination)
+            reasons[link_combination] = DisableCollisionReason.Default
         # 3. (almost) ALWAYS IN COLLISION
         always_tries = 200
         almost_always = set()
@@ -450,23 +493,27 @@ class CollisionWorldSynchronizer:
             if count > always_tries * 95:
                 white_list.remove(link_combination)
                 almost_always.add(link_combination)
+                reasons[link_combination] = DisableCollisionReason.AlmostAlways
         # 4. NEVER IN COLLISION
         never_tries = 10000
         sometimes = set()
         with Bar('never in collision', max=never_tries) as bar:
             for try_id in range(never_tries):
                 self.set_rnd_joint_state(group)
-                for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_rnd):
+                contacts = self.find_colliding_combinations(white_list, distance_threshold_rnd)
+                for link_a, link_b in contacts:
                     link_combination = self.world.sort_links(link_a, link_b)
                     white_list.remove(link_combination)
                     sometimes.add(link_combination)
                 bar.next()
         never_in_contact = white_list
+        for combi in never_in_contact:
+            reasons[combi] = DisableCollisionReason.Never
         self.world.state = joint_state_tmp
         self.white_list = white_list
         self.black_list = never_in_contact.union(default_).union(almost_always).union(adjacent)
         self.save_black_list(group, adjacent, default_, almost_always, never_in_contact)
-        pass
+        return reasons
 
     def save_black_list(self,
                         group: WorldBranch,

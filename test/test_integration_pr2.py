@@ -20,6 +20,7 @@ from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
@@ -3839,8 +3840,16 @@ class TestInfoServices:
 
 class TestWorld:
     def test_compute_self_collision_matrix(self, world_setup: WorldTree):
+        reference_collision_scene = BetterPyBulletSyncer(world_setup)
+        reference_reasons = reference_collision_scene.load_from_srdf('package://giskardpy/test/data/pr2.srdf')
         collision_scene: CollisionWorldSynchronizer = world_setup.god_map.get_data(identifier.collision_scene)
-        collision_scene.compute_self_collision_matrix('pr2')
+        actual_reasons = collision_scene.compute_self_collision_matrix('pr2')
+        reference_blacklist = reference_collision_scene.black_list
+        actual_blacklist = collision_scene.black_list
+        false_negatives = reference_blacklist.difference(actual_blacklist)
+        false_positives = actual_blacklist.difference(reference_blacklist)
+        assert len(false_negatives) == 0, f'False negatives: {sorted(false_negatives)}'
+        assert len(false_positives) == 0, f'False negatives: {sorted(false_positives)}'
         pass
 
     def test_compute_chain_reduced_to_controlled_joints(self, world_setup: WorldTree):

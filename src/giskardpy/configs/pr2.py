@@ -53,10 +53,12 @@ class PR2_Base(Giskard):
                                              'fl_caster_l_wheel_link', 'fl_caster_r_wheel_link',
                                              'br_caster_l_wheel_link', 'br_caster_r_wheel_link',
                                              'fr_caster_l_wheel_link', 'fr_caster_r_wheel_link'])
-        self.fix_joints_for_self_collision_avoidance(['head_pan_joint',
-                                                      'head_tilt_joint',
-                                                      'r_gripper_l_finger_joint',
-                                                      'l_gripper_l_finger_joint'])
+        self.fix_joints_for_self_collision_avoidance([
+            # 'head_pan_joint',
+            # 'head_tilt_joint',
+            'r_gripper_l_finger_joint',
+            'l_gripper_l_finger_joint'
+        ])
         self.fix_joints_for_external_collision_avoidance(['r_gripper_l_finger_joint',
                                                           'l_gripper_l_finger_joint'])
         # self.set_maximum_derivative(Derivatives.acceleration)

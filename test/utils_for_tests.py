@@ -28,8 +28,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
-from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver
-from giskardpy.configs.default_giskard import ControlModes
+from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver, ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives

@@ -126,7 +126,8 @@ class WorldTree(WorldTreeInterface):
     def __init__(self, root_link_name: PrefixName):
         self.root_link_name = root_link_name
         self.god_map = GodMap()
-        self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
+        # self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
+        self.default_link_color = ColorRGBA(1, 1, 1, 0.75)
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
@@ -161,6 +162,19 @@ class WorldTree(WorldTreeInterface):
         if len(matches) == 0:
             raise ValueError(f'No matches for \'{joint_name}\' found: \'{matches}\'.')
         return matches[0]
+
+    def rename_link(self, old_name: PrefixName, new_name: PrefixName):
+        if old_name not in self.link_names:
+            self._raise_if_link_does_not_exist(old_name)
+        if new_name in self.link_names:
+            self._raise_if_link_exists(new_name)
+        link = self.links[old_name]
+        link.name = new_name
+        for joint in self.joints.values():
+            if joint.parent_link_name == old_name:
+                joint.parent_link_name = new_name
+            elif joint.child_link_name == old_name:
+                joint.child_link_name = new_name
 
     def get_joint(self, joint_name: my_string, group_name: Optional[str] = None) -> Joint:
         """
@@ -796,6 +810,9 @@ class WorldTree(WorldTreeInterface):
         child_link.parent_joint_name = joint.name
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
+
+    def fix_tree_structure(self):
+        pass
 
     def _raise_if_link_does_not_exist(self, link_name: my_string):
         if link_name not in self.links:

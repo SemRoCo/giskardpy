@@ -5,7 +5,7 @@ from py_trees import Behaviour, Blackboard
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionAvoidanceConfig
+from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
@@ -26,7 +26,7 @@ class GiskardBehavior(Behaviour):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @property
-    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceConfig]:
+    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceGroupConfig]:
         return self.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
 
     def get_god_map(self):

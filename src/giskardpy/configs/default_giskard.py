@@ -3,7 +3,7 @@ import abc
 from abc import ABC
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict, Optional, List, Tuple, Type, Any, Union
+from typing import Dict, Optional, List, Tuple, Type, Any, Union, DefaultDict
 
 import numpy as np
 import rospy
@@ -14,8 +14,8 @@ from tf2_py import LookupException
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib, CollisionAvoidanceConfigEntry, ControlModes, \
-    SupportedQPSolver, QPSolverConfig, GeneralConfig
+from giskardpy.configs.data_types import CollisionCheckerLib, ControlModes, SupportedQPSolver, QPSolverConfig, \
+    GeneralConfig, CollisionAvoidanceGroupConfig, CollisionAvoidanceConfigEntry
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
@@ -48,6 +48,9 @@ class Config:
     @property
     def _collision_scene(self) -> CollisionWorldSynchronizer:
         return self.god_map.get_data(identifier.collision_scene)
+
+    def get_default_group_name(self):
+        return list(self._world.groups.values())[0]
 
 
 class WorldConfig(Config):
@@ -441,9 +444,19 @@ class BehaviorTreeConfig(Config):
         self.behavior_tree_config.plugin_config['TFPublisher']['include_prefix'] = include_prefix
 
 
+
+
 class CollisionAvoidanceConfig(Config):
+    _collision_avoidance_configs: DefaultDict[str, CollisionAvoidanceGroupConfig]
+
     def __init__(self, collision_checker):
         self.set_collision_checker(collision_checker)
+
+    def set_collision_checker(self, new_collision_checker: CollisionCheckerLib):
+        self._collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
+        self.collision_checker_id = new_collision_checker
+        collision_scene = self._create_collision_checker(self._world, new_collision_checker)
+        self.god_map.set_data(identifier.collision_scene, collision_scene)
 
     def _create_collision_checker(self, world, collision_checker):
         if collision_checker == CollisionCheckerLib.bpb:
@@ -533,7 +546,7 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        config = self._get_collision_avoidance_config(group_name)
+        config = self._collision_avoidance_configs[group_name]
         joint_name = PrefixName(joint_name, group_name)
         if number_of_repeller is not None:
             config.external_collision_avoidance[joint_name].number_of_repeller = number_of_repeller
@@ -561,7 +574,7 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        config = self._get_collision_avoidance_config(group_name)
+        config = self._collision_avoidance_configs[group_name]
         link_name = PrefixName(link_name, group_name)
         if number_of_repeller is not None:
             config.self_collision_avoidance[link_name].number_of_repeller = number_of_repeller
@@ -598,7 +611,7 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        config = self._get_collision_avoidance_config(group_name)
+        config = self._collision_avoidance_configs[group_name]
         link_name = PrefixName(link_name, group_name)
         config.ignored_self_collisions.append(link_name)
 
@@ -609,7 +622,7 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        config = self._get_collision_avoidance_config(group_name)
+        config = self._collision_avoidance_configs[group_name]
         joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
         config.fixed_joints_for_self_collision_avoidance.extend(joint_names)
 
@@ -620,7 +633,7 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        config = self._get_collision_avoidance_config(group_name)
+        config = self._collision_avoidance_configs[group_name]
         joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
         config.fixed_joints_for_external_collision_avoidance.extend(joint_names)
 
@@ -630,7 +643,7 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        config = self._get_collision_avoidance_config(group_name)
+        config = self._collision_avoidance_configs[group_name]
         link_name1 = PrefixName(link_name1, group_name)
         link_name2 = PrefixName(link_name2, group_name)
         config.ignored_self_collisions.append((link_name1, link_name2))
@@ -641,16 +654,10 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        config = self._get_collision_avoidance_config(group_name)
+        config = self._collision_avoidance_configs[group_name]
         link_name1 = PrefixName(link_name1, group_name)
         link_name2 = PrefixName(link_name2, group_name)
         config.add_self_collisions.append((link_name1, link_name2))
-
-    def set_collision_checker(self, new_collision_checker: CollisionCheckerLib):
-        self._collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = defaultdict(CollisionAvoidanceConfig)
-        self.collision_checker_id = new_collision_checker
-        collision_scene = self._create_collision_checker(self._world, new_collision_checker)
-        self.god_map.set_data(identifier.collision_scene, collision_scene)
 
     def ignore_all_collisions_of_links(self, link_names: List[str], group_name: Optional[str] = None):
         if group_name is None:

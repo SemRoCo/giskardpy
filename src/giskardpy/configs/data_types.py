@@ -89,7 +89,6 @@ class HardwareConfig:
         self.joint_state_topics_kwargs: List[dict] = []
         self.odometry_node_kwargs: List[dict] = []
 
-
 class CollisionAvoidanceConfigEntry:
     def __init__(self,
                  number_of_repeller: int = 1,
@@ -114,7 +113,7 @@ class CollisionAvoidanceConfigEntry:
         return cls(soft_threshold=0.025, hard_threshold=0.0)
 
 
-class CollisionAvoidanceConfig:
+class CollisionAvoidanceGroupConfig:
     def __init__(self):
         self.add_self_collisions: List[Tuple[PrefixName, PrefixName]] = []
         self.ignored_self_collisions: List[Union[PrefixName, Tuple[PrefixName, PrefixName]]] = []
@@ -137,7 +136,6 @@ class CollisionAvoidanceConfig:
         for value in self_distances.values():
             default_distance = max(default_distance, getattr(value, parameter_name))
         return default_distance
-
 
 class BehaviorTreeConfig:
     tree_tick_rate: float = 0.05

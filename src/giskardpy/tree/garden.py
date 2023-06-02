@@ -622,6 +622,8 @@ class StandAlone(TreeManager):
 
     def grow_closed_loop_control(self):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+            planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(KinSimPlugin('kin sim'))
         planning_4.add_child(LogTrajPlugin('log'))

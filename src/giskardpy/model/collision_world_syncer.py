@@ -8,7 +8,7 @@ from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionAvoidanceConfig
+from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -74,7 +74,7 @@ class Collisions:
     def __init__(self, collision_list_size):
         self.god_map = GodMap()
         self.collision_scene: CollisionWorldSynchronizer = self.god_map.get_data(identifier.collision_scene)
-        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig] = self.god_map.get_data(
             identifier.collision_avoidance_configs)
         self.fixed_joints = self.collision_scene.fixed_joints
         self.world: WorldTree = self.god_map.get_data(identifier.world)

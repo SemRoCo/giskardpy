@@ -77,27 +77,6 @@ class WorldConfig(Config):
         """
         self._world.default_link_color = ColorRGBA(r, g, b, a)
 
-    def add_sync_tf_frame(self, parent_link: str, child_link: str):
-        """
-        Tell Giskard to keep track of tf frames, e.g., for robot localization.
-        :param parent_link:
-        :param child_link:
-        """
-        if not tf.wait_for_transform(parent_link, child_link, rospy.Time(), rospy.Duration(1)):
-            raise LookupException(f'Cannot get transform of {parent_link}<-{child_link}')
-
-        if homogenous_transform is None:
-            homogenous_transform = np.eye(4)
-        parent_link = self._world.search_for_link_name(parent_link)
-
-        child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
-        joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
-        joint = FixedJoint(name=joint_name, parent_link_name=parent_link, child_link_name=child_link,
-                           parent_T_child=homogenous_transform)
-        self._world._add_joint(joint)
-        joint_name = self.add_6dof_joint(parent_link=parent_link, child_link=child_link)
-        self._behavior_tree_config.add_sync_tf_frame(joint_name)
-
     def _add_joint(self, joint: Tuple[Type, Dict[str, Any]]):
         joints = self.god_map.get_data(identifier.joints_to_add, default=[])
         joints.append(joint)
@@ -185,7 +164,7 @@ class WorldConfig(Config):
             self._add_odometry_topic(odometry_topic=odometry_topic,
                                      joint_name=joint_name)
 
-    def add_6dof_joint(self, parent_link: my_string, child_link: my_string):
+    def add_6dof_joint(self, parent_link: my_string, child_link: my_string, joint_name: my_string):
         """
         Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
         :param parent_link:
@@ -194,7 +173,7 @@ class WorldConfig(Config):
         """
         parent_link = self._world.search_for_link_name(parent_link)
         child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
-        joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
+        joint_name = PrefixName.from_string(joint_name, set_none_if_no_slash=True)
         joint = Joint6DOF(name=joint_name, parent_link_name=parent_link, child_link_name=child_link)
         self._world._add_joint(joint)
 
@@ -249,16 +228,19 @@ class RobotInterfaceConfig(Config):
     # def __init__(self):
     #     self.world.register_controlled_joints(self._controlled_joints)
 
-    def _add_odometry_topic(self, odometry_topic: str, joint_name: str):
-        for odometry_kwargs in hardware_config.odometry_node_kwargs:
-            sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
-        self.hardware_config.odometry_node_kwargs.append({'odometry_topic': odometry_topic,
-                                                          'joint_name': joint_name})
+    def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
+        joint_name = self._world.search_for_joint_name(joint_name)
+        self._behavior_tree.sync_odometry_topic(odometry_topic, joint_name)
 
-    def add_joint_states_topic(self, topic_name: str):
-        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for kwargs in hardware_config.joint_state_topics_kwargs:
-            sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
+    def sync_6dof_joint_with_tf_frame(self, joint_name: str, tf_parent_frame: str, tf_child_frame: str):
+        """
+        Tell Giskard to keep track of tf frames, e.g., for robot localization.
+        """
+        joint_name = self._world.search_for_joint_name(joint_name)
+        self._behavior_tree.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
+
+    def sync_joint_state_topic(self, topic_name: str):
+        self._behavior_tree.sync_joint_state_topic(topic_name)
 
     def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
         if group_name is None:

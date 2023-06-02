@@ -6,45 +6,13 @@ from giskardpy.my_types import Derivatives
 
 
 class PR2_Base(Giskard):
-    # def __init__(self, root_link_name: Optional[str] = None):
-    #     super().__init__(root_link_name=root_link_name)
-    # self.set_collision_checker(CollisionCheckerLib.none)
-    # self.set_qp_solver(SupportedQPSolver.qpalm)
-    # self.configure_PlotTrajectory(enabled=True, wait=True)
-    # self.configure_PlotDebugExpressions(enabled=True, wait=True)
-    # self.configure_DebugMarkerPublisher(enabled=True)
-    # self.configure_PublishDebugExpressions(
-    #     publish_lb=True,
-    #     publish_ub=True,
-    #     publish_lbA=True,
-    #     publish_ubA=True,
-    #     publish_bE=True,
-    #     publish_Ax=True,
-    #     publish_Ex=True,
-    #     publish_xdot=True,
-    #     publish_weights=True,
-    #     publish_debug=True,
-    # )
-
-    # self.set_maximum_derivative(Derivatives.acceleration)
-    # self.set_default_joint_limits(velocity_limit=1,
-    #                               acceleration_limit=1.5)
-    # self.overwrite_joint_velocity_limits(joint_name='head_pan_joint',
-    #                                      velocity_limit=2)
-    # self.overwrite_joint_acceleration_limits(joint_name='head_pan_joint',
-    #                                          acceleration_limit=4)
-    # self.overwrite_joint_velocity_limits(joint_name='head_tilt_joint',
-    #                                      velocity_limit=2)
-    # self.overwrite_joint_acceleration_limits(joint_name='head_tilt_joint',
-    #                                          acceleration_limit=4)
-    # self.set_default_weights(velocity_weight=0.01,
-    #                          acceleration_weight=0.01)
+    localization_joint_name = 'localization'
 
     def configure_world(self):
         self.world.set_root_link_name('map')
         odom_link_name = 'odom_combined'
         self.world.add_empty_link(odom_link_name)
-        self.world.add_6dof_joint(parent_link='map', child_link=odom_link_name)
+        self.world.add_6dof_joint(parent_link='map', child_link=odom_link_name, joint_name=self.localization_joint_name)
         pr2_group_name = self.world.add_robot_from_parameter_server()
         root_link_name = self.world.get_root_link_of_group(pr2_group_name)
         self.world.add_omni_drive_joint(name='brumbrum',
@@ -113,37 +81,26 @@ class PR2_Mujoco(PR2_Base):
     def configure_world(self):
         super().configure_world()
         self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
-        self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(name='brumbrum',
-                                  parent_link_name='odom_combined',
-                                  child_link_name='base_footprint',
-                                  translation_limits={
-                                      Derivatives.velocity: 0.4,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
-                                  },
-                                  rotation_limits={
-                                      Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
-                                  },
-                                  odometry_topic='/pr2/base_footprint')
+        # odometry_topic='/pr2/base_footprint')
 
     def configure_robot_interface(self):
         super().configure_robot_interface()
-        self.add_follow_joint_trajectory_server(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
-                                                state_topic='/pr2/whole_body_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
-                                                state_topic='/pr2/l_gripper_l_finger_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
-                                                state_topic='/pr2/r_gripper_l_finger_controller/state')
-        self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
-                                   track_only_velocity=True)
-        self.overwrite_external_collision_avoidance('brumbrum',
-                                                    number_of_repeller=2,
-                                                    soft_threshold=0.2,
-                                                    hard_threshold=0.1)
-
+        self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                                           tf_parent_frame='map',
+                                                           tf_child_frame='odom_combined')
+        self.robot_interface.sync_joint_state_topic('/joint_states')
+        self.robot_interface.sync_odometry_topic('/pr2/base_footprint', 'brumbrum')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/pr2/whole_body_controller/follow_joint_trajectory',
+            state_topic='/pr2/whole_body_controller/state')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
+            state_topic='/pr2/l_gripper_l_finger_controller/state')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
+            state_topic='/pr2/r_gripper_l_finger_controller/state')
+        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+                                                   track_only_velocity=True)
 
 
 class PR2_IAI(PR2_Base):

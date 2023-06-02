@@ -19,6 +19,7 @@ from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, HardwareConfig
 from giskardpy.god_map import GodMap
+from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
@@ -281,6 +282,22 @@ class TreeManager(ABC):
         ...
 
     @abc.abstractmethod
+    def sync_joint_state_topic(self, topic_name: str):
+        ...
+
+    @abc.abstractmethod
+    def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
+        ...
+
+    @abc.abstractmethod
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str):
+        ...
+
+    @abc.abstractmethod
+    def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
+        ...
+
+    @abc.abstractmethod
     def configure_plot_trajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
         ...
 
@@ -383,7 +400,8 @@ class TreeManager(ABC):
         """
         return self.tree_nodes[node_name].node
 
-    def get_nodes_of_type(self, node_type: Type[GiskardBehavior]) -> List[GiskardBehavior]:
+    GiskardBehavior_ = TypeVar('GiskardBehavior_', bound=GiskardBehavior)
+    def get_nodes_of_type(self, node_type: Type[GiskardBehavior_]) -> List[GiskardBehavior_]:
         return [node.node for node in self.tree_nodes.values() if isinstance(node.node, node_type)]
 
     def render(self):
@@ -662,7 +680,7 @@ class StandAlone(TreeManager):
                                  self.closed_loop_control_name)
 
     def configure_max_trajectory_length(self, enabled: bool, length: float):
-        nodes: List[MaxTrajectoryLength] = self.get_nodes_of_type(MaxTrajectoryLength)
+        nodes = self.get_nodes_of_type(MaxTrajectoryLength)
         for node in nodes:
             if enabled:
                 self.enable_node(node.name)
@@ -674,8 +692,26 @@ class StandAlone(TreeManager):
         behavior = PlotTrajectory('plot trajectory', wait=wait)
         self.insert_node(behavior, self.plan_postprocessing_name)
 
+    def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
+        tf_sync_nodes = self.get_nodes_of_type(SyncTfFrames)
+        for node in tf_sync_nodes:
+            node.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
+
+    def sync_joint_state_topic(self, topic_name: str):
+        behavior = SyncConfiguration(joint_state_topic=topic_name)
+        self.insert_node(behavior, self.sync_name, 2)
+
+    def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
+        behavior = SyncOdometry(topic_name, joint_name)
+        self.insert_node(behavior, self.sync_name, 2)
+
 
 class OpenLoop(StandAlone):
+
+
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str):
+        pass
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())

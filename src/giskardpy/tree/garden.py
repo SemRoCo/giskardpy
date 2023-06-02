@@ -1,6 +1,9 @@
+from __future__ import annotations
+import abc
+from abc import ABC
 from collections import defaultdict
 from time import time
-from typing import Type, TypeVar, Union
+from typing import Type, TypeVar, Union, Dict, List, Optional
 
 import numpy as np
 import py_trees
@@ -102,12 +105,16 @@ def anything_is_failure(cls: T) -> T:
 
 
 class ManagerNode:
-    def __init__(self, node, parent, position: int):
+    node: GiskardBehavior
+    parent: ManagerNode
+    position: int
+    disabled_children: SortedList[ManagerNode]
+    enabled_children: SortedList[ManagerNode]
+
+    def __init__(self, node: GiskardBehavior, parent: ManagerNode, position: int):
         """
         :param node: the behavior that is represented by this ManagerNode
-        :type node: ManagerNode
         :param parent: the parent of the behavior that is represented by this ManagerNode
-        :type parent: ManagerNode
         :param position: the position of the node in the list of children of the parent
         """
         self.node = node
@@ -125,12 +132,15 @@ class ManagerNode:
     def __eq__(self, other):
         return self.node == other.node and self.parent == other.parent
 
-    def disable_child(self, manager_node):
+    def __str__(self):
+        return self.node.name
+
+    def __repr__(self):
+        return str(self)
+
+    def disable_child(self, manager_node: ManagerNode):
         """
         marks the given manager node as disabled in the internal tree representation and removes it to the behavior tree
-        :param manager_node:
-        :type manager_node: ManagerNode
-        :return:
         """
         self.enabled_children.remove(manager_node)
         self.disabled_children.add(manager_node)
@@ -139,27 +149,23 @@ class ManagerNode:
         else:
             self.node.remove_child(manager_node.node)
 
-    def enable_child(self, manager_node):
+    def enable_child(self, manager_node: ManagerNode):
         """
         marks the given manager node as enabled in the internal tree representation and adds it to the behavior tree
-        :param manager_node:
-        :type manager_node: TreeManager.ManagerNode
-        :return:
         """
-        self.disabled_children.remove(manager_node)
-        self.enabled_children.add(manager_node)
-        if isinstance(self.node, AsyncBehavior):
-            self.node.add_child(manager_node.node)
-        else:
-            idx = self.enabled_children.index(manager_node)
-            self.node.insert_child(manager_node.node, idx)
+        self.disabled_children.discard(manager_node)
+        if manager_node not in self.enabled_children:
+            self.enabled_children.add(manager_node)
+            if isinstance(self.node, AsyncBehavior) \
+                    or hasattr(self.node, 'original') and isinstance(self.node.original, AsyncBehavior):
+                self.node.add_child(manager_node.node)
+            else:
+                idx = self.enabled_children.index(manager_node)
+                self.node.insert_child(manager_node.node, idx)
 
-    def add_child(self, manager_node):
+    def add_child(self, manager_node: ManagerNode):
         """
         adds the given manager node to the internal tree map and the corresponding behavior to the behavior tree
-        :param manager_node:
-        :type manager_node: TreeManager.ManagerNode
-        :return:
         """
         if isinstance(self.node, AsyncBehavior):
             self.enabled_children.add(manager_node)
@@ -227,9 +233,9 @@ def search_for(lines, function_name):
     return result
 
 
-
-class TreeManager:
+class TreeManager(ABC):
     god_map = GodMap()
+    tree_nodes: Dict[str, ManagerNode]
 
     @profile
     def __init__(self, tree=None):
@@ -242,8 +248,8 @@ class TreeManager:
         else:
             self.tree = tree
         self.tree_nodes = {}
-        self.god_map.get_data(identifier.world).reset_cache()
-        self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
+        # self.god_map.get_data(identifier.world).reset_cache()
+        # self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
         # self.render()
@@ -262,6 +268,19 @@ class TreeManager:
 
     def tick(self):
         self.tree.tick()
+
+    @abc.abstractmethod
+    def configure_visualization_marker(self, add_to_sync: Optional[bool] = None,
+                                       add_to_planning: Optional[bool] = None):
+        ...
+
+    @abc.abstractmethod
+    def configure_max_trajectory_length(self, enabled: bool, length: float):
+        ...
+
+    @abc.abstractmethod
+    def configure_plot_trajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
+        ...
 
     def setup(self, timeout=30):
         self.tree.setup(timeout)
@@ -291,12 +310,12 @@ class TreeManager:
         manager_node = ManagerNode(node=node, parent=parent, position=idx)
         if parent is not None:
             parent.enabled_children.add(manager_node)
-        if isinstance(node, AsyncBehavior):
-            children = node._children
-            for child_name in children:
-                child_node = ManagerNode(node=children[child_name], parent=manager_node, position=0)
-                self.tree_nodes[child_name] = child_node
-                manager_node.enabled_children.add(child_node)
+        # if isinstance(node, AsyncBehavior) or hasattr(node, 'original') and isinstance(node.original, AsyncBehavior):
+        #     children = node._children
+        #     for idx, child_name in enumerate(children):
+        #         child_node = ManagerNode(node=children[child_name], parent=manager_node, position=idx)
+        #         self.tree_nodes[child_name] = child_node
+        #         manager_node.enabled_children.add(child_node)
         self.tree_nodes[node.name] = manager_node
         for idx, child in enumerate(node.children):
             self.__init_map(child, manager_node, idx)
@@ -314,12 +333,10 @@ class TreeManager:
             logging.logwarn('cannot disable root node')
             return False
 
-    def enable_node(self, node_name):
+    def enable_node(self, node_name: str):
         """
         enables the node with the given name
         :param node_name: the name of the node
-        :type node_name: str
-        :return:
         """
         t = self.tree_nodes[node_name]
         if t.parent is not None:
@@ -327,16 +344,12 @@ class TreeManager:
         else:
             logging.loginfo('root node')
 
-    def insert_node(self, node, parent_name, position=-1):
+    def insert_node(self, node: GiskardBehavior, parent_name: str, position: int = -1):
         """
         inserts a node into the behavior tree.
         :param node: the node that will be inserted
-        :type node: py_trees.behaviour.Behaviour
         :param parent_name: the name of the parent node where the node will be inserted
-        :type parent_name: str
         :param position: the node will be inserted as the nth child with n = len([x for x in children if x.position < position])
-        :type position: int
-        :return:
         """
         if node.name in self.tree_nodes:
             raise ValueError(f'Node named {node.name} already exists.')
@@ -367,6 +380,9 @@ class TreeManager:
         :rtype py_trees.behaviour.Behaviour:
         """
         return self.tree_nodes[node_name].node
+
+    def get_nodes_of_type(self, node_type: Type[GiskardBehavior]) -> List[GiskardBehavior]:
+        return [node.node for node in self.tree_nodes.values() if isinstance(node.node, node_type)]
 
     def render(self):
         path = self.god_map.get_data(identifier.tmp_folder) + 'tree'
@@ -470,16 +486,16 @@ def generate_pydot_graph(root, visibility_level):
 
     def add_edges(root, root_dot_name, visibility_level):
         if visibility_level < root.blackbox_level:
-            if isinstance(root, AsyncBehavior) \
-                    or (hasattr(root, 'original') and isinstance(root.original, AsyncBehavior)):
-                children = []
-                names2 = []
-                for name, child in root.get_children().items():
-                    children.append(child)
-                    names2.append(name)
-            else:
-                children = root.children
-                names2 = [c.name for c in children]
+            # if isinstance(root, AsyncBehavior) \
+            #         or (hasattr(root, 'original') and isinstance(root.original, AsyncBehavior)):
+            #     children = []
+            #     names2 = []
+            #     for name, child in root.get_children().items():
+            #         children.append(child)
+            #         names2.append(name)
+            # else:
+            children = root.children
+            names2 = [c.name for c in children]
             for name, c in zip(names2, children):
                 (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
                 proposed_dot_name = name
@@ -528,6 +544,10 @@ def generate_pydot_graph(root, visibility_level):
 
 
 class StandAlone(TreeManager):
+    sync_name: str = 'Synchronize'
+    closed_loop_control_name: str = 'closed loop control'
+    plan_postprocessing_name: str = 'plan postprocessing'
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
@@ -546,15 +566,10 @@ class StandAlone(TreeManager):
         return wait_for_goal
 
     def grow_Synchronize(self):
-        sync = Sequence('Synchronize')
+        sync = Sequence(self.sync_name)
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames',
-                                    **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        if self.god_map.get_data(identifier.TFPublisher_enabled):
-            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        sync.add_child(SyncTfFrames('sync tf frames', []))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
-            sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
 
     def grow_process_goal(self):
@@ -591,13 +606,6 @@ class StandAlone(TreeManager):
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                  self.action_server_name,
                                                                  MoveFeedback.PLANNING))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            planning_2.add_child(running_is_failure(VisualizationBehavior)('visualization'))
-        if self.god_map.get_data(identifier.enable_CPIMarker) \
-                and self.god_map.get_data(identifier.collision_checker) is not None \
-                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         planning_2.add_child(self.grow_planning3())
         return planning_2
@@ -610,57 +618,69 @@ class StandAlone(TreeManager):
         return planning_3
 
     def grow_closed_loop_control(self):
-        planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-                and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            planning_4.add_child(VisualizationBehavior('visualization'))
-        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-            planning_4.add_child(CollisionChecker('collision checker'))
-            if self.god_map.get_data(identifier.enable_CPIMarker) \
-                    and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-                planning_4.add_child(CollisionMarker('cpi marker'))
+        planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
         planning_4.add_child(ControllerPlugin('controller'))
-        if self.god_map.get_data(identifier.debug_expr_needed):
-            planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
         planning_4.add_child(KinSimPlugin('kin sim'))
         planning_4.add_child(LogTrajPlugin('log'))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
-        if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-            planning_4.add_child(DebugMarkerPublisher('debug marker publisher'))
-        if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
-            planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
-                                                         **self.god_map.unsafe_get_data(
-                                                             identifier.PublishDebugExpressions)))
         # planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
         planning_4.add_child(TimePlugin())
-        if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
-            kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-            planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
+        planning_4.add_child(MaxTrajectoryLength('traj length check', length=30))
         return planning_4
 
     def grow_plan_postprocessing(self):
-        plan_postprocessing = Sequence('plan postprocessing')
+        plan_postprocessing = Sequence(self.plan_postprocessing_name)
         plan_postprocessing.add_child(running_is_success(TimePlugin)())
         plan_postprocessing.add_child(SetZeroVelocity())
         plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            plan_postprocessing.add_child(
-                anything_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
-        if self.god_map.get_data(identifier.enable_CPIMarker) \
-                and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
-                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            plan_postprocessing.add_child(anything_is_success(CollisionMarker)('collision marker'))
-        if self.god_map.get_data(identifier.PlotTrajectory_enabled):
-            kwargs = self.god_map.get_data(identifier.PlotTrajectory)
-            plan_postprocessing.add_child(PlotTrajectory('plot trajectory', **kwargs))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            kwargs = self.god_map.get_data(identifier.PlotDebugTrajectory)
-            plan_postprocessing.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))
         return plan_postprocessing
+
+    def configure_visualization_marker(self, add_to_sync: Optional[bool] = None,
+                                       add_to_planning: Optional[bool] = None):
+        # visualization_behaviors = self.get_nodes_of_type(VisualizationBehavior)
+        if add_to_sync is not None:
+            sync_branch = self.get_node(self.sync_name)
+            # if add_to_sync:
+            #     sync_branch.enable_child()
+        if add_to_planning is not None:
+            # close_loop_control = self.tree_nodes[self.closed_loop_control_name]
+            behavior = VisualizationBehavior('visualization')
+            self.insert_node(behavior, self.closed_loop_control_name)
+        # if self.god_map.get_data(identifier.enable_VisualizationBehavior):
+        #     sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
+        # if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+        #         and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+        #     planning_2.add_child(running_is_failure(VisualizationBehavior)('visualization'))
+        # if self.god_map.get_data(identifier.enable_CPIMarker) \
+        #         and self.god_map.get_data(identifier.collision_checker) is not None \
+        #         and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+        #     planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
+        # if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+        #         and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+        #     planning_4.add_child(VisualizationBehavior('visualization'))
+        # if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+        #     planning_4.add_child(CollisionChecker('collision checker'))
+        #     if self.god_map.get_data(identifier.enable_CPIMarker) \
+        #             and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
+        #         planning_4.add_child(CollisionMarker('cpi marker'))
+        # if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
+        #         and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
+        #     plan_postprocessing.add_child(
+        #         anything_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
+
+    def configure_max_trajectory_length(self, enabled: bool, length: float):
+        nodes: List[MaxTrajectoryLength] = self.get_nodes_of_type(MaxTrajectoryLength)
+        for node in nodes:
+            if enabled:
+                self.enable_node(node.name)
+            else:
+                self.disable_node(node.name)
+            node.length = length
+
+    def configure_plot_trajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
+        behavior = PlotTrajectory('plot trajectory', wait=wait)
+        self.insert_node(behavior, self.plan_postprocessing_name)
 
 
 class OpenLoop(StandAlone):
@@ -677,15 +697,14 @@ class OpenLoop(StandAlone):
     def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames',
-                                    **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for kwargs in hardware_config.joint_state_topics_kwargs:
-            sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
-        for odometry_kwargs in hardware_config.odometry_node_kwargs:
-            sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
-        if self.god_map.get_data(identifier.TFPublisher_enabled):
-            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        sync.add_child(SyncTfFrames('sync tf frames', joint_names=[]))
+        # hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
+        # for kwargs in hardware_config.joint_state_topics_kwargs:
+        #     sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
+        # for odometry_kwargs in hardware_config.odometry_node_kwargs:
+        #     sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
+        # if self.god_map.get_data(identifier.TFPublisher_enabled):
+        #     sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync

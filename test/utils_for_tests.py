@@ -248,13 +248,13 @@ class GiskardTestWrapper(GiskardWrapper):
         if 'QP_SOLVER' in os.environ:
             self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.giskard.grow()
-        self.tree = self.giskard._tree
+        self.tree = self.giskard._behavior_tree
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(period=rospy.Duration(self.tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces
-        self.robot_names = [c.name for c in self.god_map.get_data(identifier.robot_interface_configs)]
+        self.robot_names = [list(self.world.groups.keys())[0]]
         super().__init__(node_name='tests')
         self.results = Queue(100)
         self.default_root = str(self.world.root_link_name)
@@ -270,7 +270,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
-        return self.general_config.control_mode == self.general_config.control_mode.stand_alone
+        return self.giskard.control_mode == self.giskard.control_mode.stand_alone
 
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:

@@ -116,12 +116,32 @@ class WorldTreeInterface(ABC):
             pass
 
 
+class WorldModelUpdateContextManager:
+    first: bool = True
+
+    def __init__(self, world: WorldTree):
+        self.world = world
+
+    def __enter__(self):
+        if self.world.context_manager_active:
+            self.first = False
+        self.world.context_manager_active = True
+        return self.world
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.first:
+            self.world.context_manager_active = False
+            self.world.notify_model_change()
+
+
+
 class WorldTree(WorldTreeInterface):
     joints: Dict[PrefixName, Union[Joint, OmniDrive]]
     links: Dict[PrefixName, Link]
     state: JointStates
     free_variables: Dict[PrefixName, FreeVariable]
     virtual_free_variables: Dict[PrefixName, FreeVariable]
+    context_manager_active: bool = False
 
     def __init__(self, root_link_name: PrefixName):
         self.root_link_name = root_link_name
@@ -274,11 +294,13 @@ class WorldTree(WorldTreeInterface):
         Call this function if you have changed the model of the world to trigger necessary events and increase
         the model version number.
         """
-        with self.god_map:
-            self.reset_cache()
-            self.init_all_fks()
-            self.notify_state_change()
-            self._model_version += 1
+        if not self.context_manager_active:
+            with self.god_map:
+                self.fix_tree_structure()
+                self.reset_cache()
+                self.init_all_fks()
+                self.notify_state_change()
+                self._model_version += 1
 
     def travel_branch(self, link_name: PrefixName, companion: TravelCompanion):
         """
@@ -414,10 +436,13 @@ class WorldTree(WorldTreeInterface):
             raise DuplicateNameException(f'Group with name {name} already exists')
         new_group = WorldBranch(name, root_link_name, self, actuated=actuated)
         # if the group is a subtree of a subtree, register it for the subtree as well
-        for group in self.groups.values():
-            if root_link_name in group.links:
-                group.groups[name] = new_group
+        # for group in self.groups.values():
+        #     if root_link_name in group.links:
+        #         group.groups[name] = new_group
         self.groups[name] = new_group
+
+    def deregister_group(self, name:str):
+        del self.groups[name]
 
     @property
     def robots(self) -> List[WorldBranch]:
@@ -515,7 +540,9 @@ class WorldTree(WorldTreeInterface):
                                   child_link=urdf_root_link,
                                   transform=pose)
         else:
-            urdf_root_link = self.links[urdf_root_link_name]
+            urdf_root_link = Link(urdf_root_link_name)
+            self._add_link(urdf_root_link)
+            # urdf_root_link = self.links[urdf_root_link_name]
 
         def helper(urdf, parent_link):
             short_name = parent_link.name.short_name
@@ -543,11 +570,11 @@ class WorldTree(WorldTreeInterface):
             # -1 because root link already exists
             raise GiskardException(f'Failed to add urdf \'{group_name}\' to world')
 
-        if add_drive_joint_to_group:
-            root_link = self.get_parent_link_of_link(urdf_root_link_name)
-            self.register_group(group_name, root_link, actuated=actuated)
-        else:
-            self.register_group(group_name, urdf_root_link_name, actuated=actuated)
+        # if add_drive_joint_to_group:
+        #     root_link = self.get_parent_link_of_link(urdf_root_link_name)
+        #     self.register_group(group_name, root_link, actuated=actuated)
+        # else:
+        self.register_group(group_name, urdf_root_link_name, actuated=actuated)
         self.notify_model_change()
 
     def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
@@ -779,19 +806,20 @@ class WorldTree(WorldTreeInterface):
         """
         Resets Giskard to the state from when it was started.
         """
-        self._clear()
-        joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
-        for joint_class, kwargs in joints_to_add:
-            joint = joint_class(**kwargs)
-            self._add_joint_and_create_child(joint)
-        robot_config: RobotInterfaceConfig
-        for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
-            self.add_urdf(robot_config.urdf,
-                          group_name=robot_config.name,
-                          actuated=True,
-                          add_drive_joint_to_group=robot_config.add_drive_joint_to_group)
-        self.fast_all_fks = None
-        self.notify_model_change()
+        pass # FIXME
+        # self._clear()
+        # joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
+        # for joint_class, kwargs in joints_to_add:
+        #     joint = joint_class(**kwargs)
+        #     self._add_joint_and_create_child(joint)
+        # robot_config: RobotInterfaceConfig
+        # for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
+        #     self.add_urdf(robot_config.urdf,
+        #                   group_name=robot_config.name,
+        #                   actuated=True,
+        #                   add_drive_joint_to_group=robot_config.add_drive_joint_to_group)
+        # self.fast_all_fks = None
+        # self.notify_model_change()
 
     def _add_joint_and_create_child(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)
@@ -812,6 +840,23 @@ class WorldTree(WorldTreeInterface):
         parent_link.child_joint_names.append(joint.name)
 
     def fix_tree_structure(self):
+        for joint in self.joints.values():
+            self._raise_if_link_does_not_exist(joint.parent_link_name)
+            self._raise_if_link_does_not_exist(joint.child_link_name)
+            parent_link = self.links[joint.parent_link_name]
+            if joint.name not in parent_link.child_joint_names:
+                parent_link.child_joint_names.append(joint.name)
+            child_link = self.links[joint.child_link_name]
+            if child_link.parent_joint_name is None:
+                child_link.parent_joint_name = joint.name
+            else:
+                assert child_link.parent_joint_name == joint.name
+        for link in self.links.values():
+            if link != self.root_link:
+                self._raise_if_joint_does_not_exist(link.parent_joint_name)
+            for child_joint_name in link.child_joint_names:
+                self._raise_if_joint_does_not_exist(child_joint_name)
+
         pass
 
     def _raise_if_link_does_not_exist(self, link_name: my_string):
@@ -1072,6 +1117,9 @@ class WorldTree(WorldTreeInterface):
             tip_chain = tip_chain[1:]
         return root_chain, [connection] if add_links else [], tip_chain
 
+    def modify_world(self):
+        return WorldModelUpdateContextManager(self)
+
     @copy_memoize
     @profile
     def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> w.TransMatrix:
@@ -1263,6 +1311,10 @@ class WorldTree(WorldTreeInterface):
     def _add_link(self, link: Link):
         self._raise_if_link_exists(link.name)
         self.links[link.name] = link
+
+    def _add_joint(self, joint: Joint):
+        self._raise_if_joint_exists(joint.name)
+        self.joints[joint.name] = joint
 
     def joint_limit_expr(self, joint_name: PrefixName, order: Derivatives) \
             -> Tuple[Optional[w.symbol_expr_float], Optional[w.symbol_expr_float]]:

@@ -42,10 +42,14 @@ class PR2_Base(Giskard):
 
     def configure_world(self):
         self.world.set_root_link_name('map')
-        self.world.add_fixed_joint(parent_link='map', child_link='odom_combined')
+        odom_link_name = 'odom_combined'
+        self.world.add_empty_link(odom_link_name)
+        self.world.add_fixed_joint(parent_link='map', child_link=odom_link_name)
+        pr2_group_name = self.world.add_robot_from_parameter_server()
+        root_link_name = self.world.get_root_link_of_group(pr2_group_name)
         self.world.add_omni_drive_joint(name='brumbrum',
-                                        parent_link_name='odom_combined',
-                                        child_link_name='base_footprint',
+                                        parent_link_name=odom_link_name,
+                                        child_link_name=root_link_name,
                                         translation_limits={
                                             Derivatives.velocity: 0.2,
                                             Derivatives.acceleration: 1,
@@ -55,8 +59,9 @@ class PR2_Base(Giskard):
                                             Derivatives.velocity: 0.2,
                                             Derivatives.acceleration: 1,
                                             Derivatives.jerk: 6
-                                        })
-        self.world.add_robot_from_parameter_server()
+                                        },
+                                        robot_group_name=pr2_group_name)
+        pass
 
     def configure_collision_avoidance(self):
         self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
@@ -248,6 +253,7 @@ class PR2_StandAlone(PR2_Base):
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()
-        self.behavior_tree.configure_VisualizationBehavior(in_planning_loop=True)
-        self.behavior_tree.configure_CollisionMarker(in_planning_loop=True)
-        self.behavior_tree.publish_all_tf()
+        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=False, add_to_planning=True)
+        self.behavior_tree.configure_PlotTrajectory(enabled=True, wait=True)
+        # self.behavior_tree.configure_CollisionMarker(in_planning_loop=True)
+        # self.behavior_tree.publish_all_tf()

@@ -8,11 +8,9 @@ from giskardpy.utils.decorators import record_time
 
 class MaxTrajectoryLength(GiskardBehavior):
     @profile
-    def __init__(self, name, enabled, length):
+    def __init__(self, name, length: int = 30):
         super().__init__(name)
-
-    def initialise(self):
-        self.length = self.god_map.get_data(identifier.MaxTrajectoryLength + ['length'])
+        self.length = length
 
     @record_time
     @profile

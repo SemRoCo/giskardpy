@@ -50,7 +50,7 @@ action_server_name = general_options + ['action_server_name']
 tmp_folder = general_options + ['path_to_data_folder']
 debug_expr_needed = ['debug_expr_needed']
 test_mode = general_options + ['test_mode']
-control_mode = general_options + ['control_mode']
+control_mode = giskard + ['control_mode']
 
 joint_limits = general_options + ['joint_limits']
 
@@ -109,8 +109,8 @@ joints_to_add = ['joints_to_add']
 PublishDebugExpressions = plugins + ['PublishDebugExpressions']
 
 # behavior tree
-tree_manager = giskard + ['_tree']
-tree_tick_rate = giskard + ['behavior_tree_config', 'tree_tick_rate']
+tree_manager = ['behavior_tree']
+tree_tick_rate = giskard + ['behavior_tree', 'tree_tick_rate']
 
 # collision avoidance
 collision_avoidance_configs = giskard + ['collision_avoidance', '_collision_avoidance_configs']
@@ -119,7 +119,7 @@ collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
-collision_checker = giskard + ['collision_checker']
+collision_checker = giskard + ['collision_avoidance', 'collision_checker_id']
 
 # robot interface
 robot_interface_configs = giskard + ['robot_interface_configs']

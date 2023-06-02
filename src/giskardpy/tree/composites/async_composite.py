@@ -4,18 +4,19 @@ from threading import RLock, Thread
 from time import time
 
 import rospy
-from py_trees import Status
+from py_trees import Status, Composite
 
 from giskardpy import identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard
 
 
-class AsyncBehavior(GiskardBehavior):
+class AsyncBehavior(GiskardBehavior, Composite):
 
     def __init__(self, name, hz=None):
         super().__init__(name)
-        self._children = OrderedDict()
+        # TODO why can't we save this in .children?
+        # self._children = OrderedDict()
         self.set_status(Status.INVALID)
         self.status_lock = RLock()
         self.looped_once = False
@@ -25,31 +26,38 @@ class AsyncBehavior(GiskardBehavior):
         else:
             self.sleeper = None
 
-    def get_children(self):
-        return self._children
+    # def get_children(self):
+    #     return self._children
 
-    def add_child(self, child):
-        """
-        Registers a plugin with the process manager. The name needs to be unique.
-        :param child: Behaviour
-        :return:
-        """
-        name = child.name
-        if name in self._children:
-            raise KeyError(f'A plugin with name \'{name}\' already exists.')
-        with self.status_lock:
-            self._children[name] = child
+    # def add_child(self, child):
+    #     """
+    #     Registers a plugin with the process manager. The name needs to be unique.
+    #     :param child: Behaviour
+    #     :return:
+    #     """
+    #     name = child.name
+    #     if name in self._children:
+    #         raise KeyError(f'A plugin with name \'{name}\' already exists.')
+    #     with self.status_lock:
+    #         self._children[name] = child
+    #
+    # def insert_child(self, child, idx):
+    #     name = child.name
+    #     if name in self._children:
+    #         raise KeyError(f'A plugin with name \'{name}\' already exists.')
+    #     with self.status_lock:
+    #         self._children.
 
-    def remove_child(self, child_name):
-        with self.status_lock:
-            del self._children[child_name]
+    # def remove_child(self, child_name):
+    #     with self.status_lock:
+    #         del self._children[child_name]
 
     def setup(self, timeout):
         self.start_children()
         return super().setup(timeout)
 
     def start_children(self):
-        for child in self._children.values():
+        for child in self.children:
             child.setup(10.0)
 
     def initialise(self):
@@ -61,12 +69,12 @@ class AsyncBehavior(GiskardBehavior):
         super().initialise()
 
     def init_plugins(self):
-        for plugin in self._children.values():
-            plugin.initialise()
+        for child in self.children:
+            child.initialise()
             # plugin.status = Status.RUNNING
 
     def is_running(self):
-        return self.my_status == Status.RUNNING
+        return self.status == Status.RUNNING
 
     def terminate(self, new_status):
         with self.status_lock:
@@ -81,17 +89,20 @@ class AsyncBehavior(GiskardBehavior):
         super().terminate(new_status)
 
     def stop_children(self):
-        for plugin_name, plugin in self._children.items():
-            plugin.stop()
+        for child in self.children:
+            child.stop()
 
     def update(self):
         with self.status_lock:
             if not self.update_thread.is_alive():
                 return Status.SUCCESS
-            return self.my_status
+            return self.status
 
     def set_status(self, new_state):
-        self.my_status = new_state
+        self.status = new_state
+
+    def tip(self):
+        return GiskardBehavior.tip(self)
 
     @profile
     def loop_over_plugins(self):
@@ -99,7 +110,7 @@ class AsyncBehavior(GiskardBehavior):
             # self.init_plugins()
             self.get_blackboard().runtime = time()
             while self.is_running() and not rospy.is_shutdown():
-                for plugin_name, child in self._children.items():
+                for child in self.children:
                     with self.status_lock:
                         if not self.is_running():
                             return
@@ -107,7 +118,7 @@ class AsyncBehavior(GiskardBehavior):
                             status = node.status
                         if status is not None:
                             self.set_status(status)
-                        assert self.my_status is not None, '{} did not return a status'.format(plugin_name)
+                        assert self.status is not None, f'{child.name} did not return a status'
                         if not self.is_running():
                             return
                 self.looped_once = True

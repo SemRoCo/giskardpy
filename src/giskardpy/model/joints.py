@@ -172,14 +172,16 @@ class MovableJoint(Joint):
 
 class FixedJoint(Joint):
     def __init__(self, name: PrefixName, parent_link_name: PrefixName, child_link_name: PrefixName,
-                 parent_T_child: w.TransMatrix):
+                 parent_T_child: Optional[w.TransMatrix] = None):
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
+        if parent_T_child is None:
+            parent_T_child = w.eye(4)
         self.parent_T_child = w.TransMatrix(parent_T_child)
 
 
-class TFJoint(Joint):
+class Joint6DOF(Joint):
     def __init__(self, name: PrefixName, parent_link_name: PrefixName, child_link_name: PrefixName):
         self.name = name
         self.parent_link_name = parent_link_name

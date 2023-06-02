@@ -2,7 +2,7 @@ from typing import List, Tuple
 import giskardpy.casadi_wrapper as w
 from py_trees import Status
 
-from giskardpy.model.joints import TFJoint
+from giskardpy.model.joints import Joint6DOF
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.math import compare_poses
@@ -22,7 +22,7 @@ class SyncTfFrames(GiskardBehavior):
     def update(self):
         with self.god_map:
             for joint_name in self.joint_names:
-                joint: TFJoint = self.world.joints[joint_name]
+                joint: Joint6DOF = self.world.joints[joint_name]
                 parent_T_child = lookup_pose(joint.parent_link_name, joint.child_link_name)
                 parent_T_child_old = self.world.compute_fk_pose(joint.parent_link_name, joint.child_link_name)
                 try:

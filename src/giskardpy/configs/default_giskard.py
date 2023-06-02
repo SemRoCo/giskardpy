@@ -7,6 +7,7 @@ from typing import Dict, Optional, List, Tuple, Type, Any, Union, DefaultDict
 
 import numpy as np
 import rospy
+from geometry_msgs.msg import Pose
 from numpy.typing import NDArray
 from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
@@ -20,7 +21,7 @@ from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, OmniDrivePR22, TFJoint
+from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, OmniDrivePR22, Joint6DOF
 from giskardpy.model.links import Link
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
@@ -84,7 +85,17 @@ class WorldConfig(Config):
         """
         if not tf.wait_for_transform(parent_link, child_link, rospy.Time(), rospy.Duration(1)):
             raise LookupException(f'Cannot get transform of {parent_link}<-{child_link}')
-        joint_name = self._add_tf_joint(parent_link=parent_link, child_link=child_link)
+
+        if homogenous_transform is None:
+            homogenous_transform = np.eye(4)
+        parent_link = self._world.search_for_link_name(parent_link)
+
+        child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
+        joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
+        joint = FixedJoint(name=joint_name, parent_link_name=parent_link, child_link_name=child_link,
+                           parent_T_child=homogenous_transform)
+        self._world._add_joint(joint)
+        joint_name = self.add_6dof_joint(parent_link=parent_link, child_link=child_link)
         self._behavior_tree_config.add_sync_tf_frame(joint_name)
 
     def _add_joint(self, joint: Tuple[Type, Dict[str, Any]]):
@@ -147,11 +158,6 @@ class WorldConfig(Config):
         joint = FixedJoint(name=joint_name, parent_link_name=parent_link, child_link_name=child_link,
                            parent_T_child=homogenous_transform)
         self._world._add_joint(joint)
-        # joint = (FixedJoint, {'name': joint_name,
-        #                       'parent_link_name': parent_link,
-        #                       'child_link_name': child_link,
-        #                       'parent_T_child': homogenous_transform})
-        # self._add_joint(joint)
 
     def add_diff_drive_joint(self,
                              name: str,
@@ -179,21 +185,18 @@ class WorldConfig(Config):
             self._add_odometry_topic(odometry_topic=odometry_topic,
                                      joint_name=joint_name)
 
-    def _add_tf_joint(self, parent_link: my_string, child_link: my_string):
+    def add_6dof_joint(self, parent_link: my_string, child_link: my_string):
         """
         Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
         :param parent_link:
         :param child_link:
         :param homogenous_transform: a 4x4 transformation matrix.
         """
-        parent_link = PrefixName.from_string(parent_link, set_none_if_no_slash=True)
+        parent_link = self._world.search_for_link_name(parent_link)
         child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
         joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
-        joint = (TFJoint, {'name': joint_name,
-                           'parent_link_name': parent_link,
-                           'child_link_name': child_link})
-        self._add_joint(joint)
-        return joint_name
+        joint = Joint6DOF(name=joint_name, parent_link_name=parent_link, child_link_name=child_link)
+        self._world._add_joint(joint)
 
     def add_empty_link(self, link_name: my_string):
         link = Link(link_name)

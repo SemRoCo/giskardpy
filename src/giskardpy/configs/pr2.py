@@ -44,7 +44,7 @@ class PR2_Base(Giskard):
         self.world.set_root_link_name('map')
         odom_link_name = 'odom_combined'
         self.world.add_empty_link(odom_link_name)
-        self.world.add_fixed_joint(parent_link='map', child_link=odom_link_name)
+        self.world.add_6dof_joint(parent_link='map', child_link=odom_link_name)
         pr2_group_name = self.world.add_robot_from_parameter_server()
         root_link_name = self.world.get_root_link_of_group(pr2_group_name)
         self.world.add_omni_drive_joint(name='brumbrum',
@@ -61,7 +61,6 @@ class PR2_Base(Giskard):
                                             Derivatives.jerk: 6
                                         },
                                         robot_group_name=pr2_group_name)
-        pass
 
     def configure_collision_avoidance(self):
         # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
@@ -111,10 +110,9 @@ class PR2_Base(Giskard):
 
 
 class PR2_Mujoco(PR2_Base):
-    def __init__(self):
-        self.add_robot_from_parameter_server()
-        super().__init__()
-        self.set_default_visualization_marker_color(1, 1, 1, 0.7)
+    def configure_world(self):
+        super().configure_world()
+        self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
         self.add_sync_tf_frame('map', 'odom_combined')
         self.add_omni_drive_joint(name='brumbrum',
                                   parent_link_name='odom_combined',
@@ -130,6 +128,9 @@ class PR2_Mujoco(PR2_Base):
                                       Derivatives.jerk: 5
                                   },
                                   odometry_topic='/pr2/base_footprint')
+
+    def configure_robot_interface(self):
+        super().configure_robot_interface()
         self.add_follow_joint_trajectory_server(namespace='/pr2/whole_body_controller/follow_joint_trajectory',
                                                 state_topic='/pr2/whole_body_controller/state')
         self.add_follow_joint_trajectory_server(namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
@@ -142,6 +143,7 @@ class PR2_Mujoco(PR2_Base):
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,
                                                     hard_threshold=0.1)
+
 
 
 class PR2_IAI(PR2_Base):
@@ -252,7 +254,7 @@ class PR2_StandAlone(PR2_Base):
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()
-        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=True,
+        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=False,
                                                            add_to_control_loop=True)
         self.behavior_tree.configure_PlotTrajectory(enabled=True, wait=True)
         # self.behavior_tree.publish_all_tf()

@@ -430,7 +430,8 @@ class CollisionWorldSynchronizer:
         return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name, collision_id)
 
     def set_joint_state_to_zero(self):
-        self.world.state = JointStates()
+        for free_variable in self.world.free_variables:
+            self.world.state[free_variable].position = 0
         self.world.notify_state_change()
 
     def set_max_joint_state(self, group):

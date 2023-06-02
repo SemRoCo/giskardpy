@@ -2306,6 +2306,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
         zero_pose.clear_world()
+        zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute()
 
     def test_attach_remove_box(self, better_pose: PR2TestWrapper):

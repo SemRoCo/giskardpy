@@ -806,20 +806,9 @@ class WorldTree(WorldTreeInterface):
         """
         Resets Giskard to the state from when it was started.
         """
-        pass # FIXME
-        # self._clear()
-        # joints_to_add: List[Joint] = self.god_map.unsafe_get_data(identifier.joints_to_add)
-        # for joint_class, kwargs in joints_to_add:
-        #     joint = joint_class(**kwargs)
-        #     self._add_joint_and_create_child(joint)
-        # robot_config: RobotInterfaceConfig
-        # for robot_config in self.god_map.unsafe_get_data(identifier.robot_interface_configs):
-        #     self.add_urdf(robot_config.urdf,
-        #                   group_name=robot_config.name,
-        #                   actuated=True,
-        #                   add_drive_joint_to_group=robot_config.add_drive_joint_to_group)
-        # self.fast_all_fks = None
-        # self.notify_model_change()
+        self._clear()
+        with self.modify_world():
+            self.god_map.get_data(identifier.giskard).configure_world()
 
     def _add_joint_and_create_child(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)

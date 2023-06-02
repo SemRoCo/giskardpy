@@ -394,19 +394,6 @@ class BehaviorTreeConfig(Config):
         }
         self.behavior_tree_config.plugin_config['PublishDebugExpressions'].update(publish_flags)
 
-    def configure_CollisionMarker(self, enabled: bool = True, in_planning_loop: bool = False):
-        """
-        :param enabled: whether Giskard should publish collision markers during planning
-        :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
-                                    the system.
-        """
-        if self.god_map.get_data(identifier.enable_CPIMarker) \
-                and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
-                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            plan_postprocessing.add_child(anything_is_success(CollisionMarker)('collision marker'))
-        self.behavior_tree_config.plugin_config['CollisionMarker']['enabled'] = enabled
-        self.behavior_tree_config.plugin_config['CollisionMarker']['in_planning_loop'] = in_planning_loop
-
     def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
         self._behavior_tree.configure_plot_trajectory(enabled, normalize_position, wait)
 

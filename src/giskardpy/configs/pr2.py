@@ -253,7 +253,8 @@ class PR2_StandAlone(PR2_Base):
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()
-        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=False, add_to_planning=True)
+        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=True,
+                                                           add_to_control_loop=True)
         self.behavior_tree.configure_PlotTrajectory(enabled=True, wait=True)
         # self.behavior_tree.configure_CollisionMarker(in_planning_loop=True)
         # self.behavior_tree.publish_all_tf()

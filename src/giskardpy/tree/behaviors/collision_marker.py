@@ -40,7 +40,7 @@ class CollisionMarker(GiskardBehavior):
         collisions = self.get_god_map().get_data(identifier.closest_point)
         if len(collisions.all_collisions) > 0:
             self.publish_cpi_markers(collisions)
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def collision_to_marker(self, collisions: Union[Set[Collision], List[Collision]]) -> Marker:
         m = Marker()

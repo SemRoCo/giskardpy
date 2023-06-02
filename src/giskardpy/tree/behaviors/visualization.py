@@ -42,7 +42,7 @@ class VisualizationBehavior(GiskardBehavior):
         self.publisher.publish(markers)
         if self.ensure_publish:
             rospy.sleep(0.1)
-        return py_trees.common.Status.RUNNING
+        return py_trees.common.Status.SUCCESS
 
     def clear_marker(self):
         msg = MarkerArray()

@@ -355,13 +355,17 @@ class BehaviorTreeConfig(Config):
     def configure_MaxTrajectoryLength(self, enabled: bool = True, length: float = 30):
         self._behavior_tree.configure_max_trajectory_length(enabled, length)
 
-    def configure_VisualizationBehavior(self, add_to_sync: bool = True, add_to_planning: bool = False):
+    def configure_VisualizationBehavior(self,
+                                       add_to_sync: Optional[bool] = None,
+                                       add_to_planning: Optional[bool] = None,
+                                       add_to_control_loop: Optional[bool] = None):
         """
         :param enabled: whether Giskard should publish markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
                                     the system.
         """
-        self._behavior_tree.configure_visualization_marker(add_to_sync=add_to_sync, add_to_planning=add_to_planning)
+        self._behavior_tree.configure_visualization_marker(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
+                                                           add_to_control_loop=add_to_control_loop)
 
     def configure_PublishDebugExpressions(self, publish_lb: bool = False, publish_ub: bool = False,
                                           publish_lbA: bool = False, publish_ubA: bool = False,

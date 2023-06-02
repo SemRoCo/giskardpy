@@ -270,8 +270,10 @@ class TreeManager(ABC):
         self.tree.tick()
 
     @abc.abstractmethod
-    def configure_visualization_marker(self, add_to_sync: Optional[bool] = None,
-                                       add_to_planning: Optional[bool] = None):
+    def configure_visualization_marker(self,
+                                       add_to_sync: Optional[bool] = None,
+                                       add_to_planning: Optional[bool] = None,
+                                       add_to_control_loop: Optional[bool] = None):
         ...
 
     @abc.abstractmethod
@@ -510,7 +512,7 @@ def generate_pydot_graph(root, visibility_level):
                     function_names = ['__init__', 'setup', 'initialise', 'update']
                     function_name_padding = 20
                     entry_name_padding = 8
-                    number_padding = function_name_padding-entry_name_padding
+                    number_padding = function_name_padding - entry_name_padding
                     if hasattr(original_c, '__times'):
                         time_dict = original_c.__times
                     else:
@@ -547,6 +549,7 @@ class StandAlone(TreeManager):
     sync_name: str = 'Synchronize'
     closed_loop_control_name: str = 'closed loop control'
     plan_postprocessing_name: str = 'plan postprocessing'
+    planning2_name: str = 'planning II'
 
     def grow_giskard(self):
         root = Sequence('Giskard')
@@ -601,7 +604,7 @@ class StandAlone(TreeManager):
         return planning
 
     def grow_planning2(self):
-        planning_2 = failure_is_success(Selector)('planning II')
+        planning_2 = failure_is_success(Selector)(self.planning2_name)
         planning_2.add_child(GoalCanceled('goal canceled', self.action_server_name))
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
                                                                  self.action_server_name,
@@ -636,38 +639,25 @@ class StandAlone(TreeManager):
         plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
         return plan_postprocessing
 
-    def configure_visualization_marker(self, add_to_sync: Optional[bool] = None,
-                                       add_to_planning: Optional[bool] = None):
-        # visualization_behaviors = self.get_nodes_of_type(VisualizationBehavior)
-        if add_to_sync is not None:
-            sync_branch = self.get_node(self.sync_name)
-            # if add_to_sync:
-            #     sync_branch.enable_child()
-        if add_to_planning is not None:
-            # close_loop_control = self.tree_nodes[self.closed_loop_control_name]
-            behavior = VisualizationBehavior('visualization')
-            self.insert_node(behavior, self.closed_loop_control_name)
-        # if self.god_map.get_data(identifier.enable_VisualizationBehavior):
-        #     sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
-        # if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-        #         and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-        #     planning_2.add_child(running_is_failure(VisualizationBehavior)('visualization'))
-        # if self.god_map.get_data(identifier.enable_CPIMarker) \
-        #         and self.god_map.get_data(identifier.collision_checker) is not None \
-        #         and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-        #     planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
-        # if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-        #         and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-        #     planning_4.add_child(VisualizationBehavior('visualization'))
-        # if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-        #     planning_4.add_child(CollisionChecker('collision checker'))
-        #     if self.god_map.get_data(identifier.enable_CPIMarker) \
-        #             and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-        #         planning_4.add_child(CollisionMarker('cpi marker'))
-        # if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-        #         and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-        #     plan_postprocessing.add_child(
-        #         anything_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
+    def configure_visualization_marker(self,
+                                       add_to_sync: Optional[bool] = None,
+                                       add_to_planning: Optional[bool] = None,
+                                       add_to_control_loop: Optional[bool] = None):
+        if add_to_sync is not None and add_to_sync:
+            self.insert_node(VisualizationBehavior('visualization1'), self.sync_name)
+        if add_to_planning is not None and add_to_planning:
+            self.insert_node(success_is_failure(VisualizationBehavior)('visualization2'), self.planning2_name, 2)
+            self.insert_node(anything_is_success(VisualizationBehavior)('visualization3'),
+                             self.plan_postprocessing_name)
+            if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+                self.insert_node(success_is_failure(CollisionMarker)('collision marker2'), self.planning2_name, 2)
+                self.insert_node(anything_is_success(CollisionMarker)('collision marker3'),
+                                 self.plan_postprocessing_name)
+        if add_to_control_loop is not None and add_to_control_loop:
+            self.insert_node(success_is_running(VisualizationBehavior)('visualization4'), self.closed_loop_control_name)
+            if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+                self.insert_node(success_is_running(CollisionMarker)('collision marker4'),
+                                 self.closed_loop_control_name)
 
     def configure_max_trajectory_length(self, enabled: bool, length: float):
         nodes: List[MaxTrajectoryLength] = self.get_nodes_of_type(MaxTrajectoryLength)
@@ -768,8 +758,8 @@ class OpenLoop(StandAlone):
                                                                              identifier.PublishDebugExpressions)))
                 if self.god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
                     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher',
-                                                                         **self.god_map.unsafe_get_data(
-                                                                             identifier.PlotDebugTF)))
+                                                                      **self.god_map.unsafe_get_data(
+                                                                          identifier.PlotDebugTF)))
 
                 real_time_tracking.add_child(SendTrajectoryToCmdVel(**drive_interface))
                 execution_action_server.add_child(real_time_tracking)
@@ -809,7 +799,7 @@ class ClosedLoop(OpenLoop):
             C = behaviors[params['plugin']]
             del params['plugin']
             planning_4.add_child(C(execution_action_server_name, **params))
-        #planning_4.add_child(SyncConfiguration2('update robot configuration',
+        # planning_4.add_child(SyncConfiguration2('update robot configuration',
         #                                         self.god_map.unsafe_get_data(identifier.robot_group_name)))
         planning_4.add_child(LogTrajPlugin('log'))
         if self.god_map.get_data(identifier.collision_checker) is not None:
@@ -827,7 +817,6 @@ class ClosedLoop(OpenLoop):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
         return planning_4
-
 
 # def sanity_check(god_map):
 #     check_velocity_limits_reachable(god_map)

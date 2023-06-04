@@ -733,7 +733,7 @@ class OpenLoop(StandAlone):
         real_time_tracking = AsyncBehavior('base sequence')
         sync_tf_nodes = self.get_nodes_of_type(SyncTfFrames)
         for node in sync_tf_nodes:
-            real_time_tracking.add_child(SyncTfFrames(node.name + '*', node.joint_map))
+            real_time_tracking.add_child(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map))
         odom_nodes = self.get_nodes_of_type(SyncOdometry)
         for node in odom_nodes:
             real_time_tracking.add_child(success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,

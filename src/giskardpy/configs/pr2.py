@@ -87,6 +87,13 @@ class PR2_Mujoco(PR2_Base):
         self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
         # odometry_topic='/pr2/base_footprint')
 
+    def configure_behavior_tree(self):
+        super().configure_behavior_tree()
+        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=True,
+                                                           add_to_control_loop=False)
+        # self.behavior_tree.configure_PlotTrajectory(enabled=True, wait=True)
+        # self.behavior_tree.publish_all_tf()
+
     def configure_robot_interface(self):
         super().configure_robot_interface()
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,

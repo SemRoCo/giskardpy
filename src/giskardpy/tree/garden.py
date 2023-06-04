@@ -282,7 +282,7 @@ class TreeManager(ABC):
         ...
 
     @abc.abstractmethod
-    def sync_joint_state_topic(self, topic_name: str):
+    def sync_joint_state_topic(self, group_name: str, topic_name: str):
         ...
 
     @abc.abstractmethod
@@ -290,7 +290,13 @@ class TreeManager(ABC):
         ...
 
     @abc.abstractmethod
-    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str):
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
+                                            fill_velocity_values: bool):
+        ...
+
+    @abc.abstractmethod
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
         ...
 
     @abc.abstractmethod
@@ -401,6 +407,7 @@ class TreeManager(ABC):
         return self.tree_nodes[node_name].node
 
     GiskardBehavior_ = TypeVar('GiskardBehavior_', bound=GiskardBehavior)
+
     def get_nodes_of_type(self, node_type: Type[GiskardBehavior_]) -> List[GiskardBehavior_]:
         return [node.node for node in self.tree_nodes.values() if isinstance(node.node, node_type)]
 
@@ -697,8 +704,8 @@ class StandAlone(TreeManager):
         for node in tf_sync_nodes:
             node.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
 
-    def sync_joint_state_topic(self, topic_name: str):
-        behavior = SyncConfiguration(joint_state_topic=topic_name)
+    def sync_joint_state_topic(self, group_name: str, topic_name: str):
+        behavior = SyncConfiguration(group_name=group_name, joint_state_topic=topic_name)
         self.insert_node(behavior, self.sync_name, 2)
 
     def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
@@ -707,10 +714,50 @@ class StandAlone(TreeManager):
 
 
 class OpenLoop(StandAlone):
+    move_robots_name = 'move robots'
+    execution_name = 'execution'
 
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
+                                            fill_velocity_values: bool):
+        behavior = SendFollowJointTrajectory(action_namespace=namespace, state_topic=state_topic, group_name=group_name,
+                                             fill_velocity_values=fill_velocity_values)
+        self.insert_node(behavior, self.move_robots_name)
 
-    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str):
-        pass
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        # todo handle if this is called twice
+        self.insert_node(CleanUpBaseController('CleanUpBaseController', clear_markers=False), self.execution_name)
+        self.insert_node(SetDriveGoals('SetupBaseTrajConstraints'), self.execution_name)
+        self.insert_node(InitQPController('InitQPController for base'), self.execution_name)
+
+        real_time_tracking = AsyncBehavior('base sequence')
+        sync_tf_nodes = self.get_nodes_of_type(SyncTfFrames)
+        for node in sync_tf_nodes:
+            real_time_tracking.add_child(SyncTfFrames(node.name + '*', node.joint_map))
+        odom_nodes = self.get_nodes_of_type(SyncOdometry)
+        for node in odom_nodes:
+            real_time_tracking.add_child(success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,
+                                                                          joint_name=node.joint_name,
+                                                                          name_suffix='*'))
+        real_time_tracking.add_child(RosTime('time'))
+        real_time_tracking.add_child(ControllerPluginBase('base controller'))
+        real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
+        # todo debugging
+        # if self.god_map.get_data(identifier.PlotDebugTF_enabled):
+        #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
+        # if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
+        #     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
+        #                                                          **self.god_map.unsafe_get_data(
+        #                                                              identifier.PublishDebugExpressions)))
+        # if self.god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
+        #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher',
+        #                                                       **self.god_map.unsafe_get_data(
+        #                                                           identifier.PlotDebugTF)))
+
+        real_time_tracking.add_child(SendTrajectoryToCmdVel(cmd_vel_topic=cmd_vel_topic,
+                                                            track_only_velocity=track_only_velocity,
+                                                            joint_name=joint_name))
+        self.insert_node(real_time_tracking, self.move_robots_name)
 
     def grow_giskard(self):
         root = Sequence('Giskard')
@@ -725,7 +772,7 @@ class OpenLoop(StandAlone):
     def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames', joint_names=[]))
+        sync.add_child(SyncTfFrames('sync tf frames'))
         # hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
         # for kwargs in hardware_config.joint_state_topics_kwargs:
         #     sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
@@ -738,12 +785,8 @@ class OpenLoop(StandAlone):
         return sync
 
     def grow_execution(self):
-        execution = failure_is_success(Sequence)('execution')
+        execution = failure_is_success(Sequence)(self.execution_name)
         execution.add_child(IF('execute?', identifier.execute))
-        if self.add_real_time_tracking:
-            execution.add_child(CleanUpBaseController('CleanUpBaseController', clear_markers=False))
-            execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
-            execution.add_child(InitQPController('InitQPController for base'))
         execution.add_child(SetTrackingStartTime('start start time'))
         execution.add_child(self.grow_monitor_execution())
         execution.add_child(SetZeroVelocity())
@@ -772,35 +815,8 @@ class OpenLoop(StandAlone):
         return len(drive_interfaces) > 0
 
     def grow_move_robots(self):
-        execution_action_server = Parallel('move robots',
+        execution_action_server = Parallel(self.move_robots_name,
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
-        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for follow_joint_trajectory_config in hardware_config.follow_joint_trajectory_interfaces_kwargs:
-            execution_action_server.add_child(SendFollowJointTrajectory(**follow_joint_trajectory_config))
-        if self.add_real_time_tracking:
-            for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
-                real_time_tracking = AsyncBehavior('base sequence')
-                real_time_tracking.add_child(success_is_running(SyncTfFrames)('sync tf frames',
-                                                                              **self.god_map.unsafe_get_data(
-                                                                                  identifier.SyncTfFrames)))
-                for odometry_kwargs in hardware_config.odometry_node_kwargs:
-                    real_time_tracking.add_child(SyncOdometry(**odometry_kwargs))
-                real_time_tracking.add_child(RosTime('time'))
-                real_time_tracking.add_child(ControllerPluginBase('base controller'))
-                real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
-                if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-                    real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
-                if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
-                    real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
-                                                                         **self.god_map.unsafe_get_data(
-                                                                             identifier.PublishDebugExpressions)))
-                if self.god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
-                    real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher',
-                                                                      **self.god_map.unsafe_get_data(
-                                                                          identifier.PlotDebugTF)))
-
-                real_time_tracking.add_child(SendTrajectoryToCmdVel(**drive_interface))
-                execution_action_server.add_child(real_time_tracking)
         return execution_action_server
 
 

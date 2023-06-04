@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 import giskardpy.casadi_wrapper as w
 from py_trees import Status
 
@@ -14,9 +14,12 @@ class SyncTfFrames(GiskardBehavior):
     joint_map: Dict[PrefixName, Tuple[str, str]]
 
     @profile
-    def __init__(self, name):
+    def __init__(self, name, joint_map: Optional[Dict[PrefixName, Tuple[str, str]]] = None):
         super().__init__(name)
-        self.joint_map = {}
+        if joint_map is None:
+            self.joint_map = {}
+        else:
+            self.joint_map = joint_map
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
         if joint_name in self.joint_map:

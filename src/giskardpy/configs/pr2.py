@@ -78,6 +78,10 @@ class PR2_Base(Giskard):
 
 
 class PR2_Mujoco(PR2_Base):
+    def __init__(self):
+        super().__init__()
+        self.set_control_mode(ControlModes.open_loop)
+
     def configure_world(self):
         super().configure_world()
         self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
@@ -100,7 +104,8 @@ class PR2_Mujoco(PR2_Base):
             namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
             state_topic='/pr2/r_gripper_l_finger_controller/state')
         self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
-                                                   track_only_velocity=True)
+                                                   track_only_velocity=True,
+                                                   joint_name='brumbrum')
 
 
 class PR2_IAI(PR2_Base):

@@ -51,7 +51,7 @@ class Config:
         return self.god_map.get_data(identifier.collision_scene)
 
     def get_default_group_name(self):
-        return list(self._world.groups.values())[0]
+        return list(self._world.groups.keys())[0]
 
 
 class WorldConfig(Config):
@@ -239,8 +239,10 @@ class RobotInterfaceConfig(Config):
         joint_name = self._world.search_for_joint_name(joint_name)
         self._behavior_tree.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
 
-    def sync_joint_state_topic(self, topic_name: str):
-        self._behavior_tree.sync_joint_state_topic(topic_name)
+    def sync_joint_state_topic(self, topic_name: str, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self._behavior_tree.sync_joint_state_topic(group_name=group_name, topic_name=topic_name)
 
     def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
         if group_name is None:
@@ -291,8 +293,8 @@ class RobotInterfaceConfig(Config):
 
     def add_base_cmd_velocity(self,
                               cmd_vel_topic: str,
-                              track_only_velocity: bool = False,
-                              joint_name: Optional[my_string] = None):
+                              joint_name: my_string,
+                              track_only_velocity: bool = False):
         """
         Used if the robot's base can be controlled with a Twist topic.
         :param cmd_vel_topic:
@@ -300,9 +302,8 @@ class RobotInterfaceConfig(Config):
                                     the tracking smoother but less accurate.
         :param joint_name: name of the omni or diff drive joint. Doesn't need to be specified if there is only one.
         """
-        self.hardware_config.send_trajectory_to_cmd_vel_kwargs.append({'cmd_vel_topic': cmd_vel_topic,
-                                                                       'track_only_velocity': track_only_velocity,
-                                                                       'joint_name': joint_name})
+        joint_name = self._world.search_for_joint_name(joint_name)
+        self._behavior_tree.add_base_traj_action_server(cmd_vel_topic, track_only_velocity, joint_name)
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """
@@ -328,10 +329,9 @@ class RobotInterfaceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        self.hardware_config.follow_joint_trajectory_interfaces_kwargs.append({'action_namespace': namespace,
-                                                                               'state_topic': state_topic,
-                                                                               'group_name': group_name,
-                                                                               'fill_velocity_values': fill_velocity_values})
+        self._behavior_tree.add_follow_joint_traj_action_server(namespace=namespace, state_topic=state_topic,
+                                                                group_name=group_name,
+                                                                fill_velocity_values=fill_velocity_values)
 
 
 class BehaviorTreeConfig(Config):

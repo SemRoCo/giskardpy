@@ -52,13 +52,13 @@ class AsyncBehavior(GiskardBehavior, Composite):
     #     with self.status_lock:
     #         del self._children[child_name]
 
-    def setup(self, timeout):
-        self.start_children()
-        return super().setup(timeout)
-
-    def start_children(self):
-        for child in self.children:
-            child.setup(10.0)
+    # def setup(self, timeout):
+        # self.start_children()
+        # return super().setup(timeout)
+    #
+    # def start_children(self):
+    #     for child in self.children:
+    #         child.setup(10.0)
 
     def initialise(self):
         self.looped_once = False

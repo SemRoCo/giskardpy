@@ -393,7 +393,7 @@ class TestJointGoals:
             'l_wrist_roll_joint': -6.062015047706401,
         }
         zero_pose.set_joint_goal(start_state)
-        # zero_pose.plan_and_execute()
+        zero_pose.plan_and_execute()
 
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):
         js = {

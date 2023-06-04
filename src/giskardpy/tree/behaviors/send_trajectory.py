@@ -122,9 +122,6 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
         self.world.register_controlled_joints(controlled_joint_names)
 
-    def __str__(self):
-        return f'{super().__str__()} ({self.action_namespace})'
-
     @record_time
     @profile
     def initialise(self):

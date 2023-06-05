@@ -82,13 +82,6 @@ class QPSolverConfig:
         self.joint_weights = {d: defaultdict(float) for d in Derivatives}
 
 
-class HardwareConfig:
-    def __init__(self):
-        self.send_trajectory_to_cmd_vel_kwargs: List[dict] = []
-        self.follow_joint_trajectory_interfaces_kwargs: List[dict] = []
-        self.joint_state_topics_kwargs: List[dict] = []
-        self.odometry_node_kwargs: List[dict] = []
-
 class CollisionAvoidanceConfigEntry:
     def __init__(self,
                  number_of_repeller: int = 1,
@@ -137,90 +130,3 @@ class CollisionAvoidanceGroupConfig:
             default_distance = max(default_distance, getattr(value, parameter_name))
         return default_distance
 
-class BehaviorTreeConfig:
-    tree_tick_rate: float = 0.05
-
-    plugin_config = {
-        'GoalReached': {
-            'joint_convergence_threshold': 0.01,
-            'window_size': 21
-        },
-        'VisualizationBehavior': {
-            'enabled': True,
-            'in_planning_loop': False
-        },
-        'CollisionMarker': {
-            'enabled': True,
-            'in_planning_loop': False
-        },
-        'PublishDebugExpressions': {
-            'enabled': False,
-            'enabled_base': False,
-            'expression_filter': None
-        },
-        'PlotTrajectory': {
-            'enabled': False,
-            'history': 5,
-            'cm_per_second': 2.5,
-            'height_per_derivative': 6,
-            'normalize_position': False,
-            # 'order': 5,
-            'tick_stride': 0.5,
-            'wait': False,
-            # 'y_limits': [-0.5, 0.5]
-            # 'y_limits': [-5, 5]
-        },
-        'PlotDebugExpressions': {
-            'enabled': False,
-            'history': 5,
-            'cm_per_second': 2.5,
-            'height_per_derivative': 6,
-            # 'order': 2,
-            'wait': False,
-            'tick_stride': 0.5,
-            # 'y_limits': [-0.5, 0.5]
-        },
-        'WiggleCancel': {
-            'amplitude_threshold': 0.55,
-            'window_size': 21,
-            'frequency_range': 0.4,
-        },
-        'TFPublisher': {
-            'enabled': True,
-            'mode': TfPublishingModes.attached_objects,
-            'tf_topic': '/tf',
-        },
-        'MaxTrajectoryLength': {
-            'enabled': True,
-            'length': 60  # seconds
-        },
-        'LoopDetector': {
-            'precision': 4
-        },
-        'SyncTfFrames': {
-            'joint_names': [],
-        },
-        'PlotDebugTF': {
-            'enabled': False,
-            'enabled_base': False,
-        },
-    }
-
-    def set_goal_reached_parameters(self, joint_convergence_threshold=0.01, window_size=21):
-        self.plugin_config['GoalReached'] = {
-            'joint_convergence_threshold': joint_convergence_threshold,
-            'window_size': window_size
-        }
-
-    def add_sync_tf_frame(self, joint_name):
-        # TODO make data structure
-        self.plugin_config['SyncTfFrames']['joint_names'].append(joint_name)
-
-
-class RobotInterfaceConfig:
-    def __init__(self, urdf: str, name: Optional[str] = None, add_drive_joint_to_group: bool = True):
-        if name is None:
-            name = robot_name_from_urdf_string(urdf)
-        self.urdf = urdf
-        self.name = name
-        self.add_drive_joint_to_group = add_drive_joint_to_group

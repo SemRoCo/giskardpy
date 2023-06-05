@@ -18,7 +18,7 @@ from sortedcontainers import SortedList
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib, HardwareConfig
+from giskardpy.configs.data_types import CollisionCheckerLib
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher

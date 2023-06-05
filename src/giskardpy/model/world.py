@@ -16,8 +16,7 @@ import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.configs.data_types import RobotInterfaceConfig
-from giskardpy.data_types import JointStates, KeyDefaultDict
+from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap

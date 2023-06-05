@@ -134,7 +134,6 @@ class WorldModelUpdateContextManager:
             self.world.notify_model_change()
 
 
-
 class WorldTree(WorldTreeInterface):
     joints: Dict[PrefixName, Union[Joint, OmniDrive]]
     links: Dict[PrefixName, Link]
@@ -142,6 +141,7 @@ class WorldTree(WorldTreeInterface):
     free_variables: Dict[PrefixName, FreeVariable]
     virtual_free_variables: Dict[PrefixName, FreeVariable]
     context_manager_active: bool = False
+    _default_limits: Dict[Derivatives, float]
 
     def __init__(self, root_link_name: PrefixName):
         self.root_link_name = root_link_name
@@ -155,6 +155,19 @@ class WorldTree(WorldTreeInterface):
         self._state_version = 0
         self._model_version = 0
         self._clear()
+
+    @property
+    def default_limits(self):
+        if self._default_limits is None:
+            raise AttributeError(f'Please set default limits.')
+        return self._default_limits
+
+    def update_default_limits(self, new_limits: Dict[Derivatives, float]):
+        if not hasattr(self, '_default_limits'):
+            self._default_limits = {}
+        for derivative, limit in new_limits.items():
+            self._default_limits[derivative] = limit
+        # todo check if there are none missing
 
     def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
         logging.logwarn(f'Deprecated warning: use \'search_for_joint_name\' instead of \'get_joint_name\'.')
@@ -441,7 +454,7 @@ class WorldTree(WorldTreeInterface):
         #         group.groups[name] = new_group
         self.groups[name] = new_group
 
-    def deregister_group(self, name:str):
+    def deregister_group(self, name: str):
         del self.groups[name]
 
     @property
@@ -503,7 +516,7 @@ class WorldTree(WorldTreeInterface):
         max_derivative = self.god_map.get_data(identifier.max_derivative)
         for free_variable_name, command in next_commands.free_variable_data.items():
             self.state[free_variable_name][Derivatives.position] += command[0] * dt
-            self.state[free_variable_name][Derivatives.velocity:max_derivative+1] = command
+            self.state[free_variable_name][Derivatives.velocity:max_derivative + 1] = command
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)
@@ -557,7 +570,7 @@ class WorldTree(WorldTreeInterface):
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
 
-                joint = urdf_to_joint(urdf_joint, group_name)
+                joint = urdf_to_joint(urdf_joint, group_name, self.default_limits)
 
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)

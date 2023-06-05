@@ -68,6 +68,22 @@ class WorldConfig(Config):
         if self._default_root_link_name != root_link_name:
             self._world.rename_link(self._default_root_link_name, root_link_name)
 
+    def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
+        joint_name = self._world.search_for_joint_name(joint_name, group_name)
+        self._world.free_variables[joint_name].set_lower_limit(Derivatives.velocity, -velocity_limit)
+        self._world.free_variables[joint_name].set_upper_limit(Derivatives.velocity, velocity_limit)
+
+    def overwrite_joint_acceleration_limits(self, joint_name, acceleration_limit: float,
+                                            group_name: Optional[str] = None):
+        joint_name = self._world.search_for_joint_name(joint_name, group_name)
+        self._world.free_variables[joint_name].set_lower_limit(Derivatives.acceleration, -acceleration_limit)
+        self._world.free_variables[joint_name].set_upper_limit(Derivatives.acceleration, acceleration_limit)
+
+    def overwrite_joint_jerk_limits(self, joint_name, jerk_limit: float, group_name: Optional[str] = None):
+        joint_name = self._world.search_for_joint_name(joint_name, group_name)
+        self._world.free_variables[joint_name].set_lower_limit(Derivatives.jerk, -jerk_limit)
+        self._world.free_variables[joint_name].set_upper_limit(Derivatives.jerk, jerk_limit)
+
     def set_default_visualization_marker_color(self, r: float, g: float, b: float, a: float):
         """
         :param r: 0-1
@@ -81,6 +97,9 @@ class WorldConfig(Config):
         joints = self.god_map.get_data(identifier.joints_to_add, default=[])
         joints.append(joint)
 
+    def set_default_limits(self, new_limits: Dict[Derivatives, float]):
+        self._world.update_default_limits(new_limits)
+
     def add_robot_urdf(self,
                        urdf: str,
                        group_name: str) -> str:
@@ -90,18 +109,8 @@ class WorldConfig(Config):
         :param group_name:
         :param joint_state_topics:
         """
-        # if not hasattr(self, 'robot_interface_configs'):
-        #     self.group_names = []
-        #     self.robot_interface_configs: List[RobotInterfaceConfig] = []
-        #     self.hardware_config: HardwareConfig = HardwareConfig()
         if group_name is None:
             group_name = robot_name_from_urdf_string(urdf)
-            # assert group_name not in self.group_names
-        # self.group_names.append(group_name)
-        # robot = RobotInterfaceConfig(urdf, name=group_name, add_drive_joint_to_group=add_drive_joint_to_group)
-        # self.robot_interface_configs.append(robot)
-        # js_kwargs = [{'group_name': group_name, 'joint_state_topic': topic} for topic in joint_state_topics]
-        # self.hardware_config.joint_state_topics_kwargs.extend(js_kwargs)
         self._world.add_urdf(urdf=urdf, group_name=group_name, actuated=True, add_drive_joint_to_group=True)
         return group_name
 
@@ -243,26 +252,6 @@ class RobotInterfaceConfig(Config):
         if group_name is None:
             group_name = self.get_default_group_name()
         self._behavior_tree.sync_joint_state_topic(group_name=group_name, topic_name=topic_name)
-
-    def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        joint_name = PrefixName(joint_name, group_name)
-        self._general_config.joint_limits[Derivatives.velocity][joint_name] = velocity_limit
-
-    def overwrite_joint_acceleration_limits(self, joint_name, acceleration_limit: float,
-                                            group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        joint_name = PrefixName(joint_name, group_name)
-        self._general_config.joint_limits[Derivatives.acceleration][joint_name] = acceleration_limit
-
-    def overwrite_joint_jerk_limits(self, joint_name, jerk_limit: float, group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        joint_name = PrefixName(joint_name, group_name)
-        self._general_config.joint_limits[Derivatives.jerk][joint_name] = jerk_limit
-
 
     def overwrite_joint_velocity_weight(self,
                                         joint_name: str,

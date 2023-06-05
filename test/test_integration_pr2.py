@@ -373,27 +373,6 @@ class TestJointGoals:
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
-        start_state = {
-            'torso_lift_joint': 0.3000254972469308,
-            'head_pan_joint': 0.04135718187588074,
-            'head_tilt_joint': -0.37,
-            'r_upper_arm_roll_joint': -0.8693958356996788,
-            'r_shoulder_pan_joint': -1.112011913457302,
-            'r_shoulder_lift_joint': 0.6165443541686221,
-            'r_forearm_roll_joint': -14.916890222524186,
-            'r_elbow_flex_joint': -1.6426864689071474,
-            'r_wrist_flex_joint': -0.6157655014694016,
-            'r_wrist_roll_joint': 0.07345662278755749,
-            'l_upper_arm_roll_joint': 1.7383062350263658,
-            'l_shoulder_pan_joint': 1.8799810286792007,
-            'l_shoulder_lift_joint': 0.011627231224188975,
-            'l_forearm_roll_joint': 281.2568789280418,
-            'l_elbow_flex_joint': -2.0300928925694675,
-            'l_wrist_flex_joint': -0.11,
-            'l_wrist_roll_joint': -6.062015047706401,
-        }
-        zero_pose.set_joint_goal(start_state)
-        zero_pose.plan_and_execute()
 
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):
         js = {

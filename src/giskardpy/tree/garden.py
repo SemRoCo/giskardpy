@@ -1,4 +1,5 @@
 from __future__ import annotations
+import inspect
 import abc
 from abc import ABC
 from collections import defaultdict
@@ -695,8 +696,20 @@ class StandAlone(TreeManager):
                 self.disable_node(node.name)
             node.length = length
 
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
+                                            fill_velocity_values: bool):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
     def configure_plot_trajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
-        behavior = PlotTrajectory('plot trajectory', wait=wait)
+        # todo handle enabled properly
+        behavior = PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position)
         self.insert_node(behavior, self.plan_postprocessing_name)
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):

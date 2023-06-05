@@ -1,5 +1,7 @@
 from typing import Optional
 
+import numpy as np
+
 from giskardpy.configs.data_types import ControlModes, CollisionCheckerLib, SupportedQPSolver
 from giskardpy.configs.default_giskard import Giskard
 from giskardpy.my_types import Derivatives
@@ -9,6 +11,9 @@ class PR2_Base(Giskard):
     localization_joint_name = 'localization'
 
     def configure_world(self):
+        self.world.set_default_limits({Derivatives.velocity: 1,
+                                       Derivatives.acceleration: np.inf,
+                                       Derivatives.jerk: 30})
         self.world.set_root_link_name('map')
         odom_link_name = 'odom_combined'
         self.world.add_empty_link(odom_link_name)

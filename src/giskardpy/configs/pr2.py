@@ -9,19 +9,22 @@ from giskardpy.my_types import Derivatives
 
 class PR2_Base(Giskard):
     localization_joint_name = 'localization'
+    drive_joint_name = 'brumbrum'
+    odom_link_name = 'odom_combined'
+    map_name = 'map'
 
     def configure_world(self):
         self.world.set_default_limits({Derivatives.velocity: 1,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 30})
-        self.world.set_root_link_name('map')
-        odom_link_name = 'odom_combined'
-        self.world.add_empty_link(odom_link_name)
-        self.world.add_6dof_joint(parent_link='map', child_link=odom_link_name, joint_name=self.localization_joint_name)
+        self.world.set_root_link_name(self.map_name)
+        self.world.add_empty_link(self.odom_link_name)
+        self.world.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
+                                  joint_name=self.localization_joint_name)
         pr2_group_name = self.world.add_robot_from_parameter_server()
         root_link_name = self.world.get_root_link_of_group(pr2_group_name)
-        self.world.add_omni_drive_joint(name='brumbrum',
-                                        parent_link_name=odom_link_name,
+        self.world.add_omni_drive_joint(name=self.drive_joint_name,
+                                        parent_link_name=self.odom_link_name,
                                         child_link_name=root_link_name,
                                         translation_limits={
                                             Derivatives.velocity: 0.2,
@@ -70,7 +73,7 @@ class PR2_Base(Giskard):
                                                                           'l_gripper_l_finger_joint'])
         self.collision_avoidance.fix_joints_for_external_collision_avoidance(['r_gripper_l_finger_joint',
                                                                               'l_gripper_l_finger_joint'])
-        self.collision_avoidance.overwrite_external_collision_avoidance('brumbrum',
+        self.collision_avoidance.overwrite_external_collision_avoidance(self.drive_joint_name,
                                                                         number_of_repeller=2,
                                                                         soft_threshold=0.2,
                                                                         hard_threshold=0.1)
@@ -102,10 +105,10 @@ class PR2_Mujoco(PR2_Base):
     def configure_robot_interface(self):
         super().configure_robot_interface()
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
-                                                           tf_parent_frame='map',
-                                                           tf_child_frame='odom_combined')
+                                                           tf_parent_frame=self.map_name,
+                                                           tf_child_frame=self.odom_link_name)
         self.robot_interface.sync_joint_state_topic('/joint_states')
-        self.robot_interface.sync_odometry_topic('/pr2/base_footprint', 'brumbrum')
+        self.robot_interface.sync_odometry_topic('/pr2/base_footprint', self.drive_joint_name)
         self.robot_interface.add_follow_joint_trajectory_server(
             namespace='/pr2/whole_body_controller/follow_joint_trajectory',
             state_topic='/pr2/whole_body_controller/state')
@@ -117,7 +120,7 @@ class PR2_Mujoco(PR2_Base):
             state_topic='/pr2/r_gripper_l_finger_controller/state')
         self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
                                                    track_only_velocity=True,
-                                                   joint_name='brumbrum')
+                                                   joint_name=self.drive_joint_name)
 
 
 class PR2_IAI(PR2_Base):
@@ -126,7 +129,7 @@ class PR2_IAI(PR2_Base):
         super().__init__()
         self.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(name='brumbrum',
+        self.add_omni_drive_joint(name=self.drive_joint_name,
                                   parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
                                   translation_limits={
@@ -155,7 +158,7 @@ class PR2_IAI(PR2_Base):
                                                 fill_velocity_values=fill_velocity_values)
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
-        self.overwrite_external_collision_avoidance('brumbrum',
+        self.overwrite_external_collision_avoidance(self.drive_joint_name,
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,
                                                     hard_threshold=0.1)
@@ -168,7 +171,7 @@ class PR2_Unreal(PR2_Base):
         # self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
         # self.collision_avoidance_config.collision_checker = self.collision_avoidance_config.collision_checker.none
         self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(name='brumbrum',
+        self.add_omni_drive_joint(name=self.drive_joint_name,
                                   parent_link_name='odom_combined',
                                   child_link_name='base_footprint',
                                   translation_limits={
@@ -188,7 +191,7 @@ class PR2_Unreal(PR2_Base):
                                                 fill_velocity_values=fill_velocity_values)
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True)
-        self.overwrite_external_collision_avoidance('brumbrum',
+        self.overwrite_external_collision_avoidance(self.drive_joint_name,
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,
                                                     hard_threshold=0.1)
@@ -223,7 +226,7 @@ class PR2_StandAlone(PR2_Base):
             'l_elbow_flex_joint',
             'l_wrist_flex_joint',
             'l_wrist_roll_joint',
-            'brumbrum'
+            self.drive_joint_name,
         ])
 
     def configure_behavior_tree(self):

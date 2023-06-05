@@ -12,7 +12,9 @@ import rospy
 from sortedcontainers import SortedDict
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from giskardpy import identifier
 from giskardpy.data_types import JointStates
+from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, OmniDrive, MovableJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils import logging
@@ -91,7 +93,8 @@ class Trajectory:
             trajectory_msg.points.append(p)
         return trajectory_msg
 
-    def to_dict(self, normalize_position: bool = False, filter_0_vel: bool = True) -> Dict[Derivatives, Dict[PrefixName, np.ndarray]]:
+    def to_dict(self, normalize_position: bool = False, filter_0_vel: bool = True) -> Dict[
+        Derivatives, Dict[PrefixName, np.ndarray]]:
         data = defaultdict(lambda: defaultdict(list))
         for time, joint_states in self.items():
             for free_variable, joint_state in joint_states.items():
@@ -115,12 +118,12 @@ class Trajectory:
     def plot_trajectory(self,
                         path_to_data_folder: str,
                         sample_period: float,
-                        cm_per_second: float = 0.2,
+                        cm_per_second: float = 2.5,
                         normalize_position: bool = False,
-                        tick_stride: float = 1.0,
+                        tick_stride: float = 0.5,
                         file_name: str = 'trajectory.pdf',
                         history: int = 5,
-                        height_per_derivative: float = 3.5,
+                        height_per_derivative: float = 6,
                         print_last_tick: bool = False,
                         legend: bool = True,
                         hspace: float = 1,
@@ -138,6 +141,7 @@ class Trajectory:
         cm_per_second = cm_to_inch(cm_per_second)
         height_per_derivative = cm_to_inch(height_per_derivative)
         hspace = cm_to_inch(hspace)
+        max_derivative = GodMap().get_data(identifier.max_derivative)
         with plot_lock:
             def ceil(val, base=0.0, stride=1.0):
                 base = base % stride
@@ -158,8 +162,8 @@ class Trajectory:
             data = self.to_dict(normalize_position, filter_0_vel=filter_0_vel)
             times = np.arange(len(self)) * sample_period
 
-            f, axs = plt.subplots(len(Derivatives), sharex=True, gridspec_kw={'hspace': hspace})
-            f.set_size_inches(w=(times[-1] - times[0]) * cm_per_second, h=len(Derivatives) * height_per_derivative)
+            f, axs = plt.subplots((max_derivative + 1), sharex=True, gridspec_kw={'hspace': hspace})
+            f.set_size_inches(w=(times[-1] - times[0]) * cm_per_second, h=(max_derivative + 1) * height_per_derivative)
 
             plt.xlim(times[0], times[-1])
 
@@ -171,17 +175,19 @@ class Trajectory:
                 ticks = np.append(ticks, last)
                 if print_last_tick:
                     ticks = np.append(ticks, times[-1])
-                for derivative in data:
+                for derivative in Derivatives.range(start=Derivatives.position, stop=max_derivative):
                     axs[derivative].set_title(str(derivative))
                     axs[derivative].xaxis.set_ticks(ticks)
                     if y_limits is not None:
                         axs[derivative].set_ylim(y_limits)
             else:
-                for derivative in data:
+                for derivative in Derivatives.range(start=Derivatives.position, stop=max_derivative):
                     axs[derivative].set_title(str(derivative))
                     if y_limits is not None:
                         axs[derivative].set_ylim(y_limits)
             for derivative, d_data in data.items():
+                if derivative > max_derivative:
+                    continue
                 for free_variable, f_data in d_data.items():
                     try:
                         style, color = color_map[str(free_variable)]

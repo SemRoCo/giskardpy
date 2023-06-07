@@ -479,6 +479,18 @@ class TestConstraints:
         zero_pose.plan_and_execute()
         assert zero_pose.god_map.get_data(identifier.prediction_horizon) == default_prediction_horizon
 
+    def test_SetMaxTrajLength(self, zero_pose: PR2TestWrapper):
+        new_length = 4
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 10
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_max_traj_length(new_length)
+        zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
+        result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
+        dt = zero_pose.god_map.get_data(identifier.sample_period)
+        np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
+
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         tip = 'base_footprint'
         base_pose = PoseStamped()

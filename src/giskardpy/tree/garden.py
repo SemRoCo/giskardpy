@@ -916,11 +916,6 @@ class OpenLoop(StandAlone):
         execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
         return execute_canceled
 
-    @property
-    def add_real_time_tracking(self):
-        drive_interfaces = self.config.hardware_config.send_trajectory_to_cmd_vel_kwargs
-        return len(drive_interfaces) > 0
-
     def grow_move_robots(self):
         execution_action_server = Parallel(self.move_robots_name,
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
@@ -929,7 +924,8 @@ class OpenLoop(StandAlone):
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,
                               publish_ubA: bool = False, publish_bE: bool = False, publish_Ax: bool = False,
                               publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
-                              publish_g: bool = False, publish_debug: bool = False, add_to_base: bool = False):
+                              publish_g: bool = False, publish_debug: bool = False, add_to_base: bool = False,
+                              *args, **kwargs):
         node = PublishDebugExpressions('qp data publisher',
                                        publish_lb=publish_lb,
                                        publish_ub=publish_ub,

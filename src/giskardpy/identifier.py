@@ -62,32 +62,6 @@ retries_with_relaxed_constraints = qp_solver_config + ['retries_with_relaxed_con
 retry_added_slack = qp_solver_config + ['added_slack']
 retry_weight_factor = qp_solver_config + ['weight_factor']
 
-# tree
-plugins = giskard + ['behavior_tree_config', 'plugin_config']
-
-PlotDebugTrajectory = plugins + ['PlotDebugExpressions']
-PlotDebugTrajectory_enabled = PlotDebugTrajectory + ['enabled']
-
-PlotDebugTF = plugins + ['PlotDebugTF']
-PlotDebugTF_enabled = PlotDebugTF + ['enabled']
-
-MaxTrajectoryLength = plugins + ['MaxTrajectoryLength']
-MaxTrajectoryLength_enabled = MaxTrajectoryLength + ['enabled']
-
-fft_duration = plugins + ['WiggleCancel', 'fft_duration']
-amplitude_threshold = plugins + ['WiggleCancel', 'amplitude_threshold']
-num_samples_in_fft = plugins + ['WiggleCancel', 'window_size']
-frequency_range = plugins + ['WiggleCancel', 'frequency_range']
-
-TFPublisher = plugins + ['TFPublisher']
-TFPublisher_enabled = TFPublisher + ['enabled']
-
-SyncTfFrames = plugins + ['SyncTfFrames']
-frames_to_add = ['frames_to_add']
-joints_to_add = ['joints_to_add']
-
-PublishDebugExpressions = plugins + ['PublishDebugExpressions']
-
 # behavior tree
 tree_manager = ['behavior_tree']
 tree_tick_rate = giskard + ['behavior_tree', 'tree_tick_rate']
@@ -99,10 +73,6 @@ closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
 collision_checker = giskard + ['collision_avoidance', 'collision_checker_id']
-
-# robot interface
-robot_interface_configs = giskard + ['robot_interface_configs']
-hardware_config = giskard + ['hardware_config']
 
 # rnd stuff
 timer_collector = ['timer_collector']

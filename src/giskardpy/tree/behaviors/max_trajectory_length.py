@@ -7,6 +7,8 @@ from giskardpy.utils.decorators import record_time
 
 
 class MaxTrajectoryLength(GiskardBehavior):
+    length: float
+
     @profile
     def __init__(self, name, length: int = 30):
         super().__init__(name)

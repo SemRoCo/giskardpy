@@ -108,6 +108,7 @@ class TestConstraints:
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
+
 class TestCartGoals:
     def test_forward_right_and_rotate(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -116,6 +117,7 @@ class TestCartGoals:
         base_goal.pose.position.y = -1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
         zero_pose.move_base(base_goal)
+
 
 class TestActionServerEvents:
     def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):

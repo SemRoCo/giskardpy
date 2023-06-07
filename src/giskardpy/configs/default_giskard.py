@@ -371,26 +371,11 @@ class BehaviorTreeConfig(Config):
         }
         self.behavior_tree_config.plugin_config['PublishDebugExpressions'].update(publish_flags)
 
-    def configure_PlotTrajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
-        self._behavior_tree.configure_plot_trajectory(enabled, normalize_position, wait)
+    def add_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
+        self._behavior_tree.add_plot_trajectory(normalize_position, wait)
 
-
-    def configure_PlotDebugExpressions(self, enabled: bool = False, wait: bool = False):
-        if self.god_map.get_data(identifier.debug_expr_needed):
-            planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
-        if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
-            planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
-                                                         **self.god_map.unsafe_get_data(
-                                                             identifier.PublishDebugExpressions)))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            kwargs = self.god_map.get_data(identifier.PlotDebugTrajectory)
-            plan_postprocessing.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))
-        if enabled:
-            self._god_map.set_data(identifier.debug_expr_needed, True)
-        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['enabled'] = enabled
-        self.behavior_tree_config.plugin_config['PlotDebugExpressions']['wait'] = wait
+    def add_debug_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
+        self._behavior_tree.add_plot_debug_trajectory(normalize_position=normalize_position, wait=wait)
 
     def configure_DebugMarkerPublisher(self, enabled: bool = False):
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):

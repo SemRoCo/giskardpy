@@ -3,6 +3,7 @@ import inspect
 import abc
 from abc import ABC
 from collections import defaultdict
+from copy import copy
 from time import time
 from typing import Type, TypeVar, Union, Dict, List, Optional
 
@@ -19,6 +20,7 @@ import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
@@ -169,26 +171,22 @@ class ManagerNode:
         """
         adds the given manager node to the internal tree map and the corresponding behavior to the behavior tree
         """
-        if isinstance(self.node, AsyncBehavior):
-            self.enabled_children.add(manager_node)
-            self.node.add_child(manager_node.node)
+        if manager_node.position < 0:
+            manager_node.position = 0
+            if self.enabled_children:
+                manager_node.position = max(manager_node.position, self.enabled_children[-1].position + 1)
+            if self.disabled_children:
+                manager_node.position = max(manager_node.position, self.disabled_children[-1].position + 1)
+            idx = manager_node.position
         else:
-            if manager_node.position < 0:
-                manager_node.position = 0
-                if self.enabled_children:
-                    manager_node.position = max(manager_node.position, self.enabled_children[-1].position + 1)
-                if self.disabled_children:
-                    manager_node.position = max(manager_node.position, self.disabled_children[-1].position + 1)
-                idx = manager_node.position
-            else:
-                idx = self.disabled_children.bisect_left(manager_node)
-                for c in self.disabled_children.islice(start=idx):
-                    c.position += 1
-                idx = self.enabled_children.bisect_left(manager_node)
-                for c in self.enabled_children.islice(start=idx):
-                    c.position += 1
-            self.node.insert_child(manager_node.node, idx)
-            self.enabled_children.add(manager_node)
+            idx = self.disabled_children.bisect_left(manager_node)
+            for c in self.disabled_children.islice(start=idx):
+                c.position += 1
+            idx = self.enabled_children.bisect_left(manager_node)
+            for c in self.enabled_children.islice(start=idx):
+                c.position += 1
+        self.node.insert_child(manager_node.node, idx)
+        self.enabled_children.add(manager_node)
 
     def remove_child(self, manager_node):
         """
@@ -301,11 +299,19 @@ class TreeManager(ABC):
         ...
 
     @abc.abstractmethod
+    def add_evaluate_debug_expressions(self):
+        ...
+
+    @abc.abstractmethod
     def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
         ...
 
     @abc.abstractmethod
-    def configure_plot_trajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
+    def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
+        ...
+
+    @abc.abstractmethod
+    def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
         ...
 
     def setup(self, timeout=30):
@@ -411,6 +417,15 @@ class TreeManager(ABC):
 
     def get_nodes_of_type(self, node_type: Type[GiskardBehavior_]) -> List[GiskardBehavior_]:
         return [node.node for node in self.tree_nodes.values() if isinstance(node.node, node_type)]
+
+    def insert_node_behind_every_node_of_type(self, node_type: Type[GiskardBehavior],
+                                              node_to_be_added: GiskardBehavior):
+        nodes = self.get_nodes_of_type(node_type)
+        for idx, node in enumerate(nodes):
+            node_copy = node_to_be_added.make_copy('*' * idx)
+            manager_node = self.tree_nodes[node.name]
+            parent = manager_node.parent.node
+            self.insert_node(node_copy, parent.name, self.tree_nodes[node.name].position + 1)
 
     def render(self):
         path = self.god_map.get_data(identifier.tmp_folder) + 'tree'
@@ -707,9 +722,29 @@ class StandAlone(TreeManager):
         current_function_name = inspect.currentframe().f_code.co_name
         NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
 
-    def configure_plot_trajectory(self, enabled: bool = False, normalize_position: bool = False, wait: bool = False):
-        # todo handle enabled properly
+    def add_evaluate_debug_expressions(self):
+        nodes = self.get_nodes_of_type(EvaluateDebugExpressions)
+        if len(nodes) == 0:
+            self.insert_node_behind_every_node_of_type(ControllerPlugin,
+                                                       EvaluateDebugExpressions('evaluate debug expressions'))
+
+    def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
+        if len(self.get_nodes_of_type(PlotTrajectory)) > 0:
+            raise BehaviorTreeException(f'add_plot_trajectory is not allowed to be called twice')
         behavior = PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position)
+        self.insert_node(behavior, self.plan_postprocessing_name)
+
+    def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
+        if len(self.get_nodes_of_type(PlotDebugExpressions)) > 0:
+            raise BehaviorTreeException(f'add_plot_debug_trajectory is not allowed to be called twice')
+        self.add_evaluate_debug_expressions()
+        for node in self.get_nodes_of_type(EvaluateDebugExpressions):
+            manager_node = self.tree_nodes[node.name]
+            parent_node = self.tree_nodes[node.name].parent
+            if parent_node.node.name == self.closed_loop_control_name:
+                self.insert_node(LogDebugExpressionsPlugin('log lba'), self.closed_loop_control_name,
+                                 manager_node.position + 1)
+        behavior = PlotDebugExpressions('plot debug trajectory', wait=wait, normalize_position=normalize_position)
         self.insert_node(behavior, self.plan_postprocessing_name)
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
@@ -743,18 +778,21 @@ class OpenLoop(StandAlone):
         self.insert_node(SetDriveGoals('SetupBaseTrajConstraints'), self.execution_name)
         self.insert_node(InitQPController('InitQPController for base'), self.execution_name)
 
-        real_time_tracking = AsyncBehavior('base sequence')
+        base_sequence_name = 'base sequence'
+        real_time_tracking = AsyncBehavior(base_sequence_name)
+        self.insert_node(real_time_tracking, self.move_robots_name)
         sync_tf_nodes = self.get_nodes_of_type(SyncTfFrames)
         for node in sync_tf_nodes:
-            real_time_tracking.add_child(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map))
+            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map), base_sequence_name)
         odom_nodes = self.get_nodes_of_type(SyncOdometry)
         for node in odom_nodes:
-            real_time_tracking.add_child(success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,
-                                                                          joint_name=node.joint_name,
-                                                                          name_suffix='*'))
-        real_time_tracking.add_child(RosTime('time'))
-        real_time_tracking.add_child(ControllerPluginBase('base controller'))
-        real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
+            new_node = success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,
+                                                        joint_name=node.joint_name,
+                                                        name_suffix='*')
+            self.insert_node(new_node, base_sequence_name)
+        self.insert_node(RosTime('time'), base_sequence_name)
+        self.insert_node(ControllerPlugin('base controller'), base_sequence_name)
+        self.insert_node(RealKinSimPlugin('base kin sim'), base_sequence_name)
         # todo debugging
         # if self.god_map.get_data(identifier.PlotDebugTF_enabled):
         #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
@@ -767,10 +805,9 @@ class OpenLoop(StandAlone):
         #                                                       **self.god_map.unsafe_get_data(
         #                                                           identifier.PlotDebugTF)))
 
-        real_time_tracking.add_child(SendTrajectoryToCmdVel(cmd_vel_topic=cmd_vel_topic,
-                                                            track_only_velocity=track_only_velocity,
-                                                            joint_name=joint_name))
-        self.insert_node(real_time_tracking, self.move_robots_name)
+        self.insert_node(SendTrajectoryToCmdVel(cmd_vel_topic=cmd_vel_topic,
+                                                track_only_velocity=track_only_velocity,
+                                                joint_name=joint_name), base_sequence_name)
 
     def grow_giskard(self):
         root = Sequence('Giskard')

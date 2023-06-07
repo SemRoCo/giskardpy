@@ -243,8 +243,8 @@ class GiskardTestWrapper(GiskardWrapper):
             logging.loginfo('Inside github workflow, turning off visualization')
             self.giskard.configure_VisualizationBehavior(enabled=False)
             self.giskard.configure_CollisionMarker(enabled=False)
-            self.giskard.configure_PlotTrajectory(enabled=False)
-            self.giskard.configure_PlotDebugExpressions(enabled=False)
+            self.giskard.add_trajectory_plotter(enabled=False)
+            self.giskard.add_debug_trajectory_plotter(enabled=False)
         if 'QP_SOLVER' in os.environ:
             self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.giskard.grow()

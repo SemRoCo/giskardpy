@@ -314,6 +314,15 @@ class TreeManager(ABC):
     def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
         ...
 
+    @abc.abstractmethod
+    def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
+                              publish_lbA: bool = False, publish_ubA: bool = False,
+                              publish_bE: bool = False, publish_Ax: bool = False,
+                              publish_Ex: bool = False, publish_xdot: bool = False,
+                              publish_weights: bool = False, publish_g: bool = False,
+                              publish_debug: bool = False, *args, **kwargs):
+        ...
+
     def setup(self, timeout=30):
         self.tree.setup(timeout)
 
@@ -383,7 +392,12 @@ class TreeManager(ABC):
         :param parent_name: the name of the parent node where the node will be inserted
         :param position: the node will be inserted as the nth child with n = len([x for x in children if x.position < position])
         """
-        if node.name in self.tree_nodes:
+        for i in range(100):
+            if node.name in self.tree_nodes:
+                node.name += '*'
+            else:
+                break
+        else:
             raise ValueError(f'Node named {node.name} already exists.')
         parent = self.tree_nodes[parent_name]
         tree_node = ManagerNode(node=node, parent=parent, position=position)
@@ -422,10 +436,18 @@ class TreeManager(ABC):
                                               node_to_be_added: GiskardBehavior):
         nodes = self.get_nodes_of_type(node_type)
         for idx, node in enumerate(nodes):
-            node_copy = node_to_be_added.make_copy('*' * idx)
+            node_copy = copy(node_to_be_added)
             manager_node = self.tree_nodes[node.name]
             parent = manager_node.parent.node
             self.insert_node(node_copy, parent.name, self.tree_nodes[node.name].position + 1)
+
+    def insert_node_behind_node_of_type(self, parent_node_name: str, node_type: Type[GiskardBehavior],
+                                        node_to_be_added: GiskardBehavior):
+        parent_node = self.tree_nodes[parent_node_name]
+        for child_node in parent_node.enabled_children:
+            if isinstance(child_node.node, node_type):
+                self.insert_node(node_to_be_added, parent_node_name, child_node.position + 1)
+                break
 
     def render(self):
         path = self.god_map.get_data(identifier.tmp_folder) + 'tree'
@@ -687,19 +709,19 @@ class StandAlone(TreeManager):
                                        add_to_planning: Optional[bool] = None,
                                        add_to_control_loop: Optional[bool] = None):
         if add_to_sync is not None and add_to_sync:
-            self.insert_node(VisualizationBehavior('visualization1'), self.sync_name)
+            self.insert_node(VisualizationBehavior('visualization'), self.sync_name)
         if add_to_planning is not None and add_to_planning:
-            self.insert_node(success_is_failure(VisualizationBehavior)('visualization2'), self.planning2_name, 2)
-            self.insert_node(anything_is_success(VisualizationBehavior)('visualization3'),
+            self.insert_node(success_is_failure(VisualizationBehavior)('visualization'), self.planning2_name, 2)
+            self.insert_node(anything_is_success(VisualizationBehavior)('visualization'),
                              self.plan_postprocessing_name)
             if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-                self.insert_node(success_is_failure(CollisionMarker)('collision marker2'), self.planning2_name, 2)
-                self.insert_node(anything_is_success(CollisionMarker)('collision marker3'),
+                self.insert_node(success_is_failure(CollisionMarker)('collision marker'), self.planning2_name, 2)
+                self.insert_node(anything_is_success(CollisionMarker)('collision marker'),
                                  self.plan_postprocessing_name)
         if add_to_control_loop is not None and add_to_control_loop:
-            self.insert_node(success_is_running(VisualizationBehavior)('visualization4'), self.closed_loop_control_name)
+            self.insert_node(success_is_running(VisualizationBehavior)('visualization'), self.closed_loop_control_name)
             if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-                self.insert_node(success_is_running(CollisionMarker)('collision marker4'),
+                self.insert_node(success_is_running(CollisionMarker)('collision marker'),
                                  self.closed_loop_control_name)
 
     def configure_max_trajectory_length(self, enabled: bool, length: float):
@@ -760,10 +782,29 @@ class StandAlone(TreeManager):
         behavior = SyncOdometry(topic_name, joint_name)
         self.insert_node(behavior, self.sync_name, 2)
 
+    def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,
+                              publish_ubA: bool = False, publish_bE: bool = False, publish_Ax: bool = False,
+                              publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
+                              publish_g: bool = False, publish_debug: bool = False):
+        node = PublishDebugExpressions('qp data publisher',
+                                       publish_lb=publish_lb,
+                                       publish_ub=publish_ub,
+                                       publish_lbA=publish_lbA,
+                                       publish_ubA=publish_ubA,
+                                       publish_bE=publish_bE,
+                                       publish_Ax=publish_Ax,
+                                       publish_Ex=publish_Ex,
+                                       publish_xdot=publish_xdot,
+                                       publish_weights=publish_weights,
+                                       publish_g=publish_g,
+                                       publish_debug=publish_debug)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, EvaluateDebugExpressions, node)
+
 
 class OpenLoop(StandAlone):
     move_robots_name = 'move robots'
     execution_name = 'execution'
+    base_closed_loop_control_name = 'base sequence'
 
     def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
                                             fill_velocity_values: bool):
@@ -778,21 +819,20 @@ class OpenLoop(StandAlone):
         self.insert_node(SetDriveGoals('SetupBaseTrajConstraints'), self.execution_name)
         self.insert_node(InitQPController('InitQPController for base'), self.execution_name)
 
-        base_sequence_name = 'base sequence'
-        real_time_tracking = AsyncBehavior(base_sequence_name)
+        real_time_tracking = AsyncBehavior(self.base_closed_loop_control_name)
         self.insert_node(real_time_tracking, self.move_robots_name)
         sync_tf_nodes = self.get_nodes_of_type(SyncTfFrames)
         for node in sync_tf_nodes:
-            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map), base_sequence_name)
+            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map), self.base_closed_loop_control_name)
         odom_nodes = self.get_nodes_of_type(SyncOdometry)
         for node in odom_nodes:
             new_node = success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,
                                                         joint_name=node.joint_name,
                                                         name_suffix='*')
-            self.insert_node(new_node, base_sequence_name)
-        self.insert_node(RosTime('time'), base_sequence_name)
-        self.insert_node(ControllerPlugin('base controller'), base_sequence_name)
-        self.insert_node(RealKinSimPlugin('base kin sim'), base_sequence_name)
+            self.insert_node(new_node, self.base_closed_loop_control_name)
+        self.insert_node(RosTime('time'), self.base_closed_loop_control_name)
+        self.insert_node(ControllerPlugin('base controller'), self.base_closed_loop_control_name)
+        self.insert_node(RealKinSimPlugin('base kin sim'), self.base_closed_loop_control_name)
         # todo debugging
         # if self.god_map.get_data(identifier.PlotDebugTF_enabled):
         #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
@@ -807,7 +847,7 @@ class OpenLoop(StandAlone):
 
         self.insert_node(SendTrajectoryToCmdVel(cmd_vel_topic=cmd_vel_topic,
                                                 track_only_velocity=track_only_velocity,
-                                                joint_name=joint_name), base_sequence_name)
+                                                joint_name=joint_name), self.base_closed_loop_control_name)
 
     def grow_giskard(self):
         root = Sequence('Giskard')
@@ -868,6 +908,27 @@ class OpenLoop(StandAlone):
         execution_action_server = Parallel(self.move_robots_name,
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         return execution_action_server
+
+    def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,
+                              publish_ubA: bool = False, publish_bE: bool = False, publish_Ax: bool = False,
+                              publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
+                              publish_g: bool = False, publish_debug: bool = False, add_to_base: bool = False):
+        node = PublishDebugExpressions('qp data publisher',
+                                       publish_lb=publish_lb,
+                                       publish_ub=publish_ub,
+                                       publish_lbA=publish_lbA,
+                                       publish_ubA=publish_ubA,
+                                       publish_bE=publish_bE,
+                                       publish_Ax=publish_Ax,
+                                       publish_Ex=publish_Ex,
+                                       publish_xdot=publish_xdot,
+                                       publish_weights=publish_weights,
+                                       publish_g=publish_g,
+                                       publish_debug=publish_debug)
+        if add_to_base:
+            self.insert_node_behind_node_of_type(self.closed_loop_control_name, EvaluateDebugExpressions, node)
+        else:
+            self.insert_node_behind_node_of_type(self.base_closed_loop_control_name, EvaluateDebugExpressions, node)
 
 
 class ClosedLoop(OpenLoop):

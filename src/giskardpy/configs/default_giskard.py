@@ -344,32 +344,25 @@ class BehaviorTreeConfig(Config):
         self._behavior_tree.configure_visualization_marker(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
                                                            add_to_control_loop=add_to_control_loop)
 
-    def configure_PublishDebugExpressions(self, publish_lb: bool = False, publish_ub: bool = False,
-                                          publish_lbA: bool = False, publish_ubA: bool = False,
-                                          publish_bE: bool = False, publish_Ax: bool = False,
-                                          publish_Ex: bool = False, publish_xdot: bool = False,
-                                          publish_weights: bool = False, publish_g: bool = False,
-                                          publish_debug: bool = False, enabled_base: bool = False):
-        enabled = publish_lb or publish_ub or publish_lbA or publish_ubA or publish_bE or publish_Ax or publish_Ex \
-                  or publish_xdot or publish_weights or publish_debug
-        if enabled:
-            self._god_map.set_data(identifier.debug_expr_needed, True)
-        self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled'] = enabled
-        self.behavior_tree_config.plugin_config['PublishDebugExpressions']['enabled_base'] = enabled_base
-        publish_flags = {
-            'publish_lb': publish_lb,
-            'publish_ub': publish_ub,
-            'publish_lbA': publish_lbA,
-            'publish_ubA': publish_ubA,
-            'publish_weights': publish_weights,
-            'publish_g': publish_g,
-            'publish_bE': publish_bE,
-            'publish_Ax': publish_Ax,
-            'publish_Ex': publish_Ex,
-            'publish_xdot': publish_xdot,
-            'publish_debug': publish_debug,
-        }
-        self.behavior_tree_config.plugin_config['PublishDebugExpressions'].update(publish_flags)
+    def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
+                              publish_lbA: bool = False, publish_ubA: bool = False,
+                              publish_bE: bool = False, publish_Ax: bool = False,
+                              publish_Ex: bool = False, publish_xdot: bool = False,
+                              publish_weights: bool = False, publish_g: bool = False,
+                              publish_debug: bool = False, add_to_base: bool = False):
+        self._behavior_tree.add_qp_data_publisher(publish_lb=publish_lb,
+                                                  publish_ub=publish_ub,
+                                                  publish_lbA=publish_lbA,
+                                                  publish_ubA=publish_ubA,
+                                                  publish_bE=publish_bE,
+                                                  publish_Ax=publish_Ax,
+                                                  publish_Ex=publish_Ex,
+                                                  publish_xdot=publish_xdot,
+                                                  publish_weights=publish_weights,
+                                                  publish_g=publish_g,
+                                                  publish_debug=publish_debug,
+                                                  add_to_base=add_to_base)
+
 
     def add_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
         self._behavior_tree.add_plot_trajectory(normalize_position, wait)

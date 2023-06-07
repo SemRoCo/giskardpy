@@ -101,6 +101,8 @@ class PR2_Mujoco(PR2_Base):
                                                            add_to_control_loop=False)
         self.behavior_tree.add_trajectory_plotter(wait=True)
         self.behavior_tree.add_debug_trajectory_plotter(wait=True)
+        self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True)
+        self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True, add_to_base=True)
 
     def configure_robot_interface(self):
         super().configure_robot_interface()
@@ -235,4 +237,5 @@ class PR2_StandAlone(PR2_Base):
                                                            add_to_control_loop=True)
         self.behavior_tree.add_trajectory_plotter(wait=True)
         self.behavior_tree.add_debug_trajectory_plotter(wait=True)
+        self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True)
         # self.behavior_tree.publish_all_tf()

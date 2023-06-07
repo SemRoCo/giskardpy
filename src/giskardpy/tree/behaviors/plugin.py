@@ -21,8 +21,8 @@ class GiskardBehavior(Behaviour):
     def __str__(self):
         return f'{self.__class__.__name__}'
 
-    def make_copy(self, name_suffix):
-        return type(self)(self.name + name_suffix)
+    def __copy__(self):
+        return type(self)(self.name)
 
     @property
     def traj_time_in_sec(self):

@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 
-from giskardpy.configs.data_types import ControlModes, CollisionCheckerLib, SupportedQPSolver
+from giskardpy.configs.data_types import ControlModes, CollisionCheckerLib, SupportedQPSolver, TfPublishingModes
 from giskardpy.configs.default_giskard import Giskard
 from giskardpy.my_types import Derivatives
 
@@ -239,4 +239,5 @@ class PR2_StandAlone(PR2_Base):
         self.behavior_tree.add_debug_trajectory_plotter(wait=True)
         self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True)
         self.behavior_tree.add_debug_marker_publisher()
+        self.behavior_tree.add_tf_publisher(include_prefix=False, mode=TfPublishingModes.all)
         # self.behavior_tree.publish_all_tf()

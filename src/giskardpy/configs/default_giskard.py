@@ -16,7 +16,7 @@ from tf2_py import LookupException
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, ControlModes, SupportedQPSolver, QPSolverConfig, \
-    GeneralConfig, CollisionAvoidanceGroupConfig, CollisionAvoidanceConfigEntry
+    GeneralConfig, CollisionAvoidanceGroupConfig, CollisionAvoidanceConfigEntry, TfPublishingModes
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
@@ -333,9 +333,9 @@ class BehaviorTreeConfig(Config):
         self._behavior_tree.configure_max_trajectory_length(enabled, length)
 
     def configure_VisualizationBehavior(self,
-                                       add_to_sync: Optional[bool] = None,
-                                       add_to_planning: Optional[bool] = None,
-                                       add_to_control_loop: Optional[bool] = None):
+                                        add_to_sync: Optional[bool] = None,
+                                        add_to_planning: Optional[bool] = None,
+                                        add_to_control_loop: Optional[bool] = None):
         """
         :param enabled: whether Giskard should publish markers during planning
         :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
@@ -363,7 +363,6 @@ class BehaviorTreeConfig(Config):
                                                   publish_debug=publish_debug,
                                                   add_to_base=add_to_base)
 
-
     def add_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
         self._behavior_tree.add_plot_trajectory(normalize_position, wait)
 
@@ -373,25 +372,9 @@ class BehaviorTreeConfig(Config):
     def add_debug_marker_publisher(self):
         self._behavior_tree.add_debug_marker_publisher()
 
-    def disable_visualization(self):
-        """
-        Don't publish any visualization marker.
-        """
-        self.configure_VisualizationBehavior(enabled=False, in_planning_loop=False)
-        self.configure_CollisionMarker(enabled=False, in_planning_loop=False)
-
-    def disable_tf_publishing(self):
-        self.behavior_tree_config.plugin_config['TFPublisher']['enabled'] = False
-
-    def publish_all_tf(self, include_prefix: bool = True):
-        if self.god_map.get_data(identifier.TFPublisher_enabled):
-            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
-        if self.god_map.get_data(identifier.TFPublisher_enabled):
-            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
-        self.behavior_tree_config.plugin_config['TFPublisher']['mode'] = TfPublishingModes.all
-        self.behavior_tree_config.plugin_config['TFPublisher']['include_prefix'] = include_prefix
-
-
+    def add_tf_publisher(self, include_prefix: bool = True, tf_topic: str = 'tf',
+                         mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
+        self._behavior_tree.add_tf_publisher(include_prefix=include_prefix, tf_topic=tf_topic, mode=mode)
 
 
 class CollisionAvoidanceConfig(Config):
@@ -762,7 +745,6 @@ class Giskard(ABC, Config):
                                              Derivatives.acceleration: defaultdict(lambda: acceleration_limit),
                                              Derivatives.jerk: defaultdict(lambda: jerk_limit),
                                              Derivatives.snap: defaultdict(lambda: snap_limit)}
-
 
     def set_default_weights(self,
                             velocity_weight: float = 0.01,

@@ -19,7 +19,7 @@ from sortedcontainers import SortedList
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.configs.data_types import CollisionCheckerLib, TfPublishingModes
 from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
@@ -325,6 +325,11 @@ class TreeManager(ABC):
 
     @abc.abstractmethod
     def add_debug_marker_publisher(self):
+        ...
+
+    @abc.abstractmethod
+    def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
+                         mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
         ...
 
     def setup(self, timeout=30):
@@ -808,6 +813,10 @@ class StandAlone(TreeManager):
         node = DebugMarkerPublisher('debug marker_publisher')
         self.insert_node_behind_every_node_of_type(EvaluateDebugExpressions, node)
 
+    def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
+                         mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
+        node = TFPublisher('publish tf', mode=mode, tf_topic =tf_topic, include_prefix=include_prefix)
+        self.insert_node(node, self.sync_name)
 
 class OpenLoop(StandAlone):
     move_robots_name = 'move robots'

@@ -323,6 +323,10 @@ class TreeManager(ABC):
                               publish_debug: bool = False, *args, **kwargs):
         ...
 
+    @abc.abstractmethod
+    def add_debug_marker_publisher(self):
+        ...
+
     def setup(self, timeout=30):
         self.tree.setup(timeout)
 
@@ -785,7 +789,7 @@ class StandAlone(TreeManager):
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,
                               publish_ubA: bool = False, publish_bE: bool = False, publish_Ax: bool = False,
                               publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
-                              publish_g: bool = False, publish_debug: bool = False):
+                              publish_g: bool = False, publish_debug: bool = False, *args, **kwargs):
         node = PublishDebugExpressions('qp data publisher',
                                        publish_lb=publish_lb,
                                        publish_ub=publish_ub,
@@ -799,6 +803,10 @@ class StandAlone(TreeManager):
                                        publish_g=publish_g,
                                        publish_debug=publish_debug)
         self.insert_node_behind_node_of_type(self.closed_loop_control_name, EvaluateDebugExpressions, node)
+
+    def add_debug_marker_publisher(self):
+        node = DebugMarkerPublisher('debug marker_publisher')
+        self.insert_node_behind_every_node_of_type(EvaluateDebugExpressions, node)
 
 
 class OpenLoop(StandAlone):

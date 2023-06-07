@@ -370,12 +370,8 @@ class BehaviorTreeConfig(Config):
     def add_debug_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
         self._behavior_tree.add_plot_debug_trajectory(normalize_position=normalize_position, wait=wait)
 
-    def configure_DebugMarkerPublisher(self, enabled: bool = False):
-        if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-            planning_4.add_child(DebugMarkerPublisher('debug marker publisher'))
-        if enabled:
-            self._god_map.set_data(identifier.debug_expr_needed, True)
-        self.behavior_tree_config.plugin_config['PlotDebugTF']['enabled'] = enabled
+    def add_debug_marker_publisher(self):
+        self._behavior_tree.add_debug_marker_publisher()
 
     def disable_visualization(self):
         """

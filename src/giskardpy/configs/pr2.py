@@ -238,4 +238,5 @@ class PR2_StandAlone(PR2_Base):
         self.behavior_tree.add_trajectory_plotter(wait=True)
         self.behavior_tree.add_debug_trajectory_plotter(wait=True)
         self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True)
+        self.behavior_tree.add_debug_marker_publisher()
         # self.behavior_tree.publish_all_tf()

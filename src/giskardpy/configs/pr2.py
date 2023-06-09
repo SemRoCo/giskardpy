@@ -78,9 +78,6 @@ class PR2_Base(Giskard):
                                                                         soft_threshold=0.2,
                                                                         hard_threshold=0.1)
 
-    def configure_behavior_tree(self):
-        self.behavior_tree.configure_MaxTrajectoryLength(length=30)
-
     def configure_robot_interface(self):
         pass
 
@@ -200,9 +197,10 @@ class PR2_Unreal(PR2_Base):
 
 
 class PR2_StandAlone(PR2_Base):
-    def __init__(self):
-        super().__init__()
-        self.set_control_mode(ControlModes.stand_alone)
+
+    def configure_execution(self):
+        self.execution_config.set_control_mode(ControlModes.stand_alone)
+        self.execution_config.set_max_trajectory_length(length=30)
 
     def configure_world(self):
         super().configure_world()

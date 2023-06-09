@@ -2,26 +2,22 @@ from __future__ import annotations
 import abc
 from abc import ABC
 from collections import defaultdict
-from copy import deepcopy
-from typing import Dict, Optional, List, Tuple, Type, Any, Union, DefaultDict
+from typing import Dict, Optional, List, Union, DefaultDict
 
 import numpy as np
 import rospy
-from geometry_msgs.msg import Pose
 from numpy.typing import NDArray
 from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
-from tf2_py import LookupException
 
-import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib, ControlModes, SupportedQPSolver, QPSolverConfig, \
-    GeneralConfig, CollisionAvoidanceGroupConfig, CollisionAvoidanceConfigEntry, TfPublishingModes
+from giskardpy.configs.data_types import CollisionCheckerLib, ControlModes, SupportedQPSolver, \
+    CollisionAvoidanceGroupConfig, CollisionAvoidanceConfigEntry, TfPublishingModes
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.model.joints import Joint, FixedJoint, OmniDrive, DiffDrive, OmniDrivePR22, Joint6DOF
+from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
@@ -54,11 +50,88 @@ class Config:
         return list(self._world.groups.keys())[0]
 
 
+class ExecutionConfig(Config):
+    qp_solver: SupportedQPSolver
+    prediction_horizon: int = 9
+    sample_period: float = 0.05
+    goal_package_paths = {'giskardpy.goals'}
+    control_mode: ControlModes
+    max_derivative: Derivatives = Derivatives.jerk
+    action_server_name: str = '~command'
+    max_trajectory_length: float = 30
+    qp_solver: SupportedQPSolver = None,
+    retries_with_relaxed_constraints: int = 5,
+    added_slack: float = 100,
+    weight_factor: float = 100
+
+    def __init__(self,
+                 qp_solver: SupportedQPSolver = None,
+                 prediction_horizon: int = 9,
+                 retries_with_relaxed_constraints: int = 5,
+                 added_slack: float = 100,
+                 sample_period: float = 0.05,
+                 weight_factor: float = 100):
+        self.qp_solver = qp_solver
+        self.prediction_horizon = prediction_horizon
+        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
+        self.added_slack = added_slack
+        self.sample_period = sample_period
+        self.weight_factor = weight_factor
+        self.default_weights = {d: defaultdict(float) for d in Derivatives}
+
+    def set_prediction_horizon(self, new_prediction_horizon: int):
+        """
+        Set the prediction horizon for the MPC. If set to 1, it will turn off acceleration and jerk limits.
+        :param new_prediction_horizon: should be >= 7
+        """
+        if new_prediction_horizon < 7:
+            raise ValueError('prediction horizon must be >= 7.')
+        self.prediction_horizon = new_prediction_horizon
+
+    def set_qp_solver(self, new_solver: SupportedQPSolver):
+        self.qp_solver = new_solver
+
+    def set_max_trajectory_length(self, length: float = 30):
+        self.max_trajectory_length = length
+
+    def set_control_mode(self, mode: ControlModes):
+        self.control_mode = mode
+
+    def add_goal_package_name(self, package_name: str):
+        new_goals = get_all_classes_in_package(package_name, Goal)
+        if len(new_goals) == 0:
+            raise GiskardException(f'No classes of type \'Goal\' found in {package_name}')
+        logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
+        self.goal_package_paths.add(package_name)
+
+
 class WorldConfig(Config):
     _default_root_link_name = PrefixName('map', None)
 
     def __init__(self):
         self.god_map.set_data(identifier.world, WorldTree(self._default_root_link_name))
+        self.set_default_weights()
+
+    def set_default_weights(self,
+                            velocity_weight: float = 0.01,
+                            acceleration_weight: float = 0,
+                            jerk_weight: float = 0.01):
+        """
+        The default values are set automatically, even if this function is not called.
+        A typical goal has a weight of 1, so the values in here should be sufficiently below that.
+        """
+        self._world.update_default_weights({Derivatives.velocity: velocity_weight,
+                                            Derivatives.acceleration: acceleration_weight,
+                                            Derivatives.jerk: jerk_weight})
+
+    def set_weight(self, weight_map: derivative_map, joint_name: str, group_name: Optional[str] = None):
+        joint_name = self._world.search_for_joint_name(joint_name, group_name)
+        joint = self._world.joints[joint_name]
+        if not isinstance(joint, OneDofJoint):
+            raise ValueError(f'{joint_name} is not of type {str(OneDofJoint)}.')
+        free_variable = self._world.free_variables[joint.free_variable.name]
+        for derivative, weight in weight_map.items():
+            free_variable.quadratic_weights[derivative] = weight
 
     def get_root_link_of_group(self, group_name: str) -> PrefixName:
         return self._world.groups[group_name].root_link_name
@@ -93,11 +166,13 @@ class WorldConfig(Config):
         """
         self._world.default_link_color = ColorRGBA(r, g, b, a)
 
-    def _add_joint(self, joint: Tuple[Type, Dict[str, Any]]):
-        joints = self.god_map.get_data(identifier.joints_to_add, default=[])
-        joints.append(joint)
-
     def set_default_limits(self, new_limits: Dict[Derivatives, float]):
+        """
+        The default values will be set automatically, even if this function is not called.
+        velocity_limit: in m/s or rad/s
+        acceleration_limit: in m/s**2 or rad/s**2
+        jerk_limit: in m/s**3 or rad/s**3
+        """
         self._world.update_default_limits(new_limits)
 
     def add_robot_urdf(self,
@@ -107,7 +182,6 @@ class WorldConfig(Config):
         Add a robot urdf to the world.
         :param urdf: robot urdf as string, not the path
         :param group_name:
-        :param joint_state_topics:
         """
         if group_name is None:
             group_name = robot_name_from_urdf_string(urdf)
@@ -116,14 +190,10 @@ class WorldConfig(Config):
 
     def add_robot_from_parameter_server(self,
                                         parameter_name: str = 'robot_description',
-                                        # joint_state_topics: List[str] = ('/joint_states',),
-                                        group_name: Optional[str] = None,
-                                        add_drive_joint_to_group: bool = True) -> str:
+                                        group_name: Optional[str] = None) -> str:
         """
         Add a robot urdf from parameter server to Giskard.
         :param parameter_name:
-        :param joint_state_topics: A list of topics where the robot's states are published. Joint names have to match
-                                    with the urdf
         :param group_name: How to call the robot. If nothing is specified it will get the name it has in the urdf
         """
         urdf = rospy.get_param(parameter_name)
@@ -158,27 +228,23 @@ class WorldConfig(Config):
         """
         Same as add_omni_drive_joint, but for a differential drive.
         """
-        if robot_group_name is None:
-            robot_group_name = self.get_default_group_name()
         joint_name = PrefixName(name, robot_group_name)
-        parent_link_name = PrefixName(parent_link_name, None)
-        child_link_name = PrefixName(child_link_name, robot_group_name)
-        brumbrum_joint = (DiffDrive, {'parent_link_name': parent_link_name,
-                                      'child_link_name': child_link_name,
-                                      'name': joint_name,
-                                      'translation_limits': translation_limits,
-                                      'rotation_limits': rotation_limits})
-        self._add_joint(brumbrum_joint)
-        if odometry_topic is not None:
-            self._add_odometry_topic(odometry_topic=odometry_topic,
-                                     joint_name=joint_name)
+        parent_link_name = PrefixName.from_string(parent_link_name, set_none_if_no_slash=True)
+        child_link_name = PrefixName.from_string(child_link_name, set_none_if_no_slash=True)
+        brumbrum_joint = DiffDrive(parent_link_name=parent_link_name,
+                                   child_link_name=child_link_name,
+                                   name=joint_name,
+                                   translation_limits=translation_limits,
+                                   rotation_limits=rotation_limits)
+        self._world._add_joint(brumbrum_joint)
+        self._world.deregister_group(robot_group_name)
+        self._world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
 
     def add_6dof_joint(self, parent_link: my_string, child_link: my_string, joint_name: my_string):
         """
         Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
         :param parent_link:
         :param child_link:
-        :param homogenous_transform: a 4x4 transformation matrix.
         """
         parent_link = self._world.search_for_link_name(parent_link)
         child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
@@ -195,7 +261,6 @@ class WorldConfig(Config):
                              parent_link_name: Union[str, PrefixName],
                              child_link_name: Union[str, PrefixName],
                              robot_group_name: Optional[str] = None,
-                             # odometry_topic: Optional[str] = None,
                              translation_limits: Optional[derivative_map] = None,
                              rotation_limits: Optional[derivative_map] = None,
                              x_name: Optional[PrefixName] = None,
@@ -207,12 +272,9 @@ class WorldConfig(Config):
         :param child_link_name:
         :param robot_group_name: set if there are multiple robots
         :param name: Name of the new link. Has to be unique and may be required in other functions.
-        :param odometry_topic: where the odometry gets published
-        :param translation_limit: in m/s**3
-        :param rotation_limit: in rad/s**3
+        :param translation_limits: in m/s**3
+        :param rotation_limits: in rad/s**3
         """
-        # if robot_group_name is None:
-        #     robot_group_name = self.get_default_group_name()
         joint_name = PrefixName(name, robot_group_name)
         parent_link_name = PrefixName.from_string(parent_link_name, set_none_if_no_slash=True)
         child_link_name = PrefixName.from_string(child_link_name, set_none_if_no_slash=True)
@@ -227,9 +289,6 @@ class WorldConfig(Config):
         self._world._add_joint(brumbrum_joint)
         self._world.deregister_group(robot_group_name)
         self._world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
-        # self._add_joint(brumbrum_joint)
-        # if odometry_topic is not None:
-        #     self._add_odometry_topic(odometry_topic=odometry_topic, joint_name=joint_name)
 
 
 class RobotInterfaceConfig(Config):
@@ -252,33 +311,6 @@ class RobotInterfaceConfig(Config):
         if group_name is None:
             group_name = self.get_default_group_name()
         self._behavior_tree.sync_joint_state_topic(group_name=group_name, topic_name=topic_name)
-
-    def overwrite_joint_velocity_weight(self,
-                                        joint_name: str,
-                                        velocity_weight: float,
-                                        group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        joint_name = PrefixName(joint_name, group_name)
-        self._qp_solver_config.joint_weights[Derivatives.velocity][joint_name] = velocity_weight
-
-    def overwrite_joint_acceleration_weight(self,
-                                            joint_name: str,
-                                            acceleration_weight: float,
-                                            group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        joint_name = PrefixName(joint_name, group_name)
-        self._qp_solver_config.joint_weights[Derivatives.acceleration][joint_name] = acceleration_weight
-
-    def overwrite_joint_jerk_weight(self,
-                                    joint_name: str,
-                                    jerk_weight: float,
-                                    group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        joint_name = PrefixName(joint_name, group_name)
-        self._qp_solver_config.joint_weights[Derivatives.jerk][joint_name] = jerk_weight
 
     def add_base_cmd_velocity(self,
                               cmd_vel_topic: str,
@@ -329,18 +361,10 @@ class BehaviorTreeConfig(Config):
     def set_tree_tick_rate(self, rate: float = 0.05):
         self.tree_tick_rate = rate
 
-    def configure_MaxTrajectoryLength(self, enabled: bool = True, length: float = 30):
-        self._behavior_tree.configure_max_trajectory_length(enabled, length)
-
     def configure_VisualizationBehavior(self,
                                         add_to_sync: Optional[bool] = None,
                                         add_to_planning: Optional[bool] = None,
                                         add_to_control_loop: Optional[bool] = None):
-        """
-        :param enabled: whether Giskard should publish markers during planning
-        :param in_planning_loop: whether Giskard should update the markers after every control step. Will slow down
-                                    the system.
-        """
         self._behavior_tree.configure_visualization_marker(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
                                                            add_to_control_loop=add_to_control_loop)
 
@@ -395,14 +419,6 @@ class CollisionAvoidanceConfig(Config):
             try:
                 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
                 return BetterPyBulletSyncer(world)
-            except ImportError as e:
-                logging.logerr(f'{e}; turning off collision avoidance.')
-                self._collision_checker = CollisionCheckerLib.none
-        if collision_checker == CollisionCheckerLib.pybullet:
-            logging.loginfo('Using pybullet for collision checking.')
-            try:
-                from giskardpy.model.pybullet_syncer import PyBulletSyncer
-                return PyBulletSyncer(world)
             except ImportError as e:
                 logging.logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
@@ -602,32 +618,29 @@ class Giskard(ABC, Config):
     collision_avoidance: CollisionAvoidanceConfig
     behavior_tree: BehaviorTreeConfig
     robot_interface: RobotInterfaceConfig
-    _qp_solver_config: QPSolverConfig
-    _general_config: GeneralConfig
+    execution_config: ExecutionConfig
+    path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
 
     def __init__(self):
-        self._qp_solver_config = QPSolverConfig()
-        self._general_config = GeneralConfig()
         self._god_map = GodMap()
         self._god_map.set_data(identifier.giskard, self)
         self.world = WorldConfig()
         self.robot_interface = RobotInterfaceConfig()
+        self.execution_config = ExecutionConfig()
         self.collision_avoidance = CollisionAvoidanceConfig(CollisionCheckerLib.bpb)
         self.behavior_tree = BehaviorTreeConfig()
-        # self._god_map.set_data(identifier.joints_to_add, [])
-        # self._god_map.set_data(identifier.debug_expr_needed, False)
         self._god_map.set_data(identifier.hack, 0)
         blackboard = Blackboard
         blackboard.god_map = self._god_map
 
-        # self._controlled_joints = []
         self._backup = {}
-        self.goal_package_paths = ['giskardpy.goals']
-        self.set_default_joint_limits()
-        self.set_default_weights()
 
     @abc.abstractmethod
     def configure_world(self):
+        ...
+
+    @abc.abstractmethod
+    def configure_execution(self):
         ...
 
     @abc.abstractmethod
@@ -642,36 +655,6 @@ class Giskard(ABC, Config):
     def configure_robot_interface(self):
         ...
 
-    def add_goal_package_name(self, package_name: str):
-        new_goals = get_all_classes_in_package(package_name, Goal)
-        if len(new_goals) == 0:
-            raise GiskardException(f'No classes of type \'Goal\' found in {package_name}')
-        logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
-        self.goal_package_paths.append(package_name)
-
-    def get_default_group_name(self):
-        """
-        Returns the name of the robot, only works if there is only one.
-        """
-        if len(self.group_names) > 1:
-            raise AttributeError(f'group name has to be set if you have multiple robots')
-        return self.group_names[0]
-
-    # def set_maximum_derivative(self, new_value: Derivatives = Derivatives.jerk):
-    #     """
-    #     Setting this to e.g. jerk will enable jerk and acceleration constraints.
-    #     """
-    #     max derivative must be jerk atm
-    #     self._general_config.maximum_derivative = new_value
-
-    def _reset_config(self):
-        for parameter, value in self._backup.items():
-            setattr(self, parameter, deepcopy(value))
-
-    def _create_parameter_backup(self):
-        self._backup = {'_qp_solver_config': deepcopy(self._qp_solver_config),
-                        '_general_config': deepcopy(self._general_config)}
-
     def grow(self):
         """
         Initialize the behavior tree and world. You usually don't need to call this.
@@ -679,22 +662,19 @@ class Giskard(ABC, Config):
         with self._world.modify_world():
             self.configure_world()
         self.configure_collision_avoidance()
-        # self._create_parameter_backup()
-        # self._god_map.set_data(identifier.collision_checker, self._collision_checker)
-        # self._god_map.set_data(identifier.collision_scene, collision_scene)
-        if self.control_mode == ControlModes.open_loop:
+        self.configure_execution()
+        if self.execution_config.control_mode == ControlModes.open_loop:
             behavior_tree = OpenLoop()
-        elif self.control_mode == ControlModes.close_loop:
+        elif self.execution_config.control_mode == ControlModes.close_loop:
             behavior_tree = ClosedLoop()
-        elif self.control_mode == ControlModes.stand_alone:
+        elif self.execution_config.control_mode == ControlModes.stand_alone:
             behavior_tree = StandAlone()
         else:
-            raise KeyError(f'Robot interface mode \'{self._general_config.control_mode}\' is not supported.')
+            raise KeyError(f'Robot interface mode \'{self.execution_config.control_mode}\' is not supported.')
         self.god_map.set_data(identifier.tree_manager, behavior_tree)
         self.configure_robot_interface()
         self.configure_behavior_tree()
-
-        # self._controlled_joints_sanity_check()
+        self._controlled_joints_sanity_check()
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)
@@ -703,7 +683,8 @@ class Giskard(ABC, Config):
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
-        if len(self.hardware_config.send_trajectory_to_cmd_vel_kwargs) == 0:
+        if not self._behavior_tree.base_tracking_enabled() \
+                and not self.execution_config.control_mode == ControlModes.stand_alone:
             logging.loginfo('No cmd_vel topic has been registered.')
 
     def live(self):
@@ -712,50 +693,3 @@ class Giskard(ABC, Config):
         """
         self.grow()
         self._god_map.get_data(identifier.tree_manager).live()
-
-    def set_control_mode(self, mode: ControlModes):
-        self.control_mode = mode
-
-    # QP stuff
-
-    def set_prediction_horizon(self, new_prediction_horizon: float):
-        """
-        Set the prediction horizon for the MPC. If set to 1, it will turn off acceleration and jerk limits.
-        :param new_prediction_horizon: should be 1 or >= 5
-        """
-        self._qp_solver_config.prediction_horizon = new_prediction_horizon
-
-    def set_qp_solver(self, new_solver: SupportedQPSolver):
-        self._qp_solver_config.qp_solver = new_solver
-
-    def set_default_joint_limits(self,
-                                 velocity_limit: float = 1,
-                                 acceleration_limit: Optional[float] = float('inf'),
-                                 jerk_limit: Optional[float] = 30,
-                                 snap_limit: Optional[float] = 500):
-        """
-        The default values will be set automatically, even if this function is not called.
-        :param velocity_limit: in m/s or rad/s
-        :param acceleration_limit: in m/s**2 or rad/s**2
-        :param jerk_limit: in m/s**3 or rad/s**3
-        """
-        if jerk_limit is not None and acceleration_limit is None:
-            raise AttributeError('If jerk limits are set, acceleration limits also have to be set.')
-        self._general_config.joint_limits = {Derivatives.velocity: defaultdict(lambda: velocity_limit),
-                                             Derivatives.acceleration: defaultdict(lambda: acceleration_limit),
-                                             Derivatives.jerk: defaultdict(lambda: jerk_limit),
-                                             Derivatives.snap: defaultdict(lambda: snap_limit)}
-
-    def set_default_weights(self,
-                            velocity_weight: float = 0.01,
-                            acceleration_weight: float = 0,
-                            jerk_weight: float = 0.01,
-                            snap_weight: float = 0):
-        """
-        The default values are set automatically, even if this function is not called.
-        A typical goal has a weight of 1, so the values in here should be sufficiently below that.
-        """
-        self._qp_solver_config.joint_weights = {Derivatives.velocity: defaultdict(lambda: velocity_weight),
-                                                Derivatives.acceleration: defaultdict(lambda: acceleration_weight),
-                                                Derivatives.jerk: defaultdict(lambda: jerk_weight),
-                                                Derivatives.snap: defaultdict(lambda: snap_weight)}

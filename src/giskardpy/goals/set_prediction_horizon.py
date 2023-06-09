@@ -47,8 +47,8 @@ class SetMaxTrajLength(NonMotionGoal):
         :param new_length: in seconds
         """
         super().__init__()
-        for node in self.tree.get_nodes_of_type(MaxTrajectoryLength):
-            node.length = new_length
+        assert new_length > 0
+        self.god_map.set_data(identifier.max_trajectory_length, new_length)
 
     def __str__(self) -> str:
         return super().__str__()

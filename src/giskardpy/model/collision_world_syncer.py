@@ -1,4 +1,5 @@
 from collections import defaultdict
+from copy import deepcopy
 from itertools import product, combinations_with_replacement, combinations
 from time import time
 from typing import List, Dict, Optional
@@ -326,7 +327,7 @@ class CollisionWorldSynchronizer:
         if link_combinations is None:
             link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
         # logging.loginfo('calculating self collision matrix')
-        joint_state_tmp = self.world.state
+        joint_state_tmp = deepcopy(self.world.state)
         t = time()
         # find meaningless collisions
         for link_a, link_b in link_combinations:

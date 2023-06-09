@@ -299,6 +299,10 @@ class TreeManager(ABC):
         ...
 
     @abc.abstractmethod
+    def base_tracking_enabled(self) -> bool:
+        ...
+
+    @abc.abstractmethod
     def add_evaluate_debug_expressions(self):
         ...
 
@@ -703,7 +707,7 @@ class StandAlone(TreeManager):
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
         planning_4.add_child(TimePlugin())
-        planning_4.add_child(MaxTrajectoryLength('traj length check', length=30))
+        planning_4.add_child(MaxTrajectoryLength('traj length check'))
         return planning_4
 
     def grow_plan_postprocessing(self):
@@ -752,6 +756,9 @@ class StandAlone(TreeManager):
                                     joint_name: PrefixName = None):
         current_function_name = inspect.currentframe().f_code.co_name
         NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def base_tracking_enabled(self) -> bool:
+        return False
 
     def add_evaluate_debug_expressions(self):
         nodes = self.get_nodes_of_type(EvaluateDebugExpressions)
@@ -865,6 +872,9 @@ class OpenLoop(StandAlone):
         self.insert_node(SendTrajectoryToCmdVel(cmd_vel_topic=cmd_vel_topic,
                                                 track_only_velocity=track_only_velocity,
                                                 joint_name=joint_name), self.base_closed_loop_control_name)
+
+    def base_tracking_enabled(self) -> bool:
+        return len(self.get_nodes_of_type(SendTrajectoryToCmdVel)) > 0
 
     def grow_giskard(self):
         root = Sequence('Giskard')

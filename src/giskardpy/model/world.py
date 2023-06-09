@@ -141,6 +141,7 @@ class WorldTree(WorldTreeInterface):
     virtual_free_variables: Dict[PrefixName, FreeVariable]
     context_manager_active: bool = False
     _default_limits: Dict[Derivatives, float]
+    _default_weights: Dict[Derivatives, float]
 
     def __init__(self, root_link_name: PrefixName):
         self.root_link_name = root_link_name
@@ -166,7 +167,14 @@ class WorldTree(WorldTreeInterface):
             self._default_limits = {}
         for derivative, limit in new_limits.items():
             self._default_limits[derivative] = limit
-        # todo check if there are none missing
+        assert len(self._default_limits) == self.god_map.get_data(identifier.max_derivative)
+
+    def update_default_weights(self, new_weights: Dict[Derivatives, float]):
+        if not hasattr(self, '_default_weights'):
+            self._default_weights = {}
+        for derivative, weight in new_weights.items():
+            self._default_weights[derivative] = weight
+        assert len(self._default_weights) == self.god_map.get_data(identifier.max_derivative)
 
     def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
         logging.logwarn(f'Deprecated warning: use \'search_for_joint_name\' instead of \'get_joint_name\'.')
@@ -493,7 +501,8 @@ class WorldTree(WorldTreeInterface):
                           upper_limits: derivative_map) -> FreeVariable:
         free_variable = FreeVariable(name=name,
                                      lower_limits=lower_limits,
-                                     upper_limits=upper_limits)
+                                     upper_limits=upper_limits,
+                                     quadratic_weights=self._default_weights)
         if free_variable.has_position_limits():
             lower_limit = free_variable.get_lower_limit(derivative=Derivatives.position,
                                                         evaluated=True)
@@ -507,7 +516,8 @@ class WorldTree(WorldTreeInterface):
     def add_virtual_free_variable(self, name: PrefixName) -> FreeVariable:
         free_variable = FreeVariable(name=name,
                                      lower_limits={},
-                                     upper_limits={})
+                                     upper_limits={},
+                                     quadratic_weights=self._default_weights)
         self.virtual_free_variables[name] = free_variable
         return free_variable
 

@@ -491,6 +491,11 @@ class TestConstraints:
         dt = zero_pose.god_map.get_data(identifier.sample_period)
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
 
+        zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
+        result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
+        dt = zero_pose.god_map.get_data(identifier.sample_period)
+        assert len(result.trajectory.points) * dt > new_length + 1
+
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         tip = 'base_footprint'
         base_pose = PoseStamped()

@@ -20,7 +20,6 @@ from numpy import pi
 from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
-from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
@@ -28,7 +27,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
-from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver, ControlModes
+from giskardpy.configs.data_types import SupportedQPSolver, ControlModes
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
@@ -40,10 +39,9 @@ from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
-from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
+from giskardpy.utils.utils import msg_to_list, resolve_ros_iris
 import os
 
 BIG_NUMBER = 1e100
@@ -270,7 +268,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
-        return self.giskard.control_mode == self.giskard.control_mode.stand_alone
+        return self.giskard.execution_config.control_mode == self.giskard.execution_config.control_mode.stand_alone
 
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
@@ -1095,10 +1093,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                          parent_link_group=parent_link_group,
                                          expected_error_code=expected_response)
         return r
-
-    @property
-    def general_config(self) -> GeneralConfig:
-        return self.god_map.unsafe_get_data(identifier.general_options)
 
     def get_external_collisions(self) -> Collisions:
         collision_goals = []

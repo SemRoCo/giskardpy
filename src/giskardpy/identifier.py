@@ -37,30 +37,24 @@ cmd_id = ['cmd_id']
 result_message = ['result_message']
 tracking_start_time = ['tracking_start_time']
 
-# config file
-# general options
+# config
 general_options = giskard + ['_general_config']
-max_derivative = general_options + ['maximum_derivative']
-action_server_name = general_options + ['action_server_name']
-tmp_folder = general_options + ['path_to_data_folder']
-debug_expr_needed = ['debug_expr_needed']
-test_mode = general_options + ['test_mode']
-control_mode = giskard + ['control_mode']
+tmp_folder = giskard + ['path_to_data_folder']
+execution_config = giskard + ['execution_config']
+max_derivative = execution_config + ['max_derivative']
+action_server_name = execution_config + ['action_server_name']
+control_mode = execution_config + ['control_mode']
+goal_package_paths = execution_config + ['goal_package_paths']
+max_trajectory_length = execution_config + ['max_trajectory_length']
 
-joint_limits = general_options + ['joint_limits']
-
-
-# qp solver
-qp_solver_config = giskard + ['_qp_solver_config']
-sample_period = qp_solver_config + ['sample_period']
+sample_period = execution_config + ['sample_period']
 qp_controller = giskard + ['qp_controller']
 debug_expressions_evaluated = qp_controller + ['evaluated_debug_expressions']
-joint_weights = qp_solver_config + ['joint_weights']
-qp_solver_name = qp_solver_config + ['qp_solver']
-prediction_horizon = qp_solver_config + ['prediction_horizon']
-retries_with_relaxed_constraints = qp_solver_config + ['retries_with_relaxed_constraints']
-retry_added_slack = qp_solver_config + ['added_slack']
-retry_weight_factor = qp_solver_config + ['weight_factor']
+qp_solver_name = execution_config + ['qp_solver']
+prediction_horizon = execution_config + ['prediction_horizon']
+retries_with_relaxed_constraints = execution_config + ['retries_with_relaxed_constraints']
+retry_added_slack = execution_config + ['added_slack']
+retry_weight_factor = execution_config + ['weight_factor']
 
 # behavior tree
 tree_manager = ['behavior_tree']

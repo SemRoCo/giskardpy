@@ -148,10 +148,7 @@ class ManagerNode:
         """
         self.enabled_children.remove(manager_node)
         self.disabled_children.add(manager_node)
-        if isinstance(self.node, AsyncBehavior):
-            self.node.remove_child(manager_node.node.name)
-        else:
-            self.node.remove_child(manager_node.node)
+        self.node.remove_child(manager_node.node)
 
     def enable_child(self, manager_node: ManagerNode):
         """
@@ -160,12 +157,8 @@ class ManagerNode:
         self.disabled_children.discard(manager_node)
         if manager_node not in self.enabled_children:
             self.enabled_children.add(manager_node)
-            if isinstance(self.node, AsyncBehavior) \
-                    or hasattr(self.node, 'original') and isinstance(self.node.original, AsyncBehavior):
-                self.node.add_child(manager_node.node)
-            else:
-                idx = self.enabled_children.index(manager_node)
-                self.node.insert_child(manager_node.node, idx)
+            idx = self.enabled_children.index(manager_node)
+            self.node.insert_child(manager_node.node, idx)
 
     def add_child(self, manager_node: ManagerNode):
         """
@@ -195,29 +188,19 @@ class ManagerNode:
         :type manager_node: TreeManager.ManagerNode
         :return:
         """
-        if isinstance(self.node, AsyncBehavior):
-            if manager_node in self.enabled_children:
-                self.enabled_children.remove(manager_node)
-                self.node.remove_child(manager_node.node.name)
-            elif manager_node in self.disabled_children:
-                self.disabled_children.remove(manager_node)
-            else:
-                raise RuntimeError(
-                    'could not remove node from parent. this probably means that the tree is inconsistent')
+        if manager_node in self.enabled_children:
+            self.enabled_children.remove(manager_node)
+            self.node.remove_child(manager_node.node)
+        elif manager_node in self.disabled_children:
+            self.disabled_children.remove(manager_node)
         else:
-            if manager_node in self.enabled_children:
-                self.enabled_children.remove(manager_node)
-                self.node.remove_child(manager_node.node)
-            elif manager_node in self.disabled_children:
-                self.disabled_children.remove(manager_node)
-            else:
-                raise RuntimeError('could not remove node. this probably means that the tree is inconsistent')
-            idx = self.disabled_children.bisect_right(manager_node)
-            for c in self.disabled_children.islice(start=idx):
-                c.position -= 1
-            idx = self.enabled_children.bisect_right(manager_node)
-            for c in self.enabled_children.islice(start=idx):
-                c.position -= 1
+            raise RuntimeError('could not remove node. this probably means that the tree is inconsistent')
+        idx = self.disabled_children.bisect_right(manager_node)
+        for c in self.disabled_children.islice(start=idx):
+            c.position -= 1
+        idx = self.enabled_children.bisect_right(manager_node)
+        for c in self.enabled_children.islice(start=idx):
+            c.position -= 1
 
 
 def search_for(lines, function_name):

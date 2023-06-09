@@ -83,14 +83,13 @@ class PR2_Base(Giskard):
 
 
 class PR2_Mujoco(PR2_Base):
-    def __init__(self):
-        super().__init__()
-        self.set_control_mode(ControlModes.open_loop)
+
+    def configure_execution(self):
+        self.execution_config.set_control_mode(ControlModes.open_loop)
 
     def configure_world(self):
         super().configure_world()
         self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
-        # odometry_topic='/pr2/base_footprint')
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()

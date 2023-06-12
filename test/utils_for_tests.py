@@ -4,7 +4,7 @@ from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
 from time import time
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Type
 
 import actionlib
 import control_msgs
@@ -28,6 +28,7 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
 from giskardpy.configs.data_types import SupportedQPSolver, ControlModes
+from giskardpy.configs.default_giskard import Giskard
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
@@ -39,6 +40,11 @@ from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
+from giskardpy.tree.behaviors.collision_marker import CollisionMarker
+from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
+from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
+from giskardpy.tree.behaviors.visualization import VisualizationBehavior
+from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, resolve_ros_iris
@@ -223,8 +229,9 @@ class GiskardTestWrapper(GiskardWrapper):
     default_pose = {}
     better_pose = {}
     odom_root = 'odom'
+    tree: TreeManager
 
-    def __init__(self, config_file):
+    def __init__(self, config_file: Type[Giskard]):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
         self._alive = True
@@ -237,16 +244,16 @@ class GiskardTestWrapper(GiskardWrapper):
             self.set_localization_srv = None
 
         self.giskard = config_file()
-        if 'GITHUB_WORKFLOW' in os.environ:
-            logging.loginfo('Inside github workflow, turning off visualization')
-            self.giskard.configure_VisualizationBehavior(enabled=False)
-            self.giskard.configure_CollisionMarker(enabled=False)
-            self.giskard.add_trajectory_plotter(enabled=False)
-            self.giskard.add_debug_trajectory_plotter(enabled=False)
-        if 'QP_SOLVER' in os.environ:
-            self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.giskard.grow()
         self.tree = self.giskard._behavior_tree
+        if 'GITHUB_WORKFLOW' in os.environ:
+            logging.loginfo('Inside github workflow, turning off visualization')
+            plugins_to_disable = [VisualizationBehavior, CollisionMarker, PlotTrajectory, PlotDebugExpressions]
+            for behavior_type in plugins_to_disable:
+                for node in self.tree.get_nodes_of_type(behavior_type):
+                    self.tree.disable_node(node.name)
+        if 'QP_SOLVER' in os.environ:
+            self.giskard.execution_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)

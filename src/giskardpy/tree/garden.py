@@ -5,7 +5,7 @@ from abc import ABC
 from collections import defaultdict
 from copy import copy
 from time import time
-from typing import Type, TypeVar, Union, Dict, List, Optional
+from typing import Type, TypeVar, Union, Dict, List, Optional, Any
 
 import numpy as np
 import py_trees
@@ -106,6 +106,10 @@ def anything_is_success(cls: T) -> T:
 
 def anything_is_failure(cls: T) -> T:
     return running_is_failure(success_is_failure(cls))
+
+
+def behavior_is_instance_of(obj: Any, type_: Type) -> bool:
+    return isinstance(obj, type_) or hasattr(obj, 'original') and isinstance(obj.original, type_)
 
 
 class ManagerNode:
@@ -426,7 +430,7 @@ class TreeManager(ABC):
     GiskardBehavior_ = TypeVar('GiskardBehavior_', bound=GiskardBehavior)
 
     def get_nodes_of_type(self, node_type: Type[GiskardBehavior_]) -> List[GiskardBehavior_]:
-        return [node.node for node in self.tree_nodes.values() if isinstance(node.node, node_type)]
+        return [node.node for node in self.tree_nodes.values() if behavior_is_instance_of(node.node, node_type)]
 
     def insert_node_behind_every_node_of_type(self, node_type: Type[GiskardBehavior],
                                               node_to_be_added: GiskardBehavior):

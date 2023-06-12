@@ -410,9 +410,7 @@ class BehaviorTreeConfig(Config):
 
 class CollisionAvoidanceConfig(Config):
     _collision_avoidance_configs: DefaultDict[str, CollisionAvoidanceGroupConfig]
-
-    def __init__(self, collision_checker):
-        self.set_collision_checker(collision_checker)
+    collision_checker_id: CollisionCheckerLib
 
     def set_defaults(self):
         pass
@@ -423,7 +421,11 @@ class CollisionAvoidanceConfig(Config):
         collision_scene = self._create_collision_checker(self._world, new_collision_checker)
         self.god_map.set_data(identifier.collision_scene, collision_scene)
 
-    def _create_collision_checker(self, world, collision_checker):
+    def _create_collision_checker(self, world: WorldTree, collision_checker: CollisionCheckerLib) \
+            -> CollisionWorldSynchronizer:
+        if collision_checker not in CollisionCheckerLib:
+            raise KeyError(f'Unknown collision checker {collision_checker}. '
+                           f'Collision avoidance is disabled')
         if collision_checker == CollisionCheckerLib.bpb:
             logging.loginfo('Using betterpybullet for collision checking.')
             try:
@@ -432,13 +434,9 @@ class CollisionAvoidanceConfig(Config):
             except ImportError as e:
                 logging.logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
-        if collision_checker == CollisionCheckerLib.none:
-            logging.logwarn('Using no collision checking.')
-            from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-            return CollisionWorldSynchronizer(world)
-        if collision_checker not in CollisionCheckerLib:
-            raise KeyError(f'Unknown collision checker {self._collision_checker}. '
-                           f'Collision avoidance is disabled')
+        logging.logwarn('Using no collision checking.')
+        from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+        return CollisionWorldSynchronizer(world)
 
     def set_default_self_collision_avoidance(self,
                                              number_of_repeller: int = 1,
@@ -637,7 +635,7 @@ class Giskard(ABC, Config):
         self.world = WorldConfig()
         self.robot_interface = RobotInterfaceConfig()
         self.execution_config = ExecutionConfig()
-        self.collision_avoidance = CollisionAvoidanceConfig(CollisionCheckerLib.bpb)
+        self.collision_avoidance = CollisionAvoidanceConfig()
         self.behavior_tree = BehaviorTreeConfig()
         self._god_map.set_data(identifier.hack, 0)
         blackboard = Blackboard
@@ -679,6 +677,8 @@ class Giskard(ABC, Config):
         with self._world.modify_world():
             self.configure_world()
         self.configure_collision_avoidance()
+        if self.collision_avoidance.collision_checker_id is None:
+            self.collision_avoidance.set_collision_checker(CollisionCheckerLib.bpb)
         self.configure_execution()
         if self.execution_config.control_mode == ControlModes.open_loop:
             behavior_tree = OpenLoop()

@@ -39,7 +39,7 @@ class PR2_Base(Giskard):
                                         robot_group_name=pr2_group_name)
 
     def configure_collision_avoidance(self):
-        # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
+        self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
         self.collision_avoidance.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                                           hard_threshold=0.0)

@@ -49,6 +49,10 @@ class Config:
     def get_default_group_name(self):
         return list(self._world.groups.keys())[0]
 
+    @abc.abstractmethod
+    def set_defaults(self):
+        ...
+
 
 class ExecutionConfig(Config):
     qp_solver: SupportedQPSolver
@@ -64,19 +68,16 @@ class ExecutionConfig(Config):
     added_slack: float = 100,
     weight_factor: float = 100
 
-    def __init__(self,
-                 qp_solver: SupportedQPSolver = None,
-                 prediction_horizon: int = 9,
-                 retries_with_relaxed_constraints: int = 5,
-                 added_slack: float = 100,
-                 sample_period: float = 0.05,
-                 weight_factor: float = 100):
-        self.qp_solver = qp_solver
-        self.prediction_horizon = prediction_horizon
-        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
-        self.added_slack = added_slack
-        self.sample_period = sample_period
-        self.weight_factor = weight_factor
+    def __init__(self):
+        self.set_defaults()
+
+    def set_defaults(self):
+        self.qp_solver = None
+        self.prediction_horizon = 9
+        self.retries_with_relaxed_constraints = 5
+        self.added_slack = 100
+        self.sample_period = 0.05
+        self.weight_factor = 100
         self.default_weights = {d: defaultdict(float) for d in Derivatives}
 
     def set_prediction_horizon(self, new_prediction_horizon: int):
@@ -111,6 +112,9 @@ class WorldConfig(Config):
     def __init__(self):
         self.god_map.set_data(identifier.world, WorldTree(self._default_root_link_name))
         self.set_default_weights()
+
+    def set_defaults(self):
+        pass
 
     def set_default_weights(self,
                             velocity_weight: float = 0.01,
@@ -293,8 +297,8 @@ class WorldConfig(Config):
 
 class RobotInterfaceConfig(Config):
 
-    # def __init__(self):
-    #     self.world.register_controlled_joints(self._controlled_joints)
+    def set_defaults(self):
+        pass
 
     def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
         joint_name = self._world.search_for_joint_name(joint_name)
@@ -358,6 +362,9 @@ class RobotInterfaceConfig(Config):
 class BehaviorTreeConfig(Config):
     tree_tick_rate: float = 0.05
 
+    def set_defaults(self):
+        pass
+
     def set_tree_tick_rate(self, rate: float = 0.05):
         self.tree_tick_rate = rate
 
@@ -406,6 +413,9 @@ class CollisionAvoidanceConfig(Config):
 
     def __init__(self, collision_checker):
         self.set_collision_checker(collision_checker)
+
+    def set_defaults(self):
+        pass
 
     def set_collision_checker(self, new_collision_checker: CollisionCheckerLib):
         self._collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
@@ -634,6 +644,13 @@ class Giskard(ABC, Config):
         blackboard.god_map = self._god_map
 
         self._backup = {}
+
+    def set_defaults(self):
+        self.world.set_defaults()
+        self.robot_interface.set_defaults()
+        self.execution_config.set_defaults()
+        self.collision_avoidance.set_defaults()
+        self.behavior_tree.set_defaults()
 
     @abc.abstractmethod
     def configure_world(self):

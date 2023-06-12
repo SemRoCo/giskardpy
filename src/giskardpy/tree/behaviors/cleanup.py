@@ -28,7 +28,9 @@ class CleanUp(GiskardBehavior):
         if self.clear_markers_:
             self.clear_markers()
         self.god_map.clear_cache()
-        self.god_map.get_data(identifier.giskard).configure_execution()
+        giskard = self.god_map.get_data(identifier.giskard)
+        giskard.set_defaults()
+        giskard.configure_execution()
         self.god_map.set_data(identifier.goal_msg, None)
         self.world.fast_all_fks = None
         self.collision_scene.reset_cache()

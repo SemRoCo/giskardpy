@@ -410,13 +410,15 @@ class BehaviorTreeConfig(Config):
 
 class CollisionAvoidanceConfig(Config):
     _collision_avoidance_configs: DefaultDict[str, CollisionAvoidanceGroupConfig]
-    collision_checker_id: CollisionCheckerLib
+    collision_checker_id: CollisionCheckerLib = None
+
+    def __init__(self):
+        self._collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
 
     def set_defaults(self):
         pass
 
     def set_collision_checker(self, new_collision_checker: CollisionCheckerLib):
-        self._collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
         self.collision_checker_id = new_collision_checker
         collision_scene = self._create_collision_checker(self._world, new_collision_checker)
         self.god_map.set_data(identifier.collision_scene, collision_scene)

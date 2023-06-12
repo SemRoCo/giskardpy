@@ -247,17 +247,17 @@ class CollisionWorldSynchronizer:
 
     def __init__(self, world):
         self.world = world  # type: WorldTree
-        # self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(
-        #     identifier.collision_avoidance_configs)
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig] = self.god_map.get_data(
+            identifier.collision_avoidance_configs)
         self.fixed_joints = []
         self.links_to_ignore = set()
         self.ignored_self_collion_pairs = set()
         self.white_list_pairs = set()
-        # for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
-        #     self.fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-        #     self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))
-        #     self.ignored_self_collion_pairs.update(collision_avoidance_config.ignored_self_collisions)
-        #     self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
+        for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
+            self.fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+            self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))
+            self.ignored_self_collion_pairs.update(collision_avoidance_config.ignored_self_collisions)
+            self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
         self.white_list_pairs = set(
             tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
         self.fixed_joints = tuple(self.fixed_joints)

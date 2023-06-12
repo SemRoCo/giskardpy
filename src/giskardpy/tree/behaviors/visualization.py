@@ -16,7 +16,7 @@ class VisualizationBehavior(GiskardBehavior):
 
     @profile
     def setup(self, timeout):
-        self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
+        self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
         return super().setup(timeout)
 
     @catch_and_raise_to_blackboard

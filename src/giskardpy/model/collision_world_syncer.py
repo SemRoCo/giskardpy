@@ -260,6 +260,8 @@ class CollisionWorldSynchronizer:
             self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
         self.white_list_pairs = set(
             tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
+        self.ignored_self_collion_pairs = set(
+            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.ignored_self_collion_pairs)
         self.fixed_joints = tuple(self.fixed_joints)
 
         self.world_version = -1

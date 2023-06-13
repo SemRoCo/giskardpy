@@ -223,8 +223,8 @@ class WorldConfig(Config):
 
     def add_diff_drive_joint(self,
                              name: str,
-                             parent_link_name: str,
-                             child_link_name: str,
+                             parent_link_name: my_string,
+                             child_link_name: my_string,
                              robot_group_name: Optional[str] = None,
                              odometry_topic: Optional[str] = None,
                              translation_limits: Optional[derivative_map] = None,

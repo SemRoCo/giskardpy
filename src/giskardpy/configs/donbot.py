@@ -1,44 +1,56 @@
 from typing import Optional
 
+import numpy as np
 from std_msgs.msg import ColorRGBA
 
-from giskardpy.configs.data_types import ControlModes
+from giskardpy.configs.data_types import ControlModes, TfPublishingModes
 from giskardpy.configs.default_giskard import Giskard
+from giskardpy.my_types import Derivatives
 
 
 class Donbot_Base(Giskard):
-    def __init__(self, root_link_name: Optional[str] = None):
-        super().__init__(root_link_name=root_link_name)
-        self.load_moveit_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
-        self.ignore_self_collisions_of_pair('ur5_forearm_link', 'ur5_wrist_3_link')
-        self.ignore_self_collisions_of_pair('ur5_base_link', 'ur5_upper_arm_link')
-        self.add_self_collision('plate', 'ur5_upper_arm_link')
-        self.set_default_external_collision_avoidance(soft_threshold=0.1,
-                                                      hard_threshold=0.0)
-        self.overwrite_external_collision_avoidance('odom_z_joint',
-                                                    number_of_repeller=2,
-                                                    soft_threshold=0.1,
-                                                    hard_threshold=0.05)
+    localization_joint_name = 'localization'
+    map_name = 'map'
+
+    def configure_world(self):
+        self.world.set_default_visualization_marker_color(r=1, g=1, b=1, a=1)
+        self.world.set_default_limits({Derivatives.velocity: 0.5,
+                                       Derivatives.acceleration: np.inf,
+                                       Derivatives.jerk: 15})
+        self.world.set_root_link_name(self.map_name)
+        pr2_group_name = self.world.add_robot_from_parameter_server()
+        root_link_name = self.world.get_root_link_of_group(pr2_group_name)
+        self.world.add_6dof_joint(parent_link=self.map_name, child_link=root_link_name,
+                                  joint_name=self.localization_joint_name)
+        self.world.overwrite_joint_velocity_limits(joint_name='odom_x_joint',
+                                                   velocity_limit=0.1)
+        self.world.overwrite_joint_velocity_limits(joint_name='odom_y_joint',
+                                                   velocity_limit=0.1)
+        self.world.overwrite_joint_velocity_limits(joint_name='odom_z_joint',
+                                                   velocity_limit=0.05)
+
+    def configure_collision_avoidance(self):
+        self.collision_avoidance.load_moveit_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
+        self.collision_avoidance.ignore_self_collisions_of_pair('ur5_forearm_link', 'ur5_wrist_3_link')
+        self.collision_avoidance.ignore_self_collisions_of_pair('ur5_base_link', 'ur5_upper_arm_link')
+        self.collision_avoidance.add_self_collision('plate', 'ur5_upper_arm_link')
+        self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.1,
+                                                                          hard_threshold=0.0)
+        self.collision_avoidance.overwrite_external_collision_avoidance('odom_z_joint',
+                                                                        number_of_repeller=2,
+                                                                        soft_threshold=0.1,
+                                                                        hard_threshold=0.05)
         close_links = ['ur5_wrist_1_link', 'ur5_wrist_2_link', 'ur5_wrist_3_link', 'ur5_forearm_link',
                        'ur5_upper_arm_link']
         for link_name in close_links:
-            self.overwrite_self_collision_avoidance(link_name,
-                                                    soft_threshold=0.02,
-                                                    hard_threshold=0.005)
+            self.collision_avoidance.overwrite_self_collision_avoidance(link_name,
+                                                                        soft_threshold=0.02,
+                                                                        hard_threshold=0.005)
         super_close_links = ['gripper_gripper_left_link', 'gripper_gripper_right_link']
         for link_name in super_close_links:
-            self.overwrite_self_collision_avoidance(link_name,
-                                                    soft_threshold=0.00001,
-                                                    hard_threshold=0.0)
-
-        self.set_default_joint_limits(velocity_limit=0.5,
-                                      jerk_limit=15)
-        self.overwrite_joint_velocity_limits(joint_name='odom_x_joint',
-                                             velocity_limit=0.1)
-        self.overwrite_joint_velocity_limits(joint_name='odom_y_joint',
-                                             velocity_limit=0.1)
-        self.overwrite_joint_velocity_limits(joint_name='odom_z_joint',
-                                             velocity_limit=0.05)
+            self.collision_avoidance.overwrite_self_collision_avoidance(link_name,
+                                                                        soft_threshold=0.00001,
+                                                                        hard_threshold=0.0)
 
 
 class Donbot_IAI(Donbot_Base):
@@ -59,16 +71,18 @@ class Donbot_IAI(Donbot_Base):
 
 class Donbot_Standalone(Donbot_Base):
 
-    def __init__(self):
-        self.add_robot_from_parameter_server(add_drive_joint_to_group=False)
-        super().__init__('map')
-        self.set_default_visualization_marker_color(r=1, g=1, b=1, a=1)
-        self.set_control_mode(ControlModes.stand_alone)
-        self.publish_all_tf()
-        self.configure_VisualizationBehavior(in_planning_loop=True)
-        self.configure_CollisionMarker(in_planning_loop=True)
-        self.add_fixed_joint(parent_link='map', child_link='iai_donbot/odom')
-        self.register_controlled_joints([
+    def configure_execution(self):
+        self.execution_config.set_control_mode(ControlModes.stand_alone)
+        self.execution_config.set_max_trajectory_length(length=30)
+
+    def configure_behavior_tree(self):
+        super().configure_behavior_tree()
+        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=False,
+                                                           add_to_control_loop=True)
+        self.behavior_tree.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
+
+    def configure_robot_interface(self):
+        self.robot_interface.register_controlled_joints([
             'ur5_elbow_joint',
             'ur5_shoulder_lift_joint',
             'ur5_shoulder_pan_joint',

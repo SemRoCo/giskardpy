@@ -253,7 +253,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 for node in self.tree.get_nodes_of_type(behavior_type):
                     self.tree.disable_node(node.name)
         if 'QP_SOLVER' in os.environ:
-            self.giskard.execution_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
+            self.giskard.execution.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
@@ -275,7 +275,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
-        return self.giskard.execution_config.control_mode == self.giskard.execution_config.control_mode.stand_alone
+        return self.giskard.execution.control_mode == self.giskard.execution.control_mode.stand_alone
 
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:

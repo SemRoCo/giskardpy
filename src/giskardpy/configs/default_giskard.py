@@ -107,10 +107,8 @@ class ExecutionConfig(Config):
 
 
 class WorldConfig(Config):
-    _default_root_link_name = PrefixName('map', None)
-
     def __init__(self):
-        self.god_map.set_data(identifier.world, WorldTree(self._default_root_link_name))
+        self.god_map.set_data(identifier.world, WorldTree())
         self.set_default_weights()
 
     def set_defaults(self):
@@ -139,11 +137,6 @@ class WorldConfig(Config):
 
     def get_root_link_of_group(self, group_name: str) -> PrefixName:
         return self._world.groups[group_name].root_link_name
-
-    def set_root_link_name(self, root_link_name: str):
-        root_link_name = PrefixName.from_string(root_link_name, set_none_if_no_slash=True)
-        if self._default_root_link_name != root_link_name:
-            self._world.rename_link(self._default_root_link_name, root_link_name)
 
     def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
         joint_name = self._world.search_for_joint_name(joint_name, group_name)
@@ -189,7 +182,7 @@ class WorldConfig(Config):
         """
         if group_name is None:
             group_name = robot_name_from_urdf_string(urdf)
-        self._world.add_urdf(urdf=urdf, group_name=group_name, actuated=True, add_drive_joint_to_group=True)
+        self._world.add_urdf(urdf=urdf, group_name=group_name, actuated=True)
         return group_name
 
     def add_robot_from_parameter_server(self,
@@ -368,10 +361,10 @@ class BehaviorTreeConfig(Config):
     def set_tree_tick_rate(self, rate: float = 0.05):
         self.tree_tick_rate = rate
 
-    def configure_VisualizationBehavior(self,
-                                        add_to_sync: Optional[bool] = None,
-                                        add_to_planning: Optional[bool] = None,
-                                        add_to_control_loop: Optional[bool] = None):
+    def add_visualization_marker_publisher(self,
+                                           add_to_sync: Optional[bool] = None,
+                                           add_to_planning: Optional[bool] = None,
+                                           add_to_control_loop: Optional[bool] = None):
         self._behavior_tree.configure_visualization_marker(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
                                                            add_to_control_loop=add_to_control_loop)
 
@@ -628,7 +621,7 @@ class Giskard(ABC, Config):
     collision_avoidance: CollisionAvoidanceConfig
     behavior_tree: BehaviorTreeConfig
     robot_interface: RobotInterfaceConfig
-    execution_config: ExecutionConfig
+    execution: ExecutionConfig
     path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
 
     def __init__(self):
@@ -636,7 +629,7 @@ class Giskard(ABC, Config):
         self._god_map.set_data(identifier.giskard, self)
         self.world = WorldConfig()
         self.robot_interface = RobotInterfaceConfig()
-        self.execution_config = ExecutionConfig()
+        self.execution = ExecutionConfig()
         self.collision_avoidance = CollisionAvoidanceConfig()
         self.behavior_tree = BehaviorTreeConfig()
         self._god_map.set_data(identifier.hack, 0)
@@ -648,7 +641,7 @@ class Giskard(ABC, Config):
     def set_defaults(self):
         self.world.set_defaults()
         self.robot_interface.set_defaults()
-        self.execution_config.set_defaults()
+        self.execution.set_defaults()
         self.collision_avoidance.set_defaults()
         self.behavior_tree.set_defaults()
 
@@ -682,14 +675,14 @@ class Giskard(ABC, Config):
         if self.collision_avoidance.collision_checker_id is None:
             self.collision_avoidance.set_collision_checker(CollisionCheckerLib.bpb)
         self.configure_execution()
-        if self.execution_config.control_mode == ControlModes.open_loop:
+        if self.execution.control_mode == ControlModes.open_loop:
             behavior_tree = OpenLoop()
-        elif self.execution_config.control_mode == ControlModes.close_loop:
+        elif self.execution.control_mode == ControlModes.close_loop:
             behavior_tree = ClosedLoop()
-        elif self.execution_config.control_mode == ControlModes.stand_alone:
+        elif self.execution.control_mode == ControlModes.stand_alone:
             behavior_tree = StandAlone()
         else:
-            raise KeyError(f'Robot interface mode \'{self.execution_config.control_mode}\' is not supported.')
+            raise KeyError(f'Robot interface mode \'{self.execution.control_mode}\' is not supported.')
         self.god_map.set_data(identifier.tree_manager, behavior_tree)
         self.configure_robot_interface()
         self.configure_behavior_tree()
@@ -703,7 +696,7 @@ class Giskard(ABC, Config):
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
         if not self._behavior_tree.base_tracking_enabled() \
-                and not self.execution_config.control_mode == ControlModes.stand_alone:
+                and not self.execution.control_mode == ControlModes.stand_alone:
             logging.loginfo('No cmd_vel topic has been registered.')
 
     def live(self):

@@ -258,13 +258,15 @@ class CollisionWorldSynchronizer:
             self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))
             self.ignored_self_collion_pairs.update(collision_avoidance_config.ignored_self_collisions)
             self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
+        self.fixed_joints = tuple(self.fixed_joints)
+
+        self.world_version = -1
+
+    def _sort_white_list(self):
         self.white_list_pairs = set(
             tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
         self.ignored_self_collion_pairs = set(
             tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.ignored_self_collion_pairs)
-        self.fixed_joints = tuple(self.fixed_joints)
-
-        self.world_version = -1
 
     def has_world_changed(self):
         if self.world_version != self.world.model_version:
@@ -325,6 +327,7 @@ class CollisionWorldSynchronizer:
                                distance_threshold_rnd: float = 0.0,
                                non_controlled: bool = False,
                                steps: int = 10):
+        self._sort_white_list()
         group: WorldBranch = self.world.groups[group_name]
         if link_combinations is None:
             link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))

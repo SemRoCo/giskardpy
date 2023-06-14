@@ -18,7 +18,7 @@ class TiagoBase(Giskard):
         self.world.set_default_limits({Derivatives.velocity: 1,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 30})
-        self.world.set_root_link_name(self.map_name)
+        self.world.add_empty_link(self.map_name)
         self.world.add_empty_link(self.odom_link_name)
         self.world.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                                   joint_name=self.localization_joint_name)
@@ -78,47 +78,47 @@ class TiagoBase(Giskard):
 
 
 class TiagoMujoco(TiagoBase):
-    def __init__(self):
-        self.add_robot_from_parameter_server(joint_state_topics=['/tiago/joint_states'])
-        super().__init__()
-        self.add_sync_tf_frame('map', 'odom')
-        self.add_diff_drive_joint(parent_link_name='odom',
-                                  child_link_name='base_footprint',
-                                  odometry_topic='/tiago/base_footprint',
-                                  name='brumbrum',
-                                  translation_limits={
-                                      Derivatives.velocity: 0.4,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
-                                  },
-                                  rotation_limits={
-                                      Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
-                                  })
-        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_left_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/arm_left_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_right_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/arm_right_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/head_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/head_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/left_gripper_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/left_gripper_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/right_gripper_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/right_gripper_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/torso_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/torso_controller/state')
-        self.add_base_cmd_velocity(cmd_vel_topic='/tiago/cmd_vel')
+
+    def configure_execution(self):
+        self.execution.set_control_mode(ControlModes.open_loop)
+
+    def configure_behavior_tree(self):
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True)
+
+    def configure_robot_interface(self):
+        self.robot_interface.sync_joint_state_topic('/tiago/joint_states')
+        self.robot_interface.sync_odometry_topic(odometry_topic='/tiago/base_footprint',
+                                                 joint_name=self.drive_joint_name)
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/tiago/arm_left_controller/follow_joint_trajectory',
+            state_topic='/tiago/arm_left_controller/state')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/tiago/arm_right_controller/follow_joint_trajectory',
+            state_topic='/tiago/arm_right_controller/state')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/tiago/head_controller/follow_joint_trajectory',
+            state_topic='/tiago/head_controller/state')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/tiago/left_gripper_controller/follow_joint_trajectory',
+            state_topic='/tiago/left_gripper_controller/state')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/tiago/right_gripper_controller/follow_joint_trajectory',
+            state_topic='/tiago/right_gripper_controller/state')
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/tiago/torso_controller/follow_joint_trajectory',
+            state_topic='/tiago/torso_controller/state')
+        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/tiago/cmd_vel',
+                                                   joint_name=self.drive_joint_name)
 
 
 class Tiago_Standalone(TiagoBase):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.stand_alone)
+        self.execution.set_control_mode(ControlModes.stand_alone)
 
     def configure_behavior_tree(self):
         self.behavior_tree.add_tf_publisher(mode=TfPublishingModes.all)
-        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_control_loop=True)
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
 
     def configure_robot_interface(self):
         self.robot_interface.register_controlled_joints(
@@ -132,4 +132,3 @@ class Tiago_Standalone(TiagoBase):
         self.robot_interface.register_controlled_joints(
             ['gripper_right_left_finger_joint', 'gripper_right_right_finger_joint',
              'gripper_left_left_finger_joint', 'gripper_left_right_finger_joint'])
-

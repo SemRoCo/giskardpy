@@ -8,16 +8,16 @@ from giskardpy.my_types import Derivatives
 
 
 class PR2_Base(Giskard):
-    localization_joint_name = 'localization'
-    drive_joint_name = 'brumbrum'
-    odom_link_name = 'odom_combined'
     map_name = 'map'
+    localization_joint_name = 'localization'
+    odom_link_name = 'odom_combined'
+    drive_joint_name = 'brumbrum'
 
     def configure_world(self):
         self.world.set_default_limits({Derivatives.velocity: 1,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 30})
-        self.world.set_root_link_name(self.map_name)
+        self.world.add_empty_link(self.map_name)
         self.world.add_empty_link(self.odom_link_name)
         self.world.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                                   joint_name=self.localization_joint_name)
@@ -27,14 +27,14 @@ class PR2_Base(Giskard):
                                         parent_link_name=self.odom_link_name,
                                         child_link_name=root_link_name,
                                         translation_limits={
-                                            Derivatives.velocity: 0.2,
+                                            Derivatives.velocity: 0.4,
                                             Derivatives.acceleration: 1,
-                                            Derivatives.jerk: 6,
+                                            Derivatives.jerk: 5,
                                         },
                                         rotation_limits={
                                             Derivatives.velocity: 0.2,
                                             Derivatives.acceleration: 1,
-                                            Derivatives.jerk: 6
+                                            Derivatives.jerk: 5
                                         },
                                         robot_group_name=pr2_group_name)
 
@@ -85,7 +85,7 @@ class PR2_Base(Giskard):
 class PR2_Mujoco(PR2_Base):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.open_loop)
+        self.execution.set_control_mode(ControlModes.open_loop)
 
     def configure_world(self):
         super().configure_world()
@@ -93,12 +93,8 @@ class PR2_Mujoco(PR2_Base):
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()
-        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=True,
-                                                           add_to_control_loop=False)
-        self.behavior_tree.add_trajectory_plotter(wait=True)
-        self.behavior_tree.add_debug_trajectory_plotter(wait=True)
-        self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True)
-        self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True, add_to_base=True)
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
+                                                              add_to_control_loop=False)
 
     def configure_robot_interface(self):
         super().configure_robot_interface()
@@ -122,84 +118,83 @@ class PR2_Mujoco(PR2_Base):
 
 
 class PR2_IAI(PR2_Base):
-    def __init__(self):
-        self.add_robot_from_parameter_server()
-        super().__init__()
-        self.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
-        self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(name=self.drive_joint_name,
-                                  parent_link_name='odom_combined',
-                                  child_link_name='base_footprint',
-                                  translation_limits={
-                                      Derivatives.velocity: 0.4,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
-                                  },
-                                  rotation_limits={
-                                      Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
-                                  },
-                                  odometry_topic='/robot_pose_ekf/odom_combined')
+    def configure_execution(self):
+        self.execution.set_control_mode(ControlModes.open_loop)
+
+    def configure_world(self):
+        super().configure_world()
+        self.world.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+
+    def configure_behavior_tree(self):
+        super().configure_behavior_tree()
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
+                                                              add_to_control_loop=False)
+
+    def configure_robot_interface(self):
+        super().configure_robot_interface()
+        self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                                           tf_parent_frame=self.map_name,
+                                                           tf_child_frame=self.odom_link_name)
+        self.robot_interface.sync_joint_state_topic('/joint_states')
+        self.robot_interface.sync_odometry_topic('/robot_pose_ekf/odom_combined', self.drive_joint_name)
         fill_velocity_values = False
-        self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
-                                                state_topic='/l_arm_controller/state',
-                                                fill_velocity_values=fill_velocity_values)
-        self.add_follow_joint_trajectory_server(namespace='/r_arm_controller/follow_joint_trajectory',
-                                                state_topic='/r_arm_controller/state',
-                                                fill_velocity_values=fill_velocity_values)
-        self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
-                                                state_topic='/torso_controller/state',
-                                                fill_velocity_values=fill_velocity_values)
-        self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
-                                                state_topic='/head_traj_controller/state',
-                                                fill_velocity_values=fill_velocity_values)
-        self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
-                                   track_only_velocity=True)
-        self.overwrite_external_collision_avoidance(self.drive_joint_name,
-                                                    number_of_repeller=2,
-                                                    soft_threshold=0.2,
-                                                    hard_threshold=0.1)
+        self.robot_interface.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
+                                                                state_topic='/l_arm_controller/state',
+                                                                fill_velocity_values=fill_velocity_values)
+        self.robot_interface.add_follow_joint_trajectory_server(namespace='/r_arm_controller/follow_joint_trajectory',
+                                                                state_topic='/r_arm_controller/state',
+                                                                fill_velocity_values=fill_velocity_values)
+        self.robot_interface.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
+                                                                state_topic='/torso_controller/state',
+                                                                fill_velocity_values=fill_velocity_values)
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/head_traj_controller/follow_joint_trajectory',
+            state_topic='/head_traj_controller/state',
+            fill_velocity_values=fill_velocity_values)
+        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
+                                                   track_only_velocity=True,
+                                                   joint_name=self.drive_joint_name)
 
 
 class PR2_Unreal(PR2_Base):
-    def __init__(self):
-        self.add_robot_from_parameter_server()
-        super().__init__()
-        # self.general_config.default_link_color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
-        # self.collision_avoidance_config.collision_checker = self.collision_avoidance_config.collision_checker.none
-        self.add_sync_tf_frame('map', 'odom_combined')
-        self.add_omni_drive_joint(name=self.drive_joint_name,
-                                  parent_link_name='odom_combined',
-                                  child_link_name='base_footprint',
-                                  translation_limits={
-                                      Derivatives.velocity: 0.4,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
-                                  },
-                                  rotation_limits={
-                                      Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
-                                  },
-                                  odometry_topic='/base_odometry/odom')
+    def configure_execution(self):
+        self.execution.set_control_mode(ControlModes.open_loop)
+
+    def configure_world(self):
+        super().configure_world()
+        self.world.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+
+    def configure_behavior_tree(self):
+        super().configure_behavior_tree()
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
+                                                              add_to_control_loop=False)
+
+    def configure_robot_interface(self):
+        super().configure_robot_interface()
+        self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                                           tf_parent_frame=self.map_name,
+                                                           tf_child_frame=self.odom_link_name)
+        self.robot_interface.sync_joint_state_topic('/joint_states')
+        self.robot_interface.sync_odometry_topic('/base_odometry/odom', self.drive_joint_name)
         fill_velocity_values = False
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/state',
-                                                fill_velocity_values=fill_velocity_values)
-        self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
-                                   track_only_velocity=True)
-        self.overwrite_external_collision_avoidance(self.drive_joint_name,
-                                                    number_of_repeller=2,
-                                                    soft_threshold=0.2,
-                                                    hard_threshold=0.1)
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/whole_body_controller/follow_joint_trajectory',
+            state_topic='/whole_body_controller/state',
+            fill_velocity_values=fill_velocity_values)
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/head_traj_controller/follow_joint_trajectory',
+            state_topic='/head_traj_controller/state',
+            fill_velocity_values=fill_velocity_values)
+        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
+                                                   track_only_velocity=True,
+                                                   joint_name=self.drive_joint_name)
 
 
 class PR2_StandAlone(PR2_Base):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.stand_alone)
-        self.execution_config.set_max_trajectory_length(length=30)
+        self.execution.set_control_mode(ControlModes.stand_alone)
+        self.execution.set_max_trajectory_length(length=30)
 
     def configure_world(self):
         super().configure_world()
@@ -230,11 +225,6 @@ class PR2_StandAlone(PR2_Base):
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()
-        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=False,
-                                                           add_to_control_loop=True)
-        # self.behavior_tree.add_trajectory_plotter(wait=True)
-        # self.behavior_tree.add_debug_trajectory_plotter(wait=True)
-        # self.behavior_tree.add_qp_data_publisher(publish_xdot=True, publish_debug=True)
-        # self.behavior_tree.add_debug_marker_publisher()
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
+                                                              add_to_control_loop=True)
         self.behavior_tree.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
-        # self.behavior_tree.publish_all_tf()

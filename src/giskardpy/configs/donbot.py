@@ -17,7 +17,7 @@ class Donbot_Base(Giskard):
         self.world.set_default_limits({Derivatives.velocity: 0.5,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 15})
-        self.world.set_root_link_name(self.map_name)
+        self.world.add_empty_link(self.map_name)
         pr2_group_name = self.world.add_robot_from_parameter_server()
         root_link_name = self.world.get_root_link_of_group(pr2_group_name)
         self.world.add_6dof_joint(parent_link=self.map_name, child_link=root_link_name,
@@ -55,30 +55,34 @@ class Donbot_Base(Giskard):
 
 class Donbot_IAI(Donbot_Base):
 
-    def __init__(self):
-        self.add_robot_from_parameter_server()
-        super().__init__()
-        self._general_config.default_link_color = ColorRGBA(1, 1, 1, 0.7)
-        self.load_moveit_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
-        self.add_sync_tf_frame('map', 'odom')
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/base/state',
-                                                fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/scaled_pos_joint_traj_controller/follow_joint_trajectory',
-                                                state_topic='/scaled_pos_joint_traj_controller/state',
-                                                fill_velocity_values=True)
+    def configure_execution(self):
+        self.execution.set_control_mode(ControlModes.open_loop)
+
+    def configure_behavior_tree(self):
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
+                                                              add_to_control_loop=False)
+
+    def configure_robot_interface(self):
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/whole_body_controller/base/follow_joint_trajectory',
+            state_topic='/whole_body_controller/base/state',
+            fill_velocity_values=True)
+        self.robot_interface.add_follow_joint_trajectory_server(
+            namespace='/scaled_pos_joint_traj_controller/follow_joint_trajectory',
+            state_topic='/scaled_pos_joint_traj_controller/state',
+            fill_velocity_values=True)
 
 
 class Donbot_Standalone(Donbot_Base):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.stand_alone)
-        self.execution_config.set_max_trajectory_length(length=30)
+        self.execution.set_control_mode(ControlModes.stand_alone)
+        self.execution.set_max_trajectory_length(length=30)
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()
-        self.behavior_tree.configure_VisualizationBehavior(add_to_sync=True, add_to_planning=False,
-                                                           add_to_control_loop=True)
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
+                                                              add_to_control_loop=True)
         self.behavior_tree.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
 
     def configure_robot_interface(self):

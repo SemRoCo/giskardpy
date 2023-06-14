@@ -128,7 +128,7 @@ class WorldModelUpdateContextManager:
         return self.world
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.first:
+        if exc_type is None and self.first:
             self.world.context_manager_active = False
             self.world.notify_model_change()
 
@@ -142,11 +142,10 @@ class WorldTree(WorldTreeInterface):
     context_manager_active: bool = False
     _default_limits: Dict[Derivatives, float]
     _default_weights: Dict[Derivatives, float]
+    _root_link_name: PrefixName = None
 
-    def __init__(self, root_link_name: PrefixName):
-        self.root_link_name = root_link_name
+    def __init__(self):
         self.god_map = GodMap()
-        # self.default_link_color = self.god_map.get_data(identifier.general_options).default_link_color
         self.default_link_color = ColorRGBA(1, 1, 1, 0.75)
         if self.god_map is not None:
             self.god_map.set_data(identifier.world, self)
@@ -155,6 +154,16 @@ class WorldTree(WorldTreeInterface):
         self._state_version = 0
         self._model_version = 0
         self._clear()
+
+    @property
+    def root_link_name(self) -> PrefixName:
+        return self._root_link_name
+
+    @property
+    def root_link(self) -> Link:
+        if self._root_link_name is None:
+            raise PhysicsWorldException('no root_link set')
+        return self.links[self._root_link_name]
 
     @property
     def default_limits(self):
@@ -491,10 +500,6 @@ class WorldTree(WorldTreeInterface):
                     group_names.remove(group_name)
         return group_names
 
-    @property
-    def root_link(self) -> Link:
-        return self.links[self.root_link_name]
-
     def add_free_variable(self,
                           name: PrefixName,
                           lower_limits: derivative_map,
@@ -536,8 +541,7 @@ class WorldTree(WorldTreeInterface):
                  group_name: Optional[str] = None,
                  parent_link_name: Optional[PrefixName] = None,
                  pose: Optional[w.TransMatrix] = None,
-                 actuated: bool = False,
-                 add_drive_joint_to_group: bool = False):
+                 actuated: bool = False):
         """
         Add a urdf to the world at parent_link_name and create a SubWorldTree named group_name for it.
         :param urdf: urdf as str, not a file path
@@ -817,7 +821,7 @@ class WorldTree(WorldTreeInterface):
 
     def _clear(self):
         self.state = JointStates()
-        self.links = {self.root_link_name: Link(self.root_link_name)}
+        self.links = {}
         self.joints = {}
         self.free_variables = {}
         self.virtual_free_variables = {}
@@ -862,13 +866,21 @@ class WorldTree(WorldTreeInterface):
                 child_link.parent_joint_name = joint.name
             else:
                 assert child_link.parent_joint_name == joint.name
+        self.fix_root_link()
         for link in self.links.values():
             if link != self.root_link:
                 self._raise_if_joint_does_not_exist(link.parent_joint_name)
             for child_joint_name in link.child_joint_names:
                 self._raise_if_joint_does_not_exist(child_joint_name)
 
-        pass
+    def fix_root_link(self):
+        orphans = []
+        for link_name, link in self.links.items():
+            if link.parent_joint_name is None:
+                orphans.append(link_name)
+        if len(orphans) > 1:
+            raise PhysicsWorldException(f'Found multiple orphaned links: {orphans}.')
+        self._root_link_name = orphans[0]
 
     def _raise_if_link_does_not_exist(self, link_name: my_string):
         if link_name not in self.links:

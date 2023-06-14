@@ -40,7 +40,7 @@ tracking_start_time = ['tracking_start_time']
 # config
 general_options = giskard + ['_general_config']
 tmp_folder = giskard + ['path_to_data_folder']
-execution_config = giskard + ['execution_config']
+execution_config = giskard + ['execution']
 max_derivative = execution_config + ['max_derivative']
 action_server_name = execution_config + ['action_server_name']
 control_mode = execution_config + ['control_mode']

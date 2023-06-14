@@ -78,9 +78,6 @@ class PR2_Base(Giskard):
                                                                         soft_threshold=0.2,
                                                                         hard_threshold=0.1)
 
-    def configure_robot_interface(self):
-        pass
-
 
 class PR2_Mujoco(PR2_Base):
 
@@ -92,12 +89,10 @@ class PR2_Mujoco(PR2_Base):
         self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
 
     def configure_behavior_tree(self):
-        super().configure_behavior_tree()
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
                                                               add_to_control_loop=False)
 
     def configure_robot_interface(self):
-        super().configure_robot_interface()
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
                                                            tf_parent_frame=self.map_name,
                                                            tf_child_frame=self.odom_link_name)
@@ -126,12 +121,10 @@ class PR2_IAI(PR2_Base):
         self.world.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
 
     def configure_behavior_tree(self):
-        super().configure_behavior_tree()
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
                                                               add_to_control_loop=False)
 
     def configure_robot_interface(self):
-        super().configure_robot_interface()
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
                                                            tf_parent_frame=self.map_name,
                                                            tf_child_frame=self.odom_link_name)
@@ -165,12 +158,10 @@ class PR2_Unreal(PR2_Base):
         self.world.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
 
     def configure_behavior_tree(self):
-        super().configure_behavior_tree()
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
                                                               add_to_control_loop=False)
 
     def configure_robot_interface(self):
-        super().configure_robot_interface()
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
                                                            tf_parent_frame=self.map_name,
                                                            tf_child_frame=self.odom_link_name)
@@ -201,7 +192,6 @@ class PR2_StandAlone(PR2_Base):
         self.world.set_default_visualization_marker_color(1, 1, 1, 0.8)
 
     def configure_robot_interface(self):
-        super().configure_robot_interface()
         self.robot_interface.register_controlled_joints([
             'torso_lift_joint',
             'head_pan_joint',
@@ -224,7 +214,6 @@ class PR2_StandAlone(PR2_Base):
         ])
 
     def configure_behavior_tree(self):
-        super().configure_behavior_tree()
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
                                                               add_to_control_loop=True)
         self.behavior_tree.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)

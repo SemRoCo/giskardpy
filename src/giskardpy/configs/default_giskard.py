@@ -35,6 +35,10 @@ class Config:
         return self.god_map.get_data(identifier.giskard).behavior_tree
 
     @property
+    def _execution_config(self) -> ExecutionConfig:
+        return self.god_map.get_data(identifier.execution_config)
+
+    @property
     def _behavior_tree(self) -> TreeManager:
         return self.god_map.get_data(identifier.tree_manager)
 
@@ -101,7 +105,7 @@ class ExecutionConfig(Config):
     def add_goal_package_name(self, package_name: str):
         new_goals = get_all_classes_in_package(package_name, Goal)
         if len(new_goals) == 0:
-            raise GiskardException(f'No classes of type \'Goal\' found in {package_name}')
+            raise GiskardException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
         logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
         self.goal_package_paths.add(package_name)
 
@@ -130,7 +134,7 @@ class WorldConfig(Config):
         joint_name = self._world.search_for_joint_name(joint_name, group_name)
         joint = self._world.joints[joint_name]
         if not isinstance(joint, OneDofJoint):
-            raise ValueError(f'{joint_name} is not of type {str(OneDofJoint)}.')
+            raise ValueError(f'Can\'t change weight because {joint_name} is not of type {str(OneDofJoint)}.')
         free_variable = self._world.free_variables[joint.free_variable.name]
         for derivative, weight in weight_map.items():
             free_variable.quadratic_weights[derivative] = weight
@@ -138,23 +142,17 @@ class WorldConfig(Config):
     def get_root_link_of_group(self, group_name: str) -> PrefixName:
         return self._world.groups[group_name].root_link_name
 
-    def overwrite_joint_velocity_limits(self, joint_name, velocity_limit: float, group_name: Optional[str] = None):
+    def set_joint_limits(self, limit_map: derivative_map, joint_name: my_string, group_name: Optional[str] = None):
         joint_name = self._world.search_for_joint_name(joint_name, group_name)
-        self._world.free_variables[joint_name].set_lower_limit(Derivatives.velocity, -velocity_limit)
-        self._world.free_variables[joint_name].set_upper_limit(Derivatives.velocity, velocity_limit)
+        joint = self._world.joints[joint_name]
+        if not isinstance(joint, OneDofJoint):
+            raise ValueError(f'Can\'t change limits because {joint_name} is not of type {str(OneDofJoint)}.')
+        free_variable = self._world.free_variables[joint.free_variable.name]
+        for derivative, limit in limit_map.items():
+            free_variable.set_lower_limit(Derivatives.velocity, -limit)
+            free_variable.set_upper_limit(Derivatives.velocity, limit)
 
-    def overwrite_joint_acceleration_limits(self, joint_name, acceleration_limit: float,
-                                            group_name: Optional[str] = None):
-        joint_name = self._world.search_for_joint_name(joint_name, group_name)
-        self._world.free_variables[joint_name].set_lower_limit(Derivatives.acceleration, -acceleration_limit)
-        self._world.free_variables[joint_name].set_upper_limit(Derivatives.acceleration, acceleration_limit)
-
-    def overwrite_joint_jerk_limits(self, joint_name, jerk_limit: float, group_name: Optional[str] = None):
-        joint_name = self._world.search_for_joint_name(joint_name, group_name)
-        self._world.free_variables[joint_name].set_lower_limit(Derivatives.jerk, -jerk_limit)
-        self._world.free_variables[joint_name].set_upper_limit(Derivatives.jerk, jerk_limit)
-
-    def set_default_visualization_marker_color(self, r: float, g: float, b: float, a: float):
+    def set_default_color(self, r: float, g: float, b: float, a: float):
         """
         :param r: 0-1
         :param g: 0-1
@@ -219,7 +217,6 @@ class WorldConfig(Config):
                              parent_link_name: my_string,
                              child_link_name: my_string,
                              robot_group_name: Optional[str] = None,
-                             odometry_topic: Optional[str] = None,
                              translation_limits: Optional[derivative_map] = None,
                              rotation_limits: Optional[derivative_map] = None):
         """
@@ -329,6 +326,8 @@ class RobotInterfaceConfig(Config):
         :param joint_names:
         :param group_name: Only needs to be specified, if there are more than two robots.
         """
+        if self._execution_config.control_mode != ControlModes.stand_alone:
+            raise GiskardException(f'Joints only need to be registered in {ControlModes.stand_alone.name} mode.')
         joint_names = [self._world.search_for_joint_name(j, group_name) for j in joint_names]
         self._world.register_controlled_joints(joint_names)
 

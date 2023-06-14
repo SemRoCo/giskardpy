@@ -14,7 +14,7 @@ class HSR_Base(Giskard):
     map_name = 'map'
 
     def configure_world(self, robot_description: str = 'robot_description'):
-        self.world.set_default_visualization_marker_color(1, 1, 1, 1)
+        self.world.set_default_color(1, 1, 1, 1)
         self.world.set_default_limits({Derivatives.velocity: 1,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 30})
@@ -68,7 +68,7 @@ class HSR_Mujoco(HSR_Base):
 
     def configure_world(self, robot_description: str = 'robot_description'):
         super().configure_world('hsrb4s/robot_description')
-        self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
+        self.world.set_default_color(1, 1, 1, 0.7)
 
     def configure_behavior_tree(self):
         super().configure_behavior_tree()

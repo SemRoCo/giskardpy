@@ -86,7 +86,7 @@ class PR2_Mujoco(PR2_Base):
 
     def configure_world(self):
         super().configure_world()
-        self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
+        self.world.set_default_color(1, 1, 1, 0.7)
 
     def configure_behavior_tree(self):
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
@@ -118,7 +118,7 @@ class PR2_IAI(PR2_Base):
 
     def configure_world(self):
         super().configure_world()
-        self.world.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+        self.world.set_default_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
 
     def configure_behavior_tree(self):
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
@@ -155,7 +155,7 @@ class PR2_Unreal(PR2_Base):
 
     def configure_world(self):
         super().configure_world()
-        self.world.set_default_visualization_marker_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+        self.world.set_default_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
 
     def configure_behavior_tree(self):
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
@@ -189,7 +189,7 @@ class PR2_StandAlone(PR2_Base):
 
     def configure_world(self):
         super().configure_world()
-        self.world.set_default_visualization_marker_color(1, 1, 1, 0.8)
+        self.world.set_default_color(1, 1, 1, 0.8)
 
     def configure_robot_interface(self):
         self.robot_interface.register_controlled_joints([

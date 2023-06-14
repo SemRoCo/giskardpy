@@ -8,7 +8,7 @@ from giskardpy.my_types import PrefixName, Derivatives
 class Tracy(Giskard):
 
     def configure_world(self):
-        self.world.set_default_visualization_marker_color(1, 1, 1, 0.8)
+        self.world.set_default_color(1, 1, 1, 0.8)
         self.world.set_default_limits({Derivatives.velocity: 0.2,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 15})

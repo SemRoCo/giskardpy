@@ -10,7 +10,7 @@ class Boxy_StandAlone(Giskard):
     map_name = 'map'
 
     def configure_world(self):
-        self.world.set_default_visualization_marker_color(1, 1, 1, 1)
+        self.world.set_default_color(1, 1, 1, 1)
         self.world.set_default_limits({Derivatives.velocity: 0.5,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 15})
@@ -19,12 +19,9 @@ class Boxy_StandAlone(Giskard):
         root_link_name = self.world.get_root_link_of_group(pr2_group_name)
         self.world.add_6dof_joint(parent_link=self.map_name, child_link=root_link_name,
                                   joint_name=self.localization_joint_name)
-        self.world.overwrite_joint_velocity_limits(joint_name='odom_x_joint',
-                                                   velocity_limit=0.1)
-        self.world.overwrite_joint_velocity_limits(joint_name='odom_y_joint',
-                                                   velocity_limit=0.1)
-        self.world.overwrite_joint_velocity_limits(joint_name='odom_z_joint',
-                                                   velocity_limit=0.05)
+        self.world.set_joint_limits(limit_map={Derivatives.velocity: 0.1}, joint_name='odom_x_joint')
+        self.world.set_joint_limits(limit_map={Derivatives.velocity: 0.1}, joint_name='odom_y_joint')
+        self.world.set_joint_limits(limit_map={Derivatives.velocity: 0.05}, joint_name='odom_z_joint')
 
     def configure_execution(self):
         self.execution.set_control_mode(ControlModes.stand_alone)

@@ -14,7 +14,7 @@ class TiagoBase(Giskard):
     map_name = 'map'
 
     def configure_world(self):
-        self.world.set_default_visualization_marker_color(1, 1, 1, 0.7)
+        self.world.set_default_color(1, 1, 1, 0.7)
         self.world.set_default_limits({Derivatives.velocity: 1,
                                        Derivatives.acceleration: np.inf,
                                        Derivatives.jerk: 30})

@@ -1,6 +1,7 @@
 import itertools
 from collections import defaultdict
 from enum import Enum
+from copy import deepcopy
 from itertools import product, combinations_with_replacement, combinations
 from time import time
 from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict
@@ -12,7 +13,7 @@ from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionAvoidanceConfig
+from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -80,7 +81,7 @@ class Collisions:
     def __init__(self, collision_list_size):
         self.god_map = GodMap()
         self.collision_scene: CollisionWorldSynchronizer = self.god_map.get_data(identifier.collision_scene)
-        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig] = self.god_map.get_data(
             identifier.collision_avoidance_configs)
         self.fixed_joints = self.collision_scene.fixed_joints
         self.world: WorldTree = self.god_map.get_data(identifier.world)
@@ -260,7 +261,7 @@ class CollisionWorldSynchronizer:
 
     def __init__(self, world):
         self.world = world  # type: WorldTree
-        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceConfig] = self.god_map.get_data(
+        self.collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig] = self.god_map.get_data(
             identifier.collision_avoidance_configs)
         self.fixed_joints = []
         self.links_to_ignore = set()
@@ -271,11 +272,15 @@ class CollisionWorldSynchronizer:
             self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))
             self.ignored_self_collion_pairs.update(collision_avoidance_config.ignored_self_collisions)
             self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
-        self.white_list_pairs = set(
-            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
         self.fixed_joints = tuple(self.fixed_joints)
 
         self.world_version = -1
+
+    def _sort_white_list(self):
+        self.white_list_pairs = set(
+            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
+        self.ignored_self_collion_pairs = set(
+            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.ignored_self_collion_pairs)
 
     def has_world_changed(self):
         if self.world_version != self.world.model_version:
@@ -365,11 +370,12 @@ class CollisionWorldSynchronizer:
                                distance_threshold_rnd: float = 0.0,
                                non_controlled: bool = False,
                                steps: int = 10):
+        self._sort_white_list()
         group: WorldBranch = self.world.groups[group_name]
         if link_combinations is None:
             link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
         # logging.loginfo('calculating self collision matrix')
-        joint_state_tmp = self.world.state
+        joint_state_tmp = deepcopy(self.world.state)
         t = time()
         # find meaningless collisions
         for link_a, link_b in link_combinations:
@@ -583,7 +589,8 @@ class CollisionWorldSynchronizer:
         return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name, collision_id)
 
     def set_joint_state_to_zero(self):
-        self.world.state = JointStates()
+        for free_variable in self.world.free_variables:
+            self.world.state[free_variable].position = 0
         self.world.notify_state_change()
 
     def set_default_joint_state(self, group: WorldBranch):

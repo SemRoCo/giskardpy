@@ -21,4 +21,4 @@ class VisualizationBehavior(GiskardBehavior):
         self.visualizer.publish_markers()
         if self.ensure_publish:
             rospy.sleep(0.1)
-        return py_trees.common.Status.RUNNING
+        return py_trees.common.Status.SUCCESS

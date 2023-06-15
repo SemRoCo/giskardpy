@@ -82,6 +82,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     def setup(self, timeout):
         super().setup(timeout)
         self.put_drive_goals_on_godmap()
+        return True
 
     def put_drive_goals_on_godmap(self):
         try:

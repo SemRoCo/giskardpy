@@ -4,7 +4,7 @@ from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
 from time import time
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Type
 
 import actionlib
 import control_msgs
@@ -20,7 +20,6 @@ from numpy import pi
 from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
-from tf.transformations import rotation_from_matrix, quaternion_matrix
 from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
@@ -28,8 +27,8 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
-from giskardpy.configs.data_types import GeneralConfig, SupportedQPSolver
-from giskardpy.configs.default_giskard import ControlModes
+from giskardpy.configs.data_types import SupportedQPSolver, ControlModes
+from giskardpy.configs.default_giskard import Giskard
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
@@ -41,10 +40,14 @@ from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
-from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.tree.behaviors.collision_marker import CollisionMarker
+from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
+from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
+from giskardpy.tree.behaviors.visualization import VisualizationBehavior
+from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, resolve_ros_iris
+from giskardpy.utils.utils import msg_to_list, resolve_ros_iris
 import os
 
 BIG_NUMBER = 1e100
@@ -226,8 +229,9 @@ class GiskardTestWrapper(GiskardWrapper):
     default_pose = {}
     better_pose = {}
     odom_root = 'odom'
+    tree: TreeManager
 
-    def __init__(self, config_file):
+    def __init__(self, config_file: Type[Giskard]):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
         self._alive = True
@@ -240,22 +244,22 @@ class GiskardTestWrapper(GiskardWrapper):
             self.set_localization_srv = None
 
         self.giskard = config_file()
+        self.giskard.grow()
+        self.tree = self.giskard._behavior_tree
         if 'GITHUB_WORKFLOW' in os.environ:
             logging.loginfo('Inside github workflow, turning off visualization')
-            self.giskard.configure_VisualizationBehavior(enabled=False)
-            self.giskard.configure_CollisionMarker(enabled=False)
-            self.giskard.configure_PlotTrajectory(enabled=False)
-            self.giskard.configure_PlotDebugExpressions(enabled=False)
+            plugins_to_disable = [VisualizationBehavior, CollisionMarker, PlotTrajectory, PlotDebugExpressions]
+            for behavior_type in plugins_to_disable:
+                for node in self.tree.get_nodes_of_type(behavior_type):
+                    self.tree.disable_node(node.name)
         if 'QP_SOLVER' in os.environ:
-            self.giskard.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
-        self.giskard.grow()
-        self.tree = self.giskard._tree
+            self.giskard.execution.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
         self.heart = Timer(period=rospy.Duration(self.tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces
-        self.robot_names = [c.name for c in self.god_map.get_data(identifier.robot_interface_configs)]
+        self.robot_names = [list(self.world.groups.keys())[0]]
         super().__init__(node_name='tests')
         self.results = Queue(100)
         self.default_root = str(self.world.root_link_name)
@@ -271,7 +275,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
-        return self.general_config.control_mode == self.general_config.control_mode.stand_alone
+        return self.giskard.execution.control_mode == self.giskard.execution.control_mode.stand_alone
 
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
@@ -1096,10 +1100,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                          parent_link_group=parent_link_group,
                                          expected_error_code=expected_response)
         return r
-
-    @property
-    def general_config(self) -> GeneralConfig:
-        return self.god_map.unsafe_get_data(identifier.general_options)
 
     def get_external_collisions(self) -> Collisions:
         collision_goals = []

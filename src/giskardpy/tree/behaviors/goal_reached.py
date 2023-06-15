@@ -13,9 +13,10 @@ from giskardpy.utils.decorators import record_time
 
 class GoalReached(GiskardBehavior):
     @profile
-    def __init__(self, name):
+    def __init__(self, name, window_size: int = 21, joint_convergence_threshold: float = 0.01):
         super().__init__(name)
-        self.window_size = self.get_god_map().get_data(identifier.GoalReached_window_size)
+        self.joint_convergence_threshold = joint_convergence_threshold
+        self.window_size = window_size
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
 
     @profile
@@ -40,7 +41,7 @@ class GoalReached(GiskardBehavior):
         return Status.RUNNING
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
-        joint_convergence_threshold = self.god_map.get_data(identifier.joint_convergence_threshold)
+        joint_convergence_threshold = self.joint_convergence_threshold
         free_variables = self.god_map.get_data(identifier.free_variables)
         thresholds = []
         for free_variable in free_variables:  # type: FreeVariable

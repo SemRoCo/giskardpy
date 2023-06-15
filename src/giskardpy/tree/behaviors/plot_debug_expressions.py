@@ -17,10 +17,9 @@ plot_lock = Lock()
 
 class PlotDebugExpressions(PlotTrajectory):
     @profile
-    def __init__(self, name, enabled, wait=True, **kwargs):
+    def __init__(self, name, wait=True, normalize_position: bool = False, **kwargs):
         super().__init__(name=name,
-                         enabled=enabled,
-                         normalize_position=False,
+                         normalize_position=normalize_position,
                          wait=wait,
                          **kwargs)
         # self.path_to_data_folder += 'debug_expressions/'

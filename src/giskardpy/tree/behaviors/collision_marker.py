@@ -27,7 +27,7 @@ class CollisionMarker(GiskardBehavior):
     @profile
     def setup(self, timeout=10.0, name_space='pybullet_collisions'):
         super().setup(timeout)
-        self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
+        self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
         self.name_space = name_space
         return True
 
@@ -40,7 +40,7 @@ class CollisionMarker(GiskardBehavior):
         collisions = self.get_god_map().get_data(identifier.closest_point)
         if len(collisions.all_collisions) > 0:
             self.publish_cpi_markers(collisions)
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def collision_to_marker(self, collisions: Union[Set[Collision], List[Collision]]) -> Marker:
         m = Marker()

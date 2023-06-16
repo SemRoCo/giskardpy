@@ -40,7 +40,6 @@ from giskardpy.model.world import WorldTree
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
-from giskardpy.tree.behaviors.collision_marker import CollisionMarker
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
@@ -248,7 +247,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.tree = self.giskard._behavior_tree
         if 'GITHUB_WORKFLOW' in os.environ:
             logging.loginfo('Inside github workflow, turning off visualization')
-            plugins_to_disable = [VisualizationBehavior, CollisionMarker, PlotTrajectory, PlotDebugExpressions]
+            plugins_to_disable = [VisualizationBehavior, PlotTrajectory, PlotDebugExpressions]
             for behavior_type in plugins_to_disable:
                 for node in self.tree.get_nodes_of_type(behavior_type):
                     self.tree.disable_node(node.name)

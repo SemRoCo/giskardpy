@@ -217,14 +217,6 @@ class Collisions:
             return self.external_collision[joint_name]
         return self.default_result
 
-    def get_external_collisions_long_key(self, link_a, body_b, link_b):
-        """
-        Collisions are saved as a list for each movable robot joint, sorted by contact distance
-        :type joint_name: str
-        :rtype: SortedKeyList
-        """
-        return self.external_collision_long_key[link_a, body_b, link_b]
-
     @profile
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
@@ -243,9 +235,6 @@ class Collisions:
 
     def __contains__(self, item):
         return item in self.self_collisions or item in self.external_collision
-
-    def items(self):
-        return self.all_collisions
 
 
 class DisableCollisionReason(Enum):
@@ -282,6 +271,10 @@ class CollisionWorldSynchronizer:
         self.ignored_self_collion_pairs = set(
             tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.ignored_self_collion_pairs)
 
+    def _sort_black_list(self):
+        self.black_list = set(
+            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.black_list)
+
     def has_world_changed(self):
         if self.world_version != self.world.model_version:
             self.world_version = self.world.model_version
@@ -314,7 +307,7 @@ class CollisionWorldSynchronizer:
         for link_name in self.world.link_names_with_collisions:
             black_list.add((link_name, link_name))
         self.black_list = black_list
-        logging.loginfo(f'loaded {path_to_srdf} for self collision avoidance matrix')
+        logging.loginfo(f'Loaded self collision avoidance matrix: {path_to_srdf}')
         return reasons
 
     def robot(self, robot_name=''):
@@ -355,9 +348,9 @@ class CollisionWorldSynchronizer:
         """
         pass
 
-    def reset_collision_blacklist(self):
-        self.black_list = set()
-        self.update_collision_blacklist(white_list_combinations=self.white_list_pairs)
+    # def reset_collision_blacklist(self):
+    #     self.black_list = set()
+    #     self.update_collision_blacklist(white_list_combinations=self.white_list_pairs)
 
     def remove_black_list_entries(self, part_list: set):
         self.black_list = {x for x in self.black_list if x[0] not in part_list and x[1] not in part_list}
@@ -600,7 +593,7 @@ class CollisionWorldSynchronizer:
                 if free_variable.has_position_limits():
                     lower_limit = free_variable.get_lower_limit(Derivatives.position)
                     upper_limit = free_variable.get_upper_limit(Derivatives.position)
-                    self.world.state[free_variable.name].position = (upper_limit + lower_limit)/2
+                    self.world.state[free_variable.name].position = (upper_limit + lower_limit) / 2
         self.world.notify_state_change()
 
     def set_rnd_joint_state(self, group: WorldBranch):
@@ -648,6 +641,7 @@ class CollisionWorldSynchronizer:
         :param collision_goals: list of CollisionEntry
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
         """
+        self._sort_black_list()
         collision_goals = self.verify_collision_entries(collision_goals)
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry

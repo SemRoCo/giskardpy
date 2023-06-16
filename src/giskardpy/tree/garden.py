@@ -27,7 +27,6 @@ from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
-from giskardpy.tree.behaviors.collision_marker import CollisionMarker
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.behaviors.commands_remaining import CommandsRemaining
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
@@ -714,15 +713,8 @@ class StandAlone(TreeManager):
             self.insert_node(success_is_failure(VisualizationBehavior)('visualization'), self.planning2_name, 2)
             self.insert_node(anything_is_success(VisualizationBehavior)('visualization'),
                              self.plan_postprocessing_name)
-            if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-                self.insert_node(success_is_failure(CollisionMarker)('collision marker'), self.planning2_name, 2)
-                self.insert_node(anything_is_success(CollisionMarker)('collision marker'),
-                                 self.plan_postprocessing_name)
         if add_to_control_loop is not None and add_to_control_loop:
             self.insert_node(success_is_running(VisualizationBehavior)('visualization'), self.closed_loop_control_name)
-            if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-                self.insert_node(success_is_running(CollisionMarker)('collision marker'),
-                                 self.closed_loop_control_name)
 
     def configure_max_trajectory_length(self, enabled: bool, length: float):
         nodes = self.get_nodes_of_type(MaxTrajectoryLength)

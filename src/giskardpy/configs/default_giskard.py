@@ -55,9 +55,8 @@ class Config:
         try:
             return self.god_map.get_data(identifier.collision_scene)
         except KeyError as e:
-            if self._collision_avoidance_config.collision_checker_id is None:
-                self.collision_avoidance.set_collision_checker(CollisionCheckerLib.bpb)
-            raise GiskardException(f'You must call {self._collision_avoidance_config.set_collision_checker.__name__} first.')
+            self._collision_avoidance_config.set_collision_checker(CollisionCheckerLib.bpb)
+            return self.god_map.get_data(identifier.collision_scene)
 
     def get_default_group_name(self):
         return list(self._world.groups.keys())[0]
@@ -663,8 +662,8 @@ class Giskard(ABC, Config):
         ...
 
     @abc.abstractmethod
-    def configure_collision_avoidance(self, collision_checker: Optional[CollisionCheckerLib] = None):
-        self.collision_avoidance.set_collision_checker(collision_checker)
+    def configure_collision_avoidance(self):
+        ...
 
     @abc.abstractmethod
     def configure_behavior_tree(self):

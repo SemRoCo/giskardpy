@@ -3838,7 +3838,7 @@ class TestInfoServices:
 class TestWorld:
     def test_compute_self_collision_matrix(self, world_setup: WorldTree):
         reference_collision_scene = BetterPyBulletSyncer(world_setup)
-        reference_reasons = reference_collision_scene.load_from_srdf('package://giskardpy/test/data/pr2.srdf')
+        # reference_reasons = reference_collision_scene.load_from_srdf('package://giskardpy/test/data/pr2.srdf')
         collision_scene: CollisionWorldSynchronizer = world_setup.god_map.get_data(identifier.collision_scene)
         actual_reasons = collision_scene.compute_self_collision_matrix('pr2')
         reference_blacklist = reference_collision_scene.black_list

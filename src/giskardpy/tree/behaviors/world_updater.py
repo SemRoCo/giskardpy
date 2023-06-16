@@ -16,6 +16,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup, \
     DyeGroupRequest
+from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
@@ -299,7 +300,6 @@ class WorldUpdater(GiskardBehavior):
     @profile
     def clear_world(self):
         # assumes that parent has god map lock
-        self.collision_scene.reset_collision_blacklist()
         tmp_state = deepcopy(self.world.state)
         self.world.delete_all_but_robots()
         for group_name in list(self.added_plugin_names.keys()):
@@ -309,6 +309,7 @@ class WorldUpdater(GiskardBehavior):
         remaining_free_variables = list(self.world.free_variables.keys())+list(self.world.virtual_free_variables.keys())
         self.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
         self.world.notify_state_change()
+        self.god_map.get_data(identifier.giskard).configure_collision_avoidance()
         self.clear_markers()
         logging.loginfo('Cleared world.')
 

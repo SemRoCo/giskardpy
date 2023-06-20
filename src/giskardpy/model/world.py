@@ -1206,32 +1206,6 @@ class WorldTree(WorldTreeInterface):
         return p
 
     @profile
-    def compute_all_fks(self):
-        if self.fast_all_fks is None:
-            fks = []
-            self.fk_idx = {}
-            i = 0
-            for link in self.links.values():
-                if link.name == self.root_link_name:
-                    continue
-                if link.has_collisions():
-                    fk: w.TransMatrix = self.compose_fk_expression(self.root_link_name, link.name)
-                    fk = fk.dot(link.collisions[0].link_T_geometry)
-                    position = fk.to_position()
-                    orientation = fk.to_rotation().to_quaternion()
-                    fks.append(w.vstack([position, orientation]).T)
-                    self.fk_idx[link.name] = i
-                    i += 1
-            fks = w.vstack(fks)
-            self.fast_all_fks = fks.compile()
-
-        fks_evaluated = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-        result = {}
-        for link in self.link_names_with_collisions:
-            result[link] = fks_evaluated[self.fk_idx[link], :]
-        return result
-
-    @profile
     def as_tf_msg(self, include_prefix: bool) -> TFMessage:
         """
         Create a tfmessage for the whole world tree.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -30,6 +30,9 @@ class LinkGeometry:
         else:
             self.color = color
         self.link_T_geometry = w.TransMatrix(link_T_geometry)
+
+    def to_hash(self) -> str:
+        return ''
 
     @classmethod
     def from_urdf(cls, urdf_thing, color) -> LinkGeometry:
@@ -120,6 +123,12 @@ class MeshGeometry(LinkGeometry):
         else:
             self.scale = scale
 
+    def to_hash(self) -> str:
+        s = ''
+        with open(self.file_name[7:], 'r') as f:
+            s += f.read()
+        return s
+
     def as_visualization_marker(self) -> Marker:
         marker = super().as_visualization_marker()
         marker.type = Marker.MESH_RESOURCE
@@ -144,6 +153,9 @@ class BoxGeometry(LinkGeometry):
         self.width = width
         self.height = height
 
+    def to_hash(self) -> str:
+        return f'box{self.depth}{self.width}{self.height}'
+
     def as_visualization_marker(self):
         marker = super().as_visualization_marker()
         marker.type = Marker.CUBE
@@ -166,6 +178,9 @@ class CylinderGeometry(LinkGeometry):
         self.height = height
         self.radius = radius
 
+    def to_hash(self) -> str:
+        return f'cylinder{self.height}{self.radius}'
+
     def as_visualization_marker(self):
         marker = super().as_visualization_marker()
         marker.type = Marker.CYLINDER
@@ -187,6 +202,9 @@ class SphereGeometry(LinkGeometry):
         super().__init__(link_T_geometry, color)
         self.radius = radius
 
+    def to_hash(self) -> str:
+        return f'sphere{self.radius}'
+
     def as_visualization_marker(self):
         marker = super().as_visualization_marker()
         marker.type = Marker.SPHERE
@@ -203,6 +221,11 @@ class SphereGeometry(LinkGeometry):
 
 
 class Link:
+    child_joint_names: List[PrefixName]
+    collisions: List[LinkGeometry]
+    name: PrefixName
+    visuals: List[LinkGeometry]
+    parent_joint_name: Optional[PrefixName]
     child_joint_names: List[PrefixName]
 
     def __init__(self, name: my_string):

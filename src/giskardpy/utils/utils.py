@@ -24,6 +24,7 @@ import rospkg
 import rospy
 import trimesh
 from genpy import Message
+import betterpybullet as bpb
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import Status, Blackboard
@@ -310,23 +311,6 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
-def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
-    first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
-    resolved_old_path = resolve_ros_iris(file_name)
-    short_file_name = file_name.split('/')[-1][:-3]
-    decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
-    new_path = to_tmp_path(decomposed_obj_file_name)
-    if not os.path.exists(new_path):
-        mesh = trimesh.load(resolved_old_path, force='mesh')
-        obj_str = trimesh.exchange.obj.export_obj(mesh)
-        write_to_tmp(decomposed_obj_file_name, obj_str)
-        logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
-        # if not trimesh.convex.is_convex(mesh):
-        #     pybullet.vhacd(new_path, new_path, log_path)
-
-    return new_path
-
-
 def launch_launchfile(file_name: str):
     launch_file = resolve_ros_iris(file_name)
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
@@ -346,7 +330,7 @@ def raise_to_blackboard(exception):
 
 def has_blackboard_exception():
     return hasattr(Blackboard(), blackboard_exception_name) \
-           and getattr(Blackboard(), blackboard_exception_name) is not None
+        and getattr(Blackboard(), blackboard_exception_name) is not None
 
 
 def get_blackboard_exception():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import hashlib
 from abc import ABC
 from functools import cached_property
 from itertools import combinations
@@ -22,7 +23,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF
-from giskardpy.model.links import Link
+from giskardpy.model.links import Link, MeshGeometry
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
 from giskardpy.my_types import my_string
@@ -73,6 +74,18 @@ class WorldTreeInterface(ABC):
     @cached_property
     def link_names_with_collisions(self) -> Set[PrefixName]:
         return set(link.name for link in self.links.values() if link.has_collisions())
+
+    @profile
+    def to_hash(self):
+        s = ''
+        for link_name in sorted(self.link_names_with_collisions):
+            link = self.links[link_name]
+            for collision in link.collisions:
+                s += collision.to_hash()
+        s += str(sorted(self.controlled_joints))
+        hash_object = hashlib.sha256()
+        hash_object.update(s.encode('utf-8'))
+        return hash_object.hexdigest()
 
     @cached_property
     def link_names_without_collisions(self) -> Set[PrefixName]:
@@ -1240,7 +1253,7 @@ class WorldTree(WorldTreeInterface):
         return tf_msg
 
     @profile
-    def compute_all_fks_matrix(self):
+    def compute_all_collision_fks(self):
         return self._fk_computer.collision_fk_matrix
 
     @profile
@@ -1563,7 +1576,7 @@ class WorldBranch(WorldTreeInterface):
             raise ValueError(f'No matches for \'{joint_name}\' found: \'{matches}\'.')
         return matches[0]
 
-    @property
+    @cached_property
     def controlled_joints(self) -> List[PrefixName]:
         return [j for j in self.god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
 
@@ -1624,6 +1637,10 @@ class WorldBranch(WorldTreeInterface):
             pass
         try:
             del self.groups
+        except:
+            pass
+        try:
+            del self.controlled_joints
         except:
             pass
 

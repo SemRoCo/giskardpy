@@ -49,6 +49,12 @@ class Collision:
         self.new_b_P_pb = None
         self.new_b_V_n = None
 
+    def __str__(self):
+        return f'{self.original_link_a}|-|{self.original_link_b}: {self.contact_distance}'
+
+    def __repr__(self):
+        return str(self)
+
     def __point_to_4d(self, point):
         if point is None:
             return point
@@ -440,11 +446,13 @@ class CollisionWorldSynchronizer:
         # self.black_list[group_name] = unknown
         # return self.collision_matrices[group_name]
 
+    @profile
     def compute_self_collision_matrix(self,
                                       group_name: str,
                                       link_combinations: Optional[set] = None,
                                       distance_threshold_zero: float = 0.0,
-                                      distance_threshold_rnd: float = 0.0,
+                                      distance_threshold_never: float = 0.0,
+                                      distance_threshold_always: float = 0.005,
                                       non_controlled: bool = False,
                                       steps: int = 10) -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
         np.random.seed(1337)
@@ -485,21 +493,21 @@ class CollisionWorldSynchronizer:
         counts: DefaultDict[Tuple[PrefixName, PrefixName], int] = defaultdict(int)
         for try_id in range(always_tries):
             self.set_rnd_joint_state(group)
-            for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_rnd):
+            for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_always):
                 link_combination = self.world.sort_links(link_a, link_b)
                 counts[link_combination] += 1
         for link_combination, count in counts.items():
-            if count > always_tries * 95:
+            if count > always_tries * .95:
                 white_list.remove(link_combination)
                 almost_always.add(link_combination)
                 reasons[link_combination] = DisableCollisionReason.AlmostAlways
         # 4. NEVER IN COLLISION
-        never_tries = 10000
+        never_tries = 1000
         sometimes = set()
         with Bar('never in collision', max=never_tries) as bar:
             for try_id in range(never_tries):
                 self.set_rnd_joint_state(group)
-                contacts = self.find_colliding_combinations(white_list, distance_threshold_rnd)
+                contacts = self.find_colliding_combinations(white_list, distance_threshold_never)
                 for link_a, link_b in contacts:
                     link_combination = self.world.sort_links(link_a, link_b)
                     white_list.remove(link_combination)
@@ -524,10 +532,8 @@ class CollisionWorldSynchronizer:
         root = etree.Element('robot')
         root.set('name', group.name)
 
-        hash_object = hashlib.sha256()
-        hash_object.update(str(list(sorted(group.link_names_with_collisions))).encode("utf-8"))
         child = etree.SubElement(root, 'hash')
-        child.text = hash_object.hexdigest()
+        child.text = group.to_hash()
 
         for link_a, link_b in sorted(itertools.chain(adjacent, by_default, almost_always, never)):
             child = etree.SubElement(root, 'disable_collisions')
@@ -548,7 +554,7 @@ class CollisionWorldSynchronizer:
         path_to_tmp = self.god_map.get_data(identifier.tmp_folder)
         file_name = f'{path_to_tmp}{group.name}.srdf'
         logging.loginfo(f'Saved self collision matrix for {group.name} in {file_name}.')
-        tree.write(file_name, pretty_print=True)
+        tree.write(file_name, pretty_print=True, xml_declaration=True, encoding=tree.docinfo.encoding)
 
     def add_black_list_entry(self, link_a, link_b):
         self.black_list.add((link_a, link_b))
@@ -596,6 +602,7 @@ class CollisionWorldSynchronizer:
                     self.world.state[free_variable.name].position = (upper_limit + lower_limit) / 2
         self.world.notify_state_change()
 
+    @profile
     def set_rnd_joint_state(self, group: WorldBranch):
         for joint_name in group.controlled_joints:
             free_variable: FreeVariable

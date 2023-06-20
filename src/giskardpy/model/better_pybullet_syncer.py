@@ -79,13 +79,15 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
         return self.bpb_result_to_collisions(result, collision_list_sizes)
 
+    @profile
     def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],
                                     distance: float) -> Set[Tuple[PrefixName, PrefixName]]:
         self.query = None
         self.sync()
         cut_off_distance = {link_combination: distance for link_combination in link_combinations}
         collisions = self.check_collisions(cut_off_distance, 15)
-        colliding_combinations = {(c.original_link_a, c.original_link_b) for c in collisions.all_collisions}
+        colliding_combinations = {(c.original_link_a, c.original_link_b) for c in collisions.all_collisions
+                                  if c.contact_distance <= distance}
         return colliding_combinations
 
     @profile
@@ -154,9 +156,9 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 self.add_object(link)
             self.objects_in_order = [x for link_name in self.world._fk_computer.collision_link_order for x in self.object_name_to_id[link_name]]
             # self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
-            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
+            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_collision_fks())
             # self.update_collision_blacklist()
-        bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
+        bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_collision_fks())
 
     @profile
     def get_pose(self, link_name, collision_id=0):

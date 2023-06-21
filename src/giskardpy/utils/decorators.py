@@ -47,8 +47,6 @@ def memoize(function):
 
     @wraps(function)
     def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
         key = (args, frozenset(kwargs.items()))
         try:
             return memo[key]
@@ -88,15 +86,13 @@ def copy_memoize(function):
 
     @wraps(function)
     def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
         key = (args, frozenset(kwargs.items()))
         try:
             return deepcopy(memo[key])
         except KeyError:
             rv = function(*args, **kwargs)
             memo[key] = rv
-            return rv
+            return deepcopy(rv)
 
     return wrapper
 

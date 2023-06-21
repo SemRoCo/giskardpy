@@ -47,9 +47,9 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         if self.query is None:
             self.query = defaultdict(set)
             for (link_a, link_b), dist in cut_off_distances.items():
-                for collision_object_a in self.object_name_to_id[link_a]:
-                    for collision_object_b in self.object_name_to_id[link_b]:
-                        self.query[collision_object_a].add((collision_object_b, dist+buffer))
+                collision_object_a = self.object_name_to_id[link_a]
+                collision_object_b = self.object_name_to_id[link_b]
+                self.query[collision_object_a].add((collision_object_b, dist+buffer))
         return self.query
 
     @profile

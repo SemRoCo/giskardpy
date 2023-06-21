@@ -1228,7 +1228,8 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compute_all_collision_fks(self):
-        return self._fk_computer.collision_fk_matrix
+        params = self.god_map.unsafe_get_values(self._fk_computer.fast_collision_fks.str_params)
+        return self._fk_computer.fast_collision_fks.fast_call(params)
 
     @profile
     def init_all_fks(self):
@@ -1253,17 +1254,17 @@ class WorldTree(WorldTreeInterface):
             def compile_fks(self):
                 all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
                 collision_fks = []
-                collision_ids = []
-                for link_name in self.world.link_names_with_collisions:
+                # collision_ids = []
+                for link_name in sorted(self.world.link_names_with_collisions):
                     if link_name == self.world.root_link_name:
                         continue
-                    link = self.world.links[link_name]
-                    for collision_id, geometry in enumerate(link.collisions):
-                        link_name_with_id = link.name_with_collision_id(collision_id)
-                        collision_fks.append(self.fks[link_name].dot(geometry.link_T_geometry))
-                        collision_ids.append(link_name_with_id)
+                    # link = self.world.links[link_name]
+                    # for collision_id, geometry in enumerate(link.collisions):
+                    #     link_name_with_id = link.name_with_collision_id(collision_id)
+                    collision_fks.append(self.fks[link_name])
+                        # collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
-                self.collision_link_order = list(collision_ids)
+                # self.collision_link_order = list(collision_ids)
                 self.fast_all_fks = all_fks.compile()
                 self.fast_collision_fks = collision_fks.compile()
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
@@ -1272,8 +1273,6 @@ class WorldTree(WorldTreeInterface):
             def recompute(self):
                 self.compute_fk_np.memo.clear()
                 self.fks = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
-                self.collision_fk_matrix = self.fast_collision_fks.fast_call(
-                    self.god_map.unsafe_get_values(self.fast_collision_fks.str_params))
 
             @memoize
             @profile

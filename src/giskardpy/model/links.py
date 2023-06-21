@@ -17,7 +17,7 @@ from giskardpy.my_types import PrefixName
 from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import resolve_ros_iris
-from giskardpy.utils.decorators import memoize
+from giskardpy.utils.decorators import memoize, copy_memoize
 import giskardpy.casadi_wrapper as w
 
 
@@ -104,8 +104,7 @@ class LinkGeometry:
         marker = Marker()
         marker.color = self.color
 
-        marker.pose = Pose()
-        marker.pose = np_to_pose(self.link_T_geometry.evaluate())
+        marker.pose = self.link_T_geometry.evaluate()
         return marker
 
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
@@ -283,10 +282,10 @@ class Link:
             for collision in self.collisions:
                 collision.color = color
 
-    @memoize
+    @copy_memoize
     def collision_visualization_markers(self):
         markers = MarkerArray()
-        for collision in self.collisions:  # type: LinkGeometry
+        for collision in self.collisions:
             marker = collision.as_visualization_marker()
             markers.markers.append(marker)
         return markers
@@ -295,8 +294,6 @@ class Link:
         r = up.Robot(self.name)
         r.version = '1.0'
         link = up.Link(self.name)
-        # if self.visuals:
-        #     link.add_aggregate('visual', up.Visual(self.visuals[0].as_urdf()))
         link.add_aggregate('collision', up.Collision(self.collisions[0].as_urdf()))
         r.add_link(link)
         return r.to_xml_string()

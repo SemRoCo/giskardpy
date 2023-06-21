@@ -482,7 +482,7 @@ class CollisionWorldSynchronizer:
                 reasons[element] = DisableCollisionReason.Adjacent
         # 2. DISABLE "DEFAULT" COLLISIONS
         self.set_default_joint_state(group)
-        for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_zero):
+        for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_zero, True):
             link_combination = self.world.sort_links(link_a, link_b)
             white_list.remove(link_combination)
             default_.add(link_combination)
@@ -493,7 +493,7 @@ class CollisionWorldSynchronizer:
         counts: DefaultDict[Tuple[PrefixName, PrefixName], int] = defaultdict(int)
         for try_id in range(always_tries):
             self.set_rnd_joint_state(group)
-            for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_always):
+            for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_always, True):
                 link_combination = self.world.sort_links(link_a, link_b)
                 counts[link_combination] += 1
         for link_combination, count in counts.items():
@@ -504,14 +504,17 @@ class CollisionWorldSynchronizer:
         # 4. NEVER IN COLLISION
         never_tries = 1000
         sometimes = set()
+        update_query = True
         with Bar('never in collision', max=never_tries) as bar:
             for try_id in range(never_tries):
                 self.set_rnd_joint_state(group)
-                contacts = self.find_colliding_combinations(white_list, distance_threshold_never)
+                contacts = self.find_colliding_combinations(white_list, distance_threshold_never, update_query)
+                update_query = False
                 for link_a, link_b in contacts:
                     link_combination = self.world.sort_links(link_a, link_b)
                     white_list.remove(link_combination)
                     sometimes.add(link_combination)
+                    update_query = True
                 bar.next()
         never_in_contact = white_list
         for combi in never_in_contact:
@@ -584,13 +587,12 @@ class CollisionWorldSynchronizer:
             for link_a, link_b in product(group_a.link_names_with_collisions, group_b.link_names_with_collisions):
                 self.add_black_list_entry(*self.world.sort_links(link_a, link_b))
 
-    def get_pose(self, link_name, collision_id=0):
+    def get_map_T_geometry(self, link_name, collision_id=0):
         return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name, collision_id)
 
     def set_joint_state_to_zero(self):
         for free_variable in self.world.free_variables:
             self.world.state[free_variable].position = 0
-        self.world.notify_state_change()
 
     def set_default_joint_state(self, group: WorldBranch):
         for joint_name in group.controlled_joints:
@@ -600,7 +602,6 @@ class CollisionWorldSynchronizer:
                     lower_limit = free_variable.get_lower_limit(Derivatives.position)
                     upper_limit = free_variable.get_upper_limit(Derivatives.position)
                     self.world.state[free_variable.name].position = (upper_limit + lower_limit) / 2
-        self.world.notify_state_change()
 
     @profile
     def set_rnd_joint_state(self, group: WorldBranch):
@@ -614,16 +615,12 @@ class CollisionWorldSynchronizer:
                 else:
                     rnd_position = np.random.random() * np.pi * 2
                 self.world.state[joint_name].position = rnd_position
-        self.world.notify_state_change()
 
     def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],
-                                    distance: float) -> Set[Tuple[PrefixName, PrefixName]]:
-        in_collision = set()
-        self.sync()
-        for link_a_name, link_b_name in link_combinations:
-            if self.in_collision(link_a_name, link_b_name, distance):
-                in_collision.add((link_a_name, link_b_name))
-        return in_collision
+                                    distance: float,
+                                    update_query: bool) -> Set[Tuple[PrefixName, PrefixName]]:
+        raise NotImplementedError('Collision checking is turned off.')
+
 
     def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15) -> Collisions:
         """

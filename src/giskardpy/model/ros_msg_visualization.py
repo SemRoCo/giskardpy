@@ -29,7 +29,7 @@ class ROSMsgVisualization:
         self.god_map.set_data(identifier.ros_visualizer, self)
         self.collision_scene = self.god_map.get_data(identifier.collision_scene)
 
-    def create_world_markers(self, name_space = 'planning_visualization') -> List[Marker]:
+    def create_world_markers(self, name_space: str = 'planning_visualization') -> List[Marker]:
         markers = []
         time_stamp = rospy.Time()
         links = self.world.link_names_with_collisions
@@ -43,7 +43,7 @@ class ROSMsgVisualization:
                 marker.id = self.marker_ids[link_id_key]
                 marker.ns = name_space
                 marker.header.stamp = time_stamp
-                marker.pose = self.collision_scene.get_pose(link_name, j).pose
+                marker.pose = self.collision_scene.get_map_T_geometry(link_name, marker.pose)
                 markers.append(marker)
         return markers
 

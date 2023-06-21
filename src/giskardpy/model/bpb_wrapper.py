@@ -1,11 +1,16 @@
 import os
+from typing import List, Tuple, Optional
 
 import betterpybullet as pb
+import numpy as np
 import trimesh
 
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
+from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
+from giskardpy.my_types import my_string, PrefixName
 from giskardpy.utils import logging
+from giskardpy.utils.math import inverse_frame
 from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp
 
 
@@ -47,14 +52,14 @@ class MyCollisionObject(pb.CollisionObject):
         return self.identifier.__contains__(item.__str__())
 
 
-def create_cube_shape(extents):
+def create_cube_shape(extents: Tuple[float, float, float]) -> pb.BoxShape:
     out = pb.BoxShape(pb.Vector3(*[extents[x] * 0.5 for x in range(3)])) if type(
         extents) is not pb.Vector3 else pb.BoxShape(extents)
     out.margin = 0.001
     return out
 
 
-def create_cylinder_shape(diameter, height):
+def create_cylinder_shape(diameter: float, height: float) -> pb.CylinderShape:
     # out = pb.CylinderShapeZ(pb.Vector3(0.5 * diameter, 0.5 * diameter, height * 0.5))
     # out.margin = 0.001
     # Weird thing: The default URDF loader in bullet instantiates convex meshes. Idk why.
@@ -63,13 +68,45 @@ def create_cylinder_shape(diameter, height):
                                   scale=[diameter, diameter, height])
 
 
-def create_sphere_shape(diameter):
+def create_sphere_shape(diameter: float) -> pb.SphereShape:
     out = pb.SphereShape(0.5 * diameter)
     out.margin = 0.001
     return out
 
 
-def create_compound_shape(shapes_poses=[]):
+def create_shape_from_geometry(geometry: LinkGeometry) -> pb.CollisionShape:
+    if isinstance(geometry, BoxGeometry):
+        shape = create_cube_shape((geometry.depth, geometry.width, geometry.height))
+    elif isinstance(geometry, SphereGeometry):
+        shape = create_sphere_shape(geometry.radius * 2)
+    elif isinstance(geometry, CylinderGeometry):
+        shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
+    elif isinstance(geometry, MeshGeometry):
+        shape = load_convex_mesh_shape(geometry.file_name, scale=geometry.scale)
+        geometry.file_name = 'file://' + shape.file_path
+    else:
+        raise NotImplementedError()
+    return shape
+
+
+def create_shape_from_link(link: Link, collision_id: int = 0) -> MyCollisionObject:
+    # if len(link.collisions) > 1:
+    shapes = []
+    map_T_o = None
+    for collision_id, geometry in enumerate(link.collisions):
+        if map_T_o is None:
+            shape = create_shape_from_geometry(geometry)
+        else:
+            shape = create_shape_from_geometry(geometry)
+        link_T_geometry = pb.Transform.from_np(geometry.link_T_geometry.evaluate())
+        shapes.append((link_T_geometry, shape))
+    shape = create_compound_shape(shapes_poses=shapes)
+    # else:
+    #     shape = create_shape_from_geometry(link.collisions[0])
+    return create_object(link.name, shape, pb.Transform.identity(), collision_id)
+
+
+def create_compound_shape(shapes_poses: List[Tuple[pb.Transform, pb.CollisionShape]] = None) -> pb.CompoundShape:
     out = pb.CompoundShape()
     for t, s in shapes_poses:
         out.add_child(t, s)
@@ -78,7 +115,7 @@ def create_compound_shape(shapes_poses=[]):
 
 # Technically the tracker is not required here,
 # since the loader keeps references to the loaded shapes.
-def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1)):
+def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1)) -> pb.ConvexShape:
     if pkg_filename.startswith('file://'):
         pkg_filename = pkg_filename.split('file://')[1]
     if not pkg_filename.endswith('.obj'):
@@ -107,7 +144,10 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
     return new_path
 
 
-def create_object(name, shape, transform=pb.Transform.identity(), collision_id=0):
+def create_object(name: PrefixName, shape: pb.CollisionShape, transform: Optional[pb.Transform] = None,
+                  collision_id: int = 0) -> MyCollisionObject:
+    if transform is None:
+        transform = pb.Transform.identity()
     out = MyCollisionObject(name, collision_id)
     out.collision_shape = shape
     out.collision_flags = pb.CollisionObject.KinematicObject

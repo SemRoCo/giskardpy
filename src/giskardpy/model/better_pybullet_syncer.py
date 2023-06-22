@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Pose
 from sortedcontainers import SortedDict
 
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
-    load_convex_mesh_shape, MyCollisionObject, create_shape_from_link
+    load_convex_mesh_shape, MyCollisionObject, create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry, Link
 from giskardpy.my_types import PrefixName
@@ -45,11 +45,12 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
                                    buffer: float = 0.05) -> DefaultDict[PrefixName, Set[Tuple[MyCollisionObject, float]]]:
         if self.query is None:
-            self.query = defaultdict(set)
-            for (link_a, link_b), dist in cut_off_distances.items():
-                collision_object_a = self.object_name_to_id[link_a]
-                collision_object_b = self.object_name_to_id[link_b]
-                self.query[collision_object_a].add((collision_object_b, dist+buffer))
+            self.query = {(self.object_name_to_id[a], self.object_name_to_id[b]): v for (a, b), v in cut_off_distances.items()}
+            # self.query = defaultdict(set)
+            # for (link_a, link_b), dist in cut_off_distances.items():
+            #     collision_object_a = self.object_name_to_id[link_a]
+            #     collision_object_b = self.object_name_to_id[link_b]
+            #     self.query[collision_object_a].add((collision_object_b, dist+buffer))
         return self.query
 
     @profile
@@ -62,8 +63,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         """
 
         query = self.cut_off_distances_to_query(cut_off_distances, buffer=0.0)
-        result: Dict[MyCollisionObject, List[ClosestPair]] = self.kw.get_closest_filtered_POD_batch(query)
-
+        result: List[bpb.Collision] = self.kw.get_closest_filtered_map_batch(query)
         return self.bpb_result_to_collisions(result, collision_list_sizes)
 
     @profile
@@ -82,40 +82,13 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return colliding_combinations
 
     @profile
-    def bpb_result_to_list(self, result: Dict[MyCollisionObject, List[ClosestPair]]) -> List[Collision]:
-        result_list = []
-        for obj_a, contacts in result.items():
-            if not contacts:
-                continue
-            map_T_a = obj_a.np_transform
-            link_a = obj_a.name
-            for contact in contacts:  # type: ClosestPair
-                map_T_b = contact.obj_b.np_transform
-                link_b = contact.obj_b.name
-                for p in contact.points:  # type: ContactPoint
-                    map_P_a = map_T_a.dot(p.point_a.reshape(4))
-                    map_P_b = map_T_b.dot(p.point_b.reshape(4))
-                    c = Collision(link_a=link_a,
-                                  link_b=link_b,
-                                  contact_distance=p.distance,
-                                  map_V_n=p.normal_world_b.reshape(4),
-                                  map_P_pa=map_P_a,
-                                  map_P_pb=map_P_b)
-                    result_list.append(c)
-        return result_list
-
-    def bpb_result_to_dict(self, result: Dict[MyCollisionObject, List[ClosestPair]]):
-        result_dict = {}
-        for c in self.bpb_result_to_list(result):
-            result_dict[c.link_a, c.link_b] = c
-        return SortedDict({k: v for k, v in sorted(result_dict.items())})
-
-    @profile
-    def bpb_result_to_collisions(self, result: Dict[MyCollisionObject, List[ClosestPair]],
+    def bpb_result_to_collisions(self, result: List[bpb.Collision],
                                  collision_list_size: int) -> Collisions:
         collisions = Collisions(collision_list_size)
-        for c in self.bpb_result_to_list(result):
-            collisions.add(c)
+
+        for collision in result:
+            giskard_collision = to_giskard_collision(collision)
+            collisions.add(giskard_collision)
         return collisions
 
     def check_collision(self, link_a, link_b, distance):

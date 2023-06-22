@@ -83,6 +83,8 @@ class Collision:
 
 
 class Collisions:
+    all_collisions: Set[Collision]
+
     @profile
     def __init__(self, collision_list_size):
         self.god_map = GodMap()

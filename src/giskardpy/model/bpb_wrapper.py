@@ -7,6 +7,7 @@ import trimesh
 
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
+from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.my_types import my_string, PrefixName
 from giskardpy.utils import logging
@@ -15,41 +16,80 @@ from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp
 
 
 class MyCollisionObject(pb.CollisionObject):
-    def __init__(self, name, collision_id):
+    def __init__(self, name):
         super().__init__()
         self.name = name
-        self.collision_id = collision_id
-        self.identifier = f'{self.name}/{self.collision_id}'
 
     def __repr__(self):
-        return str(self.identifier)
+        return str(self.name)
 
     def __str__(self):
-        return str(self.identifier)
+        return str(self.name)
 
     def __hash__(self):
-        return self.identifier.__hash__()
+        return self.name.__hash__()
 
     def __eq__(self, other):
-        return self.identifier.__eq__(other.__str__())
+        return self.name.__eq__(other.__str__())
 
     def __ne__(self, other):
-        return self.identifier.__ne__(other.__str__())
+        return self.name.__ne__(other.__str__())
 
     def __le__(self, other):
-        return self.identifier.__le__(other.__str__())
+        return self.name.__le__(other.__str__())
 
     def __ge__(self, other):
-        return self.identifier.__ge__(other.__str__())
+        return self.name.__ge__(other.__str__())
 
     def __gt__(self, other):
-        return self.identifier.__gt__(other.__str__())
+        return self.name.__gt__(other.__str__())
 
     def __lt__(self, other):
-        return self.identifier.__lt__(other.__str__())
+        return self.name.__lt__(other.__str__())
 
     def __contains__(self, item):
-        return self.identifier.__contains__(item.__str__())
+        return self.name.__contains__(item.__str__())
+
+
+class BPCollisionWrapper(Collision):
+    def __init__(self, pb_collision: pb.Collision):
+        self.pb_collision = pb_collision
+        self.link_a = self.pb_collision.obj_a.name
+        self.link_b = self.pb_collision.obj_b.name
+        self.original_link_a = self.link_a
+        self.original_link_b = self.link_b
+        self.is_external = None
+        self.new_a_P_pa = None
+        self.new_b_P_pb = None
+        self.new_b_V_n = None
+
+    @property
+    def map_P_pa(self):
+        return self.pb_collision.map_P_pa
+
+    @property
+    def map_P_pb(self):
+        return self.pb_collision.map_P_pb
+
+    @property
+    def map_V_n(self):
+        return self.pb_collision.world_V_n
+
+    @property
+    def a_P_pa(self):
+        return self.pb_collision.a_P_pa
+
+    @property
+    def b_P_pb(self):
+        return self.pb_collision.b_P_pb
+
+    @property
+    def contact_distance(self):
+        return self.pb_collision.contact_distance
+
+    @property
+    def link_b_hash(self):
+        return self.link_b.__hash__()
 
 
 def create_cube_shape(extents: Tuple[float, float, float]) -> pb.BoxShape:
@@ -57,6 +97,10 @@ def create_cube_shape(extents: Tuple[float, float, float]) -> pb.BoxShape:
         extents) is not pb.Vector3 else pb.BoxShape(extents)
     out.margin = 0.001
     return out
+
+
+def to_giskard_collision(collision: pb.Collision):
+    return BPCollisionWrapper(collision)
 
 
 def create_cylinder_shape(diameter: float, height: float) -> pb.CylinderShape:
@@ -103,7 +147,7 @@ def create_shape_from_link(link: Link, collision_id: int = 0) -> MyCollisionObje
     shape = create_compound_shape(shapes_poses=shapes)
     # else:
     #     shape = create_shape_from_geometry(link.collisions[0])
-    return create_object(link.name, shape, pb.Transform.identity(), collision_id)
+    return create_object(link.name, shape, pb.Transform.identity())
 
 
 def create_compound_shape(shapes_poses: List[Tuple[pb.Transform, pb.CollisionShape]] = None) -> pb.CompoundShape:
@@ -144,11 +188,11 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
     return new_path
 
 
-def create_object(name: PrefixName, shape: pb.CollisionShape, transform: Optional[pb.Transform] = None,
-                  collision_id: int = 0) -> MyCollisionObject:
+def create_object(name: PrefixName, shape: pb.CollisionShape, transform: Optional[pb.Transform] = None) \
+        -> MyCollisionObject:
     if transform is None:
         transform = pb.Transform.identity()
-    out = MyCollisionObject(name, collision_id)
+    out = MyCollisionObject(name)
     out.collision_shape = shape
     out.collision_flags = pb.CollisionObject.KinematicObject
     out.transform = transform

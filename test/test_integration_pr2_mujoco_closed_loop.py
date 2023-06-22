@@ -164,6 +164,13 @@ class TestMoveBaseGoals:
         zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
 
+    def test_carry_my_bs(self, zero_pose: PR2TestWrapper):
+        zero_pose.set_json_goal('CarryMyBullshit',
+                                topic_name='/clicked_point')
+        zero_pose.set_max_traj_length(new_length=10000)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_wave(self, zero_pose: PR2TestWrapper):
         center = PointStamped()
         center.header.frame_id = zero_pose.default_root

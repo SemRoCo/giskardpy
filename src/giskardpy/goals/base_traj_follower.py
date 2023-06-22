@@ -1,5 +1,8 @@
 from __future__ import division
 
+import rospy
+from geometry_msgs.msg import PointStamped, Vector3Stamped, Vector3
+
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
@@ -31,7 +34,7 @@ class BaseTrajFollower(Goal):
             b = t * self.sample_period
             eq_result = self.x_symbol(t, free_variable_name, derivative)
             b_result_cases.append((b, eq_result))
-            #FIXME if less eq cases behavior changed
+            # FIXME if less eq cases behavior changed
         return w.if_less_eq_cases(a=time + start_t,
                                   b_result_cases=b_result_cases,
                                   else_result=self.x_symbol(self.trajectory_length - 1, free_variable_name, derivative))
@@ -137,6 +140,67 @@ class BaseTrajFollower(Goal):
         return f'{super().__str__()}/{self.joint_name}'
 
 
+class CarryMyBullshit(Goal):
+    current_target: PointStamped
+
+    def __init__(self,
+                 topic_name: str,
+                 distance_to_target: float = 0.5):
+        super().__init__()
+        self.sub = rospy.Subscriber(topic_name, PointStamped, self.target_sub, queue_size=10)
+        self.current_target = PointStamped()
+        self.root = self.world.root_link_name
+        self.tip = self.world.search_for_link_name('base_footprint')
+        self.tip_V_pointing_axis = Vector3()
+        self.tip_V_pointing_axis.x = 1
+        self.max_velocity = 0.3
+        self.weight = WEIGHT_ABOVE_CA
+        self.distance_to_target = distance_to_target
+
+    def project_point_to_floor(self, point: PointStamped):
+        map_P = self.world.transform_point(self.world.root_link_name, point)
+        map_P.point.z = 0
+        return map_P
+
+    def target_sub(self, point: PointStamped):
+        print('recevied new pose')
+        self.current_target = self.project_point_to_floor(point)
+
+    def make_constraints(self):
+        root_T_tip = self.get_fk(self.root, self.tip)
+        root_P_tip = root_T_tip.to_position()
+        root_P_goal_point: w.Point3 = self.get_parameter_as_symbolic_expression('current_target')
+        tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
+
+        root_V_goal_axis = root_P_goal_point - root_P_tip
+        root_V_goal_axis.scale(1)
+        root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
+        root_V_pointing_axis.vis_frame = self.tip
+        root_V_goal_axis.vis_frame = self.tip
+        self.add_debug_expr('goal_point', root_P_goal_point)
+        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
+                                         frame_V_goal=root_V_goal_axis,
+                                         reference_velocity=self.max_velocity*2,
+                                         weight=self.weight)
+
+        error = root_P_goal_point - root_P_tip
+        actual_distance_to_target = w.norm(error)
+        position_weight = w.if_greater_eq(actual_distance_to_target, self.distance_to_target, self.weight, 0)
+
+        # self.add_debug_expr('weight', position_weight)
+        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+
+        self.add_point_goal_constraints(frame_P_current=root_P_tip,
+                                        frame_P_goal=root_P_goal_point,
+                                        reference_velocity=self.max_velocity/2,
+                                        weight=position_weight)
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
 class BaseTrajFollowerPR2(BaseTrajFollower):
     joint: OmniDrivePR22
 
@@ -153,7 +217,7 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
         map_P_current = map_T_current.to_position()
         self.add_debug_expr(f'map_P_current.x', map_P_current.x)
         self.add_debug_expr('time', self.god_map.to_expr(identifier.time))
-        for t in range(self.prediction_horizon-2):
+        for t in range(self.prediction_horizon - 2):
             trajectory_time_in_s = t * self.sample_period
             map_P_goal = self.make_map_T_base_footprint_goal(trajectory_time_in_s).to_position()
             map_V_error = (map_P_goal - map_P_current)
@@ -168,14 +232,14 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
                                     weight=weight,
                                     task_expression=map_P_current.x,
                                     name=f'base/x/{t:02d}',
-                                    control_horizon=t+1)
+                                    control_horizon=t + 1)
                 self.add_constraint(reference_velocity=self.joint.translation_limits[Derivatives.velocity],
                                     lower_error=map_V_error.y,
                                     upper_error=map_V_error.y,
                                     weight=weight,
                                     task_expression=map_P_current.y,
                                     name=f'base/y/{t:02d}',
-                                    control_horizon=t+1)
+                                    control_horizon=t + 1)
             yaw1 = self.current_traj_point(self.joint.yaw1_vel.name, trajectory_time_in_s, Derivatives.velocity)
             lb_yaw1.append(yaw1)
             # if t == 0 and not self.track_only_velocity:
@@ -183,7 +247,7 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
             #     yaw1_goal_position = self.current_traj_point(self.joint.yaw1_vel.name, trajectory_time_in_s,
             #                                                  Derivatives.position)
             forward = self.current_traj_point(self.joint.forward_vel.name, t * self.sample_period,
-                                              Derivatives.velocity)*1.1
+                                              Derivatives.velocity) * 1.1
             lb_forward.append(forward)
         weight_vel = WEIGHT_ABOVE_CA
         lba_yaw = lb_yaw1

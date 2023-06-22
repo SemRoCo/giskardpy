@@ -102,6 +102,143 @@ class TestJointGoalsMujoco(TestJointGoals):
         zero_pose.plan_and_execute()
 
 
+class TestMoveBaseGoals:
+    def test_left_1m(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.y = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.move_base(base_goal)
+
+    def test_left_1cm(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.y = 0.01
+        base_goal.pose.orientation.w = 1
+        zero_pose.move_base(base_goal)
+
+    def test_forward_left_rotate(self, zero_pose: PR2TestWrapper):
+        map_T_odom = PoseStamped()
+        map_T_odom.header.frame_id = 'map'
+        map_T_odom.pose.position.x = 1
+        map_T_odom.pose.position.y = 1
+        map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
+        zero_pose.set_localization(map_T_odom)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = -1
+        # base_goal.pose.orientation.w = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(base_goal)
+
+    def test_circle(self, zero_pose: PR2TestWrapper):
+        center = PointStamped()
+        center.header.frame_id = zero_pose.default_root
+        zero_pose.set_json_goal(constraint_type='Circle',
+                                center=center,
+                                radius=0.5,
+                                tip_link='base_footprint',
+                                scale=0.1)
+        # zero_pose.set_json_goal('PR2CasterConstraints')
+        zero_pose.set_max_traj_length(new_length=60)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_stay_put(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = zero_pose.default_root
+        # base_goal.pose.position.y = 0.05
+        base_goal.pose.orientation.w = 1
+        # zero_pose.set_json_goal('PR2CasterConstraints')
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.move_base(base_goal)
+
+    def test_forward_1m(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(base_goal)
+
+    def test_wave(self, zero_pose: PR2TestWrapper):
+        center = PointStamped()
+        center.header.frame_id = zero_pose.default_root
+        zero_pose.allow_all_collisions()
+        zero_pose.set_json_goal(constraint_type='Wave',
+                                center=center,
+                                radius=0.05,
+                                tip_link='base_footprint',
+                                scale=2)
+        zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
+        zero_pose.plan_and_execute()
+
+    def test_forward_1cm(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.01
+        base_goal.pose.orientation.w = 1
+        zero_pose.move_base(base_goal)
+
+    def test_forward_left_1m_1m(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.move_base(base_goal)
+
+    def test_forward_left_1cm_1cm(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.01
+        base_goal.pose.position.y = 0.01
+        base_goal.pose.orientation.w = 1
+        zero_pose.move_base(base_goal)
+
+    def test_forward_right_and_rotate(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        zero_pose.move_base(base_goal)
+
+    def test_forward_then_left(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        zero_pose.move_base(base_goal)
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi / 3, [0, 0, 1]))
+        zero_pose.move_base(base_goal)
+
+    def test_rotate_pi_half(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 2, [0, 0, 1]))
+        zero_pose.allow_all_collisions()
+        zero_pose.move_base(base_goal)
+
+    def test_rotate_pi(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        zero_pose.move_base(base_goal)
+
+    def test_rotate_0_001_rad(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(0.001, [0, 0, 1]))
+        zero_pose.move_base(base_goal)
+
+
 class TestConstraints:
 
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):

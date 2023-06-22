@@ -16,7 +16,7 @@ class VisualizationBehavior(GiskardBehavior):
 
     @profile
     def setup(self, timeout):
-        self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
+        self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
         return super().setup(timeout)
 
     @catch_and_raise_to_blackboard
@@ -42,7 +42,7 @@ class VisualizationBehavior(GiskardBehavior):
         self.publisher.publish(markers)
         if self.ensure_publish:
             rospy.sleep(0.1)
-        return py_trees.common.Status.RUNNING
+        return py_trees.common.Status.SUCCESS
 
     def clear_marker(self):
         msg = MarkerArray()

@@ -15,7 +15,7 @@ class FreeVariable:
                  name: PrefixName,
                  lower_limits: Dict[Derivatives, float],
                  upper_limits: Dict[Derivatives, float],
-                 quadratic_weights: Optional[Dict[Derivatives, float]] = None,
+                 quadratic_weights: Dict[Derivatives, float],
                  horizon_functions: Optional[Dict[Derivatives, float]] = None):
         self.god_map = GodMap()
         self._symbols = {}
@@ -27,14 +27,8 @@ class FreeVariable:
         self.default_upper_limits = upper_limits
         self.lower_limits = {}
         self.upper_limits = {}
-        if quadratic_weights is None:
-            self.quadratic_weights = {}
-            for i in range(self.god_map.get_data(identifier.max_derivative)):
-                derivative = Derivatives(i + 1)
-                quadratic_weight_symbol = self.god_map.to_symbol(identifier.joint_weights + [derivative, self.name])
-                self.quadratic_weights[derivative] = quadratic_weight_symbol
-        else:
-            self.quadratic_weights = quadratic_weights
+        self.quadratic_weights = quadratic_weights
+        assert len(self.quadratic_weights) == self.god_map.get_data(identifier.max_derivative)
         assert max(self._symbols.keys()) == len(self._symbols) - 1
 
         self.horizon_functions = defaultdict(lambda: 0.00001)

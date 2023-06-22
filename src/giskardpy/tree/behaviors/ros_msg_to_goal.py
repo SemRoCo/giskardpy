@@ -27,7 +27,7 @@ class RosMsgToGoal(GetGoal):
     @profile
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
-        goal_package_paths = self.god_map.get_data(identifier.giskard).goal_package_paths
+        goal_package_paths = self.god_map.get_data(identifier.goal_package_paths)
         self.allowed_constraint_types = {}
         for path in goal_package_paths:
             self.allowed_constraint_types.update(get_all_classes_in_package(path, Goal))

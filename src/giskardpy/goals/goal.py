@@ -25,16 +25,19 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
 class Goal(ABC):
+    world: WorldTree
+    tree: tree.garden.TreeManager
+    _sub_goals: List[Goal]
+    god_map = GodMap()
 
     @abc.abstractmethod
     def __init__(self):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
-        self.god_map = GodMap()
-        self._test_mode = self.god_map.get_data(identifier.test_mode)
-        self._sub_goals: List[Goal] = []
-        self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
+        self._sub_goals = []
+        self.world = self.god_map.get_data(identifier.world)
+        self.tree = self.god_map.get_data(identifier.tree_manager)
 
     @property
     def prediction_horizon(self) -> int:

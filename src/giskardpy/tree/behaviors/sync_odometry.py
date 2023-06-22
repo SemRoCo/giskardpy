@@ -19,9 +19,9 @@ from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_tim
 class SyncOdometry(GiskardBehavior):
 
     @profile
-    def __init__(self, odometry_topic: str, joint_name: PrefixName):
+    def __init__(self, odometry_topic: str, joint_name: PrefixName, name_suffix: str = ''):
         self.odometry_topic = odometry_topic
-        super().__init__(str(self))
+        super().__init__(str(self) + name_suffix)
         self.joint_name = joint_name
         self.last_msg = None
         self.lock = Queue(maxsize=1)
@@ -70,4 +70,4 @@ class SyncOdometry(GiskardBehavior):
 
         except Empty:
             pass
-        return Status.RUNNING
+        return Status.SUCCESS

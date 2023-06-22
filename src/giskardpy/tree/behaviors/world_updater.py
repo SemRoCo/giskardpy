@@ -306,7 +306,7 @@ class WorldUpdater(GiskardBehavior):
             self._remove_plugins_of_group(group_name)
         self.added_plugin_names = defaultdict(list)
         # copy only state of joints that didn't get deleted
-        remaining_free_variables = list(self.world.free_variables.keys())
+        remaining_free_variables = list(self.world.free_variables.keys())+list(self.world.virtual_free_variables.keys())
         self.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
         self.world.notify_state_change()
         self.clear_markers()

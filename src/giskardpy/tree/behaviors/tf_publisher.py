@@ -15,7 +15,7 @@ class TFPublisher(GiskardBehavior):
     """
 
     @profile
-    def __init__(self, name: str, mode: TfPublishingModes, tf_topic: str, enabled: bool, include_prefix=True):
+    def __init__(self, name: str, mode: TfPublishingModes, tf_topic: str = 'tf', include_prefix: bool = True):
         super().__init__(name)
         self.original_links = set(self.world.link_names_as_set)
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
@@ -69,7 +69,6 @@ class TFPublisher(GiskardBehavior):
                         tf = self.make_transform(fk.header.frame_id, str(group.root_link_name), fk.pose)
                         tf_msg.transforms.append(tf)
                     self.tf_pub.publish(tf_msg)
-
 
         except KeyError as e:
             pass

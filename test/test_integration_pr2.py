@@ -373,27 +373,6 @@ class TestJointGoals:
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
-        start_state = {
-            'torso_lift_joint': 0.3000254972469308,
-            'head_pan_joint': 0.04135718187588074,
-            'head_tilt_joint': -0.37,
-            'r_upper_arm_roll_joint': -0.8693958356996788,
-            'r_shoulder_pan_joint': -1.112011913457302,
-            'r_shoulder_lift_joint': 0.6165443541686221,
-            'r_forearm_roll_joint': -14.916890222524186,
-            'r_elbow_flex_joint': -1.6426864689071474,
-            'r_wrist_flex_joint': -0.6157655014694016,
-            'r_wrist_roll_joint': 0.07345662278755749,
-            'l_upper_arm_roll_joint': 1.7383062350263658,
-            'l_shoulder_pan_joint': 1.8799810286792007,
-            'l_shoulder_lift_joint': 0.011627231224188975,
-            'l_forearm_roll_joint': 281.2568789280418,
-            'l_elbow_flex_joint': -2.0300928925694675,
-            'l_wrist_flex_joint': -0.11,
-            'l_wrist_roll_joint': -6.062015047706401,
-        }
-        zero_pose.set_joint_goal(start_state)
-        # zero_pose.plan_and_execute()
 
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):
         js = {
@@ -499,6 +478,23 @@ class TestConstraints:
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute()
         assert zero_pose.god_map.get_data(identifier.prediction_horizon) == default_prediction_horizon
+
+    def test_SetMaxTrajLength(self, zero_pose: PR2TestWrapper):
+        new_length = 4
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 10
+        base_goal.pose.orientation.w = 1
+        zero_pose.set_max_traj_length(new_length)
+        zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
+        result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
+        dt = zero_pose.god_map.get_data(identifier.sample_period)
+        np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
+
+        zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
+        result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
+        dt = zero_pose.god_map.get_data(identifier.sample_period)
+        assert len(result.trajectory.points) * dt > new_length + 1
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
         tip = 'base_footprint'
@@ -2306,6 +2302,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, size=(1, 1, 1), pose=p)
         zero_pose.clear_world()
+        zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute()
 
     def test_attach_remove_box(self, better_pose: PR2TestWrapper):

@@ -241,7 +241,7 @@ class WorldUpdater(GiskardBehavior):
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
         parent_group = self.world.get_parent_group_name(req.group_name)
-        self.collision_scene.update_group_blacklist(parent_group)
+        self.collision_scene.update_self_collision_matrix(parent_group)
         self.collision_scene.blacklist_inter_group_collisions()
         # logging.logwarn(f'adding took {time() - t:03}')
 
@@ -309,6 +309,7 @@ class WorldUpdater(GiskardBehavior):
         remaining_free_variables = list(self.world.free_variables.keys())+list(self.world.virtual_free_variables.keys())
         self.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
         self.world.notify_state_change()
+        self.collision_scene.sync()
         self.god_map.get_data(identifier.giskard).configure_collision_avoidance()
         self.clear_markers()
         logging.loginfo('Cleared world.')

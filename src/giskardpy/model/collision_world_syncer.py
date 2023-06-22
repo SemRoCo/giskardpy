@@ -254,9 +254,12 @@ class DisableCollisionReason(Enum):
 
 
 class CollisionWorldSynchronizer:
-    black_list: set
+    black_list: Set[Tuple[PrefixName, PrefixName]]
+    self_collision_matrix_paths: Dict[str, str]
 
     def __init__(self, world):
+        self.black_list = set()
+        self.self_collision_matrix_paths = {}
         self.world = world  # type: WorldTree
         self.collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig] = self.god_map.get_data(
             identifier.collision_avoidance_configs)
@@ -289,13 +292,22 @@ class CollisionWorldSynchronizer:
             return True
         return False
 
-    def load_from_srdf(self, path: str) -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+    def load_self_collision_matrix_in_tmp(self, group_name: str):
+        file_name = self._get_path_to_self_collision_matrix(group_name)
+        self.load_black_list_from_srdf(file_name, group_name)
+
+    def load_black_list_from_srdf(self, path: str, group_name: str) -> Dict[
+        Tuple[PrefixName, PrefixName], DisableCollisionReason]:
         path_to_srdf = resolve_ros_iris(path)
         srdf = etree.parse(path_to_srdf)
         srdf_root = srdf.getroot()
         black_list = set()
         reasons = {}
+        expected_hash = self.world.groups[group_name].to_hash()
+        actual_hash = None
         for child in srdf_root:
+            if hasattr(child, 'tag') and child.tag == 'hash':
+                actual_hash = child.text
             if hasattr(child, 'tag') and child.tag == 'disable_collisions':
                 link_a = child.attrib['link1']
                 link_b = child.attrib['link2']
@@ -312,26 +324,24 @@ class CollisionWorldSynchronizer:
                 combi = self.world.sort_links(link_a, link_b)
                 black_list.add(combi)
                 reasons[combi] = reason
+        if actual_hash is not None and actual_hash != expected_hash:
+            logging.logwarn(f'Self collision matrix \'{path_to_srdf}\' not loaded because it appears to be outdated.')
+            return {}
         for link_name in self.world.link_names_with_collisions:
             black_list.add((link_name, link_name))
         self.black_list = black_list
         logging.loginfo(f'Loaded self collision avoidance matrix: {path_to_srdf}')
+        self.self_collision_matrix_paths[group_name] = path_to_srdf
         return reasons
 
-    def robot(self, robot_name=''):
-        """
-        :rtype: WorldBranch
-        """
+    def robot(self, robot_name: str = '') -> WorldBranch:
         for robot in self.robots:
             if robot.name == robot_name:
                 return robot
         raise KeyError(f'robot names {robot_name} does not exist')
 
     @property
-    def robots(self):
-        """
-        :rtype: list of WorldBranch
-        """
+    def robots(self) -> List[WorldBranch]:
         return [self.world.groups[robot_name] for robot_name in self.world.groups.keys()
                 if self.world.groups[robot_name].actuated]
 
@@ -362,6 +372,9 @@ class CollisionWorldSynchronizer:
 
     def remove_black_list_entries(self, part_list: set):
         self.black_list = {x for x in self.black_list if x[0] not in part_list and x[1] not in part_list}
+
+    def update_self_collision_matrix(self, group_name: str):
+        pass
 
     def update_group_blacklist(self,
                                group_name: str,
@@ -556,10 +569,14 @@ class CollisionWorldSynchronizer:
         # Create the XML tree
         tree = etree.ElementTree(root)
 
-        path_to_tmp = self.god_map.get_data(identifier.tmp_folder)
-        file_name = f'{path_to_tmp}{group.name}.srdf'
+        file_name = self._get_path_to_self_collision_matrix(group.name)
         logging.loginfo(f'Saved self collision matrix for {group.name} in {file_name}.')
         tree.write(file_name, pretty_print=True, xml_declaration=True, encoding=tree.docinfo.encoding)
+        self.self_collision_matrix_paths[group.name] = file_name
+
+    def _get_path_to_self_collision_matrix(self, group_name: str) -> str:
+        path_to_tmp = self.god_map.get_data(identifier.tmp_folder)
+        return f'{path_to_tmp}{group_name}.srdf'
 
     def add_black_list_entry(self, link_a, link_b):
         self.black_list.add((link_a, link_b))
@@ -622,7 +639,6 @@ class CollisionWorldSynchronizer:
                                     distance: float,
                                     update_query: bool) -> Set[Tuple[PrefixName, PrefixName]]:
         raise NotImplementedError('Collision checking is turned off.')
-
 
     def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15) -> Collisions:
         """

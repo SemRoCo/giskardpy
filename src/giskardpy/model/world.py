@@ -82,7 +82,7 @@ class WorldTreeInterface(ABC):
             link = self.links[link_name]
             for collision in link.collisions:
                 s += collision.to_hash()
-        s += str(sorted(self.controlled_joints))
+        # s += str(sorted(self.controlled_joints))
         hash_object = hashlib.sha256()
         hash_object.update(s.encode('utf-8'))
         return hash_object.hexdigest()

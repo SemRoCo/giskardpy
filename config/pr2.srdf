@@ -1,5 +1,5 @@
 <robot name="pr2">
-  <hash>b6c77de0ff0219586dcf2c84eb6ce9c4313bace521a5df23ad302484bbd1d7f0</hash>
+  <hash>b6c77de0ff021958asdf6dcf2c84eb6ce9c4313bace521a5df23ad302484bbd1d7f0</hash>
   <disable_collisions link1="base_bellow_link" link2="base_bellow_link" reason="Adjacent"/>
   <disable_collisions link1="base_bellow_link" link2="base_link" reason="Adjacent"/>
   <disable_collisions link1="base_bellow_link" link2="bl_caster_l_wheel_link" reason="Adjacent"/>

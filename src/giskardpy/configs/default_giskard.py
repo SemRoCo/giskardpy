@@ -421,6 +421,7 @@ class CollisionAvoidanceConfig(Config):
     def set_collision_checker(self, new_collision_checker: CollisionCheckerLib):
         self.collision_checker_id = new_collision_checker
         collision_scene = self._create_collision_checker(self._world, new_collision_checker)
+        collision_scene.sync()
         self.god_map.set_data(identifier.collision_scene, collision_scene)
 
     def _create_collision_checker(self, world: WorldTree, collision_checker: CollisionCheckerLib) \
@@ -542,26 +543,16 @@ class CollisionAvoidanceConfig(Config):
         if max_velocity is not None:
             config.self_collision_avoidance[link_name].max_velocity = max_velocity
 
-    def load_moveit_self_collision_matrix(self, path_to_srdf: str, group_name: Optional[str] = None):
+    def load_self_collision_matrix(self, path_to_srdf: str, group_name: Optional[str] = None):
         """
         Giskard only has a limited ability to compute a self collision matrix. With this function you can load one
         from Moveit.
         :param path_to_srdf: path to the srdf, can handle ros package paths
         :param group_name: name of the robot for which it will be applied, only needs to be set if there are multiple robots.
         """
-        self._collision_scene.load_from_srdf(path_to_srdf)
-        # import lxml.etree as ET
-        # path_to_srdf = resolve_ros_iris(path_to_srdf)
-        # srdf = ET.parse(path_to_srdf)
-        # srdf_root = srdf.getroot()
-        # for child in srdf_root:
-        #     if hasattr(child, 'tag') and child.tag == 'disable_collisions':
-        #         link1 = child.attrib['link1']
-        #         link2 = child.attrib['link2']
-        #         reason = child.attrib['reason']
-        #         if reason in ['Never', 'Adjacent', 'Default']:
-        #             self.ignore_self_collisions_of_pair(link1, link2, group_name)
-        # logging.loginfo(f'loaded {path_to_srdf} for self collision avoidance matrix')
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
 
     def ignore_all_self_collisions_of_link(self, link_name: str, group_name: Optional[str] = None):
         """
@@ -693,6 +684,13 @@ class Giskard(ABC, Config):
         self.configure_robot_interface()
         self.configure_behavior_tree()
         self._controlled_joints_sanity_check()
+        robot_name = self.get_default_group_name()
+        if robot_name not in self._collision_scene.self_collision_matrix_paths:
+            # logging.loginfo('No self collision matrix loaded computing new one.')
+            self._collision_scene.load_self_collision_matrix_in_tmp(robot_name)
+            if len(self._collision_scene.black_list) == 0:
+                logging.loginfo('No self collision matrix loaded, computing new one.')
+                self._collision_scene.compute_self_collision_matrix(robot_name)
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)

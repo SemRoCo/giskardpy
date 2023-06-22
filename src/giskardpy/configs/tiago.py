@@ -40,7 +40,7 @@ class TiagoBase(Giskard):
                                         robot_group_name=robot_group_name)
 
     def configure_collision_avoidance(self):
-        self.collision_avoidance.load_moveit_self_collision_matrix('package://giskardpy/config/tiago.srdf')
+        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/config/tiago.srdf')
         self.collision_avoidance.overwrite_external_collision_avoidance(self.drive_joint_name,
                                                                         number_of_repeller=2,
                                                                         soft_threshold=0.2,

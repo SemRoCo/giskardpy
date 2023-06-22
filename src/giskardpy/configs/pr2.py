@@ -40,7 +40,7 @@ class PR2_Base(Giskard):
 
     def configure_collision_avoidance(self):
         # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
-        self.collision_avoidance.load_moveit_self_collision_matrix('package://giskardpy/config/pr2.srdf')
+        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/config/pr2.srdf')
         self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                                           hard_threshold=0.0)
         for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:

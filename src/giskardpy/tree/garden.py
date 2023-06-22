@@ -59,7 +59,7 @@ from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
-from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendTrajectoryToCmdVelClosedLoop
+from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendCmdVel
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
@@ -284,6 +284,14 @@ class TreeManager(ABC):
     @abc.abstractmethod
     def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
                                             fill_velocity_values: bool):
+        ...
+
+    @abc.abstractmethod
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        ...
+
+    @abc.abstractmethod
+    def add_cmd_vel_publisher(self, joint_name: PrefixName):
         ...
 
     @abc.abstractmethod
@@ -745,6 +753,15 @@ class StandAlone(TreeManager):
         current_function_name = inspect.currentframe().f_code.co_name
         NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
 
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_cmd_vel_publisher(self, joint_name: PrefixName):
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
     def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
                                     joint_name: PrefixName = None):
         current_function_name = inspect.currentframe().f_code.co_name
@@ -815,8 +832,9 @@ class StandAlone(TreeManager):
 
     def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
-        node = TFPublisher('publish tf', mode=mode, tf_topic =tf_topic, include_prefix=include_prefix)
+        node = TFPublisher('publish tf', mode=mode, tf_topic=tf_topic, include_prefix=include_prefix)
         self.insert_node(node, self.sync_name)
+
 
 class OpenLoop(StandAlone):
     move_robots_name = 'move robots'
@@ -840,7 +858,8 @@ class OpenLoop(StandAlone):
         self.insert_node(real_time_tracking, self.move_robots_name)
         sync_tf_nodes = self.get_nodes_of_type(SyncTfFrames)
         for node in sync_tf_nodes:
-            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map), self.base_closed_loop_control_name)
+            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map),
+                             self.base_closed_loop_control_name)
         odom_nodes = self.get_nodes_of_type(SyncOdometry)
         for node in odom_nodes:
             new_node = success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,
@@ -948,6 +967,16 @@ class OpenLoop(StandAlone):
 
 
 class ClosedLoop(OpenLoop):
+
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        behavior = JointVelController(namespaces=namespaces)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        behavior = SendCmdVel(cmd_vel_topic, joint_name=joint_name)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
     def grow_planning3(self):
         planning_3 = Sequence('planning III')
         # planning_3.add_child(PrintText('asdf'))
@@ -965,63 +994,32 @@ class ClosedLoop(OpenLoop):
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
 
+    def sync_joint_state_topic(self, group_name: str, topic_name: str):
+        super().sync_joint_state_topic(group_name, topic_name)
+        behavior = success_is_running(SyncConfiguration2)(group_name=group_name, joint_state_topic=topic_name)
+        self.insert_node(behavior, self.closed_loop_control_name, 0)
+
+    def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
+        super().sync_odometry_topic(topic_name, joint_name)
+        behavior = success_is_running(SyncOdometry)(topic_name, joint_name)
+        self.insert_node(behavior, self.closed_loop_control_name, 0)
+
     def grow_closed_loop_control(self):
-        pass
-        # hardware_config = self.god_map.get_data(identifier.hardware_config)
-        # planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
-        # for kwargs in hardware_config.joint_state_topics_kwargs:
-        #     planning_4.add_child(SyncConfiguration2(**kwargs))
-        # planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames',
-        #                                                               **self.god_map.unsafe_get_data(
-        #                                                                   identifier.SyncTfFrames)))
-        # for odometry_kwargs in hardware_config.odometry_node_kwargs:
-        #     planning_4.add_child(SyncOdometry(**odometry_kwargs))
-        #  planning_4.add_child(success_is_running(NotifyStateChange)())
-        # if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-        #         and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-        #     planning_4.add_child(VisualizationBehavior('visualization'))
-        # if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-        #     planning_4.add_child(CollisionChecker('collision checker'))
-        #     if self.god_map.get_data(identifier.enable_CPIMarker) \
-        #             and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-        #         planning_4.add_child(CollisionMarker('cpi marker'))
-        #
-        #
-        # planning_4.add_child(ControllerPlugin('controller'))
-        # if self.god_map.get_data(identifier.debug_expr_needed):
-        #     planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
-        # planning_4.add_child(RosTime('time'))
-        #
-        # planning_4.add_child(RealKinSimPlugin('kin sim'))
-        # for joint_group_position_controller_config in hardware_config.joint_group_position_controllers_kwargs:
-        #     planning_4.add_child(JointGroupPosController(**joint_group_position_controller_config))
-        # for joint_position_controller_config in hardware_config.joint_position_controllers_kwargs:
-        #     planning_4.add_child(JointPosController(**joint_position_controller_config))
-        # for kwargs in hardware_config.joint_velocity_controllers_kwargs:
-        #     planning_4.add_child(JointVelController(**kwargs))
-        # # for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
-        # #     planning_4.add_child(SendTrajectoryToCmdVel(**drive_interface))
-        #
-        # for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
-        #     planning_4.add_child(SendTrajectoryToCmdVelClosedLoop(**drive_interface))
-        # # planning_4.add_child(KinSimPlugin('kin sim'))
-        # # planning_4.add_child(LogTrajPlugin('log'))
-        # # if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-        # #     planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
-        # if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-        #     planning_4.add_child(DebugMarkerPublisher('debug tf publisher'))
-        # if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
-        #     planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
-        #                                                  **self.god_map.unsafe_get_data(
-        #                                                      identifier.PublishDebugExpressions)))
-        # # planning_4.add_child(WiggleCancel('wiggle'))
-        # # planning_4.add_child(LoopDetector('loop detector'))
-        # planning_4.add_child(GoalReached('goal reached', real_time=True))
-        # # planning_4.add_child(TimePlugin())
-        # if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
-        #     kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-        #     planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True, **kwargs))
-        # return planning_4
+        planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
+        planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames'))
+        # visualization
+        planning_4.add_child(success_is_running(NotifyStateChange)())
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+            planning_4.add_child(CollisionChecker('collision checker'))
+        planning_4.add_child(ControllerPlugin('controller'))
+        planning_4.add_child(RosTime())
+        planning_4.add_child(RealKinSimPlugin('kin sim'))
+        # debug expressions
+        # publish debug
+        planning_4.add_child(LoopDetector('loop detector'))
+        planning_4.add_child(GoalReached('goal reached', real_time=True))
+        planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
+        return planning_4
 
 # def sanity_check(god_map):
 #     check_velocity_limits_reachable(god_map)

@@ -147,7 +147,7 @@ class PR2_MujocoRealTime(PR2_Base):
         self.world.set_default_color(1, 1, 1, 0.7)
 
     def configure_behavior_tree(self):
-        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
                                                               add_to_control_loop=False)
 
     def configure_robot_interface(self):
@@ -176,14 +176,10 @@ class PR2_MujocoRealTime(PR2_Base):
             'pr2/head_pan_velocity_controller',
             'pr2/head_tilt_velocity_controller',
         ])
-        self.overwrite_external_collision_avoidance('brumbrum',
-                                                    number_of_repeller=2,
-                                                    soft_threshold=0.2,
-                                                    hard_threshold=0.1)
 
         self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
-                                                   track_only_velocity=True,
                                                    joint_name=self.drive_joint_name)
+
 
 class PR2_IAIRealTime(PR2_Base):
     def __init__(self):

@@ -18,7 +18,7 @@ class JointVelController(GiskardBehavior):
 
     @record_time
     @profile
-    def __init__(self, namespaces=None, group_name: str = None):
+    def __init__(self, namespaces=None):
         super().__init__('joint velocity publisher')
         self.namespaces = namespaces
         self.publishers = []

@@ -113,8 +113,6 @@ class ExecutionConfig(Config):
         logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
         self.goal_package_paths.add(package_name)
 
-    def add_joint_velocity_controller(self):
-        pass
 
 class WorldConfig(Config):
     def __init__(self):
@@ -374,6 +372,9 @@ class RobotInterfaceConfig(Config):
                                                                 group_name=group_name,
                                                                 fill_velocity_values=fill_velocity_values)
 
+
+    def add_joint_velocity_controller(self, namespaces: List[str]):
+        self._behavior_tree.add_joint_velocity_controllers(namespaces)
 
 class BehaviorTreeConfig(Config):
     tree_tick_rate: float = 0.05

@@ -1,5 +1,6 @@
 from __future__ import division
 
+from copy import deepcopy
 from typing import Optional
 
 import numpy as np
@@ -158,11 +159,12 @@ class CarryMyBullshit(Goal):
                  laser_topic_name: str = 'laser',
                  root_link: Optional[str] = None,
                  tip_link: str = 'base_footprint',
-                 last_distance_threshold: float = 0.5,
-                 laser_range: float = np.pi/4,
+                 last_distance_threshold: float = 1,
+                 laser_range: float = np.pi / 4,
                  max_rotation_velocity: float = 0.5,
                  max_translation_velocity: float = 0.5,
-                 next_point_radius: float = 0.4):
+                 next_point_radius: float = 0.4,
+                 max_temporal_distance_between_closest_and_next: float = 1):
         super().__init__()
         self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
         self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
@@ -177,22 +179,27 @@ class CarryMyBullshit(Goal):
         self.max_rotation_velocity = max_rotation_velocity
         self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_ABOVE_CA
-        self.trajectory = np.array([])
-        self.trajectory_data = []
+        self.trajectory = np.array([0, 0], ndmin=2)
+        self.trajectory_data = [(0, 0, rospy.get_rostime().to_sec())]
         self.distance_to_target = last_distance_threshold
         self.radius = next_point_radius
         self.step_dt = 0.01
-        self.max_temp_distance = 0.2
+        self.interpolation_step_size = 0.1
+        self.smoothing_factor = 0.6
+        self.max_temp_distance = max_temporal_distance_between_closest_and_next
         self.max_temp_distance = int(self.max_temp_distance / self.step_dt)
         self.closest_laser_reading = 100
         self.laser_range = laser_range
-        self.init_fake_path()
-        rospy.sleep(1)
-        self.publish_trajectory()
+        self.human_point = Point()
+        # self.init_fake_path()
+        while self.trajectory.shape[0] < 5 and not rospy.is_shutdown():
+            print(f'waiting for at least 5 traj points, current length {len(self.trajectory)}')
+            rospy.sleep(0.5)
+        # self.publish_trajectory()
 
     def laser_cb(self, scan: LaserScan):
-        center_id = int(len(scan.ranges)/2)
-        range_ = self.laser_range/scan.angle_increment
+        center_id = int(len(scan.ranges) / 2)
+        range_ = self.laser_range / scan.angle_increment
         min_id = int(center_id - range_)
         max_id = int(center_id + range_)
         segment = scan.ranges[min_id:max_id]
@@ -245,22 +252,35 @@ class CarryMyBullshit(Goal):
         return result
 
     def publish_trajectory(self):
-        m = Marker()
-        m.action = m.ADD
-        m.ns = 'debug'
-        m.id = 1
-        m.type = m.LINE_STRIP
-        m.header.frame_id = str(self.world.root_link_name)
+        ms = MarkerArray()
+        m_line = Marker()
+        m_line.action = m_line.ADD
+        m_line.ns = 'debug'
+        m_line.id = 1
+        m_line.type = m_line.LINE_STRIP
+        m_line.header.frame_id = str(self.world.root_link_name)
         for item in self.trajectory:
             p = Point()
             p.x = item[0]
             p.y = item[1]
-            m.points.append(p)
-        m.scale.x = 0.05
-        m.color.a = 1
-        m.color.r = 1
-        ms = MarkerArray()
-        ms.markers.append(m)
+            m_line.points.append(p)
+        m_line.scale.x = 0.05
+        m_line.color.a = 1
+        m_line.color.r = 1
+        ms.markers.append(m_line)
+        m_point = deepcopy(m_line)
+        m_point.id = 2
+        m_point.type = m_line.POINTS
+        m_point.color.b = 1
+        m_point.scale.y = m_point.scale.x
+        m_point.points = []
+        for item in self.trajectory_data:
+            p = Point()
+            p.x = item[0]
+            p.y = item[1]
+            m_point.points.append(p)
+        ms.markers.append(m_point)
+
         self.pub.publish(ms)
 
     def project_point_to_floor(self, point: PointStamped):
@@ -269,25 +289,45 @@ class CarryMyBullshit(Goal):
         return map_P
 
     def target_cb(self, point: PointStamped):
-        self.trajectory_data.append((point.point.x, point.point.y, point.header.stamp.to_sec()))
+        now = point.header.stamp.to_sec()
+        last_time = self.trajectory_data[-1][-1]
+        current_point = np.array([point.point.x, point.point.y])
+        last_point = np.array([self.trajectory_data[-1][0], self.trajectory_data[-1][1]])
+        error_vector = current_point - last_point
+        distance = np.linalg.norm(error_vector)
+        error_vector /= distance
+        if distance > self.interpolation_step_size * 2:
+            ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
+            dt = (now - last_time) / len(ranges)
+            for i, interpolated_distance in enumerate(ranges):
+                interpolated_point = last_point + error_vector * interpolated_distance
+                self.trajectory_data.append((interpolated_point[0], interpolated_point[1], last_time + dt * (i + 1)))
+
+        self.trajectory_data.append((current_point[0], current_point[1], now))
         traj_start = self.trajectory_data[0][2]
         traj_end = self.trajectory_data[-1][2]
         self.traj_length = traj_end - traj_start
-        data = np.array(self.trajectory_data)
+        data = np.array(self.trajectory_data).T
         x = data[0]
         y = data[1]
         t = data[2]
+        if len(x) < 5:
+            return
 
         spl_x = UnivariateSpline(t, x)
+        spl_x.set_smoothing_factor(self.smoothing_factor)
         spl_y = UnivariateSpline(t, y)
+        spl_y.set_smoothing_factor(self.smoothing_factor)
         ts = np.linspace(traj_start, traj_end, int(self.traj_length / self.step_dt + 1))
         self.trajectory = np.vstack((spl_x(ts), spl_y(ts))).T
+        self.human_point = point.point
         self.publish_trajectory()
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
         laser_center_reading = self.get_parameter_as_symbolic_expression('closest_laser_reading')
+        map_P_human = w.Point3(self.get_parameter_as_symbolic_expression('human_point'))
         next_x = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'next_x'])
         next_y = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'next_y'])
         closest_x = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'closest_x'])
@@ -301,6 +341,8 @@ class CarryMyBullshit(Goal):
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         # root_V_goal_axis = root_P_goal_point - root_P_tip
+        root_V_goal_axis = map_P_human - root_P_tip
+        distance_to_human = w.norm(root_V_goal_axis)
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
@@ -308,15 +350,19 @@ class CarryMyBullshit(Goal):
         self.add_debug_expr('goal_point', root_P_goal_point)
         self.add_debug_expr('root_P_closest_point', root_P_closest_point)
         self.add_debug_expr('laser_center_reading', laser_center_reading)
-        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        self.add_debug_expr('distance_to_human', distance_to_human)
         self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_rotation_velocity,
                                          weight=self.weight)
 
         # position_weight = self.weight
-        position_weight = w.if_greater_eq(laser_center_reading, self.distance_to_target, self.weight, 0)
+        position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, self.distance_to_target),
+                                               w.less_equal(distance_to_human, self.distance_to_target)),
+                                    0,
+                                    self.weight)
 
         self.add_point_goal_constraints(frame_P_current=root_P_tip,
                                         frame_P_goal=root_P_goal_point,

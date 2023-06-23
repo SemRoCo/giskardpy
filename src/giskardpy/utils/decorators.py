@@ -60,6 +60,33 @@ def memoize(function):
     return wrapper
 
 
+def memoize_with_counter(reset_after: int):
+    def memoize(function):
+        memo = function.memo = {}
+        function.__counter = 0
+
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            key = (args, frozenset(kwargs.items()))
+            try:
+                hit = memo[key]
+                if function.__counter >= reset_after:
+                    raise KeyError
+                else:
+                    function.__counter += 1
+                    print(function.__counter)
+                    return hit
+            except KeyError:
+                function.__counter = 1
+                rv = function(*args, **kwargs)
+                memo[key] = rv
+                return rv
+
+        return wrapper
+
+    return memoize
+
+
 def record_time(function):
     return function
     function_name = function.__name__

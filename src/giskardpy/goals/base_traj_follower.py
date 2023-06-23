@@ -1,12 +1,18 @@
 from __future__ import division
 
+import numpy as np
+# import matplotlib.pyplot as plt
+from scipy.interpolate import UnivariateSpline
 import rospy
-from geometry_msgs.msg import PointStamped, Vector3Stamped, Vector3
+from geometry_msgs.msg import PointStamped, Vector3Stamped, Vector3, Point
+from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
+from giskardpy.utils.decorators import memoize_with_counter, clear_memo
+from giskardpy.utils.tfwrapper import point_to_np
 
 
 class BaseTrajFollower(Goal):
@@ -142,12 +148,14 @@ class BaseTrajFollower(Goal):
 
 class CarryMyBullshit(Goal):
     current_target: PointStamped
+    trajectory: list
 
     def __init__(self,
                  topic_name: str,
                  distance_to_target: float = 0.5):
         super().__init__()
         self.sub = rospy.Subscriber(topic_name, PointStamped, self.target_sub, queue_size=10)
+        self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         self.current_target = PointStamped()
         self.root = self.world.root_link_name
         self.tip = self.world.search_for_link_name('base_footprint')
@@ -155,7 +163,68 @@ class CarryMyBullshit(Goal):
         self.tip_V_pointing_axis.x = 1
         self.max_velocity = 0.3
         self.weight = WEIGHT_ABOVE_CA
+        self.trajectory = []
         self.distance_to_target = distance_to_target
+        self.radius = 0.4
+        self.init_fake_path()
+        rospy.sleep(1)
+        self.publish_trajectory()
+
+    def init_fake_path(self):
+        rng = np.random.default_rng()
+        t = np.linspace(0, 5, 50)
+        x = 2 * (-np.cos(2 * -t) + 0.1 * rng.standard_normal(50) + 2)
+        y = 2 * (np.sin(2 * -t) + 0.1 * rng.standard_normal(50) + 1)
+
+        spl_x = UnivariateSpline(t, x)
+        spl_y = UnivariateSpline(t, y)
+        ts = np.linspace(0, 5, 500)
+        self.trajectory = np.vstack((spl_x(ts), spl_y(ts), ts)).T
+
+    @memoize_with_counter(4)
+    def get_current_target(self):
+        print('called')
+        root_T_tip = self.world.compute_fk_np(self.root, self.tip)
+        x = root_T_tip[0, 3]
+        y = root_T_tip[1, 3]
+        # print(f'{x} {y}')
+        current_point = np.array([x, y])
+        error = self.trajectory[:, :2] - current_point
+        distances = np.linalg.norm(error, axis=1)
+        # cut off old points
+        closest_idx = np.argmin(distances)
+        in_radius = np.where(distances < self.radius)[0]
+        if len(in_radius) > 0:
+            next_idx = max(in_radius)
+        else:
+            next_idx = closest_idx
+        if closest_idx <= 1:
+            tangent = self.trajectory[next_idx, :2] - current_point
+        else:
+            tangent = self.trajectory[closest_idx + 1, :2] - self.trajectory[closest_idx - 1, :2]
+        # self.trajectory = self.trajectory[closest_idx:]
+        result = np.array([self.trajectory[next_idx, 0], self.trajectory[next_idx, 1],
+                          tangent[0], tangent[1]])
+        return result
+
+    def publish_trajectory(self):
+        m = Marker()
+        m.action = m.ADD
+        m.ns = 'debug'
+        m.id = 1
+        m.type = m.LINE_STRIP
+        m.header.frame_id = str(self.world.root_link_name)
+        for item in self.trajectory:
+            p = Point()
+            p.x = item[0]
+            p.y = item[1]
+            m.points.append(p)
+        m.scale.x = 0.05
+        m.color.a = 1
+        m.color.r = 1
+        ms = MarkerArray()
+        ms.markers.append(m)
+        self.pub.publish(ms)
 
     def project_point_to_floor(self, point: PointStamped):
         map_P = self.world.transform_point(self.world.root_link_name, point)
@@ -163,16 +232,20 @@ class CarryMyBullshit(Goal):
         return map_P
 
     def target_sub(self, point: PointStamped):
-        print('recevied new pose')
         self.current_target = self.project_point_to_floor(point)
+        self.trajectory.append(point_to_np(self.current_target.point))
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
-        root_P_goal_point: w.Point3 = self.get_parameter_as_symbolic_expression('current_target')
+        # root_P_goal_point: w.Point3 = self.get_parameter_as_symbolic_expression('current_target')
+        stuff = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple()])
+        clear_memo(self.get_current_target)
+        root_P_goal_point = w.Point3([stuff[0], stuff[1], 0])
+        root_V_goal_axis = w.Vector3([stuff[2], stuff[3], 0])
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
-        root_V_goal_axis = root_P_goal_point - root_P_tip
+        # root_V_goal_axis = root_P_goal_point - root_P_tip
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
@@ -182,19 +255,17 @@ class CarryMyBullshit(Goal):
         self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
         self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
-                                         reference_velocity=self.max_velocity*2,
+                                         reference_velocity=self.max_velocity * 2,
                                          weight=self.weight)
 
         error = root_P_goal_point - root_P_tip
         actual_distance_to_target = w.norm(error)
-        position_weight = w.if_greater_eq(actual_distance_to_target, self.distance_to_target, self.weight, 0)
-
-        # self.add_debug_expr('weight', position_weight)
-        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        position_weight = self.weight
+        # position_weight = w.if_greater_eq(actual_distance_to_target, self.distance_to_target, self.weight, 0)
 
         self.add_point_goal_constraints(frame_P_current=root_P_tip,
                                         frame_P_goal=root_P_goal_point,
-                                        reference_velocity=self.max_velocity/2,
+                                        reference_velocity=self.max_velocity / 2,
                                         weight=position_weight)
 
     def __str__(self) -> str:

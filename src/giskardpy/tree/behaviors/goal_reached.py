@@ -27,10 +27,13 @@ class GoalReached(GiskardBehavior):
         self.above_threshold_time = 0
         self.thresholds = self.make_velocity_threshold()
         self.number_of_controlled_joints = len(self.thresholds)
+        self.endless_mode = self.god_map.get_data(identifier.endless_mode)
 
     @record_time
     @profile
     def update(self):
+        if self.endless_mode:
+            return Status.RUNNING
         planning_time = self.get_god_map().get_data(identifier.time)
         if planning_time - self.above_threshold_time >= self.window_size:
             velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution).xdot_velocity))

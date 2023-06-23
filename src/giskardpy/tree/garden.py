@@ -1009,16 +1009,13 @@ class ClosedLoop(OpenLoop):
     def grow_closed_loop_control(self):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames'))
-        # visualization
         planning_4.add_child(success_is_running(NotifyStateChange)())
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(RosTime())
         planning_4.add_child(RealKinSimPlugin('kin sim'))
-        # debug expressions
-        # publish debug
-        planning_4.add_child(LoopDetector('loop detector'))
+        # planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached', real_time=True))
         planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
         return planning_4

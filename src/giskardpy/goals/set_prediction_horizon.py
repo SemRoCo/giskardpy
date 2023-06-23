@@ -54,6 +54,15 @@ class SetMaxTrajLength(NonMotionGoal):
         return super().__str__()
 
 
+class EndlessMode(NonMotionGoal):
+    def __init__(self):
+        super().__init__()
+        self.god_map.set_data(identifier.endless_mode, True)
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
 class EnableVelocityTrajectoryTracking(NonMotionGoal):
     def __init__(self, enabled: bool = True):
         """

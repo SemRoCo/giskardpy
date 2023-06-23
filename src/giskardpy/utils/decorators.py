@@ -74,7 +74,6 @@ def memoize_with_counter(reset_after: int):
                     raise KeyError
                 else:
                     function.__counter += 1
-                    print(function.__counter)
                     return hit
             except KeyError:
                 function.__counter = 1

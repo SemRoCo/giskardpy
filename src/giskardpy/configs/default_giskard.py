@@ -86,6 +86,7 @@ class ExecutionConfig(Config):
         self.added_slack = 100
         self.sample_period = 0.05
         self.weight_factor = 100
+        self.endless_mode = False
         self.default_weights = {d: defaultdict(float) for d in Derivatives}
 
     def set_prediction_horizon(self, new_prediction_horizon: int):

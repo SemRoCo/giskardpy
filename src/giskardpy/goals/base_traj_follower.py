@@ -1,10 +1,13 @@
 from __future__ import division
 
+from typing import Optional
+
 import numpy as np
 # import matplotlib.pyplot as plt
 from scipy.interpolate import UnivariateSpline
 import rospy
 from geometry_msgs.msg import PointStamped, Vector3Stamped, Vector3, Point
+from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w, identifier
@@ -147,64 +150,98 @@ class BaseTrajFollower(Goal):
 
 
 class CarryMyBullshit(Goal):
-    current_target: PointStamped
-    trajectory: list
+    trajectory: np.ndarray
+    trajectory_data: list
 
     def __init__(self,
-                 topic_name: str,
-                 distance_to_target: float = 0.5):
+                 patrick_topic_name: str,
+                 laser_topic_name: str = 'laser',
+                 root_link: Optional[str] = None,
+                 tip_link: str = 'base_footprint',
+                 last_distance_threshold: float = 0.5,
+                 laser_range: float = np.pi/4,
+                 max_rotation_velocity: float = 0.5,
+                 max_translation_velocity: float = 0.5,
+                 next_point_radius: float = 0.4):
         super().__init__()
-        self.sub = rospy.Subscriber(topic_name, PointStamped, self.target_sub, queue_size=10)
+        self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
+        self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
-        self.current_target = PointStamped()
-        self.root = self.world.root_link_name
-        self.tip = self.world.search_for_link_name('base_footprint')
+        if root_link is None:
+            self.root = self.world.root_link_name
+        else:
+            self.root = self.world.search_for_link_name(root_link)
+        self.tip = self.world.search_for_link_name(tip_link)
         self.tip_V_pointing_axis = Vector3()
         self.tip_V_pointing_axis.x = 1
-        self.max_velocity = 0.3
+        self.max_rotation_velocity = max_rotation_velocity
+        self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_ABOVE_CA
-        self.trajectory = []
-        self.distance_to_target = distance_to_target
-        self.radius = 0.4
+        self.trajectory = np.array([])
+        self.trajectory_data = []
+        self.distance_to_target = last_distance_threshold
+        self.radius = next_point_radius
+        self.step_dt = 0.01
+        self.max_temp_distance = 0.2
+        self.max_temp_distance = int(self.max_temp_distance / self.step_dt)
+        self.closest_laser_reading = 100
+        self.laser_range = laser_range
         self.init_fake_path()
         rospy.sleep(1)
         self.publish_trajectory()
 
+    def laser_cb(self, scan: LaserScan):
+        center_id = int(len(scan.ranges)/2)
+        range_ = self.laser_range/scan.angle_increment
+        min_id = int(center_id - range_)
+        max_id = int(center_id + range_)
+        segment = scan.ranges[min_id:max_id]
+        self.closest_laser_reading = min(segment)
+
     def init_fake_path(self):
         rng = np.random.default_rng()
-        t = np.linspace(0, 5, 50)
+        self.traj_length = 5
+        t = np.linspace(0, self.traj_length, 50)
         x = 2 * (-np.cos(2 * -t) + 0.1 * rng.standard_normal(50) + 2)
         y = 2 * (np.sin(2 * -t) + 0.1 * rng.standard_normal(50) + 1)
 
         spl_x = UnivariateSpline(t, x)
         spl_y = UnivariateSpline(t, y)
-        ts = np.linspace(0, 5, 500)
-        self.trajectory = np.vstack((spl_x(ts), spl_y(ts), ts)).T
+        ts = np.linspace(0, self.traj_length, int(self.traj_length / self.step_dt + 1))
+        self.trajectory = np.vstack((spl_x(ts), spl_y(ts))).T
 
-    @memoize_with_counter(4)
+    @memoize_with_counter(6)
     def get_current_target(self):
-        print('called')
+        traj = self.trajectory.copy()
         root_T_tip = self.world.compute_fk_np(self.root, self.tip)
         x = root_T_tip[0, 3]
         y = root_T_tip[1, 3]
-        # print(f'{x} {y}')
         current_point = np.array([x, y])
-        error = self.trajectory[:, :2] - current_point
+        error = traj - current_point
         distances = np.linalg.norm(error, axis=1)
         # cut off old points
-        closest_idx = np.argmin(distances)
         in_radius = np.where(distances < self.radius)[0]
         if len(in_radius) > 0:
             next_idx = max(in_radius)
+            offset = max(0, next_idx - self.max_temp_distance)
+            closest_idx = np.argmin(distances[offset:]) + offset
         else:
-            next_idx = closest_idx
+            next_idx = closest_idx = np.argmin(distances)
+
         if closest_idx <= 1:
-            tangent = self.trajectory[next_idx, :2] - current_point
+            tangent = traj[next_idx] - current_point
+        elif closest_idx >= len(traj) - 1:
+            tangent = traj[-1] - traj[- 2]
         else:
-            tangent = self.trajectory[closest_idx + 1, :2] - self.trajectory[closest_idx - 1, :2]
-        # self.trajectory = self.trajectory[closest_idx:]
-        result = np.array([self.trajectory[next_idx, 0], self.trajectory[next_idx, 1],
-                          tangent[0], tangent[1]])
+            tangent = traj[closest_idx + 1] - traj[closest_idx - 1]
+        result = {
+            'next_x': traj[next_idx, 0],
+            'next_y': traj[next_idx, 1],
+            'closest_x': traj[closest_idx, 0],
+            'closest_y': traj[closest_idx, 1],
+            'tangent_x': tangent[0],
+            'tangent_y': tangent[1],
+        }
         return result
 
     def publish_trajectory(self):
@@ -231,18 +268,36 @@ class CarryMyBullshit(Goal):
         map_P.point.z = 0
         return map_P
 
-    def target_sub(self, point: PointStamped):
-        self.current_target = self.project_point_to_floor(point)
-        self.trajectory.append(point_to_np(self.current_target.point))
+    def target_cb(self, point: PointStamped):
+        self.trajectory_data.append((point.point.x, point.point.y, point.header.stamp.to_sec()))
+        traj_start = self.trajectory_data[0][2]
+        traj_end = self.trajectory_data[-1][2]
+        self.traj_length = traj_end - traj_start
+        data = np.array(self.trajectory_data)
+        x = data[0]
+        y = data[1]
+        t = data[2]
+
+        spl_x = UnivariateSpline(t, x)
+        spl_y = UnivariateSpline(t, y)
+        ts = np.linspace(traj_start, traj_end, int(self.traj_length / self.step_dt + 1))
+        self.trajectory = np.vstack((spl_x(ts), spl_y(ts))).T
+        self.publish_trajectory()
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
-        # root_P_goal_point: w.Point3 = self.get_parameter_as_symbolic_expression('current_target')
-        stuff = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple()])
+        laser_center_reading = self.get_parameter_as_symbolic_expression('closest_laser_reading')
+        next_x = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'next_x'])
+        next_y = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'next_y'])
+        closest_x = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'closest_x'])
+        closest_y = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'closest_y'])
+        tangent_x = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_x'])
+        tangent_y = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_y'])
         clear_memo(self.get_current_target)
-        root_P_goal_point = w.Point3([stuff[0], stuff[1], 0])
-        root_V_goal_axis = w.Vector3([stuff[2], stuff[3], 0])
+        root_P_goal_point = w.Point3([next_x, next_y, 0])
+        root_P_closest_point = w.Point3([closest_x, closest_y, 0])
+        root_V_goal_axis = w.Vector3([tangent_x, tangent_y, 0])
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         # root_V_goal_axis = root_P_goal_point - root_P_tip
@@ -251,22 +306,31 @@ class CarryMyBullshit(Goal):
         root_V_pointing_axis.vis_frame = self.tip
         root_V_goal_axis.vis_frame = self.tip
         self.add_debug_expr('goal_point', root_P_goal_point)
-        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        self.add_debug_expr('root_P_closest_point', root_P_closest_point)
+        self.add_debug_expr('laser_center_reading', laser_center_reading)
+        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
         self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
-                                         reference_velocity=self.max_velocity * 2,
+                                         reference_velocity=self.max_rotation_velocity,
                                          weight=self.weight)
 
-        error = root_P_goal_point - root_P_tip
-        actual_distance_to_target = w.norm(error)
-        position_weight = self.weight
-        # position_weight = w.if_greater_eq(actual_distance_to_target, self.distance_to_target, self.weight, 0)
+        # position_weight = self.weight
+        position_weight = w.if_greater_eq(laser_center_reading, self.distance_to_target, self.weight, 0)
 
         self.add_point_goal_constraints(frame_P_current=root_P_tip,
                                         frame_P_goal=root_P_goal_point,
-                                        reference_velocity=self.max_velocity / 2,
-                                        weight=position_weight)
+                                        reference_velocity=self.max_translation_velocity,
+                                        weight=position_weight,
+                                        name='next')
+
+        distance, _ = w.distance_point_to_line_segment(frame_P_current=root_P_tip,
+                                                       frame_P_line_start=root_P_closest_point - root_V_goal_axis * 0.1,
+                                                       frame_P_line_end=root_P_closest_point + root_V_goal_axis * 0.1)
+        self.add_position_constraint(expr_current=distance,
+                                     expr_goal=0,
+                                     reference_velocity=self.max_translation_velocity,
+                                     weight=position_weight * 10)
 
     def __str__(self) -> str:
         return super().__str__()

@@ -377,6 +377,9 @@ class RobotInterfaceConfig(Config):
     def add_joint_velocity_controller(self, namespaces: List[str]):
         self._behavior_tree.add_joint_velocity_controllers(namespaces)
 
+    def add_joint_velocity_group_controller(self, namespaces: List[str]):
+        self._behavior_tree.add_joint_velocity_group_controllers(namespaces)
+
 class BehaviorTreeConfig(Config):
     tree_tick_rate: float = 0.05
 

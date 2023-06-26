@@ -39,6 +39,7 @@ from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
 from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
+from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
 from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
@@ -288,6 +289,10 @@ class TreeManager(ABC):
 
     @abc.abstractmethod
     def add_joint_velocity_controllers(self, namespaces: List[str]):
+        ...
+
+    @abc.abstractmethod
+    def add_joint_velocity_group_controllers(self, namespaces: List[str]):
         ...
 
     @abc.abstractmethod
@@ -972,6 +977,10 @@ class ClosedLoop(OpenLoop):
 
     def add_joint_velocity_controllers(self, namespaces: List[str]):
         behavior = JointVelController(namespaces=namespaces)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def add_joint_velocity_group_controllers(self, namespace: str):
+        behavior = JointGroupVelController(namespace)
         self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
 
     def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,

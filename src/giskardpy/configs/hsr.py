@@ -44,9 +44,6 @@ class HSR_Base(Giskard):
 
     def configure_collision_avoidance(self):
         # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
-        # self.configure_PublishDebugExpressions(enabled=True)
-        # self.configure_DebugMarkerPublisher(enabled=True)
-        self.configure_MaxTrajectoryLength(length=30)
         self.collision_avoidance.load_moveit_self_collision_matrix('package://giskardpy/config/hsrb.srdf')
         self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                                           hard_threshold=0.0)
@@ -64,37 +61,38 @@ class HSR_Base(Giskard):
         pass
 
 
-class HSR_Mujoco(HSR_Base):
-
+class HSR_MujocoRealtime(HSR_Base):
     def configure_execution(self):
-        self.execution.set_control_mode(ControlModes.open_loop)
+        self.execution.set_control_mode(ControlModes.close_loop)
 
     def configure_world(self, robot_description: str = 'robot_description'):
         super().configure_world('hsrb4s/robot_description')
         self.world.set_default_color(1, 1, 1, 0.7)
 
     def configure_behavior_tree(self):
-        super().configure_behavior_tree()
-        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
                                                               add_to_control_loop=False)
+        # self.behavior_tree.add_debug_marker_publisher()
+        # self.behavior_tree.add_qp_data_publisher(publish_debug=True, add_to_base=True)
 
     def configure_robot_interface(self):
-        super().configure_robot_interface()
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
                                                            tf_parent_frame=self.map_name,
                                                            tf_child_frame=self.odom_link_name)
         self.robot_interface.sync_joint_state_topic('hsrb4s/joint_states')
         self.robot_interface.sync_odometry_topic('/hsrb4s/base_footprint', self.drive_joint_name)
-        self.robot_interface.add_follow_joint_trajectory_server(
-            namespace='/hsrb4s/arm_trajectory_controller/follow_joint_trajectory',
-            state_topic='/hsrb4s/arm_trajectory_controller/state',
-            fill_velocity_values=True)
-        self.robot_interface.add_follow_joint_trajectory_server(
-            namespace='/hsrb4s/head_trajectory_controller/follow_joint_trajectory',
-            state_topic='/hsrb4s/head_trajectory_controller/state',
-            fill_velocity_values=True)
+
+        self.robot_interface.add_joint_velocity_controller(namespaces=[
+            'hsrb4s/arm_flex_joint_velocity_controller',
+            'hsrb4s/arm_lift_joint_velocity_controller',
+            'hsrb4s/arm_roll_joint_velocity_controller',
+            'hsrb4s/head_pan_joint_velocity_controller',
+            'hsrb4s/head_tilt_joint_velocity_controller',
+            'hsrb4s/wrist_flex_joint_velocity_controller',
+            'hsrb4s/wrist_roll_joint_velocity_controller',
+        ])
+
         self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel',
-                                                   track_only_velocity=True,
                                                    joint_name=self.drive_joint_name)
 
 

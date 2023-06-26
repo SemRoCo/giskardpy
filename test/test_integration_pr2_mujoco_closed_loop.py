@@ -165,7 +165,7 @@ class TestMoveBaseGoals:
         zero_pose.move_base(base_goal)
 
     def test_carry_my_bs(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_json_goal('CarryMyBullshitNoSpline',
+        zero_pose.set_json_goal('CarryMyBullshit',
                                 patrick_topic_name='/robokudo2/human_position')
         zero_pose.set_json_goal('EndlessMode')
         zero_pose.set_max_traj_length(new_length=10000)

@@ -67,7 +67,7 @@ from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTim
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
-from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
+from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin
@@ -1012,7 +1012,7 @@ class ClosedLoop(OpenLoop):
 
     def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
         super().sync_odometry_topic(topic_name, joint_name)
-        behavior = success_is_running(SyncOdometry)(topic_name, joint_name)
+        behavior = success_is_running(SyncOdometryNoLock)(topic_name, joint_name)
         self.insert_node(behavior, self.closed_loop_control_name, 0)
 
     def grow_closed_loop_control(self):

@@ -153,7 +153,6 @@ class BaseTrajFollower(Goal):
 
 class CarryMyBullshit(Goal):
     trajectory: np.ndarray
-    trajectory_data: list
 
     def __init__(self,
                  patrick_topic_name: str,
@@ -187,20 +186,24 @@ class CarryMyBullshit(Goal):
         self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_ABOVE_CA
         self.trajectory = np.array([0, 0], ndmin=2)
-        self.trajectory_data = [(0, 0, rospy.get_rostime().to_sec())]
         self.distance_to_target = last_distance_threshold
         self.radius = next_point_radius
-        self.step_dt = 0.01
-        self.interpolation_step_size = 0.1
-        self.smoothing_factor = 0.6
-        self.max_temp_distance = max_temporal_distance_between_closest_and_next
-        self.max_temp_distance = int(self.max_temp_distance / self.step_dt)
+        # self.step_dt = 0.01
+        # self.max_temp_distance = max_temporal_distance_between_closest_and_next
+        self.interpolation_step_size = 0.05
+        self.max_temp_distance = int(self.radius / self.interpolation_step_size)
         self.closest_laser_reading = 100
         self.laser_range = laser_range
         self.human_point = Point()
         self.min_height_for_camera_target = min_height_for_camera_target
         self.max_height_for_camera_target = max_height_for_camera_target
+        self.max_traj_length = 1
         # self.init_fake_path()
+        # self.start_time = rospy.get_rostime().to_sec()
+        # self.start_time = None
+        self.traj_data = [np.array([0, 0])]  # todo get current pose
+        # self.traj_histogram_data = []  # todo get current pose
+        rospy.sleep(0.5)
         while self.trajectory.shape[0] < 5 and not rospy.is_shutdown():
             print(f'waiting for at least 5 traj points, current length {len(self.trajectory)}')
             rospy.sleep(0.5)
@@ -243,7 +246,7 @@ class CarryMyBullshit(Goal):
             closest_idx = np.argmin(distances[offset:]) + offset
         else:
             next_idx = closest_idx = np.argmin(distances)
-
+        # self.traj_data = self.traj_data[closest_idx:]
         result = {
             'next_x': traj[next_idx, 0],
             'next_y': traj[next_idx, 1],
@@ -272,55 +275,29 @@ class CarryMyBullshit(Goal):
             ms.markers.append(m_line)
         except Exception as e:
             logging.logwarn('failed to create traj marker')
-        m_point = deepcopy(m_line)
-        m_point.id = 2
-        m_point.type = m_line.POINTS
-        m_point.color.b = 1
-        m_point.scale.y = m_point.scale.x
-        m_point.points = []
-        for item in self.trajectory_data:
-            p = Point()
-            p.x = item[0]
-            p.y = item[1]
-            m_point.points.append(p)
-        ms.markers.append(m_point)
         self.pub.publish(ms)
 
     def target_cb(self, point: PointStamped):
         try:
-            now = point.header.stamp.to_sec()
-            last_time = self.trajectory_data[-1][-1]
             current_point = np.array([point.point.x, point.point.y])
-            last_point = np.array([self.trajectory_data[-1][0], self.trajectory_data[-1][1]])
+            last_point = self.traj_data[-1]
             error_vector = current_point - last_point
             distance = np.linalg.norm(error_vector)
-            error_vector /= distance
-            if distance > self.interpolation_step_size * 2:
+            if self.interpolation_step_size * 2 > distance > self.interpolation_step_size:
+                self.traj_data.append(current_point)
+            elif distance < self.interpolation_step_size:
+                self.traj_data[-1] = current_point
+            else:
+                error_vector /= distance
                 ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
-                dt = (now - last_time) / len(ranges)
-                for i, interpolated_distance in enumerate(ranges):
-                    interpolated_point = last_point + error_vector * interpolated_distance
-                    self.trajectory_data.append(
-                        (interpolated_point[0], interpolated_point[1], last_time + dt * (i + 1)))
+                interpolated_distance = distance / len(ranges)
+                for i, dt in enumerate(ranges):
+                    interpolated_point = last_point + error_vector * interpolated_distance * (i + 1)
+                    self.traj_data.append(interpolated_point)
+                self.traj_data.append(current_point)
 
-            traj_start = self.trajectory_data[0][2]
-            traj_end = self.trajectory_data[-1][2]
-            self.traj_length = traj_end - traj_start
-            data = np.array(self.trajectory_data).T
-            x = data[0]
-            y = data[1]
-            t = data[2]
-            if len(x) < 5:
-                return
-
-            spl_x = UnivariateSpline(t, x)
-            spl_x.set_smoothing_factor(self.smoothing_factor)
-            spl_y = UnivariateSpline(t, y)
-            spl_y.set_smoothing_factor(self.smoothing_factor)
-            ts = np.linspace(traj_start, traj_end, int(self.traj_length / self.step_dt + 1))
-            self.trajectory = np.vstack((spl_x(ts), spl_y(ts))).T
+            self.trajectory = np.array(self.traj_data)
             self.human_point = point.point
-            self.trajectory_data.append((current_point[0], current_point[1], now))
         except Exception as e:
             logging.logwarn(f'rejected new target because: {e}')
         self.publish_trajectory()
@@ -365,10 +342,10 @@ class CarryMyBullshit(Goal):
         #                                  weight=self.weight,
         #                                  name='pointing')
         angle = w.abs(w.angle_between_vector(root_V_pointing_axis, root_V_goal_axis))
-        buffer = np.pi/8
+        buffer = np.pi / 8
         self.add_inequality_constraint(reference_velocity=0.5,
-                                       lower_error=-angle-buffer,
-                                       upper_error=-angle+buffer,
+                                       lower_error=-angle - buffer,
+                                       upper_error=-angle + buffer,
                                        weight=self.weight,
                                        task_expression=angle,
                                        name='/rot')
@@ -401,156 +378,17 @@ class CarryMyBullshit(Goal):
                                         weight=position_weight,
                                         name='next')
 
-        distance, _ = w.distance_point_to_line_segment(frame_P_current=root_P_tip,
-                                                       frame_P_line_start=root_P_closest_point - root_V_tangent * 0.1,
-                                                       frame_P_line_end=root_P_closest_point + root_V_tangent * 0.1)
-        self.add_position_constraint(expr_current=distance,
-                                     expr_goal=0,
-                                     reference_velocity=self.max_translation_velocity,
-                                     weight=position_weight)
+        # distance, _ = w.distance_point_to_line_segment(frame_P_current=root_P_tip,
+        #                                                frame_P_line_start=root_P_closest_point - root_V_tangent * 0.1,
+        #                                                frame_P_line_end=root_P_closest_point + root_V_tangent * 0.1)
+        # self.add_position_constraint(expr_current=distance,
+        #                              expr_goal=0,
+        #                              reference_velocity=self.max_translation_velocity,
+        #                              weight=position_weight,
+        #                              name='closest')
 
     def __str__(self) -> str:
         return super().__str__()
-
-
-class CarryMyBullshitNoSpline(CarryMyBullshit):
-    traj_histogram_data: List[np.ndarray]
-
-    def __init__(self, patrick_topic_name: str, laser_topic_name: str = 'laser', root_link: Optional[str] = None,
-                 tip_link: str = 'base_footprint', camera_link: str = 'head_mount_kinect_rgb_optical_frame',
-                 last_distance_threshold: float = 1, laser_range: float = np.pi / 4, max_rotation_velocity: float = 0.5,
-                 max_translation_velocity: float = 0.5, next_point_radius: float = 0.4,
-                 min_height_for_camera_target: float = 1, max_height_for_camera_target: float = 2,
-                 max_temporal_distance_between_closest_and_next: float = 0.5):
-        # self.start_time = rospy.get_rostime().to_sec()
-        # self.start_time = None
-        self.traj_data = [np.array([0, 0])]  # todo get current pose
-        # self.traj_histogram_data = []  # todo get current pose
-        self.interpolation_step_size = 0.05
-        rospy.sleep(0.5)
-        super().__init__(patrick_topic_name, laser_topic_name, root_link, tip_link, camera_link,
-                         last_distance_threshold, laser_range, max_rotation_velocity, max_translation_velocity,
-                         next_point_radius, min_height_for_camera_target, max_height_for_camera_target,
-                         max_temporal_distance_between_closest_and_next)
-
-    def target_cb(self, point: PointStamped):
-        try:
-            current_point = np.array([point.point.x, point.point.y])
-            last_point = self.traj_data[-1]
-            error_vector = current_point - last_point
-            distance = np.linalg.norm(error_vector)
-            if self.interpolation_step_size * 2 > distance > self.interpolation_step_size:
-                self.traj_data.append(current_point)
-            elif distance < self.interpolation_step_size:
-                self.traj_data[-1] = current_point
-            else:
-                error_vector /= distance
-                ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
-                interpolated_distance = distance / len(ranges)
-                for i, dt in enumerate(ranges):
-                    interpolated_point = last_point + error_vector * interpolated_distance * (i + 1)
-                    self.traj_data.append(interpolated_point)
-                self.traj_data.append(current_point)
-
-            self.trajectory = np.array(self.traj_data)
-            self.human_point = point.point
-        except Exception as e:
-            logging.logwarn(f'rejected new target because: {e}')
-        self.publish_trajectory()
-
-    def publish_trajectory(self):
-        ms = MarkerArray()
-        m_line = Marker()
-        m_line.action = m_line.ADD
-        m_line.ns = 'debug'
-        m_line.id = 1
-        m_line.type = m_line.LINE_STRIP
-        m_line.header.frame_id = str(self.world.root_link_name)
-        m_line.scale.x = 0.05
-        m_line.color.a = 1
-        m_line.color.r = 1
-        try:
-            for item in self.trajectory:
-                p = Point()
-                p.x = item[0]
-                p.y = item[1]
-                m_line.points.append(p)
-            ms.markers.append(m_line)
-        except Exception as e:
-            logging.logwarn('failed to create traj marker')
-        self.pub.publish(ms)
-
-
-class CarryMyBullshitNoSplineTimeHistogram(CarryMyBullshit):
-    traj_histogram_data: List[np.ndarray]
-
-    def __init__(self, patrick_topic_name: str, laser_topic_name: str = 'laser', root_link: Optional[str] = None,
-                 tip_link: str = 'base_footprint', camera_link: str = 'head_mount_kinect_rgb_optical_frame',
-                 last_distance_threshold: float = 1, laser_range: float = np.pi / 4, max_rotation_velocity: float = 0.5,
-                 max_translation_velocity: float = 0.5, next_point_radius: float = 0.4,
-                 min_height_for_camera_target: float = 1, max_height_for_camera_target: float = 2,
-                 max_temporal_distance_between_closest_and_next: float = 0.5):
-        # self.start_time = rospy.get_rostime().to_sec()
-        self.start_time = None
-        # self.traj_histogram_data = [np.array([0, 0])]  # todo get current pose
-        self.traj_histogram_data = []  # todo get current pose
-        rospy.sleep(0.5)
-        super().__init__(patrick_topic_name, laser_topic_name, root_link, tip_link, camera_link,
-                         last_distance_threshold, laser_range, max_rotation_velocity, max_translation_velocity,
-                         next_point_radius, min_height_for_camera_target, max_height_for_camera_target,
-                         max_temporal_distance_between_closest_and_next)
-
-    def target_cb(self, point: PointStamped):
-        try:
-            if self.start_time is None:
-                self.start_time = point.header.stamp.to_sec()
-            now = point.header.stamp.to_sec() - self.start_time
-            last_time = len(self.traj_histogram_data) * self.interpolation_step_size
-            current_point = np.array([point.point.x, point.point.y])
-            time_dt = now - last_time
-            if len(self.traj_histogram_data) == 0 or self.interpolation_step_size * 2 > time_dt > self.interpolation_step_size:
-                self.traj_histogram_data.append(current_point)
-            elif time_dt < self.interpolation_step_size:
-                self.traj_histogram_data[-1] = current_point
-            else:
-                last_point = self.traj_histogram_data[-1]
-                error_vector = current_point - last_point
-                distance = np.linalg.norm(error_vector)
-                error_vector /= distance
-                ranges = np.arange(last_time, now, self.interpolation_step_size)
-                interpolated_distance = distance / len(ranges)
-                for i, dt in enumerate(ranges):
-                    interpolated_point = last_point + error_vector * interpolated_distance * (i + 1)
-                    self.trajectory_data.append(interpolated_point)
-                self.traj_histogram_data.append(current_point)
-
-            self.trajectory = np.array(self.traj_histogram_data)
-            self.human_point = point.point
-        except Exception as e:
-            logging.logwarn(f'rejected new target because: {e}')
-        self.publish_trajectory()
-
-    def publish_trajectory(self):
-        ms = MarkerArray()
-        m_line = Marker()
-        m_line.action = m_line.ADD
-        m_line.ns = 'debug'
-        m_line.id = 1
-        m_line.type = m_line.LINE_STRIP
-        m_line.header.frame_id = str(self.world.root_link_name)
-        m_line.scale.x = 0.05
-        m_line.color.a = 1
-        m_line.color.r = 1
-        try:
-            for item in self.trajectory:
-                p = Point()
-                p.x = item[0]
-                p.y = item[1]
-                m_line.points.append(p)
-            ms.markers.append(m_line)
-        except Exception as e:
-            logging.logwarn('failed to create traj marker')
-        self.pub.publish(ms)
 
 
 class BaseTrajFollowerPR2(BaseTrajFollower):

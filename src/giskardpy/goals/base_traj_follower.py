@@ -161,7 +161,8 @@ class CarryMyBullshit(Goal):
                  tip_link: str = 'base_footprint',
                  camera_link: str = 'head_mount_kinect_rgb_optical_frame',
                  last_distance_threshold: float = 1,
-                 laser_range: float = np.pi / 4,
+                 laser_distance_threshold: float = 0.3,
+                 laser_range: float = np.pi / 8,
                  max_rotation_velocity: float = 0.5,
                  max_translation_velocity: float = 0.5,
                  next_point_radius: float = 0.4,
@@ -188,6 +189,7 @@ class CarryMyBullshit(Goal):
         self.weight = WEIGHT_ABOVE_CA
         self.trajectory = np.array([0, 0], ndmin=2)
         self.distance_to_target = last_distance_threshold
+        self.laser_distance_threshold = laser_distance_threshold
         self.radius = next_point_radius
         # self.step_dt = 0.01
         # self.max_temp_distance = max_temporal_distance_between_closest_and_next
@@ -368,7 +370,7 @@ class CarryMyBullshit(Goal):
         self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
 
         # position_weight = self.weight
-        position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, self.distance_to_target),
+        position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, self.laser_distance_threshold),
                                                w.less_equal(distance_to_human, self.distance_to_target)),
                                     0,
                                     self.weight)

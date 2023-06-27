@@ -721,7 +721,7 @@ class StandAlone(TreeManager):
     def grow_plan_postprocessing(self):
         plan_postprocessing = Sequence(self.plan_postprocessing_name)
         plan_postprocessing.add_child(running_is_success(TimePlugin)('increase time plan post processing'))
-        plan_postprocessing.add_child(SetZeroVelocity())
+        plan_postprocessing.add_child(SetZeroVelocity('set zero vel 1'))
         plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log post processing'))
         return plan_postprocessing
 
@@ -932,7 +932,7 @@ class OpenLoop(StandAlone):
         execution.add_child(IF('execute?', identifier.execute))
         execution.add_child(SetTrackingStartTime('start start time'))
         execution.add_child(self.grow_monitor_execution())
-        execution.add_child(SetZeroVelocity())
+        execution.add_child(SetZeroVelocity('set zero vel 2'))
         return execution
 
     def grow_monitor_execution(self):

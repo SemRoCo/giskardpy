@@ -689,7 +689,7 @@ class StandAlone(TreeManager):
 
     def grow_planning2(self):
         planning_2 = failure_is_success(Selector)(self.planning2_name)
-        planning_2.add_child(GoalCanceled('goal canceled', self.action_server_name))
+        planning_2.add_child(GoalCanceled('goal canceled2', self.action_server_name))
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback1',
                                                                  self.action_server_name,
                                                                  MoveFeedback.PLANNING))
@@ -948,7 +948,7 @@ class OpenLoop(StandAlone):
 
     def grow_execution_cancelled(self):
         execute_canceled = Sequence('execute canceled')
-        execute_canceled.add_child(GoalCanceled('goal canceled', self.action_server_name))
+        execute_canceled.add_child(GoalCanceled('goal canceled1', self.action_server_name))
         execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
         return execute_canceled
 

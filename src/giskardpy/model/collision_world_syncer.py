@@ -253,6 +253,7 @@ class CollisionWorldSynchronizer:
         self.links_to_ignore = set()
         self.ignored_self_collion_pairs = set()
         self.white_list_pairs = set()
+        self.black_list = set()
         for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
             self.fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
             self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))

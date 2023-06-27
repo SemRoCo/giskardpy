@@ -10,7 +10,7 @@ from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.configs.hsr import HSR_StandAlone, HSR_Mujoco
+from giskardpy.configs.hsr import HSR_StandAlone
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import Derivatives
 from giskardpy.python_interface import GiskardWrapper
@@ -78,35 +78,6 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
         self.allow_all_collisions()
         self.plan_and_execute()
-
-
-class HSRTestWrapperMujoco(HSRTestWrapper):
-    def __init__(self):
-        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
-        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
-        self.odom_root = 'odom'
-        super().__init__(HSR_Mujoco)
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        self.move_base(p)
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.move_base(goal_pose)
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        pass
-        # super(HSRTestWrapper, self).set_localization(map_T_odom)
-
-    def reset(self):
-        # self.mujoco_reset()
-        super().reset()
-
-    def command_gripper(self, width):
-        pass
 
 
 @pytest.fixture(scope='module')

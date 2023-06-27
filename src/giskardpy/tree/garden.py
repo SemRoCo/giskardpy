@@ -710,7 +710,7 @@ class StandAlone(TreeManager):
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(KinSimPlugin('kin sim'))
-        planning_4.add_child(LogTrajPlugin('log'))
+        planning_4.add_child(LogTrajPlugin('log closed loop control'))
         # planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
@@ -722,7 +722,7 @@ class StandAlone(TreeManager):
         plan_postprocessing = Sequence(self.plan_postprocessing_name)
         plan_postprocessing.add_child(running_is_success(TimePlugin)('increase time plan post processing'))
         plan_postprocessing.add_child(SetZeroVelocity())
-        plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
+        plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log post processing'))
         return plan_postprocessing
 
     def configure_visualization_marker(self,

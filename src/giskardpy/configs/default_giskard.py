@@ -714,6 +714,7 @@ class Giskard(ABC, Config):
         self.god_map.set_data(identifier.tree_manager, behavior_tree)
         self.configure_robot_interface()
         self.configure_behavior_tree()
+        self._collision_scene.reset_collision_blacklist()
         self._controlled_joints_sanity_check()
 
     def _controlled_joints_sanity_check(self):

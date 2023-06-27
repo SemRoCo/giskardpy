@@ -169,6 +169,7 @@ class CarryMyBullshit(Goal):
                  max_height_for_camera_target: float = 2,
                  max_temporal_distance_between_closest_and_next: float = 0.5):
         super().__init__()
+        self.traj_data = [np.array([0, 0])]  # todo get current pose
         self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
         self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
@@ -201,7 +202,6 @@ class CarryMyBullshit(Goal):
         # self.init_fake_path()
         # self.start_time = rospy.get_rostime().to_sec()
         # self.start_time = None
-        self.traj_data = [np.array([0, 0])]  # todo get current pose
         # self.traj_histogram_data = []  # todo get current pose
         rospy.sleep(0.5)
         while self.trajectory.shape[0] < 5 and not rospy.is_shutdown():
@@ -216,6 +216,7 @@ class CarryMyBullshit(Goal):
         max_id = int(center_id + range_)
         segment = scan.ranges[min_id:max_id]
         self.closest_laser_reading = min(segment)
+        print(f'distance {self.closest_laser_reading}')
 
     def init_fake_path(self):
         rng = np.random.default_rng()

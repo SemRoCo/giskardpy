@@ -376,6 +376,8 @@ class TreeManager(ABC):
         #         child_node = ManagerNode(node=children[child_name], parent=manager_node, position=idx)
         #         self.tree_nodes[child_name] = child_node
         #         manager_node.enabled_children.add(child_node)
+        if node.name in self.tree_nodes:
+            raise KeyError(f'node named {node.name} already exists')
         self.tree_nodes[node.name] = manager_node
         for idx, child in enumerate(node.children):
             self.__init_map(child, manager_node, idx)
@@ -653,13 +655,13 @@ class StandAlone(TreeManager):
     def grow_Synchronize(self):
         sync = Sequence(self.sync_name)
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames', []))
+        sync.add_child(SyncTfFrames('sync tf frames1'))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         return sync
 
     def grow_process_goal(self):
         process_move_goal = failure_is_success(Selector)('Process goal')
-        process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback',
+        process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback2',
                                                                         self.action_server_name,
                                                                         MoveFeedback.PLANNING))
         process_move_goal.add_child(self.grow_process_move_commands())
@@ -688,7 +690,7 @@ class StandAlone(TreeManager):
     def grow_planning2(self):
         planning_2 = failure_is_success(Selector)(self.planning2_name)
         planning_2.add_child(GoalCanceled('goal canceled', self.action_server_name))
-        planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
+        planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback1',
                                                                  self.action_server_name,
                                                                  MoveFeedback.PLANNING))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
@@ -908,7 +910,7 @@ class OpenLoop(StandAlone):
     def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames'))
+        sync.add_child(SyncTfFrames('sync tf frames3'))
         # hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
         # for kwargs in hardware_config.joint_state_topics_kwargs:
         #     sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
@@ -1017,7 +1019,7 @@ class ClosedLoop(OpenLoop):
 
     def grow_closed_loop_control(self):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
-        planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames'))
+        planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
         planning_4.add_child(success_is_running(NotifyStateChange)())
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))

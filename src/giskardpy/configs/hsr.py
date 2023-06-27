@@ -61,12 +61,12 @@ class HSR_Base(Giskard):
         pass
 
 
-class HSR_MujocoRealtime(HSR_Base):
+class HSR_Realtime(HSR_Base):
     def configure_execution(self):
         self.execution.set_control_mode(ControlModes.close_loop)
 
     def configure_world(self, robot_description: str = 'robot_description'):
-        super().configure_world('hsrb4s/robot_description')
+        super().configure_world('robot_description')
         self.world.set_default_color(1, 1, 1, 0.7)
 
     def configure_behavior_tree(self):
@@ -79,20 +79,12 @@ class HSR_MujocoRealtime(HSR_Base):
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
                                                            tf_parent_frame=self.map_name,
                                                            tf_child_frame=self.odom_link_name)
-        self.robot_interface.sync_joint_state_topic('hsrb4s/joint_states')
-        self.robot_interface.sync_odometry_topic('/hsrb4s/base_footprint', self.drive_joint_name)
+        self.robot_interface.sync_joint_state_topic('/hsrb/joint_states')
+        self.robot_interface.sync_odometry_topic('/hsrb/odom', self.drive_joint_name)
 
-        self.robot_interface.add_joint_velocity_controller(namespaces=[
-            'hsrb4s/arm_flex_joint_velocity_controller',
-            'hsrb4s/arm_lift_joint_velocity_controller',
-            'hsrb4s/arm_roll_joint_velocity_controller',
-            'hsrb4s/head_pan_joint_velocity_controller',
-            'hsrb4s/head_tilt_joint_velocity_controller',
-            'hsrb4s/wrist_flex_joint_velocity_controller',
-            'hsrb4s/wrist_roll_joint_velocity_controller',
-        ])
+        self.robot_interface.add_joint_velocity_group_controller(namespace='/hsrb/realtime_body_controller_real')
 
-        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel',
+        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/hsrb/command_velocity',
                                                    joint_name=self.drive_joint_name)
 
 

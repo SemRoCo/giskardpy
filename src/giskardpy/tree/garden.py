@@ -754,6 +754,11 @@ class StandAlone(TreeManager):
                 self.disable_node(node.name)
             node.length = length
 
+    def add_joint_velocity_group_controllers(self, namespaces: List[str]):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
     def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
                                             fill_velocity_values: bool):
         # todo new abstract decorator that uses this as default implementation

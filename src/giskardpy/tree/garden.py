@@ -673,7 +673,7 @@ class StandAlone(TreeManager):
         process_move_cmd = success_is_failure(Sequence)('Process move commands')
         process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
         process_move_cmd.add_child(self.grow_planning())
-        process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
+        process_move_cmd.add_child(SetErrorCode('set error code1', 'Planning'))
         return process_move_cmd
 
     def grow_planning(self):
@@ -943,13 +943,13 @@ class OpenLoop(StandAlone):
                                                                         MoveFeedback.EXECUTION))
         monitor_execution.add_child(self.grow_execution_cancelled())
         monitor_execution.add_child(self.grow_move_robots())
-        monitor_execution.add_child(SetErrorCode('set error code', 'Execution'))
+        monitor_execution.add_child(SetErrorCode('set error code2', 'Execution'))
         return monitor_execution
 
     def grow_execution_cancelled(self):
         execute_canceled = Sequence('execute canceled')
         execute_canceled.add_child(GoalCanceled('goal canceled1', self.action_server_name))
-        execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
+        execute_canceled.add_child(SetErrorCode('set error code3', 'Execution'))
         return execute_canceled
 
     def grow_move_robots(self):

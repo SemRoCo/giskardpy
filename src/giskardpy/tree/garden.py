@@ -714,13 +714,13 @@ class StandAlone(TreeManager):
         # planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin())
+        planning_4.add_child(TimePlugin('increase time closed loop'))
         planning_4.add_child(MaxTrajectoryLength('traj length check'))
         return planning_4
 
     def grow_plan_postprocessing(self):
         plan_postprocessing = Sequence(self.plan_postprocessing_name)
-        plan_postprocessing.add_child(running_is_success(TimePlugin)())
+        plan_postprocessing.add_child(running_is_success(TimePlugin)('increase time plan post processing'))
         plan_postprocessing.add_child(SetZeroVelocity())
         plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
         return plan_postprocessing

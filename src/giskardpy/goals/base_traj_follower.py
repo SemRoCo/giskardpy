@@ -165,7 +165,7 @@ class CarryMyBullshit(Goal):
                  camera_link: str = 'head_rgbd_sensor_link',
                  target_recovery_joint: str = 'head_pan_joint',
                  last_distance_threshold: float = 1,
-                 laser_distance_threshold: float = 0.3,
+                 laser_distance_threshold: float = 0.8,
                  laser_range: float = np.pi / 8,
                  max_rotation_velocity: float = 0.5,
                  max_translation_velocity: float = 0.38,
@@ -181,7 +181,7 @@ class CarryMyBullshit(Goal):
         self.target_recovery_joint = self.world.search_for_joint_name(target_recovery_joint)
         self.target_age_threshold = target_age_threshold
         self.target_age_exception_threshold = target_age_exception_threshold
-        self.traj_data = [np.array([0, 0])]  # todo get current pose
+        self.traj_data = [self.get_current_point()]
         self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
         self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
@@ -231,17 +231,16 @@ class CarryMyBullshit(Goal):
         self.closest_laser_reading = min(segment)
         print(f'distance {self.closest_laser_reading}')
 
-    def get_current_point(self) -> Tuple[float, float]:
+    def get_current_point(self) -> np.ndarray:
         root_T_tip = self.world.compute_fk_np(self.root, self.tip)
         x = root_T_tip[0, 3]
         y = root_T_tip[1, 3]
-        return x, y
+        return np.array([x, y])
 
     @memoize_with_counter(4)
     def get_current_target(self):
         traj = self.trajectory.copy()
-        x, y = self.get_current_point()
-        current_point = np.array([x, y])
+        current_point = self.get_current_point()
         error = traj - current_point
         distances = np.linalg.norm(error, axis=1)
         # cut off old points

@@ -154,7 +154,7 @@ class BaseTrajFollower(Goal):
 
 
 class CarryMyBullshit(Goal):
-    trajectory: np.ndarray
+    trajectory: np.ndarray = np.array([])
     human_point: PointStamped
 
     def __init__(self,
@@ -162,22 +162,24 @@ class CarryMyBullshit(Goal):
                  laser_topic_name: str = '/hsrb/base_scan',
                  odom_joint_name: str = 'brumbrum',
                  root_link: Optional[str] = None,
-                 tip_link: str = 'base_footprint',
                  camera_link: str = 'head_rgbd_sensor_link',
                  target_recovery_joint: str = 'head_pan_joint',
                  last_distance_threshold: float = 1,
                  laser_distance_threshold: float = 0.8,
+                 base_orientation_threshold: float = np.pi / 8,
                  laser_range: float = np.pi / 8,
                  max_rotation_velocity: float = 0.5,
-                 max_rotation_velocity_head: float = 0.5,
+                 max_rotation_velocity_head: float = 3,
                  max_translation_velocity: float = 0.38,
                  footprint_radius: float = 0.3,
                  height_for_camera_target: float = 1,
                  target_age_threshold: float = 2,
-                 target_age_exception_threshold: float = 60,
-                 target_recovery_looking_speed: float = 1):
+                 target_age_exception_threshold: float = 5,
+                 target_recovery_looking_speed: float = 1,
+                 drive_back: bool = False):
         super().__init__()
         self.last_target_age = 0
+        self.base_orientation_threshold = base_orientation_threshold
         self.odom_joint_name = self.world.search_for_joint_name(odom_joint_name)
         self.odom_joint: OmniDrive = self.world.get_joint(self.odom_joint_name)
         self.target_recovery_looking_speed = target_recovery_looking_speed
@@ -192,14 +194,14 @@ class CarryMyBullshit(Goal):
         self.camera_link = self.world.search_for_link_name(camera_link)
         self.tip_V_camera_axis = Vector3()
         self.tip_V_camera_axis.z = 1
-        self.tip = self.world.search_for_link_name(tip_link)
+        self.tip = self.odom_joint.child_link_name
+        self.odom = self.odom_joint.parent_link_name
         self.tip_V_pointing_axis = Vector3()
         self.tip_V_pointing_axis.x = 1
         self.max_rotation_velocity = max_rotation_velocity
         self.max_rotation_velocity_head = max_rotation_velocity_head
         self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_ABOVE_CA
-        self.trajectory = np.array(self.get_current_point(), ndmin=2)
         self.distance_to_target = last_distance_threshold
         self.laser_distance_threshold = laser_distance_threshold
         self.radius = footprint_radius
@@ -212,18 +214,20 @@ class CarryMyBullshit(Goal):
         self.human_point = PointStamped()
         self.height_for_camera_target = height_for_camera_target
         self.max_traj_length = 1
-        # self.init_fake_path()
-        # self.start_time = rospy.get_rostime().to_sec()
-        # self.start_time = None
-        # self.traj_histogram_data = []  # todo get current pose
+        self.drive_back = drive_back
+        if not self.drive_back:
+            CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
         self.traj_data = [self.get_current_point()]
-        self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
         self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
-        rospy.sleep(0.5)
-        while self.trajectory.shape[0] < 5 and not rospy.is_shutdown():
-            print(f'waiting for at least 5 traj points, current length {len(self.trajectory)}')
+        if not self.drive_back:
+            self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
             rospy.sleep(0.5)
-        # self.publish_trajectory()
+            while CarryMyBullshit.trajectory.shape[0] < 5 and not rospy.is_shutdown():
+                print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
+                rospy.sleep(0.5)
+        else:
+            CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
+            self.publish_trajectory()
 
     def laser_cb(self, scan: LaserScan):
         center_id = int(len(scan.ranges) / 2)
@@ -242,7 +246,7 @@ class CarryMyBullshit(Goal):
 
     @memoize_with_counter(4)
     def get_current_target(self):
-        traj = self.trajectory.copy()
+        traj = CarryMyBullshit.trajectory.copy()
         current_point = self.get_current_point()
         error = traj - current_point
         distances = np.linalg.norm(error, axis=1)
@@ -255,9 +259,14 @@ class CarryMyBullshit(Goal):
         else:
             next_idx = closest_idx = np.argmin(distances)
         # self.traj_data = self.traj_data[closest_idx:]
-        self.last_target_age = rospy.get_rostime().to_sec() - self.human_point.header.stamp.to_sec()
-        if self.last_target_age > self.target_age_exception_threshold:
-            raise_to_blackboard(GiskardException(f'lost target for longer than {self.target_age_exception_threshold}s'))
+        if not self.drive_back:
+            self.last_target_age = rospy.get_rostime().to_sec() - self.human_point.header.stamp.to_sec()
+            if self.last_target_age > self.target_age_exception_threshold:
+                raise_to_blackboard(
+                    GiskardException(f'lost target for longer than {self.target_age_exception_threshold}s'))
+        else:
+            if closest_idx == CarryMyBullshit.trajectory.shape[0] - 1:
+                raise_to_blackboard(GiskardException(f'end of traj reached'))
         result = {
             'next_x': traj[next_idx, 0],
             'next_y': traj[next_idx, 1],
@@ -278,7 +287,7 @@ class CarryMyBullshit(Goal):
         m_line.color.a = 1
         m_line.color.r = 1
         try:
-            for item in self.trajectory:
+            for item in CarryMyBullshit.trajectory:
                 p = Point()
                 p.x = item[0]
                 p.y = item[1]
@@ -305,7 +314,7 @@ class CarryMyBullshit(Goal):
                     self.traj_data.append(interpolated_point)
                 self.traj_data.append(current_point)
 
-            self.trajectory = np.array(self.traj_data)
+            CarryMyBullshit.trajectory = np.array(self.traj_data)
             self.human_point = point
         except Exception as e:
             logging.logwarn(f'rejected new target because: {e}')
@@ -313,6 +322,7 @@ class CarryMyBullshit(Goal):
 
     def make_constraints(self):
         root_T_bf = self.get_fk(self.root, self.tip)
+        root_T_odom = self.get_fk(self.root, self.odom)
         root_T_camera = self.get_fk(self.root, self.camera_link)
         root_P_tip = root_T_bf.to_position()
         laser_center_reading = self.get_parameter_as_symbolic_expression('closest_laser_reading')
@@ -335,20 +345,24 @@ class CarryMyBullshit(Goal):
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         # %% orient to goal
-        _, _, map_odom_angle = root_T_bf.to_rotation().to_rpy()
+        _, _, map_odom_angle = root_T_odom.to_rotation().to_rpy()
         odom_current_angle = self.odom_joint.yaw.get_symbol(Derivatives.position)
         map_current_angle = map_odom_angle + odom_current_angle
         # root_V_goal_axis = root_P_goal_point - root_P_tip
-        root_V_goal_axis = map_P_human_projected - root_P_tip
+        if self.drive_back:
+            root_V_goal_axis = root_P_goal_point - root_P_tip
+        else:
+            root_V_goal_axis = map_P_human_projected - root_P_tip
         distance_to_human = w.norm(root_V_goal_axis)
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_bf.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
         root_V_goal_axis.vis_frame = self.tip
-        map_goal_angle = w.angle_between_vector(root_V_pointing_axis, root_V_goal_axis)
-        self.add_debug_expr('goal_point', root_P_goal_point)
-        self.add_debug_expr('root_P_closest_point', root_P_closest_point)
-        self.add_debug_expr('laser_center_reading', laser_center_reading)
+        map_goal_angle = w.angle_between_vector(w.Vector3([1, 0, 0]), root_V_goal_axis)
+        map_goal_angle = w.if_greater(root_V_goal_axis.y, 0, map_goal_angle, -map_goal_angle)
+        # self.add_debug_expr('goal_point', root_P_goal_point)
+        # self.add_debug_expr('root_P_closest_point', root_P_closest_point)
+        # self.add_debug_expr('laser_center_reading', laser_center_reading)
         # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
         # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
         # self.add_debug_expr('distance_to_human', distance_to_human)
@@ -358,10 +372,21 @@ class CarryMyBullshit(Goal):
         #                                  weight=self.weight,
         #                                  name='pointing')
         # angle = w.abs(w.angle_between_vector(root_V_pointing_axis, root_V_goal_axis))
-        buffer = np.pi / 8
+        map_angle_error = w.shortest_angular_distance(map_current_angle, map_goal_angle)
+        if self.drive_back:
+            buffer = 0
+        else:
+            buffer = self.base_orientation_threshold
+        ll = map_angle_error - buffer
+        ul = map_angle_error + buffer
+        # self.add_debug_expr('ll', ll)
+        # self.add_debug_expr('ul', ul)
+        # self.add_debug_expr('map_angle_error', map_angle_error)
+        # self.add_debug_expr('map_current_angle', map_current_angle)
+        # self.add_debug_expr('map_goal_angle', map_goal_angle)
         self.add_inequality_constraint(reference_velocity=self.max_rotation_velocity,
-                                       lower_error=-map_goal_angle - buffer,
-                                       upper_error=-map_goal_angle + buffer,
+                                       lower_error=ll,
+                                       upper_error=ul,
                                        weight=self.weight,
                                        task_expression=map_current_angle,
                                        name='/rot')
@@ -374,25 +399,12 @@ class CarryMyBullshit(Goal):
         root_V_camera_goal_axis = map_P_human - root_P_camera
         root_V_camera_goal_axis.scale(1)
         look_at_target_weight = w.if_else(target_lost, 0, self.weight)
-        self.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
-                                         frame_V_goal=root_V_camera_goal_axis,
-                                         reference_velocity=self.max_rotation_velocity_head,
-                                         weight=look_at_target_weight,
-                                         name='camera')
-
-        # %% lost target recovery
-        # time = self.traj_time_in_seconds()
-        # joint_position = self.get_joint_position_symbol(self.target_recovery_joint)
-        # lower_limit, upper_limit = self.world.get_joint_position_limits(self.target_recovery_joint)
-        # joint_range = upper_limit - lower_limit
-        # time_for_full_range = joint_range / self.target_recovery_looking_speed
-        # target_search_joint_position = w.cos(time * np.pi / time_for_full_range) * (joint_range / 2)
-        # look_at_target_weight = w.if_else(target_lost, self.weight, 0)
-        # self.add_position_constraint(expr_current=joint_position,
-        #                              expr_goal=target_search_joint_position,
-        #                              reference_velocity=self.target_recovery_looking_speed,
-        #                              weight=look_at_target_weight,
-        #                              name='lost_target_recovery')
+        if not self.drive_back:
+            self.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
+                                             frame_V_goal=root_V_camera_goal_axis,
+                                             reference_velocity=self.max_rotation_velocity_head,
+                                             weight=look_at_target_weight,
+                                             name='camera')
 
         # %% follow next point
         root_V_camera_axis.vis_frame = self.camera_link
@@ -401,12 +413,17 @@ class CarryMyBullshit(Goal):
         # self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
 
         # position_weight = self.weight
-        position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, self.laser_distance_threshold),
-                                               w.logic_and(
-                                                   w.logic_not(target_lost),
-                                                   w.less_equal(distance_to_human, self.distance_to_target))),
-                                    0,
-                                    self.weight)
+        if self.drive_back:
+            position_weight = w.if_less(map_angle_error, self.base_orientation_threshold,
+                                        self.weight,
+                                        0)
+        else:
+            position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, self.laser_distance_threshold),
+                                                   w.logic_and(
+                                                       w.logic_not(target_lost),
+                                                       w.less_equal(distance_to_human, self.distance_to_target))),
+                                        0,
+                                        self.weight)
 
         self.add_point_goal_constraints(frame_P_current=root_P_tip,
                                         frame_P_goal=root_P_goal_point,

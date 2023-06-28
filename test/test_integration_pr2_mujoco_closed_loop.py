@@ -166,7 +166,15 @@ class TestMoveBaseGoals:
 
     def test_carry_my_bs(self, zero_pose: PR2TestWrapper):
         zero_pose.set_json_goal('CarryMyBullshit',
-                                camera_link='head_mount_kinect_rgb_optical_frame')
+                                camera_link='head_mount_kinect_rgb_optical_frame',
+                                height_for_camera_target=1.5)
+        zero_pose.set_json_goal('EndlessMode')
+        zero_pose.set_max_traj_length(new_length=10000)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.ERROR])
+        zero_pose.set_json_goal('CarryMyBullshit',
+                                camera_link='head_mount_kinect_rgb_optical_frame',
+                                drive_back=True)
         zero_pose.set_json_goal('EndlessMode')
         zero_pose.set_max_traj_length(new_length=10000)
         zero_pose.allow_all_collisions()

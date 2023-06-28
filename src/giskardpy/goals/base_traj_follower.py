@@ -328,8 +328,8 @@ class CarryMyBullshit(Goal):
         clear_memo(self.get_current_target)
         root_P_goal_point = w.Point3([next_x, next_y, 0])
         root_P_closest_point = w.Point3([closest_x, closest_y, 0])
-        tangent = root_P_goal_point - root_P_closest_point
-        root_V_tangent = w.Vector3([tangent.x, tangent.y, 0])
+        # tangent = root_P_goal_point - root_P_closest_point
+        # root_V_tangent = w.Vector3([tangent.x, tangent.y, 0])
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         # %% orient to goal
@@ -353,7 +353,7 @@ class CarryMyBullshit(Goal):
         #                                  name='pointing')
         angle = w.abs(w.angle_between_vector(root_V_pointing_axis, root_V_goal_axis))
         buffer = np.pi / 8
-        self.add_inequality_constraint(reference_velocity=0.5,
+        self.add_inequality_constraint(reference_velocity=self.max_rotation_velocity,
                                        lower_error=-angle - buffer,
                                        upper_error=-angle + buffer,
                                        weight=self.weight,

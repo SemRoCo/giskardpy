@@ -155,6 +155,7 @@ class BaseTrajFollower(Goal):
 
 class CarryMyBullshit(Goal):
     trajectory: np.ndarray = np.array([])
+    thresholds: np.ndarray
     human_point: PointStamped
 
     def __init__(self,
@@ -165,13 +166,14 @@ class CarryMyBullshit(Goal):
                  camera_link: str = 'head_rgbd_sensor_link',
                  target_recovery_joint: str = 'head_pan_joint',
                  last_distance_threshold: float = 1,
-                 laser_distance_threshold: float = 0.8,
+                 laser_distance_threshold: float = 0.6,
+                 laser_distance_threshold_width: float = 0.4,
                  base_orientation_threshold: float = np.pi / 8,
                  laser_range: float = np.pi / 8,
                  max_rotation_velocity: float = 0.5,
                  max_rotation_velocity_head: float = 3,
                  max_translation_velocity: float = 0.38,
-                 footprint_radius: float = 0.3,
+                 footprint_radius: float = 0.5,
                  height_for_camera_target: float = 1,
                  target_age_threshold: float = 2,
                  target_age_exception_threshold: float = 5,
@@ -221,7 +223,8 @@ class CarryMyBullshit(Goal):
         if not self.drive_back:
             CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
         self.traj_data = [self.get_current_point()]
-        self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
+        self.init_laser_stuff(width=laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
+        self.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         if not self.drive_back:
             self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
             rospy.sleep(0.5)
@@ -231,15 +234,42 @@ class CarryMyBullshit(Goal):
         else:
             CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
             self.publish_trajectory()
+        self.publish_tracking_radius()
+
+    def init_laser_stuff(self, width: float = 0.3, circle_radius: float = 0.4):
+        laser_scan: LaserScan = rospy.wait_for_message(self.laser_topic_name, LaserScan, rospy.Duration(5))
+        self.laser_frame = laser_scan.header.frame_id
+        thresholds = []
+        for angle in np.arange(laser_scan.angle_min,
+                               laser_scan.angle_max,
+                               laser_scan.angle_increment):
+            if angle < 0:
+                y = -width
+                length = y / np.sin((angle))
+                x = np.cos(angle) * length
+                thresholds.append((x,y, length))
+            else:
+                y = width
+                length = y / np.sin((angle))
+                x = np.cos(angle) * length
+                thresholds.append((x,y, length))
+            if length > circle_radius:
+                length = circle_radius
+                x = np.cos(angle) * length
+                y = np.sin(angle) * length
+                thresholds[-1] = (x,y,length)
+        self.thresholds = np.array(thresholds)
+        assert len(thresholds) == len(laser_scan.ranges)
+        self.publish_laser_thresholds()
 
     def laser_cb(self, scan: LaserScan):
-        center_id = int(len(scan.ranges) / 2)
-        range_ = self.laser_range / scan.angle_increment
-        min_id = int(center_id - range_)
-        max_id = int(center_id + range_)
-        segment = scan.ranges[min_id:max_id]
-        self.closest_laser_reading = min(segment)
-        print(f'distance {self.closest_laser_reading}')
+        data = np.array(scan.ranges)
+        violations = data - self.thresholds[:, 2]
+        min_reading = min(violations)
+        self.closest_laser_reading = min_reading
+        if min_reading < 0:
+            print(f'min violation {min_reading}')
+        # print(f'distance {self.closest_laser_reading}')
 
     def get_current_point(self) -> np.ndarray:
         root_T_tip = self.world.compute_fk_np(self.root, self.tip)
@@ -282,7 +312,7 @@ class CarryMyBullshit(Goal):
         ms = MarkerArray()
         m_line = Marker()
         m_line.action = m_line.ADD
-        m_line.ns = 'debug'
+        m_line.ns = 'traj'
         m_line.id = 1
         m_line.type = m_line.LINE_STRIP
         m_line.header.frame_id = str(self.world.root_link_name)
@@ -298,6 +328,47 @@ class CarryMyBullshit(Goal):
             ms.markers.append(m_line)
         except Exception as e:
             logging.logwarn('failed to create traj marker')
+        self.pub.publish(ms)
+
+    def publish_laser_thresholds(self):
+        ms = MarkerArray()
+        m_line = Marker()
+        m_line.action = m_line.ADD
+        m_line.ns = 'laser_thresholds'
+        m_line.id = 1332
+        m_line.type = m_line.LINE_STRIP
+        m_line.header.frame_id = self.laser_frame
+        m_line.scale.x = 0.05
+        m_line.color.a = 1
+        m_line.color.r = 1
+        m_line.color.b = 1
+        m_line.frame_locked = True
+        try:
+            for item in self.thresholds:
+                p = Point()
+                p.x = item[0]
+                p.y = item[1]
+                m_line.points.append(p)
+            ms.markers.append(m_line)
+        except Exception as e:
+            logging.logwarn('failed to create laser marker')
+        self.pub.publish(ms)
+
+    def publish_tracking_radius(self):
+        ms = MarkerArray()
+        m_line = Marker()
+        m_line.action = m_line.ADD
+        m_line.ns = 'tracking_radius'
+        m_line.id = 1332
+        m_line.type = m_line.CYLINDER
+        m_line.header.frame_id = str(self.tip.short_name)
+        m_line.scale.x = self.radius * 2
+        m_line.scale.y = self.radius * 2
+        m_line.scale.z = 0.01
+        m_line.color.a = 0.5
+        m_line.color.b = 1
+        m_line.frame_locked = True
+        ms.markers.append(m_line)
         self.pub.publish(ms)
 
     def target_cb(self, point: PointStamped):
@@ -421,7 +492,7 @@ class CarryMyBullshit(Goal):
                                         self.weight,
                                         0)
         else:
-            position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, self.laser_distance_threshold),
+            position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, 0),
                                                    w.logic_and(
                                                        w.logic_not(target_lost),
                                                        w.less_equal(distance_to_human, self.distance_to_target))),

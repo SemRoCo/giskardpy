@@ -582,7 +582,11 @@ class WorldTree(WorldTreeInterface):
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
 
-                joint = urdf_to_joint(urdf_joint, group_name, self.default_limits)
+                joint = urdf_to_joint(urdf_joint, group_name)
+                if not isinstance(joint, FixedJoint):
+                    for derivative, limit in self.default_limits.items():
+                        joint.free_variable.set_lower_limit(derivative, -limit)
+                        joint.free_variable.set_upper_limit(derivative, limit)
 
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)

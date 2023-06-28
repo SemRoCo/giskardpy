@@ -154,8 +154,8 @@ class WorldConfig(Config):
             raise ValueError(f'Can\'t change limits because {joint_name} is not of type {str(OneDofJoint)}.')
         free_variable = self._world.free_variables[joint.free_variable.name]
         for derivative, limit in limit_map.items():
-            free_variable.set_lower_limit(Derivatives.velocity, -limit)
-            free_variable.set_upper_limit(Derivatives.velocity, limit)
+            free_variable.set_lower_limit(derivative, -limit)
+            free_variable.set_upper_limit(derivative, limit)
 
     def set_default_color(self, r: float, g: float, b: float, a: float):
         """

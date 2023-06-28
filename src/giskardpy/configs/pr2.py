@@ -37,6 +37,9 @@ class PR2_Base(Giskard):
                                             Derivatives.jerk: 5
                                         },
                                         robot_group_name=pr2_group_name)
+        self.world.set_joint_limits(limit_map={Derivatives.velocity: 3,
+                                               Derivatives.jerk: 60},
+                                    joint_name='head_pan_joint')
 
     def configure_collision_avoidance(self):
         # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)

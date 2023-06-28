@@ -12,12 +12,14 @@ from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w, identifier
+from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
 from giskardpy.utils.tfwrapper import point_to_np
+from giskardpy.utils.utils import raise_to_blackboard
 
 
 class BaseTrajFollower(Goal):
@@ -153,23 +155,28 @@ class BaseTrajFollower(Goal):
 
 class CarryMyBullshit(Goal):
     trajectory: np.ndarray
+    human_point: PointStamped
 
     def __init__(self,
-                 patrick_topic_name: str,
-                 laser_topic_name: str = 'laser',
+                 patrick_topic_name: str = '/robokudo2/human_position',
+                 laser_topic_name: str = '/hsrb/base_scan',
                  root_link: Optional[str] = None,
                  tip_link: str = 'base_footprint',
-                 camera_link: str = 'head_mount_kinect_rgb_optical_frame',
+                 camera_link: str = 'head_rgbd_sensor_link',
                  last_distance_threshold: float = 1,
                  laser_distance_threshold: float = 0.3,
                  laser_range: float = np.pi / 8,
-                 max_rotation_velocity: float = 0.5,
+                 max_rotation_velocity: float = 0.38,
                  max_translation_velocity: float = 0.5,
-                 next_point_radius: float = 0.4,
+                 footprint_radius: float = 0.3,
                  min_height_for_camera_target: float = 1,
                  max_height_for_camera_target: float = 2,
-                 max_temporal_distance_between_closest_and_next: float = 0.5):
+                 target_age_threshold: float = 2,
+                 target_age_exception_threshold: float = 5):
         super().__init__()
+        self.last_target_age = 0
+        self.target_age_threshold = target_age_threshold
+        self.target_age_exception_threshold = target_age_exception_threshold
         self.traj_data = [np.array([0, 0])]  # todo get current pose
         self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
         self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
@@ -187,17 +194,17 @@ class CarryMyBullshit(Goal):
         self.max_rotation_velocity = max_rotation_velocity
         self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_ABOVE_CA
-        self.trajectory = np.array([0, 0], ndmin=2)
+        self.trajectory = np.array(self.get_current_point(), ndmin=2)
         self.distance_to_target = last_distance_threshold
         self.laser_distance_threshold = laser_distance_threshold
-        self.radius = next_point_radius
+        self.radius = footprint_radius
         # self.step_dt = 0.01
         # self.max_temp_distance = max_temporal_distance_between_closest_and_next
         self.interpolation_step_size = 0.05
         self.max_temp_distance = int(self.radius / self.interpolation_step_size)
         self.closest_laser_reading = 100
         self.laser_range = laser_range
-        self.human_point = Point()
+        self.human_point = PointStamped()
         self.min_height_for_camera_target = min_height_for_camera_target
         self.max_height_for_camera_target = max_height_for_camera_target
         self.max_traj_length = 1
@@ -220,24 +227,16 @@ class CarryMyBullshit(Goal):
         self.closest_laser_reading = min(segment)
         print(f'distance {self.closest_laser_reading}')
 
-    def init_fake_path(self):
-        rng = np.random.default_rng()
-        self.traj_length = 5
-        t = np.linspace(0, self.traj_length, 50)
-        x = 2 * (-np.cos(2 * -t) + 0.1 * rng.standard_normal(50) + 2)
-        y = 2 * (np.sin(2 * -t) + 0.1 * rng.standard_normal(50) + 1)
-
-        spl_x = UnivariateSpline(t, x)
-        spl_y = UnivariateSpline(t, y)
-        ts = np.linspace(0, self.traj_length, int(self.traj_length / self.step_dt + 1))
-        self.trajectory = np.vstack((spl_x(ts), spl_y(ts))).T
+    def get_current_point(self) -> Tuple[float, float]:
+        root_T_tip = self.world.compute_fk_np(self.root, self.tip)
+        x = root_T_tip[0, 3]
+        y = root_T_tip[1, 3]
+        return x, y
 
     @memoize_with_counter(4)
     def get_current_target(self):
         traj = self.trajectory.copy()
-        root_T_tip = self.world.compute_fk_np(self.root, self.tip)
-        x = root_T_tip[0, 3]
-        y = root_T_tip[1, 3]
+        x, y = self.get_current_point()
         current_point = np.array([x, y])
         error = traj - current_point
         distances = np.linalg.norm(error, axis=1)
@@ -250,6 +249,9 @@ class CarryMyBullshit(Goal):
         else:
             next_idx = closest_idx = np.argmin(distances)
         # self.traj_data = self.traj_data[closest_idx:]
+        self.last_target_age = rospy.get_rostime().to_sec() - self.human_point.header.stamp.to_sec()
+        if self.last_target_age > self.target_age_exception_threshold:
+            raise_to_blackboard(GiskardException(f'lost target for longer than {self.target_age_exception_threshold}s'))
         result = {
             'next_x': traj[next_idx, 0],
             'next_y': traj[next_idx, 1],
@@ -300,7 +302,7 @@ class CarryMyBullshit(Goal):
                 self.traj_data.append(current_point)
 
             self.trajectory = np.array(self.traj_data)
-            self.human_point = point.point
+            self.human_point = point
         except Exception as e:
             logging.logwarn(f'rejected new target because: {e}')
         self.publish_trajectory()
@@ -310,6 +312,8 @@ class CarryMyBullshit(Goal):
         root_T_camera = self.get_fk(self.root, self.camera_link)
         root_P_tip = root_T_tip.to_position()
         laser_center_reading = self.get_parameter_as_symbolic_expression('closest_laser_reading')
+        last_target_age = self.get_parameter_as_symbolic_expression('last_target_age')
+        target_lost = w.greater_equal(last_target_age, self.target_age_threshold)
         map_P_human = w.Point3(self.get_parameter_as_symbolic_expression('human_point'))
         map_P_human_projected = w.Point3(map_P_human)
         map_P_human_projected.z = 0
@@ -326,6 +330,7 @@ class CarryMyBullshit(Goal):
         root_V_tangent = w.Vector3([tangent.x, tangent.y, 0])
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
+        # %% orient to goal
         # root_V_goal_axis = root_P_goal_point - root_P_tip
         root_V_goal_axis = map_P_human_projected - root_P_tip
         distance_to_human = w.norm(root_V_goal_axis)
@@ -353,25 +358,32 @@ class CarryMyBullshit(Goal):
                                        task_expression=angle,
                                        name='/rot')
 
+        # %% look at goal
         camera_V_camera_axis = w.Vector3(self.tip_V_camera_axis)
         root_V_camera_axis = root_T_camera.dot(camera_V_camera_axis)
         root_P_camera = root_T_camera.to_position()
         map_P_human.z = w.limit(map_P_human.z, self.min_height_for_camera_target, self.max_height_for_camera_target)
         root_V_camera_goal_axis = map_P_human - root_P_camera
         root_V_camera_goal_axis.scale(1)
+        look_at_target_weight = w.if_else(target_lost, 0, self.weight)
         self.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
                                          frame_V_goal=root_V_camera_goal_axis,
                                          reference_velocity=self.max_rotation_velocity,
-                                         weight=self.weight,
+                                         weight=look_at_target_weight,
                                          name='camera')
+
+        
+        # %% follow next point
         root_V_camera_axis.vis_frame = self.camera_link
         root_V_camera_goal_axis.vis_frame = self.camera_link
-        self.add_debug_expr('root_V_camera_axis', root_V_camera_axis)
-        self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
+        # self.add_debug_expr('root_V_camera_axis', root_V_camera_axis)
+        # self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
 
         # position_weight = self.weight
         position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, self.laser_distance_threshold),
-                                               w.less_equal(distance_to_human, self.distance_to_target)),
+                                               w.logic_and(
+                                                   w.logic_not(target_lost),
+                                                   w.less_equal(distance_to_human, self.distance_to_target))),
                                     0,
                                     self.weight)
 
@@ -381,14 +393,17 @@ class CarryMyBullshit(Goal):
                                         weight=position_weight,
                                         name='next')
 
+        # %% keep closest point in footprint radius
         # distance, _ = w.distance_point_to_line_segment(frame_P_current=root_P_tip,
         #                                                frame_P_line_start=root_P_closest_point - root_V_tangent * 0.1,
         #                                                frame_P_line_end=root_P_closest_point + root_V_tangent * 0.1)
-        # self.add_position_constraint(expr_current=distance,
-        #                              expr_goal=0,
-        #                              reference_velocity=self.max_translation_velocity,
-        #                              weight=position_weight,
-        #                              name='closest')
+        distance = w.norm(root_P_closest_point - root_P_tip)
+        self.add_inequality_constraint(task_expression=distance,
+                                       lower_error=-distance - self.radius,
+                                       upper_error=-distance + self.radius,
+                                       reference_velocity=self.max_translation_velocity,
+                                       weight=self.weight,
+                                       name='in_circle')
 
     def __str__(self) -> str:
         return super().__str__()

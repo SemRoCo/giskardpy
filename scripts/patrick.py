@@ -175,7 +175,7 @@ class IMServer(object):
             self.target.header.frame_id = 'map'
             self.target.point.x = 1
             self.target.point.z = 1
-            self.timer = Timer(rospy.Duration(0.33), self.timer_cb)
+            self.timer = Timer(rospy.Duration(0.1), self.timer_cb)
 
         def timer_cb(self, timer_event: TimerEvent):
             variance = 0.1

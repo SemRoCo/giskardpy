@@ -179,8 +179,8 @@ class IMServer(object):
             self.timer = Timer(rospy.Duration(0.1), self.timer_cb)
 
         def timer_cb(self, timer_event: TimerEvent):
-            if timer_event.current_real.to_sec() - self.target.header.stamp.to_sec() > self.stop_after:
-                return
+            # if timer_event.current_real.to_sec() - self.target.header.stamp.to_sec() > self.stop_after:
+            #     return
             variance = 0.1
             p = deepcopy(self.target)
             p.header.stamp = timer_event.current_real

@@ -160,6 +160,7 @@ class CarryMyBullshit(Goal):
     def __init__(self,
                  patrick_topic_name: str = '/robokudo2/human_position',
                  laser_topic_name: str = '/hsrb/base_scan',
+                 odom_joint_name: str = 'brumbrum',
                  root_link: Optional[str] = None,
                  tip_link: str = 'base_footprint',
                  camera_link: str = 'head_rgbd_sensor_link',
@@ -168,15 +169,17 @@ class CarryMyBullshit(Goal):
                  laser_distance_threshold: float = 0.8,
                  laser_range: float = np.pi / 8,
                  max_rotation_velocity: float = 0.5,
+                 max_rotation_velocity_head: float = 0.5,
                  max_translation_velocity: float = 0.38,
                  footprint_radius: float = 0.3,
-                 min_height_for_camera_target: float = 1,
-                 max_height_for_camera_target: float = 2,
+                 height_for_camera_target: float = 1,
                  target_age_threshold: float = 2,
                  target_age_exception_threshold: float = 60,
                  target_recovery_looking_speed: float = 1):
         super().__init__()
         self.last_target_age = 0
+        self.odom_joint_name = self.world.search_for_joint_name(odom_joint_name)
+        self.odom_joint: OmniDrive = self.world.get_joint(self.odom_joint_name)
         self.target_recovery_looking_speed = target_recovery_looking_speed
         self.target_recovery_joint = self.world.search_for_joint_name(target_recovery_joint)
         self.target_age_threshold = target_age_threshold
@@ -193,6 +196,7 @@ class CarryMyBullshit(Goal):
         self.tip_V_pointing_axis = Vector3()
         self.tip_V_pointing_axis.x = 1
         self.max_rotation_velocity = max_rotation_velocity
+        self.max_rotation_velocity_head = max_rotation_velocity_head
         self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_ABOVE_CA
         self.trajectory = np.array(self.get_current_point(), ndmin=2)
@@ -206,8 +210,7 @@ class CarryMyBullshit(Goal):
         self.closest_laser_reading = 100
         self.laser_range = laser_range
         self.human_point = PointStamped()
-        self.min_height_for_camera_target = min_height_for_camera_target
-        self.max_height_for_camera_target = max_height_for_camera_target
+        self.height_for_camera_target = height_for_camera_target
         self.max_traj_length = 1
         # self.init_fake_path()
         # self.start_time = rospy.get_rostime().to_sec()
@@ -309,9 +312,9 @@ class CarryMyBullshit(Goal):
         self.publish_trajectory()
 
     def make_constraints(self):
-        root_T_tip = self.get_fk(self.root, self.tip)
+        root_T_bf = self.get_fk(self.root, self.tip)
         root_T_camera = self.get_fk(self.root, self.camera_link)
-        root_P_tip = root_T_tip.to_position()
+        root_P_tip = root_T_bf.to_position()
         laser_center_reading = self.get_parameter_as_symbolic_expression('closest_laser_reading')
         last_target_age = self.get_parameter_as_symbolic_expression('last_target_age')
         target_lost = w.greater_equal(last_target_age, self.target_age_threshold)
@@ -332,13 +335,17 @@ class CarryMyBullshit(Goal):
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         # %% orient to goal
+        _, _, map_odom_angle = root_T_bf.to_rotation().to_rpy()
+        odom_current_angle = self.odom_joint.yaw.get_symbol(Derivatives.position)
+        map_current_angle = map_odom_angle + odom_current_angle
         # root_V_goal_axis = root_P_goal_point - root_P_tip
         root_V_goal_axis = map_P_human_projected - root_P_tip
         distance_to_human = w.norm(root_V_goal_axis)
         root_V_goal_axis.scale(1)
-        root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
+        root_V_pointing_axis = root_T_bf.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
         root_V_goal_axis.vis_frame = self.tip
+        map_goal_angle = w.angle_between_vector(root_V_pointing_axis, root_V_goal_axis)
         self.add_debug_expr('goal_point', root_P_goal_point)
         self.add_debug_expr('root_P_closest_point', root_P_closest_point)
         self.add_debug_expr('laser_center_reading', laser_center_reading)
@@ -350,42 +357,42 @@ class CarryMyBullshit(Goal):
         #                                  reference_velocity=self.max_rotation_velocity,
         #                                  weight=self.weight,
         #                                  name='pointing')
-        angle = w.abs(w.angle_between_vector(root_V_pointing_axis, root_V_goal_axis))
+        # angle = w.abs(w.angle_between_vector(root_V_pointing_axis, root_V_goal_axis))
         buffer = np.pi / 8
         self.add_inequality_constraint(reference_velocity=self.max_rotation_velocity,
-                                       lower_error=-angle - buffer,
-                                       upper_error=-angle + buffer,
+                                       lower_error=-map_goal_angle - buffer,
+                                       upper_error=-map_goal_angle + buffer,
                                        weight=self.weight,
-                                       task_expression=angle,
+                                       task_expression=map_current_angle,
                                        name='/rot')
 
         # %% look at goal
         camera_V_camera_axis = w.Vector3(self.tip_V_camera_axis)
         root_V_camera_axis = root_T_camera.dot(camera_V_camera_axis)
         root_P_camera = root_T_camera.to_position()
-        map_P_human.z = w.limit(map_P_human.z, self.min_height_for_camera_target, self.max_height_for_camera_target)
+        map_P_human.z = self.height_for_camera_target
         root_V_camera_goal_axis = map_P_human - root_P_camera
         root_V_camera_goal_axis.scale(1)
         look_at_target_weight = w.if_else(target_lost, 0, self.weight)
         self.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
                                          frame_V_goal=root_V_camera_goal_axis,
-                                         reference_velocity=self.max_rotation_velocity,
+                                         reference_velocity=self.max_rotation_velocity_head,
                                          weight=look_at_target_weight,
                                          name='camera')
 
         # %% lost target recovery
-        time = self.traj_time_in_seconds()
-        joint_position = self.get_joint_position_symbol(self.target_recovery_joint)
-        lower_limit, upper_limit = self.world.get_joint_position_limits(self.target_recovery_joint)
-        joint_range = upper_limit - lower_limit
-        time_for_full_range = joint_range / self.target_recovery_looking_speed
-        target_search_joint_position = w.cos(time * np.pi / time_for_full_range) * (joint_range / 2)
-        look_at_target_weight = w.if_else(target_lost, self.weight, 0)
-        self.add_position_constraint(expr_current=joint_position,
-                                     expr_goal=target_search_joint_position,
-                                     reference_velocity=self.target_recovery_looking_speed,
-                                     weight=look_at_target_weight,
-                                     name='lost_target_recovery')
+        # time = self.traj_time_in_seconds()
+        # joint_position = self.get_joint_position_symbol(self.target_recovery_joint)
+        # lower_limit, upper_limit = self.world.get_joint_position_limits(self.target_recovery_joint)
+        # joint_range = upper_limit - lower_limit
+        # time_for_full_range = joint_range / self.target_recovery_looking_speed
+        # target_search_joint_position = w.cos(time * np.pi / time_for_full_range) * (joint_range / 2)
+        # look_at_target_weight = w.if_else(target_lost, self.weight, 0)
+        # self.add_position_constraint(expr_current=joint_position,
+        #                              expr_goal=target_search_joint_position,
+        #                              reference_velocity=self.target_recovery_looking_speed,
+        #                              weight=look_at_target_weight,
+        #                              name='lost_target_recovery')
 
         # %% follow next point
         root_V_camera_axis.vis_frame = self.camera_link

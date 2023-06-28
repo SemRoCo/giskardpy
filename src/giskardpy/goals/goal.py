@@ -10,6 +10,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import Constraint as Constraint_msg
 from giskardpy import casadi_wrapper as w
 from giskardpy.casadi_wrapper import symbol_expr_float
+from giskardpy.configs.data_types import ControlModes
 from giskardpy.exceptions import ConstraintInitalizationException, GiskardException, UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
@@ -98,7 +99,10 @@ class Goal(ABC):
 
     def traj_time_in_seconds(self) -> w.Expression:
         t = self.god_map.to_expr(identifier.time)
-        return t * self.get_sampling_period_symbol()
+        if self.god_map.get_data(identifier.control_mode) == ControlModes.close_loop:
+            return t
+        else:
+            return t * self.get_sampling_period_symbol()
 
     def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
             -> transformable_message:
@@ -408,7 +412,7 @@ class Goal(ABC):
         if task_expression.shape != (1, 1):
             raise GiskardException(f'expression must have shape (1,1), has {task_expression.shape}')
         name = name if name else ''
-        name = str(self) + name
+        name = str(self) + '/' + name
         if name in self._equality_constraints:
             raise KeyError(f'A constraint with name \'{name}\' already exists. '
                            f'You need to set a name, if you add multiple constraints.')

@@ -3,7 +3,7 @@ import numbers
 from collections import defaultdict
 from copy import copy, deepcopy
 from multiprocessing import RLock
-from typing import Sequence, Union, Any
+from typing import Sequence, Union, Any, List
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
@@ -396,9 +396,9 @@ class GodMap(metaclass=SingletonMeta):
         with self.lock:
             return self.unsafe_get_values(symbols)
 
-    def unsafe_get_values(self, symbols) -> np.ndarray:
+    def unsafe_get_values(self, symbols: List[str]) -> np.ndarray:
         """
-        :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
+        :return: an array which maps all registered expressions to their values or 0 if there is no number entry
         """
         return np.array([self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols], dtype=float)
 

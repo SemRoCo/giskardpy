@@ -37,6 +37,7 @@ cmd_id = ['cmd_id']
 
 result_message = ['result_message']
 tracking_start_time = ['tracking_start_time']
+dt = ['dt']
 
 # config
 tmp_folder = giskard + ['path_to_data_folder']
@@ -47,6 +48,7 @@ action_server_name = execution_config + ['action_server_name']
 control_mode = execution_config + ['control_mode']
 goal_package_paths = execution_config + ['goal_package_paths']
 max_trajectory_length = execution_config + ['max_trajectory_length']
+endless_mode = execution_config + ['endless_mode']
 
 sample_period = execution_config + ['sample_period']
 qp_controller = giskard + ['qp_controller']
@@ -62,7 +64,7 @@ tree_manager = ['behavior_tree']
 tree_tick_rate = giskard + ['behavior_tree', 'tree_tick_rate']
 
 # collision avoidance
-collision_avoidance_configs = collision_avoidance_config + ['_collision_avoidance_configs']
+collision_avoidance_configs = collision_avoidance_config + ['collision_avoidance', '_collision_avoidance_configs']
 collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']

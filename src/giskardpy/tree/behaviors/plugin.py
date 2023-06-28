@@ -1,5 +1,5 @@
 from time import time
-from typing import Dict
+from typing import Dict, Optional
 
 from py_trees import Behaviour, Blackboard
 
@@ -13,7 +13,9 @@ from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_excep
 
 class GiskardBehavior(Behaviour):
 
-    def __init__(self, name):
+    def __init__(self, name: Optional[str] = None):
+        if name is None:
+            name = self.__str__()
         self.god_map = GodMap()
         self.world: WorldTree = self.get_god_map().unsafe_get_data(identifier.world)
         super().__init__(name)

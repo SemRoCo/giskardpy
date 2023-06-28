@@ -547,7 +547,6 @@ class WorldTree(WorldTreeInterface):
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)
-        self.notify_state_change()
 
     def add_urdf(self,
                  urdf: str,
@@ -866,6 +865,34 @@ class WorldTree(WorldTreeInterface):
         child_link.parent_joint_name = joint.name
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
+
+    def fix_tree_structure(self):
+        for joint in self.joints.values():
+            self._raise_if_link_does_not_exist(joint.parent_link_name)
+            self._raise_if_link_does_not_exist(joint.child_link_name)
+            parent_link = self.links[joint.parent_link_name]
+            if joint.name not in parent_link.child_joint_names:
+                parent_link.child_joint_names.append(joint.name)
+            child_link = self.links[joint.child_link_name]
+            if child_link.parent_joint_name is None:
+                child_link.parent_joint_name = joint.name
+            else:
+                assert child_link.parent_joint_name == joint.name
+        self.fix_root_link()
+        for link in self.links.values():
+            if link != self.root_link:
+                self._raise_if_joint_does_not_exist(link.parent_joint_name)
+            for child_joint_name in link.child_joint_names:
+                self._raise_if_joint_does_not_exist(child_joint_name)
+
+    def fix_root_link(self):
+        orphans = []
+        for link_name, link in self.links.items():
+            if link.parent_joint_name is None:
+                orphans.append(link_name)
+        if len(orphans) > 1:
+            raise PhysicsWorldException(f'Found multiple orphaned links: {orphans}.')
+        self._root_link_name = orphans[0]
 
     def fix_tree_structure(self):
         for joint in self.joints.values():
@@ -1237,6 +1264,7 @@ class WorldTree(WorldTreeInterface):
             idx_start: Dict[PrefixName, int]
             fast_collision_fks: CompiledFunction
             fast_all_fks: CompiledFunction
+            str_params: List[str]
 
             def __init__(self, world: WorldTree):
                 self.world = world
@@ -1265,8 +1293,13 @@ class WorldTree(WorldTreeInterface):
                         # collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
                 # self.collision_link_order = list(collision_ids)
-                self.fast_all_fks = all_fks.compile()
-                self.fast_collision_fks = collision_fks.compile()
+                params = set()
+                params.update(all_fks.free_symbols())
+                params.update(collision_fks.free_symbols())
+                params = list(params)
+                self.str_params = [str(v) for v in params]
+                self.fast_all_fks = all_fks.compile(parameters=params)
+                self.fast_collision_fks = collision_fks.compile(parameters=params)
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
 
             @profile
@@ -1578,6 +1611,13 @@ class WorldBranch(WorldTreeInterface):
             link_combinations.difference_update(
                 self.world.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
+
+    def get_unmovable_links(self) -> List[PrefixName]:
+        unmovable_links, _ = self.world.search_branch(link_name=self.root_link_name,
+                                                   stop_at_joint_when=lambda
+                                                       joint_name: joint_name in self.controlled_joints,
+                                                   collect_link_when=self.world.has_link_collisions)
+        return unmovable_links
 
     @property
     def base_pose(self) -> Pose:

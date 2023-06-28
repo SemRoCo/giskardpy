@@ -14,15 +14,14 @@ class CommandPublisher(GiskardBehavior):
     def __init__(self, name, hz=100):
         super().__init__(name)
         self.hz = hz
-        if not hasattr(self, 'joint_names'):
-            raise NotImplementedError('you need to set joint names')
-        self.world.register_controlled_joints(self.joint_names)
+        # if not hasattr(self, 'joint_names'):
+        #     raise NotImplementedError('you need to set joint names')
         self.stamp = None
 
     @profile
     def initialise(self):
         self.sample_period = self.god_map.get_data(identifier.sample_period)
-        self.stamp = rospy.get_rostime()
+        # self.stamp = rospy.get_rostime()
         self.timer = rospy.Timer(period=rospy.Duration(1/self.hz), callback=self.publish_joint_state)
         super().initialise()
 
@@ -31,7 +30,11 @@ class CommandPublisher(GiskardBehavior):
         return Status.RUNNING
 
     def terminate(self, new_status):
-        self.timer.shutdown()
+        try:
+            self.timer.shutdown()
+        except AttributeError as e:
+            # terminate might be called before initialise
+            pass
 
     def publish_joint_state(self, time):
         raise NotImplementedError()

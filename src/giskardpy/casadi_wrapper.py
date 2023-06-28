@@ -1918,18 +1918,18 @@ def sum_column(matrix):
     return Expression(ca.sum2(matrix))
 
 
-def distance_point_to_line_segment(point, line_start, line_end):
+def distance_point_to_line_segment(frame_P_current, frame_P_line_start, frame_P_line_end):
     """
-    :param point: current position of an object (i. e.) gripper tip
-    :param line_start: start of the approached line
-    :param line_end: end of the approached line
+    :param frame_P_current: current position of an object (i. e.) gripper tip
+    :param frame_P_line_start: start of the approached line
+    :param frame_P_line_end: end of the approached line
     :return: distance to line, the nearest point on the line
     """
-    point = Point3(point)
-    line_start = Point3(line_start)
-    line_end = Point3(line_end)
-    line_vec = line_end - line_start
-    pnt_vec = point - line_start
+    frame_P_current = Point3(frame_P_current)
+    frame_P_line_start = Point3(frame_P_line_start)
+    frame_P_line_end = Point3(frame_P_line_end)
+    line_vec = frame_P_line_end - frame_P_line_start
+    pnt_vec = frame_P_current - frame_P_line_start
     line_len = norm(line_vec)
     line_unitvec = line_vec / line_len
     pnt_vec_scaled = pnt_vec / line_len
@@ -1937,7 +1937,7 @@ def distance_point_to_line_segment(point, line_start, line_end):
     t = limit(t, lower_limit=0.0, upper_limit=1.0)
     nearest = line_vec * t
     dist = norm(nearest - pnt_vec)
-    nearest = nearest + line_start
+    nearest = nearest + frame_P_line_start
     return dist, Point3(nearest)
 
 

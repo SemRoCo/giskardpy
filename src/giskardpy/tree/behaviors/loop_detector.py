@@ -23,8 +23,11 @@ class LoopDetector(GiskardBehavior):
     def initialise(self):
         super().initialise()
         self.past_joint_states = set()
-        self.velocity_limits = defaultdict(lambda: 1)
+        self.velocity_limits = defaultdict(lambda: 1.)
         self.velocity_limits.update(self.world.get_all_free_variable_velocity_limits())
+        for name, threshold in self.velocity_limits.items():
+            if threshold < 0.001:
+                self.velocity_limits[name] = 0.001
 
     @record_time
     @profile

@@ -61,37 +61,30 @@ class HSR_Base(Giskard):
         pass
 
 
-class HSR_Mujoco(HSR_Base):
-
+class HSR_Realtime(HSR_Base):
     def configure_execution(self):
-        self.execution.set_control_mode(ControlModes.open_loop)
+        self.execution.set_control_mode(ControlModes.close_loop)
 
     def configure_world(self, robot_description: str = 'robot_description'):
-        super().configure_world('hsrb4s/robot_description')
+        super().configure_world('robot_description')
         self.world.set_default_color(1, 1, 1, 0.7)
 
     def configure_behavior_tree(self):
-        super().configure_behavior_tree()
-        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
                                                               add_to_control_loop=False)
+        # self.behavior_tree.add_debug_marker_publisher()
+        # self.behavior_tree.add_qp_data_publisher(publish_debug=True, add_to_base=True)
 
     def configure_robot_interface(self):
-        super().configure_robot_interface()
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
                                                            tf_parent_frame=self.map_name,
                                                            tf_child_frame=self.odom_link_name)
-        self.robot_interface.sync_joint_state_topic('hsrb4s/joint_states')
-        self.robot_interface.sync_odometry_topic('/hsrb4s/base_footprint', self.drive_joint_name)
-        self.robot_interface.add_follow_joint_trajectory_server(
-            namespace='/hsrb4s/arm_trajectory_controller/follow_joint_trajectory',
-            state_topic='/hsrb4s/arm_trajectory_controller/state',
-            fill_velocity_values=True)
-        self.robot_interface.add_follow_joint_trajectory_server(
-            namespace='/hsrb4s/head_trajectory_controller/follow_joint_trajectory',
-            state_topic='/hsrb4s/head_trajectory_controller/state',
-            fill_velocity_values=True)
-        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel',
-                                                   track_only_velocity=True,
+        self.robot_interface.sync_joint_state_topic('/hsrb/joint_states')
+        self.robot_interface.sync_odometry_topic('/hsrb/odom', self.drive_joint_name)
+
+        self.robot_interface.add_joint_velocity_group_controller(namespace='/hsrb/realtime_body_controller_real')
+
+        self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/hsrb/command_velocity',
                                                    joint_name=self.drive_joint_name)
 
 
@@ -116,3 +109,52 @@ class HSR_StandAlone(HSR_Base):
             'wrist_roll_joint',
             self.drive_joint_name,
         ])
+
+
+class HSR_Gazebo(HSR_Base):
+    def __init__(self):
+        self.add_robot_from_parameter_server(joint_state_topics=['/hsrb/joint_states'])
+        super().__init__()
+        self.add_sync_tf_frame('map', 'odom')
+        self.add_omni_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  # odom_x_name='odom_x',
+                                  # odom_y_name='odom_y',
+                                  # odom_yaw_name='odom_t',
+                                  odometry_topic='/hsrb/odom',
+                                  name='brumbrum')
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/head_trajectory_controller/follow_joint_trajectory',
+                                                state_topic='/hsrb/head_trajectory_controller/state',
+                                                fill_velocity_values=True)
+        # self.add_follow_joint_trajectory_server(namespace='/hsrb/omni_base_controller/follow_joint_trajectory',
+        #                                         state_topic='/hsrb/omni_base_controller/state',
+        #                                         fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/arm_trajectory_controller/follow_joint_trajectory',
+                                                state_topic='/hsrb/arm_trajectory_controller/state',
+                                                fill_velocity_values=True)
+        self.overwrite_external_collision_avoidance(joint_name='brumbrum',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.1,
+                                                    hard_threshold=0.03)
+
+
+class HSR_GazeboRealtime(HSR_Base):
+    def __init__(self):
+        self.add_robot_from_parameter_server(joint_state_topics=['/hsrb/joint_states'])
+        super().__init__()
+        self.configure_PublishDebugExpressions(publish_xdot=True)
+        self.set_control_mode(ControlModes.close_loop)
+        self.add_sync_tf_frame('map', 'odom')
+        self.add_omni_drive_joint(parent_link_name='odom',
+                                  child_link_name='base_footprint',
+                                  odometry_topic='/hsrb/odom',
+                                  name='brumbrum')
+        self.add_joint_group_position_controller(namespace='hsrb/realtime_arm_controller')
+        # self.add_joint_velocity_controller(namespaces=[])
+        # self.add_joint_velocity_controller(namespaces=['hsrb/realtime_base_controller1',
+        #                                                'hsrb/realtime_base_controller2'])
+        self.add_base_cmd_velocity('/hsrb/command_velocity')
+        self.overwrite_external_collision_avoidance(joint_name='brumbrum',
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.1,
+                                                    hard_threshold=0.03)

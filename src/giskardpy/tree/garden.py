@@ -37,12 +37,17 @@ from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
+from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
+from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
+from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
+from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
+from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -54,12 +59,14 @@ from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
+from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendCmdVel
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
+from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
+from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.tree.behaviors.tf_publisher import TFPublisher
 from giskardpy.tree.behaviors.time import TimePlugin
@@ -280,6 +287,18 @@ class TreeManager(ABC):
         ...
 
     @abc.abstractmethod
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        ...
+
+    @abc.abstractmethod
+    def add_joint_velocity_group_controllers(self, namespaces: List[str]):
+        ...
+
+    @abc.abstractmethod
+    def add_cmd_vel_publisher(self, joint_name: PrefixName):
+        ...
+
+    @abc.abstractmethod
     def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
                                     joint_name: PrefixName = None):
         ...
@@ -356,6 +375,8 @@ class TreeManager(ABC):
         #         child_node = ManagerNode(node=children[child_name], parent=manager_node, position=idx)
         #         self.tree_nodes[child_name] = child_node
         #         manager_node.enabled_children.add(child_node)
+        if node.name in self.tree_nodes:
+            raise KeyError(f'node named {node.name} already exists')
         self.tree_nodes[node.name] = manager_node
         for idx, child in enumerate(node.children):
             self.__init_map(child, manager_node, idx)
@@ -633,13 +654,13 @@ class StandAlone(TreeManager):
     def grow_Synchronize(self):
         sync = Sequence(self.sync_name)
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames', []))
+        sync.add_child(SyncTfFrames('sync tf frames1'))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         return sync
 
     def grow_process_goal(self):
         process_move_goal = failure_is_success(Selector)('Process goal')
-        process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback',
+        process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback2',
                                                                         self.action_server_name,
                                                                         MoveFeedback.PLANNING))
         process_move_goal.add_child(self.grow_process_move_commands())
@@ -651,7 +672,7 @@ class StandAlone(TreeManager):
         process_move_cmd = success_is_failure(Sequence)('Process move commands')
         process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
         process_move_cmd.add_child(self.grow_planning())
-        process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
+        process_move_cmd.add_child(SetErrorCode('set error code1', 'Planning'))
         return process_move_cmd
 
     def grow_planning(self):
@@ -667,8 +688,8 @@ class StandAlone(TreeManager):
 
     def grow_planning2(self):
         planning_2 = failure_is_success(Selector)(self.planning2_name)
-        planning_2.add_child(GoalCanceled('goal canceled', self.action_server_name))
-        planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
+        planning_2.add_child(GoalCanceled('goal canceled2', self.action_server_name))
+        planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback1',
                                                                  self.action_server_name,
                                                                  MoveFeedback.PLANNING))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
@@ -688,19 +709,19 @@ class StandAlone(TreeManager):
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(KinSimPlugin('kin sim'))
-        planning_4.add_child(LogTrajPlugin('log'))
+        planning_4.add_child(LogTrajPlugin('log closed loop control'))
         # planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin())
+        planning_4.add_child(TimePlugin('increase time closed loop'))
         planning_4.add_child(MaxTrajectoryLength('traj length check'))
         return planning_4
 
     def grow_plan_postprocessing(self):
         plan_postprocessing = Sequence(self.plan_postprocessing_name)
-        plan_postprocessing.add_child(running_is_success(TimePlugin)())
-        plan_postprocessing.add_child(SetZeroVelocity())
-        plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
+        plan_postprocessing.add_child(running_is_success(TimePlugin)('increase time plan post processing'))
+        plan_postprocessing.add_child(SetZeroVelocity('set zero vel 1'))
+        plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log post processing'))
         return plan_postprocessing
 
     def configure_visualization_marker(self,
@@ -725,9 +746,23 @@ class StandAlone(TreeManager):
                 self.disable_node(node.name)
             node.length = length
 
+    def add_joint_velocity_group_controllers(self, namespaces: List[str]):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
     def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
                                             fill_velocity_values: bool):
         # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_cmd_vel_publisher(self, joint_name: PrefixName):
         current_function_name = inspect.currentframe().f_code.co_name
         NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
 
@@ -781,6 +816,7 @@ class StandAlone(TreeManager):
                               publish_ubA: bool = False, publish_bE: bool = False, publish_Ax: bool = False,
                               publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
                               publish_g: bool = False, publish_debug: bool = False, *args, **kwargs):
+        self.add_evaluate_debug_expressions()
         node = PublishDebugExpressions('qp data publisher',
                                        publish_lb=publish_lb,
                                        publish_ub=publish_ub,
@@ -796,13 +832,15 @@ class StandAlone(TreeManager):
         self.insert_node_behind_node_of_type(self.closed_loop_control_name, EvaluateDebugExpressions, node)
 
     def add_debug_marker_publisher(self):
+        self.add_evaluate_debug_expressions()
         node = DebugMarkerPublisher('debug marker_publisher')
         self.insert_node_behind_every_node_of_type(EvaluateDebugExpressions, node)
 
     def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
-        node = TFPublisher('publish tf', mode=mode, tf_topic =tf_topic, include_prefix=include_prefix)
+        node = TFPublisher('publish tf', mode=mode, tf_topic=tf_topic, include_prefix=include_prefix)
         self.insert_node(node, self.sync_name)
+
 
 class OpenLoop(StandAlone):
     move_robots_name = 'move robots'
@@ -826,7 +864,8 @@ class OpenLoop(StandAlone):
         self.insert_node(real_time_tracking, self.move_robots_name)
         sync_tf_nodes = self.get_nodes_of_type(SyncTfFrames)
         for node in sync_tf_nodes:
-            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map), self.base_closed_loop_control_name)
+            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map),
+                             self.base_closed_loop_control_name)
         odom_nodes = self.get_nodes_of_type(SyncOdometry)
         for node in odom_nodes:
             new_node = success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,
@@ -868,7 +907,7 @@ class OpenLoop(StandAlone):
     def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames'))
+        sync.add_child(SyncTfFrames('sync tf frames3'))
         # hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
         # for kwargs in hardware_config.joint_state_topics_kwargs:
         #     sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
@@ -885,7 +924,7 @@ class OpenLoop(StandAlone):
         execution.add_child(IF('execute?', identifier.execute))
         execution.add_child(SetTrackingStartTime('start start time'))
         execution.add_child(self.grow_monitor_execution())
-        execution.add_child(SetZeroVelocity())
+        execution.add_child(SetZeroVelocity('set zero vel 2'))
         return execution
 
     def grow_monitor_execution(self):
@@ -896,13 +935,13 @@ class OpenLoop(StandAlone):
                                                                         MoveFeedback.EXECUTION))
         monitor_execution.add_child(self.grow_execution_cancelled())
         monitor_execution.add_child(self.grow_move_robots())
-        monitor_execution.add_child(SetErrorCode('set error code', 'Execution'))
+        monitor_execution.add_child(SetErrorCode('set error code2', 'Execution'))
         return monitor_execution
 
     def grow_execution_cancelled(self):
         execute_canceled = Sequence('execute canceled')
-        execute_canceled.add_child(GoalCanceled('goal canceled', self.action_server_name))
-        execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
+        execute_canceled.add_child(GoalCanceled('goal canceled1', self.action_server_name))
+        execute_canceled.add_child(SetErrorCode('set error code3', 'Execution'))
         return execute_canceled
 
     def grow_move_robots(self):
@@ -935,54 +974,58 @@ class OpenLoop(StandAlone):
 
 class ClosedLoop(OpenLoop):
 
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        behavior = JointVelController(namespaces=namespaces)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def add_joint_velocity_group_controllers(self, namespace: str):
+        behavior = JointGroupVelController(namespace)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        behavior = SendCmdVel(cmd_vel_topic, joint_name=joint_name)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def grow_planning3(self):
+        planning_3 = Sequence('planning III')
+        # planning_3.add_child(PrintText('asdf'))
+        planning_3.add_child(SetTrackingStartTime('start time', offset=0.0))
+        planning_3.add_child(self.grow_closed_loop_control())
+        # planning_3.add_child(self.grow_plan_postprocessing())
+        return planning_3
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
-        root.add_child(CleanUp('cleanup'))
+        root.add_child(CleanUpPlanning('CleanUpPlanning'))
+        root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
 
-    # def grow_sync_branch(self):
-    #     sync = Sequence('Synchronize')
-    #     sync.add_child(WorldUpdater('update world'))
-    #     sync.add_child(running_is_success(SyncConfiguration)('update robot configuration', RobotName))
-    #     sync.add_child(SyncLocalization('update robot localization', RobotName))
-    #     sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
-    #     sync.add_child(CollisionSceneUpdater('update collision scene'))
-    #     sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
-    #     return sync
+    def sync_joint_state_topic(self, group_name: str, topic_name: str):
+        super().sync_joint_state_topic(group_name, topic_name)
+        behavior = success_is_running(SyncConfiguration2)(group_name=group_name, joint_state_topic=topic_name)
+        self.insert_node(behavior, self.closed_loop_control_name, 0)
 
-    def grow_planning3(self):
-        planning_3 = Sequence('planning III', sleep=0)
-        planning_3.add_child(self.grow_closed_loop_control())
-        return planning_3
+    def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
+        super().sync_odometry_topic(topic_name, joint_name)
+        behavior = success_is_running(SyncOdometryNoLock)(topic_name, joint_name)
+        self.insert_node(behavior, self.closed_loop_control_name, 0)
 
     def grow_closed_loop_control(self):
-        planning_4 = AsyncBehavior('planning IIII')
-        action_servers = self.god_map.get_data(identifier.robot_interface)
-        behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
-        for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-            C = behaviors[params['plugin']]
-            del params['plugin']
-            planning_4.add_child(C(execution_action_server_name, **params))
-        # planning_4.add_child(SyncConfiguration2('update robot configuration',
-        #                                         self.god_map.unsafe_get_data(identifier.robot_group_name)))
-        planning_4.add_child(LogTrajPlugin('log'))
-        if self.god_map.get_data(identifier.collision_checker) is not None:
+        planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
+        planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
+        planning_4.add_child(success_is_running(NotifyStateChange)())
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
-        planning_4.add_child(KinSimPlugin('kin sim'))
-
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
-        # planning_4.add_plugin(WiggleCancel('wiggle'))
-        # planning_4.add_plugin(LoopDetector('loop detector'))
-        planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin('time'))
-        if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
-            kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-            planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
+        planning_4.add_child(RosTime())
+        planning_4.add_child(RealKinSimPlugin('kin sim'))
+        # planning_4.add_child(LoopDetector('loop detector'))
+        planning_4.add_child(GoalReached('goal reached', real_time=True))
+        planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
         return planning_4
 
 # def sanity_check(god_map):

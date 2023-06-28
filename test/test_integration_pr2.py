@@ -25,7 +25,7 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.configs.pr2 import PR2_Mujoco, PR2_StandAlone
+from giskardpy.configs.pr2 import PR2_Mujoco, PR2_StandAlone, PR2_MujocoRealTime
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.utils import launch_launchfile, suppress_stdout, suppress_stderr
@@ -229,7 +229,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('pr2/reset', Trigger)
         self.odom_root = 'odom_combined'
-        super().__init__(PR2_Mujoco)
+        super().__init__(PR2_MujocoRealTime)
 
     def reset_base(self):
         p = PoseStamped()

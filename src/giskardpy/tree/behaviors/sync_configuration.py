@@ -57,7 +57,7 @@ class SyncConfiguration(GiskardBehavior):
         except Empty:
             pass
 
-        self.get_world().state.update(self.mjs)
+        self.world.state.update(self.mjs)
         self.world.notify_state_change()
         return Status.SUCCESS
 

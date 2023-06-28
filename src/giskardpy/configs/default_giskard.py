@@ -6,9 +6,13 @@ from typing import Dict, Optional, List, Union, DefaultDict
 
 import numpy as np
 import rospy
+import rosservice
+from controller_manager_msgs.srv import ListControllers, ListControllersRequest
 from numpy.typing import NDArray
 from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
+from std_srvs.srv import Trigger
+from tf2_py import LookupException
 
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, ControlModes, SupportedQPSolver, \
@@ -90,6 +94,7 @@ class ExecutionConfig(Config):
         self.added_slack = 100
         self.sample_period = 0.05
         self.weight_factor = 100
+        self.endless_mode = False
         self.default_weights = {d: defaultdict(float) for d in Derivatives}
 
     def set_prediction_horizon(self, new_prediction_horizon: int):
@@ -258,6 +263,24 @@ class WorldConfig(Config):
         link = Link(link_name)
         self._world._add_link(link)
 
+    def add_joint_group_position_controller(self, namespace: str, group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self.hardware_config.joint_group_position_controllers_kwargs.append({'namespace': namespace,
+                                                                             'group_name': group_name})
+
+    def add_joint_position_controller(self, namespaces: List[str], group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self.hardware_config.joint_position_controllers_kwargs.append({'namespaces': namespaces,
+                                                                       'group_name': group_name})
+
+    def add_joint_velocity_controller(self, namespaces: List[str], group_name: Optional[str] = None):
+        if group_name is None:
+            group_name = self.get_default_group_name()
+        self.hardware_config.joint_velocity_controllers_kwargs.append({'namespaces': namespaces,
+                                                                       'group_name': group_name})
+
     def add_omni_drive_joint(self,
                              name: str,
                              parent_link_name: Union[str, PrefixName],
@@ -358,6 +381,12 @@ class RobotInterfaceConfig(Config):
                                                                 group_name=group_name,
                                                                 fill_velocity_values=fill_velocity_values)
 
+
+    def add_joint_velocity_controller(self, namespaces: List[str]):
+        self._behavior_tree.add_joint_velocity_controllers(namespaces)
+
+    def add_joint_velocity_group_controller(self, namespace: str):
+        self._behavior_tree.add_joint_velocity_group_controllers(namespace)
 
 class BehaviorTreeConfig(Config):
     tree_tick_rate: float = 0.05

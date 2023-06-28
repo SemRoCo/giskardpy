@@ -42,7 +42,7 @@ class JointGroupVelController(GiskardBehavior):
         msg = Float64MultiArray()
         for i, joint_name in enumerate(self.joint_names):
             msg.data.append(self.world.state[joint_name].velocity)
-            self.cmd_pub.publish(msg)
+        self.cmd_pub.publish(msg)
         return Status.RUNNING
 
     def terminate(self, new_status):

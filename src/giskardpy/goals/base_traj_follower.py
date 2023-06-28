@@ -163,18 +163,22 @@ class CarryMyBullshit(Goal):
                  root_link: Optional[str] = None,
                  tip_link: str = 'base_footprint',
                  camera_link: str = 'head_rgbd_sensor_link',
+                 target_recovery_joint: str = 'head_pan_joint',
                  last_distance_threshold: float = 1,
                  laser_distance_threshold: float = 0.3,
                  laser_range: float = np.pi / 8,
-                 max_rotation_velocity: float = 0.38,
-                 max_translation_velocity: float = 0.5,
+                 max_rotation_velocity: float = 0.5,
+                 max_translation_velocity: float = 0.38,
                  footprint_radius: float = 0.3,
                  min_height_for_camera_target: float = 1,
                  max_height_for_camera_target: float = 2,
                  target_age_threshold: float = 2,
-                 target_age_exception_threshold: float = 5):
+                 target_age_exception_threshold: float = 20,
+                 target_recovery_looking_speed: float = 0.5):
         super().__init__()
         self.last_target_age = 0
+        self.target_recovery_looking_speed = target_recovery_looking_speed
+        self.target_recovery_joint = self.world.search_for_joint_name(target_recovery_joint)
         self.target_age_threshold = target_age_threshold
         self.target_age_exception_threshold = target_age_exception_threshold
         self.traj_data = [np.array([0, 0])]  # todo get current pose
@@ -372,7 +376,19 @@ class CarryMyBullshit(Goal):
                                          weight=look_at_target_weight,
                                          name='camera')
 
-        
+        # %% lost target recovery
+        time = self.traj_time_in_seconds()
+        joint_position = self.get_joint_position_symbol(self.target_recovery_joint)
+        lower_limit, upper_limit = self.world.get_joint_position_limits(self.target_recovery_joint)
+        joint_range = upper_limit - lower_limit
+        time_for_full_range = joint_range / self.target_recovery_looking_speed
+        target_search_joint_position = w.cos(time * np.pi / time_for_full_range) * (joint_range / 2)
+        look_at_target_weight = w.if_else(target_lost, self.weight, 0)
+        self.add_position_constraint(expr_current=joint_position,
+                                     expr_goal=target_search_joint_position,
+                                     reference_velocity=self.target_recovery_looking_speed,
+                                     weight=look_at_target_weight)
+
         # %% follow next point
         root_V_camera_axis.vis_frame = self.camera_link
         root_V_camera_goal_axis.vis_frame = self.camera_link

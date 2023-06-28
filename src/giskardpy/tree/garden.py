@@ -962,6 +962,7 @@ class OpenLoop(StandAlone):
                               publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
                               publish_g: bool = False, publish_debug: bool = False, add_to_base: bool = False,
                               *args, **kwargs):
+        self.add_evaluate_debug_expressions()
         node = PublishDebugExpressions('qp data publisher',
                                        publish_lb=publish_lb,
                                        publish_ub=publish_ub,
@@ -974,7 +975,7 @@ class OpenLoop(StandAlone):
                                        publish_weights=publish_weights,
                                        publish_g=publish_g,
                                        publish_debug=publish_debug)
-        if add_to_base:
+        if not add_to_base:
             self.insert_node_behind_node_of_type(self.closed_loop_control_name, EvaluateDebugExpressions, node)
         else:
             self.insert_node_behind_node_of_type(self.base_closed_loop_control_name, EvaluateDebugExpressions, node)

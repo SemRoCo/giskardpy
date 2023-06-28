@@ -173,8 +173,8 @@ class CarryMyBullshit(Goal):
                  min_height_for_camera_target: float = 1,
                  max_height_for_camera_target: float = 2,
                  target_age_threshold: float = 2,
-                 target_age_exception_threshold: float = 20,
-                 target_recovery_looking_speed: float = 0.5):
+                 target_age_exception_threshold: float = 60,
+                 target_recovery_looking_speed: float = 1):
         super().__init__()
         self.last_target_age = 0
         self.target_recovery_looking_speed = target_recovery_looking_speed
@@ -292,10 +292,8 @@ class CarryMyBullshit(Goal):
             last_point = self.traj_data[-1]
             error_vector = current_point - last_point
             distance = np.linalg.norm(error_vector)
-            if self.interpolation_step_size * 2 > distance > self.interpolation_step_size:
-                self.traj_data.append(current_point)
-            elif distance < self.interpolation_step_size:
-                self.traj_data[-1] = current_point
+            if distance < self.interpolation_step_size * 2:
+                self.traj_data[-1] = 0.5 * self.traj_data[-1] + 0.5 * current_point
             else:
                 error_vector /= distance
                 ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
@@ -387,7 +385,8 @@ class CarryMyBullshit(Goal):
         self.add_position_constraint(expr_current=joint_position,
                                      expr_goal=target_search_joint_position,
                                      reference_velocity=self.target_recovery_looking_speed,
-                                     weight=look_at_target_weight)
+                                     weight=look_at_target_weight,
+                                     name='lost_target_recovery')
 
         # %% follow next point
         root_V_camera_axis.vis_frame = self.camera_link

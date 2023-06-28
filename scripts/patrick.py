@@ -175,9 +175,12 @@ class IMServer(object):
             self.target.header.frame_id = 'map'
             self.target.point.x = 1
             self.target.point.z = 1
+            self.stop_after = 5
             self.timer = Timer(rospy.Duration(0.1), self.timer_cb)
 
         def timer_cb(self, timer_event: TimerEvent):
+            if timer_event.current_real.to_sec() - self.target.header.stamp.to_sec() > self.stop_after:
+                return
             variance = 0.1
             p = deepcopy(self.target)
             p.header.stamp = timer_event.current_real
@@ -191,6 +194,7 @@ class IMServer(object):
                 logging.loginfo('got interactive goal update')
                 p = PointStamped()
                 p.header.frame_id = feedback.header.frame_id
+                p.header.stamp = rospy.get_rostime()
                 p.point = feedback.pose.position
                 self.target = p
                 self.parent.point = p

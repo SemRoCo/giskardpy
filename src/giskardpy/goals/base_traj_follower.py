@@ -181,9 +181,6 @@ class CarryMyBullshit(Goal):
         self.target_recovery_joint = self.world.search_for_joint_name(target_recovery_joint)
         self.target_age_threshold = target_age_threshold
         self.target_age_exception_threshold = target_age_exception_threshold
-        self.traj_data = [self.get_current_point()]
-        self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
-        self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         if root_link is None:
             self.root = self.world.root_link_name
@@ -216,6 +213,9 @@ class CarryMyBullshit(Goal):
         # self.start_time = rospy.get_rostime().to_sec()
         # self.start_time = None
         # self.traj_histogram_data = []  # todo get current pose
+        self.traj_data = [self.get_current_point()]
+        self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
+        self.laser_sub = rospy.Subscriber(laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         rospy.sleep(0.5)
         while self.trajectory.shape[0] < 5 and not rospy.is_shutdown():
             print(f'waiting for at least 5 traj points, current length {len(self.trajectory)}')

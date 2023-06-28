@@ -12,7 +12,7 @@ from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.exceptions import GiskardException
+from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
@@ -169,17 +169,18 @@ class CarryMyBullshit(Goal):
                  laser_distance_threshold: float = 0.6,
                  laser_distance_threshold_width: float = 0.4,
                  base_orientation_threshold: float = np.pi / 8,
-                 laser_range: float = np.pi / 8,
+                 wait_for_patrick_timeout: float = 30,
                  max_rotation_velocity: float = 0.5,
-                 max_rotation_velocity_head: float = 3,
+                 max_rotation_velocity_head: float = 1,
                  max_translation_velocity: float = 0.38,
-                 footprint_radius: float = 0.5,
+                 footprint_radius: float = 0.4,
                  height_for_camera_target: float = 1,
                  target_age_threshold: float = 2,
                  target_age_exception_threshold: float = 5,
                  target_recovery_looking_speed: float = 1,
                  drive_back: bool = False):
         super().__init__()
+        self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         self.god_map.set_data(identifier.endless_mode, True)
         self.god_map.set_data(identifier.max_trajectory_length, 1000)
         self.laser_topic_name = laser_topic_name
@@ -191,7 +192,6 @@ class CarryMyBullshit(Goal):
         self.target_recovery_joint = self.world.search_for_joint_name(target_recovery_joint)
         self.target_age_threshold = target_age_threshold
         self.target_age_exception_threshold = target_age_exception_threshold
-        self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         if root_link is None:
             self.root = self.world.root_link_name
         else:
@@ -215,7 +215,6 @@ class CarryMyBullshit(Goal):
         self.interpolation_step_size = 0.05
         self.max_temp_distance = int(self.radius / self.interpolation_step_size)
         self.closest_laser_reading = 100
-        self.laser_range = laser_range
         self.human_point = PointStamped()
         self.height_for_camera_target = height_for_camera_target
         self.max_traj_length = 1
@@ -225,16 +224,22 @@ class CarryMyBullshit(Goal):
         self.traj_data = [self.get_current_point()]
         self.init_laser_stuff(width=laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
         self.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
+        self.publish_tracking_radius()
         if not self.drive_back:
             self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
             rospy.sleep(0.5)
-            while CarryMyBullshit.trajectory.shape[0] < 5 and not rospy.is_shutdown():
+            for i in range(wait_for_patrick_timeout):
+                if CarryMyBullshit.trajectory.shape[0] > 5:
+                    break
                 print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
-                rospy.sleep(0.5)
+                rospy.sleep(1)
+            else:
+                raise ConstraintInitalizationException(f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
+
         else:
             CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
             self.publish_trajectory()
-        self.publish_tracking_radius()
+
 
     def init_laser_stuff(self, width: float = 0.3, circle_radius: float = 0.4):
         laser_scan: LaserScan = rospy.wait_for_message(self.laser_topic_name, LaserScan, rospy.Duration(5))
@@ -267,8 +272,8 @@ class CarryMyBullshit(Goal):
         violations = data - self.thresholds[:, 2]
         min_reading = min(violations)
         self.closest_laser_reading = min_reading
-        if min_reading < 0:
-            print(f'min violation {min_reading}')
+        # if min_reading < 0:
+        #     print(f'min violation {min_reading}')
         # print(f'distance {self.closest_laser_reading}')
 
     def get_current_point(self) -> np.ndarray:

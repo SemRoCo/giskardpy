@@ -171,7 +171,7 @@ class CarryMyBullshit(Goal):
                  max_rotation_velocity: float = 0.5,
                  max_rotation_velocity_head: float = 3,
                  max_translation_velocity: float = 0.38,
-                 footprint_radius: float = 0.3,
+                 footprint_radius: float = 0.5,
                  height_for_camera_target: float = 1,
                  target_age_threshold: float = 2,
                  target_age_exception_threshold: float = 5,
@@ -239,7 +239,7 @@ class CarryMyBullshit(Goal):
         max_id = int(center_id + range_)
         segment = scan.ranges[min_id:max_id]
         self.closest_laser_reading = min(segment)
-        print(f'distance {self.closest_laser_reading}')
+        # print(f'distance {self.closest_laser_reading}')
 
     def get_current_point(self) -> np.ndarray:
         root_T_tip = self.world.compute_fk_np(self.root, self.tip)

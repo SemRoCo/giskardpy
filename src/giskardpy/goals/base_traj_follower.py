@@ -182,6 +182,7 @@ class CarryMyBullshit(Goal):
                  target_age_threshold: float = 2,
                  target_age_exception_threshold: float = 5,
                  target_recovery_looking_speed: float = 1,
+                 clear_path: bool = False,
                  drive_back: bool = False):
         super().__init__()
         self.end_of_traj_reached = False
@@ -226,9 +227,9 @@ class CarryMyBullshit(Goal):
         self.max_traj_length = 1
         self.drive_back = drive_back
         self.init_laser_stuff(width=laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
-        if not self.drive_back and CarryMyBullshit.trajectory is None:
+        if clear_path or (not self.drive_back and CarryMyBullshit.trajectory is None):
             CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
-        if CarryMyBullshit.traj_data is None:
+        if clear_path or CarryMyBullshit.traj_data is None:
             CarryMyBullshit.traj_data = [self.get_current_point()]
         if CarryMyBullshit.laser_sub is None:
             CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
@@ -533,12 +534,14 @@ class CarryMyBullshit(Goal):
         # self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
 
         # position_weight = self.weight
+        laser_violated = w.less_equal(laser_center_reading, 0)
         if self.drive_back:
-            position_weight = w.if_less(w.abs(map_angle_error), self.base_orientation_threshold,
-                                        self.weight,
-                                        0)
+            position_weight = w.if_else(w.logic_or(laser_violated,
+                                                   w.greater(w.abs(map_angle_error), self.base_orientation_threshold)),
+                                        0,
+                                        self.weight)
         else:
-            position_weight = w.if_else(w.logic_or(w.less_equal(laser_center_reading, 0),
+            position_weight = w.if_else(w.logic_or(laser_violated,
                                                    w.logic_and(
                                                        w.logic_not(target_lost),
                                                        w.less_equal(distance_to_human, self.distance_to_target))),

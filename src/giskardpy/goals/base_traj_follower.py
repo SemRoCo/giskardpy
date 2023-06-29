@@ -161,6 +161,7 @@ class CarryMyBullshit(Goal):
     pub: rospy.Publisher = None
     laser_sub: rospy.Subscriber = None
     target_sub: rospy.Subscriber = None
+    traj_flipped: bool = False
 
     def __init__(self,
                  patrick_topic_name: str = '/robokudo2/human_position',
@@ -168,7 +169,6 @@ class CarryMyBullshit(Goal):
                  odom_joint_name: str = 'brumbrum',
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',
-                 target_recovery_joint: str = 'head_pan_joint',
                  distance_to_target_stop_threshold: float = 1,
                  laser_distance_threshold: float = 0.6,
                  laser_distance_threshold_width: float = 0.4,
@@ -177,17 +177,18 @@ class CarryMyBullshit(Goal):
                  max_rotation_velocity: float = 0.5,
                  max_rotation_velocity_head: float = 1,
                  max_translation_velocity: float = 0.38,
-                 footprint_radius: float = 0.4,
+                 traj_tracking_radius: float = 0.4,
                  height_for_camera_target: float = 1,
                  target_age_threshold: float = 2,
                  target_age_exception_threshold: float = 5,
-                 target_recovery_looking_speed: float = 1,
                  clear_path: bool = False,
-                 drive_back: bool = False):
+                 drive_back: bool = False,
+                 enable_laser_avoidance: bool = True):
         super().__init__()
         if drive_back:
             logging.loginfo('driving back')
         self.end_of_traj_reached = False
+        self.enable_laser_avoidance = enable_laser_avoidance
         if CarryMyBullshit.pub is None:
             CarryMyBullshit.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         self.god_map.set_data(identifier.endless_mode, True)
@@ -198,8 +199,6 @@ class CarryMyBullshit(Goal):
         self.base_orientation_threshold = base_orientation_threshold
         self.odom_joint_name = self.world.search_for_joint_name(odom_joint_name)
         self.odom_joint: OmniDrive = self.world.get_joint(self.odom_joint_name)
-        self.target_recovery_looking_speed = target_recovery_looking_speed
-        self.target_recovery_joint = self.world.search_for_joint_name(target_recovery_joint)
         self.target_age_threshold = target_age_threshold
         self.target_age_exception_threshold = target_age_exception_threshold
         if root_link is None:
@@ -219,15 +218,12 @@ class CarryMyBullshit(Goal):
         self.weight = WEIGHT_ABOVE_CA
         self.distance_to_target = distance_to_target_stop_threshold
         self.laser_distance_threshold = laser_distance_threshold
-        self.radius = footprint_radius
-        # self.step_dt = 0.01
-        # self.max_temp_distance = max_temporal_distance_between_closest_and_next
+        self.traj_tracking_radius = traj_tracking_radius
         self.interpolation_step_size = 0.05
-        self.max_temp_distance = int(self.radius / self.interpolation_step_size)
+        self.max_temp_distance = int(self.traj_tracking_radius / self.interpolation_step_size)
         self.closest_laser_reading = 100
         self.human_point = PointStamped()
         self.height_for_camera_target = height_for_camera_target
-        self.max_traj_length = 1
         self.drive_back = drive_back
         self.init_laser_stuff(width=laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
         if clear_path or (not self.drive_back and CarryMyBullshit.trajectory is None):
@@ -235,7 +231,8 @@ class CarryMyBullshit(Goal):
         if clear_path or CarryMyBullshit.traj_data is None:
             CarryMyBullshit.traj_data = [self.get_current_point()]
         if clear_path:
-            logging.loginfo('clear path')
+            CarryMyBullshit.traj_flipped = False
+            logging.loginfo('cleared old path')
         if CarryMyBullshit.laser_sub is None:
             CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.publish_tracking_radius()
@@ -258,7 +255,9 @@ class CarryMyBullshit(Goal):
             logging.loginfo('received target point.')
 
         else:
-            CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
+            if not CarryMyBullshit.traj_flipped:
+                CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
+                CarryMyBullshit.traj_flipped = True
             self.publish_trajectory()
 
     def clean_up(self):
@@ -323,7 +322,7 @@ class CarryMyBullshit(Goal):
         error = traj - current_point
         distances = np.linalg.norm(error, axis=1)
         # cut off old points
-        in_radius = np.where(distances < self.radius)[0]
+        in_radius = np.where(distances < self.traj_tracking_radius)[0]
         if len(in_radius) > 0:
             next_idx = max(in_radius)
             offset = max(0, next_idx - self.max_temp_distance)
@@ -404,8 +403,8 @@ class CarryMyBullshit(Goal):
         m_line.id = 1332
         m_line.type = m_line.CYLINDER
         m_line.header.frame_id = str(self.tip.short_name)
-        m_line.scale.x = self.radius * 2
-        m_line.scale.y = self.radius * 2
+        m_line.scale.x = self.traj_tracking_radius * 2
+        m_line.scale.y = self.traj_tracking_radius * 2
         m_line.scale.z = 0.01
         m_line.color.a = 0.5
         m_line.color.b = 1
@@ -574,9 +573,9 @@ class CarryMyBullshit(Goal):
 
         # %% keep the closest point in footprint radius
         if self.drive_back:
-            buffer = self.radius
+            buffer = self.traj_tracking_radius
         else:
-            buffer = self.radius
+            buffer = self.traj_tracking_radius
         distance_to_closest_point = w.norm(root_P_closest_point - root_P_tip)
         # self.add_debug_expr('position_weight2', position_weight2)
         self.add_inequality_constraint(task_expression=distance_to_closest_point,
@@ -587,21 +586,22 @@ class CarryMyBullshit(Goal):
                                        name='in_circle')
 
         # %% laser avoidance
-        bf_V_laser_avoidance_direction = w.Vector3([0, laser_avoidance_direction, 0])
-        map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
-        map_V_laser_avoidance_direction.vis_frame = self.tip
-        self.add_debug_expr('base_V_laser_avoidance_direction', map_V_laser_avoidance_direction)
-        odom_y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.position)
+        if self.enable_laser_avoidance:
+            bf_V_laser_avoidance_direction = w.Vector3([0, laser_avoidance_direction, 0])
+            map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
+            map_V_laser_avoidance_direction.vis_frame = self.tip
+            self.add_debug_expr('base_V_laser_avoidance_direction', map_V_laser_avoidance_direction)
+            odom_y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.position)
 
-        laser_avoidance_weight = w.if_else(w.less(distance_to_closest_point, self.radius),
-                                           self.weight,
-                                           0)
+            laser_avoidance_weight = w.if_else(w.less(distance_to_closest_point, self.traj_tracking_radius),
+                                               self.weight,
+                                               0)
 
-        self.add_equality_constraint(reference_velocity=self.max_translation_velocity,
-                                     equality_bound=laser_avoidance_direction,
-                                     weight=laser_avoidance_weight,
-                                     task_expression=odom_y_vel,
-                                     name='laser avoidance')
+            self.add_equality_constraint(reference_velocity=self.max_translation_velocity,
+                                         equality_bound=laser_avoidance_direction,
+                                         weight=laser_avoidance_weight,
+                                         task_expression=odom_y_vel,
+                                         name='laser avoidance')
 
     def __str__(self) -> str:
         return super().__str__()

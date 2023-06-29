@@ -155,8 +155,12 @@ class BaseTrajFollower(Goal):
 
 class CarryMyBullshit(Goal):
     trajectory: np.ndarray = np.array([])
-    thresholds: np.ndarray
-    human_point: PointStamped
+    traj_data: List[np.ndarray] = None
+    thresholds: np.ndarray = None
+    human_point: PointStamped = None
+    pub: rospy.Publisher = None
+    laser_sub: rospy.Subscriber = None
+    target_sub: rospy.Subscriber = None
 
     def __init__(self,
                  patrick_topic_name: str = '/robokudo2/human_position',
@@ -168,8 +172,8 @@ class CarryMyBullshit(Goal):
                  last_distance_threshold: float = 1,
                  laser_distance_threshold: float = 0.6,
                  laser_distance_threshold_width: float = 0.4,
-                 base_orientation_threshold: float = np.pi / 8,
-                 wait_for_patrick_timeout: float = 30,
+                 base_orientation_threshold: float = np.pi / 16,
+                 wait_for_patrick_timeout: int = 30,
                  max_rotation_velocity: float = 0.5,
                  max_rotation_velocity_head: float = 1,
                  max_translation_velocity: float = 0.38,
@@ -180,7 +184,9 @@ class CarryMyBullshit(Goal):
                  target_recovery_looking_speed: float = 1,
                  drive_back: bool = False):
         super().__init__()
-        self.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
+        self.end_of_traj_reached = False
+        if CarryMyBullshit.pub is None:
+            CarryMyBullshit.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         self.god_map.set_data(identifier.endless_mode, True)
         self.god_map.set_data(identifier.max_trajectory_length, 1000)
         self.laser_topic_name = laser_topic_name
@@ -219,27 +225,40 @@ class CarryMyBullshit(Goal):
         self.height_for_camera_target = height_for_camera_target
         self.max_traj_length = 1
         self.drive_back = drive_back
-        if not self.drive_back:
-            CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
-        self.traj_data = [self.get_current_point()]
         self.init_laser_stuff(width=laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
-        self.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
+        if not self.drive_back and CarryMyBullshit.trajectory is None:
+            CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
+        if CarryMyBullshit.traj_data is None:
+            CarryMyBullshit.traj_data = [self.get_current_point()]
+        if CarryMyBullshit.laser_sub is None:
+            CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.publish_tracking_radius()
         if not self.drive_back:
-            self.sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
+            if CarryMyBullshit.target_sub is None:
+                CarryMyBullshit.target_sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
             rospy.sleep(0.5)
-            for i in range(wait_for_patrick_timeout):
+            for i in range(int(wait_for_patrick_timeout)):
                 if CarryMyBullshit.trajectory.shape[0] > 5:
                     break
                 print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
                 rospy.sleep(1)
             else:
                 raise ConstraintInitalizationException(f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
+            logging.loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
+            rospy.wait_for_message(patrick_topic_name, PointStamped, rospy.Duration(wait_for_patrick_timeout))
+            logging.loginfo('received target point.')
 
         else:
             CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
             self.publish_trajectory()
 
+    def clean_up(self):
+        if CarryMyBullshit.target_sub is not None:
+            CarryMyBullshit.target_sub.unregister()
+            CarryMyBullshit.target_sub = None
+        if CarryMyBullshit.laser_sub is not None:
+            CarryMyBullshit.laser_sub.unregister()
+            CarryMyBullshit.laser_sub = None
 
     def init_laser_stuff(self, width: float = 0.3, circle_radius: float = 0.4):
         laser_scan: LaserScan = rospy.wait_for_message(self.laser_topic_name, LaserScan, rospy.Duration(5))
@@ -296,7 +315,7 @@ class CarryMyBullshit(Goal):
             closest_idx = np.argmin(distances[offset:]) + offset
         else:
             next_idx = closest_idx = np.argmin(distances)
-        # self.traj_data = self.traj_data[closest_idx:]
+        # CarryMyBullshit.traj_data = CarryMyBullshit.traj_data[closest_idx:]
         if not self.drive_back:
             self.last_target_age = rospy.get_rostime().to_sec() - self.human_point.header.stamp.to_sec()
             if self.last_target_age > self.target_age_exception_threshold:
@@ -304,7 +323,7 @@ class CarryMyBullshit(Goal):
                     GiskardException(f'lost target for longer than {self.target_age_exception_threshold}s'))
         else:
             if closest_idx == CarryMyBullshit.trajectory.shape[0] - 1:
-                raise_to_blackboard(GiskardException(f'end of traj reached'))
+                self.end_of_traj_reached = True
         result = {
             'next_x': traj[next_idx, 0],
             'next_y': traj[next_idx, 1],
@@ -312,6 +331,9 @@ class CarryMyBullshit(Goal):
             'closest_y': traj[closest_idx, 1],
         }
         return result
+
+    def is_done(self):
+        return self.end_of_traj_reached
 
     def publish_trajectory(self):
         ms = MarkerArray()
@@ -379,21 +401,21 @@ class CarryMyBullshit(Goal):
     def target_cb(self, point: PointStamped):
         try:
             current_point = np.array([point.point.x, point.point.y])
-            last_point = self.traj_data[-1]
+            last_point = CarryMyBullshit.traj_data[-1]
             error_vector = current_point - last_point
             distance = np.linalg.norm(error_vector)
             if distance < self.interpolation_step_size * 2:
-                self.traj_data[-1] = 0.5 * self.traj_data[-1] + 0.5 * current_point
+                CarryMyBullshit.traj_data[-1] = 0.5 * CarryMyBullshit.traj_data[-1] + 0.5 * current_point
             else:
                 error_vector /= distance
                 ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
                 interpolated_distance = distance / len(ranges)
                 for i, dt in enumerate(ranges):
                     interpolated_point = last_point + error_vector * interpolated_distance * (i + 1)
-                    self.traj_data.append(interpolated_point)
-                self.traj_data.append(current_point)
+                    CarryMyBullshit.traj_data.append(interpolated_point)
+                CarryMyBullshit.traj_data.append(current_point)
 
-            CarryMyBullshit.trajectory = np.array(self.traj_data)
+            CarryMyBullshit.trajectory = np.array(CarryMyBullshit.traj_data)
             self.human_point = point
         except Exception as e:
             logging.logwarn(f'rejected new target because: {e}')
@@ -439,11 +461,11 @@ class CarryMyBullshit(Goal):
         root_V_goal_axis.vis_frame = self.tip
         map_goal_angle = w.angle_between_vector(w.Vector3([1, 0, 0]), root_V_goal_axis)
         map_goal_angle = w.if_greater(root_V_goal_axis.y, 0, map_goal_angle, -map_goal_angle)
-        # self.add_debug_expr('goal_point', root_P_goal_point)
-        # self.add_debug_expr('root_P_closest_point', root_P_closest_point)
+        self.add_debug_expr('goal_point', root_P_goal_point)
+        self.add_debug_expr('root_P_closest_point', root_P_closest_point)
         # self.add_debug_expr('laser_center_reading', laser_center_reading)
-        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
         # self.add_debug_expr('distance_to_human', distance_to_human)
         # self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
         #                                  frame_V_goal=root_V_goal_axis,
@@ -493,7 +515,7 @@ class CarryMyBullshit(Goal):
 
         # position_weight = self.weight
         if self.drive_back:
-            position_weight = w.if_less(map_angle_error, self.base_orientation_threshold,
+            position_weight = w.if_less(w.abs(map_angle_error), self.base_orientation_threshold,
                                         self.weight,
                                         0)
         else:
@@ -503,7 +525,8 @@ class CarryMyBullshit(Goal):
                                                        w.less_equal(distance_to_human, self.distance_to_target))),
                                         0,
                                         self.weight)
-
+        # self.add_debug_expr('position_weight', position_weight)
+        # self.add_debug_expr('self.base_orientation_threshold', self.base_orientation_threshold)
         self.add_point_goal_constraints(frame_P_current=root_P_tip,
                                         frame_P_goal=root_P_goal_point,
                                         reference_velocity=self.max_translation_velocity,
@@ -514,7 +537,14 @@ class CarryMyBullshit(Goal):
         # distance, _ = w.distance_point_to_line_segment(frame_P_current=root_P_tip,
         #                                                frame_P_line_start=root_P_closest_point - root_V_tangent * 0.1,
         #                                                frame_P_line_end=root_P_closest_point + root_V_tangent * 0.1)
+        # if self.drive_back:
+        #     position_weight2 = w.if_less(map_angle_error, self.base_orientation_threshold,
+        #                                 self.weight,
+        #                                 0)
+        # else:
+        #     position_weight2 = self.weight
         distance = w.norm(root_P_closest_point - root_P_tip)
+        # self.add_debug_expr('position_weight2', position_weight2)
         self.add_inequality_constraint(task_expression=distance,
                                        lower_error=-distance - self.radius,
                                        upper_error=-distance + self.radius,

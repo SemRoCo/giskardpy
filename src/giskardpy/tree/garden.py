@@ -33,6 +33,8 @@ from giskardpy.tree.behaviors.commands_remaining import CommandsRemaining
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
+from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
+from giskardpy.tree.behaviors.goal_done import GoalDone
 from giskardpy.tree.behaviors.goal_reached import GoalReached
 from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
@@ -723,6 +725,7 @@ class StandAlone(TreeManager):
         plan_postprocessing.add_child(running_is_success(TimePlugin)('increase time plan post processing'))
         plan_postprocessing.add_child(SetZeroVelocity('set zero vel 1'))
         plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log post processing'))
+        plan_postprocessing.add_child(GoalCleanUp('clean up goals'))
         return plan_postprocessing
 
     def configure_visualization_marker(self,
@@ -1035,6 +1038,7 @@ class ClosedLoop(OpenLoop):
         # planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached', real_time=True))
         planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
+        planning_4.add_child(GoalDone('goal done check'))
         return planning_4
 
 # def sanity_check(god_map):

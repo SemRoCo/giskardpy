@@ -40,6 +40,12 @@ class Goal(ABC):
         self.world = self.god_map.get_data(identifier.world)
         self.tree = self.god_map.get_data(identifier.tree_manager)
 
+    def clean_up(self):
+        pass
+
+    def is_done(self):
+        return None
+
     @property
     def prediction_horizon(self) -> int:
         return self.god_map.get_data(identifier.prediction_horizon)

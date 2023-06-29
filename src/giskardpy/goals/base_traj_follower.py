@@ -185,6 +185,8 @@ class CarryMyBullshit(Goal):
                  clear_path: bool = False,
                  drive_back: bool = False):
         super().__init__()
+        if drive_back:
+            logging.loginfo('driving back')
         self.end_of_traj_reached = False
         if CarryMyBullshit.pub is None:
             CarryMyBullshit.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
@@ -231,6 +233,8 @@ class CarryMyBullshit(Goal):
             CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
         if clear_path or CarryMyBullshit.traj_data is None:
             CarryMyBullshit.traj_data = [self.get_current_point()]
+        if clear_path:
+            logging.loginfo('clear path')
         if CarryMyBullshit.laser_sub is None:
             CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.publish_tracking_radius()

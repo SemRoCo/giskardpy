@@ -160,18 +160,21 @@ class CarryMyBullshit(Goal):
     human_point: PointStamped = None
     pub: rospy.Publisher = None
     laser_sub: rospy.Subscriber = None
+    point_cloud_laser_sub: rospy.Subscriber = None
     target_sub: rospy.Subscriber = None
     traj_flipped: bool = False
 
     def __init__(self,
                  patrick_topic_name: str = '/robokudo2/human_position',
                  laser_topic_name: str = '/hsrb/base_scan',
+                 point_cloud_laser_topic_name: str = '/hsrb/base_scan',
+                 listen_to_point_cloud_laser: bool = True,
                  odom_joint_name: str = 'brumbrum',
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',
                  distance_to_target_stop_threshold: float = 1,
                  laser_distance_threshold: float = 0.6,
-                 laser_distance_threshold_width: float = 0.4,
+                 laser_distance_threshold_width: float = 0.8,
                  base_orientation_threshold: float = np.pi / 16,
                  wait_for_patrick_timeout: int = 30,
                  max_rotation_velocity: float = 0.5,
@@ -194,7 +197,10 @@ class CarryMyBullshit(Goal):
         self.god_map.set_data(identifier.endless_mode, True)
         self.god_map.set_data(identifier.max_trajectory_length, 1000)
         self.laser_topic_name = laser_topic_name
+        self.point_cloud_laser_topic_name = point_cloud_laser_topic_name
         self.last_target_age = 0
+        self.closest_laser_left = 0
+        self.closest_laser_right = 0
         self.laser_avoidance_direction = 0
         self.base_orientation_threshold = base_orientation_threshold
         self.odom_joint_name = self.world.search_for_joint_name(odom_joint_name)
@@ -225,7 +231,8 @@ class CarryMyBullshit(Goal):
         self.human_point = PointStamped()
         self.height_for_camera_target = height_for_camera_target
         self.drive_back = drive_back
-        self.init_laser_stuff(width=laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
+        self.laser_distance_threshold_width = laser_distance_threshold_width / 2
+        self.init_laser_stuff(width=self.laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
         if clear_path or (not self.drive_back and CarryMyBullshit.trajectory is None):
             CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
         if clear_path or CarryMyBullshit.traj_data is None:
@@ -235,6 +242,10 @@ class CarryMyBullshit(Goal):
             logging.loginfo('cleared old path')
         if CarryMyBullshit.laser_sub is None:
             CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
+        # if CarryMyBullshit.point_cloud_laser_sub is None:
+        #     CarryMyBullshit.point_cloud_laser_sub = rospy.Subscriber(self.point_cloud_laser_topic_name,
+        #                                                              LaserScan, self.point_cloud_laser_cb,
+        #                                                              queue_size=10)
         self.publish_tracking_radius()
         self.publish_distance_to_target()
         if not self.drive_back:
@@ -267,47 +278,62 @@ class CarryMyBullshit(Goal):
         if CarryMyBullshit.laser_sub is not None:
             CarryMyBullshit.laser_sub.unregister()
             CarryMyBullshit.laser_sub = None
+        # if CarryMyBullshit.point_cloud_laser_sub is not None:
+        #     CarryMyBullshit.point_cloud_laser_sub.unregister()
+        #     CarryMyBullshit.point_cloud_laser_sub = None
 
     def init_laser_stuff(self, width: float = 0.3, circle_radius: float = 0.4):
         laser_scan: LaserScan = rospy.wait_for_message(self.laser_topic_name, LaserScan, rospy.Duration(5))
         self.laser_frame = laser_scan.header.frame_id
         thresholds = []
-        for angle in np.arange(laser_scan.angle_min,
-                               laser_scan.angle_max,
-                               laser_scan.angle_increment):
+        angles = np.arange(laser_scan.angle_min,
+                           laser_scan.angle_max,
+                           laser_scan.angle_increment)
+        for angle in angles:
             if angle < 0:
                 y = -width
                 length = y / np.sin((angle))
                 x = np.cos(angle) * length
-                thresholds.append((x, y, length))
+                thresholds.append((x, y, length, angle))
             else:
                 y = width
                 length = y / np.sin((angle))
                 x = np.cos(angle) * length
-                thresholds.append((x, y, length))
+                thresholds.append((x, y, length, angle))
             if length > circle_radius:
                 length = circle_radius
                 x = np.cos(angle) * length
                 y = np.sin(angle) * length
-                thresholds[-1] = (x, y, length)
+                thresholds[-1] = (x, y, length, angle)
         self.thresholds = np.array(thresholds)
         assert len(thresholds) == len(laser_scan.ranges)
         self.publish_laser_thresholds()
 
     def laser_cb(self, scan: LaserScan):
         data = np.array(scan.ranges)
-        violations = data - self.thresholds[:, 2]
-        ys = self.thresholds[data < self.thresholds[:, 2]][:, 1]
-        ys_negative = len(np.where(ys < 0)[0])
-        ys_positive = ys.shape[0] - ys_negative
-        self.laser_avoidance_direction = 0
-        if ys.shape[0] > 0:
-            if ys_negative > ys_positive:
-                self.laser_avoidance_direction = 1
-            elif ys_negative < ys_positive:
-                self.laser_avoidance_direction = -1
-        min_reading = min(violations)
-        self.closest_laser_reading = min_reading
+        x_positive = np.where(self.thresholds[:, 0] > 0)[0]
+        x_start = x_positive[0]
+        x_end = x_positive[-1]
+        half = int(data.shape[0] / 2)
+        ys = np.sin(self.thresholds[:, 3]) * data
+        xs = np.cos(self.thresholds[:, 3]) * data
+        xs_error = xs - self.thresholds[:, 0]
+        violations = data < self.thresholds[:, 2]
+        closest_laser_right = ys[:half][violations[:half]]
+        closest_laser_left = ys[half:][violations[half:]]
+        front_violation = xs_error[x_start:x_end][violations[x_start:x_end]]
+        if len(closest_laser_left) > 0:
+            self.closest_laser_left = min(closest_laser_left)
+        else:
+            self.closest_laser_left = self.laser_distance_threshold_width
+        if len(closest_laser_right) > 0:
+            self.closest_laser_right = max(closest_laser_right)
+        else:
+            self.closest_laser_right = -self.laser_distance_threshold_width
+        if len(front_violation) > 0:
+            self.closest_laser_reading = min(front_violation)
+        else:
+            self.closest_laser_reading = 0
 
     def get_current_point(self) -> np.ndarray:
         root_T_tip = self.world.compute_fk_np(self.root, self.tip)
@@ -405,7 +431,7 @@ class CarryMyBullshit(Goal):
         m_line.header.frame_id = str(self.tip.short_name)
         m_line.scale.x = self.traj_tracking_radius * 2
         m_line.scale.y = self.traj_tracking_radius * 2
-        m_line.scale.z = 0.01
+        m_line.scale.z = 0.05
         m_line.color.a = 0.5
         m_line.color.b = 1
         m_line.frame_locked = True
@@ -458,8 +484,9 @@ class CarryMyBullshit(Goal):
         root_T_odom = self.get_fk(self.root, self.odom)
         root_T_camera = self.get_fk(self.root, self.camera_link)
         root_P_tip = root_T_bf.to_position()
-        laser_avoidance_direction = self.get_parameter_as_symbolic_expression('laser_avoidance_direction')
-        laser_center_reading = self.get_parameter_as_symbolic_expression('closest_laser_reading')
+        min_left_violation = self.get_parameter_as_symbolic_expression('closest_laser_left')
+        min_right_violation = self.get_parameter_as_symbolic_expression('closest_laser_right')
+        closest_laser_reading = self.get_parameter_as_symbolic_expression('closest_laser_reading')
         last_target_age = self.get_parameter_as_symbolic_expression('last_target_age')
         target_lost = w.greater_equal(last_target_age, self.target_age_threshold)
         map_P_human = w.Point3(self.get_parameter_as_symbolic_expression('human_point'))
@@ -486,7 +513,7 @@ class CarryMyBullshit(Goal):
         if self.drive_back:
             root_V_tip_to_closest = root_P_tip - root_P_closest_point
             root_P_between_tip_and_closest = root_P_closest_point + root_V_tip_to_closest / 2
-            self.add_debug_expr('root_P_between_tip_and_closest', root_P_between_tip_and_closest)
+            # self.add_debug_expr('root_P_between_tip_and_closest', root_P_between_tip_and_closest)
             root_V_goal_axis = root_P_goal_point - root_P_between_tip_and_closest
         else:
             root_V_goal_axis = map_P_human_projected - root_P_tip
@@ -497,11 +524,11 @@ class CarryMyBullshit(Goal):
         root_V_goal_axis.vis_frame = self.tip
         map_goal_angle = w.angle_between_vector(w.Vector3([1, 0, 0]), root_V_goal_axis)
         map_goal_angle = w.if_greater(root_V_goal_axis.y, 0, map_goal_angle, -map_goal_angle)
-        self.add_debug_expr('goal_point', root_P_goal_point)
-        self.add_debug_expr('root_P_closest_point', root_P_closest_point)
+        # self.add_debug_expr('goal_point', root_P_goal_point)
+        # self.add_debug_expr('root_P_closest_point', root_P_closest_point)
         # self.add_debug_expr('laser_center_reading', laser_center_reading)
-        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
         # self.add_debug_expr('distance_to_human', distance_to_human)
         # self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
         #                                  frame_V_goal=root_V_goal_axis,
@@ -550,7 +577,7 @@ class CarryMyBullshit(Goal):
         # self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
 
         # position_weight = self.weight
-        laser_violated = w.less_equal(laser_center_reading, 0)
+        laser_violated = w.less(closest_laser_reading, 0)
         if self.drive_back:
             position_weight = w.if_else(w.logic_or(laser_violated,
                                                    w.greater(w.abs(map_angle_error), self.base_orientation_threshold)),
@@ -587,7 +614,19 @@ class CarryMyBullshit(Goal):
 
         # %% laser avoidance
         if self.enable_laser_avoidance:
-            bf_V_laser_avoidance_direction = w.Vector3([0, laser_avoidance_direction, 0])
+            # min_left_violation = w.min(self.laser_distance_threshold_width/2, min_left_violation)
+            # min_right_violation = w.min(self.laser_distance_threshold_width/2, min_right_violation)
+            # left = w.Point3([0, min_left_violation, 0])
+            # left.reference_frame = self.world.search_for_link_name(self.laser_frame)
+            # right = w.Point3([0, min_right_violation, 0])
+            # right.reference_frame = self.world.search_for_link_name(self.laser_frame)
+            # self.add_debug_expr('left', left)
+            # self.add_debug_expr('right', right)
+            sideways_vel = (min_left_violation + min_right_violation) / 2
+            # bf_P_laser_avoidance = w.Point3([self.laser_distance_threshold + closest_laser_reading, 0, 0])
+            # bf_P_laser_avoidance.reference_frame = self.world.search_for_link_name(self.laser_frame)
+            # self.add_debug_expr('center', bf_P_laser_avoidance)
+            bf_V_laser_avoidance_direction = w.Vector3([0, sideways_vel, 0])
             map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
             map_V_laser_avoidance_direction.vis_frame = self.tip
             self.add_debug_expr('base_V_laser_avoidance_direction', map_V_laser_avoidance_direction)
@@ -598,7 +637,7 @@ class CarryMyBullshit(Goal):
                                                0)
 
             self.add_equality_constraint(reference_velocity=self.max_translation_velocity,
-                                         equality_bound=laser_avoidance_direction,
+                                         equality_bound=sideways_vel,
                                          weight=laser_avoidance_weight,
                                          task_expression=odom_y_vel,
                                          name='laser avoidance')

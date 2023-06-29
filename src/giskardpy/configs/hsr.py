@@ -72,7 +72,7 @@ class HSR_Realtime(HSR_Base):
     def configure_behavior_tree(self):
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
                                                               add_to_control_loop=False)
-        # self.behavior_tree.add_debug_marker_publisher()
+        self.behavior_tree.add_debug_marker_publisher()
         # self.behavior_tree.add_qp_data_publisher(publish_xdot=True, add_to_base=False)
 
     def configure_robot_interface(self):

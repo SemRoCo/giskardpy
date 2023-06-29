@@ -169,7 +169,7 @@ class CarryMyBullshit(Goal):
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',
                  target_recovery_joint: str = 'head_pan_joint',
-                 last_distance_threshold: float = 1,
+                 distance_to_target_stop_threshold: float = 1,
                  laser_distance_threshold: float = 0.6,
                  laser_distance_threshold_width: float = 0.4,
                  base_orientation_threshold: float = np.pi / 16,
@@ -213,7 +213,7 @@ class CarryMyBullshit(Goal):
         self.max_rotation_velocity_head = max_rotation_velocity_head
         self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_ABOVE_CA
-        self.distance_to_target = last_distance_threshold
+        self.distance_to_target = distance_to_target_stop_threshold
         self.laser_distance_threshold = laser_distance_threshold
         self.radius = footprint_radius
         # self.step_dt = 0.01
@@ -233,6 +233,7 @@ class CarryMyBullshit(Goal):
         if CarryMyBullshit.laser_sub is None:
             CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         self.publish_tracking_radius()
+        self.publish_distance_to_target()
         if not self.drive_back:
             if CarryMyBullshit.target_sub is None:
                 CarryMyBullshit.target_sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb, queue_size=10)
@@ -367,7 +368,7 @@ class CarryMyBullshit(Goal):
         m_line.header.frame_id = self.laser_frame
         m_line.scale.x = 0.05
         m_line.color.a = 1
-        m_line.color.r = 1
+        m_line.color.r = 0.5
         m_line.color.b = 1
         m_line.frame_locked = True
         try:
@@ -394,6 +395,24 @@ class CarryMyBullshit(Goal):
         m_line.scale.z = 0.01
         m_line.color.a = 0.5
         m_line.color.b = 1
+        m_line.frame_locked = True
+        ms.markers.append(m_line)
+        self.pub.publish(ms)
+
+    def publish_distance_to_target(self):
+        ms = MarkerArray()
+        m_line = Marker()
+        m_line.action = m_line.ADD
+        m_line.ns = 'distance_to_target'
+        m_line.id = 1332
+        m_line.type = m_line.CYLINDER
+        m_line.header.frame_id = str(self.tip.short_name)
+        m_line.scale.x = self.distance_to_target * 2
+        m_line.scale.y = self.distance_to_target * 2
+        m_line.scale.z = 0.01
+        m_line.color.a = 0.5
+        m_line.color.g = 1
+        m_line.pose.position.z = 0.02
         m_line.frame_locked = True
         ms.markers.append(m_line)
         self.pub.publish(ms)
@@ -543,11 +562,15 @@ class CarryMyBullshit(Goal):
         #                                 0)
         # else:
         #     position_weight2 = self.weight
+        if self.drive_back:
+            buffer = self.radius
+        else:
+            buffer = self.radius
         distance = w.norm(root_P_closest_point - root_P_tip)
         # self.add_debug_expr('position_weight2', position_weight2)
         self.add_inequality_constraint(task_expression=distance,
-                                       lower_error=-distance - self.radius,
-                                       upper_error=-distance + self.radius,
+                                       lower_error=-distance - buffer,
+                                       upper_error=-distance + buffer,
                                        reference_velocity=self.max_translation_velocity,
                                        weight=self.weight,
                                        name='in_circle')

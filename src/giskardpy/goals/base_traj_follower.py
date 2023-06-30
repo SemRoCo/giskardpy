@@ -187,6 +187,7 @@ class CarryMyBullshit(Goal):
                  max_translation_velocity: float = 0.38,
                  traj_tracking_radius: float = 0.4,
                  height_for_camera_target: float = 1,
+                 laser_frame_id: str = 'base_range_sensor_link',
                  target_age_threshold: float = 2,
                  target_age_exception_threshold: float = 5,
                  clear_path: bool = False,
@@ -210,8 +211,11 @@ class CarryMyBullshit(Goal):
         self.closest_laser_left_pc = self.laser_distance_threshold_width
         self.closest_laser_right_pc = -self.laser_distance_threshold_width
         self.closest_laser_reading_pc = 0
-        self.last_scan = None
-        self.last_scan_pc = None
+        self.laser_frame = laser_frame_id
+        self.last_scan = LaserScan()
+        self.last_scan.header.stamp = rospy.get_rostime()
+        self.last_scan_pc = LaserScan()
+        self.last_scan_pc.header.stamp = rospy.get_rostime()
         self.laser_scan_age_threshold = laser_scan_age_threshold
         self.laser_avoidance_max_x = laser_avoidance_max_x
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
@@ -293,7 +297,6 @@ class CarryMyBullshit(Goal):
             CarryMyBullshit.point_cloud_laser_sub = None
 
     def init_laser_stuff(self, laser_scan: LaserScan):
-        self.laser_frame = laser_scan.header.frame_id
         thresholds = []
         if len(laser_scan.ranges) % 2 == 0:
             print('laser range is even')

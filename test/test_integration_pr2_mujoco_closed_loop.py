@@ -184,6 +184,7 @@ class TestMoveBaseGoals:
                                 camera_link='head_mount_kinect_rgb_optical_frame',
                                 laser_topic_name='/laser',
                                 point_cloud_laser_topic_name='/laser2',
+                                laser_frame_id='base_laser_link',
                                 height_for_camera_target=1.5)
         zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=30)

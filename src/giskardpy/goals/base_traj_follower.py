@@ -287,9 +287,15 @@ class CarryMyBullshit(Goal):
     def init_laser_stuff(self, laser_scan: LaserScan):
         self.laser_frame = laser_scan.header.frame_id
         thresholds = []
-        angles = np.arange(laser_scan.angle_min,
-                           laser_scan.angle_max,
-                           laser_scan.angle_increment)
+        if len(laser_scan.ranges) % 2 == 0:
+            print('laser range is even')
+            angles = np.arange(laser_scan.angle_min,
+                               laser_scan.angle_max,
+                               laser_scan.angle_increment)[:-1]
+        else:
+            angles = np.arange(laser_scan.angle_min,
+                               laser_scan.angle_max,
+                               laser_scan.angle_increment)
         for angle in angles:
             if angle < 0:
                 y = -self.laser_distance_threshold_width
@@ -504,12 +510,12 @@ class CarryMyBullshit(Goal):
         min_left_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_left_pc')
         min_right_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_right_pc')
         closest_laser_reading2 = self.get_parameter_as_symbolic_expression('closest_laser_reading_pc')
-        # self.add_debug_expr('min_left_violation1', min_left_violation1)
-        # self.add_debug_expr('min_right_violation1', min_right_violation1)
-        # self.add_debug_expr('closest_laser_reading1', closest_laser_reading1)
-        # self.add_debug_expr('min_left_violation2', min_left_violation2)
-        # self.add_debug_expr('min_right_violation2', min_right_violation2)
-        # self.add_debug_expr('closest_laser_reading2', closest_laser_reading2)
+        self.add_debug_expr('min_left_violation1', min_left_violation1)
+        self.add_debug_expr('min_right_violation1', min_right_violation1)
+        self.add_debug_expr('closest_laser_reading1', closest_laser_reading1)
+        self.add_debug_expr('min_left_violation2', min_left_violation2)
+        self.add_debug_expr('min_right_violation2', min_right_violation2)
+        self.add_debug_expr('closest_laser_reading2', closest_laser_reading2)
         closest_laser_left = w.max(min_left_violation1, min_left_violation2)
         closest_laser_right = w.min(min_right_violation1, min_right_violation2)
         closest_laser_reading = w.min(closest_laser_reading1, closest_laser_reading2)

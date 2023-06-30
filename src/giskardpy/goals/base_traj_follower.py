@@ -316,7 +316,6 @@ class CarryMyBullshit(Goal):
                 thresholds[-1] = (x, y, length, angle)
         thresholds = np.array(thresholds)
         assert len(thresholds) == len(laser_scan.ranges)
-        self.publish_laser_thresholds()
         return thresholds
 
     def muddle_laser_scan(self, scan: LaserScan, thresholds: np.ndarray):
@@ -352,7 +351,9 @@ class CarryMyBullshit(Goal):
     def laser_cb(self, scan: LaserScan):
         if self.thresholds is None:
             self.thresholds = self.init_laser_stuff(scan)
-        self.closest_laser_reading, self.closest_laser_left, self.closest_laser_right = self.muddle_laser_scan(scan, self.thresholds)
+            self.publish_laser_thresholds()
+        self.closest_laser_reading, self.closest_laser_left, self.closest_laser_right = self.muddle_laser_scan(scan,
+                                                                                                               self.thresholds)
 
     def point_cloud_laser_cb(self, scan: LaserScan):
         if self.thresholds_pc is None:
@@ -435,26 +436,40 @@ class CarryMyBullshit(Goal):
         m_line.color.r = 0.5
         m_line.color.b = 1
         m_line.frame_locked = True
-        try:
-            for item in self.thresholds:
-                p = Point()
-                p.x = item[0]
-                p.y = item[1]
-                m_line.points.append(p)
-            ms.markers.append(m_line)
-        except Exception as e:
-            logging.logwarn('failed to create laser marker')
+        for item in self.thresholds:
+            p = Point()
+            p.x = item[0]
+            p.y = item[1]
+            m_line.points.append(p)
+        ms.markers.append(m_line)
         square = Marker()
         square.action = m_line.ADD
-        square.ns = 'laser_thresholds'
+        square.ns = 'laser_avoidance_max_x'
         square.id = 1333
-        square.type = m_line.CUBE
+        square.type = m_line.LINE_STRIP
         square.header.frame_id = self.laser_frame
-        square.scale.x = self.laser_avoidance_max_x
-        square.scale.y = self.laser_distance_threshold_width * 2
-        square.scale.z = 0.1
+        p = Point()
+        p.x = self.thresholds[0, 0]
+        p.y = self.thresholds[0, 1]
+        square.points.append(p)
+        p = Point()
+        p.x = self.laser_avoidance_max_x
+        p.y = self.thresholds[0, 1]
+        square.points.append(p)
+        p = Point()
+        square.points.append(p)
+        p = Point()
+        p.x = self.laser_avoidance_max_x
+        p.y = self.thresholds[-1, 1]
+        square.points.append(p)
+        p = Point()
+        p.x = self.thresholds[-1, 0]
+        p.y = self.thresholds[-1, 1]
+        square.points.append(p)
+        square.scale.x = 0.05
         square.color.a = 1
-        square.color.r = 1
+        square.color.r = 0.5
+        square.color.b = 1
         square.frame_locked = True
         ms.markers.append(square)
         self.pub.publish(ms)
@@ -463,15 +478,16 @@ class CarryMyBullshit(Goal):
         ms = MarkerArray()
         m_line = Marker()
         m_line.action = m_line.ADD
-        m_line.ns = 'tracking_radius'
+        m_line.ns = 'traj_tracking_radius'
         m_line.id = 1332
         m_line.type = m_line.CYLINDER
         m_line.header.frame_id = str(self.tip.short_name)
         m_line.scale.x = self.traj_tracking_radius * 2
         m_line.scale.y = self.traj_tracking_radius * 2
         m_line.scale.z = 0.05
-        m_line.color.a = 0.5
+        m_line.color.a = 1
         m_line.color.b = 1
+        m_line.pose.orientation.w = 1
         m_line.frame_locked = True
         ms.markers.append(m_line)
         self.pub.publish(ms)
@@ -480,7 +496,7 @@ class CarryMyBullshit(Goal):
         ms = MarkerArray()
         m_line = Marker()
         m_line.action = m_line.ADD
-        m_line.ns = 'distance_to_target'
+        m_line.ns = 'distance_to_target_stop_threshold'
         m_line.id = 1332
         m_line.type = m_line.CYLINDER
         m_line.header.frame_id = str(self.tip.short_name)
@@ -489,7 +505,7 @@ class CarryMyBullshit(Goal):
         m_line.scale.z = 0.01
         m_line.color.a = 0.5
         m_line.color.g = 1
-        m_line.pose.position.z = 0.02
+        m_line.pose.orientation.w = 1
         m_line.frame_locked = True
         ms.markers.append(m_line)
         self.pub.publish(ms)
@@ -528,12 +544,12 @@ class CarryMyBullshit(Goal):
         min_left_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_left_pc')
         min_right_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_right_pc')
         closest_laser_reading2 = self.get_parameter_as_symbolic_expression('closest_laser_reading_pc')
-        self.add_debug_expr('min_left_violation1', min_left_violation1)
-        self.add_debug_expr('min_right_violation1', min_right_violation1)
-        self.add_debug_expr('closest_laser_reading1', closest_laser_reading1)
-        self.add_debug_expr('min_left_violation2', min_left_violation2)
-        self.add_debug_expr('min_right_violation2', min_right_violation2)
-        self.add_debug_expr('closest_laser_reading2', closest_laser_reading2)
+        # self.add_debug_expr('min_left_violation1', min_left_violation1)
+        # self.add_debug_expr('min_right_violation1', min_right_violation1)
+        # self.add_debug_expr('closest_laser_reading1', closest_laser_reading1)
+        # self.add_debug_expr('min_left_violation2', min_left_violation2)
+        # self.add_debug_expr('min_right_violation2', min_right_violation2)
+        # self.add_debug_expr('closest_laser_reading2', closest_laser_reading2)
         closest_laser_left = w.max(min_left_violation1, min_left_violation2)
         closest_laser_right = w.min(min_right_violation1, min_right_violation2)
         closest_laser_reading = w.min(closest_laser_reading1, closest_laser_reading2)
@@ -680,7 +696,7 @@ class CarryMyBullshit(Goal):
             # self.add_debug_expr('center', bf_P_laser_avoidance)
             bf_V_laser_avoidance_direction = w.Vector3([0, sideways_vel, 0])
             map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
-            map_V_laser_avoidance_direction.vis_frame = self.tip
+            map_V_laser_avoidance_direction.vis_frame = self.world.search_for_link_name(self.laser_frame)
             self.add_debug_expr('base_V_laser_avoidance_direction', map_V_laser_avoidance_direction)
             odom_y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.position)
 

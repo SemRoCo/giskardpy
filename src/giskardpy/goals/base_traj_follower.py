@@ -200,10 +200,10 @@ class CarryMyBullshit(Goal):
         self.laser_distance_threshold_width = laser_distance_threshold_width / 2
         self.last_target_age = 0
         self.closest_laser_left = self.laser_distance_threshold_width
-        self.closest_laser_right = self.laser_distance_threshold_width
+        self.closest_laser_right = -self.laser_distance_threshold_width
         self.closest_laser_reading = 0
         self.closest_laser_left_pc = self.laser_distance_threshold_width
-        self.closest_laser_right_pc = self.laser_distance_threshold_width
+        self.closest_laser_right_pc = -self.laser_distance_threshold_width
         self.closest_laser_reading_pc = 0
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
         self.base_orientation_threshold = base_orientation_threshold
@@ -500,6 +500,12 @@ class CarryMyBullshit(Goal):
         min_left_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_left_pc')
         min_right_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_right_pc')
         closest_laser_reading2 = self.get_parameter_as_symbolic_expression('closest_laser_reading_pc')
+        # self.add_debug_expr('min_left_violation1', min_left_violation1)
+        # self.add_debug_expr('min_right_violation1', min_right_violation1)
+        # self.add_debug_expr('closest_laser_reading1', closest_laser_reading1)
+        # self.add_debug_expr('min_left_violation2', min_left_violation2)
+        # self.add_debug_expr('min_right_violation2', min_right_violation2)
+        # self.add_debug_expr('closest_laser_reading2', closest_laser_reading2)
         closest_laser_left = w.max(min_left_violation1, min_left_violation2)
         closest_laser_right = w.min(min_right_violation1, min_right_violation2)
         closest_laser_reading = w.min(closest_laser_reading1, closest_laser_reading2)

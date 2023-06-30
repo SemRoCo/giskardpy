@@ -164,6 +164,8 @@ class CarryMyBullshit(Goal):
     point_cloud_laser_sub: rospy.Subscriber = None
     target_sub: rospy.Subscriber = None
     traj_flipped: bool = False
+    last_scan: LaserScan = None
+    last_scan_pc: LaserScan = None
 
     def __init__(self,
                  patrick_topic_name: str = '/robokudo2/human_position',
@@ -173,6 +175,7 @@ class CarryMyBullshit(Goal):
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',
                  distance_to_target_stop_threshold: float = 1,
+                 laser_scan_age_threshold: float = 2,
                  laser_distance_threshold: float = 0.6,
                  laser_distance_threshold_width: float = 0.8,
                  laser_avoidance_max_x: float = 0.5,
@@ -207,6 +210,9 @@ class CarryMyBullshit(Goal):
         self.closest_laser_left_pc = self.laser_distance_threshold_width
         self.closest_laser_right_pc = -self.laser_distance_threshold_width
         self.closest_laser_reading_pc = 0
+        self.last_scan = None
+        self.last_scan_pc = None
+        self.laser_scan_age_threshold = laser_scan_age_threshold
         self.laser_avoidance_max_x = laser_avoidance_max_x
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
         self.base_orientation_threshold = base_orientation_threshold
@@ -246,7 +252,7 @@ class CarryMyBullshit(Goal):
             logging.loginfo('cleared old path')
         if CarryMyBullshit.laser_sub is None:
             CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
-        if CarryMyBullshit.point_cloud_laser_sub is None:
+        if CarryMyBullshit.point_cloud_laser_sub is None and self.point_cloud_laser_topic_name is not None:
             CarryMyBullshit.point_cloud_laser_sub = rospy.Subscriber(self.point_cloud_laser_topic_name,
                                                                      LaserScan, self.point_cloud_laser_cb,
                                                                      queue_size=10)
@@ -349,6 +355,7 @@ class CarryMyBullshit(Goal):
         return closest_laser_reading, closest_laser_left, closest_laser_right
 
     def laser_cb(self, scan: LaserScan):
+        self.last_scan = scan
         if self.thresholds is None:
             self.thresholds = self.init_laser_stuff(scan)
             self.publish_laser_thresholds()
@@ -356,6 +363,7 @@ class CarryMyBullshit(Goal):
                                                                                                                self.thresholds)
 
     def point_cloud_laser_cb(self, scan: LaserScan):
+        self.last_scan_pc = scan
         if self.thresholds_pc is None:
             self.thresholds_pc = self.init_laser_stuff(scan)
         self.closest_laser_reading_pc, self.closest_laser_left_pc, self.closest_laser_right_pc = self.muddle_laser_scan(
@@ -369,6 +377,7 @@ class CarryMyBullshit(Goal):
 
     @memoize_with_counter(4)
     def get_current_target(self):
+        self.check_laser_scan_age()
         traj = CarryMyBullshit.trajectory.copy()
         current_point = self.get_current_point()
         error = traj - current_point
@@ -397,6 +406,21 @@ class CarryMyBullshit(Goal):
             'closest_y': traj[closest_idx, 1],
         }
         return result
+
+    def check_laser_scan_age(self):
+        current_time = rospy.get_rostime().to_sec()
+        base_laser_age = current_time - self.last_scan.header.stamp.to_sec()
+        if base_laser_age > self.laser_scan_age_threshold:
+            logging.logwarn(f'last base laser scan is too old: {base_laser_age}')
+            self.closest_laser_left = self.laser_distance_threshold_width
+            self.closest_laser_right = -self.laser_distance_threshold_width
+            self.closest_laser_reading = 0
+        point_cloud_laser_age = current_time - self.last_scan_pc.header.stamp.to_sec()
+        if point_cloud_laser_age > self.laser_scan_age_threshold:
+            logging.logwarn(f'last point cloud laser scan is too old: {point_cloud_laser_age}')
+            self.closest_laser_left_pc = self.laser_distance_threshold_width
+            self.closest_laser_right_pc = -self.laser_distance_threshold_width
+            self.closest_laser_reading_pc = 0
 
     def is_done(self):
         return self.end_of_traj_reached

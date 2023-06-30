@@ -195,7 +195,6 @@ class CarryMyBullshit(Goal):
         if CarryMyBullshit.pub is None:
             CarryMyBullshit.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         self.god_map.set_data(identifier.endless_mode, True)
-        self.god_map.set_data(identifier.max_trajectory_length, 1000)
         self.laser_topic_name = laser_topic_name
         self.point_cloud_laser_topic_name = point_cloud_laser_topic_name
         self.last_target_age = 0

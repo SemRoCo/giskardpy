@@ -168,7 +168,7 @@ class CarryMyBullshit(Goal):
     last_scan_pc: LaserScan = None
 
     def __init__(self,
-                 patrick_topic_name: str = '/robokudo2/human_position',
+                 patrick_topic_name: str = '/robokudovanessa/human_position',
                  laser_topic_name: str = '/hsrb/base_scan',
                  point_cloud_laser_topic_name: str = '/scan',
                  odom_joint_name: str = 'brumbrum',
@@ -572,11 +572,13 @@ class CarryMyBullshit(Goal):
         # self.add_debug_expr('min_right_violation1', min_right_violation1)
         # self.add_debug_expr('closest_laser_reading1', closest_laser_reading1)
         # self.add_debug_expr('min_left_violation2', min_left_violation2)
-        # self.add_debug_expr('min_right_violation2', min_right_violation2)
         # self.add_debug_expr('closest_laser_reading2', closest_laser_reading2)
-        closest_laser_left = w.max(min_left_violation1, min_left_violation2)
-        closest_laser_right = w.min(min_right_violation1, min_right_violation2)
+        closest_laser_left = w.min(min_left_violation1, min_left_violation2)
+        closest_laser_right = w.max(min_right_violation1, min_right_violation2)
         closest_laser_reading = w.min(closest_laser_reading1, closest_laser_reading2)
+        # self.add_debug_expr('min_left_violation', closest_laser_left)
+        # self.add_debug_expr('min_right_violation', closest_laser_right)
+        # self.add_debug_expr('closest_laser_reading', closest_laser_reading)
         last_target_age = self.get_parameter_as_symbolic_expression('last_target_age')
         target_lost = w.greater_equal(last_target_age, self.target_age_threshold)
         map_P_human = w.Point3(self.get_parameter_as_symbolic_expression('human_point'))

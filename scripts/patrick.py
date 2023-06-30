@@ -170,7 +170,7 @@ class IMServer(object):
             self.tip_link = tip_link
             self.root_link = root_link
             self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-            self.goal_pub = rospy.Publisher('/robokudo2/human_position', PointStamped, queue_size=10)
+            self.goal_pub = rospy.Publisher('/robokudovanessa/human_position', PointStamped, queue_size=10)
             self.target = PointStamped()
             self.target.header.frame_id = 'map'
             self.target.point.x = 1

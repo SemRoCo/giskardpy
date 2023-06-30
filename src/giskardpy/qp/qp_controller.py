@@ -1195,6 +1195,8 @@ class QPProblemBuilder:
             raise
 
     def _has_nan(self):
+        nan_entries = self.p_A.isnull().stack()
+        row_col_names = nan_entries[nan_entries].index.tolist()
         pass
 
     def _are_hard_limits_violated(self, error_message):

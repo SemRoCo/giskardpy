@@ -157,6 +157,7 @@ class CarryMyBullshit(Goal):
     trajectory: np.ndarray = np.array([])
     traj_data: List[np.ndarray] = None
     thresholds: np.ndarray = None
+    thresholds_pc: np.ndarray = None
     human_point: PointStamped = None
     pub: rospy.Publisher = None
     laser_sub: rospy.Subscriber = None
@@ -234,7 +235,6 @@ class CarryMyBullshit(Goal):
         self.human_point = PointStamped()
         self.height_for_camera_target = height_for_camera_target
         self.drive_back = drive_back
-        self.init_laser_stuff(width=self.laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
         if clear_path or (not self.drive_back and CarryMyBullshit.trajectory is None):
             CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)
         if clear_path or CarryMyBullshit.traj_data is None:
@@ -284,8 +284,7 @@ class CarryMyBullshit(Goal):
             CarryMyBullshit.point_cloud_laser_sub.unregister()
             CarryMyBullshit.point_cloud_laser_sub = None
 
-    def init_laser_stuff(self, width: float = 0.3, circle_radius: float = 0.4):
-        laser_scan: LaserScan = rospy.wait_for_message(self.laser_topic_name, LaserScan, rospy.Duration(5))
+    def init_laser_stuff(self, laser_scan: LaserScan):
         self.laser_frame = laser_scan.header.frame_id
         thresholds = []
         angles = np.arange(laser_scan.angle_min,
@@ -293,34 +292,35 @@ class CarryMyBullshit(Goal):
                            laser_scan.angle_increment)
         for angle in angles:
             if angle < 0:
-                y = -width
+                y = -self.laser_distance_threshold_width
                 length = y / np.sin((angle))
                 x = np.cos(angle) * length
                 thresholds.append((x, y, length, angle))
             else:
-                y = width
+                y = self.laser_distance_threshold_width
                 length = y / np.sin((angle))
                 x = np.cos(angle) * length
                 thresholds.append((x, y, length, angle))
-            if length > circle_radius:
-                length = circle_radius
+            if length > self.laser_distance_threshold:
+                length = self.laser_distance_threshold
                 x = np.cos(angle) * length
                 y = np.sin(angle) * length
                 thresholds[-1] = (x, y, length, angle)
-        self.thresholds = np.array(thresholds)
+        thresholds = np.array(thresholds)
         assert len(thresholds) == len(laser_scan.ranges)
         self.publish_laser_thresholds()
+        return thresholds
 
-    def muddle_laser_scan(self, scan):
+    def muddle_laser_scan(self, scan: LaserScan, thresholds: np.ndarray):
         data = np.array(scan.ranges)
-        x_positive = np.where(self.thresholds[:, 0] > 0)[0]
+        x_positive = np.where(thresholds[:, 0] > 0)[0]
         x_start = x_positive[0]
         x_end = x_positive[-1]
         half = int(data.shape[0] / 2)
-        ys = np.sin(self.thresholds[:, 3]) * data
-        xs = np.cos(self.thresholds[:, 3]) * data
-        xs_error = xs - self.thresholds[:, 0]
-        violations = data < self.thresholds[:, 2]
+        ys = np.sin(thresholds[:, 3]) * data
+        xs = np.cos(thresholds[:, 3]) * data
+        xs_error = xs - thresholds[:, 0]
+        violations = data < thresholds[:, 2]
         closest_laser_right = ys[:half][violations[:half]]
         closest_laser_left = ys[half:][violations[half:]]
         front_violation = xs_error[x_start:x_end][violations[x_start:x_end]]
@@ -339,11 +339,15 @@ class CarryMyBullshit(Goal):
         return closest_laser_reading, closest_laser_left, closest_laser_right
 
     def laser_cb(self, scan: LaserScan):
-        self.closest_laser_reading, self.closest_laser_left, self.closest_laser_right = self.muddle_laser_scan(scan)
+        if self.thresholds is None:
+            self.thresholds = self.init_laser_stuff(scan)
+        self.closest_laser_reading, self.closest_laser_left, self.closest_laser_right = self.muddle_laser_scan(scan, self.thresholds)
 
     def point_cloud_laser_cb(self, scan: LaserScan):
+        if self.thresholds_pc is None:
+            self.thresholds_pc = self.init_laser_stuff(scan)
         self.closest_laser_reading_pc, self.closest_laser_left_pc, self.closest_laser_right_pc = self.muddle_laser_scan(
-            scan)
+            scan, self.thresholds_pc)
 
     def get_current_point(self) -> np.ndarray:
         root_T_tip = self.world.compute_fk_np(self.root, self.tip)
@@ -627,6 +631,8 @@ class CarryMyBullshit(Goal):
             buffer = self.traj_tracking_radius
         distance_to_closest_point = w.norm(root_P_closest_point - root_P_tip)
         # self.add_debug_expr('position_weight2', position_weight2)
+        self.add_debug_expr('distance_to_closest_point', distance_to_closest_point)
+        # self.add_debug_expr('distance_to_closest_point2', distance_to_closest_point2)
         self.add_inequality_constraint(task_expression=distance_to_closest_point,
                                        lower_error=-distance_to_closest_point - buffer,
                                        upper_error=-distance_to_closest_point + buffer,

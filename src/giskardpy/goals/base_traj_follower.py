@@ -167,8 +167,7 @@ class CarryMyBullshit(Goal):
     def __init__(self,
                  patrick_topic_name: str = '/robokudo2/human_position',
                  laser_topic_name: str = '/hsrb/base_scan',
-                 point_cloud_laser_topic_name: str = '/hsrb/base_scan',
-                 listen_to_point_cloud_laser: bool = True,
+                 point_cloud_laser_topic_name: str = '/scan',
                  odom_joint_name: str = 'brumbrum',
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',
@@ -198,12 +197,13 @@ class CarryMyBullshit(Goal):
         self.god_map.set_data(identifier.endless_mode, True)
         self.laser_topic_name = laser_topic_name
         self.point_cloud_laser_topic_name = point_cloud_laser_topic_name
+        self.laser_distance_threshold_width = laser_distance_threshold_width / 2
         self.last_target_age = 0
-        self.closest_laser_left = 0
-        self.closest_laser_right = 0
+        self.closest_laser_left = self.laser_distance_threshold_width
+        self.closest_laser_right = self.laser_distance_threshold_width
         self.closest_laser_reading = 0
-        self.closest_laser_left_pc = 0
-        self.closest_laser_right_pc = 0
+        self.closest_laser_left_pc = self.laser_distance_threshold_width
+        self.closest_laser_right_pc = self.laser_distance_threshold_width
         self.closest_laser_reading_pc = 0
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
         self.base_orientation_threshold = base_orientation_threshold
@@ -234,7 +234,6 @@ class CarryMyBullshit(Goal):
         self.human_point = PointStamped()
         self.height_for_camera_target = height_for_camera_target
         self.drive_back = drive_back
-        self.laser_distance_threshold_width = laser_distance_threshold_width / 2
         self.init_laser_stuff(width=self.laser_distance_threshold_width, circle_radius=self.laser_distance_threshold)
         if clear_path or (not self.drive_back and CarryMyBullshit.trajectory is None):
             CarryMyBullshit.trajectory = np.array(self.get_current_point(), ndmin=2)

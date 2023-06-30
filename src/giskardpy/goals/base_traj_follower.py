@@ -175,6 +175,7 @@ class CarryMyBullshit(Goal):
                  distance_to_target_stop_threshold: float = 1,
                  laser_distance_threshold: float = 0.6,
                  laser_distance_threshold_width: float = 0.8,
+                 laser_avoidance_max_x: float = 0.5,
                  laser_avoidance_sideways_buffer: float = 0.04,
                  base_orientation_threshold: float = np.pi / 16,
                  wait_for_patrick_timeout: int = 30,
@@ -206,6 +207,7 @@ class CarryMyBullshit(Goal):
         self.closest_laser_left_pc = self.laser_distance_threshold_width
         self.closest_laser_right_pc = -self.laser_distance_threshold_width
         self.closest_laser_reading_pc = 0
+        self.laser_avoidance_max_x = laser_avoidance_max_x
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
         self.base_orientation_threshold = base_orientation_threshold
         self.odom_joint_name = self.world.search_for_joint_name(odom_joint_name)
@@ -319,16 +321,19 @@ class CarryMyBullshit(Goal):
 
     def muddle_laser_scan(self, scan: LaserScan, thresholds: np.ndarray):
         data = np.array(scan.ranges)
+        xs = np.cos(thresholds[:, 3]) * data
+        ys = np.sin(thresholds[:, 3]) * data
+        violations = data < thresholds[:, 2]
+        xs_error = xs - thresholds[:, 0]
+        half = int(data.shape[0] / 2)
         x_positive = np.where(thresholds[:, 0] > 0)[0]
         x_start = x_positive[0]
         x_end = x_positive[-1]
-        half = int(data.shape[0] / 2)
-        ys = np.sin(thresholds[:, 3]) * data
-        xs = np.cos(thresholds[:, 3]) * data
-        xs_error = xs - thresholds[:, 0]
-        violations = data < thresholds[:, 2]
-        closest_laser_right = ys[:half][violations[:half]]
-        closest_laser_left = ys[half:][violations[half:]]
+        x_below_laser_avoidance_threshold = thresholds[:, 0] < self.laser_avoidance_max_x
+        y_filter = x_below_laser_avoidance_threshold & violations
+        closest_laser_right = ys[:half][y_filter[:half]]
+        closest_laser_left = ys[half:][y_filter[half:]]
+
         front_violation = xs_error[x_start:x_end][violations[x_start:x_end]]
         if len(closest_laser_left) > 0:
             closest_laser_left = min(closest_laser_left)
@@ -439,6 +444,19 @@ class CarryMyBullshit(Goal):
             ms.markers.append(m_line)
         except Exception as e:
             logging.logwarn('failed to create laser marker')
+        square = Marker()
+        square.action = m_line.ADD
+        square.ns = 'laser_thresholds'
+        square.id = 1333
+        square.type = m_line.CUBE
+        square.header.frame_id = self.laser_frame
+        square.scale.x = self.laser_avoidance_max_x
+        square.scale.y = self.laser_distance_threshold_width * 2
+        square.scale.z = 0.1
+        square.color.a = 1
+        square.color.r = 1
+        square.frame_locked = True
+        ms.markers.append(square)
         self.pub.publish(ms)
 
     def publish_tracking_radius(self):

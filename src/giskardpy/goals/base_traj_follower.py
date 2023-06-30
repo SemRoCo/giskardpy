@@ -175,6 +175,7 @@ class CarryMyBullshit(Goal):
                  distance_to_target_stop_threshold: float = 1,
                  laser_distance_threshold: float = 0.6,
                  laser_distance_threshold_width: float = 0.8,
+                 laser_avoidance_sideways_buffer: float = 0.04,
                  base_orientation_threshold: float = np.pi / 16,
                  wait_for_patrick_timeout: int = 30,
                  max_rotation_velocity: float = 0.5,
@@ -204,6 +205,7 @@ class CarryMyBullshit(Goal):
         self.closest_laser_left_pc = 0
         self.closest_laser_right_pc = 0
         self.closest_laser_reading_pc = 0
+        self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
         self.base_orientation_threshold = base_orientation_threshold
         self.odom_joint_name = self.world.search_for_joint_name(odom_joint_name)
         self.odom_joint: OmniDrive = self.world.get_joint(self.odom_joint_name)
@@ -341,7 +343,8 @@ class CarryMyBullshit(Goal):
         self.closest_laser_reading, self.closest_laser_left, self.closest_laser_right = self.muddle_laser_scan(scan)
 
     def point_cloud_laser_cb(self, scan: LaserScan):
-        self.closest_laser_reading_pc, self.closest_laser_left_pc, self.closest_laser_right_pc = self.muddle_laser_scan(scan)
+        self.closest_laser_reading_pc, self.closest_laser_left_pc, self.closest_laser_right_pc = self.muddle_laser_scan(
+            scan)
 
     def get_current_point(self) -> np.ndarray:
         root_T_tip = self.world.compute_fk_np(self.root, self.tip)
@@ -636,7 +639,7 @@ class CarryMyBullshit(Goal):
             # right.reference_frame = self.world.search_for_link_name(self.laser_frame)
             # self.add_debug_expr('left', left)
             # self.add_debug_expr('right', right)
-            sideways_vel = (closest_laser_left + closest_laser_right) / 2
+            sideways_vel = (closest_laser_left + closest_laser_right)
             # bf_P_laser_avoidance = w.Point3([self.laser_distance_threshold + closest_laser_reading, 0, 0])
             # bf_P_laser_avoidance.reference_frame = self.world.search_for_link_name(self.laser_frame)
             # self.add_debug_expr('center', bf_P_laser_avoidance)
@@ -649,12 +652,13 @@ class CarryMyBullshit(Goal):
             laser_avoidance_weight = w.if_else(w.less(distance_to_closest_point, self.traj_tracking_radius),
                                                self.weight,
                                                0)
-
-            self.add_equality_constraint(reference_velocity=self.max_translation_velocity,
-                                         equality_bound=sideways_vel,
-                                         weight=laser_avoidance_weight,
-                                         task_expression=odom_y_vel,
-                                         name='laser avoidance')
+            buffer = self.laser_avoidance_sideways_buffer / 2
+            self.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
+                                           lower_error=sideways_vel - buffer,
+                                           upper_error=sideways_vel + buffer,
+                                           weight=laser_avoidance_weight,
+                                           task_expression=odom_y_vel,
+                                           name='laser avoidance')
 
     def __str__(self) -> str:
         return super().__str__()

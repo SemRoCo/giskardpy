@@ -240,4 +240,4 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.sent_goal = False
 
     def __str__(self):
-        return f'{self.__class__.__name__}/{self.group_name}/{self.action_namespace}'
+        return f'{self.__class__.__name__}\n/{self.group_name}/{self.action_namespace}'

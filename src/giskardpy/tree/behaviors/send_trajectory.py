@@ -154,7 +154,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         overriding this shit because of the fucking prints
         """
-        current_time = rospy.get_rostime()
+        delay = self.god_map.get_data(identifier.time_delay)
+        current_time = rospy.get_rostime() - delay
         # self.logger.debug("{0}.update()".format(self.__class__.__name__))
         if not self.action_client:
             self.feedback_message = "no action client, did you call setup() on your tree?"
@@ -187,7 +188,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             raise_to_blackboard(e)
             return py_trees.Status.FAILURE
         if self.action_client.get_state() in [GoalStatus.PREEMPTED, GoalStatus.PREEMPTING]:
-            if rospy.get_rostime() > self.max_deadline:
+            if rospy.get_rostime() - delay > self.max_deadline:
                 msg = '\'{}\' preempted, ' \
                       'probably because it took to long to execute the goal.'.format(self.action_namespace)
                 raise_to_blackboard(ExecutionTimeoutException(msg))
@@ -199,7 +200,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         result = self.action_client.get_result()
         if result:
-            if current_time < self.min_deadline:
+            if current_time - delay < self.min_deadline:
                 msg = '\'{}\' executed too quickly, stopping execution.'.format(self.action_namespace)
                 e = ExecutionSucceededPrematurely(msg)
                 raise_to_blackboard(e)
@@ -208,7 +209,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
             return py_trees.Status.SUCCESS
 
-        if current_time > self.max_deadline:
+        if current_time - delay > self.max_deadline:
             self.action_client.cancel_goal()
             msg = f'Cancelling \'{self.action_namespace}\' because it took to long to execute the goal.'
             logging.logerr(msg)

@@ -581,7 +581,18 @@ class CollisionAvoidanceConfig(Config):
         """
         if group_name is None:
             group_name = self.get_default_group_name()
-        self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
+        if group_name not in self._collision_scene.self_collision_matrix_paths:
+            try:
+                self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
+            except AttributeError as e:
+                try:
+                    self._collision_scene.load_self_collision_matrix_in_tmp(group_name)
+                except AttributeError as e:
+                    logging.loginfo('No self collision matrix loaded, computing new one.')
+                    self._collision_scene.compute_self_collision_matrix(group_name)
+        else:
+            path_to_srdf = self._collision_scene.self_collision_matrix_paths[group_name]
+            self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
 
     def ignore_all_self_collisions_of_link(self, link_name: str, group_name: Optional[str] = None):
         """
@@ -715,13 +726,7 @@ class Giskard(ABC, Config):
         self._controlled_joints_sanity_check()
         robot_name = self.get_default_group_name()
         self._world.notify_model_change()
-        if robot_name not in self._collision_scene.self_collision_matrix_paths:
-            # logging.loginfo('No self collision matrix loaded computing new one.')
-            try:
-                self._collision_scene.load_self_collision_matrix_in_tmp(robot_name)
-            except AttributeError as e:
-                logging.loginfo('No self collision matrix loaded, computing new one.')
-                self._collision_scene.compute_self_collision_matrix(robot_name)
+        self.collision_avoidance.load_self_collision_matrix('')
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)

@@ -64,7 +64,7 @@ tree_manager = ['behavior_tree']
 tree_tick_rate = giskard + ['behavior_tree', 'tree_tick_rate']
 
 # collision avoidance
-collision_avoidance_configs = collision_avoidance_config + ['collision_avoidance', '_collision_avoidance_configs']
+collision_avoidance_configs = collision_avoidance_config + ['_collision_avoidance_configs']
 collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']

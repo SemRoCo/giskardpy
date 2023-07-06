@@ -894,34 +894,6 @@ class WorldTree(WorldTreeInterface):
             raise PhysicsWorldException(f'Found multiple orphaned links: {orphans}.')
         self._root_link_name = orphans[0]
 
-    def fix_tree_structure(self):
-        for joint in self.joints.values():
-            self._raise_if_link_does_not_exist(joint.parent_link_name)
-            self._raise_if_link_does_not_exist(joint.child_link_name)
-            parent_link = self.links[joint.parent_link_name]
-            if joint.name not in parent_link.child_joint_names:
-                parent_link.child_joint_names.append(joint.name)
-            child_link = self.links[joint.child_link_name]
-            if child_link.parent_joint_name is None:
-                child_link.parent_joint_name = joint.name
-            else:
-                assert child_link.parent_joint_name == joint.name
-        self.fix_root_link()
-        for link in self.links.values():
-            if link != self.root_link:
-                self._raise_if_joint_does_not_exist(link.parent_joint_name)
-            for child_joint_name in link.child_joint_names:
-                self._raise_if_joint_does_not_exist(child_joint_name)
-
-    def fix_root_link(self):
-        orphans = []
-        for link_name, link in self.links.items():
-            if link.parent_joint_name is None:
-                orphans.append(link_name)
-        if len(orphans) > 1:
-            raise PhysicsWorldException(f'Found multiple orphaned links: {orphans}.')
-        self._root_link_name = orphans[0]
-
     def _raise_if_link_does_not_exist(self, link_name: my_string):
         if link_name not in self.links:
             raise PhysicsWorldException(f'Link \'{link_name}\' does not exist.')

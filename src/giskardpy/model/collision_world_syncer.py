@@ -1,3 +1,4 @@
+import os
 import itertools
 from collections import defaultdict
 from enum import Enum
@@ -300,6 +301,8 @@ class CollisionWorldSynchronizer:
     def load_black_list_from_srdf(self, path: str, group_name: str) -> Dict[
         Tuple[PrefixName, PrefixName], DisableCollisionReason]:
         path_to_srdf = resolve_ros_iris(path)
+        if not os.path.exists(path_to_srdf):
+            raise AttributeError(f'file {path_to_srdf} does not exist')
         srdf = etree.parse(path_to_srdf)
         srdf_root = srdf.getroot()
         black_list = set()
@@ -518,7 +521,7 @@ class CollisionWorldSynchronizer:
                 almost_always.add(link_combination)
                 reasons[link_combination] = DisableCollisionReason.AlmostAlways
         # 4. NEVER IN COLLISION
-        never_tries = 1000
+        never_tries = 10000
         sometimes = set()
         update_query = True
         with Bar('never in collision', max=never_tries) as bar:

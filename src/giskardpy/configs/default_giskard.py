@@ -714,10 +714,12 @@ class Giskard(ABC, Config):
         self.configure_behavior_tree()
         self._controlled_joints_sanity_check()
         robot_name = self.get_default_group_name()
+        self._world.notify_model_change()
         if robot_name not in self._collision_scene.self_collision_matrix_paths:
             # logging.loginfo('No self collision matrix loaded computing new one.')
-            self._collision_scene.load_self_collision_matrix_in_tmp(robot_name)
-            if len(self._collision_scene.black_list) == 0:
+            try:
+                self._collision_scene.load_self_collision_matrix_in_tmp(robot_name)
+            except AttributeError as e:
                 logging.loginfo('No self collision matrix loaded, computing new one.')
                 self._collision_scene.compute_self_collision_matrix(robot_name)
 

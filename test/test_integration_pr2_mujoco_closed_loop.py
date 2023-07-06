@@ -198,7 +198,8 @@ class TestMoveBaseGoals:
 
         zero_pose.set_json_goal('CarryMyBullshit',
                                 camera_link='head_mount_kinect_rgb_optical_frame',
-                                laser_topic_name='/laser',
+                                # laser_topic_name='/laser',
+                                laser_frame_id='base_laser_link',
                                 drive_back=True)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()

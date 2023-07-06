@@ -128,11 +128,11 @@ class IMServer(object):
         # control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         # int_marker.controls.append(control)
 
-        control = InteractiveMarkerControl()
-        control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
-        control.name = 'move_z'
-        control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
-        int_marker.controls.append(control)
+        # control = InteractiveMarkerControl()
+        # control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
+        # control.name = 'move_z'
+        # control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+        # int_marker.controls.append(control)
 
         # control = InteractiveMarkerControl()
         # control.orientation = Quaternion(*normed_q(0, 0, 1, 1))
@@ -196,6 +196,7 @@ class IMServer(object):
                 p.header.frame_id = feedback.header.frame_id
                 p.header.stamp = rospy.get_rostime()
                 p.point = feedback.pose.position
+                p.point.z = 1
                 self.target = p
                 self.parent.point = p
                 # self.goal_pub.publish(p)

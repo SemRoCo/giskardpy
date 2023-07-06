@@ -241,7 +241,8 @@ class WorldUpdater(GiskardBehavior):
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
         parent_group = self.world.get_parent_group_name(req.group_name)
-        self.collision_scene.update_self_collision_matrix(parent_group)
+        new_links = self.world.groups[req.group_name].link_names_with_collisions
+        self.collision_scene.update_self_collision_matrix(parent_group, new_links)
         self.collision_scene.blacklist_inter_group_collisions()
         # logging.logwarn(f'adding took {time() - t:03}')
 

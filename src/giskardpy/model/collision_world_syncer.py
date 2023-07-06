@@ -377,106 +377,23 @@ class CollisionWorldSynchronizer:
     def remove_black_list_entries(self, part_list: set):
         self.black_list = {x for x in self.black_list if x[0] not in part_list and x[1] not in part_list}
 
-    def update_self_collision_matrix(self, group_name: str):
-        pass
-
-    def update_group_blacklist(self,
-                               group_name: str,
-                               link_combinations: Optional[set] = None,
-                               white_list_combinations: Optional[set] = None,
-                               distance_threshold_zero: float = 0.05,
-                               distance_threshold_rnd: float = 0.0,
-                               non_controlled: bool = False,
-                               steps: int = 10):
-        self._sort_white_list()
-        group: WorldBranch = self.world.groups[group_name]
-        if link_combinations is None:
-            link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
-        # logging.loginfo('calculating self collision matrix')
-        joint_state_tmp = deepcopy(self.world.state)
-        t = time()
-        # find meaningless collisions
-        for link_a, link_b in link_combinations:
-            link_combination = self.world.sort_links(link_a, link_b)
-            if link_combination in self.black_list:
-                continue
-            try:
-                if link_a == link_b \
-                        or link_a in self.links_to_ignore \
-                        or link_b in self.links_to_ignore \
-                        or link_a in self.ignored_self_collion_pairs \
-                        or link_b in self.ignored_self_collion_pairs \
-                        or (link_a, link_b) in self.ignored_self_collion_pairs \
-                        or (link_b, link_a) in self.ignored_self_collion_pairs \
-                        or self.world.are_linked(link_a, link_b, do_not_ignore_non_controlled_joints=non_controlled,
-                                                 joints_to_be_assumed_fixed=self.fixed_joints) \
-                        or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
-                    self.add_black_list_entry(*link_combination)
-            except Exception as e:
-                pass
-
-        unknown = link_combinations.difference(self.black_list)
-        self.set_joint_state_to_zero()
-        for link_a, link_b in self.find_colliding_combinations(unknown, distance_threshold_zero):
-            link_combination = self.world.sort_links(link_a, link_b)
-            self.add_black_list_entry(*link_combination)
-        unknown = unknown.difference(self.black_list)
-
-        # Remove combinations which can never touch
-        # by checking combinations which a single joint can influence
-        joints = [j for j in group.controlled_joints if j not in self.fixed_joints]
-        for joint_name in joints:
-            parent_links = group.get_siblings_with_collisions(joint_name)
-            if not parent_links:
-                continue
-            child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name, self.fixed_joints)
-            if self.world.is_joint_continuous(joint_name):
-                min_position = -np.pi
-                max_position = np.pi
-            else:
-                min_position, max_position = self.world.get_joint_position_limits(joint_name)
-
-            # joint_name can make these links touch.
-            current_combinations = set(product(parent_links, child_links))
-            # Filter for combinations which are still unknown
-            # and make sure the link_a, link_b order is same as in unknown
-            subset_of_unknown = [x for x in unknown if
-                                 x in current_combinations or (x[1], x[0]) in current_combinations]
-            if not subset_of_unknown:
-                continue
-            sometimes = set()
-            for position in np.linspace(min_position, max_position, steps):
-                self.world.state[joint_name].position = position
-                self.world.notify_state_change()
-                self.sync()
-                for link_a, link_b in subset_of_unknown:
-                    if self.in_collision(link_a, link_b, distance_threshold_rnd):
-                        sometimes.add(self.world.sort_links(link_a, link_b))
-            never = set(subset_of_unknown).difference(sometimes)
-            unknown = unknown.difference(never)
-            self.add_black_list_entries(never)
-
-        logging.logdebug(f'Calculated self collision matrix in {time() - t:.3f}s')
-        self.world.state = joint_state_tmp
-        self.world.notify_state_change()
-        # unknown.update(self.white_list_pairs)
-        if white_list_combinations is not None:
-            self.black_list.difference_update(white_list_combinations)
-        # self.black_list[group_name] = unknown
-        # return self.collision_matrices[group_name]
+    def update_self_collision_matrix(self, group_name: str, new_links: Iterable[PrefixName]):
+        group = self.world.groups[group_name]
+        link_combinations = list(product(group.link_names_with_collisions, new_links))
+        self.compute_self_collision_matrix(group_name, link_combinations, save_to_tmp=False)
 
     @profile
     def compute_self_collision_matrix(self,
                                       group_name: str,
-                                      link_combinations: Optional[set] = None,
+                                      link_combinations: Optional[Iterable] = None,
                                       distance_threshold_zero: float = 0.0,
                                       distance_threshold_never: float = 0.0,
                                       distance_threshold_always: float = 0.005,
                                       non_controlled: bool = False,
-                                      steps: int = 10) -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+                                      save_to_tmp: bool = True) \
+            -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
         np.random.seed(1337)
-        joint_state_tmp = self.world.state
-        black_list = []
+        joint_state_tmp = deepcopy(self.world.state)
         white_list = set()
         default_ = set()
         reasons = {}
@@ -540,8 +457,12 @@ class CollisionWorldSynchronizer:
             reasons[combi] = DisableCollisionReason.Never
         self.world.state = joint_state_tmp
         self.white_list = white_list
-        self.black_list = never_in_contact.union(default_).union(almost_always).union(adjacent)
-        self.save_black_list(group, adjacent, default_, almost_always, never_in_contact)
+        black_list = never_in_contact.union(default_).union(almost_always).union(adjacent)
+        if save_to_tmp:
+            self.black_list = black_list
+            self.save_black_list(group, adjacent, default_, almost_always, never_in_contact)
+        else:
+            self.black_list.update(black_list)
         return reasons
 
     def save_black_list(self,

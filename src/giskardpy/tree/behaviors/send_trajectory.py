@@ -49,6 +49,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     def __init__(self, action_namespace: str, state_topic: str, group_name: str,
                  goal_time_tolerance: float = 1, fill_velocity_values: bool = True):
         self.group_name = group_name
+        self.delay = rospy.Duration(0)
         self.action_namespace = action_namespace
         GiskardBehavior.__init__(self, str(self))
         self.min_deadline: rospy.Time
@@ -126,6 +127,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     @profile
     def initialise(self):
         super().initialise()
+        self.delay = self.god_map.get_data(identifier.time_delay)
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
@@ -139,8 +141,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         deadline = self.action_goal.trajectory.header.stamp + \
                    self.action_goal.trajectory.points[-1].time_from_start + \
                    self.action_goal.goal_time_tolerance
-        self.min_deadline = deadline - self.goal_time_tolerance
-        self.max_deadline = deadline + self.goal_time_tolerance
+        self.min_deadline = deadline - self.goal_time_tolerance + self.delay
+        self.max_deadline = deadline + self.goal_time_tolerance + self.delay
         self.cancel_tries = 0
 
     @catch_and_raise_to_blackboard
@@ -154,8 +156,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         overriding this shit because of the fucking prints
         """
-        delay = self.god_map.get_data(identifier.time_delay)
-        current_time = rospy.get_rostime() - delay
+        current_time = rospy.get_rostime()
         # self.logger.debug("{0}.update()".format(self.__class__.__name__))
         if not self.action_client:
             self.feedback_message = "no action client, did you call setup() on your tree?"
@@ -188,7 +189,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             raise_to_blackboard(e)
             return py_trees.Status.FAILURE
         if self.action_client.get_state() in [GoalStatus.PREEMPTED, GoalStatus.PREEMPTING]:
-            if rospy.get_rostime() - delay > self.max_deadline:
+            if rospy.get_rostime() > self.max_deadline:
                 msg = '\'{}\' preempted, ' \
                       'probably because it took to long to execute the goal.'.format(self.action_namespace)
                 raise_to_blackboard(ExecutionTimeoutException(msg))
@@ -200,7 +201,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         result = self.action_client.get_result()
         if result:
-            if current_time - delay < self.min_deadline:
+            if current_time < self.min_deadline:
                 msg = '\'{}\' executed too quickly, stopping execution.'.format(self.action_namespace)
                 e = ExecutionSucceededPrematurely(msg)
                 raise_to_blackboard(e)
@@ -209,7 +210,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
             return py_trees.Status.SUCCESS
 
-        if current_time - delay > self.max_deadline:
+        if current_time > self.max_deadline:
             self.action_client.cancel_goal()
             msg = f'Cancelling \'{self.action_namespace}\' because it took to long to execute the goal.'
             logging.logerr(msg)

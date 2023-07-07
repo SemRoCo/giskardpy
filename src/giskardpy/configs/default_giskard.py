@@ -711,6 +711,7 @@ class Giskard(ABC, Config):
         with self._world.modify_world():
             self.configure_world()
         self.configure_collision_avoidance()
+        self._collision_scene
         self.configure_execution()
         if self.execution.control_mode == ControlModes.open_loop:
             behavior_tree = OpenLoop()
@@ -724,7 +725,6 @@ class Giskard(ABC, Config):
         self.configure_robot_interface()
         self.configure_behavior_tree()
         self._controlled_joints_sanity_check()
-        robot_name = self.get_default_group_name()
         self._world.notify_model_change()
         self.collision_avoidance.load_self_collision_matrix('')
 

@@ -121,11 +121,10 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 self.add_object(link)
                 self.objects_in_order.append(self.object_name_to_id[link_name])
             bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_collision_fks())
-        bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_collision_fks())
+        else:
+            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_collision_fks())
 
     @profile
-    def get_map_T_geometry(self, link_name: PrefixName, link_T_geometry: np.ndarray) -> Pose:
+    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
         collision_object = self.object_name_to_id[link_name]
-        map_T_link = collision_object.transform.to_np()
-        map_T_geometry = np.dot(map_T_link, link_T_geometry)
-        return np_to_pose(map_T_geometry)
+        return collision_object.compound_transform(collision_id)

@@ -43,7 +43,7 @@ class ROSMsgVisualization:
                 marker.id = self.marker_ids[link_id_key]
                 marker.ns = name_space
                 marker.header.stamp = time_stamp
-                marker.pose = self.collision_scene.get_map_T_geometry(link_name, marker.pose)
+                marker.pose = self.collision_scene.get_map_T_geometry(link_name, j)
                 markers.append(marker)
         return markers
 

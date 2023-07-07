@@ -126,15 +126,15 @@ class RosMsgToGoal(GetGoal):
         return collision_matrix
 
     def make_max_distances(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
-        default_distance = {}
+        # default_distance = {}
         # fixme this default is buggy, but it doesn't get triggered
         for robot_name in self.robot_names:
             collision_avoidance_config = self.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance
             self_distances = collision_avoidance_config.self_collision_avoidance
-            default_distance[robot_name] = collision_avoidance_config.cal_max_param('soft_threshold')
+            # default_distance[robot_name] = collision_avoidance_config.cal_max_param('soft_threshold')
 
-        max_distances = defaultdict(lambda: default_distance)
+        max_distances = {}
         # override max distances based on external distances dict
         for robot in self.collision_scene.robots:
             for link_name in robot.link_names_with_collisions:

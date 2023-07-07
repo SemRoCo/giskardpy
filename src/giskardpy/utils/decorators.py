@@ -85,7 +85,7 @@ def memoize_with_counter(reset_after: int):
 
 
 def record_time(function):
-    return function
+    # return function
     function_name = function.__name__
 
     @wraps(function)

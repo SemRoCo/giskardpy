@@ -383,8 +383,12 @@ class CollisionWorldSynchronizer:
 
     def update_self_collision_matrix(self, group_name: str, new_links: Iterable[PrefixName]):
         group = self.world.groups[group_name]
-        link_combinations = list(product(group.link_names_with_collisions, new_links))
-        self.compute_self_collision_matrix(group_name, link_combinations, save_to_tmp=False)
+        if group.actuated:
+            link_combinations = list(product(group.link_names_with_collisions, new_links))
+            self.compute_self_collision_matrix(group_name, link_combinations, save_to_tmp=False)
+        else:
+            combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
+            self.black_list.update(combinations)
 
     @profile
     def compute_self_collision_matrix(self,
@@ -546,7 +550,7 @@ class CollisionWorldSynchronizer:
             for link_a, link_b in product(group_a.link_names_with_collisions, group_b.link_names_with_collisions):
                 self.add_black_list_entry(*self.world.sort_links(link_a, link_b))
 
-    def get_map_T_geometry(self, link_name, collision_id=0):
+    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0):
         return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name, collision_id)
 
     def set_joint_state_to_zero(self):

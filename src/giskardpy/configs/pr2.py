@@ -37,6 +37,9 @@ class PR2_Base(Giskard):
                                             Derivatives.jerk: 5
                                         },
                                         robot_group_name=pr2_group_name)
+        self.world.set_joint_limits(limit_map={Derivatives.velocity: 3,
+                                               Derivatives.jerk: 60},
+                                    joint_name='head_pan_joint')
 
     def configure_collision_avoidance(self):
         # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
@@ -152,7 +155,7 @@ class PR2_MujocoRealTime(PR2_Base):
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
                                                               add_to_control_loop=False)
         self.behavior_tree.add_debug_marker_publisher()
-        # self.behavior_tree.add_qp_data_publisher(publish_debug=True, add_to_base=True)
+        self.behavior_tree.add_qp_data_publisher(publish_debug=True, add_to_base=False)
 
     def configure_robot_interface(self):
         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,

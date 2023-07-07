@@ -1186,12 +1186,18 @@ class QPProblemBuilder:
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)
+            self._has_nan()
             self._print_iis()
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
             self.xdot_full = None
             self._are_hard_limits_violated(str(e_original))
             raise
+
+    def _has_nan(self):
+        nan_entries = self.p_A.isnull().stack()
+        row_col_names = nan_entries[nan_entries].index.tolist()
+        pass
 
     def _are_hard_limits_violated(self, error_message):
         self._create_debug_pandas(self.qp_solver)

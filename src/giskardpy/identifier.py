@@ -37,6 +37,7 @@ cmd_id = ['cmd_id']
 
 result_message = ['result_message']
 tracking_start_time = ['tracking_start_time']
+time_delay = ['time_delay']
 dt = ['dt']
 
 # config

@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Pose
 from sortedcontainers import SortedDict
 
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
-    load_convex_mesh_shape, MyCollisionObject, create_shape_from_link, to_giskard_collision
+    load_convex_mesh_shape, create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry, Link
 from giskardpy.my_types import PrefixName
@@ -20,8 +20,8 @@ from giskardpy.utils.tfwrapper import np_to_pose
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def __init__(self, world):
         self.kw = bpb.KineverseWorld()
-        self.object_name_to_id: Dict[PrefixName, MyCollisionObject] = {}
-        self.query: Optional[DefaultDict[PrefixName, Set[Tuple[MyCollisionObject, float]]]] = None
+        self.object_name_to_id: Dict[PrefixName, bpb.CollisionObject] = {}
+        self.query: Optional[DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]] = None
         super().__init__(world)
 
 
@@ -43,7 +43,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
-                                   buffer: float = 0.05) -> DefaultDict[PrefixName, Set[Tuple[MyCollisionObject, float]]]:
+                                   buffer: float = 0.05) -> DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]:
         if self.query is None:
             self.query = {(self.object_name_to_id[a], self.object_name_to_id[b]): v for (a, b), v in cut_off_distances.items()}
             # self.query = defaultdict(set)

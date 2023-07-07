@@ -274,7 +274,7 @@ class CollisionAvoidanceHint(Goal):
         super().__init__()
         self.link_name = self.world.search_for_link_name(tip_link)
         self.link_b = self.world.search_for_link_name(object_link_name)
-        self.key = (self.link_name, None, self.link_b)
+        self.key = (self.link_name, self.link_b)
         self.object_group = object_group
         self.link_b_hash = self.link_b.__hash__()
         if root_link is None:

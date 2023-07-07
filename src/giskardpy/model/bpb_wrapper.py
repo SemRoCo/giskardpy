@@ -14,42 +14,7 @@ from giskardpy.utils import logging
 from giskardpy.utils.math import inverse_frame
 from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp
 
-
-class MyCollisionObject(pb.CollisionObject):
-    def __init__(self, name):
-        super().__init__()
-        self.name = name
-
-    def __repr__(self):
-        return str(self.name)
-
-    def __str__(self):
-        return str(self.name)
-
-    def __hash__(self):
-        return self.name.__hash__()
-
-    def __eq__(self, other):
-        return self.name.__eq__(other.__str__())
-
-    def __ne__(self, other):
-        return self.name.__ne__(other.__str__())
-
-    def __le__(self, other):
-        return self.name.__le__(other.__str__())
-
-    def __ge__(self, other):
-        return self.name.__ge__(other.__str__())
-
-    def __gt__(self, other):
-        return self.name.__gt__(other.__str__())
-
-    def __lt__(self, other):
-        return self.name.__lt__(other.__str__())
-
-    def __contains__(self, item):
-        return self.name.__contains__(item.__str__())
-
+CollisionObject = pb.CollisionObject
 
 class BPCollisionWrapper(Collision):
     def __init__(self, pb_collision: pb.Collision):
@@ -133,7 +98,7 @@ def create_shape_from_geometry(geometry: LinkGeometry) -> pb.CollisionShape:
     return shape
 
 
-def create_shape_from_link(link: Link, collision_id: int = 0) -> MyCollisionObject:
+def create_shape_from_link(link: Link, collision_id: int = 0) -> pb.CollisionObject:
     # if len(link.collisions) > 1:
     shapes = []
     map_T_o = None
@@ -189,10 +154,10 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
 
 
 def create_object(name: PrefixName, shape: pb.CollisionShape, transform: Optional[pb.Transform] = None) \
-        -> MyCollisionObject:
+        -> pb.CollisionObject:
     if transform is None:
         transform = pb.Transform.identity()
-    out = MyCollisionObject(name)
+    out = pb.CollisionObject(name)
     out.collision_shape = shape
     out.collision_flags = pb.CollisionObject.KinematicObject
     out.transform = transform

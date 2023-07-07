@@ -10,7 +10,6 @@ from lxml import etree
 import hashlib
 import numpy as np
 from progress.bar import Bar
-from sortedcontainers import SortedKeyList
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
@@ -83,6 +82,39 @@ class Collision:
                          contact_distance=self.contact_distance)
 
 
+class SortedCollisionResults:
+    data: list
+    default_result = Collision(link_a='',
+                               link_b='',
+                               contact_distance=100,
+                               map_P_pa=[0, 0, 0, 1],
+                               map_P_pb=[0, 0, 0, 1],
+                               map_V_n=[0, 0, 1, 0],
+                               a_P_pa=[0, 0, 0, 1],
+                               b_P_pb=[0, 0, 0, 1])
+    default_result.new_a_P_pa = [0, 0, 0, 1]
+    default_result.new_b_P_pb = [0, 0, 0, 1]
+    default_result.new_b_V_n = [0, 0, 1, 0]
+
+    def __init__(self):
+        self.data = []
+
+        def sort(x):
+            return x.contact_distance
+
+        self.key = sort
+
+    def add(self, element):
+        self.data.append(element)
+        self.data = list(sorted(self.data, key=self.key))
+
+    def __getitem__(self, item):
+        try:
+            return self.data[item]
+        except (KeyError, IndexError) as e:
+            return SortedCollisionResults.default_result
+
+
 class Collisions:
     all_collisions: Set[Collision]
 
@@ -96,20 +128,9 @@ class Collisions:
         self.world: WorldTree = self.god_map.get_data(identifier.world)
         self.collision_list_size = collision_list_size
 
-        # @profile
-        def sort(x):
-            return x.contact_distance
-
-        # @profile
-        def default_f():
-            return SortedKeyList([self._default_collision('', '', '')] * collision_list_size,
-                                 key=sort)
-
-        self.default_result = default_f()
-
-        self.self_collisions = defaultdict(default_f)
-        self.external_collision = defaultdict(default_f)
-        self.external_collision_long_key = defaultdict(lambda: self._default_collision('', '', ''))
+        self.self_collisions = defaultdict(SortedCollisionResults)
+        self.external_collision = defaultdict(SortedCollisionResults)
+        self.external_collision_long_key = defaultdict(lambda: SortedCollisionResults.default_result)
         self.all_collisions = set()
         self.number_of_self_collisions = defaultdict(int)
         self.number_of_external_collisions = defaultdict(int)
@@ -123,8 +144,6 @@ class Collisions:
     @profile
     def add(self, collision: Collision):
         robot = self.get_robot_from_self_collision(collision)
-        # is_external = collision.link_b not in robot.link_names_with_collisions \
-        #               or collision.link_a not in robot.link_names_with_collisions
         collision.is_external = robot is None
         if collision.is_external:
             collision = self.transform_external_collision(collision)
@@ -132,7 +151,7 @@ class Collisions:
             self.external_collision[key].add(collision)
             self.number_of_external_collisions[key] = min(self.collision_list_size,
                                                           self.number_of_external_collisions[key] + 1)
-            key_long = (collision.original_link_a, None, collision.original_link_b)
+            key_long = (collision.original_link_a, collision.original_link_b)
             if key_long not in self.external_collision_long_key:
                 self.external_collision_long_key[key_long] = collision
             else:
@@ -188,7 +207,6 @@ class Collisions:
                 return self.world.is_joint_controlled(joint_name) and joint_name not in self.fixed_joints
 
             movable_joint = self.world.search_for_parent_joint(joint, stopper)
-            # movable_joint = self.world.get_controlled_parent_joint_of_link(collision.original_link_a)
         except Exception as e:
             pass
         new_a = self.world.joints[movable_joint].child_link_name
@@ -203,41 +221,27 @@ class Collisions:
         collision.new_a_P_pa = new_a_P_a
         return collision
 
-    def _default_collision(self, link_a, body_b, link_b):
-        c = Collision(link_a=link_a,
-                      link_b=link_b,
-                      contact_distance=100,
-                      map_P_pa=[0, 0, 0, 1],
-                      map_P_pb=[0, 0, 0, 1],
-                      map_V_n=[0, 0, 1, 0],
-                      a_P_pa=[0, 0, 0, 1],
-                      b_P_pb=[0, 0, 0, 1])
-        c.new_a_P_pa = [0, 0, 0, 1]
-        c.new_b_P_pb = [0, 0, 0, 1]
-        c.new_b_V_n = [0, 0, 1, 0]
-        return c
-
     @profile
-    def get_external_collisions(self, joint_name: str) -> SortedKeyList:
+    def get_external_collisions(self, joint_name: str) -> SortedCollisionResults:
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
         """
         if joint_name in self.external_collision:
             return self.external_collision[joint_name]
-        return self.default_result
+        return SortedCollisionResults()
 
     @profile
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
 
     # @profile
-    def get_self_collisions(self, link_a: my_string, link_b: my_string) -> SortedKeyList:
+    def get_self_collisions(self, link_a: my_string, link_b: my_string) -> SortedCollisionResults:
         """
         Make sure that link_a < link_b, the reverse collision is not saved.
         """
         if (link_a, link_b) in self.self_collisions:
             return self.self_collisions[link_a, link_b]
-        return self.default_result
+        return SortedCollisionResults()
 
     def get_number_of_self_collisions(self, link_a, link_b):
         return self.number_of_self_collisions[link_a, link_b]

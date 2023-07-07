@@ -593,27 +593,27 @@ def generate_pydot_graph(root, visibility_level):
                     original_c = c.original
                 else:
                     original_c = c
-                # if isinstance(original_c, GiskardBehavior) and not isinstance(original_c, AsyncBehavior):
-                #     function_names = ['__init__', 'setup', 'initialise', 'update']
-                #     function_name_padding = 20
-                #     entry_name_padding = 8
-                #     number_padding = function_name_padding - entry_name_padding
-                #     if hasattr(original_c, '__times'):
-                #         time_dict = original_c.__times
-                #     else:
-                #         time_dict = {}
-                #     for function_name in function_names:
-                #         if function_name in time_dict:
-                #             times = time_dict[function_name]
-                #             average_time = np.average(times)
-                #             total_time = np.sum(times)
-                #             if total_time > 1:
-                #                 color = 'red'
-                #             proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
-                #                                  f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.3}".ljust(number_padding)}' \
-                #                                  f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.3}".ljust(number_padding)}'
-                #         else:
-                #             proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
+                if isinstance(original_c, GiskardBehavior) and not isinstance(original_c, AsyncBehavior):
+                    function_names = ['__init__', 'setup', 'initialise', 'update']
+                    function_name_padding = 20
+                    entry_name_padding = 8
+                    number_padding = function_name_padding - entry_name_padding
+                    if hasattr(original_c, '__times'):
+                        time_dict = original_c.__times
+                    else:
+                        time_dict = {}
+                    for function_name in function_names:
+                        if function_name in time_dict:
+                            times = time_dict[function_name]
+                            average_time = np.average(times)
+                            total_time = np.sum(times)
+                            if total_time > 1:
+                                color = 'red'
+                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
+                                                 f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.3}".ljust(number_padding)}' \
+                                                 f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.3}".ljust(number_padding)}'
+                        else:
+                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
 
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"

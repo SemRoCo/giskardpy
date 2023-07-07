@@ -104,7 +104,7 @@ class LinkGeometry:
         marker = Marker()
         marker.color = self.color
 
-        marker.pose = self.link_T_geometry.evaluate()
+        # marker.pose = self.link_T_geometry.evaluate()
         return marker
 
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
@@ -282,7 +282,7 @@ class Link:
             for collision in self.collisions:
                 collision.color = color
 
-    @copy_memoize
+    @memoize
     def collision_visualization_markers(self):
         markers = MarkerArray()
         for collision in self.collisions:

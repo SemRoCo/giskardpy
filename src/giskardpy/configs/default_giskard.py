@@ -584,12 +584,8 @@ class CollisionAvoidanceConfig(Config):
         if group_name not in self._collision_scene.self_collision_matrix_paths:
             try:
                 self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
-            except AttributeError as e:
-                try:
-                    self._collision_scene.load_self_collision_matrix_in_tmp(group_name)
-                except AttributeError as e:
-                    logging.loginfo('No self collision matrix loaded, computing new one.')
-                    self._collision_scene.compute_self_collision_matrix(group_name)
+            except Exception as e:
+                logging.logwarn(str(e))
         else:
             path_to_srdf = self._collision_scene.self_collision_matrix_paths[group_name]
             self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
@@ -726,7 +722,8 @@ class Giskard(ABC, Config):
         self.configure_behavior_tree()
         self._controlled_joints_sanity_check()
         self._world.notify_model_change()
-        self.collision_avoidance.load_self_collision_matrix('')
+        if self.get_default_group_name() not in self._collision_scene.self_collision_matrix_paths:
+            self._collision_scene.load_or_compute_self_collision_matrix_in_tmp(self.get_default_group_name())
 
     def _controlled_joints_sanity_check(self):
         world = self._god_map.get_data(identifier.world)

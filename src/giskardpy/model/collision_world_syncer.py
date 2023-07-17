@@ -6,6 +6,8 @@ from copy import deepcopy
 from itertools import product, combinations_with_replacement, combinations
 from time import time
 from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict
+
+from geometry_msgs.msg import Pose
 from lxml import etree
 import hashlib
 import numpy as np
@@ -13,7 +15,7 @@ from progress.bar import Bar
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig
+from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig, CollisionCheckerLib
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
@@ -298,12 +300,22 @@ class CollisionWorldSynchronizer:
             return True
         return False
 
-    def load_self_collision_matrix_in_tmp(self, group_name: str):
-        file_name = self._get_path_to_self_collision_matrix(group_name)
-        self.load_black_list_from_srdf(file_name, group_name)
+    def load_or_compute_self_collision_matrix_in_tmp(self, group_name: str):
+        try:
+            file_name = self._get_path_to_self_collision_matrix(group_name)
+            recompute = not self.load_black_list_from_srdf(file_name, group_name)
+        except AttributeError as e:
+            logging.loginfo('No self collision matrix loaded, computing new one.')
+            recompute = True
+        if recompute:
+            self.compute_self_collision_matrix(group_name)
 
-    def load_black_list_from_srdf(self, path: str, group_name: str) -> Dict[
-        Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+    def is_collision_checking_enabled(self) -> bool:
+        return self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none
+
+    def load_black_list_from_srdf(self, path: str, group_name: str) -> bool:
+        if not self.is_collision_checking_enabled():
+            return True
         path_to_srdf = resolve_ros_iris(path)
         if not os.path.exists(path_to_srdf):
             raise AttributeError(f'file {path_to_srdf} does not exist')
@@ -334,13 +346,13 @@ class CollisionWorldSynchronizer:
                 reasons[combi] = reason
         if actual_hash is not None and actual_hash != expected_hash:
             logging.logwarn(f'Self collision matrix \'{path_to_srdf}\' not loaded because it appears to be outdated.')
-            return {}
+            return False
         for link_name in self.world.link_names_with_collisions:
             black_list.add((link_name, link_name))
         self.black_list = black_list
         logging.loginfo(f'Loaded self collision avoidance matrix: {path_to_srdf}')
         self.self_collision_matrix_paths[group_name] = path_to_srdf
-        return reasons
+        return True
 
     def robot(self, robot_name: str = '') -> WorldBranch:
         for robot in self.robots:
@@ -400,6 +412,8 @@ class CollisionWorldSynchronizer:
                                       non_controlled: bool = False,
                                       save_to_tmp: bool = True) \
             -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+        if not self.is_collision_checking_enabled():
+            return {}
         np.random.seed(1337)
         joint_state_tmp = deepcopy(self.world.state)
         white_list = set()
@@ -550,8 +564,8 @@ class CollisionWorldSynchronizer:
             for link_a, link_b in product(group_a.link_names_with_collisions, group_b.link_names_with_collisions):
                 self.add_black_list_entry(*self.world.sort_links(link_a, link_b))
 
-    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0):
-        return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name, collision_id)
+    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
+        return self.world.compute_fk_pose_with_collision_offset(self.world.root_link_name, link_name, collision_id).pose
 
     def set_joint_state_to_zero(self):
         for free_variable in self.world.free_variables:

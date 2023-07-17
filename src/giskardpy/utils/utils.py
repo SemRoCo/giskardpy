@@ -1,5 +1,5 @@
 from __future__ import division
-
+import hashlib
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
 import urdf_parser_py.urdf as up
@@ -228,6 +228,18 @@ def create_path(path):
 
 def cm_to_inch(cm):
     return cm * 0.393701
+
+
+def get_file_hash(file_path: str, algorithm: str = "sha256") -> Optional[str]:
+    try:
+        hash_func = hashlib.new(algorithm)
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(4096):
+                hash_func.update(chunk)
+        return hash_func.hexdigest()
+    except Exception as e:
+        print(f"Error occurred while hashing: {e}")
+        return None
 
 
 def resolve_ros_iris_in_urdf(input_urdf):

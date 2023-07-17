@@ -16,7 +16,7 @@ from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cyli
 from giskardpy.my_types import PrefixName
 from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
-from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy.utils.utils import resolve_ros_iris, get_file_hash
 from giskardpy.utils.decorators import memoize, copy_memoize
 import giskardpy.casadi_wrapper as w
 
@@ -26,7 +26,7 @@ class LinkGeometry:
 
     def __init__(self, link_T_geometry: np.ndarray, color: ColorRGBA = None):
         if color is None:
-            self.color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
+            self.color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         else:
             self.color = color
         self.link_T_geometry = w.TransMatrix(link_T_geometry)
@@ -99,12 +99,9 @@ class LinkGeometry:
             raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
-    @profile
     def as_visualization_marker(self) -> Marker:
         marker = Marker()
         marker.color = self.color
-
-        # marker.pose = self.link_T_geometry.evaluate()
         return marker
 
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
@@ -114,24 +111,37 @@ class LinkGeometry:
 class MeshGeometry(LinkGeometry):
     def __init__(self, link_T_geometry: np.ndarray, file_name: str, color: ColorRGBA, scale=None):
         super().__init__(link_T_geometry, color)
-        self.file_name = file_name
+        self._file_name_ros_iris = file_name
+        self.set_collision_file_name(self.file_name_absolute)
         if not os.path.isfile(resolve_ros_iris(file_name)):
-            raise CorruptShapeException(f'Can\'t find file {self.file_name}')
+            raise CorruptShapeException(f'Can\'t find file {file_name}')
         if scale is None:
             self.scale = [1, 1, 1]
         else:
             self.scale = scale
 
+    def set_collision_file_name(self, new_file_name: str):
+        self._collision_file_name = new_file_name
+
+    @property
+    def file_name_absolute(self) -> str:
+        return resolve_ros_iris(self._file_name_ros_iris)
+
+    @property
+    def file_name_ros_iris(self) -> str:
+        return self._file_name_ros_iris
+
+    @property
+    def collision_file_name_absolute(self) -> str:
+        return self._collision_file_name
+
     def to_hash(self) -> str:
-        s = ''
-        with open(self.file_name[7:], 'r') as f:
-            s += f.read()
-        return s
+        return get_file_hash(self.file_name_absolute)
 
     def as_visualization_marker(self) -> Marker:
         marker = super().as_visualization_marker()
         marker.type = Marker.MESH_RESOURCE
-        marker.mesh_resource = self.file_name
+        marker.mesh_resource = 'file://' + self.file_name_absolute
         marker.scale.x = self.scale[0]
         marker.scale.y = self.scale[1]
         marker.scale.z = self.scale[2]
@@ -139,9 +149,9 @@ class MeshGeometry(LinkGeometry):
         return marker
 
     def as_urdf(self):
-        return up.Mesh(self.file_name, self.scale)
+        return up.Mesh(self.file_name_ros_iris, self.scale)
 
-    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold:float = 0.00061) -> bool:
+    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return True
 
 

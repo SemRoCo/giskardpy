@@ -91,8 +91,8 @@ def create_shape_from_geometry(geometry: LinkGeometry) -> pb.CollisionShape:
     elif isinstance(geometry, CylinderGeometry):
         shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
     elif isinstance(geometry, MeshGeometry):
-        shape = load_convex_mesh_shape(geometry.file_name, scale=geometry.scale)
-        geometry.file_name = 'file://' + shape.file_path
+        shape = load_convex_mesh_shape(geometry.file_name_absolute, scale=geometry.scale)
+        geometry.set_collision_file_name(shape.file_path)
     else:
         raise NotImplementedError()
     return shape
@@ -125,8 +125,6 @@ def create_compound_shape(shapes_poses: List[Tuple[pb.Transform, pb.CollisionSha
 # Technically the tracker is not required here,
 # since the loader keeps references to the loaded shapes.
 def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1)) -> pb.ConvexShape:
-    if pkg_filename.startswith('file://'):
-        pkg_filename = pkg_filename.split('file://')[1]
     if not pkg_filename.endswith('.obj'):
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(pkg_filename)
     else:

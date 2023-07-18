@@ -139,7 +139,8 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
     decomposed_obj_file_name = f'{first_group_name}/original_{short_file_name}obj'
-    new_path = to_tmp_path(decomposed_obj_file_name)
+    new_path_original = to_tmp_path(decomposed_obj_file_name)
+    new_path = new_path_original.replace('original_', '')
     if not os.path.exists(new_path):
         mesh = trimesh.load(resolved_old_path, force='mesh')
         obj_str = trimesh.exchange.obj.export_obj(mesh)
@@ -148,7 +149,9 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
         if not trimesh.convex.is_convex(mesh):
             logging.loginfo(f'{file_name} is not convex, applying vhacd.')
             with suppress_stdout():
-                pb.vhacd(new_path, new_path.replace('original_', ''), log_path)
+                pb.vhacd(new_path_original, new_path, log_path)
+        else:
+            new_path = new_path_original
 
     return new_path
 

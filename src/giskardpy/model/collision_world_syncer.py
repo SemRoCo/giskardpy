@@ -495,10 +495,11 @@ class CollisionWorldSynchronizer:
                 old_min, old_max = distance_ranges[key]
                 distance_ranges[key] = (old_min, np.inf)
         for key, (min_, max_) in list(distance_ranges.items()):
-            if min_ > distance_threshold_never_zero or (max_ - min_) > distance_threshold_never_range:
-                del distance_ranges[key]
-            else:
+            if (max_ - min_) < distance_threshold_never_range or min_ > distance_threshold_never_zero:
                 never_in_contact.add(key)
+                del distance_ranges[key]
+
+            # if min_ > distance_threshold_never_zero or (max_ - min_) > distance_threshold_never_range:
         for combi in never_in_contact:
             reasons[combi] = DisableCollisionReason.Never
         self.world.state = joint_state_tmp
@@ -547,7 +548,7 @@ class CollisionWorldSynchronizer:
 
     def _get_path_to_self_collision_matrix(self, group_name: str) -> str:
         path_to_tmp = self.god_map.get_data(identifier.tmp_folder)
-        return f'{path_to_tmp}{group_name}.srdf'
+        return f'{path_to_tmp}/{group_name}/{group_name}.srdf'
 
     def add_black_list_entry(self, link_a, link_b):
         self.black_list.add((link_a, link_b))

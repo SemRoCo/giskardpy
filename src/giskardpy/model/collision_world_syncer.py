@@ -408,8 +408,8 @@ class CollisionWorldSynchronizer:
                                       link_combinations: Optional[Iterable] = None,
                                       distance_threshold_zero: float = 0.0,
                                       distance_threshold_never_initial: float = 0.05,
-                                      distance_threshold_never_min: float = -0.01,
-                                      distance_threshold_never_range: float = 0.03,
+                                      distance_threshold_never_min: float = -0.02,
+                                      distance_threshold_never_range: float = 0.05,
                                       distance_threshold_never_zero: float = 0.0,
                                       distance_threshold_always: float = 0.005,
                                       non_controlled: bool = False,
@@ -548,7 +548,7 @@ class CollisionWorldSynchronizer:
 
     def _get_path_to_self_collision_matrix(self, group_name: str) -> str:
         path_to_tmp = self.god_map.get_data(identifier.tmp_folder)
-        return f'{path_to_tmp}/{group_name}/{group_name}.srdf'
+        return f'{path_to_tmp}{group_name}/{group_name}.srdf'
 
     def add_black_list_entry(self, link_a, link_b):
         self.black_list.add((link_a, link_b))
@@ -564,6 +564,7 @@ class CollisionWorldSynchronizer:
                                    distance_threshold_rnd: float = 0.0,
                                    non_controlled: bool = False,
                                    steps: int = 10):
+        # FIXME
         # for group_name in self.world.minimal_group_names:
         #     self.update_group_blacklist(group_name, link_combinations, white_list_combinations, distance_threshold_zero,
         #                                 distance_threshold_rnd, non_controlled, steps)

@@ -96,6 +96,8 @@ class ROSMsgVisualization:
                 if contact_distance < red_threshold:
                     # m.colors[-2] = self.red
                     m.colors[-1] = self.red
+        else:
+            return []
         return [m]
 
     @profile

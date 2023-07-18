@@ -407,7 +407,10 @@ class CollisionWorldSynchronizer:
                                       group_name: str,
                                       link_combinations: Optional[Iterable] = None,
                                       distance_threshold_zero: float = 0.0,
-                                      distance_threshold_never: float = 0.0,
+                                      distance_threshold_never_initial: float = 0.05,
+                                      distance_threshold_never_min: float = -0.01,
+                                      distance_threshold_never_range: float = 0.03,
+                                      distance_threshold_never_zero: float = 0.0,
                                       distance_threshold_always: float = 0.005,
                                       non_controlled: bool = False,
                                       save_to_tmp: bool = True) \
@@ -440,7 +443,7 @@ class CollisionWorldSynchronizer:
                 reasons[element] = DisableCollisionReason.Adjacent
         # 2. DISABLE "DEFAULT" COLLISIONS
         self.set_default_joint_state(group)
-        for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_zero, True):
+        for link_a, link_b, _ in self.find_colliding_combinations(white_list, distance_threshold_zero, True):
             link_combination = self.world.sort_links(link_a, link_b)
             white_list.remove(link_combination)
             default_.add(link_combination)
@@ -451,7 +454,7 @@ class CollisionWorldSynchronizer:
         counts: DefaultDict[Tuple[PrefixName, PrefixName], int] = defaultdict(int)
         for try_id in range(always_tries):
             self.set_rnd_joint_state(group)
-            for link_a, link_b in self.find_colliding_combinations(white_list, distance_threshold_always, True):
+            for link_a, link_b, _ in self.find_colliding_combinations(white_list, distance_threshold_always, True):
                 link_combination = self.world.sort_links(link_a, link_b)
                 counts[link_combination] += 1
         for link_combination, count in counts.items():
@@ -463,18 +466,39 @@ class CollisionWorldSynchronizer:
         never_tries = 10000
         sometimes = set()
         update_query = True
+        distance_ranges: Dict[Tuple[PrefixName, PrefixName], Tuple[float, float]] = {}
+        once_without_contact = set()
         with Bar('never in collision', max=never_tries) as bar:
             for try_id in range(never_tries):
                 self.set_rnd_joint_state(group)
-                contacts = self.find_colliding_combinations(white_list, distance_threshold_never, update_query)
+                contacts = self.find_colliding_combinations(white_list, distance_threshold_never_initial, update_query)
                 update_query = False
-                for link_a, link_b in contacts:
-                    link_combination = self.world.sort_links(link_a, link_b)
-                    white_list.remove(link_combination)
-                    sometimes.add(link_combination)
-                    update_query = True
+                contact_keys = set()
+                for link_a, link_b, distance in contacts:
+                    key = self.world.sort_links(link_a, link_b)
+                    contact_keys.add(key)
+                    if key in distance_ranges:
+                        old_min, old_max = distance_ranges[key]
+                        distance_ranges[key] = (min(old_min, distance), max(old_max, distance))
+                    else:
+                        distance_ranges[key] = (distance, distance)
+                    if distance < distance_threshold_never_min:
+                        white_list.remove(key)
+                        sometimes.add(key)
+                        update_query = True
+                        del distance_ranges[key]
+                once_without_contact.update(white_list.difference(contact_keys))
                 bar.next()
         never_in_contact = white_list
+        for key in once_without_contact:
+            if key in distance_ranges:
+                old_min, old_max = distance_ranges[key]
+                distance_ranges[key] = (old_min, np.inf)
+        for key, (min_, max_) in list(distance_ranges.items()):
+            if min_ > distance_threshold_never_zero or (max_ - min_) > distance_threshold_never_range:
+                del distance_ranges[key]
+            else:
+                never_in_contact.add(key)
         for combi in never_in_contact:
             reasons[combi] = DisableCollisionReason.Never
         self.world.state = joint_state_tmp

@@ -12,7 +12,7 @@ from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometr
 from giskardpy.my_types import my_string, PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.math import inverse_frame
-from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp
+from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp, suppress_stdout
 
 CollisionObject = pb.CollisionObject
 
@@ -138,7 +138,7 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
     first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
-    decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
+    decomposed_obj_file_name = f'{first_group_name}/original_{short_file_name}obj'
     new_path = to_tmp_path(decomposed_obj_file_name)
     if not os.path.exists(new_path):
         mesh = trimesh.load(resolved_old_path, force='mesh')
@@ -146,7 +146,9 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
         write_to_tmp(decomposed_obj_file_name, obj_str)
         logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
         if not trimesh.convex.is_convex(mesh):
-            pb.vhacd(new_path, new_path, log_path)
+            logging.loginfo(f'{file_name} is not convex, applying vhacd.')
+            with suppress_stdout():
+                pb.vhacd(new_path, new_path.replace('original_', ''), log_path)
 
     return new_path
 

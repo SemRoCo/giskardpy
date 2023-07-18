@@ -141,7 +141,7 @@ class MeshGeometry(LinkGeometry):
     def as_visualization_marker(self) -> Marker:
         marker = super().as_visualization_marker()
         marker.type = Marker.MESH_RESOURCE
-        marker.mesh_resource = 'file://' + self.file_name_absolute
+        marker.mesh_resource = 'file://' + self.collision_file_name_absolute
         marker.scale.x = self.scale[0]
         marker.scale.y = self.scale[1]
         marker.scale.z = self.scale[2]

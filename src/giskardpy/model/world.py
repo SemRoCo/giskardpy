@@ -269,9 +269,9 @@ class WorldTree(WorldTreeInterface):
             if link_name == internal_link_name or link_name == internal_link_name.short_name:
                 matches.append(internal_link_name)
         if len(matches) > 1:
-            raise UnknownLinkException(f'Multiple matches for \'{link_name}\' found: \'{matches}\'.')
+            raise UnknownLinkException(f'Multiple links matches for \'{link_name}\' found: \'{matches}\'.')
         if len(matches) == 0:
-            raise UnknownLinkException(f'No matches for \'{link_name}\' found: \'{matches}\'.')
+            raise UnknownLinkException(f'Link \'{link_name}\' not found.')
         return matches[0]
 
     def get_link(self, link_name: str, group_name: Optional[str] = None) -> Link:

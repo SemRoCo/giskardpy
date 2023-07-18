@@ -138,20 +138,25 @@ def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/gis
     first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
-    decomposed_obj_file_name = f'{first_group_name}/original_{short_file_name}obj'
-    new_path_original = to_tmp_path(decomposed_obj_file_name)
-    new_path = new_path_original.replace('original_', '')
-    if not os.path.exists(new_path):
+    obj_file_name = f'{first_group_name}/{short_file_name}obj'
+    new_path_original = to_tmp_path(obj_file_name)
+    if not os.path.exists(new_path_original):
         mesh = trimesh.load(resolved_old_path, force='mesh')
         obj_str = trimesh.exchange.obj.export_obj(mesh)
-        write_to_tmp(decomposed_obj_file_name, obj_str)
-        logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
+        write_to_tmp(obj_file_name, obj_str)
+        logging.loginfo(f'Converted {file_name} to obj and saved in {new_path_original}.')
+    new_path = new_path_original
+
+    new_path_decomposed = new_path_original.replace('.obj', '_decomposed.obj')
+    if not os.path.exists(new_path_decomposed):
+        mesh = trimesh.load(new_path_original, force='mesh')
         if not trimesh.convex.is_convex(mesh):
             logging.loginfo(f'{file_name} is not convex, applying vhacd.')
             with suppress_stdout():
-                pb.vhacd(new_path_original, new_path, log_path)
-        else:
-            new_path = new_path_original
+                pb.vhacd(new_path_original, new_path_decomposed, log_path)
+            new_path = new_path_decomposed
+    else:
+        new_path = new_path_decomposed
 
     return new_path
 

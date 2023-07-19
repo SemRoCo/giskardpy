@@ -17,6 +17,7 @@ import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
+from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException, GiskardException
@@ -167,6 +168,21 @@ class WorldTree(WorldTreeInterface):
         self._state_version = 0
         self._model_version = 0
         self._clear()
+
+    @classmethod
+    def empty_world(cls):
+        self = WorldTree()
+        self._default_weights = {
+            Derivatives.velocity: 1,
+            Derivatives.acceleration: 1,
+            Derivatives.jerk: 1,
+        }
+        self._default_limits = {
+            Derivatives.velocity: 1,
+        }
+        identifier.max_derivative = ['max_derivative']
+        self.god_map.set_data(identifier.max_derivative, Derivatives.jerk)
+        return self
 
     @property
     def root_link_name(self) -> PrefixName:

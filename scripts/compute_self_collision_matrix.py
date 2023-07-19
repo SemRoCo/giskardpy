@@ -202,6 +202,18 @@ class Table(QMainWindow):
             else:
                 label = QLabel('check collision')
             label.setStyleSheet(f"background-color: {color}; color: black;")
+            if reason == DisableCollisionReason.Never:
+                label.setToolTip("These links are never in contact.")
+            elif reason == DisableCollisionReason.Unknown:
+                label.setToolTip("This link pair was disabled for an unknown reason.")
+            elif reason == DisableCollisionReason.Adjacent:
+                label.setToolTip("This link pair is only connected by joints that cannot move.")
+            elif reason == DisableCollisionReason.Default:
+                label.setToolTip("This link pair is in collision in the robot's default state.")
+            elif reason == DisableCollisionReason.AlmostAlways:
+                label.setToolTip("This link pair is almost always in collision.")
+            else:
+                label.setToolTip("Collisions will be computed.")
             legend.addWidget(label)
         return legend
 
@@ -333,6 +345,8 @@ class Table(QMainWindow):
                 checkbox.set_reason(reason)
                 self.table.setCellWidget(x, y, checkbox)
                 checkbox.connect_callback()
+                if x == y:
+                    checkbox.setDisabled(True)
 
         # Resize column width to fit contents
         # Get the number of rows
@@ -387,6 +401,4 @@ if __name__ == '__main__':
     main()
 
 # TODO:
-#   1. mouse over info for reasons
-#   2. click checkbox to show in rviz
-#   3. save blacklist from table
+#   - click checkbox to show in rviz

@@ -78,22 +78,33 @@ reason_color_map = {
 
 class ReasonCheckBox(QCheckBox):
     reason: Optional[DisableCollisionReason]
+    x: int
+    y: int
+    table: QTableWidget
 
-    def __init__(self) -> None:
+    def __init__(self, table: QTableWidget, x: int, y: int) -> None:
         super().__init__()
         self.reason = None
+        self.x = x
+        self.y = y
+        self.table = table
+
+    def connect_callback(self):
         self.stateChanged.connect(self.checkbox_callback)
 
     def set_reason(self, reason: Optional[DisableCollisionReason]):
-        self.reason = reason
         self.setChecked(reason is not None)
+        self.reason = reason
         self.setStyleSheet(f"background-color: {reason_color_map[reason]};")
 
-    def checkbox_callback(self, state):
+    def checkbox_callback(self, state, copy_to_twin: bool = True):
         if state == Qt.Checked:
             self.set_reason(DisableCollisionReason.Unknown)
         else:
             self.set_reason(None)
+        if copy_to_twin:
+            other_checkbox = self.table.cellWidget(self.y, self.x)
+            other_checkbox.checkbox_callback(state, False)
 
 
 class Table(QMainWindow):
@@ -308,8 +319,8 @@ class Table(QMainWindow):
         self.table.setVerticalHeaderLabels(self.link_names)
 
         # Populate the table with checkboxes
-        for i, link1 in enumerate(self.link_names):
-            for j, link2 in enumerate(self.link_names):
+        for x, link1 in enumerate(self.link_names):
+            for y, link2 in enumerate(self.link_names):
                 key = (link1, link2)
                 r_key = (link2, link1)
                 if key in reasons:
@@ -318,9 +329,10 @@ class Table(QMainWindow):
                     reason = reasons[r_key]
                 else:
                     reason = None
-                checkbox = ReasonCheckBox()
+                checkbox = ReasonCheckBox(self.table, x, y)
                 checkbox.set_reason(reason)
-                self.table.setCellWidget(i, j, checkbox)
+                self.table.setCellWidget(x, y, checkbox)
+                checkbox.connect_callback()
 
         # Resize column width to fit contents
         # Get the number of rows
@@ -330,9 +342,9 @@ class Table(QMainWindow):
         widths = []
 
         # Iterate over all rows
-        for i in range(num_rows):
+        for x in range(num_rows):
             # Get the item in the first column of the current row
-            item = self.table.item(i, 0)
+            item = self.table.item(x, 0)
 
             # If the item exists (is not None), get its size hint width and add it to the list
             if item is not None:
@@ -343,9 +355,21 @@ class Table(QMainWindow):
             self.table.setColumnWidth(0, max(widths))
 
     def save_srdf(self):
+        new_blacklist = set()
+        reasons = {}
+        for i, link1 in enumerate(self.link_names):
+            for j, link2 in enumerate(self.link_names):
+                link1 = self.world.search_for_link_name(link1)
+                link2 = self.world.search_for_link_name(link2)
+                key = tuple(sorted((link1, link2)))
+                checkbox = self.table.cellWidget(i, j)
+                if checkbox.isChecked():
+                    reason = checkbox.reason
+                    reasons[key] = reason
+                    new_blacklist.add(key)
         self.collision_scene.save_black_list(self.world.groups[self.group_name],
-                                             self.collision_scene.black_list,
-                                             self.reasons,
+                                             new_blacklist,
+                                             reasons,
                                              file_name=self.srdf_file_path_input.text())
         self.set_progress(100, f'Saved {self.srdf_file_path_input.text()}')
 

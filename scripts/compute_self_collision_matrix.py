@@ -70,12 +70,12 @@ def extract_collision_data(black_list: Set[Tuple[str, str]], link_names: List[st
 
 
 reason_color_map = {
-    DisableCollisionReason.Never: (0, 0, 255),  # blue
-    DisableCollisionReason.Adjacent: (255, 165, 0),  # red
-    DisableCollisionReason.AlmostAlways: (128, 0, 128),  # purple
-    DisableCollisionReason.Default: (255, 255, 0),  # yellow
-    DisableCollisionReason.Unknown: (211, 211, 211),  # grey
-    None: (255, 255, 255),  # white
+    DisableCollisionReason.Never: (163, 177, 233),  # blue
+    DisableCollisionReason.Adjacent: (233, 163, 163),  # red
+    DisableCollisionReason.AlmostAlways: (233, 163, 231),  # purple
+    DisableCollisionReason.Default: (233, 231, 163),  # yellow
+    DisableCollisionReason.Unknown: (166, 166, 166),  # grey
+    None: (255, 255, 255),
 }
 
 

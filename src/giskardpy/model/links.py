@@ -288,6 +288,7 @@ class Link:
         return link
 
     def dye_collisions(self, color: ColorRGBA):
+        self.reset_cache()
         if self.has_collisions():
             for collision in self.collisions:
                 collision.color = color

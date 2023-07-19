@@ -11,6 +11,8 @@ from collections import defaultdict
 import sys
 import os
 
+from std_msgs.msg import ColorRGBA
+
 from giskardpy import identifier
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import DisableCollisionReason
@@ -67,12 +69,12 @@ def extract_collision_data(black_list: Set[Tuple[str, str]], link_names: List[st
 
 
 reason_color_map = {
-    DisableCollisionReason.Never: 'rgb(163, 177, 233)',  # blue
-    DisableCollisionReason.Adjacent: 'rgb(233, 163, 163)',  # red
-    DisableCollisionReason.AlmostAlways: 'rgb(233, 163, 231)',  # purple
-    DisableCollisionReason.Default: 'rgb(233, 231, 163)',  # yellow
-    DisableCollisionReason.Unknown: 'rgb(166, 166, 166)',  # grey
-    None: 'white',
+    DisableCollisionReason.Never: (163, 177, 233),  # blue
+    DisableCollisionReason.Adjacent: (233, 163, 163),  # red
+    DisableCollisionReason.AlmostAlways: (233, 163, 231),  # purple
+    DisableCollisionReason.Default: (233, 231, 163),  # yellow
+    DisableCollisionReason.Unknown: (166, 166, 166),  # grey
+    None: (255, 255, 255),  # white
 }
 
 
@@ -95,7 +97,7 @@ class ReasonCheckBox(QCheckBox):
     def set_reason(self, reason: Optional[DisableCollisionReason]):
         self.setChecked(reason is not None)
         self.reason = reason
-        self.setStyleSheet(f"background-color: {reason_color_map[reason]};")
+        self.setStyleSheet(f"background-color: rgb{reason_color_map[reason]};")
 
     def checkbox_callback(self, state, copy_to_twin: bool = True):
         if state == Qt.Checked:
@@ -103,7 +105,7 @@ class ReasonCheckBox(QCheckBox):
         else:
             self.set_reason(None)
         if copy_to_twin:
-            other_checkbox = self.table.cellWidget(self.y, self.x)
+            other_checkbox = self.table.cellWidget(self.y, self.x).layout().itemAt(0).widget()
             other_checkbox.checkbox_callback(state, False)
 
 
@@ -115,6 +117,7 @@ class Table(QMainWindow):
     def __init__(self):
         super().__init__()
         self.world = WorldTree.empty_world()
+        self.world.default_link_color = ColorRGBA(0.5, 0.5, 0.5, 1)
         self.collision_scene = BetterPyBulletSyncer.empty(self.world)
         self.ros_visualizer = ROSMsgVisualization('map')
         self.df = pd.DataFrame()
@@ -171,8 +174,8 @@ class Table(QMainWindow):
         srdf_bottoms.addWidget(self.compute_srdf_button)
         srdf_bottoms.addWidget(self.save_srdf_button)
 
-        # Create Table
         self.table = QTableWidget()
+        self.table.cellClicked.connect(self.table_item_callback)
 
         # Create the layout
         layout = QVBoxLayout()
@@ -201,7 +204,7 @@ class Table(QMainWindow):
                 label = QLabel(reason.name)
             else:
                 label = QLabel('check collision')
-            label.setStyleSheet(f"background-color: {color}; color: black;")
+            label.setStyleSheet(f"background-color: rgb{color}; color: black;")
             if reason == DisableCollisionReason.Never:
                 label.setToolTip("These links are never in contact.")
             elif reason == DisableCollisionReason.Unknown:
@@ -259,6 +262,7 @@ class Table(QMainWindow):
         if rospy.has_param(self.robot_description):
             urdf = rospy.get_param(self.robot_description)
             self.load_urdf(urdf)
+            self.urdf_file_path_input.setText(f'<loaded \"{self.group_name}\" from \"{self.robot_description}\">')
 
     def load_urdf(self, urdf):
         self.world._clear()
@@ -266,7 +270,6 @@ class Table(QMainWindow):
         group_name = robot_name_from_urdf_string(urdf)
         self.set_progress(10, 'parsing urdf')
         self.world.add_urdf(urdf, group_name)
-        self.urdf_file_path_input.setText(f'<loaded \"{self.group_name}\" from \"{self.robot_description}\">')
         self._reasons = {}
         self.set_progress(50, 'updating table')
         self.update_table(self.reasons)
@@ -300,7 +303,7 @@ class Table(QMainWindow):
         urdf_file = self.urdf_file_path_input.text()
 
         if not os.path.isfile(urdf_file):
-            QMessageBox.critical(self, "Error", "URDF file does not exist.")
+            QMessageBox.critical(self, "Error", f"File does not exist: \n{urdf_file}")
             return
 
         with open(urdf_file, 'r') as f:
@@ -313,6 +316,22 @@ class Table(QMainWindow):
     @property
     def group_name(self):
         return list(self.world.group_names)[0]
+
+    def table_item_callback(self, row, column):
+        self.ros_visualizer.clear_marker()
+        self.collision_scene.sync()
+        for link_name in self.world.link_names_with_collisions:
+            self.world.links[link_name].dye_collisions(self.world.default_link_color)
+        link1 = self.world.search_for_link_name(self.link_names[row])
+        link2 = self.world.search_for_link_name(self.link_names[column])
+        key = self.world.sort_links(link1, link2)
+        reason = self.reasons.get(key, None)
+        color = reason_color_map[reason]
+        color_msg = ColorRGBA(color[0]/255, color[1]/255, color[2]/255, 1)
+        self.world.links[link1].dye_collisions(color_msg)
+        self.world.links[link2].dye_collisions(color_msg)
+        self.world.reset_cache()
+        self.ros_visualizer.publish_markers()
 
     def update_table(self, reasons):
         # Reset the table
@@ -341,32 +360,34 @@ class Table(QMainWindow):
                     reason = reasons[r_key]
                 else:
                     reason = None
-                checkbox = ReasonCheckBox(self.table, x, y)
-                checkbox.set_reason(reason)
-                self.table.setCellWidget(x, y, checkbox)
-                checkbox.connect_callback()
-                if x == y:
-                    checkbox.setDisabled(True)
+                self.add_table_item(x, y, reason)
 
-        # Resize column width to fit contents
-        # Get the number of rows
         num_rows = self.table.rowCount()
 
-        # Initialize a list to store the widths of all items in the first column
         widths = []
 
-        # Iterate over all rows
         for x in range(num_rows):
-            # Get the item in the first column of the current row
             item = self.table.item(x, 0)
-
-            # If the item exists (is not None), get its size hint width and add it to the list
             if item is not None:
                 widths.append(item.sizeHint().width())
-
-        # If the list is not empty, set the width of the first column to the maximum width in the list
         if widths:
             self.table.setColumnWidth(0, max(widths))
+
+    def add_table_item(self, x, y, reason):
+        checkbox = ReasonCheckBox(self.table, x, y)
+        checkbox.set_reason(reason)
+        checkbox.connect_callback()
+        if x == y:
+            checkbox.setDisabled(True)
+
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(checkbox)
+        layout.setAlignment(checkbox, Qt.AlignCenter)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        widget.setLayout(layout)
+        self.table.setCellWidget(x, y, widget)
 
     def save_srdf(self):
         new_blacklist = set()

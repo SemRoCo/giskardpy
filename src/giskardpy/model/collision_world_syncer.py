@@ -531,7 +531,6 @@ class CollisionWorldSynchronizer:
 
     def save_black_list(self,
                         group: WorldBranch,
-                        black_list: Set[Tuple[PrefixName, PrefixName]],
                         reasons: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason],
                         file_name: Optional[str] = None):
         # Create the root element
@@ -541,11 +540,11 @@ class CollisionWorldSynchronizer:
         child = etree.SubElement(root, 'hash')
         child.text = group.to_hash()
 
-        for link_a, link_b in sorted(black_list):
+        for (link_a, link_b), reason in sorted(reasons.items()):
             child = etree.SubElement(root, 'disable_collisions')
             child.set('link1', link_a.short_name)
             child.set('link2', link_b.short_name)
-            child.set('reason', reasons[(link_a, link_b)].name)
+            child.set('reason', reason.name)
 
         # Create the XML tree
         tree = etree.ElementTree(root)

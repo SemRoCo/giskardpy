@@ -1,10 +1,9 @@
 from __future__ import annotations
 import traceback
-import typing
 from typing import Set, Tuple, List, Optional, Dict
 import rospy
-from PyQt5.QtGui import QIntValidator, QDoubleValidator
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QWidget, \
+from PyQt5.QtGui import QDoubleValidator
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QCheckBox, QWidget, \
     QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel, QDialog, \
     QDialogButtonBox, QComboBox, QFrame
 from PyQt5.QtCore import Qt
@@ -23,53 +22,6 @@ from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
-
-
-def extract_link_names(urdf_file):
-    # Parse the URDF file
-    tree = ET.parse(urdf_file)
-
-    # Get root of the XML document
-    root = tree.getroot()
-
-    # List to store the names of all links
-    link_names = []
-
-    # Iterate over 'link' entries
-    for link in root.findall('link'):
-        # Get the name of the link
-        link_name = link.get('name')
-
-        # Append the name to the list
-        link_names.append(link_name)
-
-    return link_names
-
-
-def extract_collision_data(black_list: Set[Tuple[str, str]], link_names: List[str]):
-    # This allows us to assign values to keys that don't yet exist in the dictionary
-    data = defaultdict(lambda: defaultdict(lambda: False))
-
-    # Iterate over 'disable_collisions' entries
-    for link1, link2 in black_list:
-        link1 = link1
-        link2 = link2
-        # Assign True to the corresponding entries in the dictionary
-        data[link1][link2] = True
-        data[link2][link1] = True  # Since collision disabling is bidirectional
-
-    # Convert the nested dictionary to a DataFrame
-    df = pd.DataFrame(data, index=link_names, columns=link_names)
-
-    # Replace NaN values (which mean that there was no 'disable_collisions' entry for a pair of links) with False
-    df.fillna(False, inplace=True)
-
-    # Sort rows and columns alphabetically
-    df.sort_index(axis=0, inplace=True)
-    df.sort_index(axis=1, inplace=True)
-
-    return df
-
 
 reason_color_map = {
     DisableCollisionReason.Never: (163, 177, 233),  # blue

@@ -1016,10 +1016,6 @@ class WorldTree(WorldTreeInterface):
         this function is used when deciding for which order to calculate the collisions
         true if link_a < link_b
         """
-        if self.is_link_controlled(link_a) and not self.is_link_controlled(link_b):
-            return True
-        elif not self.is_link_controlled(link_a) and self.is_link_controlled(link_b):
-            return False
         return link_a < link_b
 
     def sort_links(self, link_a: PrefixName, link_b: PrefixName) -> Tuple[PrefixName, PrefixName]:

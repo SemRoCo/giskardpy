@@ -197,18 +197,13 @@ class Collisions:
 
     @profile
     def transform_external_collision(self, collision: Collision) -> Collision:
-        try:
-            link_name = collision.original_link_a
-            joint = self.world.links[link_name].parent_joint_name
-            if self.world.is_joint_controlled(joint) and joint not in self.fixed_joints:
-                movable_joint = joint
+        link_name = collision.original_link_a
+        joint = self.world.links[link_name].parent_joint_name
 
-            def stopper(joint_name):
-                return self.world.is_joint_controlled(joint_name) and joint_name not in self.fixed_joints
+        def stopper(joint_name):
+            return self.world.is_joint_controlled(joint_name) and joint_name not in self.fixed_joints
 
-            movable_joint = self.world.search_for_parent_joint(joint, stopper)
-        except Exception as e:
-            pass
+        movable_joint = self.world.search_for_parent_joint(joint, stopper)
         new_a = self.world.joints[movable_joint].child_link_name
         collision.link_a = new_a
         if collision.map_P_pa is not None:
@@ -222,12 +217,12 @@ class Collisions:
         return collision
 
     @profile
-    def get_external_collisions(self, joint_name: str) -> SortedCollisionResults:
+    def get_external_collisions(self, link_name: str) -> SortedCollisionResults:
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
         """
-        if joint_name in self.external_collision:
-            return self.external_collision[joint_name]
+        if link_name in self.external_collision:
+            return self.external_collision[link_name]
         return SortedCollisionResults()
 
     @profile
@@ -428,7 +423,7 @@ class CollisionWorldSynchronizer:
             return {}
         np.random.seed(1337)
         joint_state_tmp = deepcopy(self.world.state)
-        white_list = set()
+        remaining_pairs = set()
         default_ = set()
         reasons = {}
         group = self.world.groups[group_name]
@@ -437,24 +432,24 @@ class CollisionWorldSynchronizer:
             link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
         # sort links
         for link_a, link_b in list(link_combinations):
-            white_list.add(self.world.sort_links(link_a, link_b))
+            remaining_pairs.add(self.world.sort_links(link_a, link_b))
         # 1. FIND CONNECTING LINKS and DISABLE ALL ADJACENT LINK COLLISIONS
         # find meaningless collisions
         adjacent = set()
-        for link_a, link_b in list(white_list):
+        for link_a, link_b in list(remaining_pairs):
             element = link_a, link_b
             if link_a == link_b \
                     or self.world.are_linked(link_a, link_b, do_not_ignore_non_controlled_joints=non_controlled,
                                              joints_to_be_assumed_fixed=self.fixed_joints) \
                     or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
-                white_list.remove(element)
+                remaining_pairs.remove(element)
                 adjacent.add(element)
                 reasons[element] = DisableCollisionReason.Adjacent
         # 2. DISABLE "DEFAULT" COLLISIONS
         self.set_default_joint_state(group)
-        for link_a, link_b, _ in self.find_colliding_combinations(white_list, distance_threshold_zero, True):
+        for link_a, link_b, _ in self.find_colliding_combinations(remaining_pairs, distance_threshold_zero, True):
             link_combination = self.world.sort_links(link_a, link_b)
-            white_list.remove(link_combination)
+            remaining_pairs.remove(link_combination)
             default_.add(link_combination)
             reasons[link_combination] = DisableCollisionReason.Default
         # 3. (almost) ALWAYS IN COLLISION
@@ -463,12 +458,12 @@ class CollisionWorldSynchronizer:
         counts: DefaultDict[Tuple[PrefixName, PrefixName], int] = defaultdict(int)
         for try_id in range(always_tries):
             self.set_rnd_joint_state(group)
-            for link_a, link_b, _ in self.find_colliding_combinations(white_list, distance_threshold_always, True):
+            for link_a, link_b, _ in self.find_colliding_combinations(remaining_pairs, distance_threshold_always, True):
                 link_combination = self.world.sort_links(link_a, link_b)
                 counts[link_combination] += 1
         for link_combination, count in counts.items():
             if count > always_tries * .95:
-                white_list.remove(link_combination)
+                remaining_pairs.remove(link_combination)
                 almost_always.add(link_combination)
                 reasons[link_combination] = DisableCollisionReason.AlmostAlways
         # 4. NEVER IN COLLISION
@@ -479,7 +474,7 @@ class CollisionWorldSynchronizer:
         once_without_contact = set()
         for try_id in range(never_tries):
             self.set_rnd_joint_state(group)
-            contacts = self.find_colliding_combinations(white_list, distance_threshold_never_initial, update_query)
+            contacts = self.find_colliding_combinations(remaining_pairs, distance_threshold_never_initial, update_query)
             update_query = False
             contact_keys = set()
             for link_a, link_b, distance in contacts:
@@ -491,14 +486,14 @@ class CollisionWorldSynchronizer:
                 else:
                     distance_ranges[key] = (distance, distance)
                 if distance < distance_threshold_never_min:
-                    white_list.remove(key)
+                    remaining_pairs.remove(key)
                     sometimes.add(key)
                     update_query = True
                     del distance_ranges[key]
-            once_without_contact.update(white_list.difference(contact_keys))
+            once_without_contact.update(remaining_pairs.difference(contact_keys))
             if try_id % 100 == 0:
-                progress_callback(try_id//100, 'checking collisions')
-        never_in_contact = white_list
+                progress_callback(try_id // 100, 'checking collisions')
+        never_in_contact = remaining_pairs
         for key in once_without_contact:
             if key in distance_ranges:
                 old_min, old_max = distance_ranges[key]
@@ -511,7 +506,7 @@ class CollisionWorldSynchronizer:
         for combi in never_in_contact:
             reasons[combi] = DisableCollisionReason.Never
         self.world.state = joint_state_tmp
-        self.white_list = white_list
+        self.white_list = remaining_pairs
         black_list = never_in_contact.union(default_).union(almost_always).union(adjacent)
         if save_to_tmp:
             self.black_list = black_list
@@ -519,6 +514,25 @@ class CollisionWorldSynchronizer:
         else:
             self.black_list.update(black_list)
         return reasons
+
+    # def compute_self_collision_matrix_adjacent(self,
+    #                                            link_combinations: Set[Tuple[PrefixName, PrefixName]],
+    #                                            group: WorldBranch) \
+    #         -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+    #     # 1. FIND CONNECTING LINKS and DISABLE ALL ADJACENT LINK COLLISIONS
+    #     # find meaningless collisions
+    #     reasons = {}
+    #     adjacent = set()
+    #     for link_a, link_b in list(link_combinations):
+    #         element = link_a, link_b
+    #         if link_a == link_b \
+    #                 or self.world.are_linked(link_a, link_b, do_not_ignore_non_controlled_joints=non_controlled,
+    #                                          joints_to_be_assumed_fixed=self.fixed_joints) \
+    #                 or (not group.is_link_controlled(link_a) and not group.is_link_controlled(link_b)):
+    #             white_list.remove(element)
+    #             adjacent.add(element)
+    #             reasons[element] = DisableCollisionReason.Adjacent
+    #     return reasons
 
     def save_black_list(self,
                         group: WorldBranch,
@@ -623,7 +637,7 @@ class CollisionWorldSynchronizer:
 
     def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15) -> Collisions:
         """
-        :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
+        :param cut_off_distances: (link_a, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
         """
         pass
@@ -632,21 +646,19 @@ class CollisionWorldSynchronizer:
         return False
 
     def sync(self):
-        """
-        :type world: giskardpy.model.world.WorldTree
-        """
         pass
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],
-                                            min_dist: dict) -> dict:
+                                            collision_check_distances: Dict[PrefixName, float]) \
+            -> Dict[Tuple[PrefixName, PrefixName], float]:
         """
         :param collision_goals: list of CollisionEntry
-        :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
+        :return: dict mapping (link_a, link_b) -> collision checking distance
         """
         self._sort_black_list()
         collision_goals = self.verify_collision_entries(collision_goals)
-        min_allowed_distance = {}
+        collision_matrix = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if collision_entry.group1 == collision_entry.ALL:
                 group1_links = self.world.link_names_with_collisions
@@ -665,19 +677,24 @@ class CollisionWorldSynchronizer:
                     key = self.world.sort_links(link1, link2)
                     r_key = (key[1], key[0])
                     if self.is_allow_collision(collision_entry):
-                        if key in min_allowed_distance:
-                            del min_allowed_distance[key]
-                        elif r_key in min_allowed_distance:
-                            del min_allowed_distance[r_key]
+                        if key in collision_matrix:
+                            del collision_matrix[key]
+                        elif r_key in collision_matrix:
+                            del collision_matrix[r_key]
                     elif self.is_avoid_collision(collision_entry):
                         if key not in self.black_list:
                             if collision_entry.distance == -1:
-                                min_allowed_distance[key] = min_dist[key[0]]
+                                collision_matrix[key] = collision_check_distances[key[0]]
                             else:
-                                min_allowed_distance[key] = collision_entry.distance
+                                collision_matrix[key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
-        return min_allowed_distance
+        # sort matrix, such that controlled joints come first
+        for (link1, link2), distance in list(collision_matrix.items()):
+            if self.world.is_link_controlled(link2):
+                distance = collision_matrix.pop((link1, link2))
+                collision_matrix[link2, link1] = distance
+        return collision_matrix
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:
         for collision_entry in collision_goals:

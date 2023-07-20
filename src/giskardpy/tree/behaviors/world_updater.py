@@ -256,7 +256,7 @@ class WorldUpdater(GiskardBehavior):
         # pose = w.TransMatrix(pose)
         self.world.joints[joint_name].update_transform(pose)
         # self.world.update_joint_parent_T_child(joint_name, pose)
-        self.collision_scene.remove_black_list_entries(set(group.link_names_with_collisions))
+        self.collision_scene.remove_links_from_self_collision_matrix(set(group.link_names_with_collisions))
         self.collision_scene.update_collision_blacklist(
             link_combinations=set(product(group.link_names_with_collisions,
                                           self.world.link_names_with_collisions)))
@@ -274,7 +274,7 @@ class WorldUpdater(GiskardBehavior):
             logging.loginfo(f'Reattached \'{req.group_name}\' from \'{old_parent_link}\' to \'{req.parent_link}\'.')
             parent_group = self.world.get_parent_group_name(req.group_name)
             new_links = self.world.groups[req.group_name].link_names_with_collisions
-            self.collision_scene.remove_black_list_entries(new_links)
+            self.collision_scene.remove_links_from_self_collision_matrix(new_links)
             self.collision_scene.update_self_collision_matrix(parent_group, new_links)
             self.collision_scene.blacklist_inter_group_collisions()
             # self.collision_scene.update_collision_blacklist(
@@ -288,7 +288,7 @@ class WorldUpdater(GiskardBehavior):
         # assumes that parent has god map lock
         if name not in self.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
-        self.collision_scene.remove_black_list_entries(set(self.world.groups[name].link_names_with_collisions))
+        self.collision_scene.remove_links_from_self_collision_matrix(set(self.world.groups[name].link_names_with_collisions))
         self.world.delete_group(name)
         self.world.cleanup_unused_free_variable()
         # old_free_variables = [x.name for x in self.world.groups[name].free_variables]

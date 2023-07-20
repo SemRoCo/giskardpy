@@ -192,7 +192,7 @@ class RosMsgToGoal(GetGoal):
             for link_a_o, link_b_o in self.world.groups[robot_name].possible_collision_combinations():
                 link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
                 try:
-                    if (link_a_o, link_b_o) in self.collision_scene.black_list:
+                    if (link_a_o, link_b_o) in self.collision_scene.self_collision_matrix:
                         continue
                     link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
                     link_a, link_b = self.world.sort_links(link_a, link_b)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import hashlib
 from abc import ABC
+from copy import deepcopy
 from functools import cached_property
 from itertools import combinations
 from typing import Dict, Union, Tuple, Set, Optional, List, Callable, Sequence
@@ -130,6 +131,19 @@ class WorldModelUpdateContextManager:
         if exc_type is None and self.first:
             self.world.context_manager_active = False
             self.world.notify_model_change()
+
+
+class ResetJointStateContextManager:
+    def __init__(self, world: WorldTree):
+        self.world = world
+
+    def __enter__(self):
+        self.joint_state_tmp = deepcopy(self.world.state)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.world.state = self.joint_state_tmp
+            self.world.notify_state_change()
 
 
 class WorldTree(WorldTreeInterface):
@@ -1155,6 +1169,9 @@ class WorldTree(WorldTreeInterface):
 
     def modify_world(self):
         return WorldModelUpdateContextManager(self)
+
+    def reset_joint_state_context(self):
+        return ResetJointStateContextManager(self)
 
     @copy_memoize
     @profile

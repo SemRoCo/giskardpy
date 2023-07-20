@@ -583,12 +583,12 @@ class CollisionAvoidanceConfig(Config):
             group_name = self.get_default_group_name()
         if group_name not in self._collision_scene.self_collision_matrix_paths:
             try:
-                self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
+                self._collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
             except Exception as e:
                 logging.logwarn(str(e))
         else:
             path_to_srdf = self._collision_scene.self_collision_matrix_paths[group_name]
-            self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
+            self._collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
 
     def fix_joints_for_self_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
         """

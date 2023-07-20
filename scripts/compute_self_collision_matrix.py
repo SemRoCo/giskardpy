@@ -464,8 +464,7 @@ class Application(QMainWindow):
         self.urdf_progress.set_progress(100, f'Loaded {progress_str}')
 
     def set_tmp_srdf_path(self):
-        if len(self.world.group_names) > 0 and self.__srdf_path == None:
-            self.__srdf_path = self.collision_scene.get_path_to_self_collision_matrix(self.group_name)
+        self.__srdf_path = self.collision_scene.get_path_to_self_collision_matrix(self.group_name)
 
     def disable_srdf_buttons(self):
         self.__disable_srdf_buttons(True)

@@ -362,7 +362,7 @@ class CollisionWorldSynchronizer:
         for link_name in self.world.link_names_with_collisions:
             black_list.add((link_name, link_name))
         self.black_list = black_list
-        logging.loginfo(f'Loaded self collision avoidance matrix: {path_to_srdf}')
+        logging.loginfo(f'Loaded self collision matrix: {path_to_srdf}')
         self.self_collision_matrix_paths[group_name] = path_to_srdf
         return reasons
 
@@ -419,11 +419,11 @@ class CollisionWorldSynchronizer:
                                       group_name: str,
                                       link_combinations: Optional[Iterable] = None,
                                       distance_threshold_zero: float = 0.0,
+                                      distance_threshold_always: float = 0.005,
                                       distance_threshold_never_initial: float = 0.05,
                                       distance_threshold_never_min: float = -0.02,
                                       distance_threshold_never_range: float = 0.05,
                                       distance_threshold_never_zero: float = 0.0,
-                                      distance_threshold_always: float = 0.005,
                                       non_controlled: bool = False,
                                       save_to_tmp: bool = True,
                                       progress_callback: Optional[Callable[[int, str], None]] = None) \
@@ -483,7 +483,6 @@ class CollisionWorldSynchronizer:
         update_query = True
         distance_ranges: Dict[Tuple[PrefixName, PrefixName], Tuple[float, float]] = {}
         once_without_contact = set()
-        # with Bar('never in collision', max=never_tries) as bar:
         for try_id in range(never_tries):
             self.set_rnd_joint_state(group)
             contacts = self.find_colliding_combinations(white_list, distance_threshold_never_initial, update_query)
@@ -505,7 +504,6 @@ class CollisionWorldSynchronizer:
             once_without_contact.update(white_list.difference(contact_keys))
             if try_id % 100 == 0:
                 progress_callback(try_id//100, 'checking collisions')
-                # bar.next()
         never_in_contact = white_list
         for key in once_without_contact:
             if key in distance_ranges:
@@ -516,7 +514,6 @@ class CollisionWorldSynchronizer:
                 never_in_contact.add(key)
                 del distance_ranges[key]
 
-            # if min_ > distance_threshold_never_zero or (max_ - min_) > distance_threshold_never_range:
         for combi in never_in_contact:
             reasons[combi] = DisableCollisionReason.Never
         self.world.state = joint_state_tmp

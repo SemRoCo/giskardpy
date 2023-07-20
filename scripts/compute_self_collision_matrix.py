@@ -3,9 +3,10 @@ import traceback
 import typing
 from typing import Set, Tuple, List, Optional, Dict
 import rospy
+from PyQt5.QtGui import QIntValidator, QDoubleValidator
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QWidget, \
     QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel, QDialog, \
-    QDialogButtonBox, QComboBox
+    QDialogButtonBox, QComboBox, QFrame
 from PyQt5.QtCore import Qt
 import xml.etree.ElementTree as ET
 import pandas as pd
@@ -75,7 +76,7 @@ reason_color_map = {
     DisableCollisionReason.Adjacent: (233, 163, 163),  # red
     DisableCollisionReason.AlmostAlways: (233, 163, 231),  # purple
     DisableCollisionReason.Default: (233, 231, 163),  # yellow
-    DisableCollisionReason.Unknown: (166, 166, 166),  # grey
+    DisableCollisionReason.Unknown: (153, 76, 0),  # brown
     None: (255, 255, 255),
 }
 
@@ -129,17 +130,17 @@ class Table(QTableWidget):
         return {(x[0].short_name, x[1].short_name): reason for x, reason in reasons.items()}
 
     @property
-    def str_reasons(self):
+    def str_reasons(self) -> Dict[Tuple[str, str], DisableCollisionReason]:
         return self.prefix_reasons_to_str_reasons(self._reasons)
 
     @property
-    def reasons(self):
+    def reasons(self) -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
         return self._reasons
 
-    def table_id_to_link_name(self, index: int):
+    def table_id_to_link_name(self, index: int) -> str:
         return self.link_names[index]
 
-    def sort_links(self, link1, link2):
+    def sort_links(self, link1: str, link2: str) -> Tuple[str, str]:
         return tuple(sorted((link1, link2)))
 
     def update_reason(self, link1: str, link2: str, new_reason: Optional[DisableCollisionReason]):
@@ -242,6 +243,67 @@ class MyProgressBar(QProgressBar):
         self.setValue(value)
         if text is not None:
             self.setFormat(f'{text}: %p%')
+        self.parent().repaint()
+
+
+class ComputeSelfCollisionMatrixParameterDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle('Set Parameters')
+
+        self.parameters = {}
+
+        self.layout = QVBoxLayout(self)
+        self.layout.addWidget(QLabel('Set Thresholds for computing self collision matrix'))
+        self.horizontalLine = QFrame()
+        self.horizontalLine.setFrameShape(QFrame.HLine)
+        self.horizontalLine.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(self.horizontalLine)
+        self.layout.addLayout(
+            self.make_parameter_entry('Add link pair when they are this close in default joint state:',
+                                      0.0,
+                                      'distance_threshold_zero'))
+        self.layout.addLayout(
+            self.make_parameter_entry('Add link pair when they are closer than this in 95% of checks:',
+                                      0.005,
+                                      'distance_threshold_always'))
+        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_initial:',
+                                                        0.05,
+                                                        'distance_threshold_never_initial'))
+        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_min:',
+                                                        -0.02,
+                                                        'distance_threshold_never_min'))
+        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_range:',
+                                                        0.05,
+                                                        'distance_threshold_never_range'))
+        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_zero:',
+                                                        0.0,
+                                                        'distance_threshold_never_zero'))
+
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttonBox)
+
+    def make_parameter_entry(self, text: str, default: float, parameter_name: str) -> QVBoxLayout:
+        inner_box = QHBoxLayout()
+        edit = QLineEdit(self)
+        inner_box.addWidget(edit)
+        inner_box.addWidget(QLabel('m'))
+        edit.setText(str(default))
+        edit.setValidator(QDoubleValidator(self))
+
+        outer_box = QVBoxLayout()
+        outer_box.addWidget(QLabel(text))
+        outer_box.addLayout(inner_box)
+        self.parameters[parameter_name] = edit
+        return outer_box
+
+    def get_parameter_map(self) -> Dict[str, float]:
+        params = {param_name: float(edit.text()) for param_name, edit in self.parameters.items()}
+        return params
+
 
 class RosparamSelectionDialog(QDialog):
     default_option = '/robot_description'
@@ -275,10 +337,11 @@ class RosparamSelectionDialog(QDialog):
 
 
 class Application(QMainWindow):
-    robot_description = 'robot_description'
+    __srdf_path: Optional[str]
 
     def __init__(self):
         super().__init__()
+        self.__srdf_path = None
         self.world = WorldTree.empty_world()
         self.world.default_link_color = ColorRGBA(0.5, 0.5, 0.5, 1)
         self.collision_scene = BetterPyBulletSyncer.empty(self.world)
@@ -286,49 +349,42 @@ class Application(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Link Collisions')
+        self.setWindowTitle('Self Collision Matrix Tool')
         self.setMinimumSize(800, 600)
 
-        self.progress = MyProgressBar()
-
-        # Create QLineEdit for the SRDF file path
-        self.srdf_file_path_input = QLineEdit()
-
-        # Create Browse button for SRDF file
-        # self.srdf_browse_button = QPushButton('...')
-        # self.srdf_browse_button.clicked.connect(self.srdf_browse)
-
-        self.load_srdf_button = QPushButton('Load srdf')
-        self.load_srdf_button.clicked.connect(self.load_srdf)
-        self.compute_srdf_button = QPushButton('Compute self collision matrix')
-        self.compute_srdf_button.clicked.connect(self.compute_self_collision_matrix)
-        self.save_srdf_button = QPushButton('Save srdf')
-        self.save_srdf_button.clicked.connect(self.save_srdf)
+        self.progress = MyProgressBar(self)
 
         self.table = Table(self.world, self.collision_scene)
 
         layout = QVBoxLayout()
         layout.addLayout(self._urdf_box_layout())
+        self.horizontalLine = QFrame()
+        self.horizontalLine.setFrameShape(QFrame.HLine)
+        self.horizontalLine.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(self.horizontalLine)
         layout.addLayout(self._srdf_box_layout())
         layout.addWidget(self.progress)
         layout.addLayout(self._legend_box_layout())
         layout.addWidget(self.table)
 
-        # Set layout
         widget = QWidget()
         widget.setLayout(layout)
         self.setCentralWidget(widget)
 
-        self.progress.set_progress(0, 'no urdf loaded')
+        self.progress.set_progress(0, 'Load urdf')
 
     def _srdf_box_layout(self) -> QHBoxLayout:
-        srdf_text = QHBoxLayout()
-        srdf_text.addWidget(self.srdf_file_path_input)
+        self.load_srdf_button = QPushButton('Load from srdf')
+        self.load_srdf_button.clicked.connect(self.load_srdf)
+        self.compute_srdf_button = QPushButton('Compute self collision matrix')
+        self.compute_srdf_button.clicked.connect(self.compute_self_collision_matrix)
+        self.save_srdf_button = QPushButton('Save as srdf')
+        self.save_srdf_button.clicked.connect(self.save_srdf)
         srdf_bottoms = QHBoxLayout()
-        srdf_bottoms.addWidget(self.save_srdf_button)
-        srdf_bottoms.addWidget(self.load_srdf_button)
         srdf_bottoms.addWidget(self.compute_srdf_button)
-        srdf_bottoms.addLayout(srdf_text)
+        srdf_bottoms.addWidget(self.load_srdf_button)
+        srdf_bottoms.addWidget(self.save_srdf_button)
+        self.disable_srdf_buttons()
         return srdf_bottoms
 
     def _urdf_box_layout(self) -> QHBoxLayout:
@@ -336,7 +392,7 @@ class Application(QMainWindow):
         self.load_urdf_file_button.clicked.connect(self.load_urdf_from_path)
         self.load_urdf_param_button = QPushButton('Load urdf from parameter server')
         self.load_urdf_param_button.clicked.connect(self.load_urdf_from_paramserver)
-        self.urdf_progress = MyProgressBar()
+        self.urdf_progress = MyProgressBar(self)
         self.urdf_progress.set_progress(0, 'No urdf loaded')
         urdf_section = QHBoxLayout()
         urdf_section.addWidget(self.load_urdf_file_button)
@@ -369,12 +425,17 @@ class Application(QMainWindow):
         return legend
 
     def compute_self_collision_matrix(self):
-        reasons = self.collision_scene.compute_self_collision_matrix(self.group_name,
-                                                                     save_to_tmp=False,
-                                                                     non_controlled=True,
-                                                                     progress_callback=self.progress.set_progress)
-        self.table.update_table(reasons)
-        self.progress.set_progress(100, 'done checking collisions')
+        dialog = ComputeSelfCollisionMatrixParameterDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            parameters = dialog.get_parameter_map()
+            reasons = self.collision_scene.compute_self_collision_matrix(self.group_name,
+                                                                         save_to_tmp=False,
+                                                                         progress_callback=self.progress.set_progress,
+                                                                         **parameters)
+            self.table.update_table(reasons)
+            self.progress.set_progress(100, 'Done checking collisions')
+        else:
+            self.progress.set_progress(0, 'Canceled collision checking')
 
     def load_urdf_from_paramserver(self):
         dialog = RosparamSelectionDialog(self)
@@ -392,24 +453,35 @@ class Application(QMainWindow):
         group_name = robot_name_from_urdf_string(urdf)
         self.urdf_progress.set_progress(10, f'Parsing {progress_str}')
         self.world.add_urdf(urdf, group_name)
-        self.urdf_progress.set_progress(50)
-        self.table.update_table({})
-        self.set_tmp_srdf_path()
         self.world.god_map.set_data(identifier.controlled_joints, self.world.movable_joint_names)
+        self.urdf_progress.set_progress(50, f'Applying vhacd to concave meshes of {progress_str}')
+        self.collision_scene.sync()
+        self.urdf_progress.set_progress(80, f'Updating table {progress_str}')
+        reasons = {(link_name, link_name): DisableCollisionReason.Adjacent for link_name in self.world.link_names}
+        self.table.update_table(reasons)
+        self.set_tmp_srdf_path()
+        self.enable_srdf_buttons()
         self.urdf_progress.set_progress(100, f'Loaded {progress_str}')
 
     def set_tmp_srdf_path(self):
-        if len(self.world.group_names) > 0 and self.srdf_file_path_input.text() == '':
-            self.srdf_file_path_input.setText(self.collision_scene.get_path_to_self_collision_matrix(self.group_name))
+        if len(self.world.group_names) > 0 and self.__srdf_path == None:
+            self.__srdf_path = self.collision_scene.get_path_to_self_collision_matrix(self.group_name)
 
-    # def activate_srdf_buttons(self, active: bool):
-    #     if active:
-    #         self.
+    def disable_srdf_buttons(self):
+        self.__disable_srdf_buttons(True)
 
+    def enable_srdf_buttons(self):
+        self.__disable_srdf_buttons(False)
+
+    def __disable_srdf_buttons(self, active: bool):
+        self.save_srdf_button.setDisabled(active)
+        self.load_srdf_button.setDisabled(active)
+        self.compute_srdf_button.setDisabled(active)
 
     def load_srdf(self):
-        srdf_file = self.get_srdf_path_with_dialog()
-
+        srdf_file = self.get_srdf_path_with_dialog(False)
+        if srdf_file is None:
+            return
         try:
             if os.path.isfile(srdf_file):
                 reasons = self.collision_scene.load_black_list_from_srdf(srdf_file, self.group_name, False)
@@ -421,7 +493,15 @@ class Application(QMainWindow):
             QMessageBox.critical(self, 'Error', str(e))
 
     def load_urdf_from_path(self):
-        urdf_file, _ = QFileDialog.getOpenFileName()
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+        urdf_file, _ = QFileDialog.getOpenFileName(
+            self,
+            "QFileDialog.getOpenFileName()",
+            '',
+            "urdf files (*.urdf);;All files (*)",
+            options=options
+        )
         if urdf_file:
             if not os.path.isfile(urdf_file):
                 QMessageBox.critical(self, 'Error', f'File does not exist: \n{urdf_file}')
@@ -434,27 +514,40 @@ class Application(QMainWindow):
     def group_name(self):
         return list(self.world.group_names)[0]
 
-    def get_srdf_path_with_dialog(self) -> str:
+    def get_srdf_path_with_dialog(self, save: bool) -> str:
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
-        srdf_file, _ = QFileDialog.getOpenFileName(
-            self,
-            "QFileDialog.getOpenFileName()",
-            self.srdf_file_path_input.text(),  # The initial directory
-            "All Files (*)",
-            options=options
-        )
+        if save:
+            srdf_file, _ = QFileDialog.getSaveFileName(
+                self,
+                "QFileDialog.getSaveFileName()",
+                self.__srdf_path,
+                "srdf files (*.srdf);;All files (*)",
+                options=options
+            )
+        else:
+            srdf_file, _ = QFileDialog.getOpenFileName(
+                self,
+                "QFileDialog.getOpenFileName()",
+                self.__srdf_path,
+                "srdf files (*.srdf);;All files (*)",
+                options=options
+            )
 
         if srdf_file:
-            self.srdf_file_path_input.setText(srdf_file)
-        return self.srdf_file_path_input.text()
+            self.__srdf_path = srdf_file
+        else:
+            srdf_file = None
+
+        return srdf_file
 
     def save_srdf(self):
-        srdf_path = self.get_srdf_path_with_dialog()
-        self.collision_scene.save_black_list(self.world.groups[self.group_name],
-                                             self.table.reasons,
-                                             file_name=srdf_path)
-        self.progress.set_progress(100, f'Saved {self.srdf_file_path_input.text()}')
+        srdf_path = self.get_srdf_path_with_dialog(True)
+        if srdf_path is not None:
+            self.collision_scene.save_black_list(self.world.groups[self.group_name],
+                                                 self.table.reasons,
+                                                 file_name=srdf_path)
+            self.progress.set_progress(100, f'Saved {self.__srdf_path}')
 
 
 def main():

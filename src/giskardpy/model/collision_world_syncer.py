@@ -333,8 +333,13 @@ class CollisionWorldSynchronizer:
                     reason = DisableCollisionReason.Unknown
                 combi = self.world.sort_links(link_a, link_b)
                 self_collision_matrix[combi] = reason
-        for link_name in self.world.link_names_with_collisions:
-            self_collision_matrix[link_name, link_name] = DisableCollisionReason.Adjacent
+
+        #%% update matrix according to currently controlled joints
+        group = self.world.groups[group_name]
+        link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
+        link_combinations = {self.world.sort_links(*x) for x in link_combinations}
+        _, matrix_updates = self.compute_self_collision_matrix_adjacent(link_combinations, group)
+        self_collision_matrix.update(matrix_updates)
         logging.loginfo(f'Loaded self collision matrix: {path_to_srdf}')
         self.self_collision_matrix_paths[group_name] = path_to_srdf
         self.self_collision_matrix = self_collision_matrix

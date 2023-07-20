@@ -443,7 +443,7 @@ class Application(QMainWindow):
             return
         try:
             if os.path.isfile(srdf_file):
-                reasons = self.collision_scene.load_self_collision_matrix_from_srdf(srdf_file, self.group_name, False)
+                reasons = self.collision_scene.load_self_collision_matrix_from_srdf(srdf_file, self.group_name)
                 self.table.update_table(reasons)
                 self.progress.set_progress(100, f'Loaded {srdf_file}')
             else:

@@ -101,7 +101,15 @@ class ReasonCheckBox(QCheckBox):
         self.setChecked(reason is not None)
         self.setStyleSheet(f'background-color: rgb{reason_color_map[reason]};')
 
-    def checkbox_callback(self, state):
+    def checkbox_callback(self, state, update_range: bool = True):
+        if update_range:
+            self.table.selectedRanges()
+            for range_ in self.table.selectedRanges():
+                for row in range(range_.topRow(), range_.bottomRow() + 1):
+                    for column in range(range_.leftColumn(), range_.rightColumn() + 1):
+                        item = self.table.get_widget(row, column)
+                        if state != item.checkState():
+                            item.checkbox_callback(state, False)
         link1 = self.table.table_id_to_link_name(self.row)
         link2 = self.table.table_id_to_link_name(self.column)
         if state == Qt.Checked:
@@ -485,6 +493,7 @@ class Application(QMainWindow):
             if os.path.isfile(srdf_file):
                 reasons = self.collision_scene.load_black_list_from_srdf(srdf_file, self.group_name, False)
                 self.table.update_table(reasons)
+                self.progress.set_progress(100, f'Loaded {srdf_file}')
             else:
                 QMessageBox.critical(self, 'Error', f'File does not exist: \n{srdf_file}')
         except Exception as e:

@@ -4,7 +4,8 @@ import typing
 from typing import Set, Tuple, List, Optional, Dict
 import rospy
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QWidget, \
-    QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel
+    QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel, QDialog, \
+    QDialogButtonBox, QComboBox
 from PyQt5.QtCore import Qt
 import xml.etree.ElementTree as ET
 import pandas as pd
@@ -235,6 +236,44 @@ def get_readable_color(red: float, green: float, blue: float) -> Tuple[int, int,
         return 255, 255, 255
 
 
+class MyProgressBar(QProgressBar):
+    def set_progress(self, value: int, text: Optional[str] = None):
+        value = min(max(value, 0), 100)
+        self.setValue(value)
+        if text is not None:
+            self.setFormat(f'{text}: %p%')
+
+class RosparamSelectionDialog(QDialog):
+    default_option = '/robot_description'
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("File Selection")
+
+        self.layout = QVBoxLayout(self)
+
+        self.label = QLabel("Please select an option:")
+        self.layout.addWidget(self.label)
+
+        self.combo_box = QComboBox(self)
+        self.combo_box.setEditable(True)  # Make the combo box editable
+        self.layout.addWidget(self.combo_box)
+
+        # Add the options to the combobox
+        self.combo_box.addItems(rospy.get_param_names())
+        if rospy.has_param(self.default_option):
+            self.combo_box.setCurrentText(self.default_option)
+
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttonBox)
+
+    def get_selected_option(self):
+        return self.combo_box.currentText()
+
+
 class Application(QMainWindow):
     robot_description = 'robot_description'
 
@@ -250,28 +289,14 @@ class Application(QMainWindow):
         self.setWindowTitle('Link Collisions')
         self.setMinimumSize(800, 600)
 
-        self.progress = QProgressBar()
-
-        # Create QLineEdit for the URDF file path
-        self.urdf_file_path_input = QLineEdit()
-        self.urdf_file_path_input.setText('robot_description')
-
-        # Create Browse button for URDF file
-        self.urdf_browse_button = QPushButton('...')
-        self.urdf_browse_button.clicked.connect(self.urdf_browse)
+        self.progress = MyProgressBar()
 
         # Create QLineEdit for the SRDF file path
         self.srdf_file_path_input = QLineEdit()
 
         # Create Browse button for SRDF file
-        self.srdf_browse_button = QPushButton('...')
-        self.srdf_browse_button.clicked.connect(self.srdf_browse)
-
-        # Create Load and Save buttons
-        self.load_urdf_file_button = QPushButton('Load urdf from file')
-        self.load_urdf_file_button.clicked.connect(self.load_urdf_from_path)
-        self.load_urdf_param_button = QPushButton('Load urdf from parameter server')
-        self.load_urdf_param_button.clicked.connect(self.load_urdf_from_paramserver)
+        # self.srdf_browse_button = QPushButton('...')
+        # self.srdf_browse_button.clicked.connect(self.srdf_browse)
 
         self.load_srdf_button = QPushButton('Load srdf')
         self.load_srdf_button.clicked.connect(self.load_srdf)
@@ -280,34 +305,11 @@ class Application(QMainWindow):
         self.save_srdf_button = QPushButton('Save srdf')
         self.save_srdf_button.clicked.connect(self.save_srdf)
 
-        # Create horizontal box layouts for the QLineEdits and Browse buttons
-        urdf_text = QHBoxLayout()
-        urdf_text.addWidget(self.urdf_file_path_input)
-        urdf_text.addWidget(self.urdf_browse_button)
-
-        urdf_bottoms = QHBoxLayout()
-        urdf_bottoms.addWidget(self.load_urdf_file_button)
-        urdf_bottoms.addWidget(self.load_urdf_param_button)
-
-        srdf_text = QHBoxLayout()
-        srdf_text.addWidget(self.srdf_file_path_input)
-        srdf_text.addWidget(self.srdf_browse_button)
-
-        srdf_bottoms = QHBoxLayout()
-        srdf_bottoms.addWidget(self.load_srdf_button)
-        srdf_bottoms.addWidget(self.compute_srdf_button)
-        srdf_bottoms.addWidget(self.save_srdf_button)
-
         self.table = Table(self.world, self.collision_scene)
 
-        # Create the layout
         layout = QVBoxLayout()
-
-        # Add horizontal box layouts and Save button to the layout
-        layout.addLayout(urdf_text)
-        layout.addLayout(urdf_bottoms)
-        layout.addLayout(srdf_text)
-        layout.addLayout(srdf_bottoms)
+        layout.addLayout(self._urdf_box_layout())
+        layout.addLayout(self._srdf_box_layout())
         layout.addWidget(self.progress)
         layout.addLayout(self._legend_box_layout())
         layout.addWidget(self.table)
@@ -317,7 +319,30 @@ class Application(QMainWindow):
         widget.setLayout(layout)
         self.setCentralWidget(widget)
 
-        self.set_progress(0, 'no urdf loaded')
+        self.progress.set_progress(0, 'no urdf loaded')
+
+    def _srdf_box_layout(self) -> QHBoxLayout:
+        srdf_text = QHBoxLayout()
+        srdf_text.addWidget(self.srdf_file_path_input)
+        srdf_bottoms = QHBoxLayout()
+        srdf_bottoms.addWidget(self.save_srdf_button)
+        srdf_bottoms.addWidget(self.load_srdf_button)
+        srdf_bottoms.addWidget(self.compute_srdf_button)
+        srdf_bottoms.addLayout(srdf_text)
+        return srdf_bottoms
+
+    def _urdf_box_layout(self) -> QHBoxLayout:
+        self.load_urdf_file_button = QPushButton('Load urdf from file')
+        self.load_urdf_file_button.clicked.connect(self.load_urdf_from_path)
+        self.load_urdf_param_button = QPushButton('Load urdf from parameter server')
+        self.load_urdf_param_button.clicked.connect(self.load_urdf_from_paramserver)
+        self.urdf_progress = MyProgressBar()
+        self.urdf_progress.set_progress(0, 'No urdf loaded')
+        urdf_section = QHBoxLayout()
+        urdf_section.addWidget(self.load_urdf_file_button)
+        urdf_section.addWidget(self.load_urdf_param_button)
+        urdf_section.addWidget(self.urdf_progress)
+        return urdf_section
 
     def _legend_box_layout(self) -> QHBoxLayout:
         legend = QHBoxLayout()
@@ -343,66 +368,49 @@ class Application(QMainWindow):
             legend.addWidget(label)
         return legend
 
-    def set_progress(self, value: int, text: Optional[str] = None):
-        value = min(max(value, 0), 100)
-        self.progress.setValue(value)
-        if text is not None:
-            self.progress.setFormat(f'{text}: %p%')
-
-    def urdf_browse(self):
-        # Open a file dialog and get the selected file path
-        file_path, _ = QFileDialog.getOpenFileName()
-
-        # If a file path was selected, update the QLineEdit
-        if file_path:
-            self.urdf_file_path_input.setText(file_path)
-
     def compute_self_collision_matrix(self):
         reasons = self.collision_scene.compute_self_collision_matrix(self.group_name,
                                                                      save_to_tmp=False,
                                                                      non_controlled=True,
-                                                                     progress_callback=self.set_progress)
+                                                                     progress_callback=self.progress.set_progress)
         self.table.update_table(reasons)
-        self.set_progress(100, 'done checking collisions')
-
-    def srdf_browse(self):
-        # Open a file dialog and get the selected file path
-        file_path, _ = QFileDialog.getOpenFileName()
-
-        # If a file path was selected, update the QLineEdit
-        if file_path:
-            self.srdf_file_path_input.setText(file_path)
+        self.progress.set_progress(100, 'done checking collisions')
 
     def load_urdf_from_paramserver(self):
-        robot_description = self.urdf_file_path_input.text()
-        if rospy.has_param(robot_description):
-            urdf = rospy.get_param(robot_description)
-            self.load_urdf(urdf)
-        else:
-            QMessageBox.critical(self, 'Error', f'Parameter not found: \n{robot_description}')
+        dialog = RosparamSelectionDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            robot_description = dialog.get_selected_option()
+            if rospy.has_param(robot_description):
+                urdf = rospy.get_param(robot_description)
+                self.load_urdf(urdf, robot_description)
+            else:
+                QMessageBox.critical(self, 'Error', f'Parameter not found: \n{robot_description}')
 
-    def load_urdf(self, urdf):
+    def load_urdf(self, urdf: str, progress_str: str):
         self.world._clear()
-        self.set_progress(0, 'loading urdf from parameter server')
+        self.urdf_progress.set_progress(0, f'Loading {progress_str}')
         group_name = robot_name_from_urdf_string(urdf)
-        self.set_progress(10, 'parsing urdf')
+        self.urdf_progress.set_progress(10, f'Parsing {progress_str}')
         self.world.add_urdf(urdf, group_name)
-        self.set_progress(50, 'updating table')
+        self.urdf_progress.set_progress(50)
         self.table.update_table({})
         self.set_tmp_srdf_path()
         self.world.god_map.set_data(identifier.controlled_joints, self.world.movable_joint_names)
-        self.set_progress(100, 'done loading urdf')
+        self.urdf_progress.set_progress(100, f'Loaded {progress_str}')
 
     def set_tmp_srdf_path(self):
         if len(self.world.group_names) > 0 and self.srdf_file_path_input.text() == '':
             self.srdf_file_path_input.setText(self.collision_scene.get_path_to_self_collision_matrix(self.group_name))
 
+    # def activate_srdf_buttons(self, active: bool):
+    #     if active:
+    #         self.
+
+
     def load_srdf(self):
-        srdf_file = self.srdf_file_path_input.text()
+        srdf_file = self.get_srdf_path_with_dialog()
 
         try:
-
-            # Extract collision data from SRDF file
             if os.path.isfile(srdf_file):
                 reasons = self.collision_scene.load_black_list_from_srdf(srdf_file, self.group_name, False)
                 self.table.update_table(reasons)
@@ -413,24 +421,40 @@ class Application(QMainWindow):
             QMessageBox.critical(self, 'Error', str(e))
 
     def load_urdf_from_path(self):
-        urdf_file = self.urdf_file_path_input.text()
+        urdf_file, _ = QFileDialog.getOpenFileName()
+        if urdf_file:
+            if not os.path.isfile(urdf_file):
+                QMessageBox.critical(self, 'Error', f'File does not exist: \n{urdf_file}')
+                return
 
-        if not os.path.isfile(urdf_file):
-            QMessageBox.critical(self, 'Error', f'File does not exist: \n{urdf_file}')
-            return
-
-        with open(urdf_file, 'r') as f:
-            self.load_urdf(f.read())
+            with open(urdf_file, 'r') as f:
+                self.load_urdf(f.read(), urdf_file)
 
     @property
     def group_name(self):
         return list(self.world.group_names)[0]
 
+    def get_srdf_path_with_dialog(self) -> str:
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+        srdf_file, _ = QFileDialog.getOpenFileName(
+            self,
+            "QFileDialog.getOpenFileName()",
+            self.srdf_file_path_input.text(),  # The initial directory
+            "All Files (*)",
+            options=options
+        )
+
+        if srdf_file:
+            self.srdf_file_path_input.setText(srdf_file)
+        return self.srdf_file_path_input.text()
+
     def save_srdf(self):
+        srdf_path = self.get_srdf_path_with_dialog()
         self.collision_scene.save_black_list(self.world.groups[self.group_name],
                                              self.table.reasons,
-                                             file_name=self.srdf_file_path_input.text())
-        self.set_progress(100, f'Saved {self.srdf_file_path_input.text()}')
+                                             file_name=srdf_path)
+        self.progress.set_progress(100, f'Saved {self.srdf_file_path_input.text()}')
 
 
 def main():

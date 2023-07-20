@@ -32,7 +32,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
-from giskardpy.utils.utils import suppress_stderr
+from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
 
@@ -111,22 +111,7 @@ class WorldTreeInterface(ABC):
     def reset_cache(self):
         for group in self.groups.values():
             group.reset_cache()
-        try:
-            del self.link_names_as_set
-        except:
-            pass
-        try:
-            del self.link_names_with_collisions
-        except:
-            pass
-        try:
-            del self.movable_joints_as_set
-        except:
-            pass
-        try:
-            del self.movable_joints
-        except:
-            pass
+        clear_cached_properties(self)
 
 
 class WorldModelUpdateContextManager:

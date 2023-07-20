@@ -14,9 +14,9 @@ import traceback
 from collections import OrderedDict
 from contextlib import contextmanager
 from copy import deepcopy
-from functools import wraps
+from functools import wraps, cached_property
 from time import time
-from typing import Type, Optional, Dict
+from typing import Type, Optional, Dict, Any
 
 import numpy as np
 import roslaunch
@@ -240,6 +240,19 @@ def get_file_hash(file_path: str, algorithm: str = "sha256") -> Optional[str]:
     except Exception as e:
         print(f"Error occurred while hashing: {e}")
         return None
+
+
+def clear_cached_properties(instance: Any):
+    """
+    Clears the cache of all cached_property attributes of an instance.
+
+    Args:
+        instance: The instance for which to clear all cached_property caches.
+    """
+    for attr in dir(instance):
+        if isinstance(getattr(type(instance), attr, None), cached_property):
+            if attr in instance.__dict__:
+                del instance.__dict__[attr]
 
 
 def resolve_ros_iris_in_urdf(input_urdf):

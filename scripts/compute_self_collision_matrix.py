@@ -376,7 +376,7 @@ class Application(QMainWindow):
     def load_urdf_from_paramserver(self):
         robot_description = self.urdf_file_path_input.text()
         if rospy.has_param(robot_description):
-            urdf = rospy.get_param(self.robot_description)
+            urdf = rospy.get_param(robot_description)
             self.load_urdf(urdf)
         else:
             QMessageBox.critical(self, 'Error', f'Parameter not found: \n{robot_description}')

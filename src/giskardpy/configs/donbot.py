@@ -28,9 +28,6 @@ class Donbot_Base(Giskard):
 
     def configure_collision_avoidance(self):
         self.collision_avoidance.load_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
-        self.collision_avoidance.ignore_self_collisions_of_pair('ur5_forearm_link', 'ur5_wrist_3_link')
-        self.collision_avoidance.ignore_self_collisions_of_pair('ur5_base_link', 'ur5_upper_arm_link')
-        self.collision_avoidance.add_self_collision('plate', 'ur5_upper_arm_link')
         self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                                           hard_threshold=0.0)
         self.collision_avoidance.overwrite_external_collision_avoidance('odom_z_joint',

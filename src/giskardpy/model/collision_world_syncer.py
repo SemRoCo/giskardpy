@@ -317,7 +317,8 @@ class CollisionWorldSynchronizer:
             file_name = self.get_path_to_self_collision_matrix(group_name)
             recompute = not self.load_black_list_from_srdf(file_name, group_name)
         except AttributeError as e:
-            logging.loginfo('No self collision matrix loaded, computing new one.')
+            logging.logerr('No self collision matrix loaded, computing new one. '
+                           'You might want to verify the result using compute_self_collision_matrix.py.')
             recompute = True
         if recompute:
             self.compute_self_collision_matrix(group_name)
@@ -325,7 +326,7 @@ class CollisionWorldSynchronizer:
     def is_collision_checking_enabled(self) -> bool:
         return self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none
 
-    def load_black_list_from_srdf(self, path: str, group_name: str, hash_check: bool = True) -> Optional[dict]:
+    def load_black_list_from_srdf(self, path: str, group_name: str) -> Optional[dict]:
         if not self.is_collision_checking_enabled():
             return {}
         path_to_srdf = resolve_ros_iris(path)
@@ -335,11 +336,7 @@ class CollisionWorldSynchronizer:
         srdf_root = srdf.getroot()
         black_list = set()
         reasons = {}
-        expected_hash = self.world.groups[group_name].to_hash()
-        actual_hash = None
         for child in srdf_root:
-            if hasattr(child, 'tag') and child.tag == 'hash':
-                actual_hash = child.text
             if hasattr(child, 'tag') and child.tag == 'disable_collisions':
                 link_a = child.attrib['link1']
                 link_b = child.attrib['link2']
@@ -356,9 +353,6 @@ class CollisionWorldSynchronizer:
                 combi = self.world.sort_links(link_a, link_b)
                 black_list.add(combi)
                 reasons[combi] = reason
-        if hash_check and actual_hash is not None and actual_hash != expected_hash:
-            logging.logwarn(f'Self collision matrix \'{path_to_srdf}\' not loaded because it appears to be outdated.')
-            return None
         for link_name in self.world.link_names_with_collisions:
             black_list.add((link_name, link_name))
         self.black_list = black_list
@@ -521,7 +515,7 @@ class CollisionWorldSynchronizer:
         black_list = never_in_contact.union(default_).union(almost_always).union(adjacent)
         if save_to_tmp:
             self.black_list = black_list
-            self.save_black_list(group, black_list, reasons)
+            self.save_black_list(group, reasons)
         else:
             self.black_list.update(black_list)
         return reasons
@@ -533,9 +527,6 @@ class CollisionWorldSynchronizer:
         # Create the root element
         root = etree.Element('robot')
         root.set('name', group.name)
-
-        child = etree.SubElement(root, 'hash')
-        child.text = group.to_hash()
 
         for (link_a, link_b), reason in sorted(reasons.items()):
             child = etree.SubElement(root, 'disable_collisions')

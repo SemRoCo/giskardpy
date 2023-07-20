@@ -407,9 +407,7 @@ class CollisionWorldSynchronizer:
         if not self.is_collision_checking_enabled():
             return {}
         np.random.seed(1337)
-        # joint_state_tmp = deepcopy(self.world.state)
         remaining_pairs = set()
-        default_ = set()
         self_collision_matrix = {}
         group = self.world.groups[group_name]
         # 0. GENERATE ALL POSSIBLE LINK PAIRS
@@ -529,6 +527,7 @@ class CollisionWorldSynchronizer:
         Disable link pairs that are never in collision.
         """
         with self.world.reset_joint_state_context():
+            one_percent = number_of_tries // 100
             self_collision_matrix = {}
             remaining_pairs = deepcopy(link_combinations)
             update_query = True
@@ -553,8 +552,8 @@ class CollisionWorldSynchronizer:
                         update_query = True
                         del distance_ranges[key]
                 once_without_contact.update(remaining_pairs.difference(contact_keys))
-                if try_id % 100 == 0:
-                    progress_callback(try_id // 100, 'checking collisions')
+                if try_id % one_percent == 0:
+                    progress_callback(try_id // one_percent, 'checking collisions')
             never_in_contact = remaining_pairs
             for key in once_without_contact:
                 if key in distance_ranges:

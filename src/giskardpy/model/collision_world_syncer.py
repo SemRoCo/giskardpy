@@ -256,24 +256,18 @@ class DisableCollisionReason(Enum):
 class CollisionWorldSynchronizer:
     black_list: Set[Tuple[PrefixName, PrefixName]]
     self_collision_matrix_paths: Dict[str, str]
+    world: WorldTree
 
     def __init__(self, world, parse_collision_avoidance_config: bool = True):
         self.black_list = set()
         self.self_collision_matrix_paths = {}
-        self.world = world  # type: WorldTree
-        self.links_to_ignore = set()
-        self.ignored_self_collion_pairs = set()
-        self.white_list_pairs = set()
-        self.black_list = set()
+        self.world = world
         self.fixed_joints = []
         if parse_collision_avoidance_config:
             self.collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig] = self.god_map.get_data(
                 identifier.collision_avoidance_configs)
             for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
                 self.fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-                self.links_to_ignore.update(set(collision_avoidance_config.ignored_collisions))
-                self.ignored_self_collion_pairs.update(collision_avoidance_config.ignored_self_collisions)
-                self.white_list_pairs.update(collision_avoidance_config.add_self_collisions)
         self.fixed_joints = tuple(self.fixed_joints)
 
         self.world_version = -1
@@ -290,12 +284,6 @@ class CollisionWorldSynchronizer:
         self.god_map.set_data(identifier.tmp_folder, resolve_ros_iris('package://giskardpy/tmp/'))
         self.god_map.set_data(identifier.collision_scene, self)
         return self
-
-    def _sort_white_list(self):
-        self.white_list_pairs = set(
-            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.white_list_pairs)
-        self.ignored_self_collion_pairs = set(
-            tuple(x) if self.world.link_order(*x) else tuple(reversed(x)) for x in self.ignored_self_collion_pairs)
 
     def _sort_black_list(self):
         self.black_list = set(
@@ -669,18 +657,11 @@ class CollisionWorldSynchronizer:
             else:
                 group2_links = self.world.groups[collision_entry.group2].link_names_with_collisions
             for link1 in group1_links:
-                if link1 in self.links_to_ignore:
-                    continue
                 for link2 in group2_links:
-                    if link2 in self.links_to_ignore:
-                        continue
                     key = self.world.sort_links(link1, link2)
-                    r_key = (key[1], key[0])
                     if self.is_allow_collision(collision_entry):
                         if key in collision_matrix:
                             del collision_matrix[key]
-                        elif r_key in collision_matrix:
-                            del collision_matrix[r_key]
                     elif self.is_avoid_collision(collision_entry):
                         if key not in self.black_list:
                             if collision_entry.distance == -1:

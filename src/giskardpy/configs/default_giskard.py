@@ -590,16 +590,6 @@ class CollisionAvoidanceConfig(Config):
             path_to_srdf = self._collision_scene.self_collision_matrix_paths[group_name]
             self._collision_scene.load_black_list_from_srdf(path_to_srdf, group_name)
 
-    def ignore_all_self_collisions_of_link(self, link_name: str, group_name: Optional[str] = None):
-        """
-        Completely turn off self collision avoidance for this link.
-        """
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        config = self._collision_avoidance_configs[group_name]
-        link_name = PrefixName(link_name, group_name)
-        config.ignored_self_collisions.append(link_name)
-
     def fix_joints_for_self_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
         """
         Flag some joints as fixed for self collision avoidance. These joints will not be moved to avoid self
@@ -622,33 +612,7 @@ class CollisionAvoidanceConfig(Config):
         joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
         config.fixed_joints_for_external_collision_avoidance.extend(joint_names)
 
-    def ignore_self_collisions_of_pair(self, link_name1: str, link_name2: str, group_name: Optional[str] = None):
-        """
-        Ignore a certain pair of links for self collision avoidance.
-        """
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        config = self._collision_avoidance_configs[group_name]
-        link_name1 = PrefixName(link_name1, group_name)
-        link_name2 = PrefixName(link_name2, group_name)
-        config.ignored_self_collisions.append((link_name1, link_name2))
 
-    def add_self_collision(self, link_name1: str, link_name2: str, group_name: Optional[str] = None):
-        """
-        Specifically add a link pair for self collision avoidance.
-        """
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        config = self._collision_avoidance_configs[group_name]
-        link_name1 = PrefixName(link_name1, group_name)
-        link_name2 = PrefixName(link_name2, group_name)
-        config.add_self_collisions.append((link_name1, link_name2))
-
-    def ignore_all_collisions_of_links(self, link_names: List[str], group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        link_names = [PrefixName(link_name, group_name) for link_name in link_names]
-        self._collision_avoidance_configs[group_name].ignored_collisions.extend(link_names)
 
 
 class Giskard(ABC, Config):

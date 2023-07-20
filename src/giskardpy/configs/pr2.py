@@ -66,10 +66,6 @@ class PR2_Base(Giskard):
             self.collision_avoidance.overwrite_external_collision_avoidance(joint_name,
                                                                             soft_threshold=0.025,
                                                                             hard_threshold=0.0)
-        self.collision_avoidance.ignore_all_collisions_of_links(['bl_caster_l_wheel_link', 'bl_caster_r_wheel_link',
-                                                                 'fl_caster_l_wheel_link', 'fl_caster_r_wheel_link',
-                                                                 'br_caster_l_wheel_link', 'br_caster_r_wheel_link',
-                                                                 'fr_caster_l_wheel_link', 'fr_caster_r_wheel_link'])
         self.collision_avoidance.fix_joints_for_self_collision_avoidance([
             # 'head_pan_joint',
             # 'head_tilt_joint',

@@ -658,23 +658,25 @@ class CollisionWorldSynchronizer:
                 group2_links = self.world.groups[collision_entry.group2].link_names_with_collisions
             for link1 in group1_links:
                 for link2 in group2_links:
-                    key = self.world.sort_links(link1, link2)
+                    black_list_key = self.world.sort_links(link1, link2)
+                    if self.world.is_link_controlled(link2):
+                        robot_link = link2
+                        env_link = link1
+                    else:
+                        robot_link = link1
+                        env_link = link2
+                    collision_matrix_key = (robot_link, env_link)
                     if self.is_allow_collision(collision_entry):
-                        if key in collision_matrix:
-                            del collision_matrix[key]
+                        if collision_matrix in collision_matrix:
+                            del collision_matrix[collision_matrix_key]
                     elif self.is_avoid_collision(collision_entry):
-                        if key not in self.black_list:
+                        if black_list_key not in self.black_list:
                             if collision_entry.distance == -1:
-                                collision_matrix[key] = collision_check_distances[key[0]]
+                                collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
                             else:
-                                collision_matrix[key] = collision_entry.distance
+                                collision_matrix[collision_matrix_key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
-        # sort matrix, such that controlled joints come first
-        for (link1, link2), distance in list(collision_matrix.items()):
-            if self.world.is_link_controlled(link2):
-                distance = collision_matrix.pop((link1, link2))
-                collision_matrix[link2, link1] = distance
         return collision_matrix
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:

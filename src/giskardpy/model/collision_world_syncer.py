@@ -203,7 +203,10 @@ class Collisions:
         def stopper(joint_name):
             return self.world.is_joint_controlled(joint_name) and joint_name not in self.fixed_joints
 
-        movable_joint = self.world.search_for_parent_joint(joint, stopper)
+        try:
+            movable_joint = self.world.search_for_parent_joint(joint, stopper)
+        except KeyError as e:
+            movable_joint = joint
         new_a = self.world.joints[movable_joint].child_link_name
         collision.link_a = new_a
         if collision.map_P_pa is not None:

@@ -260,20 +260,23 @@ class CollisionWorldSynchronizer:
     self_collision_matrix: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
     self_collision_matrix_paths: Dict[str, str]
     world: WorldTree
+    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig]
 
     def __init__(self, world, parse_collision_avoidance_config: bool = True):
         self.self_collision_matrix = {}
         self.self_collision_matrix_paths = {}
         self.world = world
-        self.fixed_joints = []
         if parse_collision_avoidance_config:
-            self.collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig] = self.god_map.get_data(
-                identifier.collision_avoidance_configs)
-            for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
-                self.fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-        self.fixed_joints = tuple(self.fixed_joints)
+            self.collision_avoidance_configs = self.god_map.get_data(identifier.collision_avoidance_configs)
 
         self.world_version = -1
+
+    @property
+    def fixed_joints(self) -> tuple:
+        fixed_joints = []
+        for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
+            fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+        return tuple(fixed_joints)
 
     @classmethod
     def empty(cls, world):

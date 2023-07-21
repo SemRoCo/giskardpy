@@ -274,9 +274,11 @@ class CollisionWorldSynchronizer:
     @property
     def fixed_joints(self) -> tuple:
         fixed_joints = []
-        for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
-            fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-        return tuple(fixed_joints)
+        if hasattr(self, 'collision_avoidance_configs'):
+            for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
+                fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
+            return tuple(fixed_joints)
+        return tuple()
 
     @classmethod
     def empty(cls, world):
@@ -671,7 +673,8 @@ class CollisionWorldSynchronizer:
                                     update_query: bool) -> Set[Tuple[PrefixName, PrefixName]]:
         raise NotImplementedError('Collision checking is turned off.')
 
-    def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15) -> Collisions:
+    def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15, buffer: float = 0.05) \
+            -> Collisions:
         """
         :param cut_off_distances: (link_a, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.

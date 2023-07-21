@@ -52,24 +52,19 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
                                    buffer: float = 0.05) -> DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]:
         if self.query is None:
-            self.query = {(self.object_name_to_id[a], self.object_name_to_id[b]): v for (a, b), v in cut_off_distances.items()}
-            # self.query = defaultdict(set)
-            # for (link_a, link_b), dist in cut_off_distances.items():
-            #     collision_object_a = self.object_name_to_id[link_a]
-            #     collision_object_b = self.object_name_to_id[link_b]
-            #     self.query[collision_object_a].add((collision_object_b, dist+buffer))
+            self.query = {(self.object_name_to_id[a], self.object_name_to_id[b]): v + buffer for (a, b), v in cut_off_distances.items()}
         return self.query
 
     @profile
     def check_collisions(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
-                         collision_list_sizes: int) -> Collisions:
+                         collision_list_sizes: int, buffer: float = 0.05) -> Collisions:
         """
         :param cut_off_distances: (link_a, link_b) -> max distance. Contacts between objects not in this
                                     dict or further away than the cutoff distance will be ignored.
         :param collision_list_sizes: max number of collisions
         """
 
-        query = self.cut_off_distances_to_query(cut_off_distances, buffer=0.0)
+        query = self.cut_off_distances_to_query(cut_off_distances, buffer=buffer)
         result: List[bpb.Collision] = self.kw.get_closest_filtered_map_batch(query)
         return self.bpb_result_to_collisions(result, collision_list_sizes)
 
@@ -83,7 +78,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         else:
             cut_off_distance = {}
         self.sync()
-        collisions = self.check_collisions(cut_off_distance, 15)
+        collisions = self.check_collisions(cut_off_distance, 15, buffer=0.0)
         colliding_combinations = {(c.original_link_a, c.original_link_b, c.contact_distance) for c in collisions.all_collisions
                                   if c.contact_distance <= distance}
         return colliding_combinations

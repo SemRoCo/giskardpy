@@ -705,13 +705,9 @@ class CollisionWorldSynchronizer:
                 group2_links = self.world.groups[collision_entry.group2].link_names_with_collisions
             for link1 in group1_links:
                 for link2 in group2_links:
-                    black_list_key = self.world.sort_links(link1, link2)
-                    if self.world.is_link_controlled(link2):
-                        robot_link = link2
-                        env_link = link1
-                    else:
-                        robot_link = link1
-                        env_link = link2
+                    black_list_key = robot_link, env_link = self.world.sort_links(link1, link2)
+                    if not self.world.is_link_controlled(robot_link) and self.world.is_link_controlled(env_link):
+                        robot_link, env_link = env_link, robot_link
                     collision_matrix_key = (robot_link, env_link)
                     if self.is_allow_collision(collision_entry):
                         if collision_matrix in collision_matrix:

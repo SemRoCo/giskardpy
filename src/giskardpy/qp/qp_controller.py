@@ -28,8 +28,14 @@ from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math
 
 
-def save_pandas(dfs, names, path):
-    folder_name = f'{path}/pandas_{datetime.datetime.now().strftime("%Yy-%mm-%dd--%Hh-%Mm-%Ss")}/'
+# used for saving pandas in the same folder every time within a run
+date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
+
+
+def save_pandas(dfs, names, path, time: float, folder_name: Optional[str] = None):
+    if folder_name is None:
+        folder_name = ''
+    folder_name = f'{path}/pandas/{folder_name}_{date_str}/{time}/'
     create_path(folder_name)
     for df, name in zip(dfs, names):
         csv_string = 'name\n'
@@ -325,7 +331,6 @@ class FreeVariableBounds(ProblemDataPart):
 
         return lb, ub
 
-
     @profile
     def free_variable_bounds(self) \
             -> Tuple[List[Dict[str, cas.symbol_expr_float]], List[Dict[str, cas.symbol_expr_float]]]:
@@ -347,7 +352,6 @@ class FreeVariableBounds(ProblemDataPart):
         for derivative, name_to_bound_map in sorted(ub.items()):
             ub_params.append(name_to_bound_map)
         return lb_params, ub_params
-
 
     def derivative_slack_limits(self, derivative: Derivatives) \
             -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
@@ -1129,7 +1133,7 @@ class QPProblemBuilder:
         if num_debug_expressions > 0:
             logging.loginfo(f'  #debug expressions: {len(self.compiled_debug_expressions)}')
 
-    def save_all_pandas(self):
+    def save_all_pandas(self, folder_name: Optional[str] = None):
         if hasattr(self, 'p_xdot') and self.p_xdot is not None:
             save_pandas(
                 [self.p_weights, self.p_lb, self.p_ub,
@@ -1137,7 +1141,9 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug, self.p_xdot],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                self.god_map.get_data(identifier.tmp_folder))
+                self.god_map.get_data(identifier.tmp_folder),
+                self.god_map.get_data(identifier.time),
+                folder_name)
         else:
             save_pandas(
                 [self.p_weights, self.p_lb, self.p_ub,
@@ -1145,7 +1151,9 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                self.god_map.get_data(identifier.tmp_folder))
+                self.god_map.get_data(identifier.tmp_folder),
+                self.god_map.get_data(identifier.time),
+                folder_name)
 
     @property
     def god_map(self) -> GodMap:
@@ -1181,8 +1189,7 @@ class QPProblemBuilder:
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas(self.qp_solver)
-            return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
-                                prediction_horizon=self.prediction_horizon)
+            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

@@ -17,7 +17,8 @@ class ROSMsgVisualization:
     green = ColorRGBA(0, 1, 0, 1)
 
     @profile
-    def __init__(self, tf_frame: Optional[str] = None):
+    def __init__(self, tf_frame: Optional[str] = None, use_decomposed_meshes: bool = True):
+        self.use_decomposed_meshes = use_decomposed_meshes
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.marker_ids = {}
         self.god_map = GodMap()

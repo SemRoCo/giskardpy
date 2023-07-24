@@ -6,13 +6,9 @@ from typing import Dict, Optional, List, Union, DefaultDict
 
 import numpy as np
 import rospy
-import rosservice
-from controller_manager_msgs.srv import ListControllers, ListControllersRequest
 from numpy.typing import NDArray
 from py_trees import Blackboard
 from std_msgs.msg import ColorRGBA
-from std_srvs.srv import Trigger
-from tf2_py import LookupException
 
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionCheckerLib, ControlModes, SupportedQPSolver, \

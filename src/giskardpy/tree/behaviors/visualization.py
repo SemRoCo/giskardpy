@@ -9,7 +9,7 @@ from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_tim
 
 class VisualizationBehavior(GiskardBehavior):
     @profile
-    def __init__(self, name, ensure_publish=False):
+    def __init__(self, name, ensure_publish=False, use_decomposed_meshes: bool = True):
         super().__init__(name)
         self.ensure_publish = ensure_publish
         self.visualizer = ROSMsgVisualization()

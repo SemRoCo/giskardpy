@@ -437,8 +437,7 @@ class TestAddObject:
         zero_pose.add_box(name=box1_name,
                               size=(1, 1, 1),
                               pose=pose,
-                              parent_link='hand_palm_link',
-                              parent_link_group='hsrb4s')
+                              parent_link='hand_palm_link')
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()

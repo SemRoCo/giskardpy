@@ -44,7 +44,7 @@ class HSR_Base(Giskard):
 
     def configure_collision_avoidance(self):
         # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
-        # self.collision_avoidance.load_self_collision_matrix('package://giskardpy/config/hsrb.srdf')
+        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/hsrb.srdf')
         self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                                           hard_threshold=0.0)
         self.collision_avoidance.overwrite_external_collision_avoidance('wrist_roll_joint',

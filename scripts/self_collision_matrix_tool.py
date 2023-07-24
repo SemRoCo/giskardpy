@@ -201,7 +201,7 @@ def get_readable_color(red: float, green: float, blue: float) -> Tuple[int, int,
 
 class MyProgressBar(QProgressBar):
     def set_progress(self, value: int, text: Optional[str] = None):
-        value = min(max(value, 0), 100)
+        value = int(min(max(value, 0), 100))
         self.setValue(value)
         if text is not None:
             self.setFormat(f'{text}: %p%')
@@ -257,7 +257,7 @@ class ComputeSelfCollisionMatrixParameterDialog(QDialog):
                                                         'distance_threshold_never_min'))
         self.layout.addLayout(self.make_parameter_entry('and ',
                                                         0.05,
-                                                        'distance_threshold_never_initial',
+                                                        'distance_threshold_never_max',
                                                         unit='m apart.'))
         self.layout.addLayout(self.make_parameter_entry('Step 3.1: Add pairs that were always above',
                                                         0.0,

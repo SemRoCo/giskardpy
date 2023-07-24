@@ -40,7 +40,7 @@ class TiagoBase(Giskard):
                                         robot_group_name=robot_group_name)
 
     def configure_collision_avoidance(self):
-        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/config/tiago.srdf')
+        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/tiago_dual.srdf')
         self.collision_avoidance.overwrite_external_collision_avoidance(self.drive_joint_name,
                                                                         number_of_repeller=2,
                                                                         soft_threshold=0.2,
@@ -57,10 +57,6 @@ class TiagoBase(Giskard):
                                                                           'gripper_left_right_finger_joint',
                                                                           'gripper_right_left_finger_joint',
                                                                           'gripper_right_right_finger_joint'])
-        self.collision_avoidance.fix_joints_for_external_collision_avoidance(['gripper_left_left_finger_joint',
-                                                                              'gripper_left_right_finger_joint',
-                                                                              'gripper_right_left_finger_joint',
-                                                                              'gripper_right_right_finger_joint'])
         self.collision_avoidance.overwrite_external_collision_avoidance('arm_right_7_joint',
                                                                         number_of_repeller=4,
                                                                         soft_threshold=0.05,

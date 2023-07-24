@@ -135,7 +135,10 @@ class RosMsgToGoal(GetGoal):
         # override max distances based on external distances dict
         for robot in self.collision_scene.robots:
             for link_name in robot.link_names_with_collisions:
-                controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link_name)
+                try:
+                    controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link_name)
+                except KeyError as e:
+                    continue  # this happens when the root link of a robot has a collision model
                 distance = external_distances[controlled_parent_joint].soft_threshold
                 for child_link_name in self.world.get_directly_controlled_child_links_with_collisions(
                         controlled_parent_joint):

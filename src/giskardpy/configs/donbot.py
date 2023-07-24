@@ -27,7 +27,7 @@ class Donbot_Base(Giskard):
         self.world.set_joint_limits(limit_map={Derivatives.velocity: 0.05}, joint_name='odom_z_joint')
 
     def configure_collision_avoidance(self):
-        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/config/iai_donbot.srdf')
+        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/iai_donbot.srdf')
         self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                                           hard_threshold=0.0)
         self.collision_avoidance.overwrite_external_collision_avoidance('odom_z_joint',

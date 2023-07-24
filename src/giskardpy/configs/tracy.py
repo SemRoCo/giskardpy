@@ -15,7 +15,7 @@ class Tracy(Giskard):
         self.world.add_robot_from_parameter_server()
 
     def configure_collision_avoidance(self):
-        pass
+        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/tracy.srdf')
 
 
 class TracyReal(Tracy):

@@ -381,12 +381,12 @@ class RobotInterfaceConfig(Config):
                                                                 group_name=group_name,
                                                                 fill_velocity_values=fill_velocity_values)
 
-
     def add_joint_velocity_controller(self, namespaces: List[str]):
         self._behavior_tree.add_joint_velocity_controllers(namespaces)
 
     def add_joint_velocity_group_controller(self, namespace: str):
         self._behavior_tree.add_joint_velocity_group_controllers(namespace)
+
 
 class BehaviorTreeConfig(Config):
     tree_tick_rate: float = 0.05
@@ -600,19 +600,6 @@ class CollisionAvoidanceConfig(Config):
         config = self._collision_avoidance_configs[group_name]
         joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
         config.fixed_joints_for_self_collision_avoidance.extend(joint_names)
-
-    def fix_joints_for_external_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
-        """
-        Flag some joints as fixed for external collision avoidance. These joints will not be moved to avoid
-        external collisions.
-        """
-        if group_name is None:
-            group_name = self.get_default_group_name()
-        config = self._collision_avoidance_configs[group_name]
-        joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
-        config.fixed_joints_for_external_collision_avoidance.extend(joint_names)
-
-
 
 
 class Giskard(ABC, Config):

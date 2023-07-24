@@ -305,7 +305,7 @@ class CollisionWorldSynchronizer:
             recompute = not self.load_self_collision_matrix_from_srdf(file_name, group_name)
         except AttributeError as e:
             logging.logerr('No self collision matrix loaded, computing new one. '
-                           'You might want to verify the result using compute_self_collision_matrix.py.')
+                           'You might want to verify the result using self_collision_matrix_tool.py.')
             recompute = True
         if recompute:
             self.compute_self_collision_matrix(group_name)
@@ -339,7 +339,7 @@ class CollisionWorldSynchronizer:
                 combi = self.world.sort_links(link_a, link_b)
                 self_collision_matrix[combi] = reason
 
-        #%% update matrix according to currently controlled joints
+        # %% update matrix according to currently controlled joints
         group = self.world.groups[group_name]
         link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
         link_combinations = {self.world.sort_links(*x) for x in link_combinations}
@@ -404,11 +404,13 @@ class CollisionWorldSynchronizer:
                                       link_combinations: Optional[Iterable] = None,
                                       distance_threshold_zero: float = 0.0,
                                       distance_threshold_always: float = 0.005,
-                                      distance_threshold_never_initial: float = 0.05,
+                                      distance_threshold_never_max: float = 0.05,
                                       distance_threshold_never_min: float = -0.02,
                                       distance_threshold_never_range: float = 0.05,
                                       distance_threshold_never_zero: float = 0.0,
-                                      non_controlled: bool = False,
+                                      number_of_tries_always: int = 200,
+                                      almost_percentage: float = 0.95,
+                                      number_of_tries_never: int = 10000,
                                       save_to_tmp: bool = True,
                                       progress_callback: Optional[Callable[[int, str], None]] = None) \
             -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
@@ -438,19 +440,24 @@ class CollisionWorldSynchronizer:
         self_collision_matrix.update(matrix_updates)
 
         # %%
-        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_always(remaining_pairs,
-                                                                                    group,
-                                                                                    distance_threshold_always)
+        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_always(
+            link_combinations=remaining_pairs,
+            group=group,
+            distance_threshold_always=distance_threshold_always,
+            number_of_tries=number_of_tries_always,
+            almost_percentage=almost_percentage)
         self_collision_matrix.update(matrix_updates)
 
         # %%
-        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_never(remaining_pairs,
-                                                                                   group,
-                                                                                   distance_threshold_never_initial,
-                                                                                   distance_threshold_never_min,
-                                                                                   distance_threshold_never_range,
-                                                                                   distance_threshold_never_zero,
-                                                                                   progress_callback=progress_callback)
+        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_never(
+            link_combinations=remaining_pairs,
+            group=group,
+            distance_threshold_never_initial=distance_threshold_never_max,
+            distance_threshold_never_min=distance_threshold_never_min,
+            distance_threshold_never_range=distance_threshold_never_range,
+            distance_threshold_never_zero=distance_threshold_never_zero,
+            number_of_tries=number_of_tries_never,
+            progress_callback=progress_callback)
         self_collision_matrix.update(matrix_updates)
 
         if save_to_tmp:
@@ -511,7 +518,7 @@ class CollisionWorldSynchronizer:
             self_collision_matrix = {}
             remaining_pairs = deepcopy(link_combinations)
             counts: DefaultDict[Tuple[PrefixName, PrefixName], int] = defaultdict(int)
-            for try_id in range(number_of_tries):
+            for try_id in range(int(number_of_tries)):
                 self.set_rnd_joint_state(group)
                 for link_a, link_b, _ in self.find_colliding_combinations(remaining_pairs, distance_threshold_always,
                                                                           True):
@@ -543,7 +550,7 @@ class CollisionWorldSynchronizer:
             update_query = True
             distance_ranges: Dict[Tuple[PrefixName, PrefixName], Tuple[float, float]] = {}
             once_without_contact = set()
-            for try_id in range(number_of_tries):
+            for try_id in range(int(number_of_tries)):
                 self.set_rnd_joint_state(group)
                 contacts = self.find_colliding_combinations(remaining_pairs, distance_threshold_never_initial,
                                                             update_query)
@@ -632,7 +639,8 @@ class CollisionWorldSynchronizer:
                 if len(unmovable_links) > 0:
                     for link_a, link_b in product(unmovable_links,
                                                   other_group.link_names_with_collisions):
-                        self.self_collision_matrix[self.world.sort_links(link_a, link_b)] = DisableCollisionReason.Unknown
+                        self.self_collision_matrix[
+                            self.world.sort_links(link_a, link_b)] = DisableCollisionReason.Unknown
                 continue
             group_a: WorldBranch = self.world.groups[group_a_name]
             group_b: WorldBranch = self.world.groups[group_b_name]

@@ -43,7 +43,7 @@ class PR2_Base(Giskard):
 
     def configure_collision_avoidance(self):
         # self.collision_avoidance.set_collision_checker(CollisionCheckerLib.none)
-        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/config/pr2.srdf')
+        self.collision_avoidance.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/pr2.srdf')
         self.collision_avoidance.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                                           hard_threshold=0.0)
         for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
@@ -72,8 +72,6 @@ class PR2_Base(Giskard):
             'r_gripper_l_finger_joint',
             'l_gripper_l_finger_joint'
         ])
-        self.collision_avoidance.fix_joints_for_external_collision_avoidance(['r_gripper_l_finger_joint',
-                                                                              'l_gripper_l_finger_joint'])
         self.collision_avoidance.overwrite_external_collision_avoidance(self.drive_joint_name,
                                                                         number_of_repeller=2,
                                                                         soft_threshold=0.2,

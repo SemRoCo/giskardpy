@@ -1,8 +1,10 @@
 from __future__ import annotations
 import traceback
+import typing
 from typing import Set, Tuple, List, Optional, Dict
 import rospy
-from PyQt5.QtGui import QDoubleValidator
+from PyQt5 import QtCore
+from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QCheckBox, QWidget, \
     QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel, QDialog, \
     QDialogButtonBox, QComboBox, QFrame
@@ -206,6 +208,13 @@ class MyProgressBar(QProgressBar):
         self.parent().repaint()
 
 
+class HLine(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setFrameShape(QFrame.HLine)
+        self.setFrameShadow(QFrame.Sunken)
+
+
 class ComputeSelfCollisionMatrixParameterDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -215,47 +224,70 @@ class ComputeSelfCollisionMatrixParameterDialog(QDialog):
         self.parameters = {}
 
         self.layout = QVBoxLayout(self)
-        self.layout.addWidget(QLabel('Set Thresholds for computing self collision matrix'))
-        self.horizontalLine = QFrame()
-        self.horizontalLine.setFrameShape(QFrame.HLine)
-        self.horizontalLine.setFrameShadow(QFrame.Sunken)
-        self.layout.addWidget(self.horizontalLine)
-        self.layout.addLayout(
-            self.make_parameter_entry('Add link pair when they are this close in default joint state:',
-                                      0.0,
-                                      'distance_threshold_zero'))
-        self.layout.addLayout(
-            self.make_parameter_entry('Add link pair when they are closer than this in 95% of checks:',
-                                      0.005,
-                                      'distance_threshold_always'))
-        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_initial:',
-                                                        0.05,
-                                                        'distance_threshold_never_initial'))
-        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_min:',
+        self.layout.addWidget(QLabel('Set Thresholds for computing the self collision matrix. \n'
+                                     'Collision checks for entries in this matrix will not be performed.'))
+        self.layout.addWidget(HLine())
+        self.layout.addWidget(QLabel('Phase 1: Add link pairs that are in contact in default joint state.'))
+        self.layout.addLayout(self.make_parameter_entry('Distance threshold:',
+                                                        0.0,
+                                                        'distance_threshold_zero'))
+        self.layout.addWidget(HLine())
+        self.layout.addWidget(QLabel('Phase 2: Add link pairs that are (almost) always in collision.'))
+        self.layout.addLayout(self.make_parameter_entry('Do distance checks for:',
+                                                        200,
+                                                        'number_of_tries_always',
+                                                        unit='random configurations.',
+                                                        int_=True))
+        self.layout.addLayout(self.make_parameter_entry('Add all pairs that were closer than',
+                                                        0.005,
+                                                        'distance_threshold_always'))
+        self.layout.addLayout(self.make_parameter_entry('in',
+                                                        0.95,
+                                                        'almost_percentage',
+                                                        unit='% of configurations.'))
+        self.layout.addWidget(HLine())
+        self.layout.addWidget(QLabel('Phase 3: Add link pairs that are never in collision.'))
+        self.layout.addLayout(self.make_parameter_entry('Do distance checks for ',
+                                                        10000,
+                                                        'number_of_tries_never',
+                                                        unit='random configurations.',
+                                                        int_=True))
+        self.layout.addLayout(self.make_parameter_entry('Out of all pairs that are between',
                                                         -0.02,
                                                         'distance_threshold_never_min'))
-        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_range:',
+        self.layout.addLayout(self.make_parameter_entry('and ',
                                                         0.05,
-                                                        'distance_threshold_never_range'))
-        self.layout.addLayout(self.make_parameter_entry('distance_threshold_never_zero:',
+                                                        'distance_threshold_never_initial',
+                                                        unit='m apart.'))
+        self.layout.addLayout(self.make_parameter_entry('Step 3.1: Add pairs that were always above',
                                                         0.0,
-                                                        'distance_threshold_never_zero'))
+                                                        'distance_threshold_never_zero',
+                                                        unit='m apart.'))
+        self.layout.addLayout(self.make_parameter_entry('Step 3.2: Add links that were never further than',
+                                                        0.05,
+                                                        'distance_threshold_never_range',
+                                                        unit='m apart.'))
 
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.layout.addWidget(self.buttonBox)
 
-    def make_parameter_entry(self, text: str, default: float, parameter_name: str) -> QVBoxLayout:
+    def make_parameter_entry(self, text: str, default: float, parameter_name: str, int_: bool = False,
+                             unit: str = 'm') \
+            -> QVBoxLayout:
         inner_box = QHBoxLayout()
         edit = QLineEdit(self)
+        inner_box.addWidget(QLabel(text))
         inner_box.addWidget(edit)
-        inner_box.addWidget(QLabel('m'))
+        inner_box.addWidget(QLabel(unit))
         edit.setText(str(default))
-        edit.setValidator(QDoubleValidator(self))
+        if int_:
+            edit.setValidator(QIntValidator(self))
+        else:
+            edit.setValidator(QDoubleValidator(self))
 
         outer_box = QVBoxLayout()
-        outer_box.addWidget(QLabel(text))
         outer_box.addLayout(inner_box)
         self.parameters[parameter_name] = edit
         return outer_box

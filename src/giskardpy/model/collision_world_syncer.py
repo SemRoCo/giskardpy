@@ -11,7 +11,6 @@ from geometry_msgs.msg import Pose
 from lxml import etree
 import hashlib
 import numpy as np
-from progress.bar import Bar
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier

@@ -713,7 +713,7 @@ class CollisionWorldSynchronizer:
                         robot_link, env_link = env_link, robot_link
                     collision_matrix_key = (robot_link, env_link)
                     if self.is_allow_collision(collision_entry):
-                        if collision_matrix in collision_matrix:
+                        if collision_matrix_key in collision_matrix:
                             del collision_matrix[collision_matrix_key]
                     elif self.is_avoid_collision(collision_entry):
                         if black_list_key not in self.self_collision_matrix:

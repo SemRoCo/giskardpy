@@ -7,7 +7,7 @@ from PyQt5 import QtCore
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QCheckBox, QWidget, \
     QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel, QDialog, \
-    QDialogButtonBox, QComboBox, QFrame
+    QDialogButtonBox, QComboBox, QFrame, QScrollArea
 from PyQt5.QtCore import Qt
 import xml.etree.ElementTree as ET
 import pandas as pd
@@ -75,14 +75,20 @@ class ReasonCheckBox(QCheckBox):
 
 class Table(QTableWidget):
     _reasons: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
+    _disabled_links: List[str]
     world: WorldTree
 
     def __init__(self, world: WorldTree, collision_scene: BetterPyBulletSyncer):
         super().__init__()
         self.cellClicked.connect(self.table_item_callback)
         self.world = world
+        self._disabled_links = []
         self.collision_scene = collision_scene
         self.ros_visualizer = ROSMsgVisualization('map')
+
+    def update_disabled_links(self, link_names: List[str]):
+        self._disabled_links = link_names
+        self.update_table()
 
     def get_widget(self, row, column):
         return self.cellWidget(row, column).layout().itemAt(0).widget()
@@ -135,7 +141,10 @@ class Table(QTableWidget):
         self.ros_visualizer.clear_marker()
         self.collision_scene.sync()
         for link_name in self.world.link_names_with_collisions:
-            self.world.links[link_name].dye_collisions(self.world.default_link_color)
+            if link_name.short_name in self.enabled_link_names:
+                self.world.links[link_name].dye_collisions(self.world.default_link_color)
+            # else:
+            #     self.world.links[link_name].dye_collisions(ColorRGBA(1,0,0,1))
         link1 = self.world.search_for_link_name(self.link_names[row])
         link2 = self.world.search_for_link_name(self.link_names[column])
         key = self.sort_links(link1, link2)
@@ -150,6 +159,15 @@ class Table(QTableWidget):
     @property
     def link_names(self) -> List[str]:
         return list(sorted(x.short_name for x in self.world.link_names_with_collisions))
+
+    @property
+    def enabled_link_names(self) -> List[str]:
+        return list(sorted(
+            x.short_name for x in self.world.link_names_with_collisions if x.short_name not in self._disabled_links))
+
+    @property
+    def disabled_link_prefix_names(self) -> List[PrefixName]:
+        return [self.world.search_for_link_name(link_name) for link_name in self._disabled_links]
 
     def add_table_item(self, row, column):
         checkbox = ReasonCheckBox(self, row, column)
@@ -167,24 +185,29 @@ class Table(QTableWidget):
         widget.setLayout(layout)
         self.setCellWidget(row, column, widget)
 
-    def update_table(self, reasons: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]):
-        self._reasons = {self.sort_links(*k): v for k, v in reasons.items()}
+    def update_table(self, reasons: Optional[Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]] = None):
+        if reasons is not None:
+            self._reasons = {self.sort_links(*k): v for k, v in reasons.items()}
         self.clear()
         self.setRowCount(len(self.link_names))
         self.setColumnCount(len(self.link_names))
         self.setHorizontalHeaderLabels(self.link_names)
         self.setVerticalHeaderLabels(self.link_names)
 
-        for x, link1 in enumerate(self.link_names):
-            for y, link2 in enumerate(self.link_names):
-                self.add_table_item(x, y)
+        for row_id, link1 in enumerate(self.link_names):
+            if link1 not in self.enabled_link_names:
+                self.hideRow(row_id)
+            for column_id, link2 in enumerate(self.link_names):
+                self.add_table_item(row_id, column_id)
+                if link2 not in self.enabled_link_names:
+                    self.hideColumn(column_id)
 
         num_rows = self.rowCount()
 
         widths = []
 
-        for x in range(num_rows):
-            item = self.item(x, 0)
+        for row_id in range(num_rows):
+            item = self.item(row_id, 0)
             if item is not None:
                 widths.append(item.sizeHint().width())
         if widths:
@@ -328,6 +351,63 @@ class RosparamSelectionDialog(QDialog):
         return self.combo_box.currentText()
 
 
+class ClickableLabel(QLabel):
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+
+    def mousePressEvent(self, event):
+        self.parent().checkbox.click()
+
+
+class DisableLinksItem(QWidget):
+    def __init__(self, text, parent=None):
+        super().__init__(parent)
+        self.checkbox = QCheckBox()
+        self.label = ClickableLabel(text, self)
+
+        layout = QHBoxLayout()
+        layout.addWidget(self.checkbox)
+        layout.addWidget(self.label)
+        layout.addStretch()
+        self.setLayout(layout)
+
+    def set_checked(self, new_state: bool):
+        self.checkbox.setChecked(new_state)
+
+    def is_checked(self):
+        return self.checkbox.isChecked()
+
+
+class DisableLinksDialog(QDialog):
+    def __init__(self, links: List[str], mask: List[bool]):
+        super().__init__()
+        self.links = links
+        self.setWindowTitle('Disable Links')
+        self.layout = QVBoxLayout(self)
+
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+        self.layout.addWidget(self.scrollArea)
+
+        self.scrollLayout = QVBoxLayout(self.scrollAreaWidgetContents)
+
+        self.checkbox_widgets = []
+        for link, state in zip(links, mask):
+            checkbox_widget = DisableLinksItem(link)
+            self.checkbox_widgets.append(checkbox_widget)
+            self.scrollLayout.addWidget(checkbox_widget)
+            checkbox_widget.set_checked(state)
+
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok)
+        self.buttonBox.accepted.connect(self.accept)
+        self.layout.addWidget(self.buttonBox)
+
+    def checked_links(self) -> List[str]:
+        return [self.links[i] for i, cbw in enumerate(self.checkbox_widgets) if cbw.is_checked()]
+
+
 class Application(QMainWindow):
     __srdf_path: Optional[str]
 
@@ -370,10 +450,13 @@ class Application(QMainWindow):
         self.load_srdf_button.clicked.connect(self.load_srdf)
         self.compute_srdf_button = QPushButton('Compute self collision matrix')
         self.compute_srdf_button.clicked.connect(self.compute_self_collision_matrix)
+        self.disable_links_button = QPushButton('Disable links')
+        self.disable_links_button.clicked.connect(self.disable_links_callback)
         self.save_srdf_button = QPushButton('Save as srdf')
         self.save_srdf_button.clicked.connect(self.save_srdf)
         srdf_bottoms = QHBoxLayout()
         srdf_bottoms.addWidget(self.compute_srdf_button)
+        srdf_bottoms.addWidget(self.disable_links_button)
         srdf_bottoms.addWidget(self.load_srdf_button)
         srdf_bottoms.addWidget(self.save_srdf_button)
         self.disable_srdf_buttons()
@@ -429,6 +512,16 @@ class Application(QMainWindow):
         else:
             self.progress.set_progress(0, 'Canceled collision checking')
 
+    def disable_links_callback(self):
+        dialog = DisableLinksDialog(self.table.link_names,
+                                    [link in self.table._disabled_links for link in self.table.link_names])
+        if dialog.exec_() == QDialog.Accepted:
+            disabled_links = dialog.checked_links()
+            self.table.update_disabled_links(disabled_links)
+            self.progress.set_progress(100, 'Done checking collisions')
+        else:
+            self.progress.set_progress(0, 'Canceled collision checking')
+
     def load_urdf_from_paramserver(self):
         dialog = RosparamSelectionDialog(self)
         if dialog.exec_() == QDialog.Accepted:
@@ -467,6 +560,7 @@ class Application(QMainWindow):
     def __disable_srdf_buttons(self, active: bool):
         self.save_srdf_button.setDisabled(active)
         self.load_srdf_button.setDisabled(active)
+        self.disable_links_button.setDisabled(active)
         self.compute_srdf_button.setDisabled(active)
 
     def load_srdf(self):
@@ -538,6 +632,7 @@ class Application(QMainWindow):
         if srdf_path is not None:
             self.collision_scene.save_self_collision_matrix(self.world.groups[self.group_name],
                                                             self.table.reasons,
+                                                            self.table.disabled_link_prefix_names,
                                                             file_name=srdf_path)
             self.progress.set_progress(100, f'Saved {self.__srdf_path}')
 

@@ -179,8 +179,6 @@ def get_data(identifier: Sequence[Union[str, int, Sequence[Union[str, int]]]], d
         raise KeyError(e)
     except IndexError as e:
         raise KeyError(e)
-    except ValueError as e:
-        raise KeyError(e)
     return result, shortcut
 
 

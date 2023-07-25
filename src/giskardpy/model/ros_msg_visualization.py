@@ -36,7 +36,7 @@ class ROSMsgVisualization:
         time_stamp = rospy.Time()
         links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
-            for j, marker in enumerate(self.world.links[link_name].collision_visualization_markers().markers):
+            for j, marker in enumerate(self.world.links[link_name].collision_visualization_markers(use_decomposed_meshes=self.use_decomposed_meshes).markers):
                 marker.header.frame_id = self.tf_root
                 marker.action = Marker.ADD
                 link_id_key = f'{link_name}_{j}'

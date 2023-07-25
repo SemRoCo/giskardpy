@@ -396,9 +396,11 @@ class BehaviorTreeConfig(Config):
     def add_visualization_marker_publisher(self,
                                            add_to_sync: Optional[bool] = None,
                                            add_to_planning: Optional[bool] = None,
-                                           add_to_control_loop: Optional[bool] = None):
+                                           add_to_control_loop: Optional[bool] = None,
+                                           use_decomposed_meshes: bool = True):
         self._behavior_tree.configure_visualization_marker(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
-                                                           add_to_control_loop=add_to_control_loop)
+                                                           add_to_control_loop=add_to_control_loop,
+                                                           use_decomposed_meshes=use_decomposed_meshes)
 
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
                               publish_lbA: bool = False, publish_ubA: bool = False,

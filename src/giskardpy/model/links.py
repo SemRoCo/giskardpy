@@ -99,7 +99,7 @@ class LinkGeometry:
             raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
-    def as_visualization_marker(self) -> Marker:
+    def as_visualization_marker(self, *args, **kwargs) -> Marker:
         marker = Marker()
         marker.color = self.color
         return marker
@@ -138,10 +138,13 @@ class MeshGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return get_file_hash(self.file_name_absolute)
 
-    def as_visualization_marker(self) -> Marker:
+    def as_visualization_marker(self, use_decomposed_meshes, *args, **kwargs) -> Marker:
         marker = super().as_visualization_marker()
         marker.type = Marker.MESH_RESOURCE
-        marker.mesh_resource = 'file://' + self.collision_file_name_absolute
+        if use_decomposed_meshes:
+            marker.mesh_resource = 'file://' + self.collision_file_name_absolute
+        else:
+            marker.mesh_resource = 'file://' + self.file_name_absolute
         marker.scale.x = self.scale[0]
         marker.scale.y = self.scale[1]
         marker.scale.z = self.scale[2]
@@ -165,7 +168,7 @@ class BoxGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return f'box{self.depth}{self.width}{self.height}'
 
-    def as_visualization_marker(self):
+    def as_visualization_marker(self, *args, **kwargs):
         marker = super().as_visualization_marker()
         marker.type = Marker.CUBE
         marker.scale.x = self.depth
@@ -190,7 +193,7 @@ class CylinderGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return f'cylinder{self.height}{self.radius}'
 
-    def as_visualization_marker(self):
+    def as_visualization_marker(self, *args, **kwargs):
         marker = super().as_visualization_marker()
         marker.type = Marker.CYLINDER
         marker.scale.x = self.radius * 2
@@ -214,7 +217,7 @@ class SphereGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return f'sphere{self.radius}'
 
-    def as_visualization_marker(self):
+    def as_visualization_marker(self, *args, **kwargs):
         marker = super().as_visualization_marker()
         marker.type = Marker.SPHERE
         marker.scale.x = self.radius * 2
@@ -294,10 +297,10 @@ class Link:
                 collision.color = color
 
     @memoize
-    def collision_visualization_markers(self):
+    def collision_visualization_markers(self, *args, **kwargs):
         markers = MarkerArray()
         for collision in self.collisions:
-            marker = collision.as_visualization_marker()
+            marker = collision.as_visualization_marker(*args, **kwargs)
             markers.markers.append(marker)
         return markers
 

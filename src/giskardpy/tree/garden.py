@@ -268,7 +268,8 @@ class TreeManager(ABC):
     def configure_visualization_marker(self,
                                        add_to_sync: Optional[bool] = None,
                                        add_to_planning: Optional[bool] = None,
-                                       add_to_control_loop: Optional[bool] = None):
+                                       add_to_control_loop: Optional[bool] = None,
+                                       use_decomposed_meshes: bool = True):
         ...
 
     @abc.abstractmethod
@@ -730,15 +731,22 @@ class StandAlone(TreeManager):
     def configure_visualization_marker(self,
                                        add_to_sync: Optional[bool] = None,
                                        add_to_planning: Optional[bool] = None,
-                                       add_to_control_loop: Optional[bool] = None):
+                                       add_to_control_loop: Optional[bool] = None,
+                                       use_decomposed_meshes: bool = True):
         if add_to_sync is not None and add_to_sync:
-            self.insert_node(VisualizationBehavior('visualization'), self.sync_name)
+            self.insert_node(VisualizationBehavior('visualization',
+                                                   use_decomposed_meshes=use_decomposed_meshes), self.sync_name)
         if add_to_planning is not None and add_to_planning:
-            self.insert_node(success_is_failure(VisualizationBehavior)('visualization'), self.planning2_name, 2)
-            self.insert_node(anything_is_success(VisualizationBehavior)('visualization'),
+            self.insert_node(success_is_failure(VisualizationBehavior)('visualization',
+                                                                       use_decomposed_meshes=use_decomposed_meshes),
+                             self.planning2_name, 2)
+            self.insert_node(anything_is_success(VisualizationBehavior)('visualization',
+                                                                        use_decomposed_meshes=use_decomposed_meshes),
                              self.plan_postprocessing_name)
         if add_to_control_loop is not None and add_to_control_loop:
-            self.insert_node(success_is_running(VisualizationBehavior)('visualization'), self.closed_loop_control_name)
+            self.insert_node(success_is_running(VisualizationBehavior)('visualization',
+                                                                       use_decomposed_meshes=use_decomposed_meshes),
+                             self.closed_loop_control_name)
 
     def configure_max_trajectory_length(self, enabled: bool, length: float):
         nodes = self.get_nodes_of_type(MaxTrajectoryLength)
@@ -859,9 +867,12 @@ class OpenLoop(StandAlone):
     def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
                                     joint_name: PrefixName = None):
         # todo handle if this is called twice
-        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime, CleanUpBaseController('CleanUpBaseController', clear_markers=False))
-        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime, InitQPController('InitQPController for base'))
-        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime, SetDriveGoals('SetupBaseTrajConstraints'))
+        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime,
+                                             CleanUpBaseController('CleanUpBaseController', clear_markers=False))
+        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime,
+                                             InitQPController('InitQPController for base'))
+        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime,
+                                             SetDriveGoals('SetupBaseTrajConstraints'))
 
         real_time_tracking = AsyncBehavior(self.base_closed_loop_control_name)
         self.insert_node(real_time_tracking, self.move_robots_name)

@@ -25,8 +25,7 @@ class CollisionChecker(GiskardBehavior):
         except KeyError:
             # no collision checks added
             added_checks = {}
-        for (link1, link2), distance in added_checks.items():
-            key = self.world.sort_links(link1, link2)
+        for key, distance in added_checks.items():
             if key in collision_matrix:
                 collision_matrix[key] = max(distance, collision_matrix[key])
             else:

@@ -227,6 +227,14 @@ class Collisions:
             return self.external_collision[link_name]
         return SortedCollisionResults()
 
+    def get_external_collisions_long_key(self, link_a, link_b):
+        """
+        Collisions are saved as a list for each movable robot joint, sorted by contact distance
+        :type joint_name: str
+        :rtype: SortedKeyList
+        """
+        return self.external_collision_long_key[link_a, link_b]
+
     @profile
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]

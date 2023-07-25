@@ -73,10 +73,7 @@ class Goal(ABC):
         :param distance: distance threshold for the collision check. Only distances smaller than this value can be
                             detected.
         """
-        if self.world.link_order(link_a, link_b):
-            key = (link_a, link_b)
-        else:
-            key = (link_b, link_a)
+        key = link_a, link_b
         if self.world.are_linked(link_a, link_b):
             return
         try:

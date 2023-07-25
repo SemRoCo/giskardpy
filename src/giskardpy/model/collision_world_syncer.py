@@ -16,7 +16,7 @@ from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
 from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig, CollisionCheckerLib
 from giskardpy.data_types import JointStates
-from giskardpy.exceptions import UnknownGroupException
+from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldBranch
 from giskardpy.model.world import WorldTree
@@ -325,8 +325,12 @@ class CollisionWorldSynchronizer:
             if hasattr(child, 'tag') and child.tag == 'disable_collisions':
                 link_a = child.attrib['link1']
                 link_b = child.attrib['link2']
-                link_a = self.world.search_for_link_name(link_a)
-                link_b = self.world.search_for_link_name(link_b)
+                try:
+                    link_a = self.world.search_for_link_name(link_a)
+                    link_b = self.world.search_for_link_name(link_b)
+                except UnknownLinkException as e:
+                    logging.logwarn(e)
+                    continue
                 reason_id = child.attrib['reason']
                 if link_a not in self.world.link_names_with_collisions \
                         or link_b not in self.world.link_names_with_collisions:

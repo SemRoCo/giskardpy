@@ -56,6 +56,8 @@ class HSR_Base(Giskard):
                                                                         number_of_repeller=2,
                                                                         soft_threshold=0.1,
                                                                         hard_threshold=0.03)
+        self.collision_avoidance.overwrite_self_collision_avoidance(link_name='head_tilt_link',
+                                                                    soft_threshold=0.03)
 
     def configure_robot_interface(self):
         pass

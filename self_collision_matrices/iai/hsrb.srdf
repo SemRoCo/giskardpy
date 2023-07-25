@@ -1,6 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <robot name="hsrb">
-  <hash>24f2ef2d2997923e188a334f6faf817bb42fda9cd453d8f32db42037214f0e27</hash>
   <disable_collisions link1="arm_flex_link" link2="arm_flex_link" reason="Adjacent"/>
   <disable_collisions link1="arm_flex_link" link2="arm_lift_link" reason="Default"/>
   <disable_collisions link1="arm_flex_link" link2="arm_roll_link" reason="Default"/>
@@ -91,6 +90,7 @@
   <disable_collisions link1="base_link" link2="base_r_drive_wheel_link" reason="Default"/>
   <disable_collisions link1="base_link" link2="base_r_passive_wheel_z_link" reason="Default"/>
   <disable_collisions link1="base_link" link2="base_range_sensor_link" reason="Adjacent"/>
+  <disable_collisions link1="base_link" link2="hand_palm_link" reason="Unknown"/>
   <disable_collisions link1="base_link" link2="head_pan_link" reason="Never"/>
   <disable_collisions link1="base_link" link2="head_rgbd_sensor_link" reason="Never"/>
   <disable_collisions link1="base_link" link2="head_tilt_link" reason="Never"/>
@@ -176,7 +176,6 @@
   <disable_collisions link1="head_tilt_link" link2="torso_lift_link" reason="Never"/>
   <disable_collisions link1="torso_lift_link" link2="torso_lift_link" reason="Adjacent"/>
   <disable_collisions link1="torso_lift_link" link2="wrist_flex_link" reason="Never"/>
-  <disable_collisions link1="torso_lift_link" link2="wrist_roll_link" reason="Never"/>
   <disable_collisions link1="wrist_flex_link" link2="wrist_flex_link" reason="Adjacent"/>
   <disable_collisions link1="wrist_flex_link" link2="wrist_roll_link" reason="Default"/>
   <disable_collisions link1="wrist_roll_link" link2="wrist_roll_link" reason="Adjacent"/>

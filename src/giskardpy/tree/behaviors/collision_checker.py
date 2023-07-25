@@ -15,8 +15,6 @@ class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super().__init__(name)
         self.lock = Lock()
-        self.object_js_subs = {}  # JointState subscribers for articulated world objects
-        self.object_joint_states = {}  # JointStates messages for articulated world objects
 
     def add_added_checks(self, collision_matrix):
         try:

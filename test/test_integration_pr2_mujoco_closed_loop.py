@@ -5,12 +5,14 @@ import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
+from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, MoveGoal
 from giskardpy.configs.pr2 import PR2_Mujoco, PR2_MujocoRealTime
+from giskardpy.data_types import JointStates
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from utils_for_tests import JointGoalChecker
 
@@ -130,7 +132,7 @@ class TestMoveBaseGoals:
         base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
         # base_goal.pose.orientation.w = 1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
         zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
 
@@ -277,6 +279,61 @@ class TestMoveBaseGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(0.001, [0, 0, 1]))
         zero_pose.move_base(base_goal)
+
+
+class TestWorldManipulation:
+    def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
+        joint_goal = 0.2
+        object_name = kitchen_setup.kitchen_name
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': joint_goal})
+        joint_state = rospy.wait_for_message('/kitchen/joint_states', JointState, rospy.Duration(1))
+        joint_state = JointStates.from_msg(joint_state)
+        assert joint_state['sink_area_left_middle_drawer_main_joint'].position == joint_goal
+        kitchen_setup.clear_world()
+        try:
+            kitchen_setup.set_object_joint_state(object_name, {})
+        except KeyError:
+            pass
+        else:
+            raise 'expected error'
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position.x = 1
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        if kitchen_setup.is_standalone():
+            js_topic = ''
+            set_js_topic = ''
+        else:
+            js_topic = '/kitchen/joint_states'
+            set_js_topic = '/kitchen/cram_joint_states'
+        kitchen_setup.add_urdf(name=object_name,
+                               urdf=rospy.get_param('kitchen_description'),
+                               pose=p,
+                               js_topic=js_topic,
+                               set_js_topic=set_js_topic)
+        kitchen_setup.wait_heartbeats(1)
+        joint_state = kitchen_setup.get_group_info(object_name).joint_state
+        joint_state = JointStates.from_msg(joint_state)
+        assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
+
+        joint_goal = 0.1
+        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': joint_goal})
+        kitchen_setup.remove_group(object_name)
+        try:
+            kitchen_setup.set_object_joint_state(object_name, {})
+        except KeyError:
+            pass
+        else:
+            raise 'expected error'
+        kitchen_setup.add_urdf(name=object_name,
+                               urdf=rospy.get_param('kitchen_description'),
+                               pose=p,
+                               js_topic=js_topic,
+                               set_js_topic=set_js_topic)
+        kitchen_setup.wait_heartbeats(1)
+        joint_state = kitchen_setup.get_group_info(object_name).joint_state
+        joint_state = JointStates.from_msg(joint_state)
+        assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
 
 
 class TestConstraints:
@@ -436,6 +493,7 @@ class TestConstraints:
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
+
 class TestActionServerEvents:
     def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -511,7 +569,6 @@ class TestActionServerEvents:
         zero_pose.set_joint_goal(pocky_pose, check=False)
         zero_pose.add_goal_check(JointGoalChecker(zero_pose, zero_pose.default_pose))
         zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)
-
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

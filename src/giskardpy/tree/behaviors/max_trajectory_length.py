@@ -27,6 +27,8 @@ class MaxTrajectoryLength(GiskardBehavior):
         if not self.real_time:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
             length = self.god_map.get_data(identifier.max_trajectory_length)
+        else:
+            sample_period = 1
         t = t * sample_period
         if t > length:
             raise PlanningException(f'Aborted because trajectory is longer than {length}')

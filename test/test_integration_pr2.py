@@ -3033,7 +3033,6 @@ class TestCollisionAvoidanceGoals:
         pocky_pose_setup.check_cpi_geq(['box'], 0.048)
 
     def test_avoid_collision_box_between_3_boxes(self, pocky_pose_setup: PR2TestWrapper):
-        # FIXME very shaky
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
@@ -3084,10 +3083,9 @@ class TestCollisionAvoidanceGoals:
         pocky_pose_setup.set_align_planes_goal(tip_link='box', tip_normal=x, goal_normal=x_map)
         pocky_pose_setup.set_align_planes_goal(tip_link='box', tip_normal=y, goal_normal=y_map)
         pocky_pose_setup.allow_self_collision()
-        # pocky_pose_setup.allow_all_collisions()
 
         pocky_pose_setup.plan_and_execute()
-        assert ('box', 'bl') not in pocky_pose_setup.collision_scene.black_list
+        assert ('box', 'bl') not in pocky_pose_setup.collision_scene.self_collision_matrix
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_group_info('r_gripper').links, 0.04)
 
     def test_avoid_collision_box_between_cylinders(self, pocky_pose_setup: PR2TestWrapper):

@@ -16,6 +16,10 @@ from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp, s
 
 CollisionObject = pb.CollisionObject
 
+if not hasattr(pb, '__version__') or pb.__version__ != '1.0.0':
+    raise ImportError('Betterpybullet is outdated.')
+
+
 class BPCollisionWrapper(Collision):
     def __init__(self, pb_collision: pb.Collision):
         self.pb_collision = pb_collision

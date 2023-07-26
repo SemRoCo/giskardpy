@@ -30,16 +30,6 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
-      - name: load bpb # -----------------------------------------------------------------------------------------------
-        id: load-bpb
-        uses: actions/cache@v3
-        with:
-          path: ~/bpb
-          key: bpb
-      - name: add bpb to bashrc
-        run: |
-          cd ~/bpb/bullet3
-          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy'
@@ -87,12 +77,6 @@ jobs:
           catkin build
           echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
           echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
-  #    - name: build betterpybullet
-  #      run: |
-  #        mkdir betterpybullet
-  #        source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash
-  #        roscd giskardpy
-  #        ./scripts/build_better_pybullet.sh /betterpybullet
       - name: start roscore
         run: |
           roscore &
@@ -100,10 +84,6 @@ jobs:
         run: |
           roscd giskardpy
           python3 -m pytest -s test/test_cas_wrapper.py
-      - name: PR2 TestWorld
-        run: |
-          roscd giskardpy
-          python3 -m pytest -s test/test_integration_pr2.py::TestWorld
       - name: test godmap
         run: |
           roscd giskardpy

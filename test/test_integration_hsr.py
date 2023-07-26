@@ -206,7 +206,7 @@ class TestCartGoals:
         pose.header.frame_id = kitchen_setup.default_root
         pose.pose.orientation.w = 1
         kitchen_setup.add_box(name=box1_name,
-                              size=(1,1,1),
+                              size=(1, 1, 1),
                               pose=pose,
                               parent_link='hand_palm_link',
                               parent_link_group='hsrb')
@@ -353,7 +353,6 @@ class TestCollisionAvoidanceGoals:
         current_state = {k.short_name: v for k, v in current_state.items()}
         zero_pose.compare_joint_state(current_state, zero_pose.default_pose)
 
-
     def test_self_collision_avoidance(self, zero_pose: HSRTestWrapper):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
@@ -435,9 +434,9 @@ class TestAddObject:
         pose.pose.orientation.w = 1
         pose.pose.position.x = 1
         zero_pose.add_box(name=box1_name,
-                              size=(1, 1, 1),
-                              pose=pose,
-                              parent_link='hand_palm_link')
+                          size=(1, 1, 1),
+                          pose=pose,
+                          parent_link='hand_palm_link')
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()

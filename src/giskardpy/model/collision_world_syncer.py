@@ -325,7 +325,7 @@ class CollisionWorldSynchronizer:
     def is_collision_checking_enabled(self) -> bool:
         return self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none
 
-    def load_self_collision_matrix_from_srdf(self, path: str, group_name: str)\
+    def load_self_collision_matrix_from_srdf(self, path: str, group_name: str) \
             -> Tuple[Optional[dict], Set[PrefixName]]:
         if not self.is_collision_checking_enabled():
             return {}, set()
@@ -729,6 +729,15 @@ class CollisionWorldSynchronizer:
 
     def sync(self):
         pass
+
+    def sync_links_with_world(self):
+        for old_link in list(self.disabled_links):
+            if old_link not in self.world.link_names:
+                self.disabled_links.discard(old_link)
+        for key, value in list(self.self_collision_matrix.items()):
+            link1, link2 = key
+            if link1 not in self.world.link_names or link2 not in self.world.link_names:
+                del self.self_collision_matrix[key]
 
     def collision_goals_to_collision_matrix(self,
                                             collision_goals: List[CollisionEntry],

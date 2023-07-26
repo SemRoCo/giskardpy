@@ -1,17 +1,13 @@
 from __future__ import annotations
 import traceback
-import typing
-from typing import Set, Tuple, List, Optional, Dict
+from typing import Set, Tuple, List, Optional, Dict, Union
 import rospy
-from PyQt5 import QtCore
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QCheckBox, QWidget, \
     QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel, QDialog, \
     QDialogButtonBox, QComboBox, QFrame, QScrollArea
 from PyQt5.QtCore import Qt
-import xml.etree.ElementTree as ET
 import pandas as pd
-from collections import defaultdict
 import sys
 import os
 
@@ -75,7 +71,7 @@ class ReasonCheckBox(QCheckBox):
 
 class Table(QTableWidget):
     _reasons: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
-    _disabled_links: Set[str]
+    _disabled_links: Set[PrefixName]
     world: WorldTree
 
     def __init__(self, world: WorldTree, collision_scene: BetterPyBulletSyncer):
@@ -86,14 +82,16 @@ class Table(QTableWidget):
         self.collision_scene = collision_scene
         self.ros_visualizer = ROSMsgVisualization('map')
 
-    def update_disabled_links(self, link_names: Set[str]):
+    def update_disabled_links(self, link_names: Set[PrefixName]):
         self._disabled_links = link_names
         self.update_table()
 
     def disable_link(self, link_name: str):
+        link_name = self.world.search_for_link_name(link_name)
         self._disabled_links.add(link_name)
 
     def enable_link(self, link_name: str):
+        link_name = self.world.search_for_link_name(link_name)
         self._disabled_links.discard(link_name)
 
     def get_widget(self, row, column):
@@ -114,7 +112,8 @@ class Table(QTableWidget):
     def table_id_to_link_name(self, index: int) -> str:
         return self.link_names[index]
 
-    def sort_links(self, link1: str, link2: str) -> Tuple[str, str]:
+    def sort_links(self, link1: Union[str, PrefixName], link2: Union[str, PrefixName]) \
+            -> Tuple[Union[str, PrefixName], Union[str, PrefixName]]:
         return tuple(sorted((link1, link2)))
 
     def update_reason(self, link1: str, link2: str, new_reason: Optional[DisableCollisionReason]):
@@ -178,12 +177,11 @@ class Table(QTableWidget):
 
     @property
     def enabled_link_names(self) -> List[str]:
-        return list(sorted(
-            x.short_name for x in self.world.link_names_with_collisions if x.short_name not in self._disabled_links))
+        return list(sorted(x.short_name for x in self.world.link_names_with_collisions if x not in self._disabled_links))
 
     @property
     def disabled_link_prefix_names(self) -> List[PrefixName]:
-        return [self.world.search_for_link_name(link_name) for link_name in self._disabled_links]
+        return list(self._disabled_links)
 
     def add_table_item(self, row, column):
         checkbox = ReasonCheckBox(self, row, column)
@@ -409,7 +407,6 @@ class DisableLinksDialog(QDialog):
         super().__init__()
         self.table = table
         self.links = self.table.link_names
-        self.mask = [link in self.table._disabled_links for link in self.table.link_names]
         self.setWindowTitle('Disable Links')
         self.layout = QVBoxLayout(self)
 
@@ -422,11 +419,11 @@ class DisableLinksDialog(QDialog):
         self.scrollLayout = QVBoxLayout(self.scrollAreaWidgetContents)
 
         self.checkbox_widgets = []
-        for link, state in zip(self.links, self.mask):
+        for link in self.links:
             checkbox_widget = DisableLinksItem(link, self.table)
             self.checkbox_widgets.append(checkbox_widget)
             self.scrollLayout.addWidget(checkbox_widget)
-            checkbox_widget.set_checked(state)
+            checkbox_widget.set_checked(link not in self.table.enabled_link_names)
 
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok)
         self.buttonBox.accepted.connect(self.accept)
@@ -592,7 +589,8 @@ class Application(QMainWindow):
             return
         try:
             if os.path.isfile(srdf_file):
-                reasons, disabled_links = self.collision_scene.load_self_collision_matrix_from_srdf(srdf_file, self.group_name)
+                reasons, disabled_links = self.collision_scene.load_self_collision_matrix_from_srdf(srdf_file,
+                                                                                                    self.group_name)
                 self.table.update_disabled_links(disabled_links)
                 self.table.update_table(reasons)
                 self.progress.set_progress(100, f'Loaded {srdf_file}')

@@ -317,7 +317,7 @@ class CollisionWorldSynchronizer:
             recompute = not self.load_self_collision_matrix_from_srdf(file_name, group_name)
         except AttributeError as e:
             logging.logerr('No self collision matrix loaded, computing new one. '
-                           'You might want to verify the result using self_collision_matrix_tool.py.')
+                           'You might want to verify the result using collision_matrix_tool.py.')
             recompute = True
         if recompute:
             self.compute_self_collision_matrix(group_name)
@@ -325,9 +325,10 @@ class CollisionWorldSynchronizer:
     def is_collision_checking_enabled(self) -> bool:
         return self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none
 
-    def load_self_collision_matrix_from_srdf(self, path: str, group_name: str) -> Optional[dict]:
+    def load_self_collision_matrix_from_srdf(self, path: str, group_name: str)\
+            -> Tuple[Optional[dict], Set[PrefixName]]:
         if not self.is_collision_checking_enabled():
-            return {}
+            return {}, set()
         path_to_srdf = resolve_ros_iris(path)
         if not os.path.exists(path_to_srdf):
             raise AttributeError(f'file {path_to_srdf} does not exist')
@@ -368,7 +369,7 @@ class CollisionWorldSynchronizer:
         logging.loginfo(f'Loaded self collision matrix: {path_to_srdf}')
         self.self_collision_matrix_paths[group_name] = path_to_srdf
         self.self_collision_matrix = self_collision_matrix
-        return self_collision_matrix
+        return self_collision_matrix, self.disabled_links
 
     def robot(self, robot_name: str = '') -> WorldBranch:
         for robot in self.robots:

@@ -75,20 +75,26 @@ class ReasonCheckBox(QCheckBox):
 
 class Table(QTableWidget):
     _reasons: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
-    _disabled_links: List[str]
+    _disabled_links: Set[str]
     world: WorldTree
 
     def __init__(self, world: WorldTree, collision_scene: BetterPyBulletSyncer):
         super().__init__()
         self.cellClicked.connect(self.table_item_callback)
         self.world = world
-        self._disabled_links = []
+        self._disabled_links = set()
         self.collision_scene = collision_scene
         self.ros_visualizer = ROSMsgVisualization('map')
 
-    def update_disabled_links(self, link_names: List[str]):
+    def update_disabled_links(self, link_names: Set[str]):
         self._disabled_links = link_names
         self.update_table()
+
+    def disable_link(self, link_name: str):
+        self._disabled_links.add(link_name)
+
+    def enable_link(self, link_name: str):
+        self._disabled_links.discard(link_name)
 
     def get_widget(self, row, column):
         return self.cellWidget(row, column).layout().itemAt(0).widget()
@@ -141,10 +147,7 @@ class Table(QTableWidget):
         self.ros_visualizer.clear_marker()
         self.collision_scene.sync()
         for link_name in self.world.link_names_with_collisions:
-            if link_name.short_name in self.enabled_link_names:
-                self.world.links[link_name].dye_collisions(self.world.default_link_color)
-            # else:
-            #     self.world.links[link_name].dye_collisions(ColorRGBA(1,0,0,1))
+            self.world.links[link_name].dye_collisions(self.world.default_link_color)
         link1 = self.world.search_for_link_name(self.link_names[row])
         link2 = self.world.search_for_link_name(self.link_names[column])
         key = self.sort_links(link1, link2)
@@ -153,6 +156,19 @@ class Table(QTableWidget):
         color_msg = ColorRGBA(color[0] / 255, color[1] / 255, color[2] / 255, 1)
         self.world.links[link1].dye_collisions(color_msg)
         self.world.links[link2].dye_collisions(color_msg)
+        self.world.reset_cache()
+        self.ros_visualizer.publish_markers()
+
+    def dye_disabled_links(self, disabled_color: Optional[ColorRGBA] = None):
+        if disabled_color is None:
+            disabled_color = ColorRGBA(1, 0, 0, 1)
+        self.ros_visualizer.clear_marker()
+        self.collision_scene.sync()
+        for link_name in self.world.link_names_with_collisions:
+            if link_name.short_name in self.enabled_link_names:
+                self.world.links[link_name].dye_collisions(self.world.default_link_color)
+            else:
+                self.world.links[link_name].dye_collisions(disabled_color)
         self.world.reset_cache()
         self.ros_visualizer.publish_markers()
 
@@ -360,9 +376,12 @@ class ClickableLabel(QLabel):
 
 
 class DisableLinksItem(QWidget):
-    def __init__(self, text, parent=None):
+    def __init__(self, text: str, table: Table, parent=None):
         super().__init__(parent)
+        self.text = text
+        self.table = table
         self.checkbox = QCheckBox()
+        self.checkbox.stateChanged.connect(self.checkbox_callback)
         self.label = ClickableLabel(text, self)
 
         layout = QHBoxLayout()
@@ -370,6 +389,13 @@ class DisableLinksItem(QWidget):
         layout.addWidget(self.label)
         layout.addStretch()
         self.setLayout(layout)
+
+    def checkbox_callback(self, state):
+        if state == Qt.Checked:
+            self.table.disable_link(self.text)
+        else:
+            self.table.enable_link(self.text)
+        self.table.dye_disabled_links()
 
     def set_checked(self, new_state: bool):
         self.checkbox.setChecked(new_state)
@@ -379,9 +405,11 @@ class DisableLinksItem(QWidget):
 
 
 class DisableLinksDialog(QDialog):
-    def __init__(self, links: List[str], mask: List[bool]):
+    def __init__(self, table: Table):
         super().__init__()
-        self.links = links
+        self.table = table
+        self.links = self.table.link_names
+        self.mask = [link in self.table._disabled_links for link in self.table.link_names]
         self.setWindowTitle('Disable Links')
         self.layout = QVBoxLayout(self)
 
@@ -394,8 +422,8 @@ class DisableLinksDialog(QDialog):
         self.scrollLayout = QVBoxLayout(self.scrollAreaWidgetContents)
 
         self.checkbox_widgets = []
-        for link, state in zip(links, mask):
-            checkbox_widget = DisableLinksItem(link)
+        for link, state in zip(self.links, self.mask):
+            checkbox_widget = DisableLinksItem(link, self.table)
             self.checkbox_widgets.append(checkbox_widget)
             self.scrollLayout.addWidget(checkbox_widget)
             checkbox_widget.set_checked(state)
@@ -513,14 +541,9 @@ class Application(QMainWindow):
             self.progress.set_progress(0, 'Canceled collision checking')
 
     def disable_links_callback(self):
-        dialog = DisableLinksDialog(self.table.link_names,
-                                    [link in self.table._disabled_links for link in self.table.link_names])
-        if dialog.exec_() == QDialog.Accepted:
-            disabled_links = dialog.checked_links()
-            self.table.update_disabled_links(disabled_links)
-            self.progress.set_progress(100, 'Done checking collisions')
-        else:
-            self.progress.set_progress(0, 'Canceled collision checking')
+        dialog = DisableLinksDialog(self.table)
+        dialog.exec_()
+        self.table.update_table()
 
     def load_urdf_from_paramserver(self):
         dialog = RosparamSelectionDialog(self)
@@ -569,7 +592,8 @@ class Application(QMainWindow):
             return
         try:
             if os.path.isfile(srdf_file):
-                reasons = self.collision_scene.load_self_collision_matrix_from_srdf(srdf_file, self.group_name)
+                reasons, disabled_links = self.collision_scene.load_self_collision_matrix_from_srdf(srdf_file, self.group_name)
+                self.table.update_disabled_links(disabled_links)
                 self.table.update_table(reasons)
                 self.progress.set_progress(100, f'Loaded {srdf_file}')
             else:

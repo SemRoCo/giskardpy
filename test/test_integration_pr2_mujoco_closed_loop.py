@@ -13,6 +13,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, MoveGoal
 from giskardpy.configs.pr2 import PR2_Mujoco, PR2_MujocoRealTime
 from giskardpy.data_types import JointStates
+from giskardpy.goals.goal import WEIGHT_BELOW_CA
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from utils_for_tests import JointGoalChecker
 
@@ -354,7 +355,7 @@ class TestConstraints:
         # spawn cup
         cup_pose = PoseStamped()
         cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
-        cup_pose.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+        # cup_pose.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
         cup_pose.pose.position = Point(0.1, 0.2, -.05)
         cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
@@ -441,7 +442,8 @@ class TestConstraints:
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
-                                    root_link=kitchen_setup.default_root)
+                                    root_link=kitchen_setup.default_root,
+                                    weight=WEIGHT_BELOW_CA)
         kitchen_setup.plan_and_execute()
 
         l_goal.pose.position.z -= .2

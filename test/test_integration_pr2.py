@@ -3836,17 +3836,16 @@ class TestInfoServices:
 
 class TestWorld:
     def test_compute_self_collision_matrix(self, world_setup: WorldTree):
+        disabled_links = {world_setup.search_for_link_name('br_caster_l_wheel_link'),
+                          world_setup.search_for_link_name('fr_caster_l_wheel_link')}
         reference_collision_scene = BetterPyBulletSyncer(world_setup)
-        # reference_reasons = reference_collision_scene.load_from_srdf('package://giskardpy/test/data/pr2.srdf')
+        reference_reasons, reference_disabled_links = reference_collision_scene.load_self_collision_matrix_from_srdf(
+            'package://giskardpy/test/data/pr2_test.srdf', 'pr2')
         collision_scene: CollisionWorldSynchronizer = world_setup.god_map.get_data(identifier.collision_scene)
-        actual_reasons = collision_scene.compute_self_collision_matrix('pr2')
-        reference_blacklist = reference_collision_scene.black_list
-        actual_blacklist = collision_scene.black_list
-        false_negatives = reference_blacklist.difference(actual_blacklist)
-        false_positives = actual_blacklist.difference(reference_blacklist)
-        assert len(false_negatives) == 0, f'False negatives: {sorted(false_negatives)}'
-        assert len(false_positives) == 0, f'False negatives: {sorted(false_positives)}'
-        pass
+        actual_reasons = collision_scene.compute_self_collision_matrix('pr2',
+                                                                       number_of_tries_never=500)
+        assert actual_reasons == reference_reasons
+        assert reference_disabled_links == disabled_links
 
     def test_compute_chain_reduced_to_controlled_joints(self, world_setup: WorldTree):
         r_gripper_tool_frame = world_setup.search_for_link_name('r_gripper_tool_frame')

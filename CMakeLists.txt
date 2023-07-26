@@ -173,6 +173,7 @@ catkin_install_python(PROGRAMS
 	scripts/base_joint_state_publisher.py
 	scripts/giskard_pr2_standalone_example.py
 	scripts/python_interface_example.py
+	scripts/collision_matrix_tool.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

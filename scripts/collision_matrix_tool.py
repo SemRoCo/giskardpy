@@ -1,4 +1,8 @@
+#!/usr/bin/env python
+
 from __future__ import annotations
+
+import signal
 import traceback
 from typing import Set, Tuple, List, Optional, Dict, Union
 import rospy
@@ -6,7 +10,7 @@ from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QCheckBox, QWidget, \
     QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QMessageBox, QProgressBar, QLabel, QDialog, \
     QDialogButtonBox, QComboBox, QFrame, QScrollArea
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 import pandas as pd
 import sys
 import os
@@ -177,7 +181,8 @@ class Table(QTableWidget):
 
     @property
     def enabled_link_names(self) -> List[str]:
-        return list(sorted(x.short_name for x in self.world.link_names_with_collisions if x not in self._disabled_links))
+        return list(
+            sorted(x.short_name for x in self.world.link_names_with_collisions if x not in self._disabled_links))
 
     @property
     def disabled_link_prefix_names(self) -> List[PrefixName]:
@@ -438,12 +443,19 @@ class Application(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.timer = QTimer()
+        self.timer.start(1000)  # Time in milliseconds
+        self.timer.timeout.connect(lambda: None)
         self.__srdf_path = None
         self.world = WorldTree.empty_world()
         self.world.default_link_color = ColorRGBA(0.5, 0.5, 0.5, 0.75)
         self.collision_scene = BetterPyBulletSyncer.empty(self.world)
         self.df = pd.DataFrame()
         self.initUI()
+
+    def die(self):
+        if rospy.is_shutdown():
+            QApplication.quit()
 
     def initUI(self):
         self.setWindowTitle('Self Collision Matrix Tool')
@@ -659,14 +671,16 @@ class Application(QMainWindow):
             self.progress.set_progress(100, f'Saved {self.__srdf_path}')
 
 
-def main():
-    # Display DataFrame in PyQt5 GUI
-    app = QApplication(sys.argv)
-    window = Application()
-    window.show()
-    sys.exit(app.exec_())
+def handle_sigint(sig, frame):
+    """Handler for the SIGINT signal."""
+    QApplication.quit()
 
 
 if __name__ == '__main__':
     rospy.init_node('self_collision_matrix_updater')
-    main()
+    signal.signal(signal.SIGINT, handle_sigint)
+
+    app = QApplication(sys.argv)
+    window = Application()
+    window.show()
+    exit(app.exec_())

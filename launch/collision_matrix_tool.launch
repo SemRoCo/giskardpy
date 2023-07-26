@@ -1,0 +1,7 @@
+<launch>
+
+  <node pkg="giskardpy" type="collision_matrix_tool.py" name="collision_matrix_tool" output="screen"/>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/collision_matrix_tool.rviz" />
+
+</launch>

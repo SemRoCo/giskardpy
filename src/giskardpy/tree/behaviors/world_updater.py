@@ -253,9 +253,8 @@ class WorldUpdater(GiskardBehavior):
         group = self.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
         pose = self.world.transform_pose(self.world.joints[joint_name].parent_link_name, req.pose).pose
-        # pose = w.TransMatrix(pose)
         self.world.joints[joint_name].update_transform(pose)
-        # self.world.update_joint_parent_T_child(joint_name, pose)
+        self.world.notify_state_change()
         self.collision_scene.remove_links_from_self_collision_matrix(set(group.link_names_with_collisions))
         self.collision_scene.update_collision_blacklist(
             link_combinations=set(product(group.link_names_with_collisions,
@@ -277,9 +276,6 @@ class WorldUpdater(GiskardBehavior):
             self.collision_scene.remove_links_from_self_collision_matrix(new_links)
             self.collision_scene.update_self_collision_matrix(parent_group, new_links)
             self.collision_scene.blacklist_inter_group_collisions()
-            # self.collision_scene.update_collision_blacklist(
-            #     link_combinations=set(product(group.link_names_with_collisions,
-            #                                   self.world.link_names_with_collisions)))
         else:
             logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
 
@@ -288,12 +284,8 @@ class WorldUpdater(GiskardBehavior):
         # assumes that parent has god map lock
         if name not in self.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
-        self.collision_scene.remove_links_from_self_collision_matrix(set(self.world.groups[name].link_names_with_collisions))
         self.world.delete_group(name)
         self.world.cleanup_unused_free_variable()
-        # old_free_variables = [x.name for x in self.world.groups[name].free_variables]
-        # for free_variable in old_free_variables:
-        #     del self.world.state[free_variable]
         self._remove_plugins_of_group(name)
         logging.loginfo(f'Deleted \'{name}\'.')
 

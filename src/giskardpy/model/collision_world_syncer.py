@@ -358,7 +358,12 @@ class CollisionWorldSynchronizer:
                     combi = self.world.sort_links(link_a, link_b)
                     self_collision_matrix[combi] = reason
                 elif child.tag == self.srdf_disable_all_collisions:
-                    self.disabled_links.add(child.attrib['link'])
+                    try:
+                        link_name = self.world.search_for_link_name(child.attrib['link'])
+                    except UnknownLinkException as e:
+                        logging.logwarn(e)
+                        continue
+                    self.disabled_links.add(link_name)
 
         # %% update matrix according to currently controlled joints
         group = self.world.groups[group_name]
@@ -483,7 +488,9 @@ class CollisionWorldSynchronizer:
 
         if save_to_tmp:
             self.self_collision_matrix = self_collision_matrix
-            self.save_self_collision_matrix(group, self_collision_matrix)
+            self.save_self_collision_matrix(group=group,
+                                            self_collision_matrix=self_collision_matrix,
+                                            disabled_links=set())
         else:
             self.self_collision_matrix.update(self_collision_matrix)
         return self_collision_matrix
@@ -608,8 +615,8 @@ class CollisionWorldSynchronizer:
 
     def save_self_collision_matrix(self,
                                    group: WorldBranch,
-                                   reasons: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason],
-                                   disabled_links: List[PrefixName],
+                                   self_collision_matrix: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason],
+                                   disabled_links: Set[PrefixName],
                                    file_name: Optional[str] = None):
         # Create the root element
         root = etree.Element('robot')
@@ -621,7 +628,7 @@ class CollisionWorldSynchronizer:
             child.set('link', link_name.short_name)
 
         # %% self collision matrix
-        for (link_a, link_b), reason in sorted(reasons.items()):
+        for (link_a, link_b), reason in sorted(self_collision_matrix.items()):
             child = etree.SubElement(root, 'disable_self_collision')
             child.set('link1', link_a.short_name)
             child.set('link2', link_b.short_name)
@@ -743,7 +750,11 @@ class CollisionWorldSynchronizer:
             else:
                 group2_links = self.world.groups[collision_entry.group2].link_names_with_collisions
             for link1 in group1_links:
+                if link1 in self.disabled_links:
+                    continue
                 for link2 in group2_links:
+                    if link2 in self.disabled_links:
+                        continue
                     black_list_key = robot_link, env_link = self.world.sort_links(link1, link2)
                     if not self.world.is_link_controlled(robot_link) and self.world.is_link_controlled(env_link):
                         robot_link, env_link = env_link, robot_link

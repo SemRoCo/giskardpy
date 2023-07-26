@@ -2954,19 +2954,18 @@ class TestCollisionAvoidanceGoals:
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(['base_link'], distance_threshold=0.25, check_self=False)
 
-    # def test_ignore_all_collisions_of_links(self, box_setup: PR2TestWrapper):
-    # fixme this is currently not supported
-    #     p = PoseStamped()
-    #     p.header.frame_id = box_setup.default_root
-    #     p.pose.position.x += 0.5
-    #     p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-    #     box_setup.teleport_base(p)
-    #     box_setup.check_cpi_geq(['bl_caster_l_wheel_link', 'bl_caster_r_wheel_link',
-    #                              'fl_caster_l_wheel_link', 'fl_caster_r_wheel_link',
-    #                              'br_caster_l_wheel_link', 'br_caster_r_wheel_link',
-    #                              'fr_caster_l_wheel_link', 'fr_caster_r_wheel_link'],
-    #                             distance_threshold=0.25,
-    #                             check_self=False)
+    def test_ignore_all_collisions_of_links(self, box_setup: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = box_setup.default_root
+        p.pose.position.x += 0.5
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        box_setup.teleport_base(p)
+        box_setup.check_cpi_geq(['bl_caster_l_wheel_link', 'bl_caster_r_wheel_link',
+                                 'fl_caster_l_wheel_link', 'fl_caster_r_wheel_link',
+                                 'br_caster_l_wheel_link', 'br_caster_r_wheel_link',
+                                 'fr_caster_l_wheel_link', 'fr_caster_r_wheel_link'],
+                                distance_threshold=0.25,
+                                check_self=False)
 
     def test_avoid_collision_go_around_corner(self, fake_table_setup: PR2TestWrapper):
         r_goal = PoseStamped()

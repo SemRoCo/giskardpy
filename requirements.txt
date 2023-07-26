@@ -10,3 +10,4 @@ lxml>=4.5.0
 sortedcontainers>=2.4.0
 qpalm>=1.1.4
 PyQt5~=5.14.1
+pycollada>=0.7.2

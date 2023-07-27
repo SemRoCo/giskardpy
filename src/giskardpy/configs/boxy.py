@@ -27,6 +27,8 @@ class Boxy_StandAlone(Giskard):
         self.execution.set_control_mode(ControlModes.stand_alone)
 
     def configure_collision_avoidance(self):
+        self.collision_avoidance.load_self_collision_matrix(
+            'package://giskardpy/self_collision_matrices/iai/boxy_description.srdf')
         self.collision_avoidance.overwrite_external_collision_avoidance('odom_z_joint',
                                                                         number_of_repeller=2,
                                                                         soft_threshold=0.2,

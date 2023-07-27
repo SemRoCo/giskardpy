@@ -161,19 +161,16 @@ include_directories(
 # )
 
 catkin_install_python(PROGRAMS 
+	scripts/clear_world.py
+	scripts/collision_matrix_tool.py
 	scripts/giskard.py
+	scripts/giskard_pr2_standalone_example.py
 	scripts/interactive_marker.py
 	scripts/joystick_e_stop.py
-	scripts/clear_world.py
-	scripts/joint_goal_publisher.py
 	scripts/move_base_simple_goal.py
-	scripts/print_joint_state.py
-	scripts/fake_servers.py
 	scripts/move_base_simple_goal_diff_drive.py
-	scripts/base_joint_state_publisher.py
-	scripts/giskard_pr2_standalone_example.py
+	scripts/print_joint_state.py
 	scripts/python_interface_example.py
-	scripts/collision_matrix_tool.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

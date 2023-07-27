@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 
-from giskardpy.configs.data_types import ControlModes, SupportedQPSolver
+from giskardpy.configs.data_types import ControlModes, SupportedQPSolver, TfPublishingModes
 from giskardpy.configs.default_giskard import Giskard
 from giskardpy.my_types import PrefixName, Derivatives
 
@@ -98,6 +98,7 @@ class HSR_StandAlone(HSR_Base):
     def configure_behavior_tree(self):
         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True,
                                                               add_to_control_loop=True)
+        self.behavior_tree.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
 
     def configure_robot_interface(self):
         super().configure_robot_interface()

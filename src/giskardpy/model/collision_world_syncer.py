@@ -330,6 +330,7 @@ class CollisionWorldSynchronizer:
         if not self.is_collision_checking_enabled():
             return {}, set()
         path_to_srdf = resolve_ros_iris(path)
+        logging.loginfo(f'loading self collision matrix: {path_to_srdf}')
         if not os.path.exists(path_to_srdf):
             raise AttributeError(f'file {path_to_srdf} does not exist')
         srdf = etree.parse(path_to_srdf)

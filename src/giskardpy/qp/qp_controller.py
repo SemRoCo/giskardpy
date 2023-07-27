@@ -27,7 +27,6 @@ from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math
 
-
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
 
@@ -177,27 +176,6 @@ class Weights(ProblemDataPart):
         f = cas.abs(current_position * a) ** exp
         x_offset = cas.solve_for(f, target_value)
         return (cas.abs(current_position + x_offset - limit) * a) ** exp, x_offset
-
-    def asdf(self, current_position: cas.Symbol,
-             lower_limit: float,
-             upper_limit: float,
-             target_weight: float = 100,
-             threshold: float = 0.1, exp: float = 2) \
-            -> Tuple[float, cas.Expression, float, cas.Expression]:
-        range_half = (upper_limit - lower_limit) / 2
-        center = (upper_limit + lower_limit) / 2
-        soft_lower_limit = center - range_half * (1 - threshold)
-        soft_upper_limit = center + range_half * (1 - threshold)
-
-        lower_weight_f = cas.abs(current_position - soft_lower_limit) ** exp
-        a = target_weight / lower_weight_f.compile().fast_call(np.array([lower_limit]))[0]
-        lower_weight_f *= -a
-
-        upper_weight_f = cas.abs(current_position - soft_upper_limit) ** exp
-        a = target_weight / upper_weight_f.compile().fast_call(np.array([upper_limit]))[0]
-        upper_weight_f *= a
-
-        return soft_lower_limit, lower_weight_f, soft_upper_limit, upper_weight_f
 
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:

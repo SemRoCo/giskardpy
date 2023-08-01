@@ -161,16 +161,17 @@ include_directories(
 # )
 
 catkin_install_python(PROGRAMS 
-	scripts/clear_world.py
-	scripts/collision_matrix_tool.py
-	scripts/giskard.py
-	scripts/giskard_pr2_standalone_example.py
-	scripts/interactive_marker.py
-	scripts/joystick_e_stop.py
-	scripts/move_base_simple_goal.py
-	scripts/move_base_simple_goal_diff_drive.py
-	scripts/print_joint_state.py
-	scripts/python_interface_example.py
+	scripts/tools/clear_world.py
+	scripts/tools/collision_matrix_tool.py
+	scripts/iai_robots/pr2/pr2_stand_alone.py
+	scripts/iai_robots/pr2/pr2_mujoco_open_loop.py
+	scripts/examples/giskard_pr2_standalone_example.py
+	scripts/tools/interactive_marker.py
+	scripts/tools/joystick_e_stop.py
+	scripts/tools/move_base_simple_goal.py
+	scripts/tools/move_base_simple_goal_diff_drive.py
+	scripts/tools/print_joint_state.py
+	scripts/examples/python_interface_example.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

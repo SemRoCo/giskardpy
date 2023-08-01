@@ -2,9 +2,7 @@
 
   <include file="$(find pr2_description)/robots/upload_pr2.launch"/>
 
-  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="PR2_StandAlone"/>
-  </node>
+  <node pkg="giskardpy" type="pr2_stand_alone.py" name="giskard" output="screen"/>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>

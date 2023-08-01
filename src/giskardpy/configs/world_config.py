@@ -1,0 +1,194 @@
+from __future__ import annotations
+
+from typing import Dict, Optional, Union
+
+import numpy as np
+import rospy
+from numpy.typing import NDArray
+from std_msgs.msg import ColorRGBA
+
+from giskardpy import identifier
+from giskardpy.god_map import GodMap
+from giskardpy.god_map_user import GodMapUser
+from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
+from giskardpy.model.links import Link
+from giskardpy.model.utils import robot_name_from_urdf_string
+from giskardpy.model.world import WorldTree
+from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
+
+
+class WorldConfig(GodMapUser):
+    god_map = GodMap()
+
+    def __init__(self):
+        self.god_map.set_data(identifier.world, WorldTree())
+        self.set_default_weights()
+
+    def set_defaults(self):
+        pass
+
+    def set_default_weights(self,
+                            velocity_weight: float = 0.01,
+                            acceleration_weight: float = 0,
+                            jerk_weight: float = 0.01):
+        """
+        The default values are set automatically, even if this function is not called.
+        A typical goal has a weight of 1, so the values in here should be sufficiently below that.
+        """
+        self.world.update_default_weights({Derivatives.velocity: velocity_weight,
+                                            Derivatives.acceleration: acceleration_weight,
+                                            Derivatives.jerk: jerk_weight})
+
+    def set_weight(self, weight_map: derivative_map, joint_name: str, group_name: Optional[str] = None):
+        joint_name = self.world.search_for_joint_name(joint_name, group_name)
+        joint = self.world.joints[joint_name]
+        if not isinstance(joint, OneDofJoint):
+            raise ValueError(f'Can\'t change weight because {joint_name} is not of type {str(OneDofJoint)}.')
+        free_variable = self.world.free_variables[joint.free_variable.name]
+        for derivative, weight in weight_map.items():
+            free_variable.quadratic_weights[derivative] = weight
+
+    def get_root_link_of_group(self, group_name: str) -> PrefixName:
+        return self.world.groups[group_name].root_link_name
+
+    def set_joint_limits(self, limit_map: derivative_map, joint_name: my_string, group_name: Optional[str] = None):
+        joint_name = self.world.search_for_joint_name(joint_name, group_name)
+        joint = self.world.joints[joint_name]
+        if not isinstance(joint, OneDofJoint):
+            raise ValueError(f'Can\'t change limits because {joint_name} is not of type {str(OneDofJoint)}.')
+        free_variable = self.world.free_variables[joint.free_variable.name]
+        for derivative, limit in limit_map.items():
+            free_variable.set_lower_limit(derivative, -limit)
+            free_variable.set_upper_limit(derivative, limit)
+
+    def set_default_color(self, r: float, g: float, b: float, a: float):
+        """
+        :param r: 0-1
+        :param g: 0-1
+        :param b: 0-1
+        :param a: 0-1
+        """
+        self.world.default_link_color = ColorRGBA(r, g, b, a)
+
+    def set_default_limits(self, new_limits: Dict[Derivatives, float]):
+        """
+        The default values will be set automatically, even if this function is not called.
+        velocity_limit: in m/s or rad/s
+        acceleration_limit: in m/s**2 or rad/s**2
+        jerk_limit: in m/s**3 or rad/s**3
+        """
+        self.world.update_default_limits(new_limits)
+
+    def add_robot_urdf(self,
+                       urdf: str,
+                       group_name: str) -> str:
+        """
+        Add a robot urdf to the world.
+        :param urdf: robot urdf as string, not the path
+        :param group_name:
+        """
+        if group_name is None:
+            group_name = robot_name_from_urdf_string(urdf)
+        self.world.add_urdf(urdf=urdf, group_name=group_name, actuated=True)
+        return group_name
+
+    def add_robot_from_parameter_server(self,
+                                        parameter_name: str = 'robot_description',
+                                        group_name: Optional[str] = None) -> str:
+        """
+        Add a robot urdf from parameter server to Giskard.
+        :param parameter_name:
+        :param group_name: How to call the robot. If nothing is specified it will get the name it has in the urdf
+        """
+        urdf = rospy.get_param(parameter_name)
+        return self.add_robot_urdf(urdf=urdf, group_name=group_name)
+
+    def add_fixed_joint(self, parent_link: my_string, child_link: my_string,
+                        homogenous_transform: Optional[NDArray] = None):
+        """
+        Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
+        :param parent_link:
+        :param child_link:
+        :param homogenous_transform: a 4x4 transformation matrix.
+        """
+        if homogenous_transform is None:
+            homogenous_transform = np.eye(4)
+        parent_link = self.world.search_for_link_name(parent_link)
+
+        child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
+        joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
+        joint = FixedJoint(name=joint_name, parent_link_name=parent_link, child_link_name=child_link,
+                           parent_T_child=homogenous_transform)
+        self.world._add_joint(joint)
+
+    def add_diff_drive_joint(self,
+                             name: str,
+                             parent_link_name: my_string,
+                             child_link_name: my_string,
+                             robot_group_name: Optional[str] = None,
+                             translation_limits: Optional[derivative_map] = None,
+                             rotation_limits: Optional[derivative_map] = None):
+        """
+        Same as add_omni_drive_joint, but for a differential drive.
+        """
+        joint_name = PrefixName(name, robot_group_name)
+        parent_link_name = PrefixName.from_string(parent_link_name, set_none_if_no_slash=True)
+        child_link_name = PrefixName.from_string(child_link_name, set_none_if_no_slash=True)
+        brumbrum_joint = DiffDrive(parent_link_name=parent_link_name,
+                                   child_link_name=child_link_name,
+                                   name=joint_name,
+                                   translation_limits=translation_limits,
+                                   rotation_limits=rotation_limits)
+        self.world._add_joint(brumbrum_joint)
+        self.world.deregister_group(robot_group_name)
+        self.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
+
+    def add_6dof_joint(self, parent_link: my_string, child_link: my_string, joint_name: my_string):
+        """
+        Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
+        :param parent_link:
+        :param child_link:
+        """
+        parent_link = self.world.search_for_link_name(parent_link)
+        child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
+        joint_name = PrefixName.from_string(joint_name, set_none_if_no_slash=True)
+        joint = Joint6DOF(name=joint_name, parent_link_name=parent_link, child_link_name=child_link)
+        self.world._add_joint(joint)
+
+    def add_empty_link(self, link_name: my_string):
+        link = Link(link_name)
+        self.world._add_link(link)
+
+    def add_omni_drive_joint(self,
+                             name: str,
+                             parent_link_name: Union[str, PrefixName],
+                             child_link_name: Union[str, PrefixName],
+                             robot_group_name: Optional[str] = None,
+                             translation_limits: Optional[derivative_map] = None,
+                             rotation_limits: Optional[derivative_map] = None,
+                             x_name: Optional[PrefixName] = None,
+                             y_name: Optional[PrefixName] = None,
+                             yaw_vel_name: Optional[PrefixName] = None):
+        """
+        Use this to connect a robot urdf of a mobile robot to the world if it has an omni-directional drive.
+        :param parent_link_name:
+        :param child_link_name:
+        :param robot_group_name: set if there are multiple robots
+        :param name: Name of the new link. Has to be unique and may be required in other functions.
+        :param translation_limits: in m/s**3
+        :param rotation_limits: in rad/s**3
+        """
+        joint_name = PrefixName(name, robot_group_name)
+        parent_link_name = PrefixName.from_string(parent_link_name, set_none_if_no_slash=True)
+        child_link_name = PrefixName.from_string(child_link_name, set_none_if_no_slash=True)
+        brumbrum_joint = OmniDrive(parent_link_name=parent_link_name,
+                                   child_link_name=child_link_name,
+                                   name=joint_name,
+                                   translation_limits=translation_limits,
+                                   rotation_limits=rotation_limits,
+                                   x_name=x_name,
+                                   y_name=y_name,
+                                   yaw_name=yaw_vel_name)
+        self.world._add_joint(brumbrum_joint)
+        self.world.deregister_group(robot_group_name)
+        self.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)

@@ -252,7 +252,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 for node in self.tree.get_nodes_of_type(behavior_type):
                     self.tree.disable_node(node.name)
         if 'QP_SOLVER' in os.environ:
-            self.giskard.execution.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
+            self.giskard.execution_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         # self.tree = TreeManager.from_param_server(robot_names, namespaces)
         self.god_map = self.tree.god_map
         self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
@@ -274,7 +274,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
-        return self.giskard.execution.control_mode == self.giskard.execution.control_mode.stand_alone
+        return self.giskard.execution_config.control_mode == self.giskard.execution_config.control_mode.standalone
 
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
@@ -395,7 +395,7 @@ class GiskardTestWrapper(GiskardWrapper):
         # TODO it is strange that I need to kill the services... should be investigated. (:
         self.tree.kill_all_services()
         giskarding_time = self.total_time_spend_giskarding
-        if self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
+        if self.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
             giskarding_time -= self.total_time_spend_moving
         logging.loginfo(f'total time spend giskarding: {giskarding_time}')
         logging.loginfo(f'total time spend moving: {self.total_time_spend_moving}')

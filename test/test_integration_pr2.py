@@ -19,13 +19,13 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.data_types import SupportedQPSolver, ControlModes
+from giskardpy.configs.pr2 import PR2WorldSetup
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.configs.pr2 import PR2_Mujoco, PR2_StandAlone, PR2_MujocoRealTime
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils.utils import launch_launchfile, suppress_stdout, suppress_stderr
@@ -79,6 +79,38 @@ pick_up_pose = {
     'r_gripper_l_finger_joint': 0.55
 }
 
+
+class PR2Standalone(PR2WorldSetup):
+    def configure_execution(self):
+        self.execution.set_control_mode(ControlModes.standalone)
+        self.execution.set_max_trajectory_length(length=30)
+
+    def configure_robot_interface(self):
+        self.robot_interface.register_controlled_joints([
+            'torso_lift_joint',
+            'head_pan_joint',
+            'head_tilt_joint',
+            'r_shoulder_pan_joint',
+            'r_shoulder_lift_joint',
+            'r_upper_arm_roll_joint',
+            'r_forearm_roll_joint',
+            'r_elbow_flex_joint',
+            'r_wrist_flex_joint',
+            'r_wrist_roll_joint',
+            'l_shoulder_pan_joint',
+            'l_shoulder_lift_joint',
+            'l_upper_arm_roll_joint',
+            'l_forearm_roll_joint',
+            'l_elbow_flex_joint',
+            'l_wrist_flex_joint',
+            'l_wrist_roll_joint',
+            self.drive_joint_name,
+        ])
+
+    def configure_behavior_tree(self):
+        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
+                                                              add_to_control_loop=True)
+        self.behavior_tree.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
 
 class PR2TestWrapper(GiskardTestWrapper):
     default_pose = {
@@ -217,37 +249,6 @@ class PR2TestWrapper(GiskardTestWrapper):
         #                     root_link_group_name=self.robot_name,
         #                     root_link_name='br_caster_l_wheel_link')
         # self.dye_group('br_l', rgba=(1, 0, 0, 1))
-
-
-class PR2TestWrapperMujoco(PR2TestWrapper):
-    def __init__(self):
-        self.r_tip = 'r_gripper_tool_frame'
-        self.l_tip = 'l_gripper_tool_frame'
-        self.l_gripper_group = 'l_gripper'
-        self.r_gripper_group = 'r_gripper'
-        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
-        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        self.mujoco_reset = rospy.ServiceProxy('pr2/reset', Trigger)
-        self.odom_root = 'odom_combined'
-        super().__init__(PR2_MujocoRealTime)
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = tf.get_tf_root()
-        p.pose.orientation.w = 1
-        self.set_localization(p)
-        self.wait_heartbeats()
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        super(PR2TestWrapper, self).set_localization(map_T_odom)
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.allow_all_collisions()
-        self.move_base(goal_pose)
-
-    def reset(self):
-        self.mujoco_reset()
-        super().reset()
 
 
 @pytest.fixture(scope='module')

@@ -712,6 +712,9 @@ class CollisionWorldSynchronizer:
                     rnd_position = np.random.random() * np.pi * 2
                 self.world.state[joint_name].position = rnd_position
 
+    def has_self_collision_matrix(self):
+        return len(self.self_collision_matrix_paths) > 0
+
     def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],
                                     distance: float,
                                     update_query: bool) -> Set[Tuple[PrefixName, PrefixName]]:

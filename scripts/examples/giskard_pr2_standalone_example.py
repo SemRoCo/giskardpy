@@ -3,7 +3,7 @@ import numpy as np
 import rospy
 
 from giskardpy.configs.data_types import ControlModes, TfPublishingModes
-from giskardpy.configs.default_giskard import Giskard
+from giskardpy.configs.giskard import Giskard
 from giskardpy.my_types import Derivatives
 
 

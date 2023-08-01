@@ -5,12 +5,13 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from giskardpy.configs.behavior_tree_config import ControlModes
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
     from giskardpy.tree.garden import TreeManager
     from giskardpy.model.world import WorldTree
 
 
-class GodMapUser:
+class GodMapWorshipper:
     god_map = GodMap()
 
     @property
@@ -24,3 +25,7 @@ class GodMapUser:
     @property
     def collision_scene(self) -> CollisionWorldSynchronizer:
         return self.god_map.get_data(identifier.collision_scene)
+
+    @property
+    def control_mode(self) -> ControlModes:
+        return self.god_map.get_data(identifier.control_mode)

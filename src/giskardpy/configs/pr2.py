@@ -1,9 +1,6 @@
-from typing import Optional
-
 import numpy as np
 
-from giskardpy.configs.data_types import ControlModes, CollisionCheckerLib, SupportedQPSolver, TfPublishingModes
-from giskardpy.configs.default_giskard import Giskard, WorldConfig, CollisionAvoidanceConfig, RobotInterfaceConfig
+from giskardpy.configs.giskard import WorldConfig, CollisionAvoidanceConfig, RobotInterfaceConfig
 from giskardpy.my_types import Derivatives
 
 

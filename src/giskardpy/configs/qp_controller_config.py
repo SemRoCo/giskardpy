@@ -1,28 +1,14 @@
 from __future__ import annotations
-import abc
-from abc import ABC
+
 from collections import defaultdict
 from enum import IntEnum
-from typing import Dict, Optional, List, Union, DefaultDict
+from typing import Optional
 
-import numpy as np
-import rospy
-from numpy.typing import NDArray
-from py_trees import Blackboard
-from std_msgs.msg import ColorRGBA
-
-from giskardpy import identifier
-from giskardpy.exceptions import GiskardException, SetupException
+from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
-from giskardpy.model.links import Link
-from giskardpy.model.utils import robot_name_from_urdf_string
-from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
-from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, TreeManager
+from giskardpy.my_types import Derivatives
 from giskardpy.utils import logging
-from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
+from giskardpy.utils.utils import get_all_classes_in_package
 
 
 class SupportedQPSolver(IntEnum):
@@ -41,6 +27,7 @@ class SupportedQPSolver(IntEnum):
     # casadi = 12
     # super_csc = 14
     # cvxpy = 15
+
 
 class QPControllerConfig:
     qp_solver: SupportedQPSolver
@@ -88,10 +75,3 @@ class QPControllerConfig:
 
     def set_max_trajectory_length(self, length: float = 30):
         self.max_trajectory_length = length
-
-    def add_goal_package_name(self, package_name: str):
-        new_goals = get_all_classes_in_package(package_name, Goal)
-        if len(new_goals) == 0:
-            raise GiskardException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
-        logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
-        self.goal_package_paths.add(package_name)

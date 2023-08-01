@@ -2,7 +2,7 @@
 import rospy
 
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
-from giskardpy.configs.default_giskard import Giskard
+from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.pr2 import PR2World, PR2CollisionAvoidance, PR2StandaloneInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 

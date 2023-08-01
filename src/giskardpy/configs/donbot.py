@@ -4,7 +4,7 @@ import numpy as np
 from std_msgs.msg import ColorRGBA
 
 from giskardpy.configs.data_types import ControlModes, TfPublishingModes
-from giskardpy.configs.default_giskard import Giskard
+from giskardpy.configs.giskard import Giskard
 from giskardpy.my_types import Derivatives
 
 

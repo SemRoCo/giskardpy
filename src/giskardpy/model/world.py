@@ -517,6 +517,10 @@ class WorldTree(WorldTreeInterface):
         return [r.name for r in self.robots]
 
     @property
+    def robot_name(self) -> str:
+        return self.robot_names[0]
+
+    @property
     def minimal_group_names(self) -> Set[str]:
         """
         :return: All groups that are not part of another group.

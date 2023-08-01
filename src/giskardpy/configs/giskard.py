@@ -12,19 +12,21 @@ from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
 from giskardpy.exceptions import GiskardException
+from giskardpy.goals.goal import Goal
 from giskardpy.god_map import GodMap
+from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.utils import logging
-from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 
-class Giskard:
+class Giskard(GodMapWorshipper):
     world_config: WorldConfig
     collision_avoidance_config: CollisionAvoidanceConfig
     behavior_tree_config: BehaviorTreeConfig
     robot_interface_config: RobotInterfaceConfig
     execution_config: QPControllerConfig
     path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
-    goal_paths = {'giskardpy.goals'}
+    goal_package_paths = {'giskardpy.goals'}
 
     def __init__(self,
                  world_config: WorldConfig,
@@ -42,7 +44,8 @@ class Giskard:
         self.robot_interface_config = robot_interface_config
         if additional_goal_package_paths is None:
             additional_goal_package_paths = set()
-        self.goal_paths.update(additional_goal_package_paths)
+        for additional_path in additional_goal_package_paths:
+            self.add_goal_package_name(additional_path)
         self._god_map.set_data(identifier.hack, 0)
         blackboard = Blackboard
         blackboard.god_map = self._god_map
@@ -81,9 +84,16 @@ class Giskard:
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
-        if not self._behavior_tree.base_tracking_enabled() \
-                and not self.execution_config.control_mode == ControlModes.standalone:
+        if not self.tree_manager.base_tracking_enabled() \
+                and not self.control_mode == ControlModes.standalone:
             logging.loginfo('No cmd_vel topic has been registered.')
+
+    def add_goal_package_name(self, package_name: str):
+        new_goals = get_all_classes_in_package(package_name, Goal)
+        if len(new_goals) == 0:
+            raise GiskardException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
+        logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
+        self.goal_package_paths.add(package_name)
 
     def live(self):
         """

@@ -247,6 +247,13 @@ class GodMap(metaclass=SingletonMeta):
                 raise
         return r
 
+    def has_data(self, identifier):
+        try:
+            self.unsafe_get_data(identifier)
+            return True
+        except KeyError as e:
+            return False
+
     def clear_cache(self):
         self.shortcuts = {}
 

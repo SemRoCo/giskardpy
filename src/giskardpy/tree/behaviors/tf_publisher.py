@@ -1,13 +1,22 @@
+from enum import Enum
+
 import rospy
 from geometry_msgs.msg import TransformStamped
 from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
-from giskardpy.configs.data_types import TfPublishingModes
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg
 
+
+class TfPublishingModes(Enum):
+    nothing = 0
+    all = 1
+    attached_objects = 2
+
+    world_objects = 4
+    attached_and_world_objects = 6
 
 class TFPublisher(GiskardBehavior):
     """
@@ -38,7 +47,7 @@ class TFPublisher(GiskardBehavior):
     @profile
     def update(self):
         try:
-            with self.get_god_map() as god_map:
+            with self.god_map as god_map:
                 if self.mode == TfPublishingModes.all:
                     self.tf_pub.publish(self.world.as_tf_msg(self.include_prefix))
                 else:

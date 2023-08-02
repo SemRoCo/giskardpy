@@ -76,7 +76,7 @@ class TiagoBase(Giskard):
 class TiagoMujoco(TiagoBase):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.open_loop)
+        self.qp_controller_config.set_control_mode(ControlModes.open_loop)
 
     def configure_behavior_tree(self):
         self.behavior_tree_config.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True)
@@ -110,7 +110,7 @@ class TiagoMujoco(TiagoBase):
 class Tiago_Standalone(TiagoBase):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.standalone)
+        self.qp_controller_config.set_control_mode(ControlModes.standalone)
 
     def configure_behavior_tree(self):
         self.behavior_tree_config.add_tf_publisher(mode=TfPublishingModes.all)

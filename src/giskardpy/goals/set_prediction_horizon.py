@@ -1,7 +1,7 @@
 from typing import Union
 
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.utils import logging

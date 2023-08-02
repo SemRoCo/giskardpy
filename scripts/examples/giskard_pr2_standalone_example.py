@@ -76,8 +76,8 @@ class MyPR2Setup(Giskard):
                                                                                hard_threshold=0.1)
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.standalone)
-        self.execution_config.set_max_trajectory_length(length=30)
+        self.qp_controller_config.set_control_mode(ControlModes.standalone)
+        self.qp_controller_config.set_max_trajectory_length(length=30)
 
     def configure_robot_interface(self):
         self.robot_interface_config.register_controlled_joints([

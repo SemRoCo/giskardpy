@@ -9,7 +9,7 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Pose
 from sortedcontainers import SortedDict
 
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape, create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
@@ -20,15 +20,17 @@ from giskardpy.utils.tfwrapper import np_to_pose
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
-    def __init__(self, world, parse_collision_avoidance_config: bool = True):
+    collision_checker_id = CollisionCheckerLib.none
+
+    def __init__(self,):
         self.kw = bpb.KineverseWorld()
         self.object_name_to_id: Dict[PrefixName, bpb.CollisionObject] = {}
         self.query: Optional[DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]] = None
-        super().__init__(world, parse_collision_avoidance_config)
+        super().__init__()
 
     @classmethod
-    def empty(cls, world):
-        self = super().empty(world)
+    def empty(cls):
+        self = super().empty()
         self.god_map.set_data(identifier.collision_checker, CollisionCheckerLib.bpb)
         return self
 

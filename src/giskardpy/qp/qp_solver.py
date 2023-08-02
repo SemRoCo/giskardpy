@@ -8,7 +8,7 @@ import scipy.sparse as sp
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize

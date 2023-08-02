@@ -1,5 +1,4 @@
 import traceback
-from collections import OrderedDict
 from threading import RLock, Thread
 from time import time
 

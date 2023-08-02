@@ -176,7 +176,7 @@ class WorldUpdater(GiskardBehavior):
             # calling this twice, because it may still have a tick from the prev update call
             self.update_ticked.get()
             self.work_permit.get(timeout=req.timeout)
-            with self.get_god_map():
+            with self.god_map:
                 try:
                     if req.operation == UpdateWorldRequest.ADD:
                         self.add_object(req)
@@ -229,7 +229,7 @@ class WorldUpdater(GiskardBehavior):
             # plugin_name = str(PrefixName(req.group_name, 'js'))
             plugin = running_is_success(SyncConfiguration)(group_name=req.group_name,
                                                            joint_state_topic=world_body.joint_state_topic)
-            self.tree.insert_node(plugin, 'Synchronize', 1)
+            self.tree_manager.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
@@ -237,7 +237,7 @@ class WorldUpdater(GiskardBehavior):
             plugin_name = str(PrefixName(world_body.name, 'localization'))
             plugin = SyncTfFrames(plugin_name,
                                   frames=world_body.tf_root_link_name)
-            self.tree.insert_node(plugin, 'Synchronize', 1)
+            self.tree_manager.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
         parent_group = self.world.get_parent_group_name(req.group_name)
@@ -291,7 +291,7 @@ class WorldUpdater(GiskardBehavior):
 
     def _remove_plugins_of_group(self, group_name):
         for plugin_name in self.added_plugin_names[group_name]:
-            self.tree.remove_node(plugin_name)
+            self.tree_manager.remove_node(plugin_name)
         del self.added_plugin_names[group_name]
 
     @profile
@@ -307,7 +307,7 @@ class WorldUpdater(GiskardBehavior):
         self.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
         self.world.notify_state_change()
         self.collision_scene.sync()
-        self.god_map.get_data(identifier.giskard).configure_collision_avoidance()
+        self.collision_avoidance_config.setup()
         self.clear_markers()
         logging.loginfo('Cleared world.')
 

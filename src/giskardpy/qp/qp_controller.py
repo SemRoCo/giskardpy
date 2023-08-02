@@ -11,7 +11,7 @@ import pandas as pd
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
 from giskardpy.god_map import GodMap

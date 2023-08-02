@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 from collections import defaultdict
 from enum import Enum
 from typing import Dict, Optional, List, Union, DefaultDict, Tuple
@@ -8,96 +9,34 @@ from giskardpy import identifier
 from giskardpy.exceptions import SetupException
 from giskardpy.god_map import GodMap
 from giskardpy.god_map_user import GodMapWorshipper
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupConfig, \
+    CollisionCheckerLib, CollisionAvoidanceConfigEntry
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
 
-class CollisionCheckerLib(Enum):
-    none = -1
-    bpb = 1
-
-
-class CollisionAvoidanceConfigEntry:
-    def __init__(self,
-                 number_of_repeller: int = 1,
-                 soft_threshold: float = 0.05,
-                 hard_threshold: float = 0.0,
-                 max_velocity: float = 0.2):
-        self.number_of_repeller = number_of_repeller
-        self.soft_threshold = soft_threshold
-        self.hard_threshold = hard_threshold
-        self.max_velocity = max_velocity
-
-    @classmethod
-    def init_50mm(cls):
-        return cls(soft_threshold=0.05, hard_threshold=0.0)
-
-    @classmethod
-    def init_100mm(cls):
-        return cls(soft_threshold=0.1, hard_threshold=0.0)
-
-    @classmethod
-    def init_25mm(cls):
-        return cls(soft_threshold=0.025, hard_threshold=0.0)
-
-
-class CollisionAvoidanceGroupConfig:
-    def __init__(self):
-        self.add_self_collisions: List[Tuple[PrefixName, PrefixName]] = []
-        self.ignored_self_collisions: List[Union[PrefixName, Tuple[PrefixName, PrefixName]]] = []
-        self.ignored_collisions: List[PrefixName] = []
-        self.fixed_joints_for_self_collision_avoidance = []
-        self.fixed_joints_for_external_collision_avoidance = []
-
-        self.external_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
-            CollisionAvoidanceConfigEntry)
-        self.self_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
-            CollisionAvoidanceConfigEntry)
-
-    def cal_max_param(self, parameter_name):
-        external_distances = self.external_collision_avoidance
-        self_distances = self.self_collision_avoidance
-        default_distance = max(getattr(external_distances.default_factory(), parameter_name),
-                               getattr(self_distances.default_factory(), parameter_name))
-        for value in external_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
-        for value in self_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
-        return default_distance
-
-
-class CollisionAvoidanceConfig(GodMapWorshipper):
+class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
     _collision_avoidance_configs: DefaultDict[str, CollisionAvoidanceGroupConfig]
-    collision_checker_id: CollisionCheckerLib
     god_map = GodMap()
 
     def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
         self._collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
-        self.collision_checker_id = collision_checker
+        self._create_collision_checker(collision_checker)
 
     def set_defaults(self):
         pass
+
+    @abc.abstractmethod
+    def setup(self):
+        ...
 
     def _sanity_check(self):
         if self.collision_checker_id != CollisionCheckerLib.none \
                 and not self.collision_scene.has_self_collision_matrix():
             raise SetupException('You have to load a collision matrix.')
 
-    def set_collision_checker(self, new_collision_checker: CollisionCheckerLib):
-        if self.god_map.has_data(identifier.collision_scene):
-            error_msg = 'If you set the collision checker, ' \
-                        'you have to do it in the beginning of self.configure_collision_avoidance.'
-            logging.logerr(error_msg)
-            raise AttributeError(error_msg)
-        self.collision_checker_id = new_collision_checker
-        collision_scene = self._create_collision_checker(self.world, new_collision_checker)
-        collision_scene.sync()
-        self.god_map.set_data(identifier.collision_scene, collision_scene)
-
-    def _create_collision_checker(self, world: WorldTree, collision_checker: CollisionCheckerLib) \
-            -> CollisionWorldSynchronizer:
+    def _create_collision_checker(self, collision_checker: CollisionCheckerLib):
         if collision_checker not in CollisionCheckerLib:
             raise KeyError(f'Unknown collision checker {collision_checker}. '
                            f'Collision avoidance is disabled')
@@ -105,13 +44,14 @@ class CollisionAvoidanceConfig(GodMapWorshipper):
             logging.loginfo('Using betterpybullet for collision checking.')
             try:
                 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-                return BetterPyBulletSyncer(world)
+                self.god_map.set_data(identifier.collision_scene, BetterPyBulletSyncer())
+                return
             except ImportError as e:
                 logging.logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
         logging.logwarn('Using no collision checking.')
         from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-        return CollisionWorldSynchronizer(world)
+        self.god_map.set_data(identifier.collision_scene, CollisionWorldSynchronizer())
 
     def set_default_self_collision_avoidance(self,
                                              number_of_repeller: int = 1,
@@ -225,10 +165,7 @@ class CollisionAvoidanceConfig(GodMapWorshipper):
         if group_name is None:
             group_name = self.world.robot_name
         if group_name not in self.collision_scene.self_collision_matrix_paths:
-            try:
-                self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
-            except Exception as e:
-                logging.logwarn(str(e))
+            self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
         else:
             path_to_srdf = self.collision_scene.self_collision_matrix_paths[group_name]
             self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)

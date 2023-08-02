@@ -5,9 +5,8 @@ from typing import Optional, List
 from py_trees import Blackboard
 
 from giskardpy import identifier
-from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
+from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig, ControlModes
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
-from giskardpy.configs.data_types import ControlModes
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
@@ -20,11 +19,11 @@ from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 
 class Giskard(GodMapWorshipper):
-    world_config: WorldConfig
-    collision_avoidance_config: CollisionAvoidanceConfig
-    behavior_tree_config: BehaviorTreeConfig
-    robot_interface_config: RobotInterfaceConfig
-    execution_config: QPControllerConfig
+    world_config: WorldConfig = None
+    collision_avoidance_config: CollisionAvoidanceConfig = None
+    behavior_tree_config: BehaviorTreeConfig = None
+    robot_interface_config: RobotInterfaceConfig = None
+    qp_controller_config: QPControllerConfig = None
     path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
     goal_package_paths = {'giskardpy.goals'}
 
@@ -40,7 +39,7 @@ class Giskard(GodMapWorshipper):
         self.world_config = world_config
         self.collision_avoidance_config = collision_avoidance_config
         self.behavior_tree_config = behavior_tree_config
-        self.execution_config = qp_controller_config
+        self.qp_controller_config = qp_controller_config
         self.robot_interface_config = robot_interface_config
         if additional_goal_package_paths is None:
             additional_goal_package_paths = set()
@@ -58,7 +57,7 @@ class Giskard(GodMapWorshipper):
     def set_defaults(self):
         self.world_config.set_defaults()
         self.robot_interface_config.set_defaults()
-        self.execution_config.set_defaults()
+        self.qp_controller_config.set_defaults()
         self.collision_avoidance_config.set_defaults()
         self.behavior_tree_config.set_defaults()
 
@@ -71,9 +70,9 @@ class Giskard(GodMapWorshipper):
         self.collision_avoidance_config.setup()
         self.collision_avoidance_config._sanity_check()
         self.behavior_tree_config._create_behavior_tree()
-        self.execution_config.setup()
-        self.robot_interface_config.setup()
         self.behavior_tree_config.setup()
+        # self.qp_controller_config.setup()
+        self.robot_interface_config.setup()
         self._controlled_joints_sanity_check()
         self.world.notify_model_change()
 

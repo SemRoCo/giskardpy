@@ -21,7 +21,7 @@ class Tracy(Giskard):
 class TracyReal(Tracy):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.open_loop)
+        self.qp_controller_config.set_control_mode(ControlModes.open_loop)
 
     def configure_behavior_tree(self):
         self.behavior_tree_config.add_visualization_marker_publisher(add_to_sync=True,
@@ -40,7 +40,7 @@ class TracyReal(Tracy):
 class TracyStandAlone(Tracy):
 
     def configure_execution(self):
-        self.execution_config.set_control_mode(ControlModes.standalone)
+        self.qp_controller_config.set_control_mode(ControlModes.standalone)
 
     def configure_behavior_tree(self):
         self.behavior_tree_config.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)

@@ -22,10 +22,10 @@ class MaxTrajectoryLength(GiskardBehavior):
     def update(self):
         if self.endless_mode:
             return Status.RUNNING
-        t = self.get_god_map().get_data(identifier.time)
+        t = self.god_map.get_data(identifier.time)
         length = self.god_map.get_data(identifier.max_trajectory_length)
         if not self.real_time:
-            sample_period = self.get_god_map().get_data(identifier.sample_period)
+            sample_period = self.god_map.get_data(identifier.sample_period)
             length = self.god_map.get_data(identifier.max_trajectory_length)
         else:
             sample_period = 1

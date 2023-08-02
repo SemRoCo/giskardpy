@@ -42,35 +42,34 @@ dt = ['dt']
 
 # config
 tmp_folder = giskard + ['path_to_data_folder']
-execution_config = giskard + ['execution']
-collision_avoidance_config = giskard + ['collision_avoidance']
-max_derivative = execution_config + ['max_derivative']
-action_server_name = execution_config + ['action_server_name']
-control_mode = execution_config + ['control_mode']
-goal_package_paths = execution_config + ['goal_package_paths']
-max_trajectory_length = execution_config + ['max_trajectory_length']
-endless_mode = execution_config + ['endless_mode']
+qp_controller_config = giskard + ['qp_controller_config']
+collision_avoidance_config = giskard + ['collision_avoidance_config']
+world_config = giskard + ['world_config']
+max_derivative = qp_controller_config + ['max_derivative']
+goal_package_paths = giskard + ['goal_package_paths']
+max_trajectory_length = qp_controller_config + ['max_trajectory_length']
+endless_mode = qp_controller_config + ['endless_mode']
 
-sample_period = execution_config + ['sample_period']
+sample_period = qp_controller_config + ['sample_period']
 qp_controller = giskard + ['qp_controller']
 debug_expressions_evaluated = qp_controller + ['evaluated_debug_expressions']
-qp_solver_name = execution_config + ['qp_solver']
-prediction_horizon = execution_config + ['prediction_horizon']
-retries_with_relaxed_constraints = execution_config + ['retries_with_relaxed_constraints']
-retry_added_slack = execution_config + ['added_slack']
-retry_weight_factor = execution_config + ['weight_factor']
+qp_solver_name = qp_controller_config + ['qp_solver']
+prediction_horizon = qp_controller_config + ['prediction_horizon']
+retries_with_relaxed_constraints = qp_controller_config + ['retries_with_relaxed_constraints']
+retry_added_slack = qp_controller_config + ['added_slack']
+retry_weight_factor = qp_controller_config + ['weight_factor']
 
 # behavior tree
 tree_manager = ['behavior_tree']
-tree_tick_rate = giskard + ['behavior_tree', 'tree_tick_rate']
+control_mode = tree_manager + ['control_mode']
 
 # collision avoidance
-collision_avoidance_configs = collision_avoidance_config + ['_collision_avoidance_configs']
+collision_avoidance_configs = collision_scene + ['collision_avoidance_configs']
 collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
-collision_checker = giskard + ['collision_avoidance', 'collision_checker_id']
+collision_checker = collision_scene + ['collision_checker_id']
 
 # rnd stuff
 timer_collector = ['timer_collector']

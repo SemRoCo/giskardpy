@@ -10,7 +10,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
-from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
@@ -46,7 +46,7 @@ class RosMsgToGoal(GetGoal):
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
             return Status.FAILURE
-        self.get_god_map().set_data(identifier.goals, {})
+        self.god_map.set_data(identifier.goals, {})
         try:
             self.parse_constraints(move_cmd)
         except AttributeError:

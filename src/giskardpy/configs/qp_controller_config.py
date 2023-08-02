@@ -4,11 +4,7 @@ from collections import defaultdict
 from enum import IntEnum
 from typing import Optional
 
-from giskardpy.exceptions import GiskardException
-from giskardpy.goals.goal import Goal
 from giskardpy.my_types import Derivatives
-from giskardpy.utils import logging
-from giskardpy.utils.utils import get_all_classes_in_package
 
 
 class SupportedQPSolver(IntEnum):
@@ -34,9 +30,7 @@ class QPControllerConfig:
     prediction_horizon: int = 9
     sample_period: float = 0.05
     max_derivative: Derivatives = Derivatives.jerk
-    action_server_name: str = '~command'
     max_trajectory_length: float = 30
-    qp_solver: SupportedQPSolver = None,
     retries_with_relaxed_constraints: int = 5,
     added_slack: float = 100,
     weight_factor: float = 100

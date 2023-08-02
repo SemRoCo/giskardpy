@@ -18,11 +18,11 @@ import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     PhysicsWorldException, GiskardException
 from giskardpy.god_map import GodMap
+from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF
 from giskardpy.model.links import Link, MeshGeometry
@@ -146,7 +146,7 @@ class ResetJointStateContextManager:
             self.world.notify_state_change()
 
 
-class WorldTree(WorldTreeInterface):
+class WorldTree(WorldTreeInterface, GodMapWorshipper):
     joints: Dict[PrefixName, Union[Joint, OmniDrive]]
     links: Dict[PrefixName, Link]
     state: JointStates
@@ -158,10 +158,8 @@ class WorldTree(WorldTreeInterface):
     _root_link_name: PrefixName = None
 
     def __init__(self):
-        self.god_map = GodMap()
         self.default_link_color = ColorRGBA(1, 1, 1, 0.75)
-        if self.god_map is not None:
-            self.god_map.set_data(identifier.world, self)
+        self.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
         self._state_version = 0
@@ -869,7 +867,7 @@ class WorldTree(WorldTreeInterface):
         """
         self._clear()
         with self.modify_world():
-            self.god_map.get_data(identifier.giskard).configure_world()
+            self.god_map.get_data(identifier.giskard).world_config.setup()
 
     def _add_joint_and_create_child(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)

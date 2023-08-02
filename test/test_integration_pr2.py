@@ -19,8 +19,11 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver, ControlModes
-from giskardpy.configs.pr2 import PR2WorldSetup
+from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.pr2 import PR2World, PR2CollisionAvoidance, PR2StandaloneInterface
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.configs.world_config import RobotWithOmnidrive
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
@@ -80,38 +83,6 @@ pick_up_pose = {
 }
 
 
-class PR2Standalone(PR2WorldSetup):
-    def configure_execution(self):
-        self.execution.set_control_mode(ControlModes.standalone)
-        self.execution.set_max_trajectory_length(length=30)
-
-    def configure_robot_interface(self):
-        self.robot_interface.register_controlled_joints([
-            'torso_lift_joint',
-            'head_pan_joint',
-            'head_tilt_joint',
-            'r_shoulder_pan_joint',
-            'r_shoulder_lift_joint',
-            'r_upper_arm_roll_joint',
-            'r_forearm_roll_joint',
-            'r_elbow_flex_joint',
-            'r_wrist_flex_joint',
-            'r_wrist_roll_joint',
-            'l_shoulder_pan_joint',
-            'l_shoulder_lift_joint',
-            'l_upper_arm_roll_joint',
-            'l_forearm_roll_joint',
-            'l_elbow_flex_joint',
-            'l_wrist_flex_joint',
-            'l_wrist_roll_joint',
-            self.drive_joint_name,
-        ])
-
-    def configure_behavior_tree(self):
-        self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
-                                                              add_to_control_loop=True)
-        self.behavior_tree.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
-
 class PR2TestWrapper(GiskardTestWrapper):
     default_pose = {
         'r_elbow_flex_joint': -0.15,
@@ -156,9 +127,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                    'head_tilt_joint': 0,
                    }
 
-    def __init__(self, config=None):
-        if config is None:
-            config = PR2_StandAlone
+    def __init__(self):
         self.r_tip = 'r_gripper_tool_frame'
         self.l_tip = 'l_gripper_tool_frame'
         self.l_gripper_group = 'l_gripper'
@@ -166,7 +135,13 @@ class PR2TestWrapper(GiskardTestWrapper):
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom_combined'
-        super().__init__(config)
+        drive_joint_name = 'brumbrum'
+        giskard = Giskard(world_config=RobotWithOmnidrive(drive_joint_name=drive_joint_name),
+                          collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
+                          robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
+                          behavior_tree_config=StandAloneConfig(),
+                          qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
         self.robot = self.world.groups[self.robot_name]
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):

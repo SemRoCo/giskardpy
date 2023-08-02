@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import abc
+from abc import ABC
 from typing import Dict, Optional, Union
 
 import numpy as np
@@ -17,7 +19,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
 
 
-class WorldConfig(GodMapWorshipper):
+class WorldConfig(GodMapWorshipper, ABC):
     god_map = GodMap()
 
     def __init__(self):
@@ -26,6 +28,10 @@ class WorldConfig(GodMapWorshipper):
 
     def set_defaults(self):
         pass
+
+    @abc.abstractmethod
+    def setup(self):
+        ...
 
     def set_default_weights(self,
                             velocity_weight: float = 0.01,
@@ -36,8 +42,8 @@ class WorldConfig(GodMapWorshipper):
         A typical goal has a weight of 1, so the values in here should be sufficiently below that.
         """
         self.world.update_default_weights({Derivatives.velocity: velocity_weight,
-                                            Derivatives.acceleration: acceleration_weight,
-                                            Derivatives.jerk: jerk_weight})
+                                           Derivatives.acceleration: acceleration_weight,
+                                           Derivatives.jerk: jerk_weight})
 
     def set_weight(self, weight_map: derivative_map, joint_name: str, group_name: Optional[str] = None):
         joint_name = self.world.search_for_joint_name(joint_name, group_name)
@@ -192,3 +198,49 @@ class WorldConfig(GodMapWorshipper):
         self.world._add_joint(brumbrum_joint)
         self.world.deregister_group(robot_group_name)
         self.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
+
+
+class RobotWithOmnidrive(WorldConfig):
+    map_name: str
+    localization_joint_name: str
+    odom_link_name: str
+    drive_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom_combined',
+                 drive_joint_name: str = 'brumbrum'):
+        super().__init__()
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+        self.odom_link_name = odom_link_name
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.set_default_limits({Derivatives.velocity: 1,
+                                 Derivatives.acceleration: np.inf,
+                                 Derivatives.jerk: 30})
+        self.add_empty_link(self.map_name)
+        self.add_empty_link(self.odom_link_name)
+        self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
+                            joint_name=self.localization_joint_name)
+        pr2_group_name = self.add_robot_from_parameter_server()
+        root_link_name = self.get_root_link_of_group(pr2_group_name)
+        self.add_omni_drive_joint(name=self.drive_joint_name,
+                                  parent_link_name=self.odom_link_name,
+                                  child_link_name=root_link_name,
+                                  translation_limits={
+                                      Derivatives.velocity: 0.4,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  },
+                                  robot_group_name=pr2_group_name)
+        self.set_joint_limits(limit_map={Derivatives.velocity: 3,
+                                         Derivatives.jerk: 60},
+                              joint_name='head_pan_joint')

@@ -5,19 +5,18 @@ from py_trees import Behaviour, Blackboard
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig
+from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceGroupConfig
 from giskardpy.god_map import GodMap
+from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.world import WorldTree
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
 
 
-class GiskardBehavior(Behaviour):
+class GiskardBehavior(Behaviour, GodMapWorshipper):
 
     def __init__(self, name: Optional[str] = None):
         if name is None:
             name = self.__str__()
-        self.god_map = GodMap()
-        self.world: WorldTree = self.get_god_map().unsafe_get_data(identifier.world)
         super().__init__(name)
 
     def __str__(self):
@@ -42,24 +41,6 @@ class GiskardBehavior(Behaviour):
 
     def get_runtime(self):
         return time() - self.get_blackboard().runtime
-
-    @property
-    def tree(self):
-        """
-        :rtype: giskardpy.tree.garden.TreeManager
-        """
-        return self.god_map.unsafe_get_data(identifier.tree_manager)
-
-    @property
-    def collision_scene(self):
-        """
-        :rtype: giskardpy.model.collision_world_syncer.CollisionWorldSynchronizer
-        """
-        return self.god_map.unsafe_get_data(identifier.collision_scene)
-
-    @collision_scene.setter
-    def collision_scene(self, value):
-        self.god_map.unsafe_set_data(identifier.collision_scene, value)
 
     def robot(self, robot_name=''):
         """

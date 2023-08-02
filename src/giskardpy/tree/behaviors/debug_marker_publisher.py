@@ -170,7 +170,7 @@ class DebugMarkerPublisher(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        with self.get_god_map() as god_map:
+        with self.god_map as god_map:
             self.debugs = self.god_map.unsafe_get_data(identifier.debug_expressions)
             if len(self.debugs) > 0:
                 self.debugs_evaluated = self.god_map.unsafe_get_data(identifier.debug_expressions_evaluated)

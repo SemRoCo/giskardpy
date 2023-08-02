@@ -5,7 +5,7 @@ from enum import Enum
 from copy import deepcopy
 from itertools import product, combinations_with_replacement, combinations
 from time import time
-from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable
+from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable, Union
 
 from geometry_msgs.msg import Pose
 from lxml import etree
@@ -14,10 +14,10 @@ import numpy as np
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionAvoidanceGroupConfig, CollisionCheckerLib
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import GodMap
+from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.world import WorldBranch
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, Derivatives, PrefixName
@@ -26,6 +26,60 @@ from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
 
 np.random.seed(1337)
+
+
+class CollisionCheckerLib(Enum):
+    none = -1
+    bpb = 1
+
+
+class CollisionAvoidanceConfigEntry:
+    def __init__(self,
+                 number_of_repeller: int = 1,
+                 soft_threshold: float = 0.05,
+                 hard_threshold: float = 0.0,
+                 max_velocity: float = 0.2):
+        self.number_of_repeller = number_of_repeller
+        self.soft_threshold = soft_threshold
+        self.hard_threshold = hard_threshold
+        self.max_velocity = max_velocity
+
+    @classmethod
+    def init_50mm(cls):
+        return cls(soft_threshold=0.05, hard_threshold=0.0)
+
+    @classmethod
+    def init_100mm(cls):
+        return cls(soft_threshold=0.1, hard_threshold=0.0)
+
+    @classmethod
+    def init_25mm(cls):
+        return cls(soft_threshold=0.025, hard_threshold=0.0)
+
+
+class CollisionAvoidanceGroupConfig:
+    def __init__(self):
+        self.add_self_collisions: List[Tuple[PrefixName, PrefixName]] = []
+        self.ignored_self_collisions: List[Union[PrefixName, Tuple[PrefixName, PrefixName]]] = []
+        self.ignored_collisions: List[PrefixName] = []
+        self.fixed_joints_for_self_collision_avoidance = []
+        self.fixed_joints_for_external_collision_avoidance = []
+
+        self.external_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
+            CollisionAvoidanceConfigEntry)
+        self.self_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
+            CollisionAvoidanceConfigEntry)
+
+    def cal_max_param(self, parameter_name):
+        external_distances = self.external_collision_avoidance
+        self_distances = self.self_collision_avoidance
+        default_distance = max(getattr(external_distances.default_factory(), parameter_name),
+                               getattr(self_distances.default_factory(), parameter_name))
+        for value in external_distances.values():
+            default_distance = max(default_distance, getattr(value, parameter_name))
+        for value in self_distances.values():
+            default_distance = max(default_distance, getattr(value, parameter_name))
+        return default_distance
 
 
 class Collision:
@@ -263,7 +317,7 @@ class DisableCollisionReason(Enum):
     AlmostAlways = 4
 
 
-class CollisionWorldSynchronizer:
+class CollisionWorldSynchronizer(GodMapWorshipper):
     self_collision_matrix: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
     self_collision_matrix_paths: Dict[str, str]
     world: WorldTree
@@ -272,15 +326,13 @@ class CollisionWorldSynchronizer:
     srdf_disable_all_collisions = 'disable_all_collisions'
     srdf_disable_self_collision = 'disable_self_collision'
     srdf_moveit_disable_collisions = 'disable_collisions'
+    collision_checker_id = CollisionCheckerLib.none
 
-    def __init__(self, world, parse_collision_avoidance_config: bool = True):
+    def __init__(self):
         self.self_collision_matrix = {}
         self.self_collision_matrix_paths = {}
         self.disabled_links = set()
-        self.world = world
-        if parse_collision_avoidance_config:
-            self.collision_avoidance_configs = self.god_map.get_data(identifier.collision_avoidance_configs)
-
+        self.collision_avoidance_configs = {}
         self.world_version = -1
 
     @property
@@ -293,8 +345,8 @@ class CollisionWorldSynchronizer:
         return tuple()
 
     @classmethod
-    def empty(cls, world):
-        self = cls(world, False)
+    def empty(cls):
+        self = cls()
         giskard = {
             'collision_avoidance': {
                 'collision_checker_id': CollisionCheckerLib.none
@@ -322,12 +374,13 @@ class CollisionWorldSynchronizer:
         if recompute:
             self.compute_self_collision_matrix(group_name)
 
+    @property
     def is_collision_checking_enabled(self) -> bool:
         return self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none
 
     def load_self_collision_matrix_from_srdf(self, path: str, group_name: str) \
             -> Tuple[Optional[dict], Set[PrefixName]]:
-        if not self.is_collision_checking_enabled():
+        if not self.is_collision_checking_enabled:
             return {}, set()
         path_to_srdf = resolve_ros_iris(path)
         logging.loginfo(f'loading self collision matrix: {path_to_srdf}')
@@ -395,13 +448,6 @@ class CollisionWorldSynchronizer:
     @property
     def robot_names(self):
         return [r.name for r in self.robots]
-
-    @property
-    def god_map(self):
-        """
-        :rtype: giskardpy.god_map.GodMap
-        """
-        return self.world.god_map
 
     def add_object(self, link):
         """

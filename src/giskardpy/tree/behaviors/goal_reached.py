@@ -18,7 +18,7 @@ class GoalReached(GiskardBehavior):
         self.joint_convergence_threshold = joint_convergence_threshold
         self.window_size = window_size
         self.real_time = real_time
-        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
+        self.sample_period = self.god_map.get_data(identifier.sample_period)
         if real_time:
             self.window_size *= self.sample_period
 
@@ -34,9 +34,9 @@ class GoalReached(GiskardBehavior):
     def update(self):
         if self.endless_mode:
             return Status.RUNNING
-        planning_time = self.get_god_map().get_data(identifier.time)
+        planning_time = self.god_map.get_data(identifier.time)
         if planning_time - self.above_threshold_time >= self.window_size:
-            velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution).xdot_velocity))
+            velocities = np.array(list(self.god_map.get_data(identifier.qp_solver_solution).xdot_velocity))
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
                 run_time = self.get_runtime()

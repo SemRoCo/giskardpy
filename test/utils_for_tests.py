@@ -27,9 +27,15 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver, ControlModes
+
+from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
+from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
+from giskardpy.configs.world_config import WorldConfig
 from giskardpy.data_types import KeyDefaultDict, JointStates
+from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import UnknownGroupException
@@ -43,7 +49,7 @@ from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
-from giskardpy.tree.garden import TreeManager
+from giskardpy.tree.garden import TreeManager, ControlModes
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import msg_to_list, resolve_ros_iris
@@ -223,14 +229,15 @@ def pykdl_frame_to_numpy(pykdl_frame):
                      [0, 0, 0, 1]])
 
 
-class GiskardTestWrapper(GiskardWrapper):
+class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
     god_map: GodMap
     default_pose = {}
     better_pose = {}
     odom_root = 'odom'
     tree: TreeManager
 
-    def __init__(self, config_file: Type[Giskard]):
+    def __init__(self,
+                 giskard: Giskard):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
         self._alive = True
@@ -242,21 +249,18 @@ class GiskardTestWrapper(GiskardWrapper):
         except Exception as e:
             self.set_localization_srv = None
 
-        self.giskard = config_file()
+        self.giskard = giskard
         self.giskard.grow()
-        self.tree = self.giskard._behavior_tree
         if 'GITHUB_WORKFLOW' in os.environ:
             logging.loginfo('Inside github workflow, turning off visualization')
             plugins_to_disable = [VisualizationBehavior, PlotTrajectory, PlotDebugExpressions]
             for behavior_type in plugins_to_disable:
-                for node in self.tree.get_nodes_of_type(behavior_type):
-                    self.tree.disable_node(node.name)
+                for node in self.tree_manager.get_nodes_of_type(behavior_type):
+                    self.tree_manager.disable_node(node.name)
         if 'QP_SOLVER' in os.environ:
-            self.giskard.execution_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
-        # self.tree = TreeManager.from_param_server(robot_names, namespaces)
-        self.god_map = self.tree.god_map
-        self.tick_rate = self.god_map.unsafe_get_data(identifier.tree_tick_rate)
-        self.heart = Timer(period=rospy.Duration(self.tick_rate), callback=self.heart_beat)
+            self.giskard.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
+        # self.tree_manager = TreeManager.from_param_server(robot_names, namespaces)
+        self.heart = Timer(period=rospy.Duration(self.tree_manager.tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces
         self.robot_names = [list(self.world.groups.keys())[0]]
         super().__init__(node_name='tests')
@@ -274,7 +278,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.original_number_of_links = len(self.world.links)
 
     def is_standalone(self):
-        return self.giskard.execution_config.control_mode == self.giskard.execution_config.control_mode.standalone
+        return self.tree_manager.control_mode == ControlModes.standalone
 
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
@@ -324,7 +328,7 @@ class GiskardTestWrapper(GiskardWrapper):
             return self.world.transform_msg(target_frame, result_msg)
 
     def wait_heartbeats(self, number=2):
-        behavior_tree = self.tree.tree
+        behavior_tree = self.tree_manager.tree
         c = behavior_tree.count
         while behavior_tree.count < c + number:
             rospy.sleep(0.001)
@@ -349,7 +353,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def heart_beat(self, timer_thing):
         if self._alive:
-            self.tree.tick()
+            self.tree_manager.tick()
 
     def stop_ticking(self):
         self._alive = False
@@ -393,7 +397,7 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
-        self.tree.kill_all_services()
+        self.tree_manager.kill_all_services()
         giskarding_time = self.total_time_spend_giskarding
         if self.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
             giskarding_time -= self.total_time_spend_moving
@@ -856,13 +860,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                root_link_group_name=root_link_group_name,
                                root_link_name=root_link_name)
         assert new_group_name in self.get_group_names()
-
-    @property
-    def world(self):
-        """
-        :rtype: giskardpy.model.world.WorldTree
-        """
-        return self.god_map.get_data(identifier.world)
 
     def clear_world(self, timeout: float = TimeOut) -> UpdateWorldResponse:
         respone = super().clear_world(timeout=timeout)

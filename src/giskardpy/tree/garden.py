@@ -1,11 +1,14 @@
 from __future__ import annotations
+
+from enum import Enum
+from typing import Type, TypeVar, Union, Dict, List, Optional, Any
+
 import inspect
 import abc
 from abc import ABC
 from collections import defaultdict
 from copy import copy
 from time import time
-from typing import Type, TypeVar, Union, Dict, List, Optional, Any
 
 import numpy as np
 import py_trees
@@ -19,7 +22,7 @@ from sortedcontainers import SortedList
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib, TfPublishingModes
+from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
@@ -70,7 +73,7 @@ from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
-from giskardpy.tree.behaviors.tf_publisher import TFPublisher
+from giskardpy.tree.behaviors.tf_publisher import TFPublisher, TfPublishingModes
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.time_real import RosTime
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
@@ -118,6 +121,13 @@ def anything_is_failure(cls: T) -> T:
 
 def behavior_is_instance_of(obj: Any, type_: Type) -> bool:
     return isinstance(obj, type_) or hasattr(obj, 'original') and isinstance(obj.original, type_)
+
+
+class ControlModes(Enum):
+    none = -1
+    open_loop = 1
+    close_loop = 2
+    standalone = 3
 
 
 class ManagerNode:
@@ -231,10 +241,12 @@ def search_for(lines, function_name):
 class TreeManager(ABC):
     god_map = GodMap()
     tree_nodes: Dict[str, ManagerNode]
+    tick_rate: float = 0.05
+    control_mode = ControlModes.none
 
     @profile
     def __init__(self, tree=None):
-        self.action_server_name = self.god_map.get_data(identifier.action_server_name)
+        self.action_server_name = '~command'
         self.config = self.god_map.get_data(identifier.giskard)
 
         if tree is None:
@@ -250,9 +262,8 @@ class TreeManager(ABC):
         # self.render()
 
     def live(self):
-        sleeper = rospy.Rate(1 / self.god_map.get_data(identifier.tree_tick_rate))
+        sleeper = rospy.Rate(1 / self.tick_rate)
         logging.loginfo('giskard is ready')
-        t = time()
         while not rospy.is_shutdown():
             try:
                 self.tick()
@@ -294,7 +305,7 @@ class TreeManager(ABC):
         ...
 
     @abc.abstractmethod
-    def add_joint_velocity_group_controllers(self, namespaces: List[str]):
+    def add_joint_velocity_group_controllers(self, namespaces: str):
         ...
 
     @abc.abstractmethod
@@ -636,6 +647,7 @@ class StandAlone(TreeManager):
     closed_loop_control_name: str = 'closed loop control'
     plan_postprocessing_name: str = 'plan postprocessing'
     planning2_name: str = 'planning II'
+    control_mode = ControlModes.standalone
 
     def grow_giskard(self):
         root = Sequence('Giskard')
@@ -857,6 +869,7 @@ class OpenLoop(StandAlone):
     move_robots_name = 'move robots'
     execution_name = 'execution'
     base_closed_loop_control_name = 'base sequence'
+    control_mode = ControlModes.open_loop
 
     def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
                                             fill_velocity_values: bool):
@@ -988,6 +1001,7 @@ class OpenLoop(StandAlone):
 
 
 class ClosedLoop(OpenLoop):
+    control_mode = ControlModes.close_loop
 
     def add_joint_velocity_controllers(self, namespaces: List[str]):
         behavior = JointVelController(namespaces=namespaces)

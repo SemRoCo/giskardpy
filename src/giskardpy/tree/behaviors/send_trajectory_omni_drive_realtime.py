@@ -71,7 +71,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     @profile
     def initialise(self):
         super().initialise()
-        self.trajectory = self.get_god_map().get_data(identifier.trajectory)
+        self.trajectory = self.god_map.get_data(identifier.trajectory)
         sample_period = self.god_map.unsafe_get_data(identifier.sample_period)
         self.start_time = self.god_map.unsafe_get_data(identifier.tracking_start_time)
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)

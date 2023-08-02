@@ -12,7 +12,6 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
-from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
@@ -21,7 +20,7 @@ from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.pr2 import PR2World, PR2CollisionAvoidance, PR2StandaloneInterface
+from giskardpy.configs.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.configs.world_config import RobotWithOmnidrive
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer

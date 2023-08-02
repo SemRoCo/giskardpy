@@ -66,7 +66,7 @@ class MyPR2Setup(Giskard):
             self.collision_avoidance_config.overwrite_external_collision_avoidance(joint_name,
                                                                                    soft_threshold=0.025,
                                                                                    hard_threshold=0.0)
-        self.collision_avoidance_config.fix_joints_for_self_collision_avoidance([
+        self.collision_avoidance_config.fix_joints_for_collision_avoidance([
             'r_gripper_l_finger_joint',
             'l_gripper_l_finger_joint'
         ])

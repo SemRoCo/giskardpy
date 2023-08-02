@@ -9,7 +9,7 @@ from giskardpy import identifier
 from giskardpy.exceptions import SetupException
 from giskardpy.god_map import GodMap
 from giskardpy.god_map_user import GodMapWorshipper
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupConfig, \
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds, \
     CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
@@ -167,13 +167,13 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
             path_to_srdf = self.collision_scene.self_collision_matrix_paths[group_name]
             self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
 
-    def fix_joints_for_self_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
+    def fix_joints_for_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
         """
-        Flag some joints as fixed for self collision avoidance. These joints will not be moved to avoid self
+        Flag some joints as fixed for collision avoidance. These joints will not be moved to avoid self
         collisions.
         """
         if group_name is None:
             group_name = self.world.robot_name
-        config = self.collision_scene.collision_avoidance_configs[group_name]
-        joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
-        config.fixed_joints_for_self_collision_avoidance.extend(joint_names)
+        for joint_name in joint_names:
+            world_joint_name = self.world.search_for_joint_name(joint_name, group_name)
+            self.collision_scene.add_fixed_joint(world_joint_name)

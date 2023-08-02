@@ -57,28 +57,22 @@ class CollisionAvoidanceThresholds:
         return cls(soft_threshold=0.025, hard_threshold=0.0)
 
 
-class CollisionAvoidanceGroupConfig:
+class CollisionAvoidanceGroupThresholds:
     def __init__(self):
-        self.add_self_collisions: List[Tuple[PrefixName, PrefixName]] = []
-        self.ignored_self_collisions: List[Union[PrefixName, Tuple[PrefixName, PrefixName]]] = []
-        self.ignored_collisions: List[PrefixName] = []
-        self.fixed_joints_for_self_collision_avoidance = []
-        self.fixed_joints_for_external_collision_avoidance = []
-
         self.external_collision_avoidance: Dict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
             CollisionAvoidanceThresholds)
         self.self_collision_avoidance: Dict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
             CollisionAvoidanceThresholds)
 
-    def cal_max_param(self, parameter_name):
+    def max_num_of_repeller(self):
         external_distances = self.external_collision_avoidance
         self_distances = self.self_collision_avoidance
-        default_distance = max(getattr(external_distances.default_factory(), parameter_name),
-                               getattr(self_distances.default_factory(), parameter_name))
+        default_distance = max(external_distances.default_factory().number_of_repeller,
+                               self_distances.default_factory().number_of_repeller)
         for value in external_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
+            default_distance = max(default_distance, value.number_of_repeller)
         for value in self_distances.values():
-            default_distance = max(default_distance, getattr(value, parameter_name))
+            default_distance = max(default_distance, value.number_of_repeller)
         return default_distance
 
 
@@ -321,30 +315,30 @@ class CollisionWorldSynchronizer(GodMapWorshipper):
     self_collision_matrix: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
     self_collision_matrix_paths: Dict[str, str]
     world: WorldTree
-    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupConfig]
+    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
     disabled_links: Set[PrefixName]
     srdf_disable_all_collisions = 'disable_all_collisions'
     srdf_disable_self_collision = 'disable_self_collision'
     srdf_moveit_disable_collisions = 'disable_collisions'
     collision_checker_id = CollisionCheckerLib.none
+    _fixed_joints: Tuple[PrefixName]
 
     def __init__(self):
         self.self_collision_matrix = {}
         self.self_collision_matrix_paths = {}
         self.disabled_links = set()
-        self.collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
-
+        self.collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupThresholds)
+        self._fixed_joints = tuple()
         self.world_version = -1
 
-
     @property
-    def fixed_joints(self) -> tuple:
-        fixed_joints = []
-        if hasattr(self, 'collision_avoidance_configs'):
-            for robot_name, collision_avoidance_config in self.collision_avoidance_configs.items():
-                fixed_joints.extend(collision_avoidance_config.fixed_joints_for_self_collision_avoidance)
-            return tuple(fixed_joints)
-        return tuple()
+    def fixed_joints(self) -> Tuple[PrefixName]:
+        return self._fixed_joints
+
+    def add_fixed_joint(self, joint_name: PrefixName):
+        fixed_joint_list = list(self._fixed_joints)
+        fixed_joint_list.append(joint_name)
+        self._fixed_joints = tuple(fixed_joint_list)
 
     @classmethod
     def empty(cls):

@@ -51,7 +51,7 @@ class TiagoBase(Giskard):
                                    'caster_back_right_2_link',
                                    'caster_front_left_2_link',
                                    'caster_front_right_2_link']
-        self.collision_avoidance_config.fix_joints_for_self_collision_avoidance(['head_1_joint',
+        self.collision_avoidance_config.fix_joints_for_collision_avoidance(['head_1_joint',
                                                                           'head_2_joint',
                                                                           'gripper_left_left_finger_joint',
                                                                           'gripper_left_right_finger_joint',

@@ -10,18 +10,15 @@ from giskardpy.exceptions import SetupException
 from giskardpy.god_map import GodMap
 from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupConfig, \
-    CollisionCheckerLib, CollisionAvoidanceConfigEntry
+    CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
 
 class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
-    _collision_avoidance_configs: DefaultDict[str, CollisionAvoidanceGroupConfig]
-    god_map = GodMap()
 
     def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
-        self._collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
         self._create_collision_checker(collision_checker)
 
     def set_defaults(self):
@@ -70,13 +67,13 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
         """
         if group_name is None:
             group_name = self.world.robot_name
-        new_default = CollisionAvoidanceConfigEntry(
+        new_default = CollisionAvoidanceThresholds(
             number_of_repeller=number_of_repeller,
             soft_threshold=soft_threshold,
             hard_threshold=hard_threshold,
             max_velocity=max_velocity
         )
-        self._collision_avoidance_configs[group_name].self_collision_avoidance.default_factory = lambda: new_default
+        self.collision_scene.collision_avoidance_configs[group_name].self_collision_avoidance.default_factory = lambda: new_default
 
     def set_default_external_collision_avoidance(self,
                                                  number_of_repeller: int = 1,
@@ -91,8 +88,8 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
         :param hard_threshold: distance threshold not allowed to be violated
         :param max_velocity: how fast it will move away from collisions
         """
-        for config in self._collision_avoidance_configs.values():
-            config.external_collision_avoidance.default_factory = lambda: CollisionAvoidanceConfigEntry(
+        for config in self.collision_scene.collision_avoidance_configs.values():
+            config.external_collision_avoidance.default_factory = lambda: CollisionAvoidanceThresholds(
                 number_of_repeller=number_of_repeller,
                 soft_threshold=soft_threshold,
                 hard_threshold=hard_threshold,
@@ -116,7 +113,7 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
         """
         if group_name is None:
             group_name = self.world.robot_name
-        config = self._collision_avoidance_configs[group_name]
+        config = self.collision_scene.collision_avoidance_configs[group_name]
         joint_name = PrefixName(joint_name, group_name)
         if number_of_repeller is not None:
             config.external_collision_avoidance[joint_name].number_of_repeller = number_of_repeller
@@ -144,7 +141,7 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
         """
         if group_name is None:
             group_name = self.world.robot_name
-        config = self._collision_avoidance_configs[group_name]
+        config = self.collision_scene.collision_avoidance_configs[group_name]
         link_name = PrefixName(link_name, group_name)
         if number_of_repeller is not None:
             config.self_collision_avoidance[link_name].number_of_repeller = number_of_repeller
@@ -177,6 +174,6 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
         """
         if group_name is None:
             group_name = self.world.robot_name
-        config = self._collision_avoidance_configs[group_name]
+        config = self.collision_scene.collision_avoidance_configs[group_name]
         joint_names = [PrefixName(joint_name, group_name) for joint_name in joint_names]
         config.fixed_joints_for_self_collision_avoidance.extend(joint_names)

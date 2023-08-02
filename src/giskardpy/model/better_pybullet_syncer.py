@@ -20,7 +20,7 @@ from giskardpy.utils.tfwrapper import np_to_pose
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
-    collision_checker_id = CollisionCheckerLib.none
+    collision_checker_id = CollisionCheckerLib.bpb
 
     def __init__(self,):
         self.kw = bpb.KineverseWorld()

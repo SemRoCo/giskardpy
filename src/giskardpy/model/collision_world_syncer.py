@@ -33,7 +33,7 @@ class CollisionCheckerLib(Enum):
     bpb = 1
 
 
-class CollisionAvoidanceConfigEntry:
+class CollisionAvoidanceThresholds:
     def __init__(self,
                  number_of_repeller: int = 1,
                  soft_threshold: float = 0.05,
@@ -65,10 +65,10 @@ class CollisionAvoidanceGroupConfig:
         self.fixed_joints_for_self_collision_avoidance = []
         self.fixed_joints_for_external_collision_avoidance = []
 
-        self.external_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
-            CollisionAvoidanceConfigEntry)
-        self.self_collision_avoidance: Dict[PrefixName, CollisionAvoidanceConfigEntry] = defaultdict(
-            CollisionAvoidanceConfigEntry)
+        self.external_collision_avoidance: Dict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
+            CollisionAvoidanceThresholds)
+        self.self_collision_avoidance: Dict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
+            CollisionAvoidanceThresholds)
 
     def cal_max_param(self, parameter_name):
         external_distances = self.external_collision_avoidance
@@ -332,8 +332,10 @@ class CollisionWorldSynchronizer(GodMapWorshipper):
         self.self_collision_matrix = {}
         self.self_collision_matrix_paths = {}
         self.disabled_links = set()
-        self.collision_avoidance_configs = {}
+        self.collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupConfig)
+
         self.world_version = -1
+
 
     @property
     def fixed_joints(self) -> tuple:
@@ -376,7 +378,7 @@ class CollisionWorldSynchronizer(GodMapWorshipper):
 
     @property
     def is_collision_checking_enabled(self) -> bool:
-        return self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none
+        return self.collision_checker_id != CollisionCheckerLib.none
 
     def load_self_collision_matrix_from_srdf(self, path: str, group_name: str) \
             -> Tuple[Optional[dict], Set[PrefixName]]:

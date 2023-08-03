@@ -44,6 +44,7 @@ class QPControllerConfig:
                  weight_factor: float = 100,
                  endless_mode: bool = False):
         self.set_defaults()
+        # FIXME
 
     def set_defaults(self):
         self.qp_solver = None

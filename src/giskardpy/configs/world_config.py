@@ -258,3 +258,46 @@ class WorldWithOmniDriveRobot(WorldConfig):
         self.set_joint_limits(limit_map={Derivatives.velocity: 3,
                                          Derivatives.jerk: 60},
                               joint_name='head_pan_joint')
+
+
+class WorldWithDiffDriveRobot(WorldConfig):
+    map_name: str
+    localization_joint_name: str
+    odom_link_name: str
+    drive_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom_combined',
+                 drive_joint_name: str = 'brumbrum'):
+        super().__init__()
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+        self.odom_link_name = odom_link_name
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.world_config.set_default_limits({Derivatives.velocity: 1,
+                                              Derivatives.acceleration: np.inf,
+                                              Derivatives.jerk: 30})
+        self.world_config.add_empty_link(self.map_name)
+        self.world_config.add_empty_link(self.odom_link_name)
+        self.world_config.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
+                                         joint_name=self.localization_joint_name)
+        self.world_config.add_robot_from_parameter_server()
+        root_link_name = self.world_config.get_root_link_of_group(self.robot_group_name)
+        self.world_config.add_diff_drive_joint(name=self.drive_joint_name,
+                                               parent_link_name=self.odom_link_name,
+                                               child_link_name=root_link_name,
+                                               translation_limits={
+                                                   Derivatives.velocity: 0.4,
+                                                   Derivatives.acceleration: 1,
+                                                   Derivatives.jerk: 5,
+                                               },
+                                               rotation_limits={
+                                                   Derivatives.velocity: 0.2,
+                                                   Derivatives.acceleration: 1,
+                                                   Derivatives.jerk: 5
+                                               },
+                                               robot_group_name=self.robot_group_name)

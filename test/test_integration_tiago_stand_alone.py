@@ -11,8 +11,11 @@ from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver
-from giskardpy.configs.tiago import TiagoMujoco, Tiago_Standalone
+from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidance
+from giskardpy.configs.world_config import WorldWithDiffDriveRobot
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
@@ -96,10 +99,14 @@ class TiagoTestWrapper(GiskardTestWrapper):
         'gripper_left_right_finger_joint': 0.001,
     }
 
-    def __init__(self, config=None):
-        if config is None:
-            config = Tiago_Standalone
-        super().__init__(config)
+    def __init__(self, giskard=None):
+        if giskard is None:
+            giskard = Giskard(world_config=WorldWithDiffDriveRobot(),
+                              collision_avoidance_config=TiagoCollisionAvoidance(),
+                              robot_interface_config=TiagoStandaloneInterface(),
+                              behavior_tree_config=StandAloneConfig(),
+                              qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
 
     def move_base(self, goal_pose: PoseStamped, check: bool = True):
         tip_link = PrefixName('base_footprint', self.robot_name)
@@ -478,18 +485,17 @@ class TestCollisionAvoidance:
         box_pose.pose.position.z = 0.07
         box_pose.pose.position.x = 0.1
         box_pose.pose.orientation.w = 1
-        # zero_pose.add_box('box',
-        #                   size=(0.05,0.05,0.05),
-        #                   pose=box_pose)
+        zero_pose.add_box('box',
+                          size=(0.05,0.05,0.05),
+                          pose=box_pose)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'arm_left_5_link'
         box_pose.pose.position.z = 0.07
         box_pose.pose.position.y = -0.1
         box_pose.pose.orientation.w = 1
-        # zero_pose.add_box('box2',
-        #                   size=(0.05,0.05,0.05),
-        #                   pose=box_pose)
-        # zero_pose.allow_self_collision()
+        zero_pose.add_box('box2',
+                          size=(0.05,0.05,0.05),
+                          pose=box_pose)
         zero_pose.plan_and_execute()
 
     def test_load_negative_scale(self, zero_pose: TiagoTestWrapper):

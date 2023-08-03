@@ -1,6 +1,6 @@
 import giskardpy.utils.tfwrapper as tf
 import pytest
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PointStamped
 
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
 from giskardpy.configs.giskard import Giskard
@@ -35,6 +35,21 @@ class TracebotTestWrapper(GiskardTestWrapper):
         'right_wrist_3_joint': 0,
     }
 
+    better_pose = {
+        'left_shoulder_pan_joint': 2.539670467376709,
+        'left_shoulder_lift_joint': -1.46823854119096,
+        'left_elbow_joint': 2.1197431723224085,
+        'left_wrist_1_joint': -1.4825000625899811,
+        'left_wrist_2_joint': 5.467689037322998,
+        'left_wrist_3_joint': -0.9808381239520472,
+        'right_shoulder_pan_joint': 3.7588136196136475,
+        'right_shoulder_lift_joint': -1.7489210567870082,
+        'right_elbow_joint': -2.054229259490967,
+        'right_wrist_1_joint': -1.6140786610045375,
+        'right_wrist_2_joint': 0.7295855283737183,
+        'right_wrist_3_joint': 3.944669485092163,
+    }
+
     def __init__(self):
         tf.init()
         giskard = Giskard(world_config=TracyWorldConfig(),
@@ -47,6 +62,32 @@ class TracebotTestWrapper(GiskardTestWrapper):
     def reset(self):
         # self.mujoco_reset()
         self.clear_world()
+
+
+class TestTracebot:
+    def test_place_cylinder(self, better_pose: TracebotTestWrapper):
+        cylinder_name = 'C'
+        cylinder_height = 0.121
+        hole_point = PointStamped()
+        hole_point.header.frame_id = 'table'
+        hole_point.point.x = 0.7
+        hole_point.point.y = -0.25
+        pose = PoseStamped()
+        pose.header.frame_id = 'r_gripper_tool_frame'
+        pose.pose.position.z = cylinder_height / 5
+        pose.pose.orientation.w = 1
+        better_pose.add_cylinder(name=cylinder_name,
+                                 height=cylinder_height,
+                                 radius=0.0225,
+                                 pose=pose,
+                                 parent_link='r_gripper_tool_frame')
+        better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
+
+        better_pose.set_json_goal('InsertCylinder',
+                                  cylinder_name=cylinder_name,
+                                  hole_point=hole_point)
+        better_pose.allow_all_collisions()
+        better_pose.plan_and_execute()
 
 
 class TestCartGoals:

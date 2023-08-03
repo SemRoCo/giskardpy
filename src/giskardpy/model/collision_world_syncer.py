@@ -485,7 +485,7 @@ class CollisionWorldSynchronizer(GodMapWorshipper):
             -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
         if progress_callback is None:
             progress_callback = lambda value, text: None
-        if not self.is_collision_checking_enabled():
+        if not self.is_collision_checking_enabled:
             return {}
         np.random.seed(1337)
         remaining_pairs = set()

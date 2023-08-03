@@ -33,6 +33,10 @@ class WorldConfig(GodMapWorshipper, ABC):
     def setup(self):
         ...
 
+    @property
+    def robot_group_name(self) -> str:
+        return self.world.robot_name
+
     def set_default_weights(self,
                             velocity_weight: float = 0.01,
                             acceleration_weight: float = 0,
@@ -235,8 +239,8 @@ class WorldWithOmniDriveRobot(WorldConfig):
         self.add_empty_link(self.odom_link_name)
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                             joint_name=self.localization_joint_name)
-        pr2_group_name = self.add_robot_from_parameter_server()
-        root_link_name = self.get_root_link_of_group(pr2_group_name)
+        self.add_robot_from_parameter_server()
+        root_link_name = self.get_root_link_of_group(self.robot_group_name)
         self.add_omni_drive_joint(name=self.drive_joint_name,
                                   parent_link_name=self.odom_link_name,
                                   child_link_name=root_link_name,
@@ -250,7 +254,7 @@ class WorldWithOmniDriveRobot(WorldConfig):
                                       Derivatives.acceleration: 1,
                                       Derivatives.jerk: 5
                                   },
-                                  robot_group_name=pr2_group_name)
+                                  robot_group_name=self.robot_group_name)
         self.set_joint_limits(limit_map={Derivatives.velocity: 3,
                                          Derivatives.jerk: 60},
                               joint_name='head_pan_joint')

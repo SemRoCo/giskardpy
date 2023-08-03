@@ -1,44 +1,11 @@
-import numpy as np
-
-from giskardpy.configs.giskard import WorldConfig, CollisionAvoidanceConfig, RobotInterfaceConfig
+from giskardpy.configs.giskard import CollisionAvoidanceConfig, RobotInterfaceConfig
+from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.my_types import Derivatives
 
 
-class PR2World(WorldConfig):
-    map_name = 'map'
-    localization_joint_name = 'localization'
-    odom_link_name = 'odom_combined'
-    drive_joint_name = 'brumbrum'
-
-    def __init__(self, drive_joint_name: str, map_name: str = 'map'):
-        super().__init__()
-        self.drive_joint_name = drive_joint_name
-        self.map_name = map_name
-
+class WorldWithPR2(WorldWithOmniDriveRobot):
     def setup(self):
-        self.set_default_limits({Derivatives.velocity: 1,
-                                 Derivatives.acceleration: np.inf,
-                                 Derivatives.jerk: 30})
-        self.add_empty_link(self.map_name)
-        self.add_empty_link(self.odom_link_name)
-        self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
-                            joint_name=self.localization_joint_name)
-        pr2_group_name = self.add_robot_from_parameter_server()
-        root_link_name = self.get_root_link_of_group(pr2_group_name)
-        self.add_omni_drive_joint(name=self.drive_joint_name,
-                                  parent_link_name=self.odom_link_name,
-                                  child_link_name=root_link_name,
-                                  translation_limits={
-                                      Derivatives.velocity: 0.4,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
-                                  },
-                                  rotation_limits={
-                                      Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
-                                  },
-                                  robot_group_name=pr2_group_name)
+        super().setup()
         self.set_joint_limits(limit_map={Derivatives.velocity: 3,
                                          Derivatives.jerk: 60},
                               joint_name='head_pan_joint')

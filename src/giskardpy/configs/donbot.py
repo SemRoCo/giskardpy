@@ -20,8 +20,8 @@ class WorldWithDonbot(WorldConfig):
                                  Derivatives.acceleration: np.inf,
                                  Derivatives.jerk: 15})
         self.add_empty_link(self.map_name)
-        pr2_group_name = self.add_robot_from_parameter_server()
-        root_link_name = self.get_root_link_of_group(pr2_group_name)
+        self.add_robot_from_parameter_server()
+        root_link_name = self.get_root_link_of_group(self.robot_group_name)
         self.add_6dof_joint(parent_link=self.map_name, child_link=root_link_name,
                             joint_name=self.localization_joint_name)
         self.set_joint_limits(limit_map={Derivatives.velocity: 0.1}, joint_name='odom_x_joint')

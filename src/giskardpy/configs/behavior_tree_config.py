@@ -15,7 +15,9 @@ class BehaviorTreeConfig(ABC):
 
     @abstractmethod
     def setup(self):
-        ...
+        """
+        Implement this method to configure the behavior tree using it's self. methods.
+        """
 
     @property
     def tree_manager(self) -> TreeManager:
@@ -36,6 +38,10 @@ class BehaviorTreeConfig(ABC):
         pass
 
     def set_tree_tick_rate(self, rate: float = 0.05):
+        """
+        How often the tree ticks per second.
+        :param rate: in /s
+        """
         self.tree_tick_rate = rate
 
     def add_visualization_marker_publisher(self,
@@ -43,9 +49,18 @@ class BehaviorTreeConfig(ABC):
                                            add_to_planning: Optional[bool] = None,
                                            add_to_control_loop: Optional[bool] = None,
                                            use_decomposed_meshes: bool = True):
-        self.tree_manager.configure_visualization_marker(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
-                                                          add_to_control_loop=add_to_control_loop,
-                                                          use_decomposed_meshes=use_decomposed_meshes)
+        """
+
+        :param add_to_sync: Markers are published while waiting for a goal.
+        :param add_to_planning: Markers are published during planning, only relevant in open loop mode.
+        :param add_to_control_loop: Markers are published during the closed loop control sequence, this is slow.
+        :param use_decomposed_meshes: True: publish decomposed meshes used for collision avoidance, these likely only
+                                            available on the machine where Giskard is running.
+                                      False: use meshes defined in urdf.
+        """
+        self.tree_manager.add_visualization_marker_behavior(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
+                                                            add_to_control_loop=add_to_control_loop,
+                                                            use_decomposed_meshes=use_decomposed_meshes)
 
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
                               publish_lbA: bool = False, publish_ubA: bool = False,
@@ -53,30 +68,48 @@ class BehaviorTreeConfig(ABC):
                               publish_Ex: bool = False, publish_xdot: bool = False,
                               publish_weights: bool = False, publish_g: bool = False,
                               publish_debug: bool = False, add_to_base: bool = False):
+        """
+        QP data is streamed and can be visualized in e.g. plotjuggler. Useful for debugging.
+        """
         self.tree_manager.add_qp_data_publisher(publish_lb=publish_lb,
-                                                 publish_ub=publish_ub,
-                                                 publish_lbA=publish_lbA,
-                                                 publish_ubA=publish_ubA,
-                                                 publish_bE=publish_bE,
-                                                 publish_Ax=publish_Ax,
-                                                 publish_Ex=publish_Ex,
-                                                 publish_xdot=publish_xdot,
-                                                 publish_weights=publish_weights,
-                                                 publish_g=publish_g,
-                                                 publish_debug=publish_debug,
-                                                 add_to_base=add_to_base)
+                                                publish_ub=publish_ub,
+                                                publish_lbA=publish_lbA,
+                                                publish_ubA=publish_ubA,
+                                                publish_bE=publish_bE,
+                                                publish_Ax=publish_Ax,
+                                                publish_Ex=publish_Ex,
+                                                publish_xdot=publish_xdot,
+                                                publish_weights=publish_weights,
+                                                publish_g=publish_g,
+                                                publish_debug=publish_debug,
+                                                add_to_base=add_to_base)
 
     def add_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
+        """
+        Plots the generated trajectories.
+        :param normalize_position: Positions are centered around zero.
+        :param wait: True: Behavior tree waits for this plotter to finish.
+                     False: Plot is generated in a separate thread to not slow down Giskard.
+        """
         self.tree_manager.add_plot_trajectory(normalize_position, wait)
 
     def add_debug_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
+        """
+        Plots debug expressions defined in goals.
+        """
         self.tree_manager.add_plot_debug_trajectory(normalize_position=normalize_position, wait=wait)
 
     def add_debug_marker_publisher(self):
+        """
+        Publishes debug expressions defined in goals.
+        """
         self.tree_manager.add_debug_marker_publisher()
 
     def add_tf_publisher(self, include_prefix: bool = True, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
+        """
+        Publishes tf for Giskard's internal state.
+        """
         self.tree_manager.add_tf_publisher(include_prefix=include_prefix, tf_topic=tf_topic, mode=mode)
 
 

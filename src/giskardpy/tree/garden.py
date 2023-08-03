@@ -276,11 +276,11 @@ class TreeManager(ABC):
         self.tree.tick()
 
     @abc.abstractmethod
-    def configure_visualization_marker(self,
-                                       add_to_sync: Optional[bool] = None,
-                                       add_to_planning: Optional[bool] = None,
-                                       add_to_control_loop: Optional[bool] = None,
-                                       use_decomposed_meshes: bool = True):
+    def add_visualization_marker_behavior(self,
+                                          add_to_sync: Optional[bool] = None,
+                                          add_to_planning: Optional[bool] = None,
+                                          add_to_control_loop: Optional[bool] = None,
+                                          use_decomposed_meshes: bool = True):
         ...
 
     @abc.abstractmethod
@@ -740,11 +740,11 @@ class StandAlone(TreeManager):
         plan_postprocessing.add_child(GoalCleanUp('clean up goals'))
         return plan_postprocessing
 
-    def configure_visualization_marker(self,
-                                       add_to_sync: Optional[bool] = None,
-                                       add_to_planning: Optional[bool] = None,
-                                       add_to_control_loop: Optional[bool] = None,
-                                       use_decomposed_meshes: bool = True):
+    def add_visualization_marker_behavior(self,
+                                          add_to_sync: Optional[bool] = None,
+                                          add_to_planning: Optional[bool] = None,
+                                          add_to_control_loop: Optional[bool] = None,
+                                          use_decomposed_meshes: bool = True):
         if add_to_sync is not None and add_to_sync:
             self.insert_node(VisualizationBehavior('visualization',
                                                    use_decomposed_meshes=use_decomposed_meshes), self.sync_name)

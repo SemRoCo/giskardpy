@@ -39,34 +39,30 @@ class QPControllerConfig:
                  qp_solver: Optional[SupportedQPSolver] = None,
                  prediction_horizon: int = 9,
                  sample_period: float = 0.05,
+                 max_trajectory_length: float = 30,
                  retries_with_relaxed_constraints: int = 5,
                  added_slack: float = 100,
                  weight_factor: float = 100,
                  endless_mode: bool = False):
+        self.__qp_solver = qp_solver
+        if prediction_horizon < 7:
+            raise ValueError('prediction horizon must be >= 7.')
+        self.prediction_horizon = prediction_horizon
+        self.__prediction_horizon = prediction_horizon
+        self.__sample_period = sample_period
+        self.__max_trajectory_length = max_trajectory_length
+        self.__retries_with_relaxed_constraints = retries_with_relaxed_constraints
+        self.__added_slack = added_slack
+        self.__weight_factor = weight_factor
+        self.__endless_mode = endless_mode
         self.set_defaults()
-        # FIXME
 
     def set_defaults(self):
-        self.qp_solver = None
-        self.prediction_horizon = 9
-        self.retries_with_relaxed_constraints = 5
-        self.added_slack = 100
-        self.sample_period = 0.05
-        self.weight_factor = 100
-        self.endless_mode = False
-        self.default_weights = {d: defaultdict(float) for d in Derivatives}
-
-    def set_prediction_horizon(self, new_prediction_horizon: int):
-        """
-        Set the prediction horizon for the MPC. If set to 1, it will turn off acceleration and jerk limits.
-        :param new_prediction_horizon: should be >= 7
-        """
-        if new_prediction_horizon < 7:
-            raise ValueError('prediction horizon must be >= 7.')
-        self.prediction_horizon = new_prediction_horizon
-
-    def set_qp_solver(self, new_solver: SupportedQPSolver):
-        self.qp_solver = new_solver
-
-    def set_max_trajectory_length(self, length: float = 30):
-        self.max_trajectory_length = length
+        self.qp_solver = self.__qp_solver
+        self.prediction_horizon = self.__prediction_horizon
+        self.sample_period = self.__sample_period
+        self.retries_with_relaxed_constraints = self.__retries_with_relaxed_constraints
+        self.added_slack = self.__added_slack
+        self.weight_factor = self.__weight_factor
+        self.endless_mode = self.__endless_mode
+        self.max_trajectory_length = self.__max_trajectory_length

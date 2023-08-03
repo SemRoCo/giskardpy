@@ -43,7 +43,7 @@ class SetMaxTrajLength(NonMotionGoal):
                  new_length: int):
         """
         Overwrites Giskard trajectory length limit for planning.
-        If the trajectory is longer than new_length, Giskard will prempt the goal.
+        If the trajectory is longer than new_length, Giskard will preempt the goal.
         :param new_length: in seconds
         """
         super().__init__()

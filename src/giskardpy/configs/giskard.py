@@ -26,6 +26,7 @@ class Giskard(GodMapWorshipper):
     qp_controller_config: QPControllerConfig = None
     path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
     goal_package_paths = {'giskardpy.goals'}
+    action_server_name: str = '~command'
 
     def __init__(self,
                  world_config: WorldConfig,

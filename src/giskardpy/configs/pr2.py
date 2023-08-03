@@ -110,7 +110,7 @@ class PR2JointTrajServerMujocoInterface(RobotInterfaceConfig):
 
 
 class PR2CollisionAvoidance(CollisionAvoidanceConfig):
-    def __init__(self, drive_joint_name: str):
+    def __init__(self, drive_joint_name: str = 'brumbrum'):
         super().__init__()
         self.drive_joint_name = drive_joint_name
 

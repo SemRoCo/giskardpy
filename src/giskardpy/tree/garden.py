@@ -246,7 +246,7 @@ class TreeManager(ABC):
 
     @profile
     def __init__(self, tree=None):
-        self.action_server_name = '~command'
+        self.action_server_name = self.god_map.get_data(identifier.action_server_name)
         self.config = self.god_map.get_data(identifier.giskard)
 
         if tree is None:

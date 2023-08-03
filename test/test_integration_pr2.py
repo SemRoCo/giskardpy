@@ -126,7 +126,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                    'head_tilt_joint': 0,
                    }
 
-    def __init__(self):
+    def __init__(self, giskard: Optional[Giskard] = None):
         self.r_tip = 'r_gripper_tool_frame'
         self.l_tip = 'l_gripper_tool_frame'
         self.l_gripper_group = 'l_gripper'
@@ -135,11 +135,12 @@ class PR2TestWrapper(GiskardTestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom_combined'
         drive_joint_name = 'brumbrum'
-        giskard = Giskard(world_config=RobotWithOmnidrive(drive_joint_name=drive_joint_name),
-                          collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
-                          robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
-                          behavior_tree_config=StandAloneConfig(),
-                          qp_controller_config=QPControllerConfig())
+        if giskard is None:
+            giskard = Giskard(world_config=RobotWithOmnidrive(drive_joint_name=drive_joint_name),
+                              collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
+                              robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
+                              behavior_tree_config=StandAloneConfig(),
+                              qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = self.world.groups[self.robot_name]
 

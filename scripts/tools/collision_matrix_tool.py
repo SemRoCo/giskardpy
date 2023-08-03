@@ -449,7 +449,7 @@ class Application(QMainWindow):
         self.__srdf_path = None
         self.world = WorldTree.empty_world()
         self.world.default_link_color = ColorRGBA(0.5, 0.5, 0.5, 0.75)
-        self.collision_scene = BetterPyBulletSyncer.empty(self.world)
+        self.collision_scene = BetterPyBulletSyncer.empty()
         self.df = pd.DataFrame()
         self.initUI()
 

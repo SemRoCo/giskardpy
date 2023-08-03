@@ -3,7 +3,7 @@ from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.my_types import Derivatives
 
 
-class WorldWithPR2(WorldWithOmniDriveRobot):
+class WorldWithPR2Config(WorldWithOmniDriveRobot):
     def setup(self):
         super().setup()
         self.set_joint_limits(limit_map={Derivatives.velocity: 3,

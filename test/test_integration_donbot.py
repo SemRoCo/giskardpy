@@ -11,7 +11,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, CollisionEntry
 from giskardpy import identifier
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
-from giskardpy.configs.donbot import WorldWithDonbot, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
+from giskardpy.configs.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
@@ -65,11 +65,11 @@ class DonbotTestWrapper(GiskardTestWrapper):
         self.gripper_tip = 'gripper_tool_frame'
         # self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
         # self.mujoco_reset = rospy.ServiceProxy('donbot/reset', Trigger)
-        giskard = Giskard(world_config=WorldWithDonbot(),
-                              collision_avoidance_config=DonbotCollisionAvoidanceConfig(),
-                              robot_interface_config=DonbotStandaloneInterfaceConfig(),
-                              behavior_tree_config=StandAloneConfig(),
-                              qp_controller_config=QPControllerConfig())
+        giskard = Giskard(world_config=WorldWithBoxyBaseConfig(),
+                          collision_avoidance_config=DonbotCollisionAvoidanceConfig(),
+                          robot_interface_config=DonbotStandaloneInterfaceConfig(),
+                          behavior_tree_config=StandAloneConfig(),
+                          qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 
     def open_gripper(self):

@@ -6,7 +6,7 @@ from giskardpy.configs.world_config import WorldConfig
 from giskardpy.my_types import Derivatives
 
 
-class WorldWithDonbot(WorldConfig):
+class WorldWithBoxyBaseConfig(WorldConfig):
 
     def __init__(self,
                  map_name: str = 'map',

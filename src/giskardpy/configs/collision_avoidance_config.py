@@ -19,8 +19,7 @@ from giskardpy.utils import logging
 class CollisionAvoidanceConfig(abc.ABC):
     god_map = GodMap()
 
-    def __init__(self,
-                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+    def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
         self._create_collision_checker(collision_checker)
 
     def set_defaults(self):
@@ -40,7 +39,9 @@ class CollisionAvoidanceConfig(abc.ABC):
 
     @abc.abstractmethod
     def setup(self):
-        ...
+        """
+        Implement this method to configure the behavior tree using it's self. methods.
+        """
 
     def _sanity_check(self):
         if self.collision_checker_id != CollisionCheckerLib.none \
@@ -72,7 +73,7 @@ class CollisionAvoidanceConfig(abc.ABC):
                                              max_velocity: float = 0.2,
                                              group_name: Optional[str] = None):
         """
-        Sets the default self collision configuration. The default of this function are set automatically.
+        Sets the default self collision configuration. The defaults of this function are set automatically.
         If they are fine, you don't need to use this function.
         :param number_of_repeller: how many constraints are added for a particular link pair
         :param soft_threshold: will try to stay out of this threshold, but can violate
@@ -88,7 +89,8 @@ class CollisionAvoidanceConfig(abc.ABC):
             hard_threshold=hard_threshold,
             max_velocity=max_velocity
         )
-        self.collision_scene.collision_avoidance_configs[group_name].self_collision_avoidance.default_factory = lambda: new_default
+        self.collision_scene.collision_avoidance_configs[
+            group_name].self_collision_avoidance.default_factory = lambda: new_default
 
     def set_default_external_collision_avoidance(self,
                                                  number_of_repeller: int = 1,
@@ -202,3 +204,11 @@ class LoadSelfCollisionMatrixConfig(CollisionAvoidanceConfig):
 
     def setup(self):
         self.load_self_collision_matrix(self._path_to_self_collision_matrix)
+
+
+class DisableCollisionAvoidanceConfig(CollisionAvoidanceConfig):
+    def __init__(self):
+        super().__init__(CollisionCheckerLib.none)
+
+    def setup(self):
+        pass

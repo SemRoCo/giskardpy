@@ -5,8 +5,8 @@ from typing import Optional, List
 from py_trees import Blackboard
 
 from giskardpy import identifier
-from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig, ControlModes
-from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
+from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig, ControlModes, OpenLoopBTConfig
+from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig, DisableCollisionAvoidanceConfig
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
@@ -30,30 +30,38 @@ class Giskard(GodMapWorshipper):
 
     def __init__(self,
                  world_config: WorldConfig,
-                 collision_avoidance_config: CollisionAvoidanceConfig,
-                 behavior_tree_config: BehaviorTreeConfig,
-                 qp_controller_config: QPControllerConfig,
                  robot_interface_config: RobotInterfaceConfig,
+                 collision_avoidance_config: Optional[CollisionAvoidanceConfig] = None,
+                 behavior_tree_config: Optional[BehaviorTreeConfig] = None,
+                 qp_controller_config: Optional[QPControllerConfig] = None,
                  additional_goal_package_paths: Optional[List[str]] = None):
-        self._god_map = GodMap()
-        self._god_map.set_data(identifier.giskard, self)
+        """
+        :param world_config: A world configuration. Use a predefined one or implement your own WorldConfig class.
+        :param robot_interface_config: How Giskard talk to the robot. You probably have to implement your own RobotInterfaceConfig.
+        :param collision_avoidance_config: default is no collision avoidance or implement your own collision_avoidance_config.
+        :param behavior_tree_config: default is open loop mode
+        :param qp_controller_config: default is good for almost all cases
+        :param additional_goal_package_paths: specify paths that Giskard needs to import to find your custom goals.
+                                              Giskard will run 'from <additional path> import *' for each additional
+                                              path in the list.
+        """
+        self.god_map.set_data(identifier.giskard, self)
         self.world_config = world_config
-        self.collision_avoidance_config = collision_avoidance_config
-        self.behavior_tree_config = behavior_tree_config
-        self.qp_controller_config = qp_controller_config
         self.robot_interface_config = robot_interface_config
+        if collision_avoidance_config is None:
+            collision_avoidance_config = DisableCollisionAvoidanceConfig()
+        self.collision_avoidance_config = collision_avoidance_config
+        if behavior_tree_config is None:
+            behavior_tree_config = OpenLoopBTConfig()
+        self.behavior_tree_config = behavior_tree_config
+        if qp_controller_config is None:
+            qp_controller_config = QPControllerConfig()
+        self.qp_controller_config = qp_controller_config
         if additional_goal_package_paths is None:
             additional_goal_package_paths = set()
         for additional_path in additional_goal_package_paths:
             self.add_goal_package_name(additional_path)
-        self._god_map.set_data(identifier.hack, 0)
-        blackboard = Blackboard
-        blackboard.god_map = self._god_map
-        self._backup = {}
-
-    @property
-    def world(self):
-        return self._god_map.get_data(identifier.world)
+        self.god_map.set_data(identifier.hack, 0)
 
     def set_defaults(self):
         self.world_config.set_defaults()
@@ -77,7 +85,7 @@ class Giskard(GodMapWorshipper):
         self.world.notify_model_change()
 
     def _controlled_joints_sanity_check(self):
-        world = self._god_map.get_data(identifier.world)
+        world = self.god_map.get_data(identifier.world)
         non_controlled_joints = set(world.movable_joint_names).difference(set(world.controlled_joints))
         if len(world.controlled_joints) == 0:
             raise GiskardException('No joints are flagged as controlled.')
@@ -99,4 +107,4 @@ class Giskard(GodMapWorshipper):
         Start Giskard.
         """
         self.grow()
-        self._god_map.get_data(identifier.tree_manager).live()
+        self.god_map.get_data(identifier.tree_manager).live()

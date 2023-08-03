@@ -5,15 +5,15 @@ from giskardpy.configs.behavior_tree_config import StandAloneConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.pr2 import PR2CollisionAvoidance
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.robot_interface_config import StandaloneRobotInterface
-from giskardpy.configs.world_config import RobotWithOmnidrive
+from giskardpy.configs.robot_interface_config import StandAloneRobotInterface
+from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 
 if __name__ == '__main__':
     rospy.init_node('giskard')
     drive_joint_name = 'brumbrum'
-    giskard = Giskard(world_config=RobotWithOmnidrive(drive_joint_name=drive_joint_name),
+    giskard = Giskard(world_config=WorldWithOmniDriveRobot(drive_joint_name=drive_joint_name),
                       collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
-                      robot_interface_config=StandaloneRobotInterface(
+                      robot_interface_config=StandAloneRobotInterface(
                           [
                               'torso_lift_joint',
                               'head_pan_joint',

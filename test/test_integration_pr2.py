@@ -22,7 +22,7 @@ from giskardpy.configs.behavior_tree_config import StandAloneConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.configs.world_config import RobotWithOmnidrive
+from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
@@ -136,7 +136,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.odom_root = 'odom_combined'
         drive_joint_name = 'brumbrum'
         if giskard is None:
-            giskard = Giskard(world_config=RobotWithOmnidrive(drive_joint_name=drive_joint_name),
+            giskard = Giskard(world_config=WorldWithOmniDriveRobot(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneConfig(),

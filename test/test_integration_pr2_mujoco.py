@@ -14,7 +14,7 @@ from giskardpy.configs.behavior_tree_config import OpenLoopConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.pr2 import PR2CollisionAvoidance, PR2JointTrajServerMujocoInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.world_config import RobotWithOmnidrive
+from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from utils_for_tests import JointGoalChecker
 
@@ -29,7 +29,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom_combined'
-        giskard = Giskard(world_config=RobotWithOmnidrive(),
+        giskard = Giskard(world_config=WorldWithOmniDriveRobot(),
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2JointTrajServerMujocoInterface(),
                           behavior_tree_config=OpenLoopConfig(),

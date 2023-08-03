@@ -193,50 +193,6 @@ class PR2CollisionAvoidance(CollisionAvoidanceConfig):
                                                     soft_threshold=0.2,
                                                     hard_threshold=0.1)
 
-# class PR2_MujocoRealTime(PR2WorldSetup):
-#     def configure_execution(self):
-#         self.execution.set_control_mode(ControlModes.close_loop)
-#
-#     def configure_world(self):
-#         super().configure_world()
-#         self.world.set_default_color(1, 1, 1, 0.7)
-#
-#     def configure_behavior_tree(self):
-#         self.behavior_tree.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False,
-#                                                               add_to_control_loop=False)
-#         self.behavior_tree.add_debug_marker_publisher()
-#         self.behavior_tree.add_qp_data_publisher(publish_debug=True, add_to_base=False)
-#
-#     def configure_robot_interface(self):
-#         self.robot_interface.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
-#                                                            tf_parent_frame=self.map_name,
-#                                                            tf_child_frame=self.odom_link_name)
-#         self.robot_interface.sync_joint_state_topic('pr2/joint_states')
-#         self.robot_interface.sync_odometry_topic('/pr2/base_footprint', self.drive_joint_name)
-#
-#         self.robot_interface.add_joint_velocity_controller(namespaces=[
-#             'pr2/torso_lift_velocity_controller',
-#             'pr2/r_upper_arm_roll_velocity_controller',
-#             'pr2/r_shoulder_pan_velocity_controller',
-#             'pr2/r_shoulder_lift_velocity_controller',
-#             'pr2/r_forearm_roll_velocity_controller',
-#             'pr2/r_elbow_flex_velocity_controller',
-#             'pr2/r_wrist_flex_velocity_controller',
-#             'pr2/r_wrist_roll_velocity_controller',
-#             'pr2/l_upper_arm_roll_velocity_controller',
-#             'pr2/l_shoulder_pan_velocity_controller',
-#             'pr2/l_shoulder_lift_velocity_controller',
-#             'pr2/l_forearm_roll_velocity_controller',
-#             'pr2/l_elbow_flex_velocity_controller',
-#             'pr2/l_wrist_flex_velocity_controller',
-#             'pr2/l_wrist_roll_velocity_controller',
-#             'pr2/head_pan_velocity_controller',
-#             'pr2/head_tilt_velocity_controller',
-#         ])
-#
-#         self.robot_interface.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
-#                                                    joint_name=self.drive_joint_name)
-#
 #
 # class PR2_IAI(PR2WorldSetup):
 #     def configure_execution(self):

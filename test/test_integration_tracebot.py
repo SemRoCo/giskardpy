@@ -1,13 +1,11 @@
 import giskardpy.utils.tfwrapper as tf
-import numpy as np
 import pytest
-import rospy
-from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
-from std_srvs.srv import Trigger
-from tf.transformations import quaternion_about_axis
+from geometry_msgs.msg import PoseStamped
 
-from giskardpy.configs.tiago import TiagoMujoco
-from giskardpy.configs.tracy import TracyStandAlone
+from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.tracy import TracyStandAloneRobotInterface, TracyWorldConfig, TracyCollisionAvoidance
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
@@ -39,8 +37,12 @@ class TracebotTestWrapper(GiskardTestWrapper):
 
     def __init__(self):
         tf.init()
-        # self.mujoco_reset = rospy.ServiceProxy('tracebot/reset', Trigger)
-        super().__init__(TracyStandAlone)
+        giskard = Giskard(world_config=TracyWorldConfig(),
+                          collision_avoidance_config=TracyCollisionAvoidance(),
+                          robot_interface_config=TracyStandAloneRobotInterface(),
+                          behavior_tree_config=StandAloneConfig(),
+                          qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
 
     def reset(self):
         # self.mujoco_reset()

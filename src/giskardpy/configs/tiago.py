@@ -2,7 +2,6 @@ from typing import Optional
 
 import numpy as np
 
-from giskardpy.configs.data_types import SupportedQPSolver, TfPublishingModes
 from giskardpy.configs.giskard import Giskard, ControlModes
 from giskardpy.my_types import Derivatives
 

@@ -18,7 +18,8 @@ from giskardpy.utils import logging
 
 class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
 
-    def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+    def __init__(self,
+                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
         self._create_collision_checker(collision_checker)
 
     def set_defaults(self):
@@ -177,3 +178,13 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
         for joint_name in joint_names:
             world_joint_name = self.world.search_for_joint_name(joint_name, group_name)
             self.collision_scene.add_fixed_joint(world_joint_name)
+
+
+class LoadSelfCollisionMatrixConfig(CollisionAvoidanceConfig):
+    def __init__(self, path_to_self_collision_matrix: str,
+                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker)
+        self._path_to_self_collision_matrix = path_to_self_collision_matrix
+
+    def setup(self):
+        self.load_self_collision_matrix(self._path_to_self_collision_matrix)

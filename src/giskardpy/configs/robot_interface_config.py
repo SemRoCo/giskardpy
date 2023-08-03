@@ -85,7 +85,7 @@ class RobotInterfaceConfig(GodMapWorshipper, ABC):
         self.tree_manager.add_joint_velocity_group_controllers(namespace)
 
 
-class StandaloneRobotInterface(RobotInterfaceConfig):
+class StandAloneRobotInterface(RobotInterfaceConfig):
     joint_names: List[str]
 
     def __init__(self, joint_names: List[str]):

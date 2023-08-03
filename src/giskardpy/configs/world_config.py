@@ -200,7 +200,17 @@ class WorldConfig(GodMapWorshipper, ABC):
         self.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
 
 
-class RobotWithOmnidrive(WorldConfig):
+class WorldWithFixedRobot(WorldConfig):
+    def __init__(self, joint_limits: Dict[Derivatives, float] = None):
+        super().__init__()
+        self._joint_limits = joint_limits
+
+    def setup(self):
+        self.world_config.set_default_limits(self._joint_limits)
+        self.world_config.add_robot_from_parameter_server()
+
+
+class WorldWithOmniDriveRobot(WorldConfig):
     map_name: str
     localization_joint_name: str
     odom_link_name: str

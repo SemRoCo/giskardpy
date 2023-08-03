@@ -10,7 +10,11 @@ from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.configs.hsr import HSR_StandAlone
+from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.hsr import HSRCollisionAvoidance, WorldWithHSRConfig, HSRStandaloneInterface
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import Derivatives
 from giskardpy.python_interface import GiskardWrapper
@@ -30,16 +34,20 @@ class HSRTestWrapper(GiskardTestWrapper):
     }
     better_pose = default_pose
 
-    def __init__(self, config=None):
+    def __init__(self, giskard=None):
         self.tip = 'hand_gripper_tool_frame'
         self.robot_name = 'hsr'
-        if config is None:
-            config = HSR_StandAlone
+        if giskard is None:
+            giskard = Giskard(world_config=WorldWithHSRConfig(),
+                              collision_avoidance_config=HSRCollisionAvoidance(),
+                              robot_interface_config=HSRStandaloneInterface(),
+                              behavior_tree_config=StandAloneConfig(),
+                              qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom'
-        super().__init__(config)
         self.robot = self.world.groups[self.robot_name]
 
     def move_base(self, goal_pose):

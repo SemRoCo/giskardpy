@@ -34,7 +34,9 @@ class WorldConfig(ABC):
 
     @abc.abstractmethod
     def setup(self):
-        ...
+        """
+        Implement this method to configure the initial world using it's self. methods.
+        """
 
     @property
     def robot_group_name(self) -> str:
@@ -53,6 +55,9 @@ class WorldConfig(ABC):
                                            Derivatives.jerk: jerk_weight})
 
     def set_weight(self, weight_map: derivative_map, joint_name: str, group_name: Optional[str] = None):
+        """
+        Set weights for joints that are used by the qp controller. Don't change this unless you know what you are doing.
+        """
         joint_name = self.world.search_for_joint_name(joint_name, group_name)
         joint = self.world.joints[joint_name]
         if not isinstance(joint, OneDofJoint):
@@ -65,6 +70,12 @@ class WorldConfig(ABC):
         return self.world.groups[group_name].root_link_name
 
     def set_joint_limits(self, limit_map: derivative_map, joint_name: my_string, group_name: Optional[str] = None):
+        """
+        Set the joint limits for individual joints
+        :param limit_map: maps Derivatives to values, e.g. {Derivatives.velocity: 1,
+                                                            Derivatives.acceleration: np.inf,
+                                                            Derivatives.jerk: 30}
+        """
         joint_name = self.world.search_for_joint_name(joint_name, group_name)
         joint = self.world.joints[joint_name]
         if not isinstance(joint, OneDofJoint):
@@ -83,12 +94,12 @@ class WorldConfig(ABC):
         """
         self.world.default_link_color = ColorRGBA(r, g, b, a)
 
-    def set_default_limits(self, new_limits: Dict[Derivatives, float]):
+    def set_default_limits(self, new_limits: derivative_map):
         """
         The default values will be set automatically, even if this function is not called.
-        velocity_limit: in m/s or rad/s
-        acceleration_limit: in m/s**2 or rad/s**2
-        jerk_limit: in m/s**3 or rad/s**3
+        :param new_limits: e.g. {Derivatives.velocity: 1,
+                                 Derivatives.acceleration: np.inf,
+                                 Derivatives.jerk: 30}
         """
         self.world.update_default_limits(new_limits)
 
@@ -119,7 +130,7 @@ class WorldConfig(ABC):
     def add_fixed_joint(self, parent_link: my_string, child_link: my_string,
                         homogenous_transform: Optional[NDArray] = None):
         """
-        Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
+        Add a fixed joint to Giskard's world. Can be used to e.g. connect a non-mobile robot to the world frame.
         :param parent_link:
         :param child_link:
         :param homogenous_transform: a 4x4 transformation matrix.
@@ -158,7 +169,8 @@ class WorldConfig(ABC):
 
     def add_6dof_joint(self, parent_link: my_string, child_link: my_string, joint_name: my_string):
         """
-        Add a fixed joint to Giskard's world. Can be used to connect a non-mobile robot to the world frame.
+        Add a 6dof joint to Giskard's world. Generally used if you want Giskard to keep track of a tf transform,
+        e.g. for localization.
         :param parent_link:
         :param child_link:
         """
@@ -169,6 +181,9 @@ class WorldConfig(ABC):
         self.world._add_joint(joint)
 
     def add_empty_link(self, link_name: my_string):
+        """
+        If you need a virtual link during your world building.
+        """
         link = Link(link_name)
         self.world._add_link(link)
 

@@ -40,7 +40,7 @@ class CollisionAvoidanceConfig(abc.ABC):
     @abc.abstractmethod
     def setup(self):
         """
-        Implement this method to configure the behavior tree using it's self. methods.
+        Implement this method to configure the collision avoidance using it's self. methods.
         """
 
     def _sanity_check(self):
@@ -171,8 +171,7 @@ class CollisionAvoidanceConfig(abc.ABC):
 
     def load_self_collision_matrix(self, path_to_srdf: str, group_name: Optional[str] = None):
         """
-        Giskard only has a limited ability to compute a self collision matrix. With this function you can load one
-        from Moveit.
+        Load a self collision matrix. It can be created with roslaunch giskardpy collision_matrix_tool.launch.
         :param path_to_srdf: path to the srdf, can handle ros package paths
         :param group_name: name of the robot for which it will be applied, only needs to be set if there are multiple robots.
         """

@@ -20,7 +20,9 @@ class RobotInterfaceConfig(ABC):
 
     @abstractmethod
     def setup(self):
-        ...
+        """
+        Implement this method to configure how Giskard can talk to the robot using it's self. methods.
+        """
 
     @property
     def world(self) -> WorldTree:
@@ -35,17 +37,23 @@ class RobotInterfaceConfig(ABC):
         return self.god_map.get_data(identifier.control_mode)
 
     def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
+        """
+        Tell Giskard to sync an odometry joint added during by the world config.
+        """
         joint_name = self.world.search_for_joint_name(joint_name)
         self.tree_manager.sync_odometry_topic(odometry_topic, joint_name)
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: str, tf_parent_frame: str, tf_child_frame: str):
         """
-        Tell Giskard to keep track of tf frames, e.g., for robot localization.
+        Tell Giskard to sync a 6dof joint with a tf frame.
         """
         joint_name = self.world.search_for_joint_name(joint_name)
         self.tree_manager.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
 
     def sync_joint_state_topic(self, topic_name: str, group_name: Optional[str] = None):
+        """
+        Tell Giskard to sync the world state with a joint state topic
+        """
         if group_name is None:
             group_name = self.world.robot_name
         self.tree_manager.sync_joint_state_topic(group_name=group_name, topic_name=topic_name)
@@ -55,8 +63,8 @@ class RobotInterfaceConfig(ABC):
                               joint_name: my_string,
                               track_only_velocity: bool = False):
         """
-        Used if the robot's base can be controlled with a Twist topic.
-        :param cmd_vel_topic:
+        Tell Giskard how it can control an odom joint of the robot.
+        :param cmd_vel_topic: a Twist topic
         :param track_only_velocity: The tracking mode. If true, any position error is not considered which makes
                                     the tracking smoother but less accurate.
         :param joint_name: name of the omni or diff drive joint. Doesn't need to be specified if there is only one.
@@ -66,8 +74,8 @@ class RobotInterfaceConfig(ABC):
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """
-        Tell Giskard which joints can be controlled. Only used in standalone mode.
-        :param joint_names:
+        Tell Giskard which joints can be controlled. Giskard can usually figure this out on its own.
+        Only used in standalone mode.
         :param group_name: Only needs to be specified, if there are more than two robots.
         """
         if self.control_mode != ControlModes.standalone:
@@ -95,9 +103,17 @@ class RobotInterfaceConfig(ABC):
                                                               fill_velocity_values=fill_velocity_values)
 
     def add_joint_velocity_controller(self, namespaces: List[str]):
+        """
+        For closed loop mode. Tell Giskard how it can send velocities to joints.
+        :param namespaces: A list of namespaces where Giskard can find the topics and rosparams.
+        """
         self.tree_manager.add_joint_velocity_controllers(namespaces)
 
     def add_joint_velocity_group_controller(self, namespace: str):
+        """
+        For closed loop mode. Tell Giskard how it can send velocities for a group of joints.
+        :param namespace: where Giskard can find the topic and rosparams.
+        """
         self.tree_manager.add_joint_velocity_group_controllers(namespace)
 
 

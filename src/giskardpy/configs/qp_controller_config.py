@@ -39,22 +39,30 @@ class QPControllerConfig:
                  qp_solver: Optional[SupportedQPSolver] = None,
                  prediction_horizon: int = 9,
                  sample_period: float = 0.05,
-                 max_trajectory_length: float = 30,
+                 max_trajectory_length: Optional[float] = 30,
                  retries_with_relaxed_constraints: int = 5,
                  added_slack: float = 100,
-                 weight_factor: float = 100,
-                 endless_mode: bool = False):
+                 weight_factor: float = 100):
+        """
+        :param qp_solver: if not set, Giskard will search for the fasted installed solver.
+        :param prediction_horizon: Giskard uses MPC and this is the length of the horizon. You usually don't need to change this.
+        :param sample_period: time (s) difference between commands in the MPC horizon.
+        :param max_trajectory_length: Giskard will stop planning/controlling the robot until this amount of s has passed.
+                                      This is disabled if set to None.
+        :param retries_with_relaxed_constraints: don't change, only for the pros.
+        :param added_slack: don't change, only for the pros.
+        :param weight_factor: don't change, only for the pros.
+        """
         self.__qp_solver = qp_solver
         if prediction_horizon < 7:
             raise ValueError('prediction horizon must be >= 7.')
-        self.prediction_horizon = prediction_horizon
         self.__prediction_horizon = prediction_horizon
         self.__sample_period = sample_period
         self.__max_trajectory_length = max_trajectory_length
         self.__retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.__added_slack = added_slack
         self.__weight_factor = weight_factor
-        self.__endless_mode = endless_mode
+        self.__endless_mode = self.__max_trajectory_length is None
         self.set_defaults()
 
     def set_defaults(self):

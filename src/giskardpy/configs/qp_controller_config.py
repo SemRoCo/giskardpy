@@ -66,3 +66,7 @@ class QPControllerConfig:
         self.weight_factor = self.__weight_factor
         self.endless_mode = self.__endless_mode
         self.max_trajectory_length = self.__max_trajectory_length
+
+    def set_qp_solver(self, new_solver: SupportedQPSolver):
+        self.__qp_solver = new_solver
+        self.qp_solver = new_solver

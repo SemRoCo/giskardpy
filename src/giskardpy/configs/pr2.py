@@ -233,5 +233,3 @@ class PR2JointTrajServerUnrealInterface(RobotInterfaceConfig):
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True,
                                    joint_name=self.drive_joint_name)
-
-# self.world.set_default_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)

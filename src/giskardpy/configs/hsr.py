@@ -32,9 +32,9 @@ class WorldWithHSRConfig(WorldConfig):
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                             joint_name=self.localization_joint_name)
         self.add_empty_link(self.odom_link_name)
-        self.world_config.add_robot_from_parameter_server()
-        root_link_name = self.world_config.get_root_link_of_group(self.robot_group_name)
-        self.world_config.add_omni_drive_joint(parent_link_name=self.odom_link_name,
+        self.add_robot_from_parameter_server()
+        root_link_name = self.get_root_link_of_group(self.robot_group_name)
+        self.add_omni_drive_joint(parent_link_name=self.odom_link_name,
                                                child_link_name=root_link_name,
                                                name=self.drive_joint_name,
                                                x_name=PrefixName('odom_x', self.robot_group_name),

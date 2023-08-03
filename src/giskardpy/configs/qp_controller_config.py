@@ -31,8 +31,8 @@ class QPControllerConfig:
     sample_period: float = 0.05
     max_derivative: Derivatives = Derivatives.jerk
     max_trajectory_length: float = 30
-    retries_with_relaxed_constraints: int = 5,
-    added_slack: float = 100,
+    retries_with_relaxed_constraints: int = 5
+    added_slack: float = 100
     weight_factor: float = 100
 
     def __init__(self,

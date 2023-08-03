@@ -4,16 +4,12 @@ from typing import Optional
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped, Pose
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
 from numpy import pi
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_from_matrix, quaternion_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-import giskardpy.utils.tfwrapper as tf
-from giskardpy.configs.hsr import HSR_StandAlone, HSR_MujocoRealtime
-from giskardpy.model.utils import make_world_body_box
-from giskardpy.my_types import Derivatives
-from giskardpy.python_interface import GiskardWrapper
+from giskardpy.configs.iai_robots.hsr import HSR_MujocoRealtime
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
 

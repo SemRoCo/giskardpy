@@ -5,7 +5,7 @@ from geometry_msgs.msg import PoseStamped, PointStamped
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, TracyCollisionAvoidance
+from giskardpy.configs.iai_robots.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, TracyCollisionAvoidance
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 

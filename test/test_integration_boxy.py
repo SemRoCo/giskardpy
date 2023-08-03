@@ -7,8 +7,8 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStam
 from tf.transformations import quaternion_from_matrix
 
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
-from giskardpy.configs.boxy import BoxyCollisionAvoidanceConfig, BoxyStandaloneInterfaceConfig
-from giskardpy.configs.donbot import WorldWithBoxyBaseConfig
+from giskardpy.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, BoxyStandaloneInterfaceConfig
+from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.utils.utils import launch_launchfile

@@ -20,20 +20,19 @@ from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
+from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.my_types import PrefixName
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.utils.utils import launch_launchfile, suppress_stdout, suppress_stderr
-from giskardpy.utils.math import compare_points, compare_orientations
+from giskardpy.utils.utils import launch_launchfile, suppress_stderr
+from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
-    JointGoalChecker, GiskardTestWrapper, pr2_urdf, rnd_joint_state
+    GiskardTestWrapper, pr2_urdf
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,

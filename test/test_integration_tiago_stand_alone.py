@@ -3,23 +3,18 @@ from typing import Optional
 
 import numpy as np
 import pytest
-import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vector3Stamped, QuaternionStamped
-from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult
-from giskardpy import identifier
 from giskardpy.configs.behavior_tree_config import StandAloneConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidance
+from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidance
 from giskardpy.configs.world_config import WorldWithDiffDriveRobot
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.model.joints import OneDofJoint
-from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.utils.utils import publish_pose, launch_launchfile
+from giskardpy.my_types import PrefixName
+from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper, RotationGoalChecker, TranslationGoalChecker
 
 

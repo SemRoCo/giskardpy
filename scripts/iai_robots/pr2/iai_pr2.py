@@ -3,9 +3,8 @@ import rospy
 
 from giskardpy.configs.behavior_tree_config import OpenLoopConfig
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.pr2 import PR2CollisionAvoidance, WorldWithPR2Config, PR2JointTrajServerIAIInterface
+from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, WorldWithPR2Config, PR2JointTrajServerIAIInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 
 
 class WorldWithPR2ConfigBlue(WorldWithPR2Config):

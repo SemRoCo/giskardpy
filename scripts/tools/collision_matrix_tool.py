@@ -24,6 +24,7 @@ from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
+from giskardpy.utils.utils import resolve_ros_iris
 
 reason_color_map = {
     DisableCollisionReason.Never: (163, 177, 233),  # blue
@@ -581,7 +582,7 @@ class Application(QMainWindow):
         self.urdf_progress.set_progress(100, f'Loaded {progress_str}')
 
     def set_tmp_srdf_path(self):
-        self.__srdf_path = self.collision_scene.get_path_to_self_collision_matrix(self.group_name)
+        self.__srdf_path = resolve_ros_iris('package://giskardpy/self_collision_matrices/')
 
     def disable_srdf_buttons(self):
         self.__disable_srdf_buttons(True)

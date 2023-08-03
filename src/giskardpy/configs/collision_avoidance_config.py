@@ -45,7 +45,8 @@ class CollisionAvoidanceConfig(abc.ABC):
     def _sanity_check(self):
         if self.collision_checker_id != CollisionCheckerLib.none \
                 and not self.collision_scene.has_self_collision_matrix():
-            raise SetupException('You have to load a collision matrix.')
+            raise SetupException('You have to load a collision matrix, use: \n'
+                                 'roslaunch giskardpy collision_matrix_tool.launch')
 
     def _create_collision_checker(self, collision_checker: CollisionCheckerLib):
         if collision_checker not in CollisionCheckerLib:

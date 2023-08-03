@@ -72,7 +72,6 @@ class Giskard(GodMapWorshipper):
         self.collision_avoidance_config._sanity_check()
         self.behavior_tree_config._create_behavior_tree()
         self.behavior_tree_config.setup()
-        # self.qp_controller_config.setup()
         self.robot_interface_config.setup()
         self._controlled_joints_sanity_check()
         self.world.notify_model_change()

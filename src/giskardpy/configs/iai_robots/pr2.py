@@ -4,6 +4,10 @@ from giskardpy.my_types import Derivatives
 
 
 class WorldWithPR2Config(WorldWithOmniDriveRobot):
+    def __init__(self, map_name: str = 'map', localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom_combined', drive_joint_name: str = 'brumbrum'):
+        super().__init__(map_name, localization_joint_name, odom_link_name, drive_joint_name)
+
     def setup(self):
         super().setup()
         self.set_joint_limits(limit_map={Derivatives.velocity: 3,

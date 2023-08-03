@@ -8,7 +8,7 @@ from tf.transformations import quaternion_about_axis, quaternion_matrix, rotatio
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult
-from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
@@ -66,7 +66,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         giskard = Giskard(world_config=WorldWithBoxyBaseConfig(),
                           collision_avoidance_config=DonbotCollisionAvoidanceConfig(),
                           robot_interface_config=DonbotStandaloneInterfaceConfig(),
-                          behavior_tree_config=StandAloneConfig(),
+                          behavior_tree_config=StandAloneBTConfig(),
                           qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 

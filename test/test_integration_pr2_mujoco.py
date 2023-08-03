@@ -10,7 +10,7 @@ from tf.transformations import quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, MoveGoal
-from giskardpy.configs.behavior_tree_config import OpenLoopConfig
+from giskardpy.configs.behavior_tree_config import OpenLoopBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2JointTrajServerMujocoInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig
@@ -32,7 +32,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         giskard = Giskard(world_config=WorldWithOmniDriveRobot(),
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2JointTrajServerMujocoInterface(),
-                          behavior_tree_config=OpenLoopConfig(),
+                          behavior_tree_config=OpenLoopBTConfig(),
                           qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 

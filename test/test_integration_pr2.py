@@ -18,7 +18,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy import identifier
-from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
@@ -138,7 +138,7 @@ class PR2TestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
-                              behavior_tree_config=StandAloneConfig(),
+                              behavior_tree_config=StandAloneBTConfig(),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = self.world.groups[self.robot_name]

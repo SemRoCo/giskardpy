@@ -4,9 +4,9 @@ from giskardpy.configs.robot_interface_config import StandAloneRobotInterfaceCon
 
 class BoxyCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def setup(self):
-        self.collision_avoidance_config.load_self_collision_matrix(
+        self.load_self_collision_matrix(
             'package://giskardpy/self_collision_matrices/iai/boxy_description.srdf')
-        self.collision_avoidance_config.overwrite_external_collision_avoidance('odom_z_joint',
+        self.overwrite_external_collision_avoidance('odom_z_joint',
                                                                                number_of_repeller=2,
                                                                                soft_threshold=0.2,
                                                                                hard_threshold=0.1)

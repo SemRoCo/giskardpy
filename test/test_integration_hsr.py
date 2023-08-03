@@ -7,9 +7,9 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vect
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidance, WorldWithHSRConfig, HSRStandaloneInterface
+from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
@@ -32,9 +32,9 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.robot_name = 'hsr'
         if giskard is None:
             giskard = Giskard(world_config=WorldWithHSRConfig(),
-                              collision_avoidance_config=HSRCollisionAvoidance(),
+                              collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneConfig(),
+                              behavior_tree_config=StandAloneBTConfig(),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'

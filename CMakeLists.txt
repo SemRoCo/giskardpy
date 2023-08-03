@@ -163,8 +163,17 @@ include_directories(
 catkin_install_python(PROGRAMS 
 	scripts/tools/clear_world.py
 	scripts/tools/collision_matrix_tool.py
-	scripts/iai_robots/pr2/pr2_stand_alone.py
-	scripts/iai_robots/pr2/pr2_mujoco_open_loop.py
+	scripts/iai_robots/boxy/boxy_standalone.py
+	scripts/iai_robots/donbot/donbot.py
+	scripts/iai_robots/donbot/donbot_standalone.py
+	scripts/iai_robots/hsr/hsr_standalone.py
+	scripts/iai_robots/hsr/iai_hsr.py
+	scripts/iai_robots/hsr/iai_hsr_real_time.py
+	scripts/iai_robots/pr2/iai_pr2.py
+	scripts/iai_robots/pr2/pr2_standalone.py
+	scripts/iai_robots/tiago/tiago_standalone.py
+	scripts/iai_robots/tracy/tracy.py
+	scripts/iai_robots/tracy/tracy_standalone.py
 	scripts/examples/giskard_pr2_standalone_example.py
 	scripts/tools/interactive_marker.py
 	scripts/tools/joystick_e_stop.py

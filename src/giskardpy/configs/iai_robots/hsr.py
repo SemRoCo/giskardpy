@@ -15,7 +15,7 @@ class WorldWithHSRConfig(WorldConfig):
     def __init__(self,
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
-                 odom_link_name: str = 'odom_combined',
+                 odom_link_name: str = 'odom',
                  drive_joint_name: str = 'brumbrum'):
         super().__init__()
         self.map_name = map_name
@@ -35,25 +35,25 @@ class WorldWithHSRConfig(WorldConfig):
         self.add_robot_from_parameter_server()
         root_link_name = self.get_root_link_of_group(self.robot_group_name)
         self.add_omni_drive_joint(parent_link_name=self.odom_link_name,
-                                               child_link_name=root_link_name,
-                                               name=self.drive_joint_name,
-                                               x_name=PrefixName('odom_x', self.robot_group_name),
-                                               y_name=PrefixName('odom_y', self.robot_group_name),
-                                               yaw_vel_name=PrefixName('odom_t', self.robot_group_name),
-                                               translation_limits={
-                                                   Derivatives.velocity: 0.2,
-                                                   Derivatives.acceleration: 1,
-                                                   Derivatives.jerk: 6,
-                                               },
-                                               rotation_limits={
-                                                   Derivatives.velocity: 0.2,
-                                                   Derivatives.acceleration: 1,
-                                                   Derivatives.jerk: 6
-                                               },
-                                               robot_group_name=self.robot_group_name)
+                                  child_link_name=root_link_name,
+                                  name=self.drive_joint_name,
+                                  x_name=PrefixName('odom_x', self.robot_group_name),
+                                  y_name=PrefixName('odom_y', self.robot_group_name),
+                                  yaw_vel_name=PrefixName('odom_t', self.robot_group_name),
+                                  translation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 6,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 6
+                                  },
+                                  robot_group_name=self.robot_group_name)
 
 
-class HSRCollisionAvoidance(CollisionAvoidanceConfig):
+class HSRCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def __init__(self, drive_joint_name: str = 'brumbrum'):
         super().__init__()
         self.drive_joint_name = drive_joint_name
@@ -97,7 +97,7 @@ class HSRVelocityInterface(RobotInterfaceConfig):
     def __init__(self,
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
-                 odom_link_name: str = 'odom_combined',
+                 odom_link_name: str = 'odom',
                  drive_joint_name: str = 'brumbrum'):
         self.map_name = map_name
         self.localization_joint_name = localization_joint_name
@@ -115,3 +115,40 @@ class HSRVelocityInterface(RobotInterfaceConfig):
 
         self.add_base_cmd_velocity(cmd_vel_topic='/hsrb/command_velocity',
                                    joint_name=self.drive_joint_name)
+
+
+class HSRJointTrajInterfaceConfig(RobotInterfaceConfig):
+    map_name: str
+    localization_joint_name: str
+    odom_link_name: str
+    drive_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom',
+                 drive_joint_name: str = 'brumbrum'):
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+        self.odom_link_name = odom_link_name
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                           tf_parent_frame=self.map_name,
+                                           tf_child_frame=self.odom_link_name)
+        self.sync_joint_state_topic('/hsrb/joint_states')
+        self.sync_odometry_topic('/hsrb/odom', self.drive_joint_name)
+
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/head_trajectory_controller',
+                                                state_topic='/hsrb/head_trajectory_controller/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/arm_trajectory_controller',
+                                                state_topic='/hsrb/arm_trajectory_controller/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/omni_base_controller',
+                                                state_topic='/hsrb/omni_base_controller/state',
+                                                fill_velocity_values=True)
+        # self.add_base_cmd_velocity(cmd_vel_topic='/hsrb/command_velocity',
+        #                            track_only_velocity=True,
+        #                            joint_name=self.drive_joint_name)

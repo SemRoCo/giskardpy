@@ -7,10 +7,10 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vect
 from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidance
+from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidanceConfig
 from giskardpy.configs.world_config import WorldWithDiffDriveRobot
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.my_types import PrefixName
@@ -97,9 +97,9 @@ class TiagoTestWrapper(GiskardTestWrapper):
     def __init__(self, giskard=None):
         if giskard is None:
             giskard = Giskard(world_config=WorldWithDiffDriveRobot(),
-                              collision_avoidance_config=TiagoCollisionAvoidance(),
+                              collision_avoidance_config=TiagoCollisionAvoidanceConfig(),
                               robot_interface_config=TiagoStandaloneInterface(),
-                              behavior_tree_config=StandAloneConfig(),
+                              behavior_tree_config=StandAloneBTConfig(),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 

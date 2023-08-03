@@ -226,7 +226,7 @@ class WorldWithOmniDriveRobot(WorldConfig):
     def __init__(self,
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
-                 odom_link_name: str = 'odom_combined',
+                 odom_link_name: str = 'odom',
                  drive_joint_name: str = 'brumbrum'):
         super().__init__()
         self.map_name = map_name
@@ -272,7 +272,7 @@ class WorldWithDiffDriveRobot(WorldConfig):
     def __init__(self,
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
-                 odom_link_name: str = 'odom_combined',
+                 odom_link_name: str = 'odom',
                  drive_joint_name: str = 'brumbrum'):
         super().__init__()
         self.map_name = map_name

@@ -2,9 +2,7 @@
 
     <include file="$(find iai_donbot_description)/launch/upload.launch"/>
 
-    <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-        <param name="config" value="Donbot_Standalone"/>
-    </node>
+    <node pkg="giskardpy" type="donbot_standalone.py" name="giskard" output="screen"/>
 
     <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
         <rosparam param="enable_self_collision">False</rosparam>
@@ -14,5 +12,7 @@
             - [iai_donbot/odom, iai_donbot/base_footprint]
         </rosparam>
     </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz" />
 
 </launch>

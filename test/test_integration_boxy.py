@@ -6,7 +6,7 @@ import pytest
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix
 
-from giskardpy.configs.behavior_tree_config import StandAloneConfig
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, BoxyStandaloneInterfaceConfig
 from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
 from giskardpy.configs.giskard import Giskard
@@ -69,7 +69,7 @@ class BoxyTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithBoxyBaseConfig(),
                               collision_avoidance_config=BoxyCollisionAvoidanceConfig(),
                               robot_interface_config=BoxyStandaloneInterfaceConfig(),
-                              behavior_tree_config=StandAloneConfig(),
+                              behavior_tree_config=StandAloneBTConfig(),
                               qp_controller_config=QPControllerConfig())
         self.camera_tip = 'camera_link'
         self.r_tip = 'right_gripper_tool_frame'

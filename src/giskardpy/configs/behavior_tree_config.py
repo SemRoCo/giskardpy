@@ -80,7 +80,7 @@ class BehaviorTreeConfig(ABC):
         self.tree_manager.add_tf_publisher(include_prefix=include_prefix, tf_topic=tf_topic, mode=mode)
 
 
-class StandAloneConfig(BehaviorTreeConfig):
+class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self):
         super().__init__(ControlModes.standalone)
 
@@ -89,7 +89,7 @@ class StandAloneConfig(BehaviorTreeConfig):
         self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
 
 
-class OpenLoopConfig(BehaviorTreeConfig):
+class OpenLoopBTConfig(BehaviorTreeConfig):
     def __init__(self):
         super().__init__(ControlModes.open_loop)
 
@@ -97,7 +97,7 @@ class OpenLoopConfig(BehaviorTreeConfig):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True, add_to_control_loop=False)
 
 
-class ClosedLoopConfig(BehaviorTreeConfig):
+class ClosedLoopBTConfig(BehaviorTreeConfig):
     def __init__(self):
         super().__init__(ControlModes.close_loop)
 

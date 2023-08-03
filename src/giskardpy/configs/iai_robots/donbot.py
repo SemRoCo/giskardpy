@@ -66,22 +66,12 @@ class DonbotStandaloneInterfaceConfig(StandAloneRobotInterfaceConfig):
             'odom_z_joint',
         ])
 
-#
-# class Donbot_IAI(Donbot_Base):
-#
-#     def configure_execution(self):
-#         self.qp_controller_config.set_control_mode(ControlModes.open_loop)
-#
-#     def configure_behavior_tree(self):
-#         self.behavior_tree_config.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True,
-#                                                                      add_to_control_loop=False)
-#
-#     def configure_robot_interface(self):
-#         self.robot_interface_config.add_follow_joint_trajectory_server(
-#             namespace='/whole_body_controller/base/follow_joint_trajectory',
-#             state_topic='/whole_body_controller/base/state',
-#             fill_velocity_values=True)
-#         self.robot_interface_config.add_follow_joint_trajectory_server(
-#             namespace='/scaled_pos_joint_traj_controller/follow_joint_trajectory',
-#             state_topic='/scaled_pos_joint_traj_controller/state',
-#             fill_velocity_values=True)
+
+class DonbotJointTrajInterfaceConfig(RobotInterfaceConfig):
+    def setup(self):
+        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
+                                                state_topic='/whole_body_controller/base/state',
+                                                fill_velocity_values=True)
+        self.add_follow_joint_trajectory_server(namespace='/scaled_pos_joint_traj_controller/follow_joint_trajectory',
+                                                state_topic='/scaled_pos_joint_traj_controller/state',
+                                                fill_velocity_values=True)

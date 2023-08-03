@@ -2,7 +2,7 @@ from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfi
 from giskardpy.configs.robot_interface_config import StandAloneRobotInterfaceConfig, RobotInterfaceConfig
 
 
-class TiagoCollisionAvoidance(CollisionAvoidanceConfig):
+class TiagoCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def __init__(self, drive_joint_name: str = 'brumbrum'):
         super().__init__()
         self.drive_joint_name = drive_joint_name
@@ -44,7 +44,7 @@ class TiagoJointTrajServerIAIInterface(RobotInterfaceConfig):
     def __init__(self,
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
-                 odom_link_name: str = 'odom_combined',
+                 odom_link_name: str = 'odom',
                  drive_joint_name: str = 'brumbrum'):
         self.map_name = map_name
         self.localization_joint_name = localization_joint_name

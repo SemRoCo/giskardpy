@@ -11,7 +11,6 @@ from std_msgs.msg import ColorRGBA
 
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import robot_name_from_urdf_string
@@ -19,12 +18,16 @@ from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_map
 
 
-class WorldConfig(GodMapWorshipper, ABC):
+class WorldConfig(ABC):
     god_map = GodMap()
 
     def __init__(self):
         self.god_map.set_data(identifier.world, WorldTree())
         self.set_default_weights()
+
+    @property
+    def world(self) -> WorldTree:
+        return self.god_map.get_data(identifier.world)
 
     def set_defaults(self):
         pass
@@ -210,8 +213,8 @@ class WorldWithFixedRobot(WorldConfig):
         self._joint_limits = joint_limits
 
     def setup(self):
-        self.world_config.set_default_limits(self._joint_limits)
-        self.world_config.add_robot_from_parameter_server()
+        self.set_default_limits(self._joint_limits)
+        self.add_robot_from_parameter_server()
 
 
 class WorldWithOmniDriveRobot(WorldConfig):
@@ -278,16 +281,16 @@ class WorldWithDiffDriveRobot(WorldConfig):
         self.drive_joint_name = drive_joint_name
 
     def setup(self):
-        self.world_config.set_default_limits({Derivatives.velocity: 1,
+        self.set_default_limits({Derivatives.velocity: 1,
                                               Derivatives.acceleration: np.inf,
                                               Derivatives.jerk: 30})
-        self.world_config.add_empty_link(self.map_name)
-        self.world_config.add_empty_link(self.odom_link_name)
-        self.world_config.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
+        self.add_empty_link(self.map_name)
+        self.add_empty_link(self.odom_link_name)
+        self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                                          joint_name=self.localization_joint_name)
-        self.world_config.add_robot_from_parameter_server()
-        root_link_name = self.world_config.get_root_link_of_group(self.robot_group_name)
-        self.world_config.add_diff_drive_joint(name=self.drive_joint_name,
+        self.add_robot_from_parameter_server()
+        root_link_name = self.get_root_link_of_group(self.robot_group_name)
+        self.add_diff_drive_joint(name=self.drive_joint_name,
                                                parent_link_name=self.odom_link_name,
                                                child_link_name=root_link_name,
                                                translation_limits={

@@ -1,21 +1,25 @@
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Optional
 
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
-from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, ControlModes
+from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, ControlModes, TreeManager
 
 
-class BehaviorTreeConfig(GodMapWorshipper, ABC):
+class BehaviorTreeConfig(ABC):
+    god_map = GodMap()
+
     def __init__(self, mode: ControlModes):
         self._control_mode = mode
 
     @abstractmethod
     def setup(self):
         ...
+
+    @property
+    def tree_manager(self) -> TreeManager:
+        return self.god_map.get_data(identifier.tree_manager)
 
     def _create_behavior_tree(self):
         if self._control_mode == ControlModes.open_loop:

@@ -16,7 +16,8 @@ from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
 
-class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
+class CollisionAvoidanceConfig(abc.ABC):
+    god_map = GodMap()
 
     def __init__(self,
                  collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
@@ -24,6 +25,18 @@ class CollisionAvoidanceConfig(GodMapWorshipper, abc.ABC):
 
     def set_defaults(self):
         pass
+
+    @property
+    def collision_scene(self) -> CollisionWorldSynchronizer:
+        return self.god_map.get_data(identifier.collision_scene)
+
+    @property
+    def collision_checker_id(self) -> CollisionCheckerLib:
+        return self.collision_scene.collision_checker_id
+
+    @property
+    def world(self) -> WorldTree:
+        return self.god_map.get_data(identifier.world)
 
     @abc.abstractmethod
     def setup(self):

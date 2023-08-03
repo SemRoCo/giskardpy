@@ -3,13 +3,18 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
+from giskardpy import identifier
 from giskardpy.configs.behavior_tree_config import ControlModes
 from giskardpy.exceptions import GiskardException
+from giskardpy.god_map import GodMap
 from giskardpy.god_map_user import GodMapWorshipper
+from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string
+from giskardpy.tree.garden import TreeManager
 
 
-class RobotInterfaceConfig(GodMapWorshipper, ABC):
+class RobotInterfaceConfig(ABC):
+    god_map = GodMap()
 
     def set_defaults(self):
         pass
@@ -17,6 +22,18 @@ class RobotInterfaceConfig(GodMapWorshipper, ABC):
     @abstractmethod
     def setup(self):
         ...
+
+    @property
+    def world(self) -> WorldTree:
+        return self.god_map.get_data(identifier.world)
+
+    @property
+    def tree_manager(self) -> TreeManager:
+        return self.god_map.get_data(identifier.tree_manager)
+
+    @property
+    def control_mode(self) -> ControlModes:
+        return self.god_map.get_data(identifier.control_mode)
 
     def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
         joint_name = self.world.search_for_joint_name(joint_name)

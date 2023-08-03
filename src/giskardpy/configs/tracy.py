@@ -1,7 +1,7 @@
 import numpy as np
 
 from giskardpy.configs.collision_avoidance_config import LoadSelfCollisionMatrixConfig
-from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterface
+from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
 from giskardpy.configs.world_config import WorldWithFixedRobot
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.my_types import Derivatives
@@ -31,7 +31,7 @@ class TracyJointTrajServerMujocoInterface(RobotInterfaceConfig):
             state_topic='/right_arm/scaled_pos_joint_traj_controller_right/state')
 
 
-class TracyStandAloneRobotInterface(StandAloneRobotInterface):
+class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
     def __init__(self):
         super().__init__([
             'left_shoulder_pan_joint',

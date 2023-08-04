@@ -395,6 +395,7 @@ class Goal(GodMapWorshipper, ABC):
                                 weight: w.symbol_expr_float,
                                 task_expression: w.symbol_expr,
                                 name: Optional[str] = None,
+                                goal_reached_threshold: Optional[float] = None,
                                 lower_slack_limit: Optional[w.symbol_expr_float] = None,
                                 upper_slack_limit: Optional[w.symbol_expr_float] = None,
                                 control_horizon: Optional[int] = None):
@@ -425,6 +426,7 @@ class Goal(GodMapWorshipper, ABC):
                                                               derivative_goal=equality_bound,
                                                               velocity_limit=reference_velocity,
                                                               quadratic_weight=weight,
+                                                              goal_reached_threshold=goal_reached_threshold,
                                                               lower_slack_limit=lower_slack_limit,
                                                               upper_slack_limit=upper_slack_limit,
                                                               control_horizon=control_horizon)

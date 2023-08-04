@@ -119,6 +119,7 @@ class JointPositionContinuous(Goal):
             self.add_equality_constraint(reference_velocity=max_velocity,
                                          equality_bound=error,
                                          weight=self.weight,
+                                         goal_reached_threshold=0.01,
                                          task_expression=current_joint)
 
     def __str__(self):
@@ -176,6 +177,7 @@ class JointPositionPrismatic(Goal):
             self.add_equality_constraint(reference_velocity=max_velocity,
                                          equality_bound=error,
                                          weight=self.weight,
+                                         goal_reached_threshold=0.01,
                                          task_expression=current_joint)
 
     def __str__(self):
@@ -285,6 +287,7 @@ class JointPositionRevolute(Goal):
             self.add_equality_constraint(reference_velocity=max_velocity,
                                          equality_bound=error,
                                          weight=weight,
+                                         goal_reached_threshold=0.01,
                                          task_expression=current_joint)
 
     def __str__(self):

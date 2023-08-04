@@ -695,7 +695,7 @@ class OpenLoop(StandAlone):
         if self.god_map.get_data(identifier.TFPublisher_enabled):
             sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(SyncMujocoSim(name='update from mujoco sim', only_creation=True))
-        # sync.add_child(running_is_success(SyncBallVel)('init ball vel'))
+        sync.add_child(running_is_success(SyncBallVel)('init ball vel'))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync

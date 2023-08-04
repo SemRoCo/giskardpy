@@ -15,6 +15,7 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
 from giskardpy.god_map import GodMap
+from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
@@ -945,7 +946,7 @@ def detect_solvers():
 detect_solvers()
 
 
-class QPProblemBuilder:
+class QPProblemBuilder(GodMapWorshipper):
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
@@ -1132,14 +1133,6 @@ class QPProblemBuilder:
                 self.god_map.get_data(identifier.tmp_folder),
                 self.god_map.get_data(identifier.time),
                 folder_name)
-
-    @property
-    def god_map(self) -> GodMap:
-        return GodMap()
-
-    @property
-    def world(self) -> WorldTree:
-        return self.god_map.get_data(identifier.world)
 
     def _print_pandas_array(self, array):
         import pandas as pd

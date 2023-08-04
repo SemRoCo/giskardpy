@@ -83,6 +83,7 @@ class Giskard(GodMapWorshipper):
         self.robot_interface_config.setup()
         self._controlled_joints_sanity_check()
         self.world.notify_model_change()
+        self.collision_scene.sync()
 
     def _controlled_joints_sanity_check(self):
         world = self.god_map.get_data(identifier.world)

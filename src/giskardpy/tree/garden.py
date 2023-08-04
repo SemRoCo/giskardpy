@@ -72,6 +72,7 @@ from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
 from giskardpy.tree.behaviors.sync_mujoco_sim_state import SyncMujocoSim
+from giskardpy.tree.behaviors.sync_ball_velocity import SyncBallVel
 
 T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])
 
@@ -693,6 +694,8 @@ class OpenLoop(StandAlone):
             sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
         if self.god_map.get_data(identifier.TFPublisher_enabled):
             sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        sync.add_child(SyncMujocoSim(name='update from mujoco sim', only_creation=True))
+        # sync.add_child(running_is_success(SyncBallVel)('init ball vel'))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
@@ -791,6 +794,7 @@ class ClosedLoop(OpenLoop):
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames',
                                                                       **self.god_map.unsafe_get_data(
                                                                           identifier.SyncTfFrames)))
+        planning_4.add_child(SyncBallVel('sync ball vel'))
         for odometry_kwargs in hardware_config.odometry_node_kwargs:
             planning_4.add_child(SyncOdometry(**odometry_kwargs))
         planning_4.add_child(success_is_running(NotifyStateChange)())
@@ -823,8 +827,8 @@ class ClosedLoop(OpenLoop):
             planning_4.add_child(SendTrajectoryToCmdVelClosedLoop(**drive_interface))
         # planning_4.add_child(KinSimPlugin('kin sim'))
         # planning_4.add_child(LogTrajPlugin('log'))
-        # if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-        #     planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
+        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
         if self.god_map.get_data(identifier.PlotDebugTF_enabled):
             planning_4.add_child(DebugMarkerPublisher('debug tf publisher'))
         if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
@@ -833,7 +837,7 @@ class ClosedLoop(OpenLoop):
                                                              identifier.PublishDebugExpressions)))
         # planning_4.add_child(WiggleCancel('wiggle'))
         # planning_4.add_child(LoopDetector('loop detector'))
-        planning_4.add_child(GoalReached('goal reached', real_time=True))
+        # planning_4.add_child(GoalReached('goal reached', real_time=True))
         # planning_4.add_child(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)

@@ -108,8 +108,10 @@ class KeepObjectAbovePlane(Goal):
                                        task_expression=distance2,
                                        weight=self.weight,
                                        name='distance2')
-        self.add_debug_expr('distancexy', distance2)
-        self.add_debug_expr('distance_height', distance)
+        # self.add_debug_expr('distancexy', distance2)
+        # self.add_debug_expr('distance_height', distance)
+
+        self.add_debug_expr('cupPosition', root_P_object)
 
     def __str__(self):
         s = super().__str__()

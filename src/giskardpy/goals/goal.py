@@ -181,7 +181,7 @@ class Goal(ABC):
     def joint_velocity_symbols(self) -> List[Union[w.Symbol, float]]:
         velocity_symbols = []
         for joint in self.world.controlled_joints:
-            velocity_symbols.extend(self.world._joints[joint].free_variable_list)
+            velocity_symbols.extend(self.world.joints[joint].free_variables)
         return [x.get_symbol(Derivatives.velocity) for x in velocity_symbols]
 
     @property

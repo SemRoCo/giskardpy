@@ -128,3 +128,5 @@ hardware_config = giskard + ['hardware_config']
 
 # rnd stuff
 timer_collector = ['timer_collector']
+
+ball_velocity = ['ball_velocity']

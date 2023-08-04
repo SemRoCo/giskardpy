@@ -26,7 +26,7 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
             time = self.god_map.get_data(identifier.time) - 1
             last_mjs = None
             if time >= 1:
-                last_mjs = self.trajectory.get_exact(time-1)
+                last_mjs = self.trajectory.get_exact(round((time-1)/self.sample_period))
             js = JointStates()
             for name, value in debug_data.items():
                 if last_mjs is not None:

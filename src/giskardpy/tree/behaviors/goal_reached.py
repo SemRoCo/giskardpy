@@ -33,7 +33,7 @@ class GoalReached(GiskardBehavior):
         planning_time = self.get_god_map().get_data(identifier.time)
         if planning_time - self.above_threshold_time >= self.window_size:
             velocities = np.array(list(self.get_god_map().get_data(identifier.qp_solver_solution).xdot_velocity))
-            below_threshold = np.all(np.abs(velocities) < self.thresholds)
+            below_threshold = np.all(np.abs(velocities) < self.thresholds * 1.5)
             if below_threshold:
                 run_time = self.get_runtime()
                 logging.loginfo('Velocities went below threshold.')

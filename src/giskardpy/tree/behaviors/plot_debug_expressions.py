@@ -17,10 +17,9 @@ plot_lock = Lock()
 
 class PlotDebugExpressions(PlotTrajectory):
     @profile
-    def __init__(self, name, enabled, wait=True, **kwargs):
+    def __init__(self, name, wait=True, normalize_position: bool = False, **kwargs):
         super().__init__(name=name,
-                         enabled=enabled,
-                         normalize_position=False,
+                         normalize_position=normalize_position,
                          wait=wait,
                          **kwargs)
         # self.path_to_data_folder += 'debug_expressions/'
@@ -32,11 +31,17 @@ class PlotDebugExpressions(PlotTrajectory):
             new_js = JointStates()
             for name, js_ in js.items():
                 if isinstance(js_.position, np.ndarray):
-                    for x in range(js_.position.shape[0]):
-                        for y in range(js_.position.shape[1]):
-                            tmp_name = f'{name}|{x}_{y}'
-                            new_js[tmp_name].position = js_.position[x, y]
-                            new_js[tmp_name].velocity = js_.velocity[x, y]
+                    if len(js_.position.shape) == 1:
+                        for x in range(js_.position.shape[0]):
+                            tmp_name = f'{name}|{x}'
+                            new_js[tmp_name].position = js_.position[x]
+                            new_js[tmp_name].velocity = js_.velocity[x]
+                    else:
+                        for x in range(js_.position.shape[0]):
+                            for y in range(js_.position.shape[1]):
+                                tmp_name = f'{name}|{x}_{y}'
+                                new_js[tmp_name].position = js_.position[x, y]
+                                new_js[tmp_name].velocity = js_.velocity[x, y]
                 else:
                     new_js[name] = js_
                 new_traj.set(time, new_js)
@@ -44,9 +49,9 @@ class PlotDebugExpressions(PlotTrajectory):
         return new_traj
 
     def plot(self):
-        trajectory = self.get_god_map().get_data(identifier.debug_trajectory)
+        trajectory = self.god_map.get_data(identifier.debug_trajectory)
         if trajectory and len(trajectory.items()) > 0:
-            sample_period = self.get_god_map().get_data(identifier.sample_period)
+            sample_period = self.god_map.get_data(identifier.sample_period)
             traj = self.split_traj(trajectory)
             try:
                 traj.plot_trajectory(path_to_data_folder=self.path_to_data_folder,

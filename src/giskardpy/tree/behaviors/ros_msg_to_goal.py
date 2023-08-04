@@ -10,7 +10,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveCmd, CollisionEntry
-from giskardpy.configs.data_types import CollisionCheckerLib
+from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
@@ -27,7 +27,7 @@ class RosMsgToGoal(GetGoal):
     @profile
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
-        goal_package_paths = self.god_map.get_data(identifier.giskard).goal_package_paths
+        goal_package_paths = self.god_map.get_data(identifier.goal_package_paths)
         self.allowed_constraint_types = {}
         for path in goal_package_paths:
             self.allowed_constraint_types.update(get_all_classes_in_package(path, Goal))
@@ -46,7 +46,7 @@ class RosMsgToGoal(GetGoal):
         move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
             return Status.FAILURE
-        self.get_god_map().set_data(identifier.goals, {})
+        self.god_map.set_data(identifier.goals, {})
         try:
             self.parse_constraints(move_cmd)
         except AttributeError:
@@ -119,33 +119,30 @@ class RosMsgToGoal(GetGoal):
 
     def collision_entries_to_collision_matrix(self, collision_entries: List[CollisionEntry]):
         self.collision_scene.sync()
-        max_distances = self.make_max_distances()
+        collision_check_distances = self.create_collision_check_distances()
         # ignored_collisions = self.collision_scene.ignored_self_collion_pairs
         collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                    max_distances)
+                                                                                    collision_check_distances)
         return collision_matrix
 
-    def make_max_distances(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
-        default_distance = {}
-        # fixme this default is buggy, but it doesn't get triggered
+    def create_collision_check_distances(self) -> Dict[PrefixName, float]:
         for robot_name in self.robot_names:
             collision_avoidance_config = self.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance
             self_distances = collision_avoidance_config.self_collision_avoidance
-            default_distance[robot_name] = collision_avoidance_config.cal_max_param('soft_threshold')
 
-        max_distances = defaultdict(lambda: default_distance)
+        max_distances = {}
         # override max distances based on external distances dict
         for robot in self.collision_scene.robots:
             for link_name in robot.link_names_with_collisions:
                 try:
                     controlled_parent_joint = self.world.get_controlled_parent_joint_of_link(link_name)
-                    distance = external_distances[controlled_parent_joint].soft_threshold
-                    for child_link_name in self.world.get_directly_controlled_child_links_with_collisions(
-                            controlled_parent_joint):
-                        max_distances[child_link_name] = distance
-                except KeyError:
-                    pass
+                except KeyError as e:
+                    continue  # this happens when the root link of a robot has a collision model
+                distance = external_distances[controlled_parent_joint].soft_threshold
+                for child_link_name in self.world.get_directly_controlled_child_links_with_collisions(
+                        controlled_parent_joint):
+                    max_distances[child_link_name] = distance
 
         for link_name in self_distances:
             distance = self_distances[link_name].soft_threshold
@@ -198,7 +195,7 @@ class RosMsgToGoal(GetGoal):
             for link_a_o, link_b_o in self.world.groups[robot_name].possible_collision_combinations():
                 link_a_o, link_b_o = self.world.sort_links(link_a_o, link_b_o)
                 try:
-                    if (link_a_o, link_b_o) in self.collision_scene.black_list:
+                    if (link_a_o, link_b_o) in self.collision_scene.self_collision_matrix:
                         continue
                     link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
                     link_a, link_b = self.world.sort_links(link_a, link_b)

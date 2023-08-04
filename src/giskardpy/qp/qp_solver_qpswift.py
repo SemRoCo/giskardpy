@@ -5,7 +5,7 @@ from typing import Tuple, Iterable, List, Union, Optional, Dict
 
 import numpy as np
 
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver, record_solver_call_time, QPSWIFTFormatter
 import qpSWIFT

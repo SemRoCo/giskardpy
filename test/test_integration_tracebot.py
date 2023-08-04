@@ -1,13 +1,11 @@
 import giskardpy.utils.tfwrapper as tf
-import numpy as np
 import pytest
-import rospy
-from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
-from std_srvs.srv import Trigger
-from tf.transformations import quaternion_about_axis
+from geometry_msgs.msg import PoseStamped, PointStamped
 
-from giskardpy.configs.tiago import TiagoMujoco
-from giskardpy.configs.tracebot import TracebotMujoco, Tracebot_StandAlone
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.iai_robots.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, TracyCollisionAvoidanceConfig
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
@@ -54,8 +52,12 @@ class TracebotTestWrapper(GiskardTestWrapper):
 
     def __init__(self):
         tf.init()
-        # self.mujoco_reset = rospy.ServiceProxy('tracebot/reset', Trigger)
-        super().__init__(Tracebot_StandAlone)
+        giskard = Giskard(world_config=TracyWorldConfig(),
+                          collision_avoidance_config=TracyCollisionAvoidanceConfig(),
+                          robot_interface_config=TracyStandAloneRobotInterfaceConfig(),
+                          behavior_tree_config=StandAloneBTConfig(),
+                          qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
 
     def reset(self):
         # self.mujoco_reset()
@@ -99,6 +101,7 @@ class TestCartGoals:
         # goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
 
         zero_pose.set_cart_goal(goal, tip_link=tip, root_link='world')
+        # zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()

@@ -3,17 +3,18 @@ from typing import Optional
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose, Vector3Stamped, PointStamped
-from std_srvs.srv import Trigger
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix, rotation_from_matrix
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
+from tf.transformations import quaternion_about_axis, quaternion_matrix, rotation_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, CollisionEntry
-from giskardpy import identifier
-from giskardpy.configs.donbot import Donbot_Standalone
-from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskard_msgs.msg import MoveResult
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.goals.goal import WEIGHT_BELOW_CA
 from giskardpy.utils.utils import launch_launchfile
-from utils_for_tests import compare_poses, GiskardTestWrapper
+from utils_for_tests import GiskardTestWrapper
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
@@ -56,15 +57,18 @@ class DonbotTestWrapper(GiskardTestWrapper):
         'ur5_wrist_3_joint': np.pi / 2
     }
 
-    def __init__(self, config=None):
-        if config is None:
-            config = Donbot_Standalone
+    def __init__(self):
         # from iai_wsg_50_msgs.msg import PositionCmd
         self.camera_tip = 'camera_link'
         self.gripper_tip = 'gripper_tool_frame'
         # self.gripper_pub = rospy.Publisher('/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
         # self.mujoco_reset = rospy.ServiceProxy('donbot/reset', Trigger)
-        super().__init__(config)
+        giskard = Giskard(world_config=WorldWithBoxyBaseConfig(),
+                          collision_avoidance_config=DonbotCollisionAvoidanceConfig(),
+                          robot_interface_config=DonbotStandaloneInterfaceConfig(),
+                          behavior_tree_config=StandAloneBTConfig(),
+                          qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
 
     def open_gripper(self):
         self.set_gripper(0.109)

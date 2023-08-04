@@ -1,5 +1,5 @@
 from __future__ import division
-
+import hashlib
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
 import urdf_parser_py.urdf as up
@@ -10,23 +10,19 @@ import json
 import os
 import pkgutil
 import sys
-import traceback
 from collections import OrderedDict
 from contextlib import contextmanager
-from copy import deepcopy
-from functools import wraps
-from time import time
-from typing import Type, Optional, Dict
+from functools import cached_property
+from typing import Type, Optional, Dict, Any
 
 import numpy as np
 import roslaunch
 import rospkg
 import rospy
-import trimesh
 from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
-from py_trees import Status, Blackboard
+from py_trees import Blackboard
 from rospy_message_converter.message_converter import \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
@@ -34,11 +30,9 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
-from giskardpy.exceptions import DontPrintStackTrace
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
 
 
 @contextmanager
@@ -229,6 +223,31 @@ def cm_to_inch(cm):
     return cm * 0.393701
 
 
+def get_file_hash(file_path: str, algorithm: str = "sha256") -> Optional[str]:
+    try:
+        hash_func = hashlib.new(algorithm)
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(4096):
+                hash_func.update(chunk)
+        return hash_func.hexdigest()
+    except Exception as e:
+        print(f"Error occurred while hashing: {e}")
+        return None
+
+
+def clear_cached_properties(instance: Any):
+    """
+    Clears the cache of all cached_property attributes of an instance.
+
+    Args:
+        instance: The instance for which to clear all cached_property caches.
+    """
+    for attr in dir(instance):
+        if isinstance(getattr(type(instance), attr, None), cached_property):
+            if attr in instance.__dict__:
+                del instance.__dict__[attr]
+
+
 def resolve_ros_iris_in_urdf(input_urdf):
     """
     Replace all instances of ROS IRIs with a urdfs string with global paths in the file system.
@@ -310,23 +329,6 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
-def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
-    first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
-    resolved_old_path = resolve_ros_iris(file_name)
-    short_file_name = file_name.split('/')[-1][:-3]
-    decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
-    new_path = to_tmp_path(decomposed_obj_file_name)
-    if not os.path.exists(new_path):
-        mesh = trimesh.load(resolved_old_path, force='mesh')
-        obj_str = trimesh.exchange.obj.export_obj(mesh)
-        write_to_tmp(decomposed_obj_file_name, obj_str)
-        logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
-        # if not trimesh.convex.is_convex(mesh):
-        #     pybullet.vhacd(new_path, new_path, log_path)
-
-    return new_path
-
-
 def launch_launchfile(file_name: str):
     launch_file = resolve_ros_iris(file_name)
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
@@ -346,7 +348,7 @@ def raise_to_blackboard(exception):
 
 def has_blackboard_exception():
     return hasattr(Blackboard(), blackboard_exception_name) \
-           and getattr(Blackboard(), blackboard_exception_name) is not None
+        and getattr(Blackboard(), blackboard_exception_name) is not None
 
 
 def get_blackboard_exception():

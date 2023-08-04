@@ -1,8 +1,6 @@
 <launch>
 
-  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="PR2_IAI"/>
-  </node>
+  <node pkg="giskardpy" type="iai_pr2.py" name="giskard" output="screen"/>
 
   <node pkg="giskardpy" type="joystick_e_stop.py" name="giskard_e_stop" output="screen">
     <rosparam param="button_ids">

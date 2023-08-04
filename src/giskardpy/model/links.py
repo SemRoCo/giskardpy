@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -16,8 +16,8 @@ from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cyli
 from giskardpy.my_types import PrefixName
 from giskardpy.my_types import my_string
 from giskardpy.utils.tfwrapper import np_to_pose
-from giskardpy.utils.utils import resolve_ros_iris
-from giskardpy.utils.decorators import memoize
+from giskardpy.utils.utils import resolve_ros_iris, get_file_hash
+from giskardpy.utils.decorators import memoize, copy_memoize
 import giskardpy.casadi_wrapper as w
 
 
@@ -26,10 +26,13 @@ class LinkGeometry:
 
     def __init__(self, link_T_geometry: np.ndarray, color: ColorRGBA = None):
         if color is None:
-            self.color = ColorRGBA(20/255, 27.1/255, 80/255, 0.2)
+            self.color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         else:
             self.color = color
         self.link_T_geometry = w.TransMatrix(link_T_geometry)
+
+    def to_hash(self) -> str:
+        return ''
 
     @classmethod
     def from_urdf(cls, urdf_thing, color) -> LinkGeometry:
@@ -96,13 +99,9 @@ class LinkGeometry:
             raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
-    @profile
-    def as_visualization_marker(self) -> Marker:
+    def as_visualization_marker(self, *args, **kwargs) -> Marker:
         marker = Marker()
         marker.color = self.color
-
-        marker.pose = Pose()
-        marker.pose = np_to_pose(self.link_T_geometry.evaluate())
         return marker
 
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
@@ -112,18 +111,40 @@ class LinkGeometry:
 class MeshGeometry(LinkGeometry):
     def __init__(self, link_T_geometry: np.ndarray, file_name: str, color: ColorRGBA, scale=None):
         super().__init__(link_T_geometry, color)
-        self.file_name = file_name
+        self._file_name_ros_iris = file_name
+        self.set_collision_file_name(self.file_name_absolute)
         if not os.path.isfile(resolve_ros_iris(file_name)):
-            raise CorruptShapeException(f'Can\'t find file {self.file_name}')
+            raise CorruptShapeException(f'Can\'t find file {file_name}')
         if scale is None:
             self.scale = [1, 1, 1]
         else:
             self.scale = scale
 
-    def as_visualization_marker(self) -> Marker:
+    def set_collision_file_name(self, new_file_name: str):
+        self._collision_file_name = new_file_name
+
+    @property
+    def file_name_absolute(self) -> str:
+        return resolve_ros_iris(self._file_name_ros_iris)
+
+    @property
+    def file_name_ros_iris(self) -> str:
+        return self._file_name_ros_iris
+
+    @property
+    def collision_file_name_absolute(self) -> str:
+        return self._collision_file_name
+
+    def to_hash(self) -> str:
+        return get_file_hash(self.file_name_absolute)
+
+    def as_visualization_marker(self, use_decomposed_meshes, *args, **kwargs) -> Marker:
         marker = super().as_visualization_marker()
         marker.type = Marker.MESH_RESOURCE
-        marker.mesh_resource = self.file_name
+        if use_decomposed_meshes:
+            marker.mesh_resource = 'file://' + self.collision_file_name_absolute
+        else:
+            marker.mesh_resource = 'file://' + self.file_name_absolute
         marker.scale.x = self.scale[0]
         marker.scale.y = self.scale[1]
         marker.scale.z = self.scale[2]
@@ -131,9 +152,9 @@ class MeshGeometry(LinkGeometry):
         return marker
 
     def as_urdf(self):
-        return up.Mesh(self.file_name, self.scale)
+        return up.Mesh(self.file_name_ros_iris, self.scale)
 
-    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold:float = 0.00061) -> bool:
+    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return True
 
 
@@ -144,7 +165,10 @@ class BoxGeometry(LinkGeometry):
         self.width = width
         self.height = height
 
-    def as_visualization_marker(self):
+    def to_hash(self) -> str:
+        return f'box{self.depth}{self.width}{self.height}'
+
+    def as_visualization_marker(self, *args, **kwargs):
         marker = super().as_visualization_marker()
         marker.type = Marker.CUBE
         marker.scale.x = self.depth
@@ -166,7 +190,10 @@ class CylinderGeometry(LinkGeometry):
         self.height = height
         self.radius = radius
 
-    def as_visualization_marker(self):
+    def to_hash(self) -> str:
+        return f'cylinder{self.height}{self.radius}'
+
+    def as_visualization_marker(self, *args, **kwargs):
         marker = super().as_visualization_marker()
         marker.type = Marker.CYLINDER
         marker.scale.x = self.radius * 2
@@ -187,7 +214,10 @@ class SphereGeometry(LinkGeometry):
         super().__init__(link_T_geometry, color)
         self.radius = radius
 
-    def as_visualization_marker(self):
+    def to_hash(self) -> str:
+        return f'sphere{self.radius}'
+
+    def as_visualization_marker(self, *args, **kwargs):
         marker = super().as_visualization_marker()
         marker.type = Marker.SPHERE
         marker.scale.x = self.radius * 2
@@ -203,6 +233,11 @@ class SphereGeometry(LinkGeometry):
 
 
 class Link:
+    child_joint_names: List[PrefixName]
+    collisions: List[LinkGeometry]
+    name: PrefixName
+    visuals: List[LinkGeometry]
+    parent_joint_name: Optional[PrefixName]
     child_joint_names: List[PrefixName]
 
     def __init__(self, name: my_string):
@@ -256,15 +291,16 @@ class Link:
         return link
 
     def dye_collisions(self, color: ColorRGBA):
+        self.reset_cache()
         if self.has_collisions():
             for collision in self.collisions:
                 collision.color = color
 
     @memoize
-    def collision_visualization_markers(self):
+    def collision_visualization_markers(self, *args, **kwargs):
         markers = MarkerArray()
-        for collision in self.collisions:  # type: LinkGeometry
-            marker = collision.as_visualization_marker()
+        for collision in self.collisions:
+            marker = collision.as_visualization_marker(*args, **kwargs)
             markers.markers.append(marker)
         return markers
 
@@ -272,8 +308,6 @@ class Link:
         r = up.Robot(self.name)
         r.version = '1.0'
         link = up.Link(self.name)
-        # if self.visuals:
-        #     link.add_aggregate('visual', up.Visual(self.visuals[0].as_urdf()))
         link.add_aggregate('collision', up.Collision(self.collisions[0].as_urdf()))
         r.add_link(link)
         return r.to_xml_string()

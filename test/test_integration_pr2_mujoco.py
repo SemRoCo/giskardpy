@@ -1,13 +1,20 @@
 from copy import deepcopy
 from typing import Optional
 
+import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from std_srvs.srv import Trigger
+from tf.transformations import quaternion_about_axis
+
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, MoveGoal
-from giskardpy.configs.pr2 import PR2_Mujoco
+from giskardpy.configs.behavior_tree_config import OpenLoopBTConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2JointTrajServerMujocoInterface
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from utils_for_tests import JointGoalChecker
 
@@ -22,7 +29,12 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom_combined'
-        super().__init__(PR2_Mujoco)
+        giskard = Giskard(world_config=WorldWithOmniDriveRobot(),
+                          collision_avoidance_config=PR2CollisionAvoidance(),
+                          robot_interface_config=PR2JointTrajServerMujocoInterface(),
+                          behavior_tree_config=OpenLoopBTConfig(),
+                          qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
 
     def reset_base(self):
         p = PoseStamped()
@@ -75,27 +87,6 @@ class TestJointGoalsMujoco(TestJointGoals):
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
-        start_state = {
-            'torso_lift_joint': 0.3000254972469308,
-            'head_pan_joint': 0.04135718187588074,
-            'head_tilt_joint': -0.37,
-            'r_upper_arm_roll_joint': -0.8693958356996788,
-            'r_shoulder_pan_joint': -1.112011913457302,
-            'r_shoulder_lift_joint': 0.6165443541686221,
-            'r_forearm_roll_joint': -14.916890222524186,
-            'r_elbow_flex_joint': -1.6426864689071474,
-            'r_wrist_flex_joint': -0.6157655014694016,
-            'r_wrist_roll_joint': 0.07345662278755749,
-            'l_upper_arm_roll_joint': 1.7383062350263658,
-            'l_shoulder_pan_joint': 1.8799810286792007,
-            'l_shoulder_lift_joint': 0.011627231224188975,
-            'l_forearm_roll_joint': 281.2568789280418,
-            'l_elbow_flex_joint': -2.0300928925694675,
-            'l_wrist_flex_joint': -0.11,
-            'l_wrist_roll_joint': -6.062015047706401,
-        }
-        zero_pose.set_joint_goal(start_state)
-        zero_pose.plan_and_execute()
 
 
 class TestConstraints:
@@ -104,6 +95,17 @@ class TestConstraints:
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
+
+
+class TestCartGoals:
+    def test_forward_right_and_rotate(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.position.y = -1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        zero_pose.move_base(base_goal)
+
 
 class TestActionServerEvents:
     def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):

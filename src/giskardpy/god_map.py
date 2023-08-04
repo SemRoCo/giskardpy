@@ -3,7 +3,7 @@ import numbers
 from collections import defaultdict
 from copy import copy, deepcopy
 from multiprocessing import RLock
-from typing import Sequence, Union, Any
+from typing import Sequence, Union, Any, List
 
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
@@ -11,6 +11,7 @@ from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, V
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import KeyDefaultDict
+from giskardpy.utils import logging
 from giskardpy.utils.singleton import SingletonMeta
 
 
@@ -246,6 +247,13 @@ class GodMap(metaclass=SingletonMeta):
                 raise
         return r
 
+    def has_data(self, identifier):
+        try:
+            self.unsafe_get_data(identifier)
+            return True
+        except KeyError as e:
+            return False
+
     def clear_cache(self):
         self.shortcuts = {}
 
@@ -396,11 +404,25 @@ class GodMap(metaclass=SingletonMeta):
         with self.lock:
             return self.unsafe_get_values(symbols)
 
-    def unsafe_get_values(self, symbols) -> np.ndarray:
+    def unsafe_get_values(self, symbols: List[str]) -> np.ndarray:
         """
-        :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
+        :return: an array which maps all registered expressions to their values or 0 if there is no number entry
         """
-        return np.array([self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols], dtype=float)
+        try:
+            return np.array([self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols], dtype=float)
+        except ValueError as e:
+            data = []
+            for expr in symbols:
+                key = self.expr_to_key[expr]
+                value = self.unsafe_get_data(key)
+                data.append(value)
+                try:
+                    np.array(data, dtype=float)
+                except:
+                    logging.logerr(f'{key} has wrong dimensions: {value}')
+                    raise e
+            raise e
+
 
     def evaluate_expr(self, expr: w.Expression):
         if isinstance(expr, (int, float)):

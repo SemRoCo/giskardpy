@@ -23,9 +23,9 @@ class SetErrorCode(GiskardBehavior):
     def update(self):
         e = self.get_blackboard_exception()
 
-        cmd_id = self.get_god_map().get_data(identifier.cmd_id)
+        cmd_id = self.god_map.get_data(identifier.cmd_id)
 
-        result = self.get_god_map().get_data(identifier.result_message)
+        result = self.god_map.get_data(identifier.result_message)
         error_code, error_message = self.exception_to_error_code(e)
         result.error_codes[cmd_id] = error_code
         result.error_messages[cmd_id] = error_message
@@ -44,7 +44,7 @@ class SetErrorCode(GiskardBehavior):
                     logging.loginfo(f'{self.context} succeeded.')
                 else:
                     logging.logwarn(f'{self.context} failed: {error_message}.')
-        self.get_god_map().set_data(identifier.result_message, result)
+        self.god_map.set_data(identifier.result_message, result)
         return Status.SUCCESS
 
     def exception_to_error_code(self, exception):
@@ -95,7 +95,7 @@ class SetErrorCode(GiskardBehavior):
             elif isinstance(exception, SelfCollisionViolatedException):
                 error_code = MoveResult.SELF_COLLISION_VIOLATED
             elif isinstance(exception, UnreachableException):
-                if self.get_god_map().get_data(identifier.check_reachability):
+                if self.god_map.get_data(identifier.check_reachability):
                     error_code = MoveResult.UNREACHABLE
                 else:
                     error_code = MoveResult.ERROR

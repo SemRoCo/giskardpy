@@ -5,7 +5,7 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.configs.default_giskard import ControlModes
+from giskardpy.configs.giskard import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal, WEIGHT_ABOVE_CA
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
@@ -28,7 +28,7 @@ class SetSeedConfiguration(NonMotionGoal):
         if group_name is not None:
             seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
         if self.god_map.get_data(identifier.execute) \
-                and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
+                and self.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
             joint_name = self.world.search_for_joint_name(joint_name, group_name)
@@ -46,7 +46,7 @@ class SetOdometry(NonMotionGoal):
         super().__init__()
         self.group_name = group_name
         if self.god_map.get_data(identifier.execute) \
-                and self.god_map.get_data(identifier.control_mode) != ControlModes.stand_alone:
+                and self.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = self.world.groups[group_name].root_link.child_joint_names[0]
         brumbrum_joint = self.world.joints[brumbrum_joint_name]
@@ -274,9 +274,6 @@ class JointPositionRevolute(Goal):
                              self.world.get_joint_velocity_limits(self.joint_name)[1])
 
         error = joint_goal - current_joint
-        self.add_debug_expr('cur', current_joint)
-        self.add_debug_expr('-lim', self.world.get_joint_position_limits(self.joint_name)[0])
-        self.add_debug_expr('lim', self.world.get_joint_position_limits(self.joint_name)[1])
         if self.hard:
             self.add_equality_constraint(reference_velocity=max_velocity,
                                          equality_bound=error,

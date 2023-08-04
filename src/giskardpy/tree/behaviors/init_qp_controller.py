@@ -26,14 +26,14 @@ class InitQPController(GiskardBehavior):
             equality_constraints=list(eq_constraints.values()),
             inequality_constraints=list(neq_constraints.values()),
             derivative_constraints=list(derivative_constraints.values()),
-            sample_period=self.get_god_map().unsafe_get_data(identifier.sample_period),
-            prediction_horizon=self.get_god_map().unsafe_get_data(identifier.prediction_horizon),
+            sample_period=self.god_map.unsafe_get_data(identifier.sample_period),
+            prediction_horizon=self.god_map.unsafe_get_data(identifier.prediction_horizon),
             debug_expressions=debug_expressions,
-            solver_id=self.get_god_map().unsafe_get_data(identifier.qp_solver_name),
-            retries_with_relaxed_constraints=self.get_god_map().unsafe_get_data(
+            solver_id=self.god_map.unsafe_get_data(identifier.qp_solver_name),
+            retries_with_relaxed_constraints=self.god_map.unsafe_get_data(
                 identifier.retries_with_relaxed_constraints),
-            retry_added_slack=self.get_god_map().unsafe_get_data(identifier.retry_added_slack),
-            retry_weight_factor=self.get_god_map().unsafe_get_data(identifier.retry_weight_factor),
+            retry_added_slack=self.god_map.unsafe_get_data(identifier.retry_added_slack),
+            retry_weight_factor=self.god_map.unsafe_get_data(identifier.retry_weight_factor),
         )
         self.god_map.set_data(identifier.qp_controller, qp_controller)
 
@@ -56,10 +56,10 @@ class InitQPController(GiskardBehavior):
             derivative_constraints.update(new_derivative_constraints)
             debug_expressions.update(_debug_expressions)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
-        self.get_god_map().set_data(identifier.eq_constraints, eq_constraints)
-        self.get_god_map().set_data(identifier.neq_constraints, neq_constraints)
-        self.get_god_map().set_data(identifier.derivative_constraints, derivative_constraints)
-        self.get_god_map().set_data(identifier.debug_expressions, debug_expressions)
+        self.god_map.set_data(identifier.eq_constraints, eq_constraints)
+        self.god_map.set_data(identifier.neq_constraints, neq_constraints)
+        self.god_map.set_data(identifier.derivative_constraints, derivative_constraints)
+        self.god_map.set_data(identifier.debug_expressions, debug_expressions)
         return eq_constraints, neq_constraints, derivative_constraints, debug_expressions
 
     def get_active_free_symbols(self,
@@ -73,5 +73,5 @@ class InitQPController(GiskardBehavior):
                                      key=lambda x: x.position_name))
         if len(free_variables) == 0:
             raise EmptyProblemException('Goal parsing resulted in no free variables.')
-        self.get_god_map().set_data(identifier.free_variables, free_variables)
+        self.god_map.set_data(identifier.free_variables, free_variables)
         return free_variables

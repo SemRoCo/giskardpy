@@ -15,18 +15,15 @@ class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super().__init__(name)
         self.lock = Lock()
-        self.object_js_subs = {}  # JointState subscribers for articulated world objects
-        self.object_joint_states = {}  # JointStates messages for articulated world objects
 
     def add_added_checks(self, collision_matrix):
         try:
-            added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
+            added_checks = self.god_map.get_data(identifier.added_collision_checks)
             self.god_map.set_data(identifier.added_collision_checks, {})
         except KeyError:
             # no collision checks added
             added_checks = {}
-        for (link1, link2), distance in added_checks.items():
-            key = self.world.sort_links(link1, link2)
+        for key, distance in added_checks.items():
             if key in collision_matrix:
                 collision_matrix[key] = max(distance, collision_matrix[key])
             else:
@@ -39,7 +36,7 @@ class CollisionChecker(GiskardBehavior):
         try:
             self.collision_matrix = self.god_map.get_data(identifier.collision_matrix)
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
-            self.collision_list_size = sum([config.cal_max_param('number_of_repeller')
+            self.collision_list_size = sum([config.max_num_of_repeller()
                                             for config in self.collision_avoidance_configs.values()])
             self.collision_scene.sync()
             super().initialise()
@@ -49,14 +46,9 @@ class CollisionChecker(GiskardBehavior):
     def are_self_collisions_violated(self, collsions: Collisions):
         for key, self_collisions in collsions.self_collisions.items():
             for self_collision in self_collisions[:-1]: # the last collision is always some default crap
-                # link_a = self_collision.original_link_a
-                # link_b = self_collision.original_link_b
                 if self_collision.link_b_hash == 0:
                     continue # Fixme figure out why there are sometimes two default collision entries
                 distance = self_collision.contact_distance
-                # threshold_a = self.collision_avoidance_config._self_collision_avoidance[link_a].hard_threshold
-                # threshold_b = self.collision_avoidance_config._self_collision_avoidance[link_b].hard_threshold
-                # threshold = min(threshold_a, threshold_b)
                 if distance < 0.0:
                     raise SelfCollisionViolatedException(f'{self_collision.original_link_a} and '
                                                          f'{self_collision.original_link_b} violate distance threshold:'

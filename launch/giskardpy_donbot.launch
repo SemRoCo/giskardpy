@@ -1,8 +1,5 @@
 <launch>
-
-    <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="Donbot"/>
-  </node>
+    <node pkg="giskardpy" type="donbot.py" name="giskard" output="screen"/>
 
     <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
         <rosparam param="enable_self_collision">False</rosparam>

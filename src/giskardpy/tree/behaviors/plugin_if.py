@@ -12,7 +12,7 @@ class IF(GiskardBehavior):
 
     @profile
     def update(self):
-        if self.get_god_map().get_data(self.identifier):
+        if self.god_map.get_data(self.identifier):
             return Status.SUCCESS
         return Status.FAILURE
 

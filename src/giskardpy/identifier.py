@@ -1,5 +1,8 @@
 hack = ['hack']
+giskard = ['giskard']
 world = ['world']
+ros_visualizer = ['ros_visualizer']
+collision_scene = ['collision_scene']
 robot_group_name = ['robot_name']
 fk_pose = world + ['compute_fk_pose']
 fk_np = world + ['compute_fk_np']
@@ -32,98 +35,42 @@ next_move_goal = ['next_move_goal']
 number_of_move_cmds = ['number_of_move_cmds']
 cmd_id = ['cmd_id']
 
-post_processing = ['post_processing']
-soft_constraints = post_processing + ['soft_constraints']
 result_message = ['result_message']
 tracking_start_time = ['tracking_start_time']
+time_delay = ['time_delay']
+dt = ['dt']
 
-# stuff from rosparam
-robot_descriptions = ['robot_descriptions']
+# config
+tmp_folder = giskard + ['path_to_data_folder']
+qp_controller_config = giskard + ['qp_controller_config']
+collision_avoidance_config = giskard + ['collision_avoidance_config']
+world_config = giskard + ['world_config']
+max_derivative = qp_controller_config + ['max_derivative']
+goal_package_paths = giskard + ['goal_package_paths']
+max_trajectory_length = qp_controller_config + ['max_trajectory_length']
+endless_mode = qp_controller_config + ['endless_mode']
+action_server_name = giskard + ['action_server_name']
 
-giskard = ['giskard']
-
-# config file
-# general options
-general_options = giskard + ['_general_config']
-max_derivative = general_options + ['maximum_derivative']
-action_server_name = general_options + ['action_server_name']
-tmp_folder = general_options + ['path_to_data_folder']
-debug_expr_needed = ['debug_expr_needed']
-test_mode = general_options + ['test_mode']
-control_mode = general_options + ['control_mode']
-
-joint_limits = general_options + ['joint_limits']
-
-
-# qp solver
-qp_solver_config = giskard + ['_qp_solver_config']
-sample_period = qp_solver_config + ['sample_period']
+sample_period = qp_controller_config + ['sample_period']
 qp_controller = giskard + ['qp_controller']
 debug_expressions_evaluated = qp_controller + ['evaluated_debug_expressions']
-joint_weights = qp_solver_config + ['joint_weights']
-qp_solver_name = qp_solver_config + ['qp_solver']
-prediction_horizon = qp_solver_config + ['prediction_horizon']
-retries_with_relaxed_constraints = qp_solver_config + ['retries_with_relaxed_constraints']
-retry_added_slack = qp_solver_config + ['added_slack']
-retry_weight_factor = qp_solver_config + ['weight_factor']
-
-# tree
-plugins = giskard + ['behavior_tree_config', 'plugin_config']
-enable_VisualizationBehavior = plugins + ['VisualizationBehavior', 'enabled']
-VisualizationBehavior_in_planning_loop = plugins + ['VisualizationBehavior', 'in_planning_loop']
-enable_WorldVisualizationBehavior = plugins + ['WorldVisualizationBehavior', 'enabled']
-enable_CPIMarker = plugins + ['CollisionMarker', 'enabled']
-CPIMarker_in_planning_loop = plugins + ['CollisionMarker', 'in_planning_loop']
-
-PlotTrajectory = plugins + ['PlotTrajectory']
-PlotTrajectory_enabled = PlotTrajectory + ['enabled']
-
-PlotDebugTrajectory = plugins + ['PlotDebugExpressions']
-PlotDebugTrajectory_enabled = PlotDebugTrajectory + ['enabled']
-
-PlotDebugTF = plugins + ['PlotDebugTF']
-PlotDebugTF_enabled = PlotDebugTF + ['enabled']
-
-MaxTrajectoryLength = plugins + ['MaxTrajectoryLength']
-MaxTrajectoryLength_enabled = MaxTrajectoryLength + ['enabled']
-
-fft_duration = plugins + ['WiggleCancel', 'fft_duration']
-amplitude_threshold = plugins + ['WiggleCancel', 'amplitude_threshold']
-num_samples_in_fft = plugins + ['WiggleCancel', 'window_size']
-frequency_range = plugins + ['WiggleCancel', 'frequency_range']
-
-LoopDetector_precision = plugins + [u'LoopDetector', u'precision']
-
-joint_convergence_threshold = plugins + ['GoalReached', 'joint_convergence_threshold']
-GoalReached_window_size = plugins + ['GoalReached', 'window_size']
-
-TFPublisher = plugins + ['TFPublisher']
-TFPublisher_enabled = TFPublisher + ['enabled']
-
-SyncOdometry = plugins + ['SyncOdometry']
-
-SyncTfFrames = plugins + ['SyncTfFrames']
-frames_to_add = ['frames_to_add']
-joints_to_add = ['joints_to_add']
-
-PublishDebugExpressions = plugins + ['PublishDebugExpressions']
+qp_solver_name = qp_controller_config + ['qp_solver']
+prediction_horizon = qp_controller_config + ['prediction_horizon']
+retries_with_relaxed_constraints = qp_controller_config + ['retries_with_relaxed_constraints']
+retry_added_slack = qp_controller_config + ['added_slack']
+retry_weight_factor = qp_controller_config + ['weight_factor']
 
 # behavior tree
-tree_manager = giskard + ['_tree']
-tree_tick_rate = giskard + ['behavior_tree_config', 'tree_tick_rate']
+tree_manager = ['behavior_tree']
+control_mode = tree_manager + ['control_mode']
 
 # collision avoidance
-collision_avoidance_configs = giskard + ['_collision_avoidance_configs']
-collision_scene = ['collision_scene']
+collision_avoidance_configs = collision_scene + ['collision_avoidance_configs']
 collision_matrix = ['collision_matrix']
 closest_point = ['cpi']
 added_collision_checks = ['added_collision_checks']
 
-collision_checker = giskard + ['collision_checker']
-
-# robot interface
-robot_interface_configs = giskard + ['robot_interface_configs']
-hardware_config = giskard + ['hardware_config']
+collision_checker = collision_scene + ['collision_checker_id']
 
 # rnd stuff
 timer_collector = ['timer_collector']

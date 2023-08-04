@@ -37,7 +37,7 @@ from giskardpy.tree.behaviors.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
 from giskardpy.tree.behaviors.goal_done import GoalDone
-from giskardpy.tree.behaviors.goal_reached import GoalReached
+from giskardpy.tree.behaviors.goal_reached import LocalMinimum
 from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
@@ -727,7 +727,7 @@ class StandAlone(TreeManager):
         planning_4.add_child(LogTrajPlugin('log closed loop control'))
         # planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
-        planning_4.add_child(GoalReached('goal reached'))
+        planning_4.add_child(LocalMinimum('local minimum'))
         planning_4.add_child(TimePlugin('increase time closed loop'))
         planning_4.add_child(MaxTrajectoryLength('traj length check'))
         return planning_4
@@ -1053,7 +1053,7 @@ class ClosedLoop(OpenLoop):
         planning_4.add_child(RosTime())
         planning_4.add_child(RealKinSimPlugin('kin sim'))
         # planning_4.add_child(LoopDetector('loop detector'))
-        planning_4.add_child(GoalReached('goal reached', real_time=True))
+        planning_4.add_child(LocalMinimum('local minimum', real_time=True))
         planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
         planning_4.add_child(GoalDone('goal done check'))
         return planning_4

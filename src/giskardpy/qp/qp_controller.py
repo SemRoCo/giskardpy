@@ -423,10 +423,7 @@ class EqualityBounds(ProblemDataPart):
         self.evaluated = True
 
     def equality_constraint_bounds(self) -> Dict[str, cas.Expression]:
-        return {f'{c.name}': cas.limit(c.bound,
-                                       -c.velocity_limit * self.dt * c.control_horizon,
-                                       c.velocity_limit * self.dt * c.control_horizon)
-                for c in self.equality_constraints}
+        return {f'{c.name}': c.capped_bound(self.dt) for c in self.equality_constraints}
 
     def last_derivative_values(self, derivative: Derivatives) -> Dict[str, cas.symbol_expr_float]:
         last_values = {}
@@ -457,6 +454,24 @@ class EqualityBounds(ProblemDataPart):
         self.names_derivative_links = self.names[:num_derivative_links]
         self.names_equality_constraints = self.names[num_derivative_links:]
         return cas.Expression(bounds)
+
+
+class GoalReached(ProblemDataPart):
+
+    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        self.names = []
+        checks = []
+        for c in self.equality_constraints:
+            self.names.append(c.name)
+            checks.append(c.goal_reached())
+        return cas.Expression(checks)
+
+    def to_panda(self, substitutions: np.ndarray) -> pd.DataFrame:
+        data = self.goal_reached_f.fast_call(substitutions)
+        return pd.DataFrame({'data': data}, index=self.names)
+
+    def compile(self, free_symbols: List[cas.ca.SX]):
+        self.goal_reached_f = self.construct_expression().compile(free_symbols)
 
 
 class InequalityBounds(ProblemDataPart):
@@ -1077,6 +1092,7 @@ class QPProblemBuilder(GodMapWorshipper):
         self.free_variable_bounds = FreeVariableBounds(**kwargs)
         self.equality_model = EqualityModel(**kwargs)
         self.equality_bounds = EqualityBounds(**kwargs)
+        self.goal_reached_checks = GoalReached(**kwargs)
         self.inequality_model = InequalityModel(**kwargs)
         self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
 
@@ -1090,6 +1106,7 @@ class QPProblemBuilder(GodMapWorshipper):
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,
                                  A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+        self.goal_reached_checks.compile(qp_solver.free_symbols)
         logging.loginfo('Done compiling controller:')
         logging.loginfo(f'  #free variables: {weights.shape[0]}')
         logging.loginfo(f'  #equality constraints: {bE.shape[0]}')
@@ -1153,14 +1170,15 @@ class QPProblemBuilder(GodMapWorshipper):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: np.ndarray) -> NextCommands:
+    def get_cmd(self, substitutions: np.ndarray) -> Tuple[NextCommands, pd.DataFrame]:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         """
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas(self.qp_solver)
-            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
+            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon), \
+                self.goal_reached_checks.to_panda(substitutions)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

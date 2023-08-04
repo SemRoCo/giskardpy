@@ -11,7 +11,7 @@ from giskardpy.utils.decorators import record_time
 
 # fast
 
-class GoalReached(GiskardBehavior):
+class LocalMinimum(GiskardBehavior):
     @profile
     def __init__(self, name, window_size: int = 21, joint_convergence_threshold: float = 0.01, real_time: bool = False):
         super().__init__(name)

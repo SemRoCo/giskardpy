@@ -41,6 +41,7 @@ def record_solver_call_time(function):
 
 class QPSolver(ABC):
     free_symbols_str: List[str]
+    free_symbols: List[cas.ca.SX]
     solver_id: SupportedQPSolver
     qp_setup_function: cas.CompiledFunction
     # num_non_slack = num_non_slack
@@ -264,19 +265,19 @@ class QPSWIFTFormatter(QPSolver):
         free_symbols.update(bE.free_symbols())
         free_symbols.update(nA_A.free_symbols())
         free_symbols.update(nlbA_ubA.free_symbols())
-        free_symbols = list(free_symbols)
+        self.free_symbols = list(free_symbols)
 
-        self.E_f = combined_E.compile(parameters=free_symbols, sparse=self.sparse)
-        self.nA_A_f = nA_A.compile(parameters=free_symbols, sparse=self.sparse)
+        self.E_f = combined_E.compile(parameters=self.free_symbols, sparse=self.sparse)
+        self.nA_A_f = nA_A.compile(parameters=self.free_symbols, sparse=self.sparse)
         self.combined_vector_f = cas.StackedCompiledFunction([weights,
                                                               g,
                                                               nlb_without_inf,
                                                               ub_without_inf,
                                                               bE,
                                                               nlbA_ubA],
-                                                             parameters=free_symbols)
+                                                             parameters=self.free_symbols)
 
-        self.free_symbols_str = [str(x) for x in free_symbols]
+        self.free_symbols_str = [str(x) for x in self.free_symbols]
 
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}

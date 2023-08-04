@@ -8,7 +8,7 @@ from giskardpy.configs.behavior_tree_config import ControlModes
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string
+from giskardpy.my_types import my_string, PrefixName
 from giskardpy.tree.garden import TreeManager
 
 
@@ -27,6 +27,13 @@ class RobotInterfaceConfig(ABC):
     @property
     def world(self) -> WorldTree:
         return self.god_map.get_data(identifier.world)
+
+    @property
+    def robot_group_name(self) -> str:
+        return self.world.robot_name
+
+    def get_root_link_of_group(self, group_name: str) -> PrefixName:
+        return self.world.groups[group_name].root_link_name
 
     @property
     def tree_manager(self) -> TreeManager:

@@ -68,7 +68,21 @@ class DonbotStandaloneInterfaceConfig(StandAloneRobotInterfaceConfig):
 
 
 class DonbotJointTrajInterfaceConfig(RobotInterfaceConfig):
+    map_name: str
+    localization_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization'):
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+
     def setup(self):
+        root_link_name = self.get_root_link_of_group(self.robot_group_name)
+        self.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                           tf_parent_frame=self.map_name,
+                                           tf_child_frame=root_link_name.short_name)
+        self.sync_joint_state_topic('/joint_states')
         self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
                                                 state_topic='/whole_body_controller/base/state',
                                                 fill_velocity_values=True)

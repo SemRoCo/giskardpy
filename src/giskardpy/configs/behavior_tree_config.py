@@ -120,6 +120,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=True)
         self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
+        # self.add_trajectory_plotter()
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):

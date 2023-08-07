@@ -160,10 +160,29 @@ class MeshGeometry(LinkGeometry):
 
 class BoxGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, depth, width, height, color):
+        """
+        :param link_T_geometry:
+        :param depth: x size
+        :param width: y size
+        :param height: z size
+        :param color:
+        """
         super().__init__(link_T_geometry, color)
         self.depth = depth
         self.width = width
         self.height = height
+
+    @property
+    def x_size(self) -> float:
+        return self.depth
+
+    @property
+    def y_size(self) -> float:
+        return self.width
+
+    @property
+    def z_size(self) -> float:
+        return self.height
 
     def to_hash(self) -> str:
         return f'box{self.depth}{self.width}{self.height}'

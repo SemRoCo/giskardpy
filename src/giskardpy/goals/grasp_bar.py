@@ -148,39 +148,17 @@ class GraspBox(Goal):
         self.root_link = self.world.search_for_link_name(root_link)
         self.shape: BoxGeometry = self.object.root_link.collisions[0]
         cube_pose = self.world.compute_fk_np(self.world.root_link_name, self.object_root_link)
-        reference = compute_grasp_pose(cube_pose,
+        map_R_goal = compute_grasp_pose(cube_pose,
                                        self.world.compute_fk_np(self.world.root_link_name, self.tip_link),
                                        [self.shape.x_size, self.shape.y_size, self.shape.z_size])
-        object_P_tip: Point = self.world.compute_fk_pose(self.object_root_link, self.tip_link).pose.position
-        if object_P_tip.x > 0:
-            self.closed_x = np.array([-1, 0, 0, 0])
-        else:
-            self.closed_x = np.array([1, 0, 0, 0])
-        if object_P_tip.y > 0:
-            self.closed_y = np.array([0, -1, 0, 0])
-        else:
-            self.closed_y = np.array([0, 1, 0, 0])
-        if self.shape.x_size > self.shape.y_size:
-            box_V_grasp_axis = self.closed_x
-        else:
-            box_V_grasp_axis = self.closed_y
-        map_V_gripper_up = Vector3Stamped()
-        map_V_gripper_up.header.frame_id = self.world.root_link_name
-        map_V_gripper_up.vector.z = 1
-        box_V_gripper_up = self.transform_msg(self.object_root_link, map_V_gripper_up)
-        box_V_gripper_up = vector_to_np(box_V_gripper_up.vector)
-        y = np.cross(box_V_grasp_axis[:3], box_V_gripper_up[:3])
-        y = np.append(y, 0)
-        box_T_tip = np.vstack([box_V_gripper_up, y, box_V_grasp_axis, [0, 0, 0, 1]]).T
         grasp_goal = PoseStamped()
         grasp_goal.header.frame_id = self.world.root_link_name
-        grasp_goal.pose = np_to_pose(reference)
+        grasp_goal.pose = np_to_pose(map_R_goal)
         grasp_goal.pose.position = self.world.compute_fk_pose(self.world.root_link_name,
                                                               self.object_root_link).pose.position
         self.add_constraints_of_goal(CartesianPose(root_link=root_link,
                                                    tip_link=tip_link,
                                                    goal_pose=grasp_goal))
-        pass
 
     def clean_up(self):
         pass

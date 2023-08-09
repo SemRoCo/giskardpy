@@ -426,6 +426,42 @@ class TestConstraints:
         base_goal.pose.orientation.w = 1
         box_setup.move_base(base_goal)
 
+    def test_graspbox6(self, box_setup: HSRTestWrapper):
+        box_name = 'asdf'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'map'
+        box_pose.pose.position = Point(0.8, 0.3, .7)
+        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/8, [0, 1, 0]))
+
+        box_setup.add_box(box_name, (0.04, 0.07, 0.15), box_pose)
+        box_setup.open_gripper()
+
+        grasp_pose = deepcopy(box_pose)
+        # grasp_pose.pose.position.x -= 0.05
+        grasp_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                          [0, -1, 0, 0],
+                                                                          [1, 0, 0, 0],
+                                                                          [0, 0, 0, 1]]))
+
+        approach_direction = PointStamped()
+        approach_direction.header.frame_id = 'base_footprint'
+        approach_direction.point.x = 1
+        approach_direction.point.y = 1
+        box_setup.set_json_goal('GraspBox',
+                                UUID=box_name,
+                                tip_link=box_setup.tip,
+                                root_link=box_setup.default_root,
+                                approach_direction=approach_direction)
+        box_setup.allow_all_collisions()
+        box_setup.plan_and_execute()
+        box_setup.update_parent_link_of_group(box_name, box_setup.tip)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = box_setup.default_root
+        base_goal.pose.position.x -= 0.5
+        base_goal.pose.orientation.w = 1
+        box_setup.move_base(base_goal)
+
     def test_open_fridge(self, kitchen_setup: HSRTestWrapper):
         handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'

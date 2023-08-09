@@ -10,7 +10,7 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 from giskardpy.model.links import BoxGeometry
-from giskardpy.utils.tfwrapper import np_to_pose, vector_to_np
+from giskardpy.utils.tfwrapper import np_to_pose, vector_to_np, point_to_np
 
 
 class GraspBar(Goal):
@@ -92,7 +92,7 @@ class GraspBar(Goal):
                                         weight=self.weight)
 
 
-def compute_grasp_pose(map_T_cube, map_T_gripper, cube_dimensions) -> np.ndarray:
+def compute_grasp_pose(map_T_cube, map_P_gripper, cube_dimensions) -> np.ndarray:
     """
     :param map_T_cube: 4x4 transformation matrix
     :param map_T_gripper: 4x4 transformation matrix
@@ -101,23 +101,26 @@ def compute_grasp_pose(map_T_cube, map_T_gripper, cube_dimensions) -> np.ndarray
     """
     # Extract the rotation matrix part of the transformations
     map_R_cube = map_T_cube[:3, :3]
-    cube_R_gripper = map_T_gripper[:3, :3]
-    cube_V_gripper = map_T_cube[:3, 3] - map_T_gripper[:3, 3]
+    cube_V_gripper = map_T_cube[:3, 3] - map_P_gripper[:3]
+    # cube_V_gripper[2] = map_R_cube[2]
     # cube_T_gripper_pos = map_T_gripper[:3, 3]
 
     # step 1: collect 6 axis corresponding to x, y, z of map_T_cube and their negatives
-    axis_pool = [map_R_cube[:, i] for i in range(3)] + [-map_R_cube[:, i] for i in range(3)]
+    axis_pool = []
+    for i in range(3):
+        axis_pool.append((map_R_cube[:, i], cube_dimensions[i]))
+        axis_pool.append((-map_R_cube[:, i], cube_dimensions[i]))
+    # axis_pool = [map_R_cube[:, i] for i in range(3)] + [-map_R_cube[:, i] for i in range(3)]
 
     # step 2: from that pool, find the axis with the highest z value. Choose this as the x axis of cube_T_goal
-    x_axis = max(axis_pool, key=lambda v: v[2])
+    x_axis = max(axis_pool, key=lambda v: v[0][2])[0]
 
     # step 3: remove this and its opposite axis from the pool.
-    axis_pool = [v for v in axis_pool if not np.allclose(v, x_axis) and not np.allclose(v, -x_axis)]
+    axis_pool = [v for v in axis_pool if not np.allclose(v[0], x_axis) and not np.allclose(v[0], -x_axis)]
 
     # step 4: look at the remaining axis and their corresponding cube dimensions.
     # Select the two which correspond to the largest cube dimension
-    remaining_axes = sorted([(v, cube_dimensions[i]) for i, v in enumerate(axis_pool[:3])],
-                            key=lambda x: x[1], reverse=True)[:2]
+    remaining_axes = sorted(axis_pool, key=lambda x: -x[1])[:2]
 
     # step 5: out of the remaining 2, select the one that points most away from the gripper, using cube_T_gripper,
     # and choose it as z axis for cube_T_goal
@@ -139,8 +142,13 @@ class GraspBox(Goal):
     def __init__(self,
                  UUID: str,
                  tip_link: str,
-                 root_link: str):
+                 root_link: str,
+                 approach_direction: Optional[PointStamped] = None,
+                 translation_velocity_limit: float = 0.2,
+                 rotation_velocity_limit: float = 0.5,
+                 weight: float = WEIGHT_ABOVE_CA):
         super().__init__()
+        self.weight = weight
         self.uuid = UUID
         self.object = self.world.groups[self.uuid]
         self.object_root_link = self.object.root_link_name
@@ -148,8 +156,12 @@ class GraspBox(Goal):
         self.root_link = self.world.search_for_link_name(root_link)
         self.shape: BoxGeometry = self.object.root_link.collisions[0]
         cube_pose = self.world.compute_fk_np(self.world.root_link_name, self.object_root_link)
+        if approach_direction is None:
+            approach_direction = self.world.compute_fk_np(self.world.root_link_name, self.tip_link)[:, 3]
+        else:
+            approach_direction = point_to_np(self.transform_msg(self.world.root_link_name, approach_direction).point)
         map_R_goal = compute_grasp_pose(cube_pose,
-                                        self.world.compute_fk_np(self.world.root_link_name, self.tip_link),
+                                        approach_direction,
                                         [self.shape.x_size, self.shape.y_size, self.shape.z_size])
         grasp_goal = PoseStamped()
         grasp_goal.header.frame_id = self.world.root_link_name
@@ -157,9 +169,8 @@ class GraspBox(Goal):
         grasp_goal.pose.position = self.world.compute_fk_pose(self.world.root_link_name,
                                                               self.object_root_link).pose.position
         self.grasp_goal = grasp_goal
-        self.weight = WEIGHT_ABOVE_CA
-        self.trans_vel = 0.2
-        self.rot_vel = 0.5
+        self.trans_vel = translation_velocity_limit
+        self.rot_vel = rotation_velocity_limit
 
     def clean_up(self):
         pass

@@ -7,7 +7,7 @@
         <rosparam param="interactive_marker_chains">
           - [odom, base_footprint]
           - [odom, head_rgbd_sensor_link]
-          - [odom, hand_palm_link]
+          - [odom, hand_gripper_tool_frame]
         </rosparam>
     </node>
 

@@ -149,23 +149,57 @@ class GraspBox(Goal):
         self.shape: BoxGeometry = self.object.root_link.collisions[0]
         cube_pose = self.world.compute_fk_np(self.world.root_link_name, self.object_root_link)
         map_R_goal = compute_grasp_pose(cube_pose,
-                                       self.world.compute_fk_np(self.world.root_link_name, self.tip_link),
-                                       [self.shape.x_size, self.shape.y_size, self.shape.z_size])
+                                        self.world.compute_fk_np(self.world.root_link_name, self.tip_link),
+                                        [self.shape.x_size, self.shape.y_size, self.shape.z_size])
         grasp_goal = PoseStamped()
         grasp_goal.header.frame_id = self.world.root_link_name
         grasp_goal.pose = np_to_pose(map_R_goal)
         grasp_goal.pose.position = self.world.compute_fk_pose(self.world.root_link_name,
                                                               self.object_root_link).pose.position
-        self.add_constraints_of_goal(CartesianPose(root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   goal_pose=grasp_goal))
+        self.grasp_goal = grasp_goal
+        self.weight = WEIGHT_ABOVE_CA
+        self.trans_vel = 0.2
+        self.rot_vel = 0.5
 
     def clean_up(self):
         pass
-        # self.world.move_group(group_name=self.uuid, new_parent_link_name=self.tip_link)
 
     def make_constraints(self):
-        pass
+        map_T_grasp_goal = w.TransMatrix(self.grasp_goal)
+        r_P_g = map_T_grasp_goal.to_position()
+        r_R_g = map_T_grasp_goal.to_rotation()
+        r_P_c = self.get_fk(self.root_link, self.tip_link).to_position()
+        r_R_c = self.get_fk(self.root_link, self.tip_link).to_rotation()
+        c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link).to_rotation()
+
+        map_V_pre_grasp_direction = r_R_g[:, 2]
+        map_P_pre_grasp_goal = r_P_g - map_V_pre_grasp_direction * 0.2
+        distance_error = w.norm(map_P_pre_grasp_goal - r_P_c)
+        # self.add_debug_expr('distance_error', distance_error)
+        distance_to_line, root_P_on_line = w.distance_point_to_line_segment(r_P_c,
+                                                                            r_P_g,
+                                                                            map_P_pre_grasp_goal)
+        weight_pregrasp = w.if_less(distance_to_line, 0.01, 0, self.weight)
+        weight_grasp = w.if_eq(weight_pregrasp, 0, self.weight, 0)
+        self.add_point_goal_constraints(frame_P_current=r_P_c,
+                                        frame_P_goal=root_P_on_line,
+                                        reference_velocity=0.1,
+                                        weight=weight_pregrasp,
+                                        name='pregrasp')
+
+        self.add_point_goal_constraints(frame_P_goal=r_P_g,
+                                        frame_P_current=r_P_c,
+                                        reference_velocity=self.trans_vel,
+                                        weight=weight_grasp,
+                                        name='grasp position')
+
+        # self.add_debug_expr('trans', w.norm(r_P_c))
+        self.add_rotation_goal_constraints(frame_R_current=r_R_c,
+                                           frame_R_goal=r_R_g,
+                                           current_R_frame_eval=c_R_r_eval,
+                                           reference_velocity=self.rot_vel,
+                                           weight=self.weight,
+                                           name='grasp orientation')
 
     def __str__(self) -> str:
         s = super().__str__()

@@ -102,15 +102,12 @@ def compute_grasp_pose(map_T_cube, map_P_gripper, cube_dimensions) -> np.ndarray
     # Extract the rotation matrix part of the transformations
     map_R_cube = map_T_cube[:3, :3]
     cube_V_gripper = map_T_cube[:3, 3] - map_P_gripper[:3]
-    # cube_V_gripper[2] = map_R_cube[2]
-    # cube_T_gripper_pos = map_T_gripper[:3, 3]
 
     # step 1: collect 6 axis corresponding to x, y, z of map_T_cube and their negatives
     axis_pool = []
     for i in range(3):
         axis_pool.append((map_R_cube[:, i], cube_dimensions[i]))
         axis_pool.append((-map_R_cube[:, i], cube_dimensions[i]))
-    # axis_pool = [map_R_cube[:, i] for i in range(3)] + [-map_R_cube[:, i] for i in range(3)]
 
     # step 2: from that pool, find the axis with the highest z value. Choose this as the x axis of cube_T_goal
     x_axis = max(axis_pool, key=lambda v: v[0][2])[0]
